@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 flatbuffers = { workspace = true }
 bytes = { workspace = true }

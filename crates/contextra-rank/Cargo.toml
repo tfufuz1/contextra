@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 contextra-types.workspace = true
 contextra-ports.workspace = true

@@ -1,9 +1,9 @@
-//! Text index, text embedding engine, and segment synthesizer traits.
+//! Text index and segment synthesizer traits.
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
-// ZWECK: TextIndex, TextEmbeddingEngine & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
-// INVARIANTEN: AFIT for TextIndex, BoxFuture for TextEmbeddingEngine.
+// ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
+// INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
 
 use super::BoxFuture;
 use crate::types::{DocId, ScoredDocument, TxId};
@@ -11,23 +11,7 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
-/// Text embedding engine trait.
-pub trait TextEmbeddingEngine: Send + Sync + 'static {
-    /// Generates an embedding for the given text.
-    fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>>;
-
-    /// Generates embeddings for multiple texts.
-    /// Default implementation executes sequential calls.
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Vec<f32>>>> {
-        Box::pin(async move {
-            let mut results = Vec::with_capacity(texts.len());
-            for text in texts {
-                results.push(self.embed(text).await?);
-            }
-            Ok(results)
-        })
-    }
-}
+pub use crate::embedding::TextEmbeddingEngine;
 
 /// Trait-Abstraktion für LLM-Synthesizer zur Segment-Zusammenfassung (REM-Phase).
 pub trait SegmentSynthesizer: Send + Sync {

@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Native Candle GGUF ML inference backend for Contextra"
 
+[package.metadata.contextra]
+ring = "2"
+
 [dependencies]
 candle-core = "0.11"
 candle-nn = "0.11"

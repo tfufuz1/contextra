@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra"
 
+[package.metadata.contextra]
+ring = "tooling"
+
 [dependencies]
 contextra-ports = { workspace = true }
 contextra-types = { workspace = true }

@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3)"
 
+[package.metadata.contextra]
+ring = "3"
+
 [dependencies]
 # Y.6.2, Clock-Injektion für P28-konforme Hash-Trace-Erzeugung
 contextra-ports = { workspace = true }

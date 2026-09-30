@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)"
 
+[package.metadata.contextra]
+ring = "0"
+
 [features]
 default = []
 docid-128 = ["contextra-types/docid-128", "contextra-store/docid-128"]

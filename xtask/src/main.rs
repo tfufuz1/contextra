@@ -101,6 +101,7 @@ mod crate_context;
 mod env_validate;
 mod feature_matrix;
 mod gate_check;
+mod gen_arch_docs;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
@@ -2226,6 +2227,13 @@ fn main() {
         "check-crate-references" => {
             if let Err(e) = gates::check_crate_references::run_check_crate_references() {
                 eprintln!("❌ check-crate-references failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "gen-arch-docs" => {
+            let check_only = args.iter().any(|arg| arg == "--check");
+            if let Err(e) = gen_arch_docs::run_gen_arch_docs(check_only) {
+                eprintln!("❌ gen-arch-docs failed: {}", e);
                 process::exit(1);
             }
         }

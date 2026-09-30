@@ -5,6 +5,9 @@ edition = "2021"
 publish = false
 build = "build.rs"
 
+[package.metadata.contextra]
+ring = "tooling"
+
 [dependencies]
 chrono = "0.4"
 regex = "1"
