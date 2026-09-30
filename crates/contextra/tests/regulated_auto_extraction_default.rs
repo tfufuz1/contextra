@@ -1,48 +1,41 @@
 // FILE-CONTEXT
-// ZWECK: Test default auto-extraction settings across deployment tiers (Spec B.1.8 / Spec D.6 / J.16 / B-08)
+// ZWECK: Verify DeploymentTier presets auto_extraction defaults (Spec D.6 / J.16/B-08)
 
 use contextra::collection_profile::{
-    AutoExtractionMode, DeploymentTier, DEFAULT_AUTO_EXTRACTION_MODE,
-    ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
+    AutoExtractionMode, DeploymentTier, ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
 };
 
 #[test]
-fn test_regulated_auto_extraction_default() {
+fn test_enterprise_regulated_auto_extraction_default_is_disabled() {
     assert_eq!(
         ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
         AutoExtractionMode::Disabled,
-        "ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT must be Disabled"
+        "ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT constant must be Disabled"
     );
 
+    let profile = DeploymentTier::EnterpriseRegulated.resolve();
     assert_eq!(
-        DEFAULT_AUTO_EXTRACTION_MODE,
-        AutoExtractionMode::Enabled,
-        "DEFAULT_AUTO_EXTRACTION_MODE must be Enabled"
-    );
-
-    assert_eq!(
-        DeploymentTier::EnterpriseRegulated
-            .resolve()
-            .auto_extraction,
+        profile.auto_extraction,
         AutoExtractionMode::Disabled,
-        "EnterpriseRegulated tier preset must default auto_extraction to Disabled"
+        "EnterpriseRegulated preset must have auto_extraction set to Disabled by default"
     );
+}
 
-    assert_eq!(
-        DeploymentTier::EdgeMinimal.resolve().auto_extraction,
-        AutoExtractionMode::Enabled,
-        "EdgeMinimal tier preset must default auto_extraction to Enabled"
-    );
+#[test]
+fn test_other_deployment_tiers_auto_extraction_default_is_enabled() {
+    let enabled_tiers = [
+        DeploymentTier::EdgeMinimal,
+        DeploymentTier::PowerUserLocal,
+        DeploymentTier::EnterpriseShared,
+    ];
 
-    assert_eq!(
-        DeploymentTier::PowerUserLocal.resolve().auto_extraction,
-        AutoExtractionMode::Enabled,
-        "PowerUserLocal tier preset must default auto_extraction to Enabled"
-    );
-
-    assert_eq!(
-        DeploymentTier::EnterpriseShared.resolve().auto_extraction,
-        AutoExtractionMode::Enabled,
-        "EnterpriseShared tier preset must default auto_extraction to Enabled"
-    );
+    for tier in enabled_tiers {
+        let profile = tier.resolve();
+        assert_eq!(
+            profile.auto_extraction,
+            AutoExtractionMode::Enabled,
+            "Preset {:?} must have auto_extraction set to Enabled by default",
+            tier
+        );
+    }
 }

@@ -10,10 +10,9 @@ use contextra_store::kv::delete_mode::KvDeleteMode;
 /// Default auto extraction mode for standard deployment tiers.
 pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode::Enabled;
 
-/// Default auto extraction mode for EnterpriseRegulated tier.
-/// In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM gegeben,
-/// solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung); explizite
-/// Aktivierung pro Collection bleibt möglich.
+/// In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM
+/// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung);
+/// explizite Aktivierung pro Collection bleibt möglich.
 pub const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT: AutoExtractionMode =
     AutoExtractionMode::Disabled;
 
