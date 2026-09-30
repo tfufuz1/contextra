@@ -1,4 +1,4 @@
-//! SAOS (Synthesized Agent Operating System) types and query abstractions.
+//! Query-Abstraktionen (wie `HybridQuery` und `HybridQueryBuilder`) sowie Signal-Fusionstypen (wie `FusionWeights`, `FusionStrategy`, `GraphTraversalStrategy`, `ContextChunk`, `ContextWindow`, `ScoredEntry`, `RerankResult`). Der Begriff SAOS (Synthesized Agent Operating System) dient als historische Modulbezeichnung.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
