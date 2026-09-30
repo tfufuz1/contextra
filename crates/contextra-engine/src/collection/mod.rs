@@ -31,7 +31,7 @@ mod tests;
 #[cfg(not(loom))]
 use contextra_graph::CsrGraph;
 #[cfg(not(loom))]
-use contextra_ports::{StorageEngine, TextEmbeddingEngine, VectorIndex};
+use contextra_ports::{Clock, StorageEngine, SystemClock, TextEmbeddingEngine, VectorIndex};
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
 #[cfg(not(loom))]
@@ -284,6 +284,8 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     /// Watch receiver for monitoring system pressure levels.
     pub(super) pressure_rx:
         parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>,
+    /// Injected clock port for time operations.
+    pub(super) clock: parking_lot::RwLock<Arc<dyn Clock>>,
 }
 
 #[cfg(not(loom))]
@@ -310,6 +312,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             consolidation_in_progress: self.consolidation_in_progress.clone(),
             config: parking_lot::RwLock::new(self.config.read().clone()),
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
+            clock: parking_lot::RwLock::new(self.clock.read().clone()),
         }
     }
 }
@@ -388,7 +391,24 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
             config: parking_lot::RwLock::new(CollectionConfig::default()),
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
+            clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
         }
+    }
+
+    /// Sets or overrides the clock implementation (builder version).
+    pub fn with_clock(self, clock: Arc<dyn Clock>) -> Self {
+        *self.clock.write() = clock;
+        self
+    }
+
+    /// Sets or overrides the clock implementation.
+    pub fn set_clock(&self, clock: Arc<dyn Clock>) {
+        *self.clock.write() = clock;
+    }
+
+    /// Returns a cloned reference to the injected clock.
+    pub fn clock(&self) -> Arc<dyn Clock> {
+        self.clock.read().clone()
     }
 
     /// Sets or updates the collection configuration.
