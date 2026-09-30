@@ -8,7 +8,42 @@
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use contextra_types::ContextraError;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
+
+static EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
+static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
+
+/// Ergebnis der Provider-Einstellung-Auflösung.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ResolvedProviderSetting {
+    pub value: String,
+    pub used_unprefixed_fallback: bool,
+}
+
+/// Löste eine Provider-Einstellung ohne Prozess-Env-Zugriff auf.
+pub(crate) fn resolve_provider_setting(
+    prefixed: Option<&str>,
+    unprefixed: Option<&str>,
+    default_val: &str,
+) -> ResolvedProviderSetting {
+    let clean_prefixed = prefixed.map(|s| s.trim()).filter(|s| !s.is_empty());
+    let clean_unprefixed = unprefixed.map(|s| s.trim()).filter(|s| !s.is_empty());
+
+    match (clean_prefixed, clean_unprefixed) {
+        (Some(p), _) => ResolvedProviderSetting {
+            value: p.to_string(),
+            used_unprefixed_fallback: false,
+        },
+        (None, Some(u)) => ResolvedProviderSetting {
+            value: u.to_string(),
+            used_unprefixed_fallback: true,
+        },
+        (None, None) => ResolvedProviderSetting {
+            value: default_val.to_string(),
+            used_unprefixed_fallback: false,
+        },
+    }
+}
 
 /// Embedding provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -40,9 +75,19 @@ impl Default for EmbeddingConfig {
 impl EmbeddingConfig {
     /// Loads configuration from environment variables with fallbacks.
     pub fn from_env() -> Self {
-        let provider = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER")
-            .or_else(|_| std::env::var("EMBEDDING_PROVIDER"))
-            .unwrap_or_else(|_| "mock".to_string());
+        let prefixed = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER").ok();
+        let unprefixed = std::env::var("EMBEDDING_PROVIDER").ok();
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
+
+        if resolved.used_unprefixed_fallback {
+            EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
+                tracing::warn!(
+                    "Ungeprefixte Variable EMBEDDING_PROVIDER ist deprecated, bitte CONTEXTRA_EMBEDDING_PROVIDER verwenden."
+                );
+            });
+        }
+
+        let provider = resolved.value;
 
         let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
             .unwrap_or_else(|_| "http://localhost:11434".to_string());
@@ -182,9 +227,19 @@ impl Default for LlmConfig {
 impl LlmConfig {
     /// Loads configuration from environment variables with fallbacks.
     pub fn from_env() -> Self {
-        let provider = std::env::var("CONTEXTRA_LLM_PROVIDER")
-            .or_else(|_| std::env::var("LLM_PROVIDER"))
-            .unwrap_or_else(|_| "mock".to_string());
+        let prefixed = std::env::var("CONTEXTRA_LLM_PROVIDER").ok();
+        let unprefixed = std::env::var("LLM_PROVIDER").ok();
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
+
+        if resolved.used_unprefixed_fallback {
+            LLM_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
+                tracing::warn!(
+                    "Ungeprefixte Variable LLM_PROVIDER ist deprecated, bitte CONTEXTRA_LLM_PROVIDER verwenden."
+                );
+            });
+        }
+
+        let provider = resolved.value;
 
         let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
             .unwrap_or_else(|_| "http://localhost:11434".to_string());
@@ -339,6 +394,27 @@ impl LlmTextGenerator for MockLlmGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_resolve_provider_setting_prefixed_wins() {
+        let res = resolve_provider_setting(Some("onnx"), Some("ollama"), "mock");
+        assert_eq!(res.value, "onnx");
+        assert!(!res.used_unprefixed_fallback);
+    }
+
+    #[test]
+    fn test_resolve_provider_setting_unprefixed_fallback() {
+        let res = resolve_provider_setting(None, Some("ollama"), "mock");
+        assert_eq!(res.value, "ollama");
+        assert!(res.used_unprefixed_fallback);
+    }
+
+    #[test]
+    fn test_resolve_provider_setting_default() {
+        let res = resolve_provider_setting(None, None, "mock");
+        assert_eq!(res.value, "mock");
+        assert!(!res.used_unprefixed_fallback);
+    }
 
     #[test]
     fn test_embedding_config_defaults() {
