@@ -1,190 +1,135 @@
-# Architekturentscheidung: Lizenz-Binding & Activation Model (`LicensePayload` vs. `SignedActivation`)
+# Architektur-Entscheidung: Lizenz- & Aktivierungs-Binding (Tenant-ID vs. Installation-Binding)
 
-**Status:** Vorschlag / Entscheidungsdokument
 **Datum:** 2026-09-28
-**Betroffene Crates:** `contextra-license`, `contextra-ports`, `contextra-engine`, `contextra`, `contextra-mcp`
-**Referenzierte Spezifikationen:** Spec §14.6, §15, Spec-Anforderung D.1, ADR-104
+**Status:** Entscheidungsentwurf (Phase 1)
+**Betroffene Crates:** `contextra-license`, `contextra-ports`, `contextra-mcp`, `contextra`
 
 ---
 
-## 1. Ausgangslage & Problemstellung
+## 1. Heutiger Stand (IST-Zustand)
 
-Die Spezifikation (Spec-Anforderung D.1) skizziert eine Aktivierungsstruktur zur Durchsetzung des Drei-Ring-Lizenzmodells:
-
-```rust
-struct SignedActivation {
-    ring: FeatureRing,
-    installation_id_hash: [u8; 32],
-    expires_at_unix: i64,
-    signature: [u8; 64],
-}
-```
-
-Sowie den zugehörigen Evaluierungsalgorithmus für `check_ring(ring)`:
-1. `FeatureRing::Fast` $\rightarrow$ `Ok(())` bedingungslos (auch bei fehlender oder korrupter Lizenz, Invariante `INV-LICENSE-2`).
-2. Keine Aktivierung vorhanden $\rightarrow$ `Err(LicenseError::NotActivated(ring))`.
-3. `installation_id_hash` $\neq$ lokale Hardware-/Instanz-Kennung $\rightarrow$ `Err(LicenseError::NotActivated(ring))` (*fail-closed ohne Informationsleck*).
-4. Signatur ungültig $\rightarrow$ `Err(LicenseError::InvalidSignature)`.
-5. `clock.now_unix()` $\ge$ `expires_at` $\rightarrow$ `Err(LicenseError::Expired(expires_at))`.
-6. Aktivierter Ring niedriger als angefragt $\rightarrow$ `Err(LicenseError::NotActivated(ring))`.
-7. `Ok(())`.
-
-### IST-Zustand im Codebase
-
-In der aktuellen Implementierung (`crates/contextra-license/src/signed_gate.rs`) existiert stattdessen der Typ `LicensePayload`:
-
+### 1.1 Typen & Datenstrukturen
+In `crates/contextra-license/src/signed_gate.rs`:
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LicensePayload {
+    /// Tenant identity bound to this license.
     pub tenant_id: TenantId,
+    /// List of feature rings activated by this license.
     pub allowed_rings: Vec<FeatureRing>,
+    /// Optional Unix timestamp (in seconds) after which the license expires.
     pub expires_at: Option<i64>,
+    /// Arbitrary key-value feature flags.
     pub feature_flags: BTreeMap<String, bool>,
 }
 ```
 
-Die Validierung erfolgt in `SignedLicenseGate::from_signed_payload_with_clock(...)`, das Ed25519-Signaturen über den Bincode-serialisierten Payload prüft.
+* `SignedLicenseGate` speichert eine `verifying_key: VerifyingKey`, eine deserialisierte `license_payload: LicensePayload` sowie eine `clock: Arc<dyn Clock>`.
+* Die Konstruktion (`from_signed_payload`) prüft die Ed25519-Signatur über den Bincode-serialisierten `LicensePayload`.
+* In `check_ring(ring)` prüft das Gate:
+  1. Ist `ring == FeatureRing::Fast`? Falls ja: `Ok(())` (`INV-LICENSE-2`).
+  2. Ist `ring` in `allowed_rings` enthalten? Falls nein: `Err(LicenseError::NotActivated(ring))`.
+  3. Ist `expires_at` gesetzt und `now_secs >= expires_at`? Falls ja: `Err(LicenseError::Expired(expires_at))`.
 
-**Offene Entscheidung:** Soll die Datenstruktur auf `installation_id_hash` umgestellt werden, bei `tenant_id` verbleiben, oder um ein optionales/kombiniertes Binding erweitert werden?
-
----
-
-## 2. Heutiger Stand: Typen, Fehlerarten und Aufrufer
-
-### 2.1 Typen & Traits
-* **`LicensePayload`** (`contextra-license`): Repräsentiert den signierten Inhalt (Tenant-ID, aktivierte Ringe, Ablaufsdatum, Feature-Flags).
-* **`SignedLicenseGate`** (`contextra-license`): Implementiert das Trait `LicenseGate`. Hält den VerifyingKey (Ed25519) und den geprüften `LicensePayload`.
-* **`LicenseGate` Trait** (`contextra-ports`):
-  ```rust
-  pub trait LicenseGate: Send + Sync {
-      fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError>;
-      fn authorize(&self, requested: FeatureRing) -> Result<AuthorizedRing, LicenseError>;
-  }
-  ```
-* **`LicenseError` Enum** (`contextra-ports`):
-  ```rust
-  pub enum LicenseError {
-      NotActivated(FeatureRing),
-      InvalidSignature,
-      Expired(i64),
-  }
-  ```
-* **`OpenFastGate`** (`contextra-ports`): Standard-Gate für Open-Source-Betrieb (erlaubt `Fast`, lehnt `Sovereign` / `Compliance` ab).
-* **`AuthorizedRing`** (`contextra-ports`): Unfälschbares Token für geschützte Engine-Operationen (ADR-104).
-
-### 2.2 Aufrufer von `check_ring` bzw. `LicenseGate`
-1. **`contextra` Facade (`PerformanceProfile::enforce_license`)**: Prüft beim Bauen von Collections/Engines, ob das gewählte Performance-Profil (`Fast`, `Sovereign`, `Compliance`) durch die Lizenz abgedeckt ist.
-2. **`contextra::builder::EngineBuilder`**: Nimmt `Arc<dyn LicenseGate>` oder Payload-Bytes + Signatur entgegen.
-3. **`contextra-engine::Engine`**: Speichert `license_gate: Arc<dyn LicenseGate>` zur Laufzeitprüfung.
-4. **`contextra-ports::PluginRegistry`**: Prüft bei der Registrierung von Plugins, ob der erforderliche Ring freigeschaltet ist (`gate.check_ring(required_ring)`).
-5. **`contextra-mcp`**: Verwendet die `contextra`-Engine als Backend und stützt sich auf das dort konfigurierte `LicenseGate`.
-
----
-
-## 3. Analyse der Optionen
-
-### Option A: Nur `tenant_id` (Status Quo)
-Die Lizenz bindet ausschließlich an eine logische Organisation bzw. Mandanten-Identität (`TenantId`).
-
-* **Vorteile:**
-  * Maximale Flexibilität für Cloud-Native, Kubernetes Pods, Auto-Scaling und ephemere Container.
-  * Kein lokales Machine-ID-Fingerprinting erforderlich (kein Lesezugriff auf `/etc/machine-id`, MAC-Adressen oder DMI/Bios-Werte).
-  * Einfaches Deployment für MCP-Server (`contextra-mcp`) und CLI-Tools.
-* **Nachteile:**
-  * Ein vergebener Lizenzschlüssel kann auf einer beliebigen Anzahl physischer oder virtueller Rechner kopiert und ausgeführt werden.
-
----
-
-### Option B: Erweiterung um `installation_id_hash` (Hybrides Modell)
-`LicensePayload` wird um ein optionales Feld `installation_id_hash: Option<[u8; 32]>` erweitert:
-
+In `crates/contextra-ports/src/license.rs`:
 ```rust
-pub struct LicensePayload {
-    pub tenant_id: TenantId,
-    pub installation_id_hash: Option<[u8; 32]>,
-    pub allowed_rings: Vec<FeatureRing>,
-    pub expires_at: Option<i64>,
-    pub feature_flags: BTreeMap<String, bool>,
+pub enum LicenseError {
+    NotActivated(FeatureRing),
+    InvalidSignature,
+    Expired(i64),
+}
+
+pub trait LicenseGate: Send + Sync {
+    fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError>;
+    fn authorize(&self, requested: FeatureRing) -> Result<AuthorizedRing, LicenseError>;
 }
 ```
 
-* **Vorteile:**
-  * Vereint organisatorische Zuordnung (`tenant_id`) mit optionalem Hardware/Node-Pinning (`installation_id_hash`).
-  * B2B-Enterprise-Kunden mit On-Premises Appliances können an spezifische Server-Hardware gebunden werden.
-  * Cloud-/MCP-Nutzer können lizenziert werden, indem `installation_id_hash = None` gesetzt wird.
-* **Nachteile:**
-  * Geringfügige Vergrößerung der Payload-Struktur.
-  * Erfordert eine definierte Strategie zur Ermittlung der lokalen `installation_id` auf der Host-Maschine (sofern gesetzt).
+### 1.2 Aufrufer von `check_ring` bzw. `LicenseGate`
+1. **`contextra` Facade (`builder.rs`, `performance_profile.rs`)**:
+   `ContextraBuilder` erzwingt die Autorisierung des gewählten `FeatureRing` bei der Instanziierung der Engine.
+2. **`contextra-ports` (`plugin.rs`)**:
+   `PluginRegistry::activate_all()` prüft vor der Aktivierung von Plugins, ob der geforderte `FeatureRing` freigeschaltet ist (`LicenseError::NotActivated`).
+3. **`contextra-mcp` (`plugin_status.rs`)**:
+   Verwendet `FeatureRing`, um den aktiven Lizenzstatus gegenüber MCP-Clients zu exponieren.
 
 ---
 
-### Option C: `tenant_id` durch `installation_id_hash` ersetzen (Exakte Spec D.1)
-Entfernung von `tenant_id` aus der Aktivierungsstruktur zugunsten von `installation_id_hash: [u8; 32]`.
+## 2. Spezifikations-Anforderung (Spec D.1)
 
-* **Vorteile:**
-  * Exakte 1:1 Abdeckung des Datenstrukturentwurfs aus Spec-Anforderung D.1.
-  * Verhindert das Kopieren der Lizenzdatei auf andere Rechner.
-* **Nachteile:**
-  * Verlust der direkten Mandanten-Verknüpfung (`TenantId`) im Lizenz-Header (relevante Zuordnung für Audit-Export und Multi-Tenant Scopes geht verloren).
-  * Inkompatibel mit dynamischen Cloud-Umgebungen und containerisiertem `contextra-mcp`, da bei jedem Container-Neustart/Migration eine neue Lizenz ausgestellt werden müsste.
+Laut Spezifikationsanforderung **D.1** wird ein kompaktes, direktes Aktivierungsmodell definiert:
 
----
+### 2.1 Datenstruktur (`SignedActivation`)
+* Fields: `ring: FeatureRing`, `installation_id_hash: [u8; 32]`, `expires_at_unix: i64`, `signature: [u8; 64]`.
+* Signatur: Ed25519-Signatur direkt über die drei Datenfelder (`ring`, `installation_id_hash`, `expires_at_unix`).
 
-## 4. Auswirkungen auf Ring-Modell, `FeatureRing` und `contextra-mcp`
-
-1. **Drei-Ring-Modell (`Fast`, `Sovereign`, `Compliance`):**
-   * **`Fast` (MIT/Apache-2.0):** Durch die Invariante `INV-LICENSE-2` muss `check_ring(FeatureRing::Fast)` stets `Ok(())` zurückgeben — völlig unabhängig davon, ob `installation_id_hash` oder `tenant_id` übereinstimmen oder ob die Lizenz abgelaufen/korrupt ist.
-   * **`Sovereign` / `Compliance`:** Diese kommerziellen bzw. funktional geschützten Ringe verlangen ein gültiges `SignedLicenseGate`.
-
-2. **Impact auf `contextra-mcp`:**
-   * MCP-Server laufen lokal auf Entwickler-Laptops oder in kurzlebigen Sidecar-Containern.
-   * Eine strikte Pflicht-Bindung an `installation_id_hash` (Option C) würde die Nutzbarkeit von `contextra-mcp` im Enterprise-Umfeld massiv erschweren, da Hardware-Wechsel oder Container-Rebuilds Lizenzen ungültig machen würden. Option A oder Option B (mit `None` für MCP) bieten hier nahtlose Integration.
-
-3. **Risiko für bestehende Signaturen und Formate:**
-   * Jede Anpassung von `LicensePayload` ändert die Bincode-Serialisierung. Da Ed25519 über das exakte Byte-Array signiert, führt jede Schema-Änderung zur Entwertung aller zuvor ausgetauschten Test- und Produktions-Signaturen.
-   * Bincode ist im Gegensatz zu JSON nicht feld-tolerant. Schema-Migrationen müssen daher strikt versioniert oder in einem Schritt durchgeführt werden.
+### 2.2 Prüflogik in `check_ring(requested_ring)`
+1. **Fast-Ring**: `requested_ring == Fast` $\rightarrow$ `Ok(())` immer (auch bei korrupter/fehlender Aktivierung, `INV-LICENSE-2`).
+2. **Keine Aktivierung vorhanden**: $\rightarrow$ `Err(LicenseError::NotActivated)`.
+3. **Mismatch der Kennung**: `installation_id_hash != lokale_installation_id_hash` $\rightarrow$ `Err(LicenseError::NotActivated)` (Sicherheits-Grundsatz: Kein Informationsleck bezüglich der erwarteten/tatsächlichen ID).
+4. **Ungültige Signatur**: $\rightarrow$ `Err(LicenseError::InvalidSignature)`.
+5. **Ablauf**: `clock.now_unix() >= expires_at` $\rightarrow$ `Err(LicenseError::Expired)`.
+6. **Ring-Stufe unzureichend**: Aktivierter Ring niedriger als angefragt $\rightarrow$ `Err(LicenseError::NotActivated)`.
+7. **Erfolg**: $\rightarrow$ `Ok(())`.
 
 ---
 
-## 5. Fundamentale Grenze: Der Open-Source / Fork-Bypass
+## 3. Handlungsoptionen
 
-Ein zentraler Aspekt für die Architekturentscheidung ist die quelloffene Natur von Contextra:
+| Kriterium | Option A: Nur `tenant_id` (IST) | Option B: Hybrid (`tenant_id` + `installation_id_hash`) | Option C: Ersetzung gemäß Spec D.1 (`SignedActivation`) |
+|---|---|---|---|
+| **Datenstruktur** | `LicensePayload` (Tenant, Rings, Expire, Flags) | `LicensePayload` erweitert um `installation_id_hash: Option<[u8; 32]>` | `SignedActivation` (`ring`, `installation_id_hash`, `expires_at`) |
+| **Spec D.1 Konformität** | Abweichend | Großteils konform (Superset) | 100 % konform |
+| **On-Premise Instanz-Bindung** | Nein (Lizenz gilt pro Tenant) | Ja (optional oder erzwungen) | Ja (strikt) |
+| **Mandanten-Bezug (`TenantId`)** | Explizit in Lizenz enthalten | Explizit in Lizenz enthalten | Nicht in Lizenz (wird durch Anwendung verwaltet) |
+| **Feature Flags** | Flexibel in Lizenz integriert | Flexibel in Lizenz integriert | Entfällt in Lizenz (in App/Config verwaltet) |
 
-> **Fundamentale Grenze:**
-> Die Kernbibliothek (Ring 0–2 und Facade) steht unter den Open-Source-Lizenzen MIT bzw. Apache-2.0.
-> Ein technisches Hardware-Binding (`installation_id_hash`) innerhalb des Open-Source-Codes stellt **keinen unüberwindbaren Kopierschutz (DRM)** dar. Jeder Nutzer mit Rust-Kenntnissen kann das Repository forken und in `SignedLicenseGate::check_ring` das Matching von `installation_id_hash` oder die Signaturprüfung schlicht mit `Ok(())` überschreiben.
+### Option A: Beibehalten von `tenant_id` (Keine Installation-Bindung)
+* **Vorteile:** Kein Refactoring erforderlich; Mandanten-Bindung direkt im Lizenzobjekt.
+* **Nachteile:** Weicht von Spec D.1 ab; Lizenzen können ohne Weiteres auf beliebigen Servern kopiert und wiederverwendet werden, solange die `TenantId` übereinstimmt.
 
-### Konsequenz für die Geschäfts- und Sicherheitsarchitektur
-* Die Lizenzprüfung in `contextra-license` dient der **Legal Compliance und Audit-Sicherheit** für B2B-Kunden (z. B. Nachweis gegenüber Datenschutzbeauftragten, BSI-Grundschutz, DSGVO Artikel 30 Registrierung).
-* B2B-Unternehmen nutzen die signierte Lizenz zur Vermeidung von Haftungsrisiken. Sie forken den Code nicht, um Lizenzschlüssel zu fälschen.
-* Ein hochkomplexes Hardware-Fingerprinting (`installation_id_hash`) erzeugt signifikanten Wartungsaufwand (z. B. Supportfälle bei CPU-/MAC-Wechseln oder VM-Migrationen), ohne echten Schutz gegen böswillige Akteure zu bieten.
+### Option B: Hybrid-Erweiterung (`tenant_id` + `installation_id_hash`)
+* **Vorteile:** Kombiniert Mandanten-Kontext mit der hardware-/instanzbezogenen Diebstahlssicherung; abwärtskompatibel gestaltbar.
+* **Nachteile:** Payload-Format ist komplexer als in Spec D.1 vorgesehen; Bincode-Deserialisierung muss Feld-Erweiterung abfangen.
+
+### Option C: Vollständige Ersetzung durch `SignedActivation` (Spec D.1)
+* **Vorteile:** Exakte Einhaltung der Spec D.1; Schlankes binäres Format ohne Bincode/Map-Overhead; strikter Instanzschutz.
+* **Nachteile:** Bisherige `LicensePayload`-Signaturen werden ungültig; `feature_flags` und `tenant_id` müssen außerhalb der Lizenz-Aktivierung verarbeitet werden.
 
 ---
 
-## 6. Empfehlung & Begründung
+## 4. Auswirkungen auf Architektur, Ringe und MCP
 
-### Beschlussempfehlung: Option B (Hybrides Modell mit optionalem `installation_id_hash`)
+### 4.1 Ring-Modell & `FeatureRing`
+* Das dreistufige Ring-Modell (`Fast`, `Sovereign`, `Compliance`) bleibt in allen Optionen unverändert.
+* Invariante `INV-LICENSE-2` (Fail-Open für `Fast`) bleibt bei allen Optionen garantiert.
 
-Es wird empfohlen, `LicensePayload` wie folgt anzupassen:
+### 4.2 `contextra-mcp` & Plugin-System
+* `contextra-mcp` fragt über `plugin_status.rs` den aktiven `FeatureRing` ab.
+* Bei Option B & C muss beim Start des MCP-Servers oder der Engine die lokale `installation_id_hash` (z. B. BLAKE3-Hash aus Machine-ID, MAC-Adresse oder Instanz-UUID) bestimmt und an das `SignedLicenseGate` übergeben werden.
 
-```rust
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LicensePayload {
-    /// Mandanten-Identität für Audit-Trail und Multi-Tenancy-Zuordnung.
-    pub tenant_id: TenantId,
-    /// Optionaler SHA-256 Hash der Instanz-/Hardware-Kennung für On-Premises Hardware-Binding.
-    pub installation_id_hash: Option<[u8; 32]>,
-    /// Freigeschaltete Feature-Ringe.
-    pub allowed_rings: Vec<FeatureRing>,
-    /// Optionaler Ablauf-Zeitstempel (Unix-Epoch in Sekunden).
-    pub expires_at: Option<i64>,
-    /// Zusätzliche feingranulare Feature-Flags.
-    pub feature_flags: BTreeMap<String, bool>,
-}
-```
+### 4.3 Risiko für bestehende Signaturen und Formate
+* Da `contextra-license` als `experimental` eingestuft ist und das Lizenzformat bisher nur in internen Modultests genutzt wird, ist das Risiko eines Breaking Changes bei Option B oder C minimal.
 
-### Begründung
-1. **Erfüllung der Spec D.1 ohne Nachteile:** Der in Spec D.1 geforderte `installation_id_hash` wird unterstützt, ohne die logische `TenantId` aufzugeben.
-2. **Praxistauglichkeit für Cloud & MCP:** Wenn `installation_id_hash` `None` ist, funktioniert die Lizenz reibungslos in Kubernetes, Docker und `contextra-mcp`.
-3. **Hardware-Binding bei Bedarf:** Enterprise-Kunden mit Appliance-Verträgen können ein fixes Hash-Binding nutzen (`Some([u8; 32])`).
-4. **Verhältnismäßigkeit:** Berücksichtigt die Realität von MIT/Apache-2.0 Software: Legal Compliance steht im Vordergrund, Frustration für ehrliche Nutzer durch fehlerhaftes Hardware-Fingerprinting wird vermieden.
+---
+
+## 5. Systemische Grenze (Open-Source-Grenzziehung)
+
+**Wichtige architektonische Erkenntnis:**
+Contextra wird unter einer quelloffenen Lizenz (MIT / Apache-2.0) als Rust-Bibliothek ausgeliefert.
+
+* **Grenze:** Da der Quellcode frei zugänglich ist und im Prozess des Anwenders läuft, kann jede clientseitige Lizenz- und Aktivierungsprüfung (einschließlich `check_ring` und Ed25519-Signaturprüfungen) durch ein Einkompilieren einer eigenen `LicenseGate`-Implementierung oder einen einfachen Fork umgangen werden.
+* **Zweck des Aktivierungssystems:** Das Lizenz-System und das Installation-Binding dienen **nicht** als unknackbares DRM, sondern als **rechtlich und audittechnisch relevantes Compliance-Gate**. Es schützt gewerbliche Nutzer vor unabsichtlicher Fehllizenzierung ("License Drift") und bildet die Grundlage für kommerzielle Support- und BSI-/DSGVO-Compliance-Verträge im `Compliance`-Ring.
+
+---
+
+## 6. Empfehlung mit Begründung
+
+**Empfehlung: Umsetzung von Option B (Hybrid) oder Option C (Vollständige Spec-Konformität)**
+
+1. **Falls die Spezifikation D.1 strikt bindend ist:**
+   Implementierung von **Option C (`SignedActivation`)**. `LicensePayload` wird durch `SignedActivation` ersetzt. Die Prüfung von `installation_id_hash` erfolgt gegen einen beim Erstellen des Gates injizierten lokalen Hash.
+2. **Falls Mandanten-Metadaten in der Lizenz benötigt werden:**
+   Implementierung von **Option B**. `LicensePayload` wird um `pub installation_id_hash: Option<[u8; 32]>` erweitert. Wenn das Feld gesetzt ist, prüft `check_ring` die Übereinstimmung mit der lokalen Installations-ID.
+
+*Entscheidungsvorschlag für das Team:* **Option C** umsetzen, um 100 % Konformität mit Spec D.1 herzustellen, da Mandanten-Zuordnungen auf Engine-Ebene (`TenantId`) unabhängig von der Instanz-Aktivierung verwaltet werden.
