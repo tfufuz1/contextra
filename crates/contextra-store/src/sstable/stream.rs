@@ -1,4 +1,5 @@
-use super::reader::SstableReader;
+use super::block_search::get_entry_at_index;
+use super::reader::{parse_block_trailer, SstableReader};
 use bytes::Bytes;
 use contextra_core::{ContextraError, Result};
 use std::sync::Arc;
@@ -36,48 +37,22 @@ impl SstableStream {
                 self.block_idx += 1;
                 self.entry_idx = 0;
 
-                let n = block_data.len();
-                if n < 10 {
-                    continue; // Empty or malformed block, try next
-                }
+                let (num_offsets, offsets_start, _) =
+                    parse_block_trailer(&block_data, self.reader.format_version)?;
 
-                self.num_offsets = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(n.saturating_sub(2)..n)
-                        .ok_or_else(|| ContextraError::Storage("missing num_offsets".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
-
-                let offsets_len = self.num_offsets * 2;
-                if n < 10 + offsets_len {
-                    continue;
-                }
-                self.offsets_start = n - 2 - offsets_len;
+                self.num_offsets = num_offsets;
+                self.offsets_start = offsets_start;
                 self.current_block = Some(block_data);
             }
 
             // Yield an entry from the current block
             if let Some(block_data) = &self.current_block {
                 if self.entry_idx < self.num_offsets {
-                    let off_pos = self.offsets_start + self.entry_idx * 2;
-                    let entry_off = usize::from(u16::from_le_bytes(
-                        block_data
-                            .get(off_pos..off_pos + 2)
-                            .ok_or_else(|| ContextraError::Storage("missing off_pos".into()))?
-                            .try_into()
-                            .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ));
+                    let is_v3 = self.reader.format_version >= 3;
+                    let (entry_off, k_len) =
+                        get_entry_at_index(block_data, self.offsets_start, self.entry_idx, is_v3)?;
 
-                    let mut ep = entry_off;
-                    let k_len = usize::from(u16::from_le_bytes(
-                        block_data
-                            .get(ep..ep + 2)
-                            .ok_or_else(|| ContextraError::Storage("missing k_len".into()))?
-                            .try_into()
-                            .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ));
-                    ep += 2;
+                    let mut ep = entry_off + 2;
                     let entry_key = block_data
                         .get(ep..ep + k_len)
                         .ok_or_else(|| ContextraError::Storage("missing entry_key".into()))?;

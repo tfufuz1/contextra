@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::Arc;
