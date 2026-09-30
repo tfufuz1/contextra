@@ -173,15 +173,28 @@ Das Repository erzwingt `#![forbid(unsafe_code)]` in allen Crates mit exakt **dr
 
 Jeder `unsafe`-Block erfordert zwingend eine `// SAFETY:`-Begründung.
 
-### 6.2 Locking-Disziplin
+### 6.2 Locking-Disziplin & Lock-Familien
 
 ```
 collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embedder (RwLock)
 ```
 
 - Mehrfach-Locks werden ausnahmslos in fester Reihenfolge von links nach rechts akquiriert.
-- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter Reihenfolge (`acquire_multi_sorted`), um Deadlocks auszuschließen.
+- `KvKeyLocks` nutzt die reine, synchrone Funktion `sorted_unique_shards(keys, shard_count, hasher) -> Vec<usize>`, um Schlüssel-Shard-Indizes deterministisch dedupliziert und streng aufsteigend sortiert zu akquirieren (`lock_many_sorted`), um Deadlocks bei mehrfachen Schlüsselzugriffen auszuschließen.
 - Kein `.await` unter gehaltenen synchronen Mutex/RwLock-Guards.
+
+#### Lock-Familien-Richtlinie
+
+In Contextra kommen drei Lock-Familien zum Einsatz, jeweils mit klarem Geltungsbereich:
+
+1. **`parking_lot` (`parking_lot::Mutex`, `parking_lot::RwLock`)**:
+   - **Anwendungsbereich**: Synchroner Code und Hot-Paths (In-Memory Indexe, Transaktions-Puffer, Statistiken).
+   - **Bedingung**: Höchste Performance, darf **niemals** über `.await`-Punkt hinweg gehalten werden.
+2. **`tokio::sync` (`tokio::sync::Mutex`, `tokio::sync::RwLock`)**:
+   - **Anwendungsbereich**: Asynchrone Ressourcen und I/O-Grenzschichten (z. B. `KvKeyLocks`, Connection Pools, Konsolidierungs-Passes).
+   - **Bedingung**: Darf über `.await`-Punkte hinweg gehalten werden.
+3. **`std::sync` (`std::sync::Mutex`, `std::sync::LazyLock`)**:
+   - **Anwendungsbereich**: Einmalige/statische Initialisierungen (`LazyLock`) und Loom-basierte Nebenläufigkeitstests (`#[cfg(loom)]`).
 
 ---
 

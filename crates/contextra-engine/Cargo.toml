@@ -45,6 +45,9 @@ tempfile = { workspace = true }
 proptest = "1.4"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
 [features]
 default = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)

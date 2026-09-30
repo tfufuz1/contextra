@@ -270,9 +270,17 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             );
             for &doc_id in doc_ids.iter() {
                 let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                let _ = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await;
                 if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                    let _ = self
+                        .collection
+                        .graph_index
+                        .remove_entity(comp_tx, eid_str)
+                        .await;
                 }
             }
             return Err(ContextraError::Transaction(format!(
@@ -294,9 +302,17 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             );
             for &doc_id in doc_ids.iter() {
                 let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                let _ = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await;
                 if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                    let _ = self
+                        .collection
+                        .graph_index
+                        .remove_entity(comp_tx, eid_str)
+                        .await;
                 }
             }
             return Err(ContextraError::Transaction(format!(
@@ -319,13 +335,24 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             );
             for &doc_id in doc_ids.iter() {
                 let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                let _ = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await;
                 if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                    let _ = self
+                        .collection
+                        .graph_index
+                        .remove_entity(comp_tx, eid_str)
+                        .await;
                 }
             }
             return Err(ContextraError::Transaction(storage_err.to_string()));
         }
+
+        // Storage commit succeeded — transaction is committed durably (T-06 / F-20)
+        self.committed.store(true, Ordering::Release);
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(

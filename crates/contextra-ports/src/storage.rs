@@ -202,6 +202,7 @@ pub trait StorageWrite: Send + Sync + 'static {
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch explizite `BoxFuture`-Rückgabetypen vtable-kompatibel (dyn-safe).
 pub trait StorageEngine: Send + Sync + 'static {
+    // TOCTOU-ACCEPTED: StorageEngine provides default batching/tracking delegate methods.
     /// Retrieves a value by key.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
@@ -213,7 +214,11 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::get`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
-    fn get_tracked<'a>(&'a self, _tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+    fn get_tracked<'a>(
+        &'a self,
+        _tx_id: TxId,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
         self.get(key)
     }
 

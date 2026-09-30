@@ -52,6 +52,7 @@ pub fn forward_push_apprh<G: PathGraph>(
     params: &PprParams,
     hyperedge_decay_factor: f32,
 ) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraError> {
+    // // NAN-CHECK-OK: Validate finite bounds on hyperedge decay parameter
     if !hyperedge_decay_factor.is_finite()
         || hyperedge_decay_factor <= 0.0
         || hyperedge_decay_factor > 1.0
