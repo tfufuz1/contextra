@@ -10,10 +10,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             return Ok(Vec::new());
         }
 
-        #[cfg(feature = "reranking")]
         let _has_reranker = self.reranker.is_some();
-        #[cfg(not(feature = "reranking"))]
-        let _has_reranker = false;
 
         let fusion_weights = self.weights.unwrap_or_default();
         let fusion_strategy = self
@@ -108,7 +105,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             );
         }
 
-        #[cfg(feature = "reranking")]
         if let Some(reranker) = self.reranker {
             // RESOLVED: AGT-DB-8ddf8937 (TS: 2026-09-10T00:00:00Z SESSION: 8ddf8937)
             // Explicitly bind query text for Cross-Encoder reranking
@@ -129,9 +125,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                     })
                     .collect();
 
-                let rerank_deadline = std::time::Duration::from_millis(
-                    reranker.config().rerank_deadline_ms.unwrap_or(500),
-                );
+                let deadline_ms = reranker.rerank_deadline_ms().unwrap_or(500);
+                let rerank_deadline = std::time::Duration::from_millis(deadline_ms);
 
                 let reranked = tokio::time::timeout(
                     rerank_deadline,
@@ -307,7 +302,6 @@ where
             );
         }
 
-        #[cfg(feature = "reranking")]
         if let Some(reranker) = self.reranker {
             let text_str = self.text.as_deref().unwrap_or("");
             if !results.is_empty() && !text_str.is_empty() {
@@ -323,9 +317,8 @@ where
                     })
                     .collect();
 
-                let rerank_deadline = std::time::Duration::from_millis(
-                    reranker.config().rerank_deadline_ms.unwrap_or(500),
-                );
+                let deadline_ms = reranker.rerank_deadline_ms().unwrap_or(500);
+                let rerank_deadline = std::time::Duration::from_millis(deadline_ms);
 
                 if let Ok(Ok(ranked)) = tokio::time::timeout(
                     rerank_deadline,

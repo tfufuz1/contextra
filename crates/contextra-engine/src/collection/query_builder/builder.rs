@@ -2,7 +2,7 @@ use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_ports::{Reranker, StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType};
 
 #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -36,8 +36,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) include_provenance: bool,
     pub(super) filter_fn: Option<Box<dyn Fn(DocId) -> bool + Send + Sync>>,
     pub(super) hard_scope: Option<super::scope::ScopeConstraint>,
-    #[cfg(feature = "reranking")]
-    pub(super) reranker: Option<&'a contextra_infer_onnx::CrossEncoderReranker>,
+    pub(super) reranker: Option<&'a (dyn Reranker + 'a)>,
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -67,7 +66,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             include_provenance: false,
             filter_fn: None,
             hard_scope: None,
-            #[cfg(feature = "reranking")]
             reranker: None,
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
@@ -194,8 +192,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Sets optional CrossEncoder reranker for post-retrieval ranking.
-    #[cfg(feature = "reranking")]
-    pub fn reranker(mut self, reranker: &'a contextra_infer_onnx::CrossEncoderReranker) -> Self {
+    pub fn reranker(mut self, reranker: &'a (dyn Reranker + 'a)) -> Self {
         self.reranker = Some(reranker);
         self
     }

@@ -1,13 +1,62 @@
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
+use contextra_ports::{BoxFuture, Reranker};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{FilterExpr, HybridQuery};
+use contextra_types::{FilterExpr, HybridQuery, RerankResult};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
+
+struct MockReranker {
+    deadline_ms: Option<u64>,
+    simulate_delay_ms: Option<u64>,
+}
+
+impl MockReranker {
+    fn passthrough() -> Self {
+        Self {
+            deadline_ms: Some(500),
+            simulate_delay_ms: None,
+        }
+    }
+
+    fn with_delay(deadline_ms: u64, delay_ms: u64) -> Self {
+        Self {
+            deadline_ms: Some(deadline_ms),
+            simulate_delay_ms: Some(delay_ms),
+        }
+    }
+}
+
+impl Reranker for MockReranker {
+    fn rerank<'a>(
+        &'a self,
+        _query: &'a str,
+        candidates: &'a [String],
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<RerankResult>>> {
+        let delay = self.simulate_delay_ms;
+        Box::pin(async move {
+            if let Some(d) = delay {
+                tokio::time::sleep(std::time::Duration::from_millis(d)).await;
+            }
+            Ok(candidates
+                .iter()
+                .enumerate()
+                .map(|(i, _)| RerankResult {
+                    original_index: i,
+                    score: 1.0 - (i as f32 * 0.01),
+                })
+                .collect())
+        })
+    }
+
+    fn rerank_deadline_ms(&self) -> Option<u64> {
+        self.deadline_ms
+    }
+}
 
 async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex>, TempDir) {
     let dir = TempDir::new().unwrap(); // unwrap
@@ -191,7 +240,6 @@ async fn test_builder_query_config_equivalence() {
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
 async fn test_rerank_candidate_pool_size_k10_fetches_100_candidates() {
     let (col, _dir) = create_test_collection("test_rerank_pool_100").await;
     // Populate 150 documents
@@ -208,7 +256,7 @@ async fn test_rerank_candidate_pool_size_k10_fetches_100_candidates() {
         .unwrap();
     }
 
-    let reranker = contextra_infer_onnx::CrossEncoderReranker::passthrough();
+    let reranker = MockReranker::passthrough();
     let res = col
         .query()
         .text("rust system")
@@ -220,13 +268,11 @@ async fn test_rerank_candidate_pool_size_k10_fetches_100_candidates() {
         .unwrap();
 
     assert_eq!(res.len(), 10, "Final results truncated to k=10");
-    // Verify that candidates retrieved before truncation had ce_score attached to 100 items (or top k items returned with ce_score)
-    // With passthrough reranker, ce_score is attached to top k items from the 100 candidates
+    // Verify that candidates retrieved before truncation had ce_score attached to top k items
     assert!(res[0].metadata.as_ref().unwrap().get("ce_score").is_some());
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
 async fn test_rerank_candidate_pool_max_cap_k100_capped_at_200() {
     let (col, _dir) = create_test_collection("test_rerank_pool_max_200").await;
     // Populate 300 documents
@@ -243,7 +289,7 @@ async fn test_rerank_candidate_pool_max_cap_k100_capped_at_200() {
         .unwrap();
     }
 
-    let reranker = contextra_infer_onnx::CrossEncoderReranker::passthrough();
+    let reranker = MockReranker::passthrough();
 
     // Query with k=100 and default pool settings (mult=10, max=200) -> fetch_k = min(100*10, 200) = 200
     let res_default = col
@@ -279,7 +325,6 @@ async fn test_rerank_candidate_pool_max_cap_k100_capped_at_200() {
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
 async fn test_query_builder_reranking_with_text_and_reranker() {
     let (col, _dir) = create_test_collection("test_rerank_builder").await;
     col.insert(
@@ -304,46 +349,42 @@ async fn test_query_builder_reranking_with_text_and_reranker() {
     .await
     .unwrap(); // unwrap
 
-    let reranker_res = contextra_infer_onnx::CrossEncoderReranker::new(
-        contextra_infer_onnx::RerankConfig::default(),
-    );
-    if let Ok(reranker) = reranker_res {
-        let res = col
-            .query()
-            .text("rust")
-            .embedding([1.0, 0.0, 0.0, 0.0])
-            .reranker(&reranker)
-            .include_provenance(true)
-            .k(2)
-            .execute()
-            .await
-            .unwrap(); // unwrap
+    let reranker = MockReranker::passthrough();
+    let res = col
+        .query()
+        .text("rust")
+        .embedding([1.0, 0.0, 0.0, 0.0])
+        .reranker(&reranker)
+        .include_provenance(true)
+        .k(2)
+        .execute()
+        .await
+        .unwrap(); // unwrap
 
-        assert_eq!(res.len(), 2, "Results must be truncated to k=2");
+    assert_eq!(res.len(), 2, "Results must be truncated to k=2");
 
-        for item in &res {
-            let meta = item.metadata.as_ref().expect("metadata must exist"); // expect
-            assert!(
-                meta.get("ce_score").is_some(),
-                "ce_score must be attached to metadata"
-            );
-            if let Some(prov) = &item.provenance {
-                assert!(
-                    prov.rerank_score.is_some(),
-                    "rerank_score must be set in provenance"
-                );
-            }
-        }
-
+    for item in &res {
+        let meta = item.metadata.as_ref().expect("metadata must exist"); // expect
         assert!(
-            res[0].score >= res[1].score,
-            "Results must be sorted descending by rerank score"
+            meta.get("ce_score").is_some(),
+            "ce_score must be attached to metadata"
         );
+        if let Some(prov) = &item.provenance {
+            assert!(
+                prov.rerank_score.is_some(),
+                "rerank_score must be set in provenance"
+            );
+        }
     }
+
+    assert!(
+        res[0].score >= res[1].score,
+        "Results must be sorted descending by rerank score"
+    );
 }
 
 #[tokio::test]
-#[cfg(all(feature = "reranking", feature = "adaptive-candidate-pool-sizing"))]
+#[cfg(feature = "adaptive-candidate-pool-sizing")]
 async fn test_pid_controller_integration_with_reranker() {
     let (col, _dir) = create_test_collection("test_pid_rerank").await;
     col.insert(
@@ -361,7 +402,7 @@ async fn test_pid_controller_integration_with_reranker() {
     .await
     .unwrap();
 
-    let reranker = contextra_infer_onnx::CrossEncoderReranker::passthrough();
+    let reranker = MockReranker::passthrough();
     let pid = Arc::new(parking_lot::Mutex::new(
         contextra_adapt::PidController::default(),
     ));
@@ -398,7 +439,6 @@ async fn test_pid_controller_integration_with_reranker() {
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
 async fn test_reranker_deadline_falls_back() {
     let (col, _dir) = create_test_collection("test_rerank_deadline").await;
     col.insert(
@@ -416,13 +456,7 @@ async fn test_reranker_deadline_falls_back() {
     .await
     .unwrap(); // unwrap
 
-    let config = contextra_infer_onnx::RerankConfig {
-        rerank_deadline_ms: Some(10),
-        simulate_delay_ms: Some(100),
-        ..Default::default()
-    };
-
-    let reranker = contextra_infer_onnx::CrossEncoderReranker::passthrough_with_config(config);
+    let reranker = MockReranker::with_delay(10, 100);
 
     let res = col
         .query()
@@ -450,7 +484,6 @@ async fn test_reranker_deadline_falls_back() {
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
 async fn test_query_builder_reranking_no_text_query_skips_rerank() {
     let (col, _dir) = create_test_collection("test_rerank_no_text").await;
     col.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"val": 1})))
@@ -460,27 +493,23 @@ async fn test_query_builder_reranking_no_text_query_skips_rerank() {
         .await
         .unwrap(); // unwrap
 
-    let reranker_res = contextra_infer_onnx::CrossEncoderReranker::new(
-        contextra_infer_onnx::RerankConfig::default(),
-    );
-    if let Ok(reranker) = reranker_res {
-        let res = col
-            .query()
-            .embedding([1.0, 0.0, 0.0, 0.0])
-            .reranker(&reranker)
-            .k(2)
-            .execute()
-            .await
-            .unwrap(); // unwrap
+    let reranker = MockReranker::passthrough();
+    let res = col
+        .query()
+        .embedding([1.0, 0.0, 0.0, 0.0])
+        .reranker(&reranker)
+        .k(2)
+        .execute()
+        .await
+        .unwrap(); // unwrap
 
-        assert_eq!(res.len(), 2);
-        for item in &res {
-            if let Some(meta) = &item.metadata {
-                assert!(
-                    meta.get("ce_score").is_none(),
-                    "ce_score should not be attached when reranking is skipped"
-                );
-            }
+    assert_eq!(res.len(), 2);
+    for item in &res {
+        if let Some(meta) = &item.metadata {
+            assert!(
+                meta.get("ce_score").is_none(),
+                "ce_score should not be attached when reranking is skipped"
+            );
         }
     }
 }

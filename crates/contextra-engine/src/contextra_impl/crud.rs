@@ -206,7 +206,6 @@ impl Contextra {
         builder.execute().await
     }
 
-    #[cfg(feature = "reranking")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, reranker, anchor_entities))]
     pub async fn hybrid_search_reranked(
@@ -214,7 +213,7 @@ impl Contextra {
         text: &str,
         vector: &[f32],
         k: usize,
-        reranker: Option<&contextra_infer_onnx::CrossEncoderReranker>,
+        reranker: Option<&dyn contextra_ports::Reranker>,
         anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;
