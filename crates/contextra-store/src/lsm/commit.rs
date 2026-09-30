@@ -19,7 +19,8 @@ impl LsmStorage {
             origin,
             durable,
         };
-        self.observer_registry.notify_with_context(entries, seq_no, ctx);
+        self.observer_registry
+            .notify_with_context(entries, seq_no, ctx);
     }
 
     /// Clears intent locks matching a predicate, gracefully recovering from poisoned locks.
@@ -86,10 +87,12 @@ impl LsmStorage {
 
     /// Applies memory updates to the provided `MemTable` and updates budget tracking.
     ///
-    /// # Lock Invariants
-    /// The caller must hold appropriate lock access (read or write guard on `LsmState`)
-    /// guarding the `MemTable`. `MemTable` internally uses `parking_lot::RwLock` for safe
-    /// concurrent mutations.
+    /// # Lock Invariants & Lock Strength Justification
+    /// The caller must hold at least a **read guard** (`state.read().await`) on `LsmState`.
+    /// A read guard is sufficient (and optimal) because:
+    /// 1. `LsmState` guards structural modifications to `immutable_memtables` (e.g. MemTable rotation during flush).
+    /// 2. Active entry insertions update `state.memtable` (an `Arc<MemTable>`), which internally uses an isolated `parking_lot::RwLock` for concurrent mutations.
+    /// 3. Holding a read guard allows concurrent commits to apply updates to `state.memtable` in parallel without blocking reads on `LsmState` metadata.
     pub(super) fn apply_mem_updates(
         &self,
         memtable: &MemTable,
