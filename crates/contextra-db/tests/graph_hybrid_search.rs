@@ -205,6 +205,7 @@ async fn test_hybrid_search_with_ppr_strategy() {
             None,
             Some(&ppr_strategy),
             None,
+            None,
         )
         .await
         .expect("PPR under snapshot isolation must succeed");
@@ -277,6 +278,7 @@ async fn test_hybrid_search_with_pathrag_strategy() {
             Some(&[anchor_eid]),
             None,
             Some(&pathrag_strategy),
+            None,
             None,
         )
         .await;
