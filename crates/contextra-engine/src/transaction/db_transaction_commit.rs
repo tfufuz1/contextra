@@ -1,6 +1,6 @@
 use super::compensating_actions::{
     CommitLedger, CompensateGraphAction, CompensateHnswAction,
-    CompensateTextAction, RollbackStagedAction,
+    CompensateLsmAction, CompensateTextAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;

@@ -217,12 +217,3 @@ impl ScoredDocument {
         Self { doc_id, score }
     }
 }
-
-/// Cross-encoder reranking result.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct RerankResult {
-    /// Original candidate index before reranking.
-    pub original_index: usize,
-    /// Rerank score (calibrated probability or raw logit).
-    pub score: f32,
-}
