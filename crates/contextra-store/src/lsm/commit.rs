@@ -87,9 +87,13 @@ impl LsmStorage {
     /// Applies memory updates to the provided `MemTable` and updates budget tracking.
     ///
     /// # Lock Invariants
-    /// The caller must hold appropriate lock access (read or write guard on `LsmState`)
-    /// guarding the `MemTable`. `MemTable` internally uses `parking_lot::RwLock` for safe
-    /// concurrent mutations.
+    /// The caller holds a read guard (`state.read()`) on `LsmState`. This is intentional and symmetrical across
+    /// single-commit and group-commit paths:
+    /// - `state.read()` prevents `MemTable` pointer replacement during concurrent `flush()` operations while allowing
+    ///   concurrent readers.
+    /// - `MemTable` internally uses `parking_lot::RwLock` for thread-safe concurrent mutations during `put()`.
+    /// - `state.write()` is strictly reserved for atomic `MemTable` and `WAL` rotation in `flush()`.
+    /// INVARIANTE: LOCK-REIHENFOLGE: commit_mutex → state.read → MemTable-RwLock.
     pub(super) fn apply_mem_updates(
         &self,
         memtable: &MemTable,

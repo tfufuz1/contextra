@@ -378,7 +378,7 @@ async fn test_phantom_data_after_partial_compaction() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_compaction_pressure_awareness() {
     use crate::system_pressure::{PressureLevel, SystemPressure};
 
@@ -410,7 +410,7 @@ async fn test_compaction_pressure_awareness() {
         )),
         None,
     )
-    .with_pressure_rx(pressure_rx);
+    .with_pressure_rx(pressure_rx.clone());
 
     // Create 2 SSTables with 20 entries each
     let mut entries1 = Vec::new();
@@ -452,7 +452,7 @@ async fn test_compaction_pressure_awareness() {
 
     // Measure merge duration with Normal pressure
     let normal_out = tmp.path().join("normal_merged.sst");
-    let start_normal = std::time::Instant::now();
+    let start_normal = tokio::time::Instant::now();
     engine
         .merge_sstables(
             &[Arc::clone(&sst1), Arc::clone(&sst2)],
@@ -476,7 +476,7 @@ async fn test_compaction_pressure_awareness() {
 
     // Measure merge duration with Critical pressure (yielding 4 times across 40 items -> 4 * 50ms = ~200ms delay)
     let critical_out = tmp.path().join("critical_merged.sst");
-    let start_critical = std::time::Instant::now();
+    let start_critical = tokio::time::Instant::now();
     engine
         .merge_sstables(&[sst1, sst2], &critical_out, u64::MAX, true)
         .await

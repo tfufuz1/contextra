@@ -8,8 +8,9 @@
 //! IMPLEMENTATION NOTES & LIMITATIONS:
 //! - `wal_queue_depth`: Fully implemented in `LsmStorage` via AtomicUsize tracking pending
 //!   group-commit followers awaiting disk write/notification.
-//! - `blocking_util`: Currently measures Tokio async scheduler global queue depth
-//!   (`metrics.global_queue_depth()`), NOT dedicated blocking thread pool utilization.
+//! - `scheduler_queue_depth`: Measures Tokio async scheduler global queue depth ratio
+//!   (`metrics.global_queue_depth()`), rather than dedicated blocking pool thread utilization
+//!   (which requires `tokio_unstable` disabled here to maintain stable Rust toolchain compatibility).
 //! - `embedding_queue_depth`: Defaults to `0/0` in `LsmStorage` because `contextra-store` is a pure
 //!   KV engine decoupled from embedding crates (`contextra-embed` / `contextra-candle`), which manage
 //!   their own semaphore permits.
@@ -19,8 +20,10 @@ use tokio_util::sync::CancellationToken;
 
 pub const WAL_QUEUE_CRITICAL_THRESHOLD: usize = 500;
 pub const WAL_QUEUE_ELEVATED_THRESHOLD: usize = 100;
-pub const BLOCKING_UTIL_CRITICAL: f32 = 0.85;
-pub const BLOCKING_UTIL_ELEVATED: f32 = 0.60;
+pub const SCHEDULER_QUEUE_CRITICAL: f32 = 0.85;
+pub const SCHEDULER_QUEUE_ELEVATED: f32 = 0.60;
+pub const BLOCKING_UTIL_CRITICAL: f32 = SCHEDULER_QUEUE_CRITICAL;
+pub const BLOCKING_UTIL_ELEVATED: f32 = SCHEDULER_QUEUE_ELEVATED;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PressureLevel {
@@ -32,8 +35,8 @@ pub enum PressureLevel {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemPressure {
     pub wal_queue_depth: usize,
-    pub blocking_thread_utilization: f32, // 0.0–1.0
-    pub embedding_queue_depth: usize,     // via Semaphore-Permits
+    pub scheduler_queue_depth: f32, // 0.0–1.0 (Tokio global scheduler queue depth ratio)
+    pub embedding_queue_depth: usize, // via Semaphore-Permits
     pub pressure_level: PressureLevel,
 }
 
@@ -47,7 +50,7 @@ impl SystemPressureMonitor {
     pub fn new(sampling_interval: Duration) -> Self {
         let default_pressure = SystemPressure {
             wal_queue_depth: 0,
-            blocking_thread_utilization: 0.0,
+            scheduler_queue_depth: 0.0,
             embedding_queue_depth: 0,
             pressure_level: PressureLevel::Normal,
         };
@@ -62,16 +65,17 @@ impl SystemPressureMonitor {
     pub fn compute_pressure(
         &self,
         wal_depth: usize,
-        blocking_util: f32,
+        scheduler_queue_depth: f32,
         embedding_queue: usize,
         max_permits: usize,
     ) -> SystemPressure {
-        let level = if blocking_util > BLOCKING_UTIL_CRITICAL
+        let level = if scheduler_queue_depth > SCHEDULER_QUEUE_CRITICAL
             || wal_depth > WAL_QUEUE_CRITICAL_THRESHOLD
             || (max_permits > 0 && embedding_queue == 0)
         {
             PressureLevel::Critical
-        } else if blocking_util > BLOCKING_UTIL_ELEVATED || wal_depth > WAL_QUEUE_ELEVATED_THRESHOLD
+        } else if scheduler_queue_depth > SCHEDULER_QUEUE_ELEVATED
+            || wal_depth > WAL_QUEUE_ELEVATED_THRESHOLD
         {
             PressureLevel::Elevated
         } else {
@@ -80,7 +84,7 @@ impl SystemPressureMonitor {
 
         SystemPressure {
             wal_queue_depth: wal_depth,
-            blocking_thread_utilization: blocking_util,
+            scheduler_queue_depth,
             embedding_queue_depth: embedding_queue,
             pressure_level: level,
         }
@@ -101,14 +105,14 @@ impl SystemPressureMonitor {
                     let metrics = tokio::runtime::Handle::current().metrics();
                     let active_tasks = metrics.num_workers() as f32;
                     let queue_depth = metrics.global_queue_depth() as f32;
-                    let blocking_util = if queue_depth > 0.0 {
+                    let scheduler_queue_depth = if queue_depth > 0.0 {
                         (queue_depth / (active_tasks + queue_depth)).min(1.0)
                     } else {
                         0.0
                     };
                     let pressure = self.compute_pressure(
                         wal_queue_depth_fn(),
-                        blocking_util,
+                        scheduler_queue_depth,
                         embedding_permits_fn(),
                         max_embedding_permits,
                     );
@@ -118,7 +122,7 @@ impl SystemPressureMonitor {
                             previous_level = ?last_level,
                             new_level = ?pressure.pressure_level,
                             wal_depth = pressure.wal_queue_depth,
-                            blocking_util = pressure.blocking_thread_utilization,
+                            scheduler_queue_depth = pressure.scheduler_queue_depth,
                             embedding_queue = pressure.embedding_queue_depth,
                             "SystemPressure level transitioned"
                         );
