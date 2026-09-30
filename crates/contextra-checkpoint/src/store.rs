@@ -4,7 +4,7 @@ use crate::hardlink_cloner::{
 };
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
-use crate::orphan::{monotonic_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
+use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
 use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
@@ -151,6 +151,8 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     checkpoint_counter: Arc<AtomicU64>,
     /// Instanz-spezifischer Zähler für verpasste Rollbacks
     skipped_rollbacks: Arc<AtomicU64>,
+    /// Injizierbarer Zeitgeber (P28)
+    clock: Arc<dyn contextra_ports::Clock>,
 }
 
 impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
@@ -240,6 +242,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
         let checkpoint_counter = Arc::new(AtomicU64::new(0));
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
+        let clock = orphan_registry.clock().clone();
 
         Ok(Self {
             storage,
@@ -252,6 +255,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             orphan_registry,
             checkpoint_counter,
             skipped_rollbacks,
+            clock,
         })
     }
 
@@ -359,8 +363,20 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         self.checkpoint_counter.load(Ordering::Relaxed)
     }
 
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        if let Some(reg) = Arc::get_mut(&mut self.orphan_registry) {
+            reg.set_clock(clock.clone());
+        }
+        self.clock = clock;
+        self
+    }
+
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+        &self.clock
+    }
+
     pub fn monotonic_timestamp_ms(&self) -> u64 {
-        let wall_ms = monotonic_timestamp_ms();
+        let wall_ms = clock_timestamp_ms(self.clock.as_ref());
         self.checkpoint_counter
             .fetch_max(wall_ms, Ordering::SeqCst)
             .max(wall_ms)
