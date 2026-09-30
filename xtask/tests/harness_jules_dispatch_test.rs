@@ -114,8 +114,11 @@ fn test_jules_dispatch_reject_auto_create_pr() {
         .contains("AUTO_CREATE_PR"));
 }
 
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn test_jules_dispatch_send_with_key_and_redaction() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let (_temp, root, card_path) = jules_dispatch_test_setup_repo();
 
     let mock_response =
@@ -127,7 +130,7 @@ fn test_jules_dispatch_send_with_key_and_redaction() {
     // Set variable explicitly for the test run
     std::env::set_var("JULES_API_KEY", "secret-key-12345");
     let (code, res) = jules_dispatch::jules_dispatch_execute(&root, &card_path, true, &mock);
-    std::env::remove_var("JULES_API_KEY");
+    std::env::set_var("JULES_API_KEY", "");
 
     assert_eq!(code, 0);
     assert_eq!(res.get("session_id").unwrap(), "sess-9999");
@@ -141,8 +144,9 @@ fn test_jules_dispatch_send_with_key_and_redaction() {
 
 #[test]
 fn test_jules_dispatch_missing_key_exit_2() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let (_temp, root, card_path) = jules_dispatch_test_setup_repo();
-    std::env::remove_var("JULES_API_KEY");
+    std::env::set_var("JULES_API_KEY", "");
 
     let mock = MockHttpTransport {
         response: Ok("{}".to_string()),
