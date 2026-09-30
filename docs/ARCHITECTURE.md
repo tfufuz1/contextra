@@ -191,15 +191,28 @@ Das Repository erzwingt `#![forbid(unsafe_code)]` in allen Crates mit exakt **dr
 
 Jeder `unsafe`-Block erfordert zwingend eine `// SAFETY:`-Begründung.
 
-### 6.2 Locking-Disziplin
+### 6.2 Locking-Disziplin & Lock-Familien
 
 ```
 collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embedder (RwLock)
 ```
 
 - Mehrfach-Locks werden ausnahmslos in fester Reihenfolge von links nach rechts akquiriert.
-- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter Reihenfolge (`acquire_multi_sorted`), um Deadlocks auszuschließen.
+- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter und deduplizierter Reihenfolge via `lock_many_sorted` und die reine synchrone Funktion `sorted_unique_shards`, um Selbst- und Kreuz-Deadlocks auszuschließen.
 - Kein `.await` unter gehaltenen synchronen Mutex/RwLock-Guards.
+
+#### Lock-Familien im Workspace
+
+Contextra setzt drei explizit getrennte Lock-Familien ein, je nach Latenz-, Async- und Verifikationsanforderungen:
+
+1. **`parking_lot` (`parking_lot::Mutex`, `parking_lot::RwLock`)**:
+   - *Verwendungszweck*: Synchroner Hot-Path, In-Memory-Indexstrukturen, Skipartitionierung und Caches (`MemTable`, `SkipList`, `InvertedIndex` Staged Stats, `HnswIndex` Node-Locks).
+   - *Regel*: Höchste Performance, kein Overhead für Async-Contexts; Guards dürfen **niemals** über `.await`-Punkte hinweg gehalten werden.
+2. **`tokio::sync` (`tokio::sync::Mutex`, `tokio::sync::RwLock`)**:
+   - *Verwendungszweck*: Asynchrone Schichten, bei denen Sperren über `.await`-Abläufe oder langlaufende I/O-Operationen gehalten werden müssen (z. B. `KvKeyLocks` in `Collection`, Hintergrund-Maintance, Transaktions-Commit-Pipeline).
+   - *Regel*: Verhindert Thread-Blocking der Tokio-Worker-Threads bei Latenzen im I/O-Pfad.
+3. **`std::sync` (`std::sync::Mutex`, `std::sync::RwLock`)**:
+   - *Verwendungszweck*: Standard-Bibliothekssynchronisation für statische/lazy Initialisierungen (`std::sync::LazyLock`), einfache synchrone State-Kapselung sowie Nebenläufigkeitsmodellierung in Loom-Tests (unter `cfg(loom)` abstrahiert via `loom::sync::Mutex`).
 
 ---
 

@@ -40,12 +40,16 @@ bincode = { workspace = true }
 hmac = "0.12"
 sha2 = "0.10"
 
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
 [dev-dependencies]
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"
+loom = "0.7"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]

@@ -202,6 +202,7 @@ pub trait StorageWrite: Send + Sync + 'static {
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch explizite `BoxFuture`-Rückgabetypen vtable-kompatibel (dyn-safe).
 pub trait StorageEngine: Send + Sync + 'static {
+    // TOCTOU-ACCEPTED: StorageEngine provides default batching/tracking delegate methods.
     /// Retrieves a value by key.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 

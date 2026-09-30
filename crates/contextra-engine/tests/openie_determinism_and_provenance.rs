@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Determinismus- & Provenienztests fuer OpenIE Tripel-Extraktion und edge.source_doc_id-Kaskade.
 // INVARIANTEN: No unwrap/expect/panic in production code; Test A, B, C gemaess §3.2 und §13.

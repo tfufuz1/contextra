@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use contextra_engine::chunker::{
     chunk_text, chunk_text_with_overlap, ChunkerConfig, MarkdownChunker,
 };

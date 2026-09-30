@@ -840,6 +840,7 @@ dependencies = [
  "contextra-types",
  "contextra-vector",
  "hmac",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "serde",

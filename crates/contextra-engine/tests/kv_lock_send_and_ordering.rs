@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use std::sync::Arc;
 use tempfile::TempDir;
 

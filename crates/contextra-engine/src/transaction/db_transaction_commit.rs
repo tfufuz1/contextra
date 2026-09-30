@@ -1,5 +1,5 @@
 use super::compensating_actions::{
-    CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
+    CommitLedger, CompensateGraphAction, CompensateHnswAction,
     CompensateTextAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
@@ -175,30 +175,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             self.tx_id,
         ));
 
-        // Register CompensateLsmAction so storage keys are compensated if any subsequent commit step fails
-        let f_keys = {
-            let mut guard = match self.staged_forward_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-        let r_keys = {
-            let mut guard = match self.staged_reverse_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        ledger.push(CompensateLsmAction::new(
-            self.collection.clone(),
-            intent_key.clone(),
-            Arc::clone(&doc_ids),
-            f_keys,
-            r_keys,
-        ));
-
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
         let intent_tx = TxId::new(
             self.collection
@@ -326,6 +302,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
             return Err(ContextraError::Transaction(storage_err.to_string()));
         }
+
+        // Storage commit succeeded — transaction is committed durably (T-06 / F-20)
+        self.committed.store(true, Ordering::Release);
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
