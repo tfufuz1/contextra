@@ -16,7 +16,7 @@ async fn test_reconstruction_attack_search_quality_baseline() {
 
     // Insert 50 baseline vectors
     for i in 1..=50u64 {
-        let doc_id = DocId::new(i);
+        let doc_id = DocId::new(i.into());
         let vector: Vec<f32> = (0..dimension)
             .map(|d| (i * dimension as u64 + d as u64) as f32 / 1000.0)
             .collect();
