@@ -61,7 +61,10 @@ async fn build_hnsw_index(vectors: &[Vec<f32>]) -> HnswIndex {
     let index = HnswIndex::try_new(config).unwrap();
     let tx = TxId::new(1);
     for (i, v) in vectors.iter().enumerate() {
-        index.insert(tx, DocId::new((i as u64).into()), v).await.unwrap();
+        index
+            .insert(tx, DocId::new((i as u64).into()), v)
+            .await
+            .unwrap();
     }
     index.commit(tx).await.unwrap();
     index
@@ -123,7 +126,10 @@ async fn test_partial_rebuild_recall_regression() {
     let region_ids = select_local_cluster_region(&vectors, 0.15);
     let tx_del = TxId::new(2);
     for id in &region_ids {
-        index.delete(tx_del, DocId::new((*id).into())).await.unwrap();
+        index
+            .delete(tx_del, DocId::new((*id).into()))
+            .await
+            .unwrap();
     }
     index.commit(tx_del).await.unwrap();
 

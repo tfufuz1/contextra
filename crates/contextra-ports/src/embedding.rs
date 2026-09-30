@@ -46,7 +46,10 @@ pub trait TextEmbeddingEngine: Send + Sync + 'static {
 
     /// Generates embeddings for multiple texts.
     /// Default implementation executes sequential calls.
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, crate::Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> BoxFuture<'a, crate::Result<Vec<Vec<f32>>>> {
         Box::pin(async move {
             let mut results = Vec::with_capacity(texts.len());
             for text in texts {

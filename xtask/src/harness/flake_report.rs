@@ -72,7 +72,10 @@ pub fn run_flake_report(args: &[String]) -> i32 {
                 })
             );
         } else {
-            eprintln!("FEHLER: {}\nInstallationshinweis: cargo install cargo-nextest", msg);
+            eprintln!(
+                "FEHLER: {}\nInstallationshinweis: cargo install cargo-nextest",
+                msg
+            );
         }
         return 2;
     }
@@ -129,7 +132,10 @@ pub fn run_flake_report(args: &[String]) -> i32 {
         "flaky_detected": flaky_detected
     });
 
-    let _ = fs::write(&report_file, serde_json::to_string_pretty(&report_json).unwrap_or_default());
+    let _ = fs::write(
+        &report_file,
+        serde_json::to_string_pretty(&report_json).unwrap_or_default(),
+    );
 
     if use_json {
         println!(

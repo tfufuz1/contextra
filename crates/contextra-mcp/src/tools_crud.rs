@@ -53,11 +53,19 @@ impl McpServer {
 
         if let Some(ae_val) = args.get("auto_extraction") {
             let ae_str = ae_val.as_str().ok_or_else(|| {
-                McpError::invalid_params("Invalid params: 'auto_extraction' must be a string ('enabled' or 'disabled')")
+                McpError::invalid_params(
+                    "Invalid params: 'auto_extraction' must be a string ('enabled' or 'disabled')",
+                )
             })?;
             match ae_str.to_lowercase().as_str() {
-                "enabled" => profile.auto_extraction = contextra::collection_profile::AutoExtractionMode::Enabled,
-                "disabled" => profile.auto_extraction = contextra::collection_profile::AutoExtractionMode::Disabled,
+                "enabled" => {
+                    profile.auto_extraction =
+                        contextra::collection_profile::AutoExtractionMode::Enabled
+                }
+                "disabled" => {
+                    profile.auto_extraction =
+                        contextra::collection_profile::AutoExtractionMode::Disabled
+                }
                 invalid => {
                     return Err(McpError::invalid_params(format!(
                         "Invalid auto_extraction '{invalid}'. Valid options are: 'enabled', 'disabled'"

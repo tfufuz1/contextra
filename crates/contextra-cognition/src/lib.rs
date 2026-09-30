@@ -2,7 +2,6 @@
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.
-
 #![forbid(unsafe_code)]
 
 pub mod aggregation_phase;

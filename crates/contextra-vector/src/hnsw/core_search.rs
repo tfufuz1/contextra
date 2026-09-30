@@ -633,13 +633,9 @@ impl HnswIndex {
                 current_ef.max(k)
             };
 
-            let candidates = self.inner.search_layer(
-                query,
-                query_quantized.as_deref(),
-                &ep,
-                ef,
-                0,
-            )?;
+            let candidates =
+                self.inner
+                    .search_layer(query, query_quantized.as_deref(), &ep, ef, 0)?;
 
             let mmap_guard = self.inner.cold.mmap_index.read();
             let mmap_node_count = mmap_guard

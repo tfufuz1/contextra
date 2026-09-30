@@ -2,10 +2,11 @@
 // FILE-CONTEXT
 // ZWECK: Determinismus- & Provenienztests fuer OpenIE Tripel-Extraktion und edge.source_doc_id-Kaskade.
 // INVARIANTEN: No unwrap/expect/panic in production code; Test A, B, C gemaess §3.2 und §13.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::collection::crud::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
+use contextra_engine::collection::crud::{
+    AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig,
+};
 #[cfg(feature = "entity-extraction")]
 use contextra_engine::extraction::extract_triples;
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};

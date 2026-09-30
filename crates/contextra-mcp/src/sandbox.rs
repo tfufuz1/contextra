@@ -719,10 +719,7 @@ mod tests {
                 ToolCategory::CodeExecution,
                 "Listed tool '{name}' must not classify as CodeExecution"
             );
-            assert_eq!(
-                cat, *expected_cat,
-                "Tool '{name}' category mismatch"
-            );
+            assert_eq!(cat, *expected_cat, "Tool '{name}' category mismatch");
         }
 
         // Assert explain is DatabaseRead

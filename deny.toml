@@ -7,7 +7,11 @@ feature-depth = 1
 [advisories]
 ignore = [
     "RUSTSEC-2024-0384", # number_prefix
+    "RUSTSEC-2025-0119", # number_prefix
     "RUSTSEC-2024-0436", # paste
+    "RUSTSEC-2025-0141", # bincode
+    "RUSTSEC-2025-0057", # fxhash
+    "RUSTSEC-2026-0253", # lru
     "RUSTSEC-2026-0176", # pyo3
     "RUSTSEC-2026-0177", # pyo3
     "RUSTSEC-2026-0285", # rustls
@@ -29,6 +33,7 @@ ignore = [
     "RUSTSEC-2026-0096", # wasmtime
     "RUSTSEC-2026-0222", # wasmtime
     "RUSTSEC-2026-0269", # wasmtime
+    "RUSTSEC-2026-0316", # wasmtime
 ]
 
 [licenses]
@@ -80,15 +85,15 @@ deny = [
         "tower",
     ] },
     # §4.2 Ring-Modell: Candle-Inferenz nur in contextra-infer-candle (TRANSITION; künftig contextra-infer-candle) sowie Candle-Eigencrates
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle", "contextra-infer-candle"] },
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle"] },
     # §4.2 Ring-Modell: ONNX/ort nur in contextra-infer-onnx (TRANSITION; künftig contextra-infer-onnx)
-    { crate = "ort", wrappers = ["contextra-infer-onnx", "contextra-infer-onnx"] },
+    { crate = "ort", wrappers = ["contextra-infer-onnx"] },
     # §4.2 Ring-Modell: PyO3 nur in contextra-py (isoliertes Workspace-Crate) und Interop-Crates
     { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
     # §4.2 Ring-Modell: reqwest nur in contextra-infer-ollama (TRANSITION; künftig contextra-infer-ollama)
-    { crate = "reqwest", wrappers = ["contextra-infer-ollama", "contextra-infer-ollama"] },
+    { crate = "reqwest", wrappers = ["contextra-infer-ollama"] },
     # §4.2 Ring-Modell: Wasmtime-Sandbox nur in contextra-sandbox
-    { crate = "wasmtime", wrappers = ["contextra-sandbox", "contextra-privacy"] },
+    { crate = "wasmtime", wrappers = ["contextra-sandbox"] },
 ]
 
 [sources]

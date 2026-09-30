@@ -467,10 +467,13 @@ async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_typ
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let storage = Arc::new(LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    }).await?);
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
     let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
@@ -545,10 +548,13 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let storage = Arc::new(LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    }).await?);
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
     let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
@@ -588,7 +594,8 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
     )
     .await?;
 
-    let weights = contextra_types::FusionWeights::new(0.40, 0.30, 0.30).map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
+    let weights = contextra_types::FusionWeights::new(0.40, 0.30, 0.30)
+        .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
 
     let rrf_results = col
         .hybrid_search_with_strategy(
@@ -632,7 +639,8 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
 }
 
 #[tokio::test]
-async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf() -> contextra_types::Result<()> {
+async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
+) -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
@@ -641,10 +649,13 @@ async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf() -
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let storage = Arc::new(LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    }).await?);
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
     let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
@@ -705,10 +716,13 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let storage = Arc::new(LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    }).await?);
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
     let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
@@ -798,7 +812,8 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
 }
 
 #[tokio::test]
-async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies() -> contextra_types::Result<()> {
+async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies(
+) -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{EntityId, FusionStrategy};
@@ -807,10 +822,13 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let storage = Arc::new(LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    }).await?);
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
     let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
@@ -841,7 +859,8 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
 
     let eid_target = EntityId::from_key("doc_comm_target")?;
 
-    col.relate("doc_comm_target", "doc_neighbor", "knows").await?;
+    col.relate("doc_comm_target", "doc_neighbor", "knows")
+        .await?;
     col.run_community_detection().await?;
 
     // Test with FusionStrategy::Rrf

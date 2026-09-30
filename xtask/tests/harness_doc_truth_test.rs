@@ -101,23 +101,43 @@ See `crates/contextra-types/src/lib.rs`
     .unwrap();
 
     // 7. .jules/COMMON_LLM_ERRORS.md
-    fs::write(root.join(".jules/COMMON_LLM_ERRORS.md"), "# Common Errors\n").unwrap();
+    fs::write(
+        root.join(".jules/COMMON_LLM_ERRORS.md"),
+        "# Common Errors\n",
+    )
+    .unwrap();
     // 8. .jules/SCHEDULED_AUDIT.md
-    fs::write(root.join(".jules/SCHEDULED_AUDIT.md"), "# Scheduled Audit\n").unwrap();
+    fs::write(
+        root.join(".jules/SCHEDULED_AUDIT.md"),
+        "# Scheduled Audit\n",
+    )
+    .unwrap();
     // 9. .jules/AUDIT_INTAKE_PROTOCOL.md
-    fs::write(root.join(".jules/AUDIT_INTAKE_PROTOCOL.md"), "# Audit Intake\n").unwrap();
+    fs::write(
+        root.join(".jules/AUDIT_INTAKE_PROTOCOL.md"),
+        "# Audit Intake\n",
+    )
+    .unwrap();
     // 10. .jules/ISSUE_AUTOMATION_POLICY.md
-    fs::write(root.join(".jules/ISSUE_AUTOMATION_POLICY.md"), "# Automation Policy\n").unwrap();
+    fs::write(
+        root.join(".jules/ISSUE_AUTOMATION_POLICY.md"),
+        "# Automation Policy\n",
+    )
+    .unwrap();
 
     // 11. Crates
     // contextra-types (non-island)
     let types_dir = root.join("crates/contextra-types");
     fs::create_dir_all(types_dir.join("src")).unwrap();
-    fs::write(types_dir.join("Cargo.toml"), r#"[package]
+    fs::write(
+        types_dir.join("Cargo.toml"),
+        r#"[package]
 name = "contextra-types"
 version = "0.1.0"
 edition = "2021"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     fs::write(types_dir.join("AGENTS.md"), "# Types AGENTS\n").unwrap();
     fs::write(
         types_dir.join("src/lib.rs"),
@@ -128,11 +148,15 @@ edition = "2021"
     // contextra-simd (unsafe-island)
     let simd_dir = root.join("crates/contextra-simd");
     fs::create_dir_all(simd_dir.join("src")).unwrap();
-    fs::write(simd_dir.join("Cargo.toml"), r#"[package]
+    fs::write(
+        simd_dir.join("Cargo.toml"),
+        r#"[package]
 name = "contextra-simd"
 version = "0.1.0"
 edition = "2021"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     fs::write(simd_dir.join("AGENTS.md"), "# SIMD AGENTS\n").unwrap();
     fs::write(
         simd_dir.join("src/lib.rs"),
@@ -162,7 +186,8 @@ fn test_doc_truth_valid_workspace_passes() {
     let root = temp_repo.path();
     setup_valid_workspace(root);
 
-    let code = doc_truth::run_doc_truth(&["--root".to_string(), root.to_str().unwrap().to_string()]);
+    let code =
+        doc_truth::run_doc_truth(&["--root".to_string(), root.to_str().unwrap().to_string()]);
     assert_eq!(code, 0, "Valid workspace must pass doc-truth check");
 }
 
@@ -187,7 +212,10 @@ Reference to `non_existent_file_xyz.rs`.
         root.to_str().unwrap().to_string(),
         "--strict".to_string(),
     ]);
-    assert_eq!(code, 1, "Phantom path reference must trigger failure in strict mode");
+    assert_eq!(
+        code, 1,
+        "Phantom path reference must trigger failure in strict mode"
+    );
 }
 
 #[test]
@@ -212,7 +240,10 @@ Run `cargo xtask future-command` <!-- harness:planned -->
         root.to_str().unwrap().to_string(),
         "--strict".to_string(),
     ]);
-    assert_eq!(code, 0, "Ignored paths and planned commands should not fail gate");
+    assert_eq!(
+        code, 0,
+        "Ignored paths and planned commands should not fail gate"
+    );
 }
 
 #[test]
@@ -256,7 +287,10 @@ fn test_doc_truth_unsafe_mismatch_fails() {
         root.to_str().unwrap().to_string(),
         "--strict".to_string(),
     ]);
-    assert_eq!(code, 1, "Unsafe code in non-island crate must fail doc-truth");
+    assert_eq!(
+        code, 1,
+        "Unsafe code in non-island crate must fail doc-truth"
+    );
 }
 
 #[test]
@@ -282,7 +316,10 @@ fn test_doc_truth_crate_table_mismatch_fails() {
         root.to_str().unwrap().to_string(),
         "--strict".to_string(),
     ]);
-    assert_eq!(code, 1, "Missing crate in JULES_CONTEXT.md crate table must fail doc-truth");
+    assert_eq!(
+        code, 1,
+        "Missing crate in JULES_CONTEXT.md crate table must fail doc-truth"
+    );
 }
 
 #[test]
@@ -336,9 +373,7 @@ fn test_doc_truth_real_repo_standalone() {
         }
     }
 
-    let code = doc_truth::run_doc_truth(&[
-        "--root".to_string(),
-        root.to_str().unwrap().to_string(),
-    ]);
+    let code =
+        doc_truth::run_doc_truth(&["--root".to_string(), root.to_str().unwrap().to_string()]);
     assert_eq!(code, 0, "doc-truth on real repo must return exit code 0");
 }

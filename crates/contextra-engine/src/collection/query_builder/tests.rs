@@ -1,9 +1,9 @@
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
-use contextra_ports::{BoxFuture, Reranker};
+use contextra_ports::{BoxFuture, RerankResult, Reranker};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{FilterExpr, HybridQuery, RerankResult};
+use contextra_types::{FilterExpr, HybridQuery};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::AtomicU64;

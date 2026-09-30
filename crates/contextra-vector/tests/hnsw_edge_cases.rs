@@ -75,7 +75,9 @@ async fn test_ef_construction_boundary() -> Result<(), Box<dyn std::error::Error
 
     for i in 1..=ef_const {
         let vec = vec![i as f32, 0.0, 0.0, 0.0];
-        index.insert(tx, DocId::new((i as u64).into()), &vec).await?;
+        index
+            .insert(tx, DocId::new((i as u64).into()), &vec)
+            .await?;
     }
     index.commit(tx).await?;
 
@@ -107,7 +109,9 @@ async fn test_duplicate_vectors_tie_breaking() -> Result<(), Box<dyn std::error:
     let duplicate_vec = vec![1.0, 2.0, 3.0, 4.0];
 
     for i in 1..=20u64 {
-        index.insert(tx, DocId::new(i.into()), &duplicate_vec).await?;
+        index
+            .insert(tx, DocId::new(i.into()), &duplicate_vec)
+            .await?;
     }
     index.commit(tx).await?;
 
@@ -179,7 +183,9 @@ async fn test_nan_in_embeddings_rejected() -> Result<(), Box<dyn std::error::Err
     ];
 
     for (i, bad_vec) in invalid_vectors.iter().enumerate() {
-        let res = index.insert(tx, DocId::new((i as u64 + 1).into()), bad_vec).await;
+        let res = index
+            .insert(tx, DocId::new((i as u64 + 1).into()), bad_vec)
+            .await;
         assert!(
             matches!(res, Err(ContextraError::InvalidInput(_))),
             "Expected InvalidInput error for vector containing non-finite value, got: {:?}",

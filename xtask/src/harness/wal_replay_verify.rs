@@ -69,7 +69,10 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
             }
             "--tests" => {
                 if i + 1 < args.len() {
-                    custom_tests = args[i + 1].split(',').map(|s| s.trim().to_string()).collect();
+                    custom_tests = args[i + 1]
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
                     i += 1;
                 }
             }
@@ -106,7 +109,10 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
             findings: vec![],
         };
         if json {
-            println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&output).unwrap_or_default()
+            );
         } else {
             println!("wal-replay-verify: not_applicable (Diff touched no WAL/store crates)");
         }
@@ -115,7 +121,10 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
 
     let default_tests = vec![
         ("chaos_matrix", "chaos_wal_corruption_during_flush"),
-        ("chaos_matrix", "chaos_manifest_corruption_during_compaction"),
+        (
+            "chaos_matrix",
+            "chaos_manifest_corruption_during_compaction",
+        ),
         ("chaos_matrix", "chaos_concurrent_crash_recovery_matrix"),
         ("crash_recovery", ""),
         ("crash_prefix_enumeration", ""),
@@ -127,7 +136,15 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
     if custom_tests.is_empty() {
         for (target, filter) in default_tests {
             let list_output = Command::new("cargo")
-                .args(["test", "-p", "contextra-store", "--test", target, "--", "--list"])
+                .args([
+                    "test",
+                    "-p",
+                    "contextra-store",
+                    "--test",
+                    target,
+                    "--",
+                    "--list",
+                ])
                 .current_dir(&root)
                 .output();
 
@@ -179,8 +196,12 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
                                 severity: "error".to_string(),
                                 file: format!("crates/contextra-store/tests/{}.rs", target),
                                 line: 0,
-                                message: format!("WAL replay crash test '{}:{}' failed", target, filter),
-                                fix: "Investigate crash recovery logic and state replay".to_string(),
+                                message: format!(
+                                    "WAL replay crash test '{}:{}' failed",
+                                    target, filter
+                                ),
+                                fix: "Investigate crash recovery logic and state replay"
+                                    .to_string(),
                             });
                         }
                         break;
@@ -200,7 +221,10 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
                     severity: "error".to_string(),
                     file: format!("crates/contextra-store/tests/{}.rs", target),
                     line: 0,
-                    message: format!("Test '{}:{}' exceeded budget of {}s", target, filter, budget_secs),
+                    message: format!(
+                        "Test '{}:{}' exceeded budget of {}s",
+                        target, filter, budget_secs
+                    ),
                     fix: "Optimize test runtime or increase --budget-secs".to_string(),
                 });
             }
@@ -208,7 +232,15 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
     } else {
         for test_name in &custom_tests {
             let list_output = Command::new("cargo")
-                .args(["test", "-p", "contextra-store", "--test", test_name, "--", "--list"])
+                .args([
+                    "test",
+                    "-p",
+                    "contextra-store",
+                    "--test",
+                    test_name,
+                    "--",
+                    "--list",
+                ])
                 .current_dir(&root)
                 .output();
 
@@ -219,7 +251,10 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
                     severity: "error".to_string(),
                     file: format!("crates/contextra-store/tests/{}.rs", test_name),
                     line: 0,
-                    message: format!("Test target '{}' does not exist in contextra-store", test_name),
+                    message: format!(
+                        "Test target '{}' does not exist in contextra-store",
+                        test_name
+                    ),
                     fix: "Provide a valid test target name".to_string(),
                 });
                 continue;
@@ -258,7 +293,8 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
                                 file: format!("crates/contextra-store/tests/{}.rs", test_name),
                                 line: 0,
                                 message: format!("WAL replay crash test '{}' failed", test_name),
-                                fix: "Investigate crash recovery logic and state replay".to_string(),
+                                fix: "Investigate crash recovery logic and state replay"
+                                    .to_string(),
                             });
                         }
                         break;
@@ -307,11 +343,19 @@ pub fn run_wal_replay_verify(args: &[String]) -> i32 {
     };
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
     } else {
         println!("{}", summary);
         for f in &findings {
-            println!("  [{}] WAS: {} - {}", f.severity.to_uppercase(), f.id, f.message);
+            println!(
+                "  [{}] WAS: {} - {}",
+                f.severity.to_uppercase(),
+                f.id,
+                f.message
+            );
         }
     }
 
