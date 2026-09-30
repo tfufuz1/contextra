@@ -16,12 +16,11 @@ use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
 use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
-use contextra_ports::StorageEngine;
+use contextra_ports::{Clock, StorageEngine, SystemClock};
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 /// Reason for exiting `OrchestratorEngine::run_event_loop`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,6 +37,7 @@ pub struct OrchestratorEngine {
     pub tools: HashMap<String, Box<dyn AgentTool>>,
     pub checkpoint_store: Arc<dyn CheckpointRegistry>,
     pub dead_letter_queue: Option<DeadLetterQueue>,
+    pub clock: Arc<dyn Clock>,
 }
 
 impl OrchestratorEngine {
@@ -48,7 +48,22 @@ impl OrchestratorEngine {
             tools: HashMap::new(),
             checkpoint_store: Arc::new(checkpoint_store),
             dead_letter_queue: Some(DeadLetterQueue::new(storage)),
+            clock: Arc::new(SystemClock::new()),
         })
+    }
+
+    /// Sets a custom [`Clock`] implementation for deterministic time management.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    fn now_secs(&self) -> u64 {
+        self.clock.now_unix_nanos() / 1_000_000_000
+    }
+
+    fn now_millis(&self) -> u64 {
+        self.clock.now_unix_nanos() / 1_000_000
     }
 
     /// Attempts to construct an [`OrchestratorEngine`] directly from a Contextra DB handle.
@@ -105,6 +120,7 @@ impl OrchestratorEngine {
                 tools: HashMap::new(),
                 checkpoint_store: Arc::new(FallbackRegistry),
                 dead_letter_queue: Some(DeadLetterQueue::new(storage)),
+                clock: Arc::new(SystemClock::new()),
             }
         })
     }
@@ -240,10 +256,7 @@ impl OrchestratorEngine {
                                         },
                                         input: input.clone(),
                                         attempt: 0,
-                                        failed_at_secs: SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_secs(),
+                                        failed_at_secs: self.now_secs(),
                                     };
                                     if let Err(e) = dlq.push(&letter).await {
                                         tracing::error!("DLQ push failed: {}", e);
@@ -292,10 +305,7 @@ impl OrchestratorEngine {
                                                 },
                                                 input: input.clone(),
                                                 attempt,
-                                                failed_at_secs: SystemTime::now()
-                                                    .duration_since(std::time::UNIX_EPOCH)
-                                                    .unwrap_or_default()
-                                                    .as_secs(),
+                                                failed_at_secs: self.now_secs(),
                                             };
                                             if let Err(dlq_err) = dlq.push(&letter).await {
                                                 tracing::error!(
@@ -334,10 +344,7 @@ impl OrchestratorEngine {
                                                     },
                                                     input: input.clone(),
                                                     attempt,
-                                                    failed_at_secs: SystemTime::now()
-                                                        .duration_since(std::time::UNIX_EPOCH)
-                                                        .unwrap_or_default()
-                                                        .as_secs(),
+                                                    failed_at_secs: self.now_secs(),
                                                 };
                                                 if let Err(dlq_err) = dlq.push(&letter).await {
                                                     tracing::error!("DLQ push failed: {}", dlq_err);
@@ -386,10 +393,7 @@ impl OrchestratorEngine {
                                                 },
                                                 input: input.clone(),
                                                 attempt,
-                                                failed_at_secs: SystemTime::now()
-                                                    .duration_since(std::time::UNIX_EPOCH)
-                                                    .unwrap_or_default()
-                                                    .as_secs(),
+                                                failed_at_secs: self.now_secs(),
                                             };
                                             if let Err(dlq_err) = dlq.push(&letter).await {
                                                 tracing::error!("DLQ push failed: {}", dlq_err);
@@ -633,10 +637,7 @@ impl OrchestratorEngine {
             seq_no,
             tx_id,
             metadata,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0),
+            created_at: self.now_millis(),
         };
 
         self.checkpoint_store.save_checkpoint(meta).await
