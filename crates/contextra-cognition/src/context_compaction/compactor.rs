@@ -1,22 +1,47 @@
 use contextra_engine::collection::Collection;
 use contextra_engine::ProvenanceRecord;
-use contextra_ports::{ContextSegment, LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_ports::{
+    ContextSegment, LlmTextGenerator, Rng, SeededRng, StorageEngine, VectorIndex,
+};
 use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
+use std::sync::Arc;
 
 use super::session::ConsolidationSession;
 use super::types::{CompactedContext, CompactionStrategy, StatusToken};
 
 /// Context Compaction Engine.
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct ContextCompactor {
     budget: TokenBudget,
     strategy: CompactionStrategy,
+    rng: Arc<dyn Rng>,
+}
+
+impl std::fmt::Debug for ContextCompactor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContextCompactor")
+            .field("budget", &self.budget)
+            .field("strategy", &self.strategy)
+            .field("rng", &"<dyn Rng>")
+            .finish()
+    }
 }
 
 impl ContextCompactor {
     /// Creates a new `ContextCompactor` with given `TokenBudget` and `CompactionStrategy`.
     pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self {
-        Self { budget, strategy }
+        // Default: SeededRng mit fester Konstante. Der Composition Root soll per with_rng einen Entropie-Seed setzen.
+        Self {
+            budget,
+            strategy,
+            rng: Arc::new(SeededRng::new(0x434F_4E54_5854_5241)),
+        }
+    }
+
+    /// Setzt den Zufallszahlengenerator für Backoff-Jitter.
+    pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
+        self.rng = rng;
+        self
     }
 
     /// Kompaktiert eine Liste von Chunks auf das Token-Budget.
@@ -208,13 +233,39 @@ impl ContextCompactor {
     /// Bei einem Konflikt ruft refresh() die veränderten DocIds ab.
     /// Falls nur ein Teil der Source-Dokumente geändert wurde, wird nur dieser Teil
     /// neu zusammengefasst (delta re-summarization).
-    /// Exponentieller Backoff: 10ms → 20ms → 40ms (jitter: +/- 5ms)
+    /// Exponentieller Backoff: 10ms → 20ms → 40ms (jitter: 0..=10 ms)
     pub async fn consolidate_with_retry<S, V, G>(
         collection: &Collection<S, V>,
         source_doc_ids: &[DocId],
         target_doc_id: DocId,
         generator: &G,
         max_retries: usize,
+    ) -> Result<()>
+    where
+        S: StorageEngine,
+        V: VectorIndex,
+        G: LlmTextGenerator + ?Sized,
+    {
+        let default_rng = SeededRng::new(0x434F_4E54_5854_5241);
+        Self::consolidate_with_retry_with_rng(
+            collection,
+            source_doc_ids,
+            target_doc_id,
+            generator,
+            max_retries,
+            &default_rng,
+        )
+        .await
+    }
+
+    /// Führt eine Konsolidierung durch und wiederholt bei OCC-Konflikten automatisch mit einem konfigurierbaren RNG.
+    pub async fn consolidate_with_retry_with_rng<S, V, G>(
+        collection: &Collection<S, V>,
+        source_doc_ids: &[DocId],
+        target_doc_id: DocId,
+        generator: &G,
+        max_retries: usize,
+        rng: &dyn Rng,
     ) -> Result<()>
     where
         S: StorageEngine,
@@ -242,10 +293,7 @@ impl ContextCompactor {
                     );
                     // Exponentieller Backoff mit Jitter
                     let base_ms = 10u64 * (1u64 << attempt.min(6));
-                    let jitter_ms: u64 = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.subsec_nanos() as u64 % 11)
-                        .unwrap_or(0);
+                    let jitter_ms: u64 = rng.next_u64() % 11;
                     tokio::time::sleep(std::time::Duration::from_millis(base_ms + jitter_ms)).await;
                     continue;
                 }
