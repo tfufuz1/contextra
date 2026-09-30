@@ -1,0 +1,10 @@
+{
+  "disclaimer": "Hinweis: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst 100000 Chunks; die Zahlen sind nicht auf größere Bestände extrapolierbar.",
+  "total_docs_requested": 100000,
+  "step_size": 10000,
+  "dimension": 128,
+  "seed": 42,
+  "aborted_at_docs": 0,
+  "error": "Error during insertion: Transaction error: Storage error: Memory budget exceeded (95%)",
+  "intervals": []
+}
