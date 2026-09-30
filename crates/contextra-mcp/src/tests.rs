@@ -102,6 +102,16 @@ async fn test_tools_list_returns_all_tools() {
     assert!(names.contains(&"contextra_delete"));
     assert!(names.contains(&"contextra_create_collection"));
     assert!(names.contains(&"contextra_drop_collection"));
+
+    // Dynamic assertion: every tool returned in tools/list MUST NOT classify as CodeExecution (INV-MCP-CLASSIFY-1)
+    for name in &names {
+        let cat = crate::sandbox::McpSandbox::classify_method(name);
+        assert_ne!(
+            cat,
+            crate::sandbox::ToolCategory::CodeExecution,
+            "Tool '{name}' listed in tools/list classified as CodeExecution"
+        );
+    }
 }
 
 #[tokio::test]

@@ -2437,15 +2437,6 @@ fn main() {
                 process::exit(1);
             }
         }
-        "check-commit-diff-integrity" => {
-            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) =
-                check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
-            {
-                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
-                process::exit(1);
-            }
-        }
         "check-commit-messages" => {
             if let Err(e) = check_commit_messages::check_commit_messages() {
                 eprintln!("❌ check-commit-messages failed: {}", e);
