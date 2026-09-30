@@ -590,9 +590,10 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
+ "contextra-cognition",
  "contextra-core",
  "contextra-crypto",
- "contextra-db",
+ "contextra-engine",
  "contextra-infer-candle",
  "contextra-infer-ollama",
  "contextra-infer-onnx",
@@ -630,7 +631,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "contextra-checkpoint",
- "contextra-db",
+ "contextra-engine",
  "contextra-graph",
  "contextra-ports",
  "contextra-router",
@@ -674,12 +675,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "contextra-core",
- "contextra-db",
- "contextra-graph",
+ "contextra-engine",
  "contextra-infer-onnx",
  "contextra-store",
- "contextra-text",
- "contextra-vector",
  "criterion",
  "hdrhistogram",
  "libc",
@@ -690,8 +688,6 @@ dependencies = [
  "sled",
  "tempfile",
  "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -779,40 +775,6 @@ dependencies = [
  "subtle",
  "thiserror 2.0.20",
  "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "contextra-db"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "contextra-adapt",
- "contextra-checkpoint",
- "contextra-cognition",
- "contextra-crypto",
- "contextra-engine",
- "contextra-graph",
- "contextra-ports",
- "contextra-rank",
- "contextra-store",
- "contextra-sys",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
- "criterion",
- "ed25519-dalek",
- "parking_lot 0.12.5",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
  "tracing",
  "zeroize",
 ]
@@ -991,9 +953,6 @@ dependencies = [
  "contextra-adapt",
  "contextra-agent",
  "contextra-crypto",
- "contextra-infer-candle",
- "contextra-infer-ollama",
- "contextra-infer-onnx",
  "contextra-license",
  "contextra-ports",
  "contextra-privacy",
@@ -1003,7 +962,6 @@ dependencies = [
  "futures-util",
  "parking_lot 0.12.5",
  "rand 0.8.8",
- "scc",
  "serde",
  "serde_json",
  "tempfile",
@@ -1073,15 +1031,10 @@ dependencies = [
 name = "contextra-py"
 version = "0.1.0"
 dependencies = [
- "contextra-adapt",
  "contextra-core",
- "contextra-db",
- "contextra-rank",
- "contextra-router",
- "contextra-store",
+ "contextra-engine",
  "flatbuffers",
  "numpy",
- "parking_lot 0.12.5",
  "pyo3",
  "pythonize",
  "serde_json",
@@ -1111,7 +1064,8 @@ dependencies = [
  "arc-swap",
  "bytes",
  "contextra-adapt",
- "contextra-db",
+ "contextra-cognition",
+ "contextra-engine",
  "contextra-graph",
  "contextra-ports",
  "contextra-privacy",

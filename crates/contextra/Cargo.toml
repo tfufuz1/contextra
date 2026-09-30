@@ -11,7 +11,8 @@ contextra-core = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-license = { workspace = true }
 contextra-store = { workspace = true }
-contextra-db = { workspace = true }
+contextra-engine = { workspace = true }
+contextra-cognition = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
 contextra-privacy = { workspace = true, optional = true }
 serde = { workspace = true }
@@ -35,7 +36,7 @@ sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]
 audit-export = []
 avv-generator = []
-onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
+onnx = ["contextra-infer-onnx/onnx", "contextra-engine/onnx"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
 router = ["contextra-router", "contextra-rank"]

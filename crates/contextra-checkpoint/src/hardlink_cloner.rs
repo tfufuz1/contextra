@@ -39,14 +39,20 @@ mod fs {
     }
 
     pub async fn metadata<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomMetadata> {
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "loom mock"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "loom mock",
+        ))
     }
 
     pub async fn remove_file<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {
         Ok(())
     }
 
-    pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<()> {
+    pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(
+        _from: P,
+        _to: Q,
+    ) -> std::io::Result<()> {
         Ok(())
     }
 
@@ -131,9 +137,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                 .map_err(ContextraError::Io)?;
 
             // 3. Scan source directory for SSTable files (.sst)
-            let mut read_dir = fs::read_dir(source_dir)
-                .await
-                .map_err(ContextraError::Io)?;
+            let mut read_dir = fs::read_dir(source_dir).await.map_err(ContextraError::Io)?;
 
             let mut linked_files = Vec::new();
 

@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --example quickstart`
 
-use contextra_db::{Contextra, ContextraConfig};
+use contextra::{Contextra, ContextraConfig};
 
 #[tokio::main]
 async fn main() -> contextra_types::Result<()> {

@@ -46,14 +46,14 @@ fn test_stategraph_complex_workflow() {
 #[tokio::test]
 async fn test_decision_node_condition_branching() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         dimension: 4,
         max_elements: 1000,
-        distance_metric: contextra_db::DistanceMetric::Cosine,
+        distance_metric: contextra_engine::DistanceMetric::Cosine,
         ..Default::default()
     };
     let db = std::sync::Arc::new(
-        contextra_db::Contextra::open_with_config(tmp.path(), config)
+        contextra_engine::Contextra::open_with_config(tmp.path(), config)
             .await
             .expect("open db"),
     );

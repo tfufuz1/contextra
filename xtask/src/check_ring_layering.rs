@@ -57,8 +57,7 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         | "contextra-cognition"
         | "contextra-privacy"
         | "contextra-router"
-        | "contextra-agent"
-        | "contextra-db" => Some(Ring::Ring3),
+        | "contextra-agent" => Some(Ring::Ring3),
 
         // Ring 4
         "contextra"
@@ -391,7 +390,7 @@ mod tests {
         assert_eq!(get_crate_ring("contextra-core"), Some(Ring::Ring0));
         assert_eq!(get_crate_ring("contextra-store"), Some(Ring::Ring1));
         assert_eq!(get_crate_ring("contextra-infer-candle"), Some(Ring::Ring2));
-        assert_eq!(get_crate_ring("contextra-db"), Some(Ring::Ring3));
+        assert_eq!(get_crate_ring("contextra-engine"), Some(Ring::Ring3));
         assert_eq!(get_crate_ring("contextra-mcp"), Some(Ring::Ring4));
         assert_eq!(get_crate_ring("xtask"), Some(Ring::Tooling));
         assert_eq!(get_crate_ring("nonexistent"), None);

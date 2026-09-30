@@ -1,6 +1,6 @@
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;

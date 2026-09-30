@@ -10,11 +10,11 @@ use contextra_types::TokenBudget;
 #[tokio::test]
 async fn test_router_engine_instance_decision_id_independence() {
     let dir = tempfile::tempdir().unwrap();
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+    let db = contextra_engine::Contextra::open_with_config(dir.path(), config)
         .await
         .unwrap();
     let collection = db.collection("default").await.unwrap();
@@ -48,11 +48,11 @@ async fn test_router_engine_instance_decision_id_independence() {
 async fn test_calibration_stats_initial_state(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = contextra_engine::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     let profile1 = SlmProfile::new(
@@ -99,11 +99,11 @@ fn test_profile_calibration_state_reset() {
 async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn std::error::Error>>
 {
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = contextra_engine::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     let profile = SlmProfile::new(
@@ -134,13 +134,13 @@ async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn
 #[cfg(feature = "bandit-routing")]
 fn test_pending_bandit_eviction_unit() {
     let dir = tempfile::tempdir().unwrap();
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+        let db = contextra_engine::Contextra::open_with_config(dir.path(), config)
             .await
             .unwrap();
         let collection = db.collection("default").await.unwrap();

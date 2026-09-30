@@ -90,7 +90,7 @@ sind synchron und kurz.
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-ports` (L0), `contextra-db` (L2, nur `dev-dependencies`)
+- **Erlaubte Imports**: `contextra-core` (L0), `contextra-ports` (L0), `contextra-engine` (L2, nur `dev-dependencies`)
 - **Verbotene Imports**: `contextra-mcp` (L4)
 - **Genutzt von**: `contextra-mcp`, ggf. `contextra-agent` als Tool
 

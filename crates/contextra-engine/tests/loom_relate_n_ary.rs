@@ -5,12 +5,12 @@
 //! cleanly without deadlocks thanks to canonical participant EntityId sorting before lock acquisition.
 //!
 //! Execution:
-//! - Standard test: cargo test -p contextra-db --test loom_relate_n_ary
-//! - Loom execution: RUSTFLAGS="--cfg loom" cargo test -p contextra-db --test loom_relate_n_ary
+//! - Standard test: cargo test -p contextra-engine --test loom_relate_n_ary
+//! - Loom execution: RUSTFLAGS="--cfg loom" cargo test -p contextra-engine --test loom_relate_n_ary
 
 #![allow(unexpected_cfgs)]
 
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Collection, Contextra, ContextraConfig};
 use std::sync::Arc;
 use tempfile::TempDir;
 

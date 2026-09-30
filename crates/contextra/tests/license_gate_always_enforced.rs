@@ -70,10 +70,11 @@ async fn compliance_profile_with_valid_signed_license_activates_deletion_proof()
     ));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
-    let (payload_bytes, signature, verifying_key_bytes) = SignedLicenseGate::create_test_signed_payload(
-        vec![FeatureRing::Sovereign, FeatureRing::Compliance],
-        None,
-    );
+    let (payload_bytes, signature, verifying_key_bytes) =
+        SignedLicenseGate::create_test_signed_payload(
+            vec![FeatureRing::Sovereign, FeatureRing::Compliance],
+            None,
+        );
 
     let db = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
@@ -106,10 +107,11 @@ async fn expired_signature_rejected() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 
     let past_timestamp = 1000;
-    let (payload_bytes, signature, verifying_key_bytes) = SignedLicenseGate::create_test_signed_payload(
-        vec![FeatureRing::Sovereign, FeatureRing::Compliance],
-        Some(past_timestamp),
-    );
+    let (payload_bytes, signature, verifying_key_bytes) =
+        SignedLicenseGate::create_test_signed_payload(
+            vec![FeatureRing::Sovereign, FeatureRing::Compliance],
+            Some(past_timestamp),
+        );
 
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
@@ -145,10 +147,11 @@ async fn tampered_signature_rejected() {
     ));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
-    let (payload_bytes, mut signature, verifying_key_bytes) = SignedLicenseGate::create_test_signed_payload(
-        vec![FeatureRing::Sovereign, FeatureRing::Compliance],
-        None,
-    );
+    let (payload_bytes, mut signature, verifying_key_bytes) =
+        SignedLicenseGate::create_test_signed_payload(
+            vec![FeatureRing::Sovereign, FeatureRing::Compliance],
+            None,
+        );
     signature[0] ^= 0xFF; // tamper
 
     let res = ContextraBuilder::new(4)
@@ -185,12 +188,13 @@ async fn explicit_conflicting_user_value_to_profile_returns_policy_violation() {
     ));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
-    let (payload_bytes, signature, verifying_key_bytes) = SignedLicenseGate::create_test_signed_payload(
-        vec![FeatureRing::Sovereign, FeatureRing::Compliance],
-        None,
-    );
+    let (payload_bytes, signature, verifying_key_bytes) =
+        SignedLicenseGate::create_test_signed_payload(
+            vec![FeatureRing::Sovereign, FeatureRing::Compliance],
+            None,
+        );
 
-    let config = contextra_db::ContextraConfig {
+    let config = contextra_engine::ContextraConfig {
         durability_mode: DurabilityMode::MemoryOnly,
         ..Default::default()
     };

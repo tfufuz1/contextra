@@ -30,7 +30,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-contextra-db = { workspace = true }
+contextra-engine = { workspace = true }
+contextra-cognition = { workspace = true }
 contextra-vector = { workspace = true }
 bytes = { workspace = true }
 contextra-graph = { workspace = true }

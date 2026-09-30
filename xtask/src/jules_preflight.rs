@@ -651,7 +651,7 @@ mod tests {
         let files = vec![
             "README.md".to_string(),
             "crates/contextra-core/src/lib.rs".to_string(),
-            "crates/contextra-db/src/lib.rs".to_string(),
+            "crates/contextra-engine/src/lib.rs".to_string(),
         ];
         assert_eq!(
             derive_crate_from_changed_files(&files),

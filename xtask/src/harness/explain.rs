@@ -191,7 +191,10 @@ pub fn run_explain(args: &[String]) -> i32 {
     };
 
     let get_str = |key: &str| -> Option<String> {
-        table.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+        table
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
     };
 
     let title = get_str("title");

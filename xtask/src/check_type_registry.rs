@@ -184,8 +184,8 @@ mod tests {
             "contextra-core"
         );
         assert_eq!(
-            extract_crate_from_path("crates/contextra-db/src/collection/search.rs"),
-            "contextra-db"
+            extract_crate_from_path("crates/contextra-engine/src/collection/search.rs"),
+            "contextra-engine"
         );
         assert_eq!(extract_crate_from_path("src/main.rs"), "");
     }

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
 
-use contextra_db::{Collection, Contextra, ContextraConfig};
+use contextra_engine::{Collection, Contextra, ContextraConfig};
 use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_router::ports_local::{CommunityResolver, HybridSearchProvider};
 use contextra_router::{RouterEngine, SlmProfile};
@@ -111,7 +111,7 @@ fn bench_router_engine(c: &mut Criterion) {
         }
 
         struct BenchCollectionAdapter<S: StorageEngine + 'static> {
-            collection: Arc<contextra_db::Collection<S>>,
+            collection: Arc<contextra_engine::Collection<S>>,
         }
 
         impl<S: StorageEngine + 'static> contextra_ports::HybridSearchProvider
@@ -163,7 +163,7 @@ fn bench_router_engine(c: &mut Criterion) {
                 budget: &TokenBudget,
                 relevance_threshold: f32,
             ) -> Result<ContextWindow> {
-                let mut manager = contextra_db::context::ContextManager::new(budget.clone());
+                let mut manager = contextra_cognition::ContextManager::new(budget.clone());
                 manager.set_relevance_threshold(relevance_threshold);
                 manager.prepare_context(chunks)
             }

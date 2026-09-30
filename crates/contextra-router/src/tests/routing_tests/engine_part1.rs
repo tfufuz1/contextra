@@ -1,6 +1,6 @@
 use super::super::fixtures::*;
 use crate::{RouterEngine, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
@@ -14,7 +14,7 @@ async fn test_router_engine_instantiation_with_mock_storage() {
     let hnsw = Arc::new(contextra_vector::HnswIndex::try_new(hnsw_config).unwrap());
     let graph = Arc::new(contextra_graph::CsrGraph::new());
     let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
-    let collection = Arc::new(contextra_db::Collection::new(
+    let collection = Arc::new(contextra_engine::Collection::new(
         "test_collection".to_string(),
         storage,
         hnsw,

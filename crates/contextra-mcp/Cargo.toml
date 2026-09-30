@@ -9,10 +9,10 @@ edition.workspace = true
 [features]
 default = []
 agent-workflows = ["contextra-agent"]
-onnx = ["contextra-infer-onnx", "contextra-infer-onnx/onnx"]
-candle = ["dep:contextra-infer-candle"]
-ollama = ["dep:contextra-infer-ollama", "contextra/ollama"]
-kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
+onnx = ["contextra/onnx"]
+candle = ["contextra/candle"]
+ollama = ["contextra/ollama"]
+kv-bridge = ["contextra/candle"]
 test-utils = []
 docid-128 = ["contextra-types/docid-128"]
 
@@ -26,14 +26,10 @@ contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
-contextra-infer-onnx = { workspace = true, optional = true }
-contextra-infer-ollama = { workspace = true, optional = true }
 contextra-agent = { workspace = true, optional = true }
-contextra-infer-candle = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }
 parking_lot = { workspace = true }
-scc = "2"
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -74,7 +74,7 @@ impl Ring {
 
             // Ring 3: Engine, Reasoning & Cognition
             "contextra-engine" | "contextra-cognition" | "contextra-privacy"
-            | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
+            | "contextra-router" | "contextra-agent" => Some(Ring::Ring3),
 
             // Ring 4: Public Facade & Protocol Servers
             "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),

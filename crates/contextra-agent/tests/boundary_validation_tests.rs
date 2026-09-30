@@ -7,7 +7,7 @@ use contextra_agent::{
     AgentContext, AgentTool, BackgroundEvent, NodeType, OrchestratorEngine, StateGraph, StepResult,
     VecEventSource,
 };
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::ContextraError;
 use tempfile::TempDir;
 

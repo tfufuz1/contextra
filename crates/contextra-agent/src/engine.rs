@@ -52,7 +52,7 @@ impl OrchestratorEngine {
     }
 
     /// Attempts to construct an [`OrchestratorEngine`] directly from a Contextra DB handle.
-    pub fn try_from_db(db: &contextra_db::Contextra) -> Result<Self> {
+    pub fn try_from_db(db: &contextra_engine::Contextra) -> Result<Self> {
         Self::try_new(db.inner_storage())
     }
 
@@ -114,7 +114,7 @@ impl OrchestratorEngine {
     #[deprecated(
         note = "Use try_from_db instead to handle initialization errors without panicking"
     )]
-    pub fn from_db(db: &contextra_db::Contextra) -> Self {
+    pub fn from_db(db: &contextra_engine::Contextra) -> Self {
         Self::new(db.inner_storage())
     }
 

@@ -40,7 +40,7 @@ fn test_discover_loom_tests_real_workspace() {
     );
 
     let paths: Vec<&str> = discovered.iter().map(|f| f.path.as_str()).collect();
-    assert!(paths.contains(&"crates/contextra-db/tests/loom_relate_n_ary.rs"));
+    assert!(paths.contains(&"crates/contextra-engine/tests/loom_relate_n_ary.rs"));
     assert!(paths.contains(&"crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"));
     assert!(paths.contains(&"crates/contextra-crypto/tests/loom_eviction_worker_shutdown_race.rs"));
     assert!(paths.contains(&"crates/contextra-vector/tests/loom_quantizer_race_test.rs"));

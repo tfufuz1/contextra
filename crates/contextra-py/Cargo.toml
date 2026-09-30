@@ -20,20 +20,8 @@ doctest = false
 pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"] }
 numpy = "0.24"
 tokio = { workspace = true }
-# ANCHOR:ARCH:DAG-003 — Architektur-Layer durchbrochen (Ausnahme für Bindings)
-# WP:NONE PRIO:2 NEEDS:NONE
-# AGENT:06 DATE:2026-05-09 STATUS:DONE
-# VERLETZUNG: contextra-py importiert contextra-db, contextra-router und contextra-rank gegen die DAG-Invariante.
-# RECHTFERTIGUNG: Als High-Level Python-Bridge (Layer 3) benötigt contextra-py Zugriff
-# auf die orchestrating Facade in contextra-db sowie Routing- und Kalibrierungskomponenten. Dies ist eine beabsichtigte Ausnahme
-# vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
-contextra-router = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-adapt = { workspace = true }
-parking_lot = { workspace = true }
 contextra-core = { workspace = true }
-contextra-store = { workspace = true }
-contextra-db = { workspace = true }
+contextra-engine = { workspace = true }
 flatbuffers = { workspace = true }
 serde_json = { workspace = true }
 pythonize = "0.24"

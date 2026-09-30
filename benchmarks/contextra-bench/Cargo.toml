@@ -25,17 +25,12 @@ path = "src/bin/compare_baseline.rs"
 [dependencies]
 contextra-core = { workspace = true }
 contextra-store = { workspace = true }
-contextra-vector = { workspace = true }
-contextra-text = { workspace = true }
-contextra-graph = { workspace = true }
-contextra-db = { workspace = true }
+contextra-engine = { workspace = true }
 contextra-infer-onnx = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 anyhow = "1"
 hdrhistogram = "7"
 rand = { workspace = true }
@@ -61,4 +56,4 @@ sled = "0.34"
 [features]
 default = []
 external-benchmarks = []
-onnx-bench = ["contextra-infer-onnx/onnx", "contextra-db/reranking"]
+onnx-bench = ["contextra-infer-onnx/onnx", "contextra-engine/reranking"]

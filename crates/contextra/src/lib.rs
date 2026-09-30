@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Contextra Primary Facade & Composition Root (Ring 4).
-// INVARIANTEN: #![forbid(unsafe_code)]; <= 20 pub fn; zero direct dependencies on Ring 0/1 internal crates.
+// INVARIANTEN: #![forbid(unsafe_code)]; <= 20 pub fn; Primary Facade & Composition Root for Contextra.
 
 #![forbid(unsafe_code)]
 
@@ -11,14 +11,15 @@ pub mod performance_profile;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
+pub use contextra_cognition::{execute_background_consolidation, memory_consolidation};
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
-pub use contextra_db::{
-    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    SearchResult, TextEmbeddingEngine,
+pub use contextra_engine::{
+    chunker, Collection, CollectionConfig, Contextra, ContextraConfig, ContextraStats,
+    EmbeddingBackend, SearchResult,
 };
+pub use contextra_ports::{DriftStatusProvider, TextEmbeddingEngine};
 
 #[cfg(feature = "router")]
 pub use contextra_router as router;

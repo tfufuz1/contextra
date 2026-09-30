@@ -29,8 +29,9 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
     }
 
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_db::ContextraConfig::default();
-    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_engine::ContextraConfig::default();
+    let db =
+        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_test_col").await?;
 
     let mut engine = OrchestratorEngine::try_from_db(&db)?;
@@ -99,8 +100,9 @@ async fn test_dlq_remove_and_string_tx_id_idempotency() -> Result<()> {
     use contextra_types::TxId;
 
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_db::ContextraConfig::default();
-    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_engine::ContextraConfig::default();
+    let db =
+        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_remove_col").await?;
 
     let dlq = contextra_agent::DeadLetterQueue::new(db.inner_storage());
@@ -155,8 +157,9 @@ async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
     use contextra_types::TxId;
 
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_db::ContextraConfig::default();
-    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_engine::ContextraConfig::default();
+    let db =
+        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_idempotency_col").await?;
 
     let dlq = contextra_agent::DeadLetterQueue::new(db.inner_storage());
@@ -230,8 +233,9 @@ async fn test_concurrent_allocate_tx_uniqueness() -> Result<()> {
     use std::collections::HashSet;
 
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_db::ContextraConfig::default();
-    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_engine::ContextraConfig::default();
+    let db =
+        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
     let lsm_storage = db.inner_storage();
 
     let dlq = Arc::new(DeadLetterQueue::new(lsm_storage));
@@ -296,8 +300,9 @@ async fn test_tool_retry_succeeds_on_second_attempt() -> Result<()> {
     }
 
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_db::ContextraConfig::default();
-    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_engine::ContextraConfig::default();
+    let db =
+        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_retry_col").await?;
 
     let mut engine = OrchestratorEngine::try_from_db(&db)?;

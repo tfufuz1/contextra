@@ -24,7 +24,10 @@ impl Contextra {
     /// Opens or creates a `Contextra` instance at `path` with explicit `config`, forcing
     /// `deletion_proof_active = false` (as no authorized token was provided) and using default [`LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path, config))]
-    pub async fn open_with_config(path: impl AsRef<Path>, mut config: ContextraConfig) -> Result<Self> {
+    pub async fn open_with_config(
+        path: impl AsRef<Path>,
+        mut config: ContextraConfig,
+    ) -> Result<Self> {
         config.deletion_proof_active = false;
         let fast_gate = Arc::new(OpenFastGate);
         let token = fast_gate
@@ -450,7 +453,6 @@ impl Drop for Contextra {
 }
 
 impl Contextra {
-
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn close(self) -> Result<()> {
         self.wait_shutdown().await;

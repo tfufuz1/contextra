@@ -2150,7 +2150,8 @@ fn main() {
         }
         "check-commit-diff-integrity" => {
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            {
                 eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
@@ -2431,8 +2432,7 @@ fn main() {
         }
         "check-commit-diff-integrity" => {
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) =
-                check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
             {
                 eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
@@ -4258,12 +4258,12 @@ description = "Core crate"
     fn test_check_dag_layer_violations_detected() {
         let crates = vec![
             CrateInfo {
-                name: "contextra-db".to_string(),
-                path: "crates/contextra-db".to_string(),
+                name: "contextra-engine".to_string(),
+                path: "crates/contextra-engine".to_string(),
                 layer: 2,
                 loc: 100,
                 status: "🟢 stable".to_string(),
-                description: "DB".to_string(),
+                description: "Engine".to_string(),
                 dependencies: vec!["contextra-ollama".to_string()],
                 ring: "Ring 3".to_string(),
                 maturity: "stable".to_string(),
@@ -4282,7 +4282,7 @@ description = "Core crate"
         ];
         let violations = check_dag_layer_violations(&crates);
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].from_crate, "contextra-db");
+        assert_eq!(violations[0].from_crate, "contextra-engine");
         assert_eq!(violations[0].from_layer, 2);
         assert_eq!(violations[0].to_crate, "contextra-ollama");
         assert_eq!(violations[0].to_layer, 3);
@@ -4291,12 +4291,12 @@ description = "Core crate"
     #[test]
     fn test_run_check_dag_known_and_unknown_handling() {
         let violations = vec![DagViolation {
-            from_crate: "contextra-db".to_string(),
+            from_crate: "contextra-engine".to_string(),
             from_layer: 2,
             to_crate: "contextra-ollama".to_string(),
             to_layer: 3,
         }];
-        let known_exceptions: &[(&str, &str)] = &[("contextra-db", "contextra-ollama")];
+        let known_exceptions: &[(&str, &str)] = &[("contextra-engine", "contextra-ollama")];
 
         let mut untracked = Vec::new();
         for v in &violations {
@@ -4431,7 +4431,7 @@ description = "Core crate"
     fn test_workspace_crate_layers_regression() {
         let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let crates = get_workspace_crates();
-        assert_eq!(crates.len(), 34, "Expected 34 workspace crates");
+        assert_eq!(crates.len(), 33, "Expected 33 workspace crates");
     }
 
     #[test]
@@ -4515,7 +4515,7 @@ Always ensure all unit tests pass cleanly.
         let capabilities_crates = get_workspace_crates_from_root(&root, &cap_manifest);
 
         assert_eq!(legacy_crates.len(), capabilities_crates.len());
-        assert_eq!(capabilities_crates.len(), 34);
+        assert_eq!(capabilities_crates.len(), 33);
 
         println!("=== GOLDEN-FILE COMPARISON: Legacy vs Capabilities.toml ===");
 

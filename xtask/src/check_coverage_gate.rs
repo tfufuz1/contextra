@@ -40,7 +40,7 @@ struct LlvmCovMetric {
 pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     match crate_name {
         "contextra-store" => 85.0,
-        "contextra-db" => 75.0,
+        "contextra-engine" => 75.0,
         "contextra-vector" => 75.0,
         "contextra-graph" => 70.0,
         "contextra-text" => 70.0,
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn test_coverage_thresholds() {
         assert_eq!(get_threshold_for_crate("contextra-store"), 85.0);
-        assert_eq!(get_threshold_for_crate("contextra-db"), 75.0);
+        assert_eq!(get_threshold_for_crate("contextra-engine"), 75.0);
         assert_eq!(get_threshold_for_crate("contextra-vector"), 75.0);
         assert_eq!(get_threshold_for_crate("contextra-graph"), 70.0);
         assert_eq!(get_threshold_for_crate("contextra-text"), 70.0);
@@ -154,7 +154,7 @@ mod tests {
           }
         },
         {
-          "filename": "crates/contextra-db/src/lib.rs",
+          "filename": "crates/contextra-engine/src/lib.rs",
           "summary": {
             "lines": { "count": 100, "covered": 50 }
           }
@@ -178,7 +178,7 @@ mod tests {
 
         let db_res = results
             .iter()
-            .find(|r| r.crate_name == "contextra-db")
+            .find(|r| r.crate_name == "contextra-engine")
             .unwrap();
         assert_eq!(db_res.actual_coverage, 50.0);
         assert!(!db_res.passed);

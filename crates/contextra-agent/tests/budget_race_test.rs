@@ -5,8 +5,9 @@
 
 use contextra_agent::step::{AgentTool, StepResult};
 use contextra_agent::{AgentContext, NodeType, OrchestratorEngine, StateGraph};
-use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
+use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::BoxFuture;
+use contextra_types::DistanceMetric;
 use contextra_types::{Result, TokenBudget};
 use std::sync::Arc;
 use tempfile::TempDir;

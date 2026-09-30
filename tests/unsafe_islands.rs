@@ -18,7 +18,6 @@ pub const ALLOWED_UNSAFE_ISLANDS: &[&str] = &[
 pub const TRANSITION_ALLOWED_CRATES: &[&str] = &[
     "contextra-vector",        // SIMD + Mmap, being moved to contextra-simd / contextra-sys in Phase 1c
     "contextra-store",        // Win32 ACL, being moved to contextra-sys in Phase 1c
-    "contextra-db",           // volatile-vault mlock, being moved to contextra-sys in Phase 1c
     "contextra-crypto",       // test-only Zeroize drop semantics verification
 ];
 
