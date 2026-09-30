@@ -10,6 +10,7 @@ pub mod explain;
 pub mod io;
 pub mod plugin_status;
 pub mod prompt_injection;
+pub mod proof_key;
 pub mod protocol;
 pub mod routing;
 pub mod sandbox;
@@ -34,6 +35,7 @@ pub use egress_gateway::{
 
 pub use explain::{ExplainRequest, ExplainResponse};
 pub use plugin_status::{handle_plugin_status, PluginStatusEntry, PluginStatusResponse};
+pub use proof_key::deletion_proof_key_from_env;
 
 pub use io::{read_line_bounded, MAX_RPC_BYTES, MAX_SEARCH_QUERY_BYTES};
 
