@@ -204,7 +204,6 @@ fn test_open_rejects_unsupported_version() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "docid-128"))]
 #[tokio::test]
 async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
@@ -342,7 +341,6 @@ fn test_open_rejects_truncated_header() -> Result<()> {
 fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("oob_connections.hnsw");
-    let conn_offset = HnswHeader::SIZE + NodeRecord::SIZE;
     let header = HnswHeader::new(
         128,
         16,
@@ -353,14 +351,14 @@ fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
         1,
         0,
         HnswHeader::SIZE as u64,
-        conn_offset as u64,
+        (HnswHeader::SIZE + 25) as u64,
         1,
     );
     let mut file_bytes = header.to_bytes().to_vec();
     let record = NodeRecord {
         doc_id: 1,
         max_layer: 1,
-        vector_offset: conn_offset as u64,
+        vector_offset: (HnswHeader::SIZE + 25) as u64,
         connections_offset: 9999,
     };
     file_bytes.extend_from_slice(&record.to_bytes());

@@ -696,7 +696,8 @@ impl Wal {
     }
 
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
-        self.allow_legacy_integrity_key_fallback.load(std::sync::atomic::Ordering::Relaxed)
+        self.allow_legacy_integrity_key_fallback
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Recovers a poisoned `Wal` handle after a suspected torn write event.

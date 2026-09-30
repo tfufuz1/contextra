@@ -39,7 +39,10 @@ impl KvKeyLocks {
 
     #[cfg(test)]
     pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>> {
-        self.shards[idx].try_lock().ok().map(|guard| KeyGuard { _guard: guard })
+        self.shards[idx]
+            .try_lock()
+            .ok()
+            .map(|guard| KeyGuard { _guard: guard })
     }
 
     pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {

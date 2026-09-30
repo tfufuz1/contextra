@@ -34,11 +34,7 @@ fn setup_temp_repo() -> (TempDir, String) {
     )
     .unwrap();
 
-    fs::write(
-        path.join(".github/unwrap_baseline.txt"),
-        "100\n",
-    )
-    .unwrap();
+    fs::write(path.join(".github/unwrap_baseline.txt"), "100\n").unwrap();
 
     fs::write(
         path.join("src/lib.rs"),

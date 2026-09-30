@@ -14,7 +14,7 @@ async fn test_quantizer_encapsulation_prevents_field_mutation() {
     let tx1 = TxId::new(1);
     for i in 1..=60u64 {
         let v = vec![1.0, 2.0, 3.0, 4.0];
-        index.insert(tx1, DocId::new(i.into()), &v).await.unwrap();
+        index.insert(tx1, DocId::new(i), &v).await.unwrap();
     }
     index.commit(tx1).await.unwrap();
 

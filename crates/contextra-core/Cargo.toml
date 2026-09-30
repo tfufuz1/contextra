@@ -14,6 +14,7 @@ ring = "0"
 
 [features]
 test-utils = []
+docid-128 = ["contextra-types/docid-128"]
 
 [dependencies]
 contextra-types = { workspace = true }

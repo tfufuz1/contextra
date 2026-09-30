@@ -156,7 +156,10 @@ pub fn run_mutants_diff(args: &[String]) -> i32 {
             findings: vec![],
         };
         if json {
-            println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&output).unwrap_or_default()
+            );
         } else {
             println!("mutants-diff: not_applicable (no Tier-1 crates touched)");
         }
@@ -202,14 +205,19 @@ pub fn run_mutants_diff(args: &[String]) -> i32 {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 let stderr = String::from_utf8_lossy(&o.stderr);
 
-                if !o.status.success() && (stderr.contains("no such subcommand") || stdout.contains("no such subcommand") || stderr.contains("error:")) {
+                if !o.status.success()
+                    && (stderr.contains("no such subcommand")
+                        || stdout.contains("no such subcommand")
+                        || stderr.contains("error:"))
+                {
                     has_error = true;
                     findings.push(MutantsDiffFinding {
                         id: "CARGO_MUTANTS_MISSING".to_string(),
                         severity: "error".to_string(),
                         file: format!("crates/{}", crate_name),
                         line: 0,
-                        message: "cargo-mutants toolchain missing or cargo subcommand failed".to_string(),
+                        message: "cargo-mutants toolchain missing or cargo subcommand failed"
+                            .to_string(),
                         fix: "Install cargo-mutants or verify PATH".to_string(),
                     });
                     continue;
@@ -302,11 +310,19 @@ pub fn run_mutants_diff(args: &[String]) -> i32 {
     };
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
     } else {
         println!("{}", summary);
         for f in &findings {
-            println!("  [{}] {}: {}", f.severity.to_uppercase(), f.file, f.message);
+            println!(
+                "  [{}] {}: {}",
+                f.severity.to_uppercase(),
+                f.file,
+                f.message
+            );
         }
     }
 

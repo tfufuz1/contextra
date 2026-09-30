@@ -206,16 +206,6 @@ impl ScalarQuantizer {
         &self.maxes
     }
 
-    /// Returns a reference to per-dimension scale values.
-    pub fn scales(&self) -> &[f32] {
-        &self.scales
-    }
-
-    /// Returns a reference to per-dimension inverse scale values.
-    pub fn inv_scales(&self) -> &[f32] {
-        &self.inv_scales
-    }
-
     /// Returns the target dimension of the quantizer.
     pub fn dimension(&self) -> usize {
         self.dimension
