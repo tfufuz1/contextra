@@ -4,7 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::collection::crud::{AutoExtractionConfig, EntityExtractionConfig};
+use contextra_engine::collection::crud::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};
 use contextra_types::{ContextraError, Result};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -73,6 +73,7 @@ async fn test_auto_extraction_disabled_no_llm_calls() {
 
     let mock_llm = Arc::new(MockLlmGenerator::ok("[]"));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Disabled,
         enabled: false,
         entity_config: EntityExtractionConfig::default(),
     };
@@ -114,6 +115,7 @@ async fn test_auto_extraction_enabled_creates_edges() {
     ]"#;
     let mock_llm = Arc::new(MockLlmGenerator::ok(mock_json));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Enabled,
         enabled: true,
         entity_config: EntityExtractionConfig {
             enabled: true,
@@ -172,6 +174,7 @@ async fn test_auto_extraction_low_confidence_ignored() {
     ]"#;
     let mock_llm = Arc::new(MockLlmGenerator::ok(mock_json));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Enabled,
         enabled: true,
         entity_config: EntityExtractionConfig {
             enabled: true,
@@ -225,6 +228,7 @@ async fn test_auto_extraction_llm_error_best_effort() {
 
     let mock_llm = Arc::new(MockLlmGenerator::err("Simulated LLM service timeout"));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Enabled,
         enabled: true,
         entity_config: EntityExtractionConfig::default(),
     };

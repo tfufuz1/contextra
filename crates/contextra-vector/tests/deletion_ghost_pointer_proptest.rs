@@ -24,7 +24,7 @@ proptest! {
 
             // Deterministic pseudo-random vector generation using seed
             for i in 0..num_nodes {
-                let doc_id = DocId::new((i + 1) as u64);
+                let doc_id = DocId::new(((i + 1) as u64).into());
                 let mut vector = vec![0.0f32; dimension];
                 for d in 0..dimension {
                     let val = (((i * dimension + d) as u64 + seed) % 100) as f32 / 100.0;

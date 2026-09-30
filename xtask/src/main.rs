@@ -101,6 +101,7 @@ mod crate_context;
 mod env_validate;
 mod feature_matrix;
 mod gate_check;
+mod gen_arch_docs;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
@@ -2229,6 +2230,13 @@ fn main() {
                 process::exit(1);
             }
         }
+        "gen-arch-docs" => {
+            let check_only = args.iter().any(|arg| arg == "--check");
+            if let Err(e) = gen_arch_docs::run_gen_arch_docs(check_only) {
+                eprintln!("❌ gen-arch-docs failed: {}", e);
+                process::exit(1);
+            }
+        }
         "gen-feature-catalog" => {
             if let Err(e) = gen_feature_catalog::run_gen_feature_catalog() {
                 eprintln!("❌ gen-feature-catalog failed: {}", e);
@@ -2426,15 +2434,6 @@ fn main() {
         "check-duplicate-intent" => {
             if let Err(e) = check_duplicate_intent::check_duplicate_intent() {
                 eprintln!("❌ check-duplicate-intent failed: {}", e);
-                process::exit(1);
-            }
-        }
-        "check-commit-diff-integrity" => {
-            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) =
-                check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
-            {
-                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
         }

@@ -45,6 +45,24 @@ Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe*
 - **Ring `sovereign` (Quelloffen, Opt-in Aktivierung):** Quellcode bleibt offen (Löschbeweis `DeletionProof`, Privacy Gateway, Zero-Net-Traffic). Aktivierung ist wegen Latenzkosten opt-in.
 - **Ring `compliance` (Closed-Source, Commercial):** Quellcode verlässt das Haus nie. Vertrieb als signiertes Binary/Appliance. Beinhaltet Lizenzschicht (`contextra-license`), BSI TR-02102-1 Mapping und Mandanten-Scoping. <!-- crate-ref-ignore -->
 
+### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
+
+Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
+
+1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
+   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
+2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
+   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
+
+**Vorrangordnung (Precedence):**
+`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
+
+*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
+
+**Deployment-Tier Defaults & Spec D.6 Status:**
+- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
+- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
+
 ---
 
 <a id="2-vier-schichten-modell"></a>

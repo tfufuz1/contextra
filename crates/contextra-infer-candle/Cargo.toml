@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Native Candle GGUF ML inference backend for Contextra"
 
+[package.metadata.contextra]
+ring = "2"
+
 [dependencies]
 candle-core = "0.11"
 candle-nn = "0.11"
@@ -42,7 +45,6 @@ required-features = ["kv-bridge"]
 [features]
 default = []
 candle = []
-docid-128 = ["contextra-types/docid-128"]
 kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]

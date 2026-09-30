@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Contextra — Core storage, index, and transaction orchestrator engine"
 
+[package.metadata.contextra]
+ring = "3"
+
 [dependencies]
 contextra-sys = { workspace = true }
 contextra-types = { workspace = true }
@@ -51,18 +54,18 @@ contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
+reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
 encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
 bench = []
 sandbox = []
 reranking = []
-onnx = []
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["contextra-graph/physio-percolation"]
-docid-128 = ["contextra-types/docid-128"]
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 entity-extraction = []
 auto-extraction-opt-out = []
+reranking = []

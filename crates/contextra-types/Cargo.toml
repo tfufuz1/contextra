@@ -9,9 +9,13 @@ license.workspace = true
 rust-version.workspace = true
 description = "Canonical domain types, IDs, budgets, filters, and error types for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [features]
 default = []
 docid-128 = []
+auto-extraction-opt-out = []
 
 [dependencies]
 thiserror = { workspace = true }

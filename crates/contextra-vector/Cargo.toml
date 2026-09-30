@@ -9,7 +9,11 @@ license.workspace = true
 rust-version.workspace = true
 description = "HNSW vector index with SIMD distance computation for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
+contextra-types = { workspace = true }
 contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
@@ -25,7 +29,7 @@ serde = { workspace = true, features = ["derive"] }
 
 [features]
 default = []
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []

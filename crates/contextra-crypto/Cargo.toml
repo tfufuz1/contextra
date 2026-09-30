@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 thiserror = { workspace = true }
 sha2 = "0.10"

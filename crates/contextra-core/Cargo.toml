@@ -9,9 +9,11 @@ license.workspace = true
 rust-version.workspace = true
 description = "Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [features]
 test-utils = []
-docid-128 = ["contextra-types/docid-128"]
 
 [dependencies]
 contextra-types = { workspace = true }

@@ -6,6 +6,9 @@ name = "contextra-mcp"
 version.workspace = true
 edition.workspace = true
 
+[package.metadata.contextra]
+ring = "4"
+
 [features]
 default = []
 agent-workflows = ["contextra-agent"]
@@ -14,7 +17,6 @@ candle = ["dep:contextra-infer-candle"]
 ollama = ["dep:contextra-infer-ollama", "contextra/ollama"]
 kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
 test-utils = []
-docid-128 = ["contextra-types/docid-128"]
 
 [dependencies]
 contextra = { workspace = true, features = ["router"] }

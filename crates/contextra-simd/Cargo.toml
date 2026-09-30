@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 contextra-core = { workspace = true }
 thiserror = { workspace = true }

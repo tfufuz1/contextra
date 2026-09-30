@@ -14,7 +14,7 @@ fn test_naive_reference_top_k_with_equality_predicate() {
     let target_ids = [2u64, 3u64, 4u64, 10u64];
 
     // Predicate matching only target_ids
-    let predicate = move |id: DocId| target_ids.contains(&id.inner());
+    let predicate = move |id: DocId| target_ids.contains(&(id.inner() as u64));
 
     // Search k=3 nearest neighbors among matching predicate points
     let k = 3;

@@ -55,6 +55,8 @@ pub mod metrics;
 pub mod observability;
 /// Plugin registry and dependency resolution.
 pub mod plugin;
+/// Reranker port trait for cross-encoder post-retrieval ranking.
+pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
 /// Key-value storage engine traits.
@@ -78,6 +80,7 @@ pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
 pub use plugin::*;
+pub use reranker::*;
 pub use rng::*;
 pub use storage::*;
 pub use text_index::*;
@@ -112,6 +115,7 @@ mod dyn_safety {
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
+    fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -129,5 +133,6 @@ mod dyn_safety {
         _assert_dyn_id_gen(None);
         _assert_dyn_license_gate(None);
         _assert_dyn_attention_exporter(None);
+        _assert_dyn_reranker(None);
     }
 }

@@ -5,10 +5,7 @@
 
 #![allow(dead_code)]
 
-#[path = "../src/deletion_proof.rs"]
-mod deletion_proof;
-
-use deletion_proof::hash_deleted_keys_length_prefixed;
+use contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed;
 use proptest::prelude::*;
 
 fn split_into_chunks(bytes: &[u8], split_indices: &[usize]) -> Vec<Vec<u8>> {
