@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "LSM-Tree storage engine for Contextra"
 
+[package.metadata.contextra]
+ring = "1"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",

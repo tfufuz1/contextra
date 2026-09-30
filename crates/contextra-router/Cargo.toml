@@ -7,6 +7,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[package.metadata.contextra]
+ring = "3"
+
 [features]
 default = []
 bandit-routing = ["egress-sherman-morrison"]

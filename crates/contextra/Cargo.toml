@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 
+[package.metadata.contextra]
+ring = "4"
+
 [dependencies]
 contextra-core = { workspace = true }
 contextra-ports = { workspace = true }

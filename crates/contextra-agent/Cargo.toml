@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop"
 
+[package.metadata.contextra]
+ring = "3"
+
 [features]
 default = []
 test-utils = []

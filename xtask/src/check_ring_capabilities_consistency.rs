@@ -1,6 +1,6 @@
 //! Module: check_ring_capabilities_consistency
-//! Compares architecture ring declarations between `capabilities.toml` and `check_ring_layering.rs::get_crate_ring()`.
-//! Returns findings for any crates where both sources diverge or where `check_ring_layering.rs` does not know the crate.
+//! Compares architecture ring declarations between `capabilities.toml` and `Cargo.toml` package.metadata.contextra.ring metadata.
+//! Returns findings for any crates where both sources diverge or where ring metadata is missing.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -70,10 +70,12 @@ pub fn run_check_ring_capabilities_consistency_in_root(
 
     let mut findings = Vec::new();
 
+    let ring_map = crate::check_ring_layering::get_workspace_ring_map()
+        .map_err(|e| format!("Failed to get workspace ring map: {}", e))?;
+
     for (crate_name, entry) in parsed.crates {
         let caps_ring = entry.ring.trim();
-        let layering_ring_opt =
-            crate::check_ring_layering::get_crate_ring(&crate_name).map(|r| r.name().to_string());
+        let layering_ring_opt = ring_map.get(&crate_name).map(|r| r.name().to_string());
 
         let is_consistent = match &layering_ring_opt {
             Some(layering_ring) => caps_ring == layering_ring,

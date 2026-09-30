@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Contextra — Embedded hybrid-search for AI agents"
 
+[package.metadata.contextra]
+ring = "3"
+
 [dependencies]
 contextra-engine = { workspace = true }
 contextra-cognition = { workspace = true }

@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "License and activation enforcement gate layer for Contextra feature rings"
 
+[package.metadata.contextra]
+ring = "4"
+
 [dependencies]
 thiserror = { workspace = true }
 serde = { workspace = true }

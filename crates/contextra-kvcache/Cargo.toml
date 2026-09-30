@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
 
+[package.metadata.contextra]
+ring = "1"
+
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }

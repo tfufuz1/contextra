@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Canonical dyn-compatible port traits for Contextra subsystems"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 contextra-types = { workspace = true }
 futures-util = "0.3"

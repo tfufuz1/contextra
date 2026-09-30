@@ -32,46 +32,17 @@ impl Ring {
             Ring::Tooling => "Tooling",
         }
     }
-}
 
-/// Mappt Crate-Namen exakt auf Ringe gemäß Spezifikation (§4.3 / Phase 0R).
-pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
-    match crate_name {
-        // Ring 0
-        "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
-        | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
-        | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
-        | "contextra-core" => Some(Ring::Ring0),
-
-        // Ring 1
-        "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
-
-        // Ring 2
-        "contextra-sandbox"
-        | "contextra-infer-onnx"
-        | "contextra-infer-candle"
-        | "contextra-infer-ollama" => Some(Ring::Ring2),
-
-        // Ring 3
-        "contextra-engine"
-        | "contextra-cognition"
-        | "contextra-privacy"
-        | "contextra-router"
-        | "contextra-agent"
-        | "contextra-db" => Some(Ring::Ring3),
-
-        // Ring 4
-        "contextra"
-        | "contextra-mcp"
-        | "contextra-py"
-        | "contextra-audit-export"
-        | "contextra-avv-generator"
-        | "contextra-license" => Some(Ring::Ring4),
-
-        // Tooling
-        "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
-
-        _ => None,
+    pub fn from_str(s: &str) -> Option<Ring> {
+        match s.trim() {
+            "0" | "Ring 0" => Some(Ring::Ring0),
+            "1" | "Ring 1" => Some(Ring::Ring1),
+            "2" | "Ring 2" => Some(Ring::Ring2),
+            "3" | "Ring 3" => Some(Ring::Ring3),
+            "4" | "Ring 4" => Some(Ring::Ring4),
+            "tooling" | "Tooling" => Some(Ring::Tooling),
+            _ => None,
+        }
     }
 }
 
@@ -132,6 +103,17 @@ pub struct RingViolation {
 struct MetadataPackage {
     name: String,
     dependencies: Vec<MetadataDependency>,
+    metadata: Option<MetadataExtra>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MetadataExtra {
+    contextra: Option<ContextraMetadata>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContextraMetadata {
+    ring: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,6 +130,52 @@ struct CargoMetadata {
     workspace_members: HashSet<String>,
 }
 
+pub fn get_ring_map_from_metadata_json(json_str: &str) -> Result<HashMap<String, Ring>, String> {
+    let metadata: CargoMetadata = serde_json::from_str(json_str)
+        .map_err(|e| format!("Failed to parse cargo metadata: {}", e))?;
+
+    let mut ring_map = HashMap::new();
+
+    for pkg in &metadata.packages {
+        let is_member = metadata
+            .workspace_members
+            .iter()
+            .any(|m| m.contains(&pkg.name))
+            || metadata.workspace_members.contains(&pkg.name);
+
+        if is_member {
+            let ring = pkg
+                .metadata
+                .as_ref()
+                .and_then(|m| m.contextra.as_ref())
+                .and_then(|c| Ring::from_str(&c.ring));
+
+            if let Some(r) = ring {
+                ring_map.insert(pkg.name.clone(), r);
+            }
+        }
+    }
+
+    Ok(ring_map)
+}
+
+pub fn get_workspace_ring_map() -> Result<HashMap<String, Ring>, String> {
+    let output = Command::new("cargo")
+        .args(["metadata", "--format-version", "1", "--no-deps"])
+        .output()
+        .map_err(|e| format!("Failed to execute cargo metadata: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "cargo metadata command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    get_ring_map_from_metadata_json(&json_str)
+}
+
 pub fn check_ring_layering_from_metadata_json(
     json_str: &str,
 ) -> Result<Vec<RingViolation>, String> {
@@ -158,7 +186,6 @@ pub fn check_ring_layering_from_metadata_json(
         .packages
         .iter()
         .filter(|p| {
-            // Check if package is a workspace member (either by id or package name matching workspace_members)
             metadata
                 .workspace_members
                 .iter()
@@ -168,18 +195,31 @@ pub fn check_ring_layering_from_metadata_json(
         .map(|p| (p.name.clone(), p))
         .collect();
 
+    let ring_map: HashMap<String, Ring> = workspace_packages
+        .iter()
+        .map(|(name, pkg)| {
+            let ring = pkg
+                .metadata
+                .as_ref()
+                .and_then(|m| m.contextra.as_ref())
+                .and_then(|c| Ring::from_str(&c.ring));
+
+            match ring {
+                Some(r) => Ok((name.clone(), r)),
+                None => Err(format!(
+                    "Unmapped workspace crate '{}': workspace member has no [package.metadata.contextra] ring assigned in Cargo.toml!",
+                    name
+                )),
+            }
+        })
+        .collect::<Result<_, _>>()?;
+
     let mut violations = Vec::new();
 
     for (pkg_name, pkg) in &workspace_packages {
-        let from_ring = match get_crate_ring(pkg_name) {
-            Some(r) => r,
-            None => {
-                return Err(format!(
-                    "Unmapped workspace crate '{}': workspace member has no assigned Ring in check_ring_layering.rs!",
-                    pkg_name
-                ));
-            }
-        };
+        let from_ring = ring_map.get(pkg_name).copied().ok_or_else(|| {
+            format!("Missing ring metadata for package '{}'", pkg_name)
+        })?;
 
         for dep in &pkg.dependencies {
             let dep_name = &dep.name;
@@ -187,13 +227,13 @@ pub fn check_ring_layering_from_metadata_json(
             // Only inspect workspace-internal dependencies
             if !workspace_packages.contains_key(dep_name)
                 && dep.path.is_none()
-                && get_crate_ring(dep_name).is_none()
+                && !ring_map.contains_key(dep_name)
             {
                 continue;
             }
 
-            let to_ring = match get_crate_ring(dep_name) {
-                Some(r) => r,
+            let to_ring = match ring_map.get(dep_name) {
+                Some(&r) => r,
                 None => continue, // Ignore external dependencies
             };
 
@@ -387,29 +427,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ring_mapping_all_crates_covered() {
-        assert_eq!(get_crate_ring("contextra-core"), Some(Ring::Ring0));
-        assert_eq!(get_crate_ring("contextra-store"), Some(Ring::Ring1));
-        assert_eq!(get_crate_ring("contextra-infer-candle"), Some(Ring::Ring2));
-        assert_eq!(get_crate_ring("contextra-db"), Some(Ring::Ring3));
-        assert_eq!(get_crate_ring("contextra-mcp"), Some(Ring::Ring4));
-        assert_eq!(get_crate_ring("xtask"), Some(Ring::Tooling));
-        assert_eq!(get_crate_ring("nonexistent"), None);
-    }
-
-    #[test]
     fn test_synthetic_metadata_clean() {
         let mock_json = r#"{
             "packages": [
                 {
                     "name": "contextra-core",
-                    "dependencies": []
+                    "dependencies": [],
+                    "metadata": { "contextra": { "ring": "0" } }
                 },
                 {
                     "name": "contextra-store",
                     "dependencies": [
                         { "name": "contextra-core", "kind": null }
-                    ]
+                    ],
+                    "metadata": { "contextra": { "ring": "1" } }
                 }
             ],
             "workspace_members": ["contextra-core", "contextra-store"]
@@ -427,11 +458,13 @@ mod tests {
                     "name": "contextra-core",
                     "dependencies": [
                         { "name": "contextra-store", "kind": null }
-                    ]
+                    ],
+                    "metadata": { "contextra": { "ring": "0" } }
                 },
                 {
                     "name": "contextra-store",
-                    "dependencies": []
+                    "dependencies": [],
+                    "metadata": { "contextra": { "ring": "1" } }
                 }
             ],
             "workspace_members": ["contextra-core", "contextra-store"]
