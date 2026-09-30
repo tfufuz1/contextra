@@ -588,7 +588,7 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
     )
     .await?;
 
-    let weights = contextra_types::FusionWeights::new(0.40, 0.30, 0.30).unwrap();
+    let weights = contextra_types::FusionWeights::new(0.40, 0.30, 0.30).map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
 
     let rrf_results = col
         .hybrid_search_with_strategy(
