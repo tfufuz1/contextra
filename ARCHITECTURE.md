@@ -123,6 +123,7 @@ graph TD
     contextra[contextra] --> contextra_rank[contextra-rank]
     contextra[contextra] --> contextra_router[contextra-router]
     contextra[contextra] --> contextra_store[contextra-store]
+    contextra[contextra] --> contextra_types[contextra-types]
     contextra_adapt[contextra-adapt] --> contextra_ports[contextra-ports]
     contextra_adapt[contextra-adapt] --> contextra_types[contextra-types]
     contextra_agent[contextra-agent] --> contextra_checkpoint[contextra-checkpoint]
@@ -223,6 +224,7 @@ graph TD
     contextra_py[contextra-py] --> contextra_rank[contextra-rank]
     contextra_py[contextra-py] --> contextra_router[contextra-router]
     contextra_py[contextra-py] --> contextra_store[contextra-store]
+    contextra_py[contextra-py] --> contextra_types[contextra-types]
     contextra_rank[contextra-rank] --> contextra_ports[contextra-ports]
     contextra_rank[contextra-rank] --> contextra_types[contextra-types]
     contextra_router[contextra-router] --> contextra_adapt[contextra-adapt]
@@ -237,6 +239,7 @@ graph TD
     contextra_store[contextra-store] --> contextra_mvcc[contextra-mvcc]
     contextra_store[contextra-store] --> contextra_ports[contextra-ports]
     contextra_store[contextra-store] --> contextra_sys[contextra-sys]
+    contextra_store[contextra-store] --> contextra_types[contextra-types]
     contextra_sys[contextra-sys]
     contextra_testkit[contextra-testkit] --> contextra_ports[contextra-ports]
     contextra_testkit[contextra-testkit] --> contextra_types[contextra-types]
@@ -247,6 +250,7 @@ graph TD
     contextra_vector[contextra-vector] --> contextra_crypto[contextra-crypto]
     contextra_vector[contextra-vector] --> contextra_simd[contextra-simd]
     contextra_vector[contextra-vector] --> contextra_sys[contextra-sys]
+    contextra_vector[contextra-vector] --> contextra_types[contextra-types]
     contextra_wire[contextra-wire]
     xtask[xtask] --> contextra_bench[contextra-bench]
     xtask[xtask] --> contextra_router[contextra-router]
@@ -269,10 +273,10 @@ Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende
    * *IST:* `contextra-db` existiert weiterhin als Fassade. `contextra-router` importiert noch `contextra-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
 3. **Inferenz-Namenskonvention:**
    * *SOLL:* Die Inferenz-Crates tragen vereinheitlichte Namen `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
-   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`).
+   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`). <!-- crate-ref-ignore -->
 4. **Vektorindex-Namenskonvention:**
    * *SOLL:* Das Vektorindex-Crate heißt `contextra-vector`.
-   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`).
+   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`). <!-- crate-ref-ignore -->
 5. **Legacy-Calibration-Crate:**
    * *SOLL:* `contextra-rank` geht in `contextra-adapt` und `contextra-rank` auf.
    * *IST:* `contextra-rank` existiert aktuell noch als eigenständiges Crate.

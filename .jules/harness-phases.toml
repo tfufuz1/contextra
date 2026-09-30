@@ -19,7 +19,7 @@ cmd = ["cargo", "fmt", "--check"]
 required = true
 
 [[phase.check]]
-cmd = ["cargo", "clippy", "--workspace", "--exclude", "contextra-tauri", "--", "-D", "warnings"]
+cmd = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
 required = true
 
 [[phase.check]]
