@@ -8,6 +8,7 @@ pub mod agent_memory;
 pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
+pub mod query_rewriter;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
@@ -19,6 +20,7 @@ pub use contextra_db::{
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
+pub use query_rewriter::LlmQueryRewriter;
 
 #[cfg(feature = "router")]
 pub use contextra_router as router;
