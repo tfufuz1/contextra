@@ -1,7 +1,7 @@
 # Contextra — Vollständige Feature- und Funktionsspezifikation
 
 **Stand:** 2026-09-29
-**Quelle der Wahrheit:** Quellcode-Audit über alle 33 Workspace-Crates (HEAD)
+**Quelle der Wahrheit:** Quellcode-Audit über alle 35 Workspace-Crates (HEAD)
 **Status:** Verbindliche Spezifikation aller sichtbaren, opt-in, versteckten und internen Features
 
 ---
@@ -21,7 +21,7 @@ Contextra ist eine hochperformante, einbettbare (embedded), air-gapped-fähige G
 
 ---
 
-## 2. Detaillierte Feature-Spezifikation aller 33 Crates
+## 2. Detaillierte Feature-Spezifikation aller 35 Crates
 
 ### 2.1 Ring 0 — Synchrone Primitives & Algorithmen
 

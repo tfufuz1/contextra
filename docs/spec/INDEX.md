@@ -1,6 +1,6 @@
 # Contextra Spezifikation — Index und Kapitelübersicht
 
-Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamtspezifikation **Contextra — Finale Produktspezifikation (Synthese)** (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`), sowie die vorausgegangenen Kapiteldateien.
+Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamtspezifikation **Contextra — Systemspezifikation v14** (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`), sowie die vorausgegangenen Kapiteldateien.
 
 > **Hinweis zur Normativität**: Die unten aufgeführten nummerierten Kapiteldateien (`00a`…`21`…`92`) sind historische Vorstufen der Synthese. Bei etwaigen Widersprüchen gilt ausschließlich `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` als normative Quelle der Wahrheit.
 
@@ -21,7 +21,7 @@ Für dieses Repository gilt ausschließlich E.1–E.13 der CIAI-Vollspezifikatio
 
 | Dateiname | Kapitelüberschrift (Originalwortlaut) | Grober Ring-/Crate-Bezug |
 |---|---|---|
-| `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` | Contextra — Finale Produktspezifikation (Synthese) | Global / Ring 0–4 / Master |
+| `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` | Contextra — Systemspezifikation v14 | Global / Ring 0–4 / Master |
 | `00a-titel-und-einleitung.md` | Contextra — Finale Konsolidierte Gesamtspezifikation (Fassung 4 · SOTA-Algorithmen-Integration & Architekten-Review) | Global / Workspace |
 | `00b-teil-a-stabilisierungsauftrag.md` | ## Teil A — Stabilisierungsauftrag: Ground Truth, Reifegrade, Gates | Global / Ring 0–4 |
 | `00c-teil-a2-zielarchitektur-v2.md` | ## Teil A2 — Zielarchitektur v2 (Ring-Modell), verbindlich ab sofort | Ring 0–4 / Crate-Graph |

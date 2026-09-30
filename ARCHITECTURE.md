@@ -269,10 +269,10 @@ Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende
    * *IST:* `contextra-db` existiert weiterhin als Fassade. `contextra-router` importiert noch `contextra-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
 3. **Inferenz-Namenskonvention:**
    * *SOLL:* Die Inferenz-Crates tragen vereinheitlichte Namen `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
-   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`).
+   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed` <!-- crate-ref-ignore -->).
 4. **Vektorindex-Namenskonvention:**
    * *SOLL:* Das Vektorindex-Crate heißt `contextra-vector`.
-   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`).
+   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index` <!-- crate-ref-ignore -->).
 5. **Legacy-Calibration-Crate:**
    * *SOLL:* `contextra-rank` geht in `contextra-adapt` und `contextra-rank` auf.
    * *IST:* `contextra-rank` existiert aktuell noch als eigenständiges Crate.
