@@ -8,12 +8,12 @@
 | `contextra` | Ring 4 | 🟢 stable | `public-api`, `facade` | Haupt-Library Facade für Endanwender |
 | `contextra-adapt` | Ring 0 | 🟡 experimental | `model-adaption`, `pid-latency-controller` | Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller) |
 | `contextra-agent` | Ring 3 | 🟢 stable | `in-memory-audit`, `agent-pipeline` | Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline |
-| `contextra-audit-export` | Ring 4 | 🟡 experimental | `gdpr-art30-export` | Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export |
-| `contextra-avv-generator` | Ring 4 | 🟡 experimental | `avv-generation` | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
+| `contextra-audit-export` | Ring 0 | 🟡 experimental | `gdpr-art30-export` | Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export |
+| `contextra-avv-generator` | Ring 0 | 🟡 experimental | `avv-generation` | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
 | `contextra-checkpoint` | Ring 1 | 🟢 stable | `blake3-checkpoints`, `orphan-recovery` | Persistent Checkpoint Engine und Blake3 Manifest-Verifikation |
 | `contextra-cognition` | Ring 3 | 🟢 stable | `sleep-cycle-consolidation`, `session-grouping` | Konsolidierungs- und Background Sleep Passes |
 | `contextra-core` | Ring 0 | 🟢 stable | `tombstone-semantics`, `tx-buffer` | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
-| `contextra-crypto` | Ring 0 | 🟢 stable | `aes-256-gcm`, `hmac-sha256`, `zeroize-on-drop` | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
+| `contextra-crypto` | Ring 0 | 🟢 stable | `aes-256-gcm-siv`, `hmac-sha256`, `zeroize-on-drop` | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
 | `contextra-db` | Ring 3 | 🟢 stable | `hybrid-search`, `collection-manager`, `volatile-vault` | Contextra Main Database Abstraction, Hybrid Search & Collections |
 | `contextra-engine` | Ring 3 | 🟢 stable | `bounded-compute-pool`, `ring0-async-wrapper` | Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) |
 | `contextra-graph` | Ring 0 | 🟢 stable | `csr-traversal`, `label-propagation`, `deadlock-free-dag` | CSR Graph-Engine, Path Graphing und GraphRAG Community Detection |

@@ -27,7 +27,7 @@ pub enum DeletionProofError {
     InvalidSignature(String),
 
     /// Nicht unterstützte Version der Löschbeweis-Signatur.
-    #[error("unsupported signature version: {0}")]
+    #[error("Unsupported DeletionProof signature_version: {0}")]
     UnsupportedVersion(u8),
 }
 
