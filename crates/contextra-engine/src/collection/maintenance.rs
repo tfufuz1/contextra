@@ -164,183 +164,179 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // 1. Scan for pending transaction intents (2-Phase Commit Recovery — FIND-DB-005)
         let intent_prefix = self.namespaced_key(&[], 3);
         let intents = self.storage.scan_prefix(&intent_prefix).await?;
+        let recovery_tx = self.allocate_tx()?;
+        let mut recovered_any = false;
+        let mut recovered_text = false;
+        let mut recovered_graph = false;
 
-        if !intents.is_empty() {
-            let recovery_tx = self.allocate_tx()?;
-            let mut recovered_any = false;
-            let mut recovered_text = false;
-            let mut recovered_graph = false;
-
-            for (intent_key, intent_val) in intents {
-                use crate::transaction::CommitIntent;
-                if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
-                    let (doc_ids, has_text, has_graph) = match intent_variant {
-                        CommitIntent::Pending {
-                            doc_ids,
-                            has_text,
-                            has_graph,
-                            ..
-                        } => (doc_ids, has_text, has_graph),
-                        CommitIntent::Consolidation {
-                            source_docs: _,
-                            target_id,
-                            base_tx: _,
-                        } => {
-                            // Crash Recovery during Consolidation Pass (INV-CONSOLIDATE-2)
-                            // If target_id was committed to storage, ensure it is re-synced to index.
-                            // If target_id was not yet committed, consolidation aborted; delete the intent.
-                            let target_doc_key =
-                                self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
-                            // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
-                            if self.storage.get(&target_doc_key).await?.is_some() {
-                                (Arc::new(vec![target_id]), true, false)
-                            } else {
-                                if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
-                                    tracing::warn!(key = ?intent_key, "Failed to delete interrupted consolidation intent: {e}");
-                                }
-                                continue;
-                            }
-                        }
-                        _ => continue,
-                    };
-
-                    tracing::info!(
-                        "Found pending transaction intent, recovering {} documents (has_text={}, has_graph={})",
-                        doc_ids.len(),
+        for (intent_key, intent_val) in intents {
+            use crate::transaction::CommitIntent;
+            if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
+                let (doc_ids, has_text, has_graph) = match intent_variant {
+                    CommitIntent::Pending {
+                        doc_ids,
                         has_text,
-                        has_graph
-                    );
-
-                    let mut any_doc_in_storage = false;
-                    for &doc_id in doc_ids.iter() {
-                        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                        if self.storage.get(&doc_key).await?.is_some() {
-                            any_doc_in_storage = true;
-                            break;
+                        has_graph,
+                        ..
+                    } => (doc_ids, has_text, has_graph),
+                    CommitIntent::Consolidation {
+                        source_docs: _,
+                        target_id,
+                        base_tx: _,
+                    } => {
+                        // Crash Recovery during Consolidation Pass (INV-CONSOLIDATE-2)
+                        // If target_id was committed to storage, ensure it is re-synced to index.
+                        // If target_id was not yet committed, consolidation aborted; delete the intent.
+                        let target_doc_key =
+                            self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
+                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
+                        if self.storage.get(&target_doc_key).await?.is_some() {
+                            (Arc::new(vec![target_id]), true, false)
+                        } else {
+                            if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
+                                tracing::warn!(key = ?intent_key, "Failed to delete interrupted consolidation intent: {e}");
+                            }
+                            continue;
                         }
                     }
+                    _ => continue,
+                };
 
-                    if any_doc_in_storage {
-                        for &doc_id in doc_ids.iter() {
-                            let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                            // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
-                            if let Some(val) = self.storage.get(&doc_key).await? {
-                                let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
-                                    .map(|m| m.id)
-                                    .ok();
+                tracing::info!(
+                    "Found pending transaction intent, recovering {} documents (has_text={}, has_graph={})",
+                    doc_ids.len(),
+                    has_text,
+                    has_graph
+                );
 
-                                let mut stored_doc = None;
-                                if let Some(ref id_str) = meta_id {
-                                    let user_key = self.namespaced_key(id_str.as_bytes(), 0);
-                                    // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
-                                    if let Some(user_val) = self.storage.get(&user_key).await? {
-                                        if let Ok(stored) =
-                                            serde_json::from_slice::<StoredDocument>(&user_val)
-                                        {
-                                            stored_doc = Some(stored);
-                                        }
-                                    }
-                                }
-
-                                if stored_doc.is_none() {
-                                    if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
-                                        stored_doc = Some(full);
-                                    }
-                                }
-
-                                if let Some(stored) = stored_doc {
-                                    if !indexed_ids.contains(&doc_id) {
-                                        self.index
-                                            .insert(recovery_tx, doc_id, &stored.embedding)
-                                            .await?;
-                                        repair_count += 1;
-                                        recovered_any = true;
-                                    }
-
-                                    if has_text {
-                                        if let Some(text) = extract_text(&stored.metadata) {
-                                            let text_exists = match self.text_index.search_bm25(&text, 1, None).await {
-                                                Ok(hits) => hits.iter().any(|(id, _)| *id == doc_id),
-                                                Err(_) => false,
-                                            };
-                                            if !text_exists {
-                                                self.text_index
-                                                    .upsert_document(recovery_tx, doc_id, &text)
-                                                    .await?;
-                                                recovered_text = true;
-                                            }
-                                        }
-                                    }
-
-                                    if has_graph {
-                                        if let Ok(eid) = EntityId::from_key(&stored.id) {
-                                            let entity = contextra_types::Entity::new(
-                                                eid, &stored.id, "Document",
-                                            );
-                                            if let Err(e) =
-                                                self.graph_index.add_entity(recovery_tx, entity).await
-                                            {
-                                                tracing::warn!(
-                                                    doc_id = %stored.id,
-                                                    error = %e,
-                                                    "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
-                                                );
-                                            } else {
-                                                recovered_graph = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Storage commit NEVER completed! Compensate index entries.
-                        for &doc_id in doc_ids.iter() {
-                            if let Err(e) = self.index.delete(recovery_tx, doc_id).await {
-                                tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Vektor-Index-Eintrag bei Recovery nicht löschen");
-                            } else {
-                                recovered_any = true;
-                            }
-
-                            if has_text {
-                                if let Err(e) =
-                                    self.text_index.delete_document(recovery_tx, doc_id).await
-                                {
-                                    tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Text-Index-Eintrag bei Recovery nicht löschen");
-                                } else {
-                                    recovered_text = true;
-                                }
-                            }
-
-                            if has_graph {
-                                let eid = EntityId::from_doc_id(doc_id);
-                                if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {
-                                    tracing::warn!(?eid, error = %e, "Konnte verwaisten Graph-Index-Eintrag bei Recovery nicht löschen");
-                                } else {
-                                    recovered_graph = true;
-                                }
-                            }
-                        }
-                    }
-
-                    // Cleanup recovered intent
-                    if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
-                        tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
+                let mut any_doc_in_storage = false;
+                for &doc_id in doc_ids.iter() {
+                    let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                    if self.storage.get(&doc_key).await?.is_some() {
+                        any_doc_in_storage = true;
+                        break;
                     }
                 }
-            }
 
-            if recovered_any {
-                self.index.commit(recovery_tx).await?;
+                if any_doc_in_storage {
+                    for &doc_id in doc_ids.iter() {
+                        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
+                        if let Some(val) = self.storage.get(&doc_key).await? {
+                            let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
+                                .map(|m| m.id)
+                                .ok();
+
+                            let mut stored_doc = None;
+                            if let Some(ref id_str) = meta_id {
+                                let user_key = self.namespaced_key(id_str.as_bytes(), 0);
+                                // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
+                                if let Some(user_val) = self.storage.get(&user_key).await? {
+                                    if let Ok(stored) =
+                                        serde_json::from_slice::<StoredDocument>(&user_val)
+                                    {
+                                        stored_doc = Some(stored);
+                                    }
+                                }
+                            }
+
+                            if stored_doc.is_none() {
+                                if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+                                    stored_doc = Some(full);
+                                }
+                            }
+
+                            if let Some(stored) = stored_doc {
+                                if !indexed_ids.contains(&doc_id) {
+                                    self.index
+                                        .insert(recovery_tx, doc_id, &stored.embedding)
+                                        .await?;
+                                    repair_count += 1;
+                                    recovered_any = true;
+                                }
+
+                                if has_text {
+                                    if let Some(text) = extract_text(&stored.metadata) {
+                                        let text_exists = match self.text_index.search_bm25(&text, 1, None).await {
+                                            Ok(hits) => hits.iter().any(|(id, _)| *id == doc_id),
+                                            Err(_) => false,
+                                        };
+                                        if !text_exists {
+                                            self.text_index
+                                                .upsert_document(recovery_tx, doc_id, &text)
+                                                .await?;
+                                            recovered_text = true;
+                                        }
+                                    }
+                                }
+
+                                if has_graph {
+                                    if let Ok(eid) = EntityId::from_key(&stored.id) {
+                                        let entity = contextra_types::Entity::new(
+                                            eid, &stored.id, "Document",
+                                        );
+                                        if let Err(e) =
+                                            self.graph_index.add_entity(recovery_tx, entity).await
+                                        {
+                                            tracing::warn!(
+                                                doc_id = %stored.id,
+                                                error = %e,
+                                                "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
+                                            );
+                                        } else {
+                                            recovered_graph = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Storage commit NEVER completed! Compensate index entries.
+                    for &doc_id in doc_ids.iter() {
+                        if let Err(e) = self.index.delete(recovery_tx, doc_id).await {
+                            tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Vektor-Index-Eintrag bei Recovery nicht löschen");
+                        } else {
+                            recovered_any = true;
+                        }
+
+                        if has_text {
+                            if let Err(e) =
+                                self.text_index.delete_document(recovery_tx, doc_id).await
+                            {
+                                tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Text-Index-Eintrag bei Recovery nicht löschen");
+                            } else {
+                                recovered_text = true;
+                            }
+                        }
+
+                        if has_graph {
+                            let eid = EntityId::from_doc_id(doc_id);
+                            if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {
+                                tracing::warn!(?eid, error = %e, "Konnte verwaisten Graph-Index-Eintrag bei Recovery nicht löschen");
+                            } else {
+                                recovered_graph = true;
+                            }
+                        }
+                    }
+                }
+
+                // Cleanup recovered intent
+                if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
+                    tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
+                }
             }
-            if recovered_text {
-                self.text_index.commit(recovery_tx).await?;
-            }
-            if recovered_graph {
-                self.graph_index.commit(recovery_tx).await?;
-            }
-            self.storage.commit(recovery_tx).await?;
         }
+        if recovered_any {
+            self.index.commit(recovery_tx).await?;
+        }
+        if recovered_text {
+            self.text_index.commit(recovery_tx).await?;
+        }
+        if recovered_graph {
+            self.graph_index.commit(recovery_tx).await?;
+        }
+        self.storage.commit(recovery_tx).await?;
 
         // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
         let fallback_tx = self.allocate_tx()?;
