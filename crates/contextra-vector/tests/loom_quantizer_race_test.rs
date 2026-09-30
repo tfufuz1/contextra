@@ -51,7 +51,7 @@ mod loom_tests {
                         .unwrap();
                     rt.block_on(async {
                         let tx = TxId::new(i);
-                        let doc_id = DocId::new(i);
+                        let doc_id = DocId::new(i.into());
                         let vec = vec![i as f32 * 10.0, i as f32 * -5.0, 1.0, 2.0];
                         index_clone
                             .insert(tx, doc_id, &vec)
@@ -112,7 +112,7 @@ mod normal_tests {
             let index_clone = Arc::clone(&index);
             tasks.push(tokio::spawn(async move {
                 let tx = TxId::new(i);
-                let doc_id = DocId::new(i);
+                let doc_id = DocId::new(i.into());
                 let vec = vec![i as f32 * 10.0, i as f32 * -5.0, 1.0, 2.0];
                 index_clone.insert(tx, doc_id, &vec).await?;
                 index_clone.commit(tx).await?;
