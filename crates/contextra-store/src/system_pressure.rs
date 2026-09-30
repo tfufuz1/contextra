@@ -8,8 +8,10 @@
 //! IMPLEMENTATION NOTES & LIMITATIONS:
 //! - `wal_queue_depth`: Fully implemented in `LsmStorage` via AtomicUsize tracking pending
 //!   group-commit followers awaiting disk write/notification.
-//! - `blocking_util`: Currently measures Tokio async scheduler global queue depth
+//! - `blocking_util`: Currently measures Tokio async scheduler global queue depth ratio
 //!   (`metrics.global_queue_depth()`), NOT dedicated blocking thread pool utilization.
+//!   Note: `num_blocking_threads` and `num_idle_blocking_threads` are restricted to Tokio's
+//!   `tokio_unstable` feature flag and are not available in standard stable Tokio builds.
 //! - `embedding_queue_depth`: Defaults to `0/0` in `LsmStorage` because `contextra-store` is a pure
 //!   KV engine decoupled from embedding crates (`contextra-embed` / `contextra-candle`), which manage
 //!   their own semaphore permits.
