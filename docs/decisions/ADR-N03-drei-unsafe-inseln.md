@@ -15,9 +15,7 @@
    `unsafe`-Code ist ausschließlich in drei isolierten Kapseln erlaubt:
    * **`contextra-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `contextra_sys::mmap_readonly`) bereit.
    * **`contextra-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
-   * **`contextra-wire`:** Auto-generierte FlatBuffers IPC-Deserialisierungs-Bindings mit Verifier-Prüfung.
-   *(Hinweis: `contextra-crypto` ist 100% safe Rust und erzwingt `#![forbid(unsafe_code)]`.)*
-   * **Übergangs-Whitelists (`contextra-vector`, `contextra-store`):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
+   * **Übergangs-Whitelists (`contextra-vector`, `contextra-store` / `contextra-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
 
 3. **Verpflichtendes `UNSAFE_TRANSITION.md`-Tracking:**
    Tritt aus historischen Gründen `unsafe`-Code in Whitelist-Crates auf, MUSS jede Fundstelle mit einer Tracking-ID (z. B. `TRANS-VEC-001`), Quellpfad, Begründung, Ziel-Crate und Migrationsstatus in `UNSAFE_TRANSITION.md` dokumentiert sein.

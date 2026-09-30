@@ -76,7 +76,7 @@ async fn test_differential_acorn_hnsw_vs_naive_reference() -> Result<(), Box<dyn
         let mut rng = StdRng::seed_from_u64(tc.seed);
 
         let modulus = (1.0 / tc.selectivity).round() as u64;
-        let predicate = move |id: DocId| (id.inner() as u64) % modulus == 0;
+        let predicate = move |id: DocId| id.inner() % modulus == 0;
 
         let hnsw_cfg = HnswConfig {
             dimension: tc.dimension,
@@ -93,7 +93,7 @@ async fn test_differential_acorn_hnsw_vs_naive_reference() -> Result<(), Box<dyn
         let tx = TxId::new(1);
 
         for i in 1..=tc.num_points as u64 {
-            let doc_id = DocId::new(i.into());
+            let doc_id = DocId::new(i);
             let vec = generate_random_vector(tc.dimension, &mut rng);
 
             hnsw_index.insert(tx, doc_id, &vec).await?;
@@ -161,7 +161,7 @@ async fn test_high_selectivity_beam_starvation_regression() -> Result<(), Box<dy
     let selectivity = 0.01; // 1% selectivity: exactly 1 in 100 pass filter
 
     let modulus = 100u64;
-    let predicate = move |id: DocId| (id.inner() as u64) % modulus == 0;
+    let predicate = move |id: DocId| id.inner() % modulus == 0;
 
     let hnsw_cfg = HnswConfig {
         dimension: dim,
@@ -176,7 +176,7 @@ async fn test_high_selectivity_beam_starvation_regression() -> Result<(), Box<dy
     let tx = TxId::new(1);
 
     for i in 1..=num_points as u64 {
-        let doc_id = DocId::new(i.into());
+        let doc_id = DocId::new(i);
         let vec = generate_random_vector(dim, &mut rng);
         hnsw_index.insert(tx, doc_id, &vec).await?;
     }
@@ -239,7 +239,7 @@ async fn test_zero_cross_contamination_invariant() -> Result<(), Box<dyn std::er
 
     for i in 1..=300u64 {
         let vec = generate_random_vector(dim, &mut rng);
-        hnsw_index.insert(tx, DocId::new(i.into()), &vec).await?;
+        hnsw_index.insert(tx, DocId::new(i), &vec).await?;
     }
     hnsw_index.commit(tx).await?;
 

@@ -202,7 +202,6 @@ pub trait StorageWrite: Send + Sync + 'static {
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch explizite `BoxFuture`-Rückgabetypen vtable-kompatibel (dyn-safe).
 pub trait StorageEngine: Send + Sync + 'static {
-    // TOCTOU-ACCEPTED: StorageEngine provides default batching/tracking delegate methods.
     /// Retrieves a value by key.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
@@ -301,7 +300,6 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Deletes all key-value pairs starting with `prefix` as part of a transaction.
-    // TOCTOU-ACCEPTED
     fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move {
             let matching_keys: Vec<Vec<u8>> = self

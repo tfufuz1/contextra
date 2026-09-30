@@ -300,13 +300,12 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_create_collection",
-                            "description": "Create a new collection with specified DeploymentTier and optional auto_extraction mode.",
+                            "description": "Create a new collection with specified DeploymentTier.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
                                     "collection":      { "type": "string" },
-                                    "deployment_tier": { "type": "string", "enum": ["EdgeMinimal", "PowerUserLocal", "EnterpriseShared", "EnterpriseRegulated"], "default": "PowerUserLocal" },
-                                    "auto_extraction": { "type": "string", "enum": ["enabled", "disabled"] }
+                                    "deployment_tier": { "type": "string", "enum": ["EdgeMinimal", "PowerUserLocal", "EnterpriseShared", "EnterpriseRegulated"], "default": "PowerUserLocal" }
                                 },
                                 "required": ["collection"]
                             }

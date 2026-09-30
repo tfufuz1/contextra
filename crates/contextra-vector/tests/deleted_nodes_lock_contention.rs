@@ -23,7 +23,7 @@ async fn proof_no_deadlock_concurrent_delete_search() {
         for i in 1..=500u64 {
             let vec = vec![(i % 10) as f32; 16];
             index
-                .insert(tx1, DocId::new(i.into()), &vec)
+                .insert(tx1, DocId::new(i), &vec)
                 .await
                 .expect("insert failed");
         }
@@ -49,7 +49,7 @@ async fn proof_no_deadlock_concurrent_delete_search() {
         for t in 0..64u64 {
             let idx = Arc::clone(&index);
             handles.push(tokio::spawn(async move {
-                let doc_id = DocId::new((t + 1).into());
+                let doc_id = DocId::new(t + 1);
                 let tx = TxId::new(100 + t);
                 let _ = idx.delete(tx, doc_id).await;
                 let _ = idx.commit(tx).await;
@@ -137,7 +137,7 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
     for i in 1..=500u64 {
         let vec = vec![(i as f32) * 0.01; dim];
         index_a
-            .insert(tx1, DocId::new(i.into()), &vec)
+            .insert(tx1, DocId::new(i), &vec)
             .await
             .expect("insert_a");
     }
@@ -146,7 +146,7 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
     // Soft delete 150 vectors
     let tx2 = TxId::new(2);
     for i in 1..=150u64 {
-        index_a.delete(tx2, DocId::new(i.into())).await.expect("delete_a");
+        index_a.delete(tx2, DocId::new(i)).await.expect("delete_a");
     }
     index_a.commit(tx2).await.expect("commit_a2");
 
@@ -165,7 +165,7 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
     for i in 1..=500u64 {
         let vec = vec![(i as f32) * 0.01; dim];
         index_b
-            .insert(tx_b, DocId::new(i.into()), &vec)
+            .insert(tx_b, DocId::new(i), &vec)
             .await
             .expect("insert_b");
     }

@@ -551,13 +551,11 @@ mod tests {
                     "name": "contextra-types",
                     "dependencies": [
                         { "name": "contextra-graph", "kind": null }
-                    ],
-                    "metadata": { "contextra": { "ring": "0" } }
+                    ]
                 },
                 {
                     "name": "contextra-graph",
-                    "dependencies": [],
-                    "metadata": { "contextra": { "ring": "0" } }
+                    "dependencies": []
                 }
             ],
             "workspace_members": ["contextra-types", "contextra-graph"]
@@ -579,14 +577,13 @@ mod tests {
                 {
                     "name": "contextra-engine",
                     "dependencies": [
-                        { "name": "contextra-agent", "kind": null }
+                        { "name": "contextra-store", "kind": null }
                     ],
-                    "metadata": { "contextra": { "ring": "3" } }
+                    "metadata": { "contextra": { "ring": "0" } }
                 },
                 {
                     "name": "contextra-agent",
-                    "dependencies": [],
-                    "metadata": { "contextra": { "ring": "3" } }
+                    "dependencies": []
                 }
             ],
             "workspace_members": ["contextra-engine", "contextra-agent"]
@@ -625,8 +622,7 @@ mod tests {
             "packages": [
                 {
                     "name": "contextra-types",
-                    "dependencies": [],
-                    "metadata": { "contextra": { "ring": "0" } }
+                    "dependencies": []
                 }
             ],
             "workspace_members": ["contextra-types"]

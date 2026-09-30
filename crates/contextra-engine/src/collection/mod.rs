@@ -8,43 +8,27 @@
 // INVARIANT: Logische Isolation (Namespaces).
 // PREFIXING: Jeder Key im LSM bekommt das Prefix `__col:{name}:\x00`.
 
-pub mod kv_lock;
-
-#[cfg(not(loom))]
 pub mod crud;
-#[cfg(not(loom))]
+pub mod kv_lock;
 pub mod maintenance;
-#[cfg(not(loom))]
 pub mod query_builder;
-#[cfg(not(loom))]
 pub mod relate;
-#[cfg(not(loom))]
 pub mod search;
-#[cfg(not(loom))]
 pub mod tx;
 
-#[cfg(not(loom))]
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests;
 
-#[cfg(not(loom))]
 use contextra_graph::CsrGraph;
-#[cfg(not(loom))]
 use contextra_ports::{StorageEngine, TextEmbeddingEngine, VectorIndex};
-#[cfg(not(loom))]
 use contextra_store::LsmStorage;
-#[cfg(not(loom))]
 use contextra_text::inverted::InvertedIndex;
-#[cfg(not(loom))]
 use contextra_text::Language;
 use contextra_types::{DocId, Result, TxId};
-#[cfg(not(loom))]
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
-#[cfg(not(loom))]
 use std::sync::atomic::{AtomicBool, AtomicU64};
-#[cfg(not(loom))]
 use std::sync::Arc;
 
 /// Configuration for a collection.
@@ -257,7 +241,6 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
 ///
 /// Each collection provides its own vector index and inverted text index,
 /// while sharing the underlying LSM-Tree storage with other collections.
-#[cfg(not(loom))]
 pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex> {
     pub(super) name: String,
     pub(super) prefix: Vec<u8>,
@@ -286,7 +269,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
         parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>,
 }
 
-#[cfg(not(loom))]
 impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
     fn clone(&self) -> Self {
         Self {
@@ -314,7 +296,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
     }
 }
 
-#[cfg(not(loom))]
 impl<S: StorageEngine> Collection<S, HnswIndex> {
     /// Convenience constructor for creating a `Collection` with `HnswIndex`.
     pub fn with_hnsw(
@@ -338,7 +319,6 @@ impl<S: StorageEngine> Collection<S, HnswIndex> {
     }
 }
 
-#[cfg(not(loom))]
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// werden als "vergessen" markiert und gelöscht.
     pub const DECAY_DELETION_THRESHOLD: f32 = 0.05;

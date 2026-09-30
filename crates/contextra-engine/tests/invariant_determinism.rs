@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, SearchResult};
 use serde_json::json;
 use tempfile::TempDir;

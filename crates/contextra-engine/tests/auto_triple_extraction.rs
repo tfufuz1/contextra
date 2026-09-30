@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::collection::crud::AutoExtractionConfig;
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};

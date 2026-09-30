@@ -43,7 +43,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let res = self.insert(id, &embedding, metadata).await;
         if res.is_ok() {
             if let Some((generator, cfg)) = self.auto_extraction_config() {
-                if cfg.is_enabled() {
+                if cfg.enabled {
                     if let Err(e) =
                         auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await
                     {
@@ -91,7 +91,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let res = self.upsert(id, &embedding, metadata).await;
         if res.is_ok() {
             if let Some((generator, cfg)) = self.auto_extraction_config() {
-                if cfg.is_enabled() {
+                if cfg.enabled {
                     if let Err(e) =
                         auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await
                     {

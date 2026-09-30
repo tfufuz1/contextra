@@ -257,16 +257,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                                 if has_text {
                                     if let Some(text) = extract_text(&stored.metadata) {
-                                        let text_exists = match self.text_index.search_bm25(&text, 1, None).await {
-                                            Ok(hits) => hits.iter().any(|(id, _)| *id == doc_id),
-                                            Err(_) => false,
-                                        };
-                                        if !text_exists {
-                                            self.text_index
-                                                .upsert_document(recovery_tx, doc_id, &text)
-                                                .await?;
-                                            recovered_text = true;
-                                        }
+                                        self.text_index
+                                            .upsert_document(recovery_tx, doc_id, &text)
+                                            .await?;
+                                        recovered_text = true;
                                     }
                                 }
 

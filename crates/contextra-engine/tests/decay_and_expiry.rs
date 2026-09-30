@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::{
     AdaptiveDecayController, Contextra, ContextraConfig, DecayControllerConfig, DecaySignalInputs,
 };

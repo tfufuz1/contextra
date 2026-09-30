@@ -66,7 +66,7 @@ impl EncryptedWal {
         })
     }
 
-    /// Wraps the internal WAL chunk in AES-256-GCM-SIV stream.
+    /// Wraps the internal WAL chunk in AES-256-GCM stream.
     /// Prepends the 12-byte nonce to the encrypted ciphertext.
     pub fn encrypt_chunk(&self, payload: &[u8]) -> Result<Vec<u8>> {
         if payload.len() > MAX_CHUNK_SIZE {

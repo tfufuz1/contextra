@@ -287,7 +287,8 @@ impl LsmStorage {
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
             let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
-                || valid_manifest_sstables.as_ref().is_some_and(|s| !s.is_empty())
+                || (last_replayed_hmac.is_none()
+                    && valid_manifest_sstables.as_ref().is_some_and(|s| !s.is_empty()))
             {
                 expected_hwm
             } else {

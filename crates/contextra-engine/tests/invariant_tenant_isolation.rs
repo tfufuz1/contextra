@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::{ContextraError, TenantId};
 use serde_json::json;

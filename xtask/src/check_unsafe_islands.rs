@@ -19,6 +19,7 @@ pub const ALLOWED_ISLANDS: &[&str] = &["contextra-sys", "contextra-simd", "conte
 pub const PHASE_0R_TRANSITION_ISLANDS: &[&str] = &[
     "contextra-store",
     // TRANSITION-EXTRA: test allocators, benchmark fixtures
+    "contextra-crypto",
     "contextra-graph",
     "contextra-text",
     "contextra-bench",

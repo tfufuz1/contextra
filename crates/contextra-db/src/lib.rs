@@ -597,23 +597,17 @@ mod tests {
     #[tokio::test]
     async fn test_drop_removes_all_data() {
         let (db, _tmp) = test_db(4).await;
-        let tenant_id = TenantId::try_new(1).expect("tenant_id"); // expect
-        let col = db
-            .collection_for_tenant("drop-me", tenant_id)
-            .await
-            .expect("col"); // expect
+        let col = db.collection("drop-me").await.expect("col"); // expect
         col.insert("k1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
             .expect("ins"); // expect
 
+        let tenant_id = TenantId::try_new(1).expect("tenant_id"); // expect
         db.drop_collection("drop-me", tenant_id, &[0u8; 32])
             .await
             .expect("drop"); // expect
 
-        let col2 = db
-            .collection_for_tenant("drop-me", tenant_id)
-            .await
-            .expect("re-create"); // expect
+        let col2 = db.collection("drop-me").await.expect("re-create"); // expect
         assert_eq!(col2.len().await, 0);
         assert!(col2.get("k1").await.expect("get").is_none()); // expect
     }
@@ -717,8 +711,7 @@ mod tests {
             dimension: 768,
             ..Default::default()
         };
-        let db = Contextra::open_with_config(dir.path(), config_768).await?;
-        db.close().await?;
+        let _db = Contextra::open_with_config(dir.path(), config_768).await?;
 
         // Zweites Öffnen mit falscher Dimension muss früh fehlschlagen
         let config_1536 = ContextraConfig {

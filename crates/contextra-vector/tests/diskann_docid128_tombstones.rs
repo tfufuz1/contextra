@@ -1,13 +1,9 @@
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "experimental-diskann")]
 use contextra_core::{DocId, Result, VectorIndex};
-#[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
-#[cfg(feature = "experimental-diskann")]
 use tempfile::tempdir;
 
-#[cfg(feature = "experimental-diskann")]
 #[tokio::test]
 async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
     let dir = tempdir().map_err(contextra_core::ContextraError::Io)?;

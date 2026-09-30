@@ -203,9 +203,7 @@ use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
-#[cfg(not(loom))]
 pub use contextra_store::lsm::DurabilityMode;
-#[cfg(not(loom))]
 use contextra_store::LsmStorage;
 use contextra_types::{CollectionId, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -214,63 +212,42 @@ use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-#[cfg(not(loom))]
 pub mod background_workers;
-#[cfg(not(loom))]
 pub mod chunker;
 pub mod collection;
-#[cfg(not(loom))]
 pub mod decay_controller;
-#[cfg(not(loom))]
 pub mod export;
 #[cfg(feature = "entity-extraction")]
-#[cfg(not(loom))]
 pub mod extraction;
-#[cfg(not(loom))]
 pub mod filter;
-#[cfg(not(loom))]
 pub mod fusion;
-#[cfg(not(loom))]
 pub mod import;
-#[cfg(not(loom))]
 pub mod temporal_filter;
-#[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(not(loom))]
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 
-#[cfg(not(loom))]
 pub use export::{
     ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1, SCHEMA_VERSION_V1,
 };
-#[cfg(not(loom))]
 pub use import::ImportSummary;
 
-#[cfg(not(loom))]
 #[cfg(feature = "background-maintenance")]
 pub use background_workers::start_decay_cleanup_worker;
-#[cfg(not(loom))]
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
 
-#[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
-#[cfg(not(loom))]
 #[cfg(feature = "graph-connectivity-health")]
 pub use collection::maintenance::PercolationResult;
-#[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
-#[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
 #[cfg(feature = "graph-connectivity-health")]
 pub use contextra_graph::percolation::PercolationConfig;
 pub use contextra_text::Language;
-#[cfg(not(loom))]
 #[allow(deprecated)]
 pub use filter::MetadataFilter;
 
-#[cfg(not(loom))]
 #[allow(clippy::type_complexity)]
 pub type ConsolidationLauncher = Arc<
     dyn Fn(
@@ -284,7 +261,6 @@ pub type ConsolidationLauncher = Arc<
 >;
 
 /// Registers a consolidation worker launcher function (deprecated: set on `ContextraConfig` instead).
-#[cfg(not(loom))]
 #[deprecated(
     note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
 )]
@@ -305,10 +281,8 @@ where
     );
 }
 
-#[cfg(not(loom))]
 pub use fusion::{ProvenanceRecord, SearchResult, SignalContribution};
 
-#[cfg(not(loom))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
     pub id: String,
@@ -373,7 +347,6 @@ pub enum TenantPolicy {
     Required,
 }
 
-#[cfg(not(loom))]
 #[derive(Clone)]
 pub struct ContextraConfig {
     pub dimension: usize,
@@ -416,7 +389,6 @@ pub struct ContextraConfig {
     pub tenant_policy: TenantPolicy,
 }
 
-#[cfg(not(loom))]
 impl ContextraConfig {
     pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
         self.consolidation_launcher = Some(launcher);
@@ -429,7 +401,6 @@ impl ContextraConfig {
     }
 }
 
-#[cfg(not(loom))]
 impl std::fmt::Debug for ContextraConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContextraConfig")
@@ -465,7 +436,6 @@ impl std::fmt::Debug for ContextraConfig {
     }
 }
 
-#[cfg(not(loom))]
 impl Default for ContextraConfig {
     fn default() -> Self {
         Self {
@@ -492,13 +462,11 @@ impl Default for ContextraConfig {
     }
 }
 
-#[cfg(not(loom))]
 pub type TenantCollectionMap = ahash::AHashMap<
     (TenantId, String),
     Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>,
 >;
 
-#[cfg(not(loom))]
 pub struct Contextra {
     storage: Arc<LsmStorage>,
     next_tx: Arc<AtomicU64>,
@@ -522,13 +490,11 @@ pub struct Contextra {
     >,
 }
 
-#[cfg(not(loom))]
 mod contextra_impl;
 
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
 
-#[cfg(not(loom))]
 impl Contextra {
     #[doc(hidden)]
     pub fn inner_storage(&self) -> Arc<LsmStorage> {

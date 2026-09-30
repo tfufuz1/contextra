@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, ExportDocumentV1, SCHEMA_VERSION_V1};
 use contextra_types::ContextraError;
 use serde_json::json;

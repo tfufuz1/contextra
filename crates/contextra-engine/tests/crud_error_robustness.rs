@@ -1,4 +1,3 @@
-#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, MAX_SCAN_RESULTS};
 use contextra_types::ContextraError;
 use serde_json::json;
