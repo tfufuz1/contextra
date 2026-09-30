@@ -38,8 +38,8 @@ async fn test_recall_at_10_above_95() {
 
     let tx = TxId::new(1);
     for (i, v) in data.iter().enumerate() {
-        index_f32.insert(tx, DocId::new(i as u64), v).await.unwrap();
-        index_sq8.insert(tx, DocId::new(i as u64), v).await.unwrap();
+        index_f32.insert(tx, DocId::new((i as u64).into()), v).await.unwrap();
+        index_sq8.insert(tx, DocId::new((i as u64).into()), v).await.unwrap();
     }
     index_f32.commit(tx).await.unwrap();
     index_sq8.commit(tx).await.unwrap();
