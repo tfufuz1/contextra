@@ -27,4 +27,3 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
-pub use types::saos::RerankResult;
