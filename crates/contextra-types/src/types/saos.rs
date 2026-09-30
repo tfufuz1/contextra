@@ -208,15 +208,6 @@ impl std::fmt::Display for ContextWindow {
     }
 }
 
-/// Evaluated candidate result from Cross-Encoder reranking.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RerankResult {
-    /// Original index of candidate prior to reranking.
-    pub original_index: usize,
-    /// Calibrated relevance score.
-    pub score: f32,
-}
-
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoredEntry {
@@ -226,6 +217,15 @@ pub struct ScoredEntry {
     pub final_score: f32,
     /// Associated entry metadata.
     pub metadata: Option<serde_json::Value>,
+}
+
+/// Evaluated result from a cross-encoder reranker.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Original index of candidate document in the query input.
+    pub original_index: usize,
+    /// Calculated reranking score.
+    pub score: f32,
 }
 
 /// A unified query traversing multiple index signals.
