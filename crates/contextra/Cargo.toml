@@ -8,6 +8,7 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 
 [dependencies]
 contextra-core = { workspace = true }
+contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-license = { workspace = true }
 contextra-store = { workspace = true }
@@ -31,6 +32,7 @@ tempfile = { workspace = true }
 [features]
 default = ["fast", "candle"]
 fast = []
+docid-128 = ["contextra-types/docid-128"]
 sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]
 audit-export = []

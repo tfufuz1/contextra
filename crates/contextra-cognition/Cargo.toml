@@ -31,7 +31,6 @@ blake3 = { workspace = true }
 default = []
 graph-connectivity-health = ["contextra-graph/physio-percolation", "contextra-engine/graph-connectivity-health"]
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "contextra-engine/edge-reinforcement-learning"]
-docid-128 = ["contextra-types/docid-128", "contextra-engine/docid-128"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
