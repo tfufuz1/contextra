@@ -14,6 +14,7 @@ pub mod approval;
 pub mod capabilities;
 pub mod error;
 pub mod executor;
+pub mod merge;
 pub mod output;
 pub mod wasi;
 
@@ -23,4 +24,5 @@ pub use approval::{
 pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
 pub use error::SandboxError;
 pub use executor::WasmExecutor;
+pub use merge::WasmMergeFunction;
 pub use output::WasmOutput;
