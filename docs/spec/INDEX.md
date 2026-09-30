@@ -1,13 +1,13 @@
 # Contextra Spezifikation — Index und Kapitelübersicht
 
-Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamtspezifikation **Contextra — Finale Produktspezifikation (Synthese)** (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`), sowie die vorausgegangenen Kapiteldateien.
+Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamtspezifikation **Contextra — Systemspezifikation v14** (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` / `CONTEXTRA_SPEZIFIKATION_v14.md`), sowie die vorausgegangenen Kapiteldateien.
 
-> **Hinweis zur Normativität**: Die unten aufgeführten nummerierten Kapiteldateien (`00a`…`21`…`92`) sind historische Vorstufen der Synthese. Bei etwaigen Widersprüchen gilt ausschließlich `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` als normative Quelle der Wahrheit.
+> **Hinweis zur Normativität**: Die unten aufgeführten nummerierten Kapiteldateien (`00a`…`21`…`92`) sind historische Vorstufen. Bei etwaigen Widersprüchen gilt ausschließlich `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` (Systemspezifikation v14, Stand 30.09.2026) als normative Quelle der Wahrheit.
 
 ## Hauptspezifikation
 
-- **[`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**: Normative Mikrofeingranulare Schnittstellen- und Implementierungsspezifikation des Zielprodukts (Synthese aller Vorkapitel).
-- **[`../FEATURES_SPECIFICATION.md`](../FEATURES_SPECIFICATION.md)**: Vollständige Feature- und Funktionsspezifikation über alle 33 Crates, inklusive versteckter Mechanismen und Cargo-Feature-Flags.
+- **[`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)** / **[`CONTEXTRA_SPEZIFIKATION_v14.md`](CONTEXTRA_SPEZIFIKATION_v14.md)**: Normative Systemspezifikation v14 (Stand 30.09.2026; 35 Crates) des Zielprodukts (IST- und SOLL-Zustand).
+- **[`../FEATURES_SPECIFICATION.md`](../FEATURES_SPECIFICATION.md)**: Vollständige Feature- und Funktionsspezifikation über alle 35 Crates, inklusive versteckter Mechanismen und Cargo-Feature-Flags.
 
 ## Hinweis zur Namenskollision 'Anhang E'
 
@@ -21,7 +21,8 @@ Für dieses Repository gilt ausschließlich E.1–E.13 der CIAI-Vollspezifikatio
 
 | Dateiname | Kapitelüberschrift (Originalwortlaut) | Grober Ring-/Crate-Bezug |
 |---|---|---|
-| `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` | Contextra — Finale Produktspezifikation (Synthese) | Global / Ring 0–4 / Master |
+| `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` | Contextra — Systemspezifikation v14 (IST- und SOLL-Zustand) | Global / Ring 0–4 / Master |
+| `CONTEXTRA_SPEZIFIKATION_v14.md` | Contextra — Systemspezifikation v14 (IST- und SOLL-Zustand, 30.09.2026) | Global / Ring 0–4 / Master |
 | `00a-titel-und-einleitung.md` | Contextra — Finale Konsolidierte Gesamtspezifikation (Fassung 4 · SOTA-Algorithmen-Integration & Architekten-Review) | Global / Workspace |
 | `00b-teil-a-stabilisierungsauftrag.md` | ## Teil A — Stabilisierungsauftrag: Ground Truth, Reifegrade, Gates | Global / Ring 0–4 |
 | `00c-teil-a2-zielarchitektur-v2.md` | ## Teil A2 — Zielarchitektur v2 (Ring-Modell), verbindlich ab sofort | Ring 0–4 / Crate-Graph |

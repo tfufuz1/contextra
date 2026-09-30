@@ -2,7 +2,7 @@
 
 Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25 / BM25F), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
-> **Dokumentationsstand:** Normativ abgestimmt mit der **[Finalen Produktspezifikation (Synthese)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
+> **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v14 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
 ---
 
@@ -35,9 +35,14 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 | **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten (`contextra` ohne Ollama). |
 | **Python Bindings (`contextra-py`)** | Opt-in | `contextra-py` | 🟢 Produktiv | FFI-Bindings für Python (aus default-members entfernt). |
 | **WASM-Sandbox** | Opt-in | `contextra-sandbox` | 🟢 Produktiv | Wasmtime Isolation (aus default-members entfernt). |
-| **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟢 Produktiv | `DeletionProof`, AEAD-Schlüsselhierarchie, Anti-Tamper. |
+| **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟢 Produktiv | `DeletionProof` (7 Ebenen), AEAD-Schlüsselhierarchie, Anti-Tamper. |
 | **Privacy Gateway** | `sovereign` | `contextra-privacy` | 🟢 Produktiv | Egress-Gateway, PII-Vault, DLP, Prompt-Injection-Filter. |
-| **Lizenz- & Compliance-Schicht** | `compliance` | `contextra-license` | 🔒 Closed | Lizenzdurchsetzung, BSI TR-02102-1 Audit, Mandanten-Scoping. | <!-- crate-ref-ignore -->
+| **AVV Generator (Art. 28 DSGVO)** | `sovereign` | `contextra-avv-generator` | 🟢 Produktiv | AVV-Vertragstemplate-Generator mit technischen Garantien. |
+| **Audit- & Art.-30-Export** | `sovereign` | `contextra-audit-export` | 🟢 Produktiv | BSI TR-02102-1 Kryptomapping und DSGVO Art. 30 Export. |
+| **Memory Consolidation & Cognition** | `fast` | `contextra-cognition` | 🟢 Produktiv | Konsolidierung, LLM-Kompaktierung, MaintenanceScheduler. |
+| **Persistent Checkpoint Engine** | `fast` | `contextra-checkpoint` | 🟢 Produktiv | persistent_checkpoint_store, Hardlink-Cloner, Blake3-Manifest. |
+| **Persistent Agent Workflows** | `fast` | `contextra-agent` | 🟢 Produktiv | Agenten-Workflow-Engine, Checkpoint/Execute/Audit-Loop. |
+| **Lizenz- & Compliance-Schicht** | `compliance` | `contextra-license` | 🔒 Closed | Lizenzdurchsetzung, Ring-Gating, Mandanten-Scoping. | <!-- crate-ref-ignore -->
 
 ---
 
