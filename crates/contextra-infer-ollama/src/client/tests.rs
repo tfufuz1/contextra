@@ -1592,3 +1592,65 @@ async fn test_llm_text_generator_streaming_ollama_mock() {
     assert_eq!(assembled, "Das ist ein Test.");
     assert_eq!(sync_resp, assembled);
 }
+
+#[test]
+fn test_retry_jitter_bounds() {
+    use contextra_ports::SeededRng;
+
+    let rng = SeededRng::new(42);
+    for _ in 0..1000 {
+        let jitter = retry_jitter(&rng);
+        assert!(
+            jitter < Duration::from_millis(100),
+            "retry_jitter must always be < 100ms, got {:?}",
+            jitter
+        );
+    }
+}
+
+#[test]
+fn test_retry_jitter_same_seed_reproducibility() {
+    use contextra_ports::SeededRng;
+
+    let rng1 = SeededRng::new(12345);
+    let rng2 = SeededRng::new(12345);
+
+    let seq1: Vec<Duration> = (0..16).map(|_| retry_jitter(&rng1)).collect();
+    let seq2: Vec<Duration> = (0..16).map(|_| retry_jitter(&rng2)).collect();
+
+    assert_eq!(
+        seq1, seq2,
+        "identical seeds must produce identical retry_jitter sequence"
+    );
+}
+
+#[test]
+fn test_retry_jitter_different_seeds_divergence() {
+    use contextra_ports::SeededRng;
+
+    let rng1 = SeededRng::new(12345);
+    let rng2 = SeededRng::new(54321);
+
+    let seq1: Vec<Duration> = (0..16).map(|_| retry_jitter(&rng1)).collect();
+    let seq2: Vec<Duration> = (0..16).map(|_| retry_jitter(&rng2)).collect();
+
+    assert_ne!(
+        seq1, seq2,
+        "different seeds must produce different retry_jitter sequences"
+    );
+}
+
+#[test]
+fn test_with_rng_builder() {
+    use contextra_ports::{Rng, SeededRng};
+    use std::sync::Arc;
+
+    let custom_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(99999));
+    let client = OllamaClient::new("http://localhost:11434").with_rng(custom_rng.clone());
+
+    let val1 = retry_jitter(client.rng.as_ref());
+    let ref_rng = SeededRng::new(99999);
+    let val2 = retry_jitter(&ref_rng);
+
+    assert_eq!(val1, val2);
+}

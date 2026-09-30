@@ -7,16 +7,39 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
+use contextra_ports::{Rng, SeededRng};
 use contextra_types::{ContextraError, Result};
 use futures_util::StreamExt;
 use serde::Deserialize;
+use std::sync::Arc;
 use std::time::Duration;
 
+/// Default RNG seed for deterministic fallback.
+/// The Composition Root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
+const DEFAULT_RNG_SEED: u64 = 0x4f4c_4c41_4d41_524e; // "OLLAMARN"
+
+/// Private helper to calculate retry jitter bounded to 0..100 ms using the injected RNG port.
+#[inline]
+pub(crate) fn retry_jitter(rng: &dyn Rng) -> Duration {
+    Duration::from_millis(rng.next_u64() % 100)
+}
+
 /// HTTP client for interacting with a local Ollama instance.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OllamaClient {
     pub(crate) config: OllamaConfig,
     pub(crate) client: reqwest::Client,
+    pub(crate) rng: Arc<dyn Rng>,
+}
+
+impl std::fmt::Debug for OllamaClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OllamaClient")
+            .field("config", &self.config)
+            .field("client", &self.client)
+            .field("rng", &"Arc<dyn Rng>")
+            .finish()
+    }
 }
 
 impl OllamaClient {
@@ -48,7 +71,20 @@ impl OllamaClient {
                 reqwest::Client::new()
             }
         };
-        Self { config, client }
+        // Default RNG uses SeededRng with a deterministic default seed.
+        // The composition root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
+        let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(DEFAULT_RNG_SEED));
+        Self {
+            config,
+            client,
+            rng,
+        }
+    }
+
+    /// Sets a custom random number generator for retry jitter computation.
+    pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
+        self.rng = rng;
+        self
     }
 
     /// Health check verifying Ollama availability via GET /api/tags
@@ -290,7 +326,7 @@ impl OllamaClient {
                     last_err = Some(e);
                     if attempt + 1 < max_retries {
                         let base_delay = Duration::from_millis(100 * 2u64.pow(attempt));
-                        let jitter = Duration::from_millis(rand::random::<u64>() % 100);
+                        let jitter = retry_jitter(self.rng.as_ref());
                         let delay = (base_delay + jitter).min(Duration::from_secs(5));
                         tracing::warn!(
                             attempt = attempt + 1,
@@ -526,7 +562,7 @@ impl OllamaClient {
                     last_err = Some(e);
                     if attempt + 1 < max_retries {
                         let base_delay = Duration::from_millis(100 * 2u64.pow(attempt));
-                        let jitter = Duration::from_millis(rand::random::<u64>() % 100);
+                        let jitter = retry_jitter(self.rng.as_ref());
                         let delay = (base_delay + jitter).min(Duration::from_secs(5));
                         tracing::warn!(
                             attempt = attempt + 1,
@@ -632,7 +668,7 @@ impl OllamaClient {
                     last_err = Some(e);
                     if attempt + 1 < max_retries {
                         let base_delay = Duration::from_millis(100 * 2u64.pow(attempt));
-                        let jitter = Duration::from_millis(rand::random::<u64>() % 100);
+                        let jitter = retry_jitter(self.rng.as_ref());
                         let delay = (base_delay + jitter).min(Duration::from_secs(5));
                         if let Some(err) = last_err.as_ref() {
                             tracing::warn!(
