@@ -54,7 +54,7 @@ pub struct MaintenanceConfig {
     pub percolation: PercolationConfig,
 
     // --- F-07 Replikatordynamik ---
-    /// Ob Replikatordynamik-Updates aktiviert sind. Default: true.
+    /// Ob Replikatordynamik-Updates aktiviert sind. Default: false.
     pub replicator_enabled: bool,
     /// Lernrate η für Replikatordynamik. Default: 0.05.
     pub replicator_lr: f32,

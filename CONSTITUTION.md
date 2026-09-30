@@ -13,6 +13,7 @@
 - **WAL First**: No in-memory state modifications prior to WAL commit and disk sync.
 - **Deterministic Recovery**: System state must be fully reconstructible from logs alone.
 - **No Silent Failures**: All I/O errors must be explicitly propagated.
+- **P28 Determinismus**: Zeit, Zufall und IDs werden über die Ports Clock, Rng und IdGenerator injiziert. Ausnahme: kryptografisches Schlüssel- und Salt-Material darf aus dem System-RNG stammen (z. B. store/src/wal/hmac.rs).
 
 ### 3. Modularity & Layering
 - **Strict DAG Topology**: Architecture follows a strict Directed Acyclic Graph (Layers 0–4). Dependencies flow strictly downward.
