@@ -219,6 +219,15 @@ pub struct ScoredEntry {
     pub metadata: Option<serde_json::Value>,
 }
 
+/// Result of reranking a document candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Original candidate index prior to reranking.
+    pub original_index: usize,
+    /// Relevance or similarity score assigned by the reranker model.
+    pub score: f32,
+}
+
 /// A unified query traversing multiple index signals.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HybridQuery {

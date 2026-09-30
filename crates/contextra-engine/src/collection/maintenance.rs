@@ -330,6 +330,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if recovered_graph {
             self.graph_index.commit(recovery_tx).await?;
         }
+        if recovered_any || recovered_text || recovered_graph {
+            self.storage.commit(recovery_tx).await?;
+        }
 
         // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
         let fallback_tx = self.allocate_tx()?;
