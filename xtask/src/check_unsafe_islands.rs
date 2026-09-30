@@ -17,9 +17,7 @@ pub const ALLOWED_ISLANDS: &[&str] = &["contextra-sys", "contextra-simd", "conte
 
 /// Phase 0R Übergangsliste für Bestands-`unsafe` Vorkommen
 pub const PHASE_0R_TRANSITION_ISLANDS: &[&str] = &[
-    "contextra-vector",
     "contextra-store",
-    "contextra-db",
     // TRANSITION-EXTRA: test allocators, benchmark fixtures
     "contextra-crypto",
     "contextra-graph",
