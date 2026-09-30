@@ -15,6 +15,9 @@ pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
 /// Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
 pub const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10;
 
+/// Default-Seed für die deterministische HNSW-Ebenenzuweisung (wie in hnswlib üblich).
+pub const DEFAULT_LAYER_SEED: u64 = 100;
+
 #[derive(Debug, Clone)]
 pub enum VectorData {
     /// Standard 32-bit floating point vectors.
@@ -97,11 +100,19 @@ pub struct HnswHotCore {
     pub ram_entry_point: AtomicU32,
     pub max_layer: AtomicU64,
     pub ml: f64,
+    pub layer_seed: AtomicU64,
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
     pub rebuilding: AtomicBool,
     pub arena: HnswArena,
+}
+
+impl HnswIndexCore {
+    /// Sets the random seed used for HNSW layer selection during insertions.
+    pub fn set_layer_seed(&self, seed: u64) {
+        self.hot.layer_seed.store(seed, Ordering::Relaxed);
+    }
 }
 
 impl HnswHotCore {
@@ -202,6 +213,7 @@ impl HnswIndex {
                     ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
                     ml,
+                    layer_seed: AtomicU64::new(DEFAULT_LAYER_SEED),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -253,6 +265,7 @@ impl HnswIndex {
                     ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
                     ml,
+                    layer_seed: AtomicU64::new(DEFAULT_LAYER_SEED),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -307,6 +320,10 @@ impl HnswIndex {
         *self.inner.cold.sq8_bias.read()
     }
 
+    /// Sets the random seed used for HNSW layer selection during insertions.
+    pub fn set_layer_seed(&self, seed: u64) {
+        self.inner.set_layer_seed(seed);
+    }
 
     pub fn deleted_ratio(&self) -> f64 {
         self.inner.deleted_ratio()
