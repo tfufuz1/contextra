@@ -1,5 +1,5 @@
 use super::compensating_actions::{
-    CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
+    CommitLedger, CompensateGraphAction, CompensateHnswAction,
     CompensateTextAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
@@ -191,14 +191,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             std::mem::take(&mut *guard)
         };
 
-        ledger.push(CompensateLsmAction::new(
-            self.collection.clone(),
-            intent_key.clone(),
-            Arc::clone(&doc_ids),
-            f_keys,
-            r_keys,
-        ));
-
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
         let intent_tx = TxId::new(
             self.collection
@@ -326,6 +318,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
             return Err(ContextraError::Transaction(storage_err.to_string()));
         }
+
+        ledger.push(CompensateLsmAction::new(
+            self.collection.clone(),
+            intent_key.clone(),
+            Arc::clone(&doc_ids),
+            f_keys,
+            r_keys,
+        ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(

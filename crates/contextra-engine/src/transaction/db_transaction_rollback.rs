@@ -5,6 +5,7 @@ use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+#[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) {
         if let Some(kv_store) = self.collection.kv_store() {

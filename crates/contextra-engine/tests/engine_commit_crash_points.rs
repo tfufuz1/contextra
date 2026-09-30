@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
 use contextra_graph::CsrGraph;

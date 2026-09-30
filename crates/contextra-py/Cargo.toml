@@ -20,6 +20,7 @@ test = false
 doctest = false
 
 [dependencies]
+contextra-types = { workspace = true }
 pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"] }
 numpy = "0.24"
 tokio = { workspace = true }
@@ -43,4 +44,4 @@ pythonize = "0.24"
 
 [features]
 default = []
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]

@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::{BoxFuture, TextEmbeddingEngine};
 use contextra_types::{EntityId, FusionWeights, GraphTraversalStrategy, Result};

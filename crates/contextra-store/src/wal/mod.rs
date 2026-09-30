@@ -20,6 +20,7 @@ pub(crate) mod fs {
 }
 
 #[cfg(loom)]
+#[allow(dead_code)]
 pub(crate) mod fs {
     use std::path::Path;
 

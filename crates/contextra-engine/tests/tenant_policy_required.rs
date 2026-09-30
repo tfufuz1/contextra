@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, TenantPolicy};
 use contextra_types::{ContextraError, TenantId};
 use tempfile::tempdir;

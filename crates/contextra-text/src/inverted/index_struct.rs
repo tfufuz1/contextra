@@ -272,8 +272,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
                     let old_terms: Vec<String> = bincode::deserialize(&fw_bytes)
                         .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
                     for term in old_terms {
-                        let tbs_key = self.key_tombstone(doc_id, &term);
-                        self.storage.put(tx, &tbs_key, &[]).await?;
+                        if !tfs.contains_key(&term) {
+                            let tbs_key = self.key_tombstone(doc_id, &term);
+                            self.storage.put(tx, &tbs_key, &[]).await?;
+                        }
                     }
                 }
             }

@@ -530,6 +530,7 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
             None,
             None,
             None,
+            None,
         )
         .await?;
 

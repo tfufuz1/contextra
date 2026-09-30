@@ -181,6 +181,7 @@ pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateGraphAction<S, V> {
+    #[allow(dead_code)]
     pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
         Self { collection, doc_ids }
     }
