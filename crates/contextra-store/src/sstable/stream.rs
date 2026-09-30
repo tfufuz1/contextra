@@ -38,8 +38,7 @@ impl SstableStream {
                 self.entry_idx = 0;
 
                 let (num_offsets, offsets_start, _) =
-                    parse_block_trailer(&block_data, self.reader.format_version)?;
-
+                    super::reader::parse_block_trailer(&block_data, self.reader.format_version)?;
                 self.num_offsets = num_offsets;
                 self.offsets_start = offsets_start;
                 self.current_block = Some(block_data);
@@ -49,10 +48,15 @@ impl SstableStream {
             if let Some(block_data) = &self.current_block {
                 if self.entry_idx < self.num_offsets {
                     let is_v3 = self.reader.format_version >= 3;
-                    let (entry_off, k_len) =
-                        get_entry_at_index(block_data, self.offsets_start, self.entry_idx, is_v3)?;
+                    let (entry_off, k_len) = super::block_search::get_entry_at_index(
+                        block_data,
+                        self.offsets_start,
+                        self.entry_idx,
+                        is_v3,
+                    )?;
 
-                    let mut ep = entry_off + 2;
+                    let mut ep = entry_off;
+                    ep += 2;
                     let entry_key = block_data
                         .get(ep..ep + k_len)
                         .ok_or_else(|| ContextraError::Storage("missing entry_key".into()))?;

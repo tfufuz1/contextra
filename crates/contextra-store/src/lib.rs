@@ -34,7 +34,8 @@ pub mod wal;
 
 // WP-4.1 (UNIMPLEMENTED): mmap-basierter SSTable-Zugriff für Out-of-Core-Daten.
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
-// Tracking-Issue: [ISSUE-NUMMER]
+// Tracking-Issue: TODO(owner): Issue anlegen
+// INVARIANTE: LSM-Kern bleibt blind gegenüber Indexstrukturen.
 
 #[cfg(not(loom))]
 pub use compaction::{

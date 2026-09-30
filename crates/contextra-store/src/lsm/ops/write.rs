@@ -353,9 +353,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             is_durable,
         );
 
-        // LOCK ORDER 4: state (read guard)
-        // Lock Strength: Read guard on LsmState is sufficient because MemTable handles its own
-        // thread-safe internal locking via parking_lot::RwLock, while LsmState only protects structural swaps.
+        // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
         let state = storage.state.read().await;
         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
         storage.advance_visibility(tx_id);
@@ -667,9 +665,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
 
         let _commit_lock = storage.commit_mutex.lock().await;
-        // LOCK ORDER 4: state (read guard)
-        // Lock Strength: Read guard on LsmState is sufficient because MemTable handles its own
-        // thread-safe internal locking via parking_lot::RwLock, while LsmState only protects structural swaps.
+        // LOCK ORDER 4: state (read guard: symmetrical with single-commit, MemTable uses internal RwLock)
         let state = storage.state.read().await;
         for (req_tx_id, mem_updates) in all_updates {
             storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);

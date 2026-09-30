@@ -54,6 +54,7 @@ contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
+reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
 encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
 bench = []

@@ -161,6 +161,11 @@ struct CargoMetadata {
     workspace_members: HashSet<String>,
 }
 
+pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
+    let ring_map = get_workspace_ring_map().ok()?;
+    ring_map.get(crate_name).copied()
+}
+
 pub fn get_ring_map_from_metadata_json(json_str: &str) -> Result<HashMap<String, Ring>, String> {
     let metadata: CargoMetadata = serde_json::from_str(json_str)
         .map_err(|e| format!("Failed to parse cargo metadata: {}", e))?;
