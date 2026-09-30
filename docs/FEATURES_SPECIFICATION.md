@@ -1,7 +1,7 @@
 # Contextra — Vollständige Feature- und Funktionsspezifikation
 
-**Stand:** 2026-09-29
-**Quelle der Wahrheit:** Quellcode-Audit über alle 33 Workspace-Crates (HEAD)
+**Stand:** 2026-09-30 (Systemspezifikation v14)
+**Quelle der Wahrheit:** Quellcode-Audit über alle 35 Workspace-Crates (HEAD)
 **Status:** Verbindliche Spezifikation aller sichtbaren, opt-in, versteckten und internen Features
 
 ---
@@ -12,16 +12,16 @@ Contextra ist eine hochperformante, einbettbare (embedded), air-gapped-fähige G
 
 | Ring | Charakteristik | Enthaltene Crates |
 | :--- | :--- | :--- |
-| **Ring 0** | Synchrone Kern-Primitives, Zero-Copy-Typen, SIMD, Mathematik | `contextra-types`, `contextra-core`, `contextra-wire`, `contextra-ports`, `contextra-sys`, `contextra-simd`, `contextra-mvcc`, `contextra-crypto`, `contextra-text`, `contextra-vector`, `contextra-graph`, `contextra-rank`, `contextra-adapt` |
+| **Ring 0** | Synchrone Kern-Primitives, Zero-Copy-Typen, SIMD, Compliance-Templates, Audit-Exports, Mathematik | `contextra-types`, `contextra-core`, `contextra-wire`, `contextra-ports`, `contextra-sys`, `contextra-simd`, `contextra-mvcc`, `contextra-crypto`, `contextra-text`, `contextra-vector`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-avv-generator`, `contextra-audit-export` |
 | **Ring 1** | Persistenz, LSM-Tree, WAL, Checkpoints, KV-Cache | `contextra-store`, `contextra-checkpoint`, `contextra-kvcache` |
 | **Ring 2** | Isolation, Datenschutz, Inferenz-Provider | `contextra-sandbox`, `contextra-privacy`, `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx` |
 | **Ring 3** | Compute Engine, Graph-Konsolidierung, Routing, DB & Agenten | `contextra-engine`, `contextra-cognition`, `contextra-router`, `contextra-db`, `contextra-agent` |
-| **Ring 4** | Endanwender-Fassade, Protokolle, Compliance & Bindings | `contextra`, `contextra-mcp`, `contextra-py`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-license` |
+| **Ring 4** | Endanwender-Fassade, Protokolle & Bindings | `contextra`, `contextra-mcp`, `contextra-py`, `contextra-license` |
 | **Tooling**| Test-Harnesses & Benchmarks | `contextra-testkit`, `contextra-bench` |
 
 ---
 
-## 2. Detaillierte Feature-Spezifikation aller 33 Crates
+## 2. Detaillierte Feature-Spezifikation aller 35 Crates
 
 ### 2.1 Ring 0 — Synchrone Primitives & Algorithmen
 

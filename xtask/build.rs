@@ -29,7 +29,7 @@ fn main() {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
                 let stem = match path.file_stem().and_then(|s| s.to_str()) {
                     Some(s) => s.to_string(),
                     None => continue,
@@ -79,7 +79,7 @@ fn main() {
 
 fn validate_stem(stem: &str, path: &Path) {
     let valid = !stem.is_empty()
-        && stem.chars().next().map_or(false, |c| c.is_ascii_lowercase())
+        && stem.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         && stem.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
 
     if !valid {

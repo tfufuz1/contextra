@@ -13,7 +13,7 @@
 | **1k Chunks Search p50 = ~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Widerspricht §4 (~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) und neuem VM-Messlauf (2.61 ms). |
 | **5k Chunks Search p50 = ~~809.15 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.11 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
 | **10k Chunks Search p50 = ~~337.77 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.13 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
-| **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `nur dokumentiert, nicht reproduziert` | Mathematische Extrapolation ohne realen Benchmark-Lauf. |
+| **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `Messung in Arbeit (extrapoliert, unbestätigt)` | Mathematische Extrapolation; gemessen bis 10.000 Dokumente. |
 | **Recall@5 / @10 / @20 = 1.0000** | `crates/contextra-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
 | **Hybrid Search p50 = ~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) sowie VM-Messlauf (2.61 ms). |
 | **Wettbewerbsvergleich Mem0/Zep/MemOS** | `docs/BENCHMARKS.md` §4 | `nur dokumentiert, nicht reproduziert` | Keine öffentlichen Messungen vorhanden; Wettbewerberzeilen wurden gelöscht. |
@@ -23,19 +23,28 @@
 
 ## 1. Verifizierter VM-Messlauf (`benches/scale_bench.rs`)
 
+> **Hinweis zur Latenz-Abgrenzung:** Misst ausschließlich Speicher- und Indexlatenz. Embedding-Inferenz (Ollama, ONNX, Candle) addiert je nach Modell und Hardware 10-500 ms pro Anfrage.
+
 *Protokollierter Messlauf:*
 - **Commit:** `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`
 - **Datum:** 2026-09-21
 - **Hardware:** Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), 7.8 GiB RAM, Linux x86_64
 - **Befehl:** `CONTEXTRA_SCALE_TIERS="1000,5000,10000" cargo bench -p contextra-db --bench scale_bench -- --quick`
 
+### 1.a Verifizierte Messwerte (bis 10.000 Dokumente)
+
 | Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | VmRSS Peak (MB) | Status |
 |---|---|---|---|---|---|
 | **1,000** | 409.7 docs/sec | 2.61 ms | 2.66 ms | 148.85 MB | `reproduziert` |
 | **5,000** | 126.9 docs/sec | 5.11 ms | 5.20 ms | 332.36 MB | `reproduziert` |
 | **10,000** | 72.0 docs/sec | 5.13 ms | 5.29 ms | 597.16 MB | `reproduziert` |
-| **100,000** *(extrapoliert)* | ~25 docs/sec | ~3,500 ms | ~4,200 ms | ~1,950 MB | `nur dokumentiert, nicht reproduziert` |
-| **1,000,000** *(extrapoliert)* | ~5 docs/sec | > 30 s | > 45 s | > 18.5 GB (exceeds RAM) | `nur dokumentiert, nicht reproduziert` |
+
+### 1.b Unbestätigte Extrapolationen (nicht belegt)
+
+| Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | VmRSS Peak (MB) | Status |
+|---|---|---|---|---|---|
+| **100,000** *(extrapoliert)* | ~25 docs/sec | ~3,500 ms | ~4,200 ms | ~1,950 MB | `Messung in Arbeit (extrapoliert, unbestätigt)` |
+| **1,000,000** *(extrapoliert)* | ~5 docs/sec | > 30 s | > 45 s | > 18.5 GB (exceeds RAM) | `Messung in Arbeit (extrapoliert, unbestätigt)` |
 
 ---
 
@@ -93,9 +102,9 @@ Verifizierte Messung gegen synthetische Ground Truth (`crates/contextra-db/tests
 4. **Vollständiger In-Memory HNSW-Graph**: Bei 1M+ Chunks überschreitet der RAM-Bedarf von `HnswIndex` die physische RAM-Grenze typischer Developer-VMs (7.8 GiB).
 
 ### 4.1 Skalierungsgrenze & Single-Node Positionierung
-Contextra ist bewusst als Single-Node-, In-Process-Gedächtnisschicht für vertrauliche und lokale KI-Agenten konzipiert. Der Standard-Vektorindex `HnswIndex` hält den Traversierungsgraphen im RAM, was für Korpora bis ca. 100.000 Dokumente optimale p50-Latenzen (< 10 ms) bietet.
+Contextra ist bewusst als Single-Node-, In-Process-Gedächtnisschicht für vertrauliche und lokale KI-Agenten konzipiert. Der Standard-Vektorindex `HnswIndex` hält den Traversierungsgraphen im RAM. Gemessen sind Latenzen bis 10.000 Dokumente (p50 = 5,13 ms im VM-Messlauf, siehe §1); darüber extrapoliert und nicht belegt (Messung in Arbeit).
 
-Ab ca. 100.000 Dokumenten ist die DiskANN-Variante (`experimental-diskann`, aktuell experimentell) zu verwenden, da der In-Memory-HNSW-Index den typischen RAM einer Entwicklungsumgebung überschreitet. Diese Skalierungsgrenze ist ein bewusster Bestandteil der Positionierung als leichtgewichtige Single-Node-Gedächtnisschicht, nicht eine verschwiegene Schwäche.
+Ab größeren Korpora (100.000+ Chunks) ist die DiskANN-Variante (`experimental-diskann`, aktuell experimentell) zu verwenden, da der In-Memory-HNSW-Index den typischen RAM einer Entwicklungsumgebung überschreitet. Diese Skalierungsgrenze ist ein bewusster Bestandteil der Positionierung als leichtgewichtige Single-Node-Gedächtnisschicht, nicht eine verschwiegene Schwäche.
 
 ---
 

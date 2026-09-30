@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{Result, StorageEngine, TxId};
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};

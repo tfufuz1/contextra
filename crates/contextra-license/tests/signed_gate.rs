@@ -41,6 +41,7 @@ fn test_valid_signature_allowed_ring_sovereign() {
         allowed_rings: vec![FeatureRing::Fast, FeatureRing::Sovereign],
         expires_at: Some(2000000000), // Year 2033
         feature_flags: BTreeMap::from([("audit_export".to_string(), true)]),
+        installation_id_hash: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -70,6 +71,7 @@ fn test_valid_signature_missing_ring_compliance() {
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
+        installation_id_hash: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -102,6 +104,7 @@ fn test_invalid_signature_rejected() {
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
+        installation_id_hash: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -125,6 +128,7 @@ fn test_expired_license() {
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
+        installation_id_hash: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -159,6 +163,7 @@ fn test_inv_license_2_fast_ring_always_allowed() {
         allowed_rings: vec![], // Fast ring NOT listed, expired
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
+        installation_id_hash: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");

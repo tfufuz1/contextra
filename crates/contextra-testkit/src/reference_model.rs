@@ -17,6 +17,7 @@ pub enum RefOp {
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceModel {
+    #[allow(clippy::type_complexity)]
     history: BTreeMap<Vec<u8>, Vec<(u64, Option<Vec<u8>>)>>,
     pending_writes: Vec<RefOp>,
     current_seq: u64,
@@ -42,9 +43,8 @@ impl ReferenceModel {
 
     /// Stages a `Delete` operation in uncommitted pending buffer.
     pub fn delete(&mut self, key: &[u8]) {
-        self.pending_writes.push(RefOp::Delete {
-            key: key.to_vec(),
-        });
+        self.pending_writes
+            .push(RefOp::Delete { key: key.to_vec() });
     }
 
     /// Clears any uncommitted pending writes without advancing sequence number.

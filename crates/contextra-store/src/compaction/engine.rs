@@ -1,5 +1,6 @@
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
+use super::merge_operator::MergeOperator;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
@@ -20,6 +21,7 @@ pub struct CompactionEngine {
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
     workload_metrics: WorkloadMetrics,
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
+    merge_operator: Option<Arc<dyn MergeOperator>>,
 }
 
 impl CompactionEngine {
@@ -54,7 +56,14 @@ impl CompactionEngine {
             pressure_rx: None,
             workload_metrics: WorkloadMetrics::new(),
             adaptive_planner,
+            merge_operator: None,
         }
+    }
+
+    /// Attaches a custom merge operator for compaction value merging (§4.12).
+    pub fn with_merge_operator(mut self, merge_operator: Arc<dyn MergeOperator>) -> Self {
+        self.merge_operator = Some(merge_operator);
+        self
     }
 
     /// Attaches a system pressure watch receiver to enable pressure-aware compaction backpressure.
@@ -216,9 +225,10 @@ impl CompactionEngine {
             let is_contiguous = match start_opt {
                 Some(start) => {
                     if start + input_ssts.len() <= ssts.len() {
-                        input_ssts.iter().enumerate().all(|(idx, inp)| {
-                            Arc::ptr_eq(inp, &ssts[start + idx])
-                        })
+                        input_ssts
+                            .iter()
+                            .enumerate()
+                            .all(|(idx, inp)| Arc::ptr_eq(inp, &ssts[start + idx]))
                     } else {
                         false
                     }
@@ -625,59 +635,155 @@ impl CompactionEngine {
                 floor_emitted = false;
             }
 
-            // LSM Retention Rule:
-            // Keep all versions with raw_seq >= min_snapshot_seq (visible to active or future snapshots)
-            // PLUS the newest version with raw_seq < min_snapshot_seq (the "floor" version).
-            // All further, older versions for the key below min_snapshot_seq are discarded.
-            let keep = if raw_seq >= min_snapshot_seq {
-                true
-            } else if !floor_emitted {
-                floor_emitted = true;
-                true
-            } else {
-                false
-            };
+            let mut merged = false;
+            let mut failed_merge_keep = false;
 
-            if keep {
-                // O(1): Bytes::clone is an Arc refcount increment
-                last_key = Some(item.key.clone());
+            // MergeOperator logic:
+            // 1. key_manager MUST be None (encrypted values cannot be merged as raw bytes).
+            //    Note: If encryption is enabled (key_manager.is_some()), values are encrypted
+            //    ciphertexts and cannot be merged by a raw MergeOperator. Merging is skipped,
+            //    preserving existing versions according to standard retention rules.
+            // 2. Both current item and next item must be Put entries (not tombstones).
+            // 3. Both sequence numbers must be strictly below min_snapshot_seq (no active snapshot
+            //    can view the older version independently).
+            // 4. No tombstone exists for this key in inputs (tombstone keys are never merged to avoid resurrecting deleted data).
+            if let Some(ref merge_op) = self.merge_operator {
+                if self.key_manager.is_none() && !is_tombstone && raw_seq < min_snapshot_seq {
+                    if let Some(next_item) = heap.peek() {
+                        let next_is_same_key = next_item.key == item.key;
+                        let next_is_tombstone = (next_item.seq & TOMBSTONE_BIT) != 0;
+                        let next_raw_seq = next_item.seq & !TOMBSTONE_BIT;
 
-                // FIND-STO-001: Tombstone-Retention
-                // Only GC tombstones during FULL compaction when no snapshot references them
-                // and no older SSTables outside this compaction round can contain older values.
-                // NOTE: If raw_seq < min_snapshot_seq and is_full_compaction is true, this tombstone
-                // is the floor version below min_snapshot_seq. Being a tombstone below min_snapshot_seq
-                // during full compaction, no active snapshot references a non-deleted version below it
-                // and no older SSTables exist, so GC'ing it is safe.
-                let should_gc_tombstone =
-                    is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
-                if !should_gc_tombstone {
-                    let entry_bytes = (item.key.len() + item.value.len() + 16) as u64; // +16 für Overhead
-                    builder
-                        .add(&item.key, &item.value, item.seq, item.tx)
-                        .await?;
+                        if next_is_same_key
+                            && !next_is_tombstone
+                            && next_raw_seq < min_snapshot_seq
+                            && !heap
+                                .iter()
+                                .any(|h| h.key == item.key && (h.seq & TOMBSTONE_BIT) != 0)
+                        {
+                            // existing_val is older version (next_item), new_val is newer version (item)
+                            match merge_op.merge(&next_item.value, &item.value) {
+                                Ok(merged_val) => {
+                                    // Consume next_item from heap and advance its stream
+                                    if let Some(popped_next) = heap.pop() {
+                                        if let Some((key, value, seq, tx)) =
+                                            streams[popped_next.source_idx].next_entry().await?
+                                        {
+                                            heap.push(HeapItem {
+                                                key,
+                                                value,
+                                                seq,
+                                                tx,
+                                                source_idx: popped_next.source_idx,
+                                            });
+                                        }
+                                    }
 
-                    // Token-Bucket I/O Rate Limiting (plattformneutral, außerhalb aller Write-Locks)
-                    if let Some(max_bps) = self.config.max_io_bytes_per_second {
-                        if max_bps > 0 {
-                            io_token_bytes_written += entry_bytes;
-                            let elapsed = io_token_last_reset.elapsed();
-                            let target = std::time::Duration::from_secs_f64(
-                                io_token_bytes_written as f64 / max_bps as f64,
-                            );
-                            if target > elapsed {
-                                let delay =
-                                    (target - elapsed).min(std::time::Duration::from_millis(100));
-                                // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
-                                // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
-                                tokio::time::sleep(delay).await;
-                                // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
-                                let total_elapsed = io_token_last_reset.elapsed();
-                                let allowed_bytes =
-                                    (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
-                                io_token_bytes_written =
-                                    io_token_bytes_written.saturating_sub(allowed_bytes);
-                                io_token_last_reset = std::time::Instant::now();
+                                    let merged_bytes = bytes::Bytes::from(merged_val);
+                                    let entry_bytes =
+                                        (item.key.len() + merged_bytes.len() + 16) as u64;
+                                    builder
+                                        .add(&item.key, &merged_bytes, item.seq, item.tx)
+                                        .await?;
+
+                                    // Token-Bucket I/O Rate Limiting
+                                    if let Some(max_bps) = self.config.max_io_bytes_per_second {
+                                        if max_bps > 0 {
+                                            io_token_bytes_written += entry_bytes;
+                                            let elapsed = io_token_last_reset.elapsed();
+                                            let target = std::time::Duration::from_secs_f64(
+                                                io_token_bytes_written as f64 / max_bps as f64,
+                                            );
+                                            if target > elapsed {
+                                                let delay = (target - elapsed)
+                                                    .min(std::time::Duration::from_millis(100));
+                                                tokio::time::sleep(delay).await;
+                                                let total_elapsed = io_token_last_reset.elapsed();
+                                                let allowed_bytes = (total_elapsed.as_secs_f64()
+                                                    * max_bps as f64)
+                                                    as u64;
+                                                io_token_bytes_written = io_token_bytes_written
+                                                    .saturating_sub(allowed_bytes);
+                                                io_token_last_reset = std::time::Instant::now();
+                                            }
+                                        }
+                                    }
+
+                                    last_key = Some(item.key.clone());
+                                    floor_emitted = true;
+                                    merged = true;
+                                }
+                                Err(err) => {
+                                    tracing::warn!(
+                                        "Merge operator error for key {:?}: {}, retaining both versions (fail-safe)",
+                                        item.key,
+                                        err
+                                    );
+                                    failed_merge_keep = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !merged {
+                // LSM Retention Rule:
+                // Keep all versions with raw_seq >= min_snapshot_seq (visible to active or future snapshots)
+                // PLUS the newest version with raw_seq < min_snapshot_seq (the "floor" version).
+                // All further, older versions for the key below min_snapshot_seq are discarded.
+                let keep = if raw_seq >= min_snapshot_seq {
+                    true
+                } else if !floor_emitted {
+                    if !failed_merge_keep {
+                        floor_emitted = true;
+                    }
+                    true
+                } else {
+                    false
+                };
+
+                if keep {
+                    // O(1): Bytes::clone is an Arc refcount increment
+                    last_key = Some(item.key.clone());
+
+                    // FIND-STO-001: Tombstone-Retention
+                    // Only GC tombstones during FULL compaction when no snapshot references them
+                    // and no older SSTables outside this compaction round can contain older values.
+                    // NOTE: If raw_seq < min_snapshot_seq and is_full_compaction is true, this tombstone
+                    // is the floor version below min_snapshot_seq. Being a tombstone below min_snapshot_seq
+                    // during full compaction, no active snapshot references a non-deleted version below it
+                    // and no older SSTables exist, so GC'ing it is safe.
+                    let should_gc_tombstone =
+                        is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
+                    if !should_gc_tombstone {
+                        let entry_bytes = (item.key.len() + item.value.len() + 16) as u64; // +16 für Overhead
+                        builder
+                            .add(&item.key, &item.value, item.seq, item.tx)
+                            .await?;
+
+                        // Token-Bucket I/O Rate Limiting (plattformneutral, außerhalb aller Write-Locks)
+                        if let Some(max_bps) = self.config.max_io_bytes_per_second {
+                            if max_bps > 0 {
+                                io_token_bytes_written += entry_bytes;
+                                let elapsed = io_token_last_reset.elapsed();
+                                let target = std::time::Duration::from_secs_f64(
+                                    io_token_bytes_written as f64 / max_bps as f64,
+                                );
+                                if target > elapsed {
+                                    let delay = (target - elapsed)
+                                        .min(std::time::Duration::from_millis(100));
+                                    // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
+                                    // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
+                                    tokio::time::sleep(delay).await;
+                                    // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
+                                    let total_elapsed = io_token_last_reset.elapsed();
+                                    let allowed_bytes =
+                                        (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
+                                    io_token_bytes_written =
+                                        io_token_bytes_written.saturating_sub(allowed_bytes);
+                                    io_token_last_reset = std::time::Instant::now();
+                                }
                             }
                         }
                     }

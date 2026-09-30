@@ -1,8 +1,11 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::tempdir;
 
 #[tokio::test]
+#[cfg_attr(not(feature = "fault-injection"), ignore)]
 async fn test_batch_rollback_does_not_truncate_valid_history() {
     let dir = tempdir().expect("tempdir creation failed");
     let path = dir.path().to_path_buf();
@@ -37,7 +40,13 @@ async fn test_batch_rollback_does_not_truncate_valid_history() {
     storage.restore_wal_file_handle_for_test().await;
 
     // Verify k1 and k2 are still readable
-    assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
-    assert_eq!(storage.get(b"k2").await.unwrap(), Some(bytes::Bytes::from_static(b"v2")));
+    assert_eq!(
+        storage.get(b"k1").await.unwrap(),
+        Some(bytes::Bytes::from_static(b"v1"))
+    );
+    assert_eq!(
+        storage.get(b"k2").await.unwrap(),
+        Some(bytes::Bytes::from_static(b"v2"))
+    );
     assert_eq!(storage.get(b"k3").await.unwrap(), None);
 }

@@ -49,7 +49,31 @@ impl McpServer {
         };
 
         // Initialize collection profile and resolve configuration
-        let profile = tier.resolve();
+        let mut profile = tier.resolve();
+
+        if let Some(ae_val) = args.get("auto_extraction") {
+            let ae_str = ae_val.as_str().ok_or_else(|| {
+                McpError::invalid_params(
+                    "Invalid params: 'auto_extraction' must be a string ('enabled' or 'disabled')",
+                )
+            })?;
+            match ae_str.to_lowercase().as_str() {
+                "enabled" => {
+                    profile.auto_extraction =
+                        contextra::collection_profile::AutoExtractionMode::Enabled
+                }
+                "disabled" => {
+                    profile.auto_extraction =
+                        contextra::collection_profile::AutoExtractionMode::Disabled
+                }
+                invalid => {
+                    return Err(McpError::invalid_params(format!(
+                        "Invalid auto_extraction '{invalid}'. Valid options are: 'enabled', 'disabled'"
+                    )));
+                }
+            }
+        }
+
         profile.validate().map_err(|e| {
             McpError::invalid_params(format!("Invalid collection profile configuration: {e}"))
         })?;
@@ -61,6 +85,7 @@ impl McpServer {
             "ok": true,
             "collection": name,
             "deployment_tier": tier_str,
+            "auto_extraction": format!("{:?}", profile.auto_extraction).to_lowercase(),
             "kv_delete_mode": format!("{:?}", profile.kv_delete_mode)
         }))
     }
@@ -95,21 +120,13 @@ impl McpServer {
             ));
         }
 
-        let proof_key_str = std::env::var("CONTEXTRA_DELETION_PROOF_KEY")
-            .or_else(|_| std::env::var("CONTEXTRA_PROOF_KEY"))
-            .map_err(|_| McpError::invalid_params("deletion proof key not configured"))?;
-        let trimmed_key = proof_key_str.trim();
-        if trimmed_key.is_empty() {
-            return Err(McpError::invalid_params(
-                "deletion proof key not configured",
-            ));
-        }
+        let proof_key = crate::proof_key::deletion_proof_key_from_env()?;
 
         let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
 
         let proof = self
             .db
-            .drop_collection(col_name, tenant_id, trimmed_key.as_bytes())
+            .drop_collection(col_name, tenant_id, proof_key.as_bytes())
             .await
             .map_err(McpError::from)?;
 
@@ -182,10 +199,10 @@ impl McpServer {
                 .map_err(|e| McpError::internal_error(e.to_string()))?,
         ];
 
-        let proof_key_str = std::env::var("CONTEXTRA_DELETION_PROOF_KEY")
-            .or_else(|_| std::env::var("CONTEXTRA_PROOF_KEY"))
-            .unwrap_or_else(|_| "default_test_deletion_proof_key_32_bytes!".to_string());
-        let trimmed_key = proof_key_str.trim();
+        let proof_key = crate::proof_key::deletion_proof_key_from_env().unwrap_or_else(|_| {
+            zeroize::Zeroizing::new("default_test_deletion_proof_key_32_bytes!".to_string())
+        });
+        let trimmed_key = proof_key.trim();
 
         let tx_id = self.db.allocate_tx().unwrap_or(TxId::new(1));
 

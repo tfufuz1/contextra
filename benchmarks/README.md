@@ -46,6 +46,20 @@ Vergleicht die Retrieval-Qualität der Standard 4-Signal RRF-Fusion (BM25 + HNSW
 
 ---
 
+## Skalierungslauf (100.000 Dokumente)
+
+Für die Messung des Skalierungsverhaltens bei größeren Dokumentmengen steht das Binary `scale-100k` bereit:
+
+```bash
+cargo run -p contextra-bench --release --bin scale-100k -- --docs 100000 --step 10000
+```
+
+> **Hinweis**: Dieser Skalierungslauf wird lokal und manuell ausgeführt. Die Ergebnisse werden ausschließlich nach `benchmarks/results/scale_100k.json` geschrieben.
+>
+> **Disclaimer**: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst 100.000 Chunks; die Zahlen sind nicht auf größere Bestände extrapolierbar.
+
+---
+
 ## Einordnung der Messwerte zu externen Forschungswerten
 
 In Marketing-Materialien und in der Fachliteratur zu Contextual-Retrieval-Verfahren werden häufig generische Prozentzahlen genannt:

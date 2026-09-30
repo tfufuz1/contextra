@@ -413,6 +413,7 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
             None,
             None,
             Some(eid_a),
+            None,
         )
         .await?;
 

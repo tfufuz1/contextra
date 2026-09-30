@@ -539,3 +539,34 @@ impl Default for ConfigFingerprint {
         Self::new("default", "F16", "", 0.0)
     }
 }
+
+/// Mode for automatic OpenIE entity extraction during document ingestion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoExtractionMode {
+    /// Automatic entity extraction is enabled.
+    Enabled,
+    /// Automatic entity extraction is disabled.
+    Disabled,
+}
+
+impl AutoExtractionMode {
+    /// Returns `true` if auto extraction mode is enabled.
+    #[inline]
+    pub fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
+}
+
+impl Default for AutoExtractionMode {
+    fn default() -> Self {
+        #[cfg(not(feature = "auto-extraction-opt-out"))]
+        {
+            Self::Enabled
+        }
+        #[cfg(feature = "auto-extraction-opt-out")]
+        {
+            Self::Disabled
+        }
+    }
+}

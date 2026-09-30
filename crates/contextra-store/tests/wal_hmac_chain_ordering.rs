@@ -4,6 +4,8 @@
 // ERSTELLT: 2026-09-13 (Audit-Befund P-1, Architektur-Review 2026-09-13)
 // ABHÄNGIG VON: prepare_batch → append_batch Aufruf-Reihenfolge in LsmStorage::commit()
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::Wal;

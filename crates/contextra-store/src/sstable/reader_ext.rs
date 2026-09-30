@@ -24,8 +24,6 @@ impl SstableReader {
             start_idx -= 1;
         }
 
-        let is_v3 = self.format_version >= 3;
-
         for idx in start_idx..self.index.len() {
             let offset = self
                 .index
@@ -148,8 +146,6 @@ impl SstableReader {
         if self.index.is_empty() {
             return Ok(results);
         }
-
-        let is_v3 = self.format_version >= 3;
 
         for idx in 0..self.index.len() {
             let offset = self

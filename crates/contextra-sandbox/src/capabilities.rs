@@ -110,11 +110,44 @@ impl MergeOperatorCapabilities {
             random_seed: None,
         }
     }
+
+    /// Returns a strict `WasmCapabilities` preset for merge operators with stdout enabled for returning output bytes.
+    ///
+    /// Differs from `pure()` strictly by `allow_stdout = true`. All other restrictions (clock, PRNG, FS, network, cloud)
+    /// remain disabled.
+    pub fn pure_with_result_channel() -> WasmCapabilities {
+        let mut caps = Self::pure();
+        caps.allow_stdout = true;
+        caps
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_merge_operator_capabilities_pure_with_result_channel() {
+        let caps = MergeOperatorCapabilities::pure_with_result_channel();
+        let pure_caps = MergeOperatorCapabilities::pure();
+
+        assert!(
+            caps.allow_stdout,
+            "stdout must be enabled for result channel"
+        );
+        assert!(
+            !caps.allow_stderr,
+            "stderr must be disabled for pure_with_result_channel"
+        );
+        assert!(!caps.allow_filesystem, "filesystem must be disabled");
+        assert!(!caps.allow_network, "network must be disabled");
+        assert!(!caps.allow_clock, "clock access must be disabled");
+        assert!(!caps.allow_cloud_egress, "cloud egress must be disabled");
+        assert!(caps.random_seed.is_none(), "random seed must be None");
+        assert_eq!(caps.max_fuel, pure_caps.max_fuel);
+        assert_eq!(caps.max_wall_clock_ms, pure_caps.max_wall_clock_ms);
+        assert_eq!(caps.max_memory_pages, pure_caps.max_memory_pages);
+    }
 
     #[test]
     fn test_merge_operator_capabilities_pure_strictness() {

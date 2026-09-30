@@ -40,6 +40,24 @@ Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 In einer früheren Version hing das Datenbank-Crate `contextra-db` (damals Layer 2 / Ring 3) direkt von `contextra-infer-candle` und `contextra-infer-ollama` (damals Layer 3 / Ring 2) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
 Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn EmbeddingProvider>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
 
+### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
+
+Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
+
+1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
+   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
+2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
+   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
+
+**Vorrangordnung (Precedence):**
+`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
+
+*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
+
+**Deployment-Tier Defaults & Spec D.6 Status:**
+- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
+- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
+
 ---
 
 <!-- BEGIN GENERATED -->
@@ -105,6 +123,7 @@ graph TD
     contextra[contextra] --> contextra_rank[contextra-rank]
     contextra[contextra] --> contextra_router[contextra-router]
     contextra[contextra] --> contextra_store[contextra-store]
+    contextra[contextra] --> contextra_types[contextra-types]
     contextra_adapt[contextra-adapt] --> contextra_ports[contextra-ports]
     contextra_adapt[contextra-adapt] --> contextra_types[contextra-types]
     contextra_agent[contextra-agent] --> contextra_checkpoint[contextra-checkpoint]
@@ -205,6 +224,7 @@ graph TD
     contextra_py[contextra-py] --> contextra_rank[contextra-rank]
     contextra_py[contextra-py] --> contextra_router[contextra-router]
     contextra_py[contextra-py] --> contextra_store[contextra-store]
+    contextra_py[contextra-py] --> contextra_types[contextra-types]
     contextra_rank[contextra-rank] --> contextra_ports[contextra-ports]
     contextra_rank[contextra-rank] --> contextra_types[contextra-types]
     contextra_router[contextra-router] --> contextra_adapt[contextra-adapt]
@@ -219,6 +239,7 @@ graph TD
     contextra_store[contextra-store] --> contextra_mvcc[contextra-mvcc]
     contextra_store[contextra-store] --> contextra_ports[contextra-ports]
     contextra_store[contextra-store] --> contextra_sys[contextra-sys]
+    contextra_store[contextra-store] --> contextra_types[contextra-types]
     contextra_sys[contextra-sys]
     contextra_testkit[contextra-testkit] --> contextra_ports[contextra-ports]
     contextra_testkit[contextra-testkit] --> contextra_types[contextra-types]
@@ -229,6 +250,7 @@ graph TD
     contextra_vector[contextra-vector] --> contextra_crypto[contextra-crypto]
     contextra_vector[contextra-vector] --> contextra_simd[contextra-simd]
     contextra_vector[contextra-vector] --> contextra_sys[contextra-sys]
+    contextra_vector[contextra-vector] --> contextra_types[contextra-types]
     contextra_wire[contextra-wire]
     xtask[xtask] --> contextra_bench[contextra-bench]
     xtask[xtask] --> contextra_router[contextra-router]
@@ -251,10 +273,10 @@ Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende
    * *IST:* `contextra-db` existiert weiterhin als Fassade. `contextra-router` importiert noch `contextra-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
 3. **Inferenz-Namenskonvention:**
    * *SOLL:* Die Inferenz-Crates tragen vereinheitlichte Namen `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
-   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`).
+   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`). <!-- crate-ref-ignore -->
 4. **Vektorindex-Namenskonvention:**
    * *SOLL:* Das Vektorindex-Crate heißt `contextra-vector`.
-   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`).
+   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`). <!-- crate-ref-ignore -->
 5. **Legacy-Calibration-Crate:**
    * *SOLL:* `contextra-rank` geht in `contextra-adapt` und `contextra-rank` auf.
    * *IST:* `contextra-rank` existiert aktuell noch als eigenständiges Crate.

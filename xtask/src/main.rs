@@ -2151,7 +2151,8 @@ fn main() {
         }
         "check-commit-diff-integrity" => {
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            {
                 eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
@@ -2439,8 +2440,7 @@ fn main() {
         }
         "check-commit-diff-integrity" => {
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) =
-                check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
             {
                 eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
