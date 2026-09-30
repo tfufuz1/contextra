@@ -1,17 +1,21 @@
 // FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
+#[cfg(not(loom))]
 use crate::lsm::config::DurabilityMode;
 use contextra_core::{ContextraError, Result};
+#[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 use std::path::Path;
 
 /// Handle for exclusive database directory locking.
+#[cfg(not(loom))]
 #[derive(Debug)]
 pub(crate) struct DirLock {
     _file: Option<File>,
 }
 
+#[cfg(not(loom))]
 impl DirLock {
     /// Acquires an exclusive lock on `dir/LOCK`.
     pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {

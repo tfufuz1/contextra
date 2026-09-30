@@ -28,6 +28,7 @@ pub(crate) mod fs {
         std::fs::read(path)
     }
     // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
+    #[allow(dead_code)]
     pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(
         path: P,
         contents: C,

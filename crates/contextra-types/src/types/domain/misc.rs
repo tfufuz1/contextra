@@ -396,6 +396,15 @@ impl Default for TlHfdParams {
     }
 }
 
+/// Result item returned by a text or cross-encoder reranker.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Zero-based index of the document in the candidate array passed to `rerank()`.
+    pub index: usize,
+    /// Calibrated probability or raw relevance score.
+    pub score: f32,
+}
+
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
