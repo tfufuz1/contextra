@@ -23,7 +23,7 @@ async fn proof_nan_rejected_at_insert() {
     for (i, (name, val)) in invalid_values.iter().enumerate() {
         let mut test_vec = vec![1.0, 0.0, 0.0, 0.0];
         test_vec[1] = *val;
-        let res = index.insert(tx, DocId::new(i as u64 + 1), &test_vec).await;
+        let res = index.insert(tx, DocId::new((i as u64 + 1).into()), &test_vec).await;
 
         assert!(
             matches!(res, Err(ContextraError::InvalidInput(_))),

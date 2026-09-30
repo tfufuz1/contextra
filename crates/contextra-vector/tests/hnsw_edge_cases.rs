@@ -75,7 +75,7 @@ async fn test_ef_construction_boundary() -> Result<(), Box<dyn std::error::Error
 
     for i in 1..=ef_const {
         let vec = vec![i as f32, 0.0, 0.0, 0.0];
-        index.insert(tx, DocId::new(i as u64), &vec).await?;
+        index.insert(tx, DocId::new((i as u64).into()), &vec).await?;
     }
     index.commit(tx).await?;
 
@@ -107,7 +107,7 @@ async fn test_duplicate_vectors_tie_breaking() -> Result<(), Box<dyn std::error:
     let duplicate_vec = vec![1.0, 2.0, 3.0, 4.0];
 
     for i in 1..=20u64 {
-        index.insert(tx, DocId::new(i), &duplicate_vec).await?;
+        index.insert(tx, DocId::new(i.into()), &duplicate_vec).await?;
     }
     index.commit(tx).await?;
 
@@ -179,7 +179,7 @@ async fn test_nan_in_embeddings_rejected() -> Result<(), Box<dyn std::error::Err
     ];
 
     for (i, bad_vec) in invalid_vectors.iter().enumerate() {
-        let res = index.insert(tx, DocId::new(i as u64 + 1), bad_vec).await;
+        let res = index.insert(tx, DocId::new((i as u64 + 1).into()), bad_vec).await;
         assert!(
             matches!(res, Err(ContextraError::InvalidInput(_))),
             "Expected InvalidInput error for vector containing non-finite value, got: {:?}",
@@ -208,7 +208,7 @@ async fn test_concurrent_insert_during_search() -> Result<(), Box<dyn std::error
         let init_tx = TxId::new(1);
         for i in 1..=50u64 {
             let vec = vec![(i % 10) as f32; 16];
-            index.insert(init_tx, DocId::new(i), &vec).await?;
+            index.insert(init_tx, DocId::new(i.into()), &vec).await?;
         }
         index.commit(init_tx).await?;
 
@@ -232,7 +232,7 @@ async fn test_concurrent_insert_during_search() -> Result<(), Box<dyn std::error
         for t in 0..10u64 {
             let idx = Arc::clone(&index);
             handles.push(tokio::spawn(async move {
-                let doc_id = DocId::new(100 + t);
+                let doc_id = DocId::new((100 + t).into());
                 let tx = TxId::new(200 + t);
                 let vec = vec![(t + 1) as f32; 16];
                 let _ = idx.insert(tx, doc_id, &vec).await;
@@ -316,7 +316,7 @@ async fn test_max_elements_boundary() -> Result<(), Box<dyn std::error::Error>> 
     // Insert 100 elements (double max_elements)
     for i in 1..=100u64 {
         let vec = vec![i as f32 * 0.01, 0.0, 0.0, 0.0];
-        index.insert(tx, DocId::new(i), &vec).await?;
+        index.insert(tx, DocId::new(i.into()), &vec).await?;
     }
     index.commit(tx).await?;
 

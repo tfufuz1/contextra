@@ -97,7 +97,7 @@ async fn run_recall_test(
 
     let tx = TxId::new(1);
     for (i, v) in data.iter().enumerate() {
-        index.insert(tx, DocId::new(i as u64), v).await?;
+        index.insert(tx, DocId::new((i as u64).into()), v).await?;
     }
     index.commit(tx).await?;
 
@@ -112,7 +112,7 @@ async fn run_recall_test(
         let hnsw_results = index.search(&query, k).await?;
         let hits = hnsw_results
             .iter()
-            .filter(|r| ground_truth_set.contains(&r.doc_id.inner()))
+            .filter(|r| ground_truth_set.contains(&(r.doc_id.inner() as u64)))
             .count();
 
         total_recall += hits as f64 / k as f64;

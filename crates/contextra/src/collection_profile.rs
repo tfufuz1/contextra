@@ -3,8 +3,17 @@
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
+pub use contextra_core::types::domain::AutoExtractionMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
+
+/// Default auto extraction mode for standard deployment tiers.
+pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode::Enabled;
+
+/// DECISION-PENDING (Spec D.6): Default auto extraction mode for EnterpriseRegulated tier.
+/// Standard value remains Enabled until decision is finalized.
+pub const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT: AutoExtractionMode =
+    AutoExtractionMode::Enabled;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LsmTuning {
@@ -19,6 +28,7 @@ pub struct CollectionProfile {
     pub performance: PerformanceProfile,
     pub kv_delete_mode: KvDeleteMode,
     pub lsm_tuning: LsmTuning,
+    pub auto_extraction: AutoExtractionMode,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -71,6 +81,7 @@ impl DeploymentTier {
                     group_commit_window_micros: 200,
                     block_cache_shards: 2,
                 },
+                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
             Self::PowerUserLocal => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
@@ -81,6 +92,7 @@ impl DeploymentTier {
                     group_commit_window_micros: 2_000,
                     block_cache_shards: 8,
                 },
+                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
             Self::EnterpriseShared => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
@@ -91,6 +103,7 @@ impl DeploymentTier {
                     group_commit_window_micros: 10_000,
                     block_cache_shards: 32,
                 },
+                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
             Self::EnterpriseRegulated => CollectionProfile {
                 performance: PerformanceProfile::Compliance,
@@ -101,6 +114,7 @@ impl DeploymentTier {
                     group_commit_window_micros: 10_000,
                     block_cache_shards: 32,
                 },
+                auto_extraction: ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
             },
         }
     }

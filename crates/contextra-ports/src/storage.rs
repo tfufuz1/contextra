@@ -300,6 +300,7 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Deletes all key-value pairs starting with `prefix` as part of a transaction.
+    // TOCTOU-ACCEPTED
     fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move {
             let matching_keys: Vec<Vec<u8>> = self
