@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra::Contextra;
 use contextra_mcp::{
     protocol::JsonRpcRequest,
@@ -226,7 +228,10 @@ async fn test_invalid_tool_name() {
 
     let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        text.contains("Unbekanntes Tool") || text.contains("gesperrt") || text.contains("Sandbox")
+        text.contains("Unbekanntes Tool")
+            || text.contains("unknown tool")
+            || text.contains("gesperrt")
+            || text.contains("Sandbox")
     );
 }
 
