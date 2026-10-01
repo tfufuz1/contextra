@@ -2,7 +2,6 @@
 
 use contextra_core::{
     snapshot::SnapshotRegistry,
-    traits::DistanceCalculator,
     tx_buffer::{IndexOp, TxBuffer},
     types::{DocId, TxId},
 };
@@ -60,13 +59,10 @@ fn test_integration_tx_buffer_and_snapshots() {
 fn test_domain_metrics_integration() {
     use contextra_core::types::DistanceMetric;
 
-    // Testing the integration between the generic DistanceMetric enum and the Calculator Trait
-    let dyn_calc: &dyn DistanceCalculator = &DistanceMetric::Cosine;
-
     let a = [1.0, 0.0, 0.0];
     let b = [1.0, 0.0, 0.0];
 
     // Exact match in Cosine means distance is 0.0 ideally
-    let dist = dyn_calc.compute_f32(&a, &b).unwrap();
+    let dist = DistanceMetric::Cosine.compute(&a, &b).unwrap();
     assert!(dist < 0.0001); // floating point tolerance
 }
