@@ -86,23 +86,11 @@ pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
 
-impl lifecycle::DistanceCalculator for contextra_types::DistanceMetric {
-    fn compute_f32(&self, a: &[f32], b: &[f32]) -> contextra_types::Result<f32> {
-        self.compute(a, b)
-    }
-
-    fn compute_u8(&self, a: &[u8], b: &[u8]) -> contextra_types::Result<u32> {
-        self.compute_u8(a, b)
-    }
-}
-
 #[cfg(test)]
 mod dyn_safety {
     use super::*;
 
     fn _assert_dyn_storage(_: Option<&dyn StorageEngine>) {}
-    fn _assert_dyn_storage_read(_: Option<&dyn StorageRead>) {}
-    fn _assert_dyn_storage_write(_: Option<&dyn StorageWrite>) {}
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
     fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
     fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
@@ -120,8 +108,6 @@ mod dyn_safety {
     #[test]
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
-        _assert_dyn_storage_read(None);
-        _assert_dyn_storage_write(None);
         _assert_dyn_metrics_sink(None);
         _assert_dyn_kv_bridge_storage(None);
         _assert_dyn_kv_prefix_store(None);

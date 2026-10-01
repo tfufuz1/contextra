@@ -3,7 +3,7 @@
 //! # Ring-0 Reinheit (R-03)
 //! `contextra-graph` besitzt keine eigene Storage-Anbindung oder Dateisystem-I/O.
 //! Alle Persistenzinteraktionen erfolgen entkoppelt über den `StorageEngine`-Trait
-//! (bzw. `StorageRead`/`StorageWrite`-Trait-Abstraktionen aus `contextra-ports`/`contextra-core`).
+//! aus `contextra-ports`.
 
 use serde::Deserialize;
 use std::collections::HashSet;
