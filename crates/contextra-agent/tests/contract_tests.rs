@@ -8,7 +8,7 @@
 use contextra_agent::audit::AuditLog;
 use contextra_agent::step::StepResult;
 use contextra_agent::{AgentContext, AgentTool, NodeType, OrchestratorEngine, StateGraph};
-use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
+use contextra_engine::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 use contextra_types::TokenBudget;

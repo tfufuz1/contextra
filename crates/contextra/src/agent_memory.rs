@@ -3,7 +3,7 @@
 // INVARIANTEN: #![forbid(unsafe_code)]; Zero panic doctrine (.unwrap/.expect forbidden); Wraps Contextra engine without changing business logic.
 
 use contextra_core::error::ContextraError;
-use contextra_db::{Contextra, ProvenanceRecord, SearchResult};
+use contextra_engine::{Contextra, ProvenanceRecord, SearchResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;

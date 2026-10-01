@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
-use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
+use contextra_engine::{Contextra, ContextraConfig, EmbeddingBackend};
+use contextra_ports::TextEmbeddingEngine;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
 

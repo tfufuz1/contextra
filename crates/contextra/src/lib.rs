@@ -14,11 +14,14 @@ pub use builder::ContextraBuilder;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
-pub use contextra_db::{
-    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    SearchResult, TextEmbeddingEngine,
+pub use contextra_cognition::{
+    execute_background_consolidation, memory_consolidation,
 };
+pub use contextra_engine::{
+    chunker, Collection, CollectionConfig, Contextra, ContextraConfig, ContextraStats, DriftStatusProvider,
+    EmbeddingBackend, SearchResult,
+};
+pub use contextra_ports::TextEmbeddingEngine;
 
 #[cfg(feature = "router")]
 pub use contextra_router as router;

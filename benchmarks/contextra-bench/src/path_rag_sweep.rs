@@ -6,7 +6,7 @@
 use crate::locomo::{load_locomo_dataset, LocomoQuestionCategory};
 use crate::long_mem_eval::{LongMemEvalQuestionType, RegressionSuite};
 use contextra_core::Result;
-use contextra_db::{Contextra, ContextraConfig, SearchStrategy};
+use contextra_engine::{Contextra, ContextraConfig, SearchStrategy};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tempfile::TempDir;

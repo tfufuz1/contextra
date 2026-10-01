@@ -3,7 +3,7 @@
 // AGENT:09 DATE:2026-05-15 STATUS:PARTIAL
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::TxId;
 use criterion::{criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;

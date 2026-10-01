@@ -1,5 +1,5 @@
-use contextra_db::fusion::weighted_reciprocal_rank_fusion;
-use contextra_db::SearchResult;
+use contextra_engine::fusion::weighted_reciprocal_rank_fusion;
+use contextra_engine::SearchResult;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::fs::{self, OpenOptions};
 use std::io::Write;

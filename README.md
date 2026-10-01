@@ -57,7 +57,7 @@ serde_json = "1.0"
 ## Quick Start (Rust)
 
 ```rust
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_engine::{Contextra, ContextraConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

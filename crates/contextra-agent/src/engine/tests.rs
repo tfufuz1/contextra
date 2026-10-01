@@ -1,5 +1,5 @@
 use super::*;
-use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
+use contextra_engine::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_types::TokenBudget;
 use serde_json::json;
 use std::sync::Arc;
