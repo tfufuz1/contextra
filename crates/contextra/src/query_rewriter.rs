@@ -3,8 +3,9 @@
 // INVARIANTEN: Zero Panic; UTF-8-sichere Snippet-Kürzung; Prompt-Injection-Isolation via XML-Tags; keine Async Locks.
 
 use contextra_core::error::Result;
-use contextra_db::{QueryRewriter, SearchResult};
+use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::ScoredEntry;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -53,7 +54,7 @@ impl QueryRewriter for LlmQueryRewriter {
     fn rewrite<'a>(
         &'a self,
         original_query: &'a str,
-        current_results: &'a [SearchResult],
+        current_results: &'a [ScoredEntry],
     ) -> BoxFuture<'a, Result<Vec<String>>> {
         Box::pin(async move {
             let prompt = build_prompt(
@@ -77,7 +78,7 @@ fn truncate_str_chars(s: &str, max_chars: usize) -> &str {
     }
 }
 
-fn extract_snippet(res: &SearchResult) -> String {
+fn extract_snippet(res: &ScoredEntry) -> String {
     if let Some(meta) = &res.metadata {
         if let Some(text) = meta
             .get("text")
@@ -95,7 +96,7 @@ fn extract_snippet(res: &SearchResult) -> String {
 
 fn build_prompt(
     original_query: &str,
-    current_results: &[SearchResult],
+    current_results: &[ScoredEntry],
     max_subqueries: usize,
     max_context_results: usize,
     max_snippet_chars: usize,
@@ -127,7 +128,7 @@ fn clean_line(line: &str) -> &str {
         return "";
     }
     s = s
-        .trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+'))
+        .trim_start_matches(['-', '*', '•', '+'])
         .trim();
     if s.starts_with('[') {
         if let Some(closing) = s.find(']') {

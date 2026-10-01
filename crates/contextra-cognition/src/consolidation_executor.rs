@@ -161,6 +161,7 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
 /// 1. Structural Consolidation Pass: Segmentierung & Near-Duplicate Tombstoning.
 /// 2. Generative Synthesis Pass (falls `synthesis_config` und `llm` angegeben): Wissenssynthese über stabile Graph-Communities.
 ///    Synthetisierte MetaChunks werden in die Collection eingefügt.
+///
 /// Adapter, der einen `GroundingValidator` (mit kalibrierter GroundingAssessment- und PolicyViolation-Semantik)
 /// an das `ResponseGroundingValidator`-Trait anpasst.
 pub struct GroundingValidatorAdapter<'a>(pub &'a dyn GroundingValidator);
@@ -183,7 +184,7 @@ impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
 
         let mut future = self.0.validate_grounding(response, &chunks);
         let waker = std::task::Waker::noop();
-        let mut cx = std::task::Context::from_waker(&waker);
+        let mut cx = std::task::Context::from_waker(waker);
         let assessment_res = match std::future::Future::poll(future.as_mut(), &mut cx) {
             std::task::Poll::Ready(res) => res,
             std::task::Poll::Pending => {
@@ -243,6 +244,7 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
 /// 2. Generative Synthesis Pass (falls `synthesis_config` und `llm` angegeben): Wissenssynthese über stabile Graph-Communities.
 ///    Synthetisierte MetaChunks werden in die Collection eingefügt.
 ///    WENN `rich_validator` angegeben ist, wird dessen kalibrierte Grounding-/PolicyViolation-Semantik bevorzugt.
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_background_consolidation_with_rich_validator<
     S: StorageEngine,
     V: VectorIndex,

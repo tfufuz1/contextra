@@ -114,8 +114,10 @@ impl OnnxReranker {
             .into_iter()
             .enumerate()
             .map(|(i, score)| RerankResult {
+                index: i,
                 original_index: i,
                 score,
+                calibrated_score: score,
             })
             .collect();
 
