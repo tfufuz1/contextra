@@ -3,12 +3,22 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use bincode::Options;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_types::TenantId;
 pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+#[inline]
+fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    let mut res = 0u8;
+    for i in 0..32 {
+        res |= a[i] ^ b[i];
+    }
+    res == 0
+}
 
 mod bytes_64 {
     use super::*;
@@ -238,7 +248,11 @@ impl SignedLicenseGate {
             .verify(payload_bytes, &sig)
             .map_err(|_| LicenseError::InvalidSignature)?;
 
-        if let Ok(license_payload) = bincode::deserialize::<LicensePayload>(payload_bytes) {
+        let bincode_opts = bincode::options()
+            .with_fixint_encoding()
+            .reject_trailing_bytes();
+
+        if let Ok(license_payload) = bincode_opts.deserialize::<LicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
                 activation: None,
@@ -248,7 +262,7 @@ impl SignedLicenseGate {
             });
         }
 
-        if let Ok(legacy) = bincode::deserialize::<LegacyLicensePayload>(payload_bytes) {
+        if let Ok(legacy) = bincode_opts.deserialize::<LegacyLicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
                 activation: None,
@@ -314,68 +328,67 @@ impl LicenseGate for SignedLicenseGate {
             return Ok(());
         }
 
-        // Extract activation attributes from SignedActivation or legacy LicensePayload
-        let (act_ring, _act_hash, act_expires, is_sig_valid) =
-            if let Some(ref act) = self.activation {
-                let sig_valid = match &self.verifying_key {
-                    Some(vk) => act.verify_signature(vk),
-                    None => false,
-                };
-                (
-                    act.ring,
-                    act.installation_id_hash,
-                    act.expires_at_unix,
-                    sig_valid,
-                )
-            } else if let Some(ref payload) = self.license_payload {
-                let sig_valid = true;
-                let hash = payload.installation_id_hash.unwrap_or_default();
-                let expires = payload.expires_at.unwrap_or(i64::MAX);
-                let mapped_ring = if payload.allowed_rings.contains(&ring) {
-                    ring
-                } else {
-                    payload
-                        .allowed_rings
-                        .first()
-                        .copied()
-                        .unwrap_or(FeatureRing::Fast)
-                };
-                (mapped_ring, hash, expires, sig_valid)
-            } else {
-                // (2) Step 2: Missing activation
-                return Err(LicenseError::NotActivated(ring));
-            };
+        // (2) Step 2: Missing activation check
+        if self.activation.is_none() && self.license_payload.is_none() {
+            return Err(LicenseError::NotActivated(ring));
+        }
 
-        // (3) Step 3: Installation ID hash mismatch check.
-        // Return NotActivated on mismatch to prevent information leaks about expected vs actual hash.
+        // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed without leaking details)
         if let Some(ref act) = self.activation {
             match self.local_installation_id {
-                Some(local_hash) if local_hash == act.installation_id_hash => {}
+                Some(local_hash) if constant_time_eq_32(&local_hash, &act.installation_id_hash) => {
+                }
                 _ => return Err(LicenseError::NotActivated(ring)),
             }
         } else if let Some(ref payload) = self.license_payload {
             if let Some(expected_hash) = payload.installation_id_hash {
                 match self.local_installation_id {
-                    Some(local_hash) if local_hash == expected_hash => {}
+                    Some(local_hash) if constant_time_eq_32(&local_hash, &expected_hash) => {}
                     _ => return Err(LicenseError::NotActivated(ring)),
                 }
+            } else {
+                tracing::warn!(
+                    "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
+                );
             }
         }
 
         // (4) Step 4: Invalid signature check
-        if !is_sig_valid {
+        if let Some(ref act) = self.activation {
+            let sig_valid = match &self.verifying_key {
+                Some(vk) => act.verify_signature(vk),
+                None => false,
+            };
+            if !sig_valid {
+                return Err(LicenseError::InvalidSignature);
+            }
+        } else if self.license_payload.is_some() && self.verifying_key.is_none() {
             return Err(LicenseError::InvalidSignature);
         }
 
         // (5) Step 5: Expiration check using clock port (P28)
+        let expires_at = if let Some(ref act) = self.activation {
+            act.expires_at_unix
+        } else if let Some(ref payload) = self.license_payload {
+            payload.expires_at.unwrap_or(i64::MAX)
+        } else {
+            i64::MAX
+        };
+
         let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
-        if now_secs >= act_expires {
-            return Err(LicenseError::Expired(act_expires));
+        if now_secs >= expires_at {
+            return Err(LicenseError::Expired(expires_at));
         }
 
-        // (6) Step 6: Ring level requirement check (no automatic hierarchy inheritance)
-        if act_ring != ring {
-            return Err(LicenseError::NotActivated(ring));
+        // (6) Step 6: Ring level requirement check (explicit allowed_rings / ring matching, no automatic hierarchy)
+        if let Some(ref act) = self.activation {
+            if act.ring != ring {
+                return Err(LicenseError::NotActivated(ring));
+            }
+        } else if let Some(ref payload) = self.license_payload {
+            if !payload.allowed_rings.contains(&ring) {
+                return Err(LicenseError::NotActivated(ring));
+            }
         }
 
         // (7) Step 7: Success
