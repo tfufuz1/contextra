@@ -1,9 +1,10 @@
 // FILE-CONTEXT
-// ZWECK: HKDF-Sub-Key-Ableitung und Key-Registry für KV-Crypto-Shredding (AP-P0-06).
-// INVARIANTEN: CryptoShred vernichtet Sub-Key-Registry-Eintrag (O(1)). Amortisiert HKDF via group_id. Zeroizing für SubKeys.
-// HOTSPOTS: [SubKey, KeyRegistry, derive_subkey, revoke_subkey]
+// ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding (AP-P0-06, Spec v17 §16.1).
+// INVARIANTEN: CryptoShred vernichtet KEK (Gruppenlöschung) oder DEK-Wrap (Einzellöschung) in O(1).
+// Zufälliges KEK/DEK-Material via OsRng (keine deterministische Ableitung rein aus group_id).
+// HOTSPOTS: [SubKey, KeyRegistry, revoke_group, revoke_record, encrypt_record, decrypt_record]
 
-//! HKDF Sub-Key derivation and thread-safe registry for KV crypto-shredding.
+//! Envelope encryption and thread-safe key registry for KV crypto-shredding.
 
 #![forbid(unsafe_code)]
 
@@ -14,16 +15,16 @@ use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
 };
-use hkdf::Hkdf;
-use sha2::Sha256;
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use zeroize::ZeroizeOnDrop;
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::sync::RwLock;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
-/// Default size of a shred key group (number of records sharing one sub-key).
+/// Default size of a shred key group (number of records sharing one KEK).
 pub const DEFAULT_SHRED_KEY_GROUP_SIZE: usize = 64;
 
-/// Derived sub-key (256 bits) that is zeroized on drop.
+/// Sub-key or KEK bytes (256 bits) zeroized on drop.
 #[derive(ZeroizeOnDrop)]
 pub struct SubKey(pub [u8; 32]);
 
@@ -41,123 +42,364 @@ impl std::fmt::Debug for SubKey {
     }
 }
 
-/// Derives a sub-key for a shred group from a master key (`KeyManager`) using HKDF-SHA256.
-pub fn derive_subkey(master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
-    let hk = Hkdf::<Sha256>::from_prk(master_key.master_key_bytes())
-        .map_err(|_| CryptoError::Crypto("Invalid PRK length in KeyManager".to_string()))?;
+/// Group Key Encryption Key (KEK) - 256 bits, zeroized on drop.
+#[derive(ZeroizeOnDrop)]
+pub struct GroupKek(pub [u8; 32]);
 
-    let mut info = Vec::with_capacity(b"contextra-kv-shred-v1:".len() + 8);
-    info.extend_from_slice(b"contextra-kv-shred-v1:");
-    info.extend_from_slice(&group_id.to_le_bytes());
-
-    let mut sub_key_bytes = [0u8; 32];
-    hk.expand(&info, &mut sub_key_bytes)
-        .map_err(|e| CryptoError::Crypto(format!("HKDF sub-key expansion failed: {e}")))?;
-
-    Ok(SubKey(sub_key_bytes))
+impl std::fmt::Debug for GroupKek {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GroupKek")
+            .field("bytes", &"***REDACTED***")
+            .finish()
+    }
 }
 
-/// In-memory thread-safe registry for shred group sub-keys, integrated with persistent `RevocationLog`.
+/// Record Data Encryption Key (DEK) - 256 bits, zeroized on drop.
+#[derive(ZeroizeOnDrop)]
+pub struct RecordDek(pub [u8; 32]);
+
+impl std::fmt::Debug for RecordDek {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecordDek")
+            .field("bytes", &"***REDACTED***")
+            .finish()
+    }
+}
+
+/// Container for an encrypted record payload under Envelope Encryption.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
+#[zeroize(drop)]
+pub struct EncryptedRecordPayload {
+    /// Unique identifier for the record.
+    pub record_id: u64,
+    /// Shred group identifier to which this record belongs.
+    pub group_id: u64,
+    /// AES-256-GCM-SIV encrypted record data.
+    pub ciphertext: Vec<u8>,
+    /// 12-byte initialization vector (nonce) for payload decryption.
+    pub nonce: [u8; 12],
+    /// DEK wrapped with Group KEK.
+    pub wrapped_dek: Vec<u8>,
+    /// 12-byte initialization vector (nonce) for DEK unwrapping.
+    pub dek_nonce: [u8; 12],
+}
+
+#[derive(Debug)]
+struct RecordDekEntry {
+    wrapped_dek: Vec<u8>,
+    dek_nonce: [u8; 12],
+    revoked: bool,
+}
+
+#[derive(Debug)]
+struct GroupEntry {
+    kek: GroupKek,
+    wrapped_kek: Vec<u8>,
+    kek_nonce: [u8; 12],
+    record_deks: HashMap<u64, RecordDekEntry>,
+}
+
+/// Derives or retrieves a random sub-key (Group KEK) for a shred group via `KeyRegistry`.
+pub fn derive_subkey(registry: &KeyRegistry, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
+    registry.get_or_derive(master_key, group_id)
+}
+
+/// In-memory thread-safe registry for envelope KV crypto-shredding keys.
 #[derive(Debug, Default)]
 pub struct KeyRegistry {
-    entries: RwLock<HashMap<u64, SubKey>>,
-    revocation_log: RwLock<Option<Arc<RevocationLog>>>,
+    groups: RwLock<HashMap<u64, GroupEntry>>,
+    revoked_groups: RwLock<HashSet<u64>>,
 }
 
 impl KeyRegistry {
     /// Creates a new empty `KeyRegistry`.
     pub fn new() -> Self {
         Self {
-            entries: RwLock::new(HashMap::new()),
-            revocation_log: RwLock::new(None),
+            groups: RwLock::new(HashMap::new()),
+            revoked_groups: RwLock::new(HashSet::new()),
         }
     }
 
-    /// Attaches a persistent `RevocationLog` to this registry.
-    pub fn with_revocation_log(self, log: Arc<RevocationLog>) -> Self {
-        if let Ok(mut guard) = self.revocation_log.write() {
-            *guard = Some(log);
+    /// Retrieves the wrapped KEK and nonce for a group, if available and active.
+    pub fn get_wrapped_kek(&self, group_id: u64) -> Option<(Vec<u8>, [u8; 12])> {
+        if self.is_group_revoked(group_id) {
+            return None;
         }
-        self
+        let read_guard = self.groups.read().ok()?;
+        let entry = read_guard.get(&group_id)?;
+        Some((entry.wrapped_kek.clone(), entry.kek_nonce))
     }
 
-    /// Attaches a persistent `RevocationLog` by reference.
-    pub fn set_revocation_log(&self, log: Arc<RevocationLog>) {
-        if let Ok(mut guard) = self.revocation_log.write() {
-            *guard = Some(log);
+    /// Retrieves the wrapped DEK and nonce for a record, if available and active.
+    pub fn get_wrapped_dek(&self, group_id: u64, record_id: u64) -> Option<(Vec<u8>, [u8; 12])> {
+        if self.is_group_revoked(group_id) {
+            return None;
+        }
+        let read_guard = self.groups.read().ok()?;
+        let entry = read_guard.get(&group_id)?;
+        let rec = entry.record_deks.get(&record_id)?;
+        if rec.revoked {
+            return None;
+        }
+        Some((rec.wrapped_dek.clone(), rec.dek_nonce))
+    }
+
+    /// Checks if a group is revoked.
+    pub fn is_group_revoked(&self, group_id: u64) -> bool {
+        if let Ok(guard) = self.revoked_groups.read() {
+            guard.contains(&group_id)
+        } else {
+            true
         }
     }
 
-    /// Checks if a group target is actively revoked in the attached `RevocationLog`.
-    fn check_revocation(&self, group_id: u64) -> Result<()> {
-        if let Ok(guard) = self.revocation_log.read() {
-            if let Some(ref log) = *guard {
-                if log.is_revoked(&RevocationTarget::Group(group_id)) {
-                    return Err(CryptoError::KeyRevoked(format!(
-                        "Shred group {group_id} has been revoked"
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Derives or retrieves a sub-key for the specified `group_id`.
-    /// Consults the `RevocationLog` prior to retrieval/derivation and actively rejects revoked groups.
+    /// Retrieves or generates a random Group KEK for `group_id`.
+    /// Returns `Err(CryptoError::Crypto(...))` if `group_id` has been revoked/shredded.
     pub fn get_or_derive(&self, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
-        self.check_revocation(group_id)?;
+        if self.is_group_revoked(group_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Shred group {group_id} has been revoked and cannot be accessed"
+            )));
+        }
 
         {
             let read_guard = self
-                .entries
+                .groups
                 .read()
                 .map_err(|_| CryptoError::Crypto("KeyRegistry read lock poisoned".to_string()))?;
-            if let Some(key) = read_guard.get(&group_id) {
-                return Ok(key.clone());
+            if let Some(entry) = read_guard.get(&group_id) {
+                return Ok(SubKey(entry.kek.0));
             }
         }
 
         let mut write_guard = self
-            .entries
+            .groups
             .write()
             .map_err(|_| CryptoError::Crypto("KeyRegistry write lock poisoned".to_string()))?;
-        if let Some(key) = write_guard.get(&group_id) {
-            return Ok(key.clone());
+
+        if self.is_group_revoked(group_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Shred group {group_id} has been revoked and cannot be accessed"
+            )));
         }
 
-        let subkey = derive_subkey(master_key, group_id)?;
-        write_guard.insert(group_id, subkey.clone());
-        Ok(subkey)
-    }
+        if let Some(entry) = write_guard.get(&group_id) {
+            return Ok(SubKey(entry.kek.0));
+        }
 
-    /// Revokes (destroys) the sub-key for `group_id` in O(1) and records revocation in `RevocationLog` if attached.
-    /// Returns `true` if a key was present and removed or if recorded in the log.
-    pub fn revoke_subkey(&self, group_id: u64) -> bool {
-        let removed = if let Ok(mut write_guard) = self.entries.write() {
-            write_guard.remove(&group_id).is_some()
-        } else {
-            false
+        // Generate a random 32-byte Group KEK (never derived from group_id)
+        let mut kek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut kek_bytes);
+
+        // AEAD wrap the KEK using Master Key
+        let (wrapped_kek, kek_nonce) = master_key.encrypt_auto_nonce(&kek_bytes)?;
+
+        let entry = GroupEntry {
+            kek: GroupKek(kek_bytes),
+            wrapped_kek,
+            kek_nonce,
+            record_deks: HashMap::new(),
         };
 
-        if let Ok(guard) = self.revocation_log.read() {
-            if let Some(ref log) = *guard {
-                let _ = log.append(RevocationTarget::Group(group_id));
+        write_guard.insert(group_id, entry);
+        Ok(SubKey(kek_bytes))
+    }
+
+    /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
+    /// Returns `true` if the group was active and is now revoked.
+    pub fn revoke_group(&self, group_id: u64) -> bool {
+        let mut revoked_guard = match self.revoked_groups.write() {
+            Ok(g) => g,
+            Err(_) => return false,
+        };
+
+        if revoked_guard.contains(&group_id) {
+            return false;
+        }
+
+        revoked_guard.insert(group_id);
+
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(mut entry) = groups_guard.remove(&group_id) {
+                entry.kek.0.zeroize();
+                entry.wrapped_kek.zeroize();
+                for (_, mut rec) in entry.record_deks.drain() {
+                    rec.wrapped_dek.zeroize();
+                }
+                return true;
             }
         }
 
-        removed
+        true
+    }
+
+    /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
+    pub fn revoke_subkey(&self, group_id: u64) -> bool {
+        self.revoke_group(group_id)
+    }
+
+    /// Revokes (destroys) the DEK wrap for a single record within `group_id` (Single Record Deletion).
+    /// Leaves neighbor records in the same group intact and decryptable.
+    pub fn revoke_record(&self, group_id: u64, record_id: u64) -> bool {
+        if self.is_group_revoked(group_id) {
+            return false;
+        }
+
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(entry) = groups_guard.get_mut(&group_id) {
+                if let Some(rec) = entry.record_deks.get_mut(&record_id) {
+                    if !rec.revoked {
+                        rec.revoked = true;
+                        rec.wrapped_dek.zeroize();
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Returns `true` if `group_id` has an active KEK and is not revoked.
+    pub fn is_group_active(&self, group_id: u64) -> bool {
+        !self.is_group_revoked(group_id)
+            && self
+                .groups
+                .read()
+                .map(|g| g.contains_key(&group_id))
+                .unwrap_or(false)
     }
 
     /// Returns `true` if `group_id` has an active sub-key in the registry.
     pub fn is_key_active(&self, group_id: u64) -> bool {
-        if let Ok(read_guard) = self.entries.read() {
-            read_guard.contains_key(&group_id)
-        } else {
-            false
-        }
+        self.is_group_active(group_id)
     }
 
-    /// Encrypts plaintext using the sub-key for `group_id`.
+    /// Returns `true` if `record_id` in `group_id` is active and not revoked.
+    pub fn is_record_active(&self, group_id: u64, record_id: u64) -> bool {
+        if self.is_group_revoked(group_id) {
+            return false;
+        }
+        if let Ok(groups_guard) = self.groups.read() {
+            if let Some(entry) = groups_guard.get(&group_id) {
+                if let Some(rec) = entry.record_deks.get(&record_id) {
+                    return !rec.revoked;
+                }
+            }
+        }
+        false
+    }
+
+    /// Encrypts a record using Envelope Encryption (Random KEK per group, Random DEK per record).
+    pub fn encrypt_record(
+        &self,
+        master_key: &KeyManager,
+        group_id: u64,
+        record_id: u64,
+        plaintext: &[u8],
+    ) -> Result<EncryptedRecordPayload> {
+        let subkey = self.get_or_derive(master_key, group_id)?;
+        let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
+
+        let mut dek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut dek_bytes);
+
+        let mut dek_nonce = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut dek_nonce);
+        let wrapped_dek = kek_cipher
+            .encrypt(Nonce::from_slice(&dek_nonce), dek_bytes.as_slice())
+            .map_err(|e| CryptoError::Crypto(format!("DEK wrapping failed: {e}")))?;
+
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;
+        let mut nonce = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut nonce);
+        let ciphertext = dek_cipher
+            .encrypt(Nonce::from_slice(&nonce), plaintext)
+            .map_err(|e| CryptoError::Crypto(format!("Payload encryption failed: {e}")))?;
+
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(entry) = groups_guard.get_mut(&group_id) {
+                entry.record_deks.insert(
+                    record_id,
+                    RecordDekEntry {
+                        wrapped_dek: wrapped_dek.clone(),
+                        dek_nonce,
+                        revoked: false,
+                    },
+                );
+            }
+        }
+
+        dek_bytes.zeroize();
+
+        Ok(EncryptedRecordPayload {
+            record_id,
+            group_id,
+            ciphertext,
+            nonce,
+            wrapped_dek,
+            dek_nonce,
+        })
+    }
+
+    /// Decrypts an `EncryptedRecordPayload` using Envelope Encryption.
+    /// Fails with `CryptoError::Crypto` if group or record has been revoked.
+    pub fn decrypt_record(
+        &self,
+        master_key: &KeyManager,
+        payload: &EncryptedRecordPayload,
+    ) -> Result<Vec<u8>> {
+        if self.is_group_revoked(payload.group_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Group {} has been revoked/shredded",
+                payload.group_id
+            )));
+        }
+
+        if let Ok(groups_guard) = self.groups.read() {
+            if let Some(entry) = groups_guard.get(&payload.group_id) {
+                if let Some(rec) = entry.record_deks.get(&payload.record_id) {
+                    if rec.revoked {
+                        return Err(CryptoError::Crypto(format!(
+                            "Record {} in group {} has been revoked/shredded",
+                            payload.record_id, payload.group_id
+                        )));
+                    }
+                }
+            } else {
+                return Err(CryptoError::Crypto(format!(
+                    "Group {} missing or revoked in KeyRegistry",
+                    payload.group_id
+                )));
+            }
+        }
+
+        let subkey = self.get_or_derive(master_key, payload.group_id)?;
+        let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
+
+        let dek_bytes = kek_cipher
+            .decrypt(
+                Nonce::from_slice(&payload.dek_nonce),
+                payload.wrapped_dek.as_slice(),
+            )
+            .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?;
+
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;
+
+        let plaintext = dek_cipher
+            .decrypt(
+                Nonce::from_slice(&payload.nonce),
+                payload.ciphertext.as_slice(),
+            )
+            .map_err(|e| CryptoError::Crypto(format!("Payload decryption failed: {e}")))?;
+
+        Ok(plaintext)
+    }
+
+    /// Encrypts plaintext using the sub-key (KEK) for `group_id`.
     pub fn encrypt_with_group(
         &self,
         master_key: &KeyManager,
@@ -169,7 +411,7 @@ impl KeyRegistry {
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv init failed: {e}")))?;
 
         let mut nonce_bytes = [0u8; 12];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce_bytes);
+        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let ciphertext = cipher
@@ -179,29 +421,32 @@ impl KeyRegistry {
         Ok((ciphertext, nonce_bytes))
     }
 
-    /// Decrypts ciphertext using the sub-key for `group_id`.
-    /// Returns `Err(CryptoError::KeyRevoked(...))` if group was revoked in the log,
-    /// or `Err(CryptoError::Crypto(...))` if missing or decryption fails.
+    /// Decrypts ciphertext using the sub-key (KEK) for `group_id`.
+    /// Returns `Err(CryptoError::Crypto(...))` if key was revoked or decryption fails.
     pub fn decrypt_with_group(
         &self,
         group_id: u64,
         ciphertext: &[u8],
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
-        self.check_revocation(group_id)?;
+        if self.is_group_revoked(group_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Sub-key for group {group_id} has been revoked or is missing"
+            )));
+        }
 
         let read_guard = self
-            .entries
+            .groups
             .read()
             .map_err(|_| CryptoError::Crypto("KeyRegistry read lock poisoned".to_string()))?;
 
-        let subkey = read_guard.get(&group_id).ok_or_else(|| {
+        let entry = read_guard.get(&group_id).ok_or_else(|| {
             CryptoError::Crypto(format!(
                 "Sub-key for group {group_id} has been revoked or is missing"
             ))
         })?;
 
-        let cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
+        let cipher = Aes256GcmSiv::new_from_slice(&entry.kek.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv init failed: {e}")))?;
 
         let nonce = Nonce::from_slice(nonce_bytes);
@@ -216,38 +461,87 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_derive_subkey_determinism() -> Result<()> {
-        let km = KeyManager::try_new("test-passphrase", b"salt1")?;
-        let k1 = derive_subkey(&km, 42)?;
-        let k2 = derive_subkey(&km, 42)?;
-        let k3 = derive_subkey(&km, 43)?;
+    fn test_envelope_single_record_deletion_64_records() -> Result<()> {
+        let km = KeyManager::try_new("test-passphrase-envelope", b"salt1")?;
+        let registry = KeyRegistry::new();
+        let group_id = 42;
 
-        assert_eq!(k1.0, k2.0);
-        assert_ne!(k1.0, k3.0);
+        let mut payloads = Vec::with_capacity(64);
+        for record_id in 0..64 {
+            let plaintext = format!("Payload for record {record_id}");
+            let payload =
+                registry.encrypt_record(&km, group_id, record_id, plaintext.as_bytes())?;
+            payloads.push(payload);
+        }
+
+        // Verify all 64 records decrypt successfully
+        for (i, payload) in payloads.iter().enumerate() {
+            let decrypted = registry.decrypt_record(&km, payload)?;
+            assert_eq!(decrypted, format!("Payload for record {i}").as_bytes());
+        }
+
+        // Perform single record deletion (revoke record 10)
+        let revoked = registry.revoke_record(group_id, 10);
+        assert!(revoked, "Record 10 must be successfully revoked");
+
+        // Record 10 MUST fail decryption
+        let res_10 = registry.decrypt_record(&km, &payloads[10]);
+        assert!(
+            res_10.is_err(),
+            "Revoked record 10 MUST fail decryption"
+        );
+
+        // All remaining 63 neighbor records MUST remain readable
+        for (i, payload) in payloads.iter().enumerate() {
+            if i == 10 {
+                continue;
+            }
+            let decrypted = registry.decrypt_record(&km, payload)?;
+            assert_eq!(
+                decrypted,
+                format!("Payload for record {i}").as_bytes(),
+                "Neighbor record {i} MUST remain decryptable after single record 10 deletion"
+            );
+        }
+
         Ok(())
     }
 
     #[test]
-    fn test_key_registry_encrypt_decrypt_and_revoke() -> Result<()> {
-        let km = KeyManager::try_new("test-passphrase", b"salt1")?;
+    fn test_envelope_group_deletion_and_attack_simulation() -> Result<()> {
+        let km = KeyManager::try_new("test-passphrase-envelope", b"salt1")?;
         let registry = KeyRegistry::new();
         let group_id = 100;
-        let plaintext = b"Sensitive Document Payload";
 
-        let (ciphertext, nonce) = registry.encrypt_with_group(&km, group_id, plaintext)?;
-        assert!(registry.is_key_active(group_id));
+        let payload =
+            registry.encrypt_record(&km, group_id, 1, b"Group confidential data block")?;
+        assert!(registry.is_group_active(group_id));
 
-        let decrypted = registry.decrypt_with_group(group_id, &ciphertext, &nonce)?;
-        assert_eq!(decrypted, plaintext);
+        // Revoke entire group (Group Deletion)
+        let revoked = registry.revoke_group(group_id);
+        assert!(revoked, "Group 100 revocation must succeed");
+        assert!(!registry.is_group_active(group_id));
 
-        // Revoke sub-key
-        let revoked = registry.revoke_subkey(group_id);
-        assert!(revoked);
-        assert!(!registry.is_key_active(group_id));
+        // Decryption via decrypt_record MUST fail
+        let res_decrypt = registry.decrypt_record(&km, &payload);
+        assert!(
+            res_decrypt.is_err(),
+            "Decryption of record in revoked group MUST fail"
+        );
 
-        // Decryption now fails
-        let res = registry.decrypt_with_group(group_id, &ciphertext, &nonce);
-        assert!(res.is_err());
+        // Attempting to re-derive key for group 100 via get_or_derive MUST fail
+        let res_get_derive = registry.get_or_derive(&km, group_id);
+        assert!(
+            res_get_derive.is_err(),
+            "Re-deriving key for revoked group MUST fail and be consistently rejected"
+        );
+
+        // Attempting to encrypt_with_group for revoked group MUST fail
+        let res_encrypt = registry.encrypt_with_group(&km, group_id, b"New payload");
+        assert!(
+            res_encrypt.is_err(),
+            "encrypt_with_group MUST consistently reject revoked group"
+        );
 
         Ok(())
     }
