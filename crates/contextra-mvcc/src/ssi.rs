@@ -620,8 +620,7 @@ impl SequenceLogSsiValidator {
 
         let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
         let longest_pin_duration = longest_pin.map(|(_, dur)| dur);
-        let is_pin_expired =
-            longest_pin.is_some_and(|(_, dur)| dur > self.max_pin_duration);
+        let is_pin_expired = longest_pin.is_some_and(|(_, dur)| dur > self.max_pin_duration);
 
         Some(PruningBlockerInfo {
             min_unpruned_seq,
