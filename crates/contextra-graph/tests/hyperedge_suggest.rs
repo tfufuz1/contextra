@@ -2,7 +2,7 @@ use contextra_graph::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, GraphMutationError,
     HyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
-use contextra_ports::{BoxFuture, TextGenerator};
+use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -24,8 +24,8 @@ impl MockTextGenerator {
     }
 }
 
-impl TextGenerator for MockTextGenerator {
-    fn generate_text<'a>(
+impl LlmTextGenerator for MockTextGenerator {
+    fn generate<'a>(
         &'a self,
         _prompt: &'a str,
     ) -> BoxFuture<'a, contextra_ports::Result<String>> {
