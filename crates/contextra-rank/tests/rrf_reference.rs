@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::fusion::{reciprocal_rank_fusion, SearchResult};
 use contextra_types::DocId;
 use std::collections::HashMap;

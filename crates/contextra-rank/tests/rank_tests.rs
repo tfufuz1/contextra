@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Comprehensive unit test suite for `contextra-rank` crate modules.
 
 #[cfg(test)]
