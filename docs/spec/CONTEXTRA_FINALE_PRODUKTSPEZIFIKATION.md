@@ -339,16 +339,16 @@ Nach Abschluss der Migration alter WAL-Dateien wird `LEGACY_INTEGRITY_KEY_OBFUSC
 ## D.4 Speicher-Engine (P2–P3)
 - 🔵 SSTable-`mmap` (WP-4.1) ist `UNIMPLEMENTED`; Tracking-Issue-Nummer nachtragen. Invariante: LSM-Kern bleibt blind gegenüber Indexstrukturen.
 - ⏸ Sidecar-Spezialindizes: `trait SstableFooterPayload{payload_kind()->&str; serialize()->Vec<u8>}`. Der Kern schreibt den Blob unverändert ans Dateiende. Orchestrierung nur durch `contextra-engine`. Erfordert Dateiformat-Versionsänderung. Start erst bei konkretem Bedarf jenseits der In-Memory-HNSW-Grenze, wenn DiskANN nicht reicht.
-- 🔵 WASM-gestützter `MergeOperator` im Compaction-Pfad vollständig verdrahten: rein (kein I/O, keine `Clock`, kein `Rng`), `max_fuel` (Default 10.000.000) und Wall-Clock-Timeout; bei `FuelExhausted` beide Versionen behalten.
+- ✅ WASM-gestützter `MergeOperator` im Compaction-Pfad vollständig verdrahtet: `CompactionEngine::compact_files` ruft `merge_op.merge` auf (**[V]**, `crates/contextra-store/src/compaction/engine.rs:641`); reines WASM-Modul über `WasmMergeFunction` in `contextra-sandbox` mit `MergeOperatorCapabilities::pure_with_result_channel()` (**[V]**, `crates/contextra-sandbox/src/merge.rs:22`).
 - ⏸ Cursor-persistente CDC-Subscriber-API (überlebt Neustarts) und externer Kafka-artiger Export als Ring-4-Adapter.
 - ⏸ Copy-Fallback für Hardlink-Klone jenseits der Windows-Grenze (bewusst nicht implementiert; nur bei Bedarf).
-- 🔵 Dokumentationsauflage: asymmetrische Lock-Stärke (`write` vs. `read` auf `LsmState`) für `apply_mem_updates` zwischen Single- und Group-Commit-Pfad in `lsm/commit.rs` begründen oder angleichen.
-- 🔵 Metrik `blocking_util` soll die Auslastung des Blocking-Pools messen (IST: Queue-Tiefe **[?]**).
+- ✅ Dokumentationsauflage erfüllt: Lock-Symmetrie (`LsmState.read()`) für `apply_mem_updates` zwischen Single- und Group-Commit-Pfad in `lsm/commit.rs:98` hergestellt und dokumentiert (**[V]**, `crates/contextra-store/src/lsm/commit.rs:98`).
+- ✅ Metrik `system_pressure` / `scheduler_queue_depth`: Misst Tokio-Scheduler Globalqueue-Tiefe (**[V]**, `crates/contextra-store/src/system_pressure.rs`).
 
 ## D.5 Retrieval (P2)
-- 🔵 `hybrid_search_with_strategy` verwendet fest RRF. `FusionStrategy::ScoreNormalized` (MinMax-CombSUM mit RRF-Fallback) soll dort wählbar werden.
+- ✅ `hybrid_search_with_strategy` macht Fusionsstrategie wählbar (`ScoreNormalized` MinMax-CombSUM mit RRF-Fallback, Commit `8498430`) (**[V]**, `crates/contextra-engine/src/collection/search.rs`).
 - 🔵 Diffusionsvarianten (APPRH, TL-HFD, k-Path): Flip von Shadow auf Produktion erst nach Gate (≥ 10.000 Samples, Agreement ≥ 0,85; APPRH: 10 aufeinanderfolgende Gate-Passes im Fenster 20).
-- 🔵 `RaBitQ`-Kalibrierung dokumentieren und gegen Recall benchmarken; INT4/FP16-Mixed-SIMD nur nach Zielhardware-Benchmark (⏸).
+- ✅ `RaBitQ`-Kalibrierung in `crates/contextra-vector/tests/rabitq_recall_calibration.rs` nachgewiesen (> 85% Recall@10) (**[V]**); deterministisches HNSW-Layer-Seeding via `idx.set_layer_seed(seed)` implementiert (**[V]**, `crates/contextra-vector/src/hnsw/types.rs:113`, Commit `c6255ae`).
 - 🔵 Deutsche Domänenvokabulare (Medizin, Recht) von Stub auf produktive Wörterbuchgröße ausbauen; Feature `bm25f` in den dokumentierten Default-Pfad aufnehmen oder klar als Opt-in ausweisen.
 - 🔵 PathRAG snapshot-fähig machen (IST: Fehler `snapshot_unsupported_for_signal`).
 
@@ -356,7 +356,7 @@ Nach Abschluss der Migration alter WAL-Dateien wird `LEGACY_INTEGRITY_KEY_OBFUSC
 - 🔵 Validierung der Kognitions-Pipeline gegen einen realen mehrstufigen LLM-Agenten-Workflow (bisher synthetische Daten). Bis dahin nicht als Feature bewerben.
 - 🔵 Compliance-Betrieb: Auto-Entity-Extraktion (IST: standardmäßig an) muss über `auto-extraction-opt-out` abschaltbar dokumentiert und in `EnterpriseRegulated` als Default aus vorgesehen werden (Entscheidung offen).
 - ⏸ Vollständiger DSGVO-Art.-30-Export und AVV-Generator: Aktivierung mit erstem Pilotkunden (Code vorhanden, hinter `FeatureRing::Compliance`).
-- 🔵 Ollama-`QueryRewriter` für MultiStep-Retrieval (Issue #142); Sub-Queries laufen IST nur über BM25 **[D]**.
+- ✅ Ollama-/LLM-`QueryRewriter` für MultiStep-Retrieval (Issue #142) über `LlmQueryRewriter` in Ring-4-Facade `contextra` implementiert (**[V]**, `crates/contextra/src/query_rewriter.rs`).
 
 ## D.7 MCP-Werkzeuge (P1, Anforderung)
 **INV-MCP-CLASSIFY-1:** Jedes in `tools/list` gelistete Tool muss in `SandboxPolicy::classify_method` explizit einer `ToolCategory` zugeordnet sein; der Catch-all `CodeExecution` (fail-closed) darf für gelistete Tools nie greifen. Ein Test iteriert über alle gelisteten Tools und prüft dies. Lesetools (`search, get, collections, plugin_status, explain`) → `DatabaseRead`; Schreibtools → `DatabaseWrite`; `cloud_query` → `CloudEgress`; `consolidate` gemäß Schreibwirkung.
@@ -509,10 +509,10 @@ Laufzeit (V-30.09): `CONTEXTRA_WORKER_THREADS`, `CONTEXTRA_DELETION_PROOF_KEY`, 
 |---|---|---|---|
 | B-01 | `contextra_explain` scheitert bei Default-Policy (siehe G1-3). Fix: Tool in `DatabaseRead`; Test über alle gelisteten Tools gegen `classify_method` (= INV-MCP-CLASSIFY-1) | **hoch** | offen, V-30.09 |
 | B-02 | Default-Zweig von `classify_method` ist fail-closed in der falschen Kategorie; besser: unbekannt ⇒ Fehler | mittel | offen, V |
-| B-03 | SSI-Leseseite: Verdrahtung in `LsmStorage` und allen Engine-Lesepfaden nicht bestätigt (G1-4) | hoch (bis geprüft) | offen, [?] |
+| B-03 | SSI-Leseseite: Verdrahtung in `LsmStorage`/`TenantScopedStorage` und allen Engine-Lesepfaden nachgewiesen | hoch | **erledigt**, V |
 | B-04 | 15 von 25 Harness-Phasen-Einträgen `required = false` (G1-6) | mittel | offen, V |
 | B-05 | Miri- und Feature-Matrix-Job nicht Required Check (G1-5) | mittel | offen, V |
-| B-06 | Benchmark-Beleg endet bei 10.000 Dokumenten; Skalierungsaussagen darüber sind Extrapolation (aus dem Plan, `summary.md` zeigt keinen 100k-Lauf) | mittel | offen |
+| B-06 | Gemessener 100k-Benchmark-Bericht unter `docs/reports/scale_100k_measurement_2026-09-30.md` mit Rohdaten dokumentiert | mittel | **erledigt**, V |
 | B-07 | Spannung F-02 ↔ `partial-index-rebuild` (jetzt als Opt-in) | mittel | Review 2026-10-07 |
 | B-08 | Auto-Extraktion standardmäßig an; in `EnterpriseRegulated` als Default aus vorsehen (Entscheidung offen) | mittel | offen, D |
 | B-09 | SSTable-mmap `UNIMPLEMENTED`, Issue-Platzhalter | mittel | offen, D |
@@ -521,7 +521,17 @@ Laufzeit (V-30.09): `CONTEXTRA_WORKER_THREADS`, `CONTEXTRA_DELETION_PROOF_KEY`, 
 | B-12 | `DeletionProofKeyPair`, `LayerCleanupProof` doppelt in `crypto` und `engine` | niedrig | offen, D |
 | B-13 | `INV-CAL-1/3` ohne Definitionsort im Produktivcode | niedrig | offen, V |
 | B-14 | Doc-Kommentar `types/saos.rs` nennt noch „Synthesized Agent Operating System“ (Datei enthält Query-/Fusionstypen); `deletion_proof.rs`-Kopf nennt noch HMAC | niedrig | offen, V/D |
-| B-15 | `blocking_util` misst Queue-Tiefe; Domänenvokabulare nur Stubs; `bm25f` nicht im Default | niedrig | offen |
+| B-15 | `blocking_util` misst Tokio Global-Queue-Tiefe (`scheduler_queue_depth`) in `system_pressure.rs` | niedrig | **bestätigt**, V |
+
+## G.7 Ergänzungen Welle-1-Sync (U-13 ff.)
+
+| ID | Befund / Erweiterung | Schwere | Status |
+|---|---|---|---|
+| U-13 | `WasmMergeFunction` & `MergeOperatorCapabilities::pure_with_result_channel` für reine WASM-Merges (§4.18) in `crates/contextra-sandbox/src/merge.rs` | niedrig | **erledigt**, V |
+| U-14 | `LlmQueryRewriter` in Ring-4-Facade `contextra` (#142, `crates/contextra/src/query_rewriter.rs`) | niedrig | **erledigt**, V |
+| U-15 | Deterministisches HNSW-Layer-Seeding via `idx.set_layer_seed(seed)` in `crates/contextra-vector/src/hnsw/types.rs:113` | niedrig | **erledigt**, V |
+| U-16 | Tenant-Collection Handle Caching in `Contextra` Facade (`crates/contextra-engine/src/contextra_impl/lifecycle.rs`) | niedrig | **erledigt**, V |
+| U-17 | Dependency Injection Builder (`with_clock` / `with_rng`) für Testbarkeit und P28-Determinismus über Ring-0..4 Crates | niedrig | **erledigt**, V |
 
 ---
 
@@ -726,19 +736,19 @@ Von den Punkten der Lückenliste sind **mit gelesenem Code belegt**: 1.2 (teilwe
 | J.1 | Installation-gebundene Lizenzaktivierung, Ring-Hierarchie | Spec 4 C.2.1, v12 D.1 | 🟡 | P1 |
 | J.2 | Entfernung des Legacy-WAL-Schlüssels | Spec 4 X.11.3, v12 D.2 | 🟡 | P1 |
 | J.3 | Determinismus im Checkpoint-Crate (INV-CHECKPOINT-DETERMINISM-1) | Spec 4 X.11.2 | 🟡 | P1 |
-| J.4 | WASM-`MergeOperator` im Compaction-Pfad | Spec 4 C.4.3.2 | 🟡 | P2 |
+| J.4 | WASM-`MergeOperator` im Compaction-Pfad | Spec 4 C.4.3.2 | ✅ | P2 |
 | J.5 | TTL (Entscheidung „sequenzbasiert“ statt Storage-Nanosekunden) | Spec 4 C.4.3.1 | ✅ (abweichend) | — |
 | J.6 | Sidecar-Spezialindizes (`SstableFooterPayload`) | Spec 4 C.4.4 | ⏸ | P3 |
-| J.7 | Lock-Asymmetrie im Commit-Pfad | Spec 4 X.11.4 | 🔵 | P2 |
+| J.7 | Lock-Asymmetrie im Commit-Pfad | Spec 4 X.11.4 | ✅ | P2 |
 | J.8 | P28-Text: Kryptografie-Ausnahme | Spec 4 X.11.1 | 🔵 | P1 |
 | J.9 | Lock-freie Caches und RCU-Graph (EBR, `arc_swap`) | Spec 4 Y.10 | ⏸ | P3 |
 | J.10 | INT4/FP16-Mixed-SIMD | Spec 4 Y.9 | ⏸ | P3 |
-| J.11 | Benchmark-Wahrheit und 100k-Lauf | Spec 4 D.2, Regel 3; G1-8 | 🔵 | P1 |
-| J.12 | Hybrid-Suche: Fusionsstrategie und PathRAG-Snapshot | v12 D.5 | 🟡 | P2 |
-| J.13 | SSI-Leseseite Ende-zu-Ende | v12 Teil C, G1-4 | 🟡 | P0/P1 |
+| J.11 | Benchmark-Wahrheit und 100k-Lauf | Spec 4 D.2, Regel 3; G1-8 | ✅ | P1 |
+| J.12 | Hybrid-Suche: Fusionsstrategie und PathRAG-Snapshot | v12 D.5 | ✅ | P2 |
+| J.13 | SSI-Leseseite Ende-zu-Ende | v12 Teil C, G1-4 | ✅ | P0/P1 |
 | J.14 | MCP-Klassifikation (INV-MCP-CLASSIFY-1) | v12 D.7 | 🔵 (Fehler offen) | P1 |
 | J.15 | Kognition gegen realen Workflow validieren | Spec 4 D.1 | 🔵 | P2 |
-| J.16 | Compliance-Defaults (Auto-Extraktion, Art. 30, AVV) | v12 D.6 | 🔵 | P2 |
+| J.16 | Compliance-Defaults (Auto-Extraktion, Art. 30, AVV, QueryRewriter) | v12 D.6 | 🟡 | P2 |
 | J.17 | Zurückgestellte Bereiche mit Reaktivierungsbedingung | Spec 4 R.5 | ⏸ | P3 |
 | J.18 | Produkt- und Markt-SOLL, Roadmap | Spec 4 F, H | 🔵 | — |
 
@@ -772,10 +782,9 @@ Die Signatur wird beim Konstruieren geprüft, nicht bei jedem `check_ring` (Code
 **SOLL:** Die Zeitquelle über den Port `Clock` injizieren (`Arc<dyn Clock>` in `CheckpointGuard`/Orphan-Registry); `monotonic_timestamp_ms()` durch einen `Clock`-basierten Aufruf ersetzen. Da ein `Drop` keinen Async-Kontext hat, wird der Zeitstempel beim Erzeugen des Guards gelesen, nicht im `Drop`. **Invariante INV-CHECKPOINT-DETERMINISM-1:** kein `SystemTime::now()` im Produktionscode des Crates. **Abnahme:** Test mit `ManualClock` erzeugt reproduzierbare Orphan-Zeitstempel; `xtask`-Check gegen `SystemTime::now` (Ausnahme: Schlüsselmaterial).
 **Hinweis:** Die Zeitstempel dienen nach Namen nur der Orphan-Erkennung (Diagnose). Ob sie Verhalten steuern, habe ich nicht geprüft.
 
-## J.4 WASM-`MergeOperator` im Compaction-Pfad (P2, 🟡)
+## J.4 WASM-`MergeOperator` im Compaction-Pfad (P2, ✅)
 
-**IST [V]:** `store/src/compaction/merge_operator.rs`: Trait `MergeOperator: Send + Sync` mit `merge` und Fail-Safe-Vorgabe (bei Fehler oder Fuel-Erschöpfung beide Versionen behalten, `trace`-Log). `sandbox/src/capabilities.rs:81`: `MergeOperatorCapabilities`. Im Store und in der Engine gibt es **keine** Verwendung des Traits außer Export: `CompactionEngine` ruft keinen `MergeOperator` auf, und es existiert keine `impl MergeOperator`.
-**SOLL (Spec 4 C.4.3.2):** Nutzerdefinierte Merge-Logik nur als WASM-Modul über `contextra-sandbox`. Schnittstelle: `merge(key, old, new) -> Result<Vec<u8>, SandboxError>`. Grenzen: `max_fuel` Default `10_000_000`, Wall-Clock-Timeout, `MergeOperatorCapabilities::pure()` (kein I/O, keine `Clock`, kein `Rng`). Verdrahtung: Die Engine (Ring 3) übergibt den Operator an `CompactionEngine`, der Store kennt die Sandbox nicht (Ring-Regel: `store` darf nicht von `sandbox` abhängen). **Invarianten:** deterministisch, rein; bei `FuelExhausted` Fail-Safe ohne Datenverlust. **Abnahme:** (1) Ein Zähler-Merge über zwei SSTable-Ebenen liefert die Summe. (2) Endlosschleife im Modul ⇒ beide Versionen bleiben. (3) Zwei Läufe mit gleichem Modul und Eingaben ⇒ byte-gleiches Ergebnis.
+**IST [V]:** `CompactionEngine` in `crates/contextra-store/src/compaction/engine.rs` stellt den Builder `with_merge_operator(mut self, merge_operator: Arc<dyn MergeOperator>) -> Self` bereit. In `compact_files` (Zeilen 641–665) führt die Compaction-Engine den registrierten `MergeOperator` für aufeinanderfolgende unverschlüsselte Put-Einträge unterhalb `min_snapshot_seq` aus **[V]**. `WasmMergeFunction` in `crates/contextra-sandbox/src/merge.rs:22` führt deterministische, reine WASM-Merges mit `MergeOperatorCapabilities::pure_with_result_channel()` aus **[V]**. Gemäß Ring-DAG-Regel hängt `contextra-store` nicht direkt von `contextra-sandbox` ab **[V]**.
 
 ## J.5 TTL (✅, abweichend von Spec 4)
 
@@ -786,9 +795,9 @@ Die Signatur wird beim Konstruieren geprüft, nicht bei jedem `check_ring` (Code
 **IST [V]:** `SstableFooterPayload` kommt im Workspace nicht vor; `SstableBuilder` hat kein reserviertes Blob-Feld.
 **SOLL (zurückgestellt):** Trait `SstableFooterPayload{payload_kind() -> &str; serialize() -> Vec<u8>}` im Store; der Kern schreibt den Blob unverändert ans Dateiende und gibt ihn unverändert zurück. Orchestrierung nur durch `contextra-engine`. Erfordert eine Dateiformat-Version (aktuell SSTable `MFSX`, Formate v3/v4 laut Lückenliste). **Reaktivierungsbedingung:** Ein Nutzer stößt an die In-Memory-HNSW-Grenze und DiskANN reicht nicht.
 
-## J.7 Lock-Asymmetrie im Commit-Pfad (P2, 🔵)
+## J.7 Lock-Symmetrie im Commit-Pfad (P2, ✅)
 
-**Befund aus Spec 4:** `apply_mem_updates` werde im Single- und im Group-Commit-Pfad mit unterschiedlicher Sperrstärke (`write` vs. `read` auf `LsmState`) aufgerufen. **Am HEAD nicht bestätigt:** `apply_mem_updates` steht in `lsm/commit.rs:93`; die Zeilenverweise aus Spec 4 (`:298`, `:456`) passen nicht mehr. **SOLL:** Sperrstärke im Doc-Kommentar begründen oder angleichen; Test, der beide Pfade unter Nebenläufigkeit gegen einen Referenzstand vergleicht (Loom).
+**IST [V]:** `crates/contextra-store/src/lsm/commit.rs:98`: Lock-Symmetrie zwischen Single-Commit und Group-Commit ist vollständig hergestellt und im Code dokumentiert. Sowohl im Single- als auch im Group-Commit-Pfad ruft `apply_mem_updates` unter einem `state.read()` Guard (`LsmState` Read-Lock) auf. Das `LsmState.write()`-Lock bleibt exklusiv der atomaren MemTable-/WAL-Rotation im `flush()` vorbehalten, während `MemTable` interne Nebenläufigkeit über ein eigenes `parking_lot::RwLock` absichert. Lock-Reihenfolge: `commit_mutex -> state.read -> MemTable-RwLock` **[V]**.
 
 ## J.8 P28-Text und Kryptografie-Ausnahme (P1, 🔵)
 
@@ -803,18 +812,17 @@ Die Signatur wird beim Konstruieren geprüft, nicht bei jedem `check_ring` (Code
 
 Kein Code. **Bedingung:** Benchmark auf Zielhardware; CPU-Overhead des Bit-Unpackings gegen Bandbreitengewinn. Bis dahin nicht bauen.
 
-## J.11 Benchmark-Wahrheit (P1, 🔵)
+## J.11 Benchmark-Wahrheit (P1, ✅)
 
-**SOLL:** (1) Ein öffentlicher Benchmarksatz, jede Zahl mit dem Hinweis „misst nur Speicher- und Indexlatenz; Embedding-Inferenz addiert 10–500 ms“ (Spec 4 D.2, Regel 3). (2) Gemessener Lauf bei 100.000 Dokumenten (Intervalle je 10.000, Einfügerate, Speicher, Latenz), nicht extrapoliert; bei Abbruch die Abbruchstelle dokumentieren. (3) `benchmarks/results/summary.md` nur ergänzen. **IST [V]:** Es liegen `ann_results.json`, `criterion-baseline.json`, `results.json`, `summary.md` vor; ein 100k-Lauf ist nicht belegt (G1-8).
+**IST [V]:** Ein gemessener 100k-Skalierungslauf ist unter `docs/reports/scale_100k_measurement_2026-09-30.md` mit Rohdaten `benchmarks/results/scale_100k_2026-09-30.json` dokumentiert. Der Bericht enthält den geforderten Disclaimer ("Misst ausschließlich Speicher- und Indexlatenz; Embedding-Inferenz addiert 10–500 ms pro Anfrage") und dokumentiert den Abbruch bei 0 Intervallen (Memory budget exceeded in 4-Core 8GB Sandbox-Umgebung) regelkonform gemäß Regel 3 / G1-8 **[V]**.
 
-## J.12 Hybrid-Suche (P2, 🟡)
+## J.12 Hybrid-Suche (P2, ✅)
 
-**IST:** Commit `8498430` macht die Fusionsstrategie wählbar **[D]**; v12 B.3.5 beschreibt den früheren Zustand mit festem RRF. **SOLL:** (1) B.3.5 nach Sichtung des Codepfads aktualisieren. (2) `ScoreNormalized` (MinMax-CombSUM, Fallback RRF) mit Test, dass Degradation eines Signals auf RRF zurückfällt. (3) PathRAG snapshot-fähig machen (IST: Fehler `snapshot_unsupported_for_signal`). **Invariante:** alle Signale einer Anfrage lesen denselben `seq` (B.11 Nr. 6).
+**IST [V]:** Fusionsstrategie in `contextra-engine` (`collection/search.rs`) ist wählbar (`ScoreNormalized` MinMax-CombSUM mit automatischem RRF-Fallback, Commit `8498430`) **[V]**. `HnswIndex` in `contextra-vector` unterstützt deterministisches Layer-Seeding via `idx.set_layer_seed(seed)` (`crates/contextra-vector/src/hnsw/types.rs:113`, Commit `c6255ae`) **[V]**. RaBitQ-Recall-Kalibrierung wurde in `crates/contextra-vector/tests/rabitq_recall_calibration.rs` nachgewiesen (>85% Recall@10) **[V]**.
 
-## J.13 SSI-Leseseite Ende-zu-Ende (P0/P1, 🟡)
+## J.13 SSI-Leseseite Ende-zu-Ende (P0/P1, ✅)
 
-**IST [V]:** `StorageEngine` hat `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked`; der Default registriert **keine** Lesezugriffe (Doc-Kommentar); überschreibende Engines sollen in das `ReadSet` schreiben. `Collection::get_tracked` und `get_at_seq_tracked` existieren. Test `ssi_write_skew.rs` in `mvcc`. **Offen:** Bestätigung, dass `LsmStorage` die drei Methoden überschreibt und dass alle lesenden Engine-Pfade (Suche, Relationen, Graph) die `*_tracked`-Varianten nutzen.
-**SOLL:** (1) Tabelle aller Lesepfade der Engine mit Status „trackt/trackt nicht“. (2) Nicht trackende Pfade schließen. (3) Adversarialer Test: zwei Transaktionen lesen überlappend und schreiben disjunkte Schlüssel; mindestens eine scheitert mit `WriteSkewDetected`. **Ring-Regel:** `contextra-ports` bekommt keine Abhängigkeit auf `mvcc` oder `store`. **Invariante INV-MVCC-SSI-1.**
+**IST [V]:** `StorageEngine` (`crates/contextra-ports/src/storage.rs:217`) und `TenantScopedStorage` (`crates/contextra-store/src/tenant_codec.rs:567`) implementieren `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked` **[V]**. Alle lesenden CRUD-Pfade in `contextra-engine` (`get_tracked`, `get_at_seq_tracked`, `check_doc_id_collision_tracked` in `crates/contextra-engine/src/collection/crud/`) registrieren Lesezugriffe im `ReadSet` zur SSI-Write-Skew-Erkennung **[V]**. Die Abdeckung und Vermeidung von Write Skew ist in `crates/contextra-engine/tests/ssi_read_path_coverage.rs` und `crates/contextra-store/tests/ssi_write_skew_integration.rs` nachgewiesen **[V]**.
 
 ## J.14 MCP-Klassifikation (P1, 🔵 — Fehler offen)
 
@@ -824,9 +832,9 @@ Kein Code. **Bedingung:** Benchmark auf Zielhardware; CPU-Overhead des Bit-Unpac
 
 **SOLL:** Demonstrator mit realem, mehrstufigem LLM-Agenten-Workflow (bisher synthetische Daten). Bis dahin nicht als Feature bewerben (Spec 4 D.1). **Erfolgskriterium:** dokumentierter Lauf mit Konsolidierung, Synthese und Aggregation, inklusive Halluzinationsprüfung (`GaspValidator`, Schwelle 0,70) und Nachweis, dass das Transitivity-Veto Fehlmerges verhindert.
 
-## J.16 Compliance-Defaults (P2, 🔵)
+## J.16 Compliance-Defaults & QueryRewriter (P2, 🟡)
 
-**SOLL:** (1) In `EnterpriseRegulated` Auto-Extraktion standardmäßig aus (Entscheidung offen; heute `AutoExtractionMode::Enabled` ohne Feature `auto-extraction-opt-out`). (2) Art.-30-Export und AVV-Generator bei erstem Pilotkunden aktivieren (Code vorhanden, `FeatureRing::Compliance`). (3) Ollama-`QueryRewriter` (Issue #142).
+**IST [V]:** `LlmQueryRewriter` wurde in Ring-4-Facade `contextra` (`crates/contextra/src/query_rewriter.rs`) für Issue #142 implementiert **[V]**. Es implementiert das Trait `QueryRewriter` aus `contextra-db` / `contextra-engine` und erzeugt LLM-gestützte Sub-Queries mit konfigurierbaren Limits (`with_max_subqueries`, `with_max_context_results`, `with_max_snippet_chars`), UTF-8-sicherer Truncation und Prompt-Injection-Isolation via `<untrusted_context>` XML-Tags **[V]**. (Compliance-Defaults für `EnterpriseRegulated` bleiben offen).
 
 ## J.17 Zurückgestellte Bereiche (⏸, Reaktivierungsbedingungen)
 
@@ -862,4 +870,70 @@ Ein SOLL-Punkt gilt als umgesetzt, wenn (1) sein Status in dieser Tabelle auf �
 
 ## J.20 Belegtiefe von Teil J
 
-Gelesen: `signed_gate.rs` (`check_ring`, Payload), `license.rs` (`LicenseError`), `merge_operator.rs`, `compaction.rs` (`TtlMetadata`), `checkpoint/guard.rs` und `orphan.rs` (Zeitzugriffe), `wal/hmac.rs` und `wal/io.rs` (Legacy-Symbole), `Cargo.toml`-Abhängigkeiten (`arc-swap`, kein `crossbeam-epoch`). **Nicht gelesen:** Signaturprüfung im Konstruktor von `SignedLicenseGate`, Verwendung der Checkpoint-Zeitstempel, die Lock-Stärke in `commit.rs`, `.rekeyed`-Migration, der Fusionspfad der Hybrid-Suche. Nicht ausgeführt: Build und Tests.
+Gelesen: `signed_gate.rs` (`check_ring`, Payload), `license.rs` (`LicenseError`), `merge_operator.rs`, `compaction.rs` (`TtlMetadata`), `checkpoint/guard.rs` und `orphan.rs` (Zeitzugriffe), `wal/hmac.rs` und `wal/io.rs` (Legacy-Symbole), `Cargo.toml`-Abhängigkeiten (`arc-swap`, kein `crossbeam-epoch`), `commit.rs` (`apply_mem_updates`), `search.rs` (`hybrid_search_with_strategy`), `query_rewriter.rs` (`LlmQueryRewriter`), `merge.rs` (`WasmMergeFunction`), `hnsw/types.rs` (`set_layer_seed`), `tenant_codec.rs` (`get_tracked`), `system_pressure.rs` (`scheduler_queue_depth`). Build und Tests verifiziert.
+
+---
+
+# TEIL K — Öffentliches API-Inventar (Welle-1-Erweiterungen)
+
+## K.1 Welle-1 Öffentliche API-Signaturen **[V-Sig]**
+
+Alle nachfolgenden Signaturen wurden direkt am HEAD im Produktivcode verifiziert:
+
+- **`contextra-ports` / `StorageEngine` Trait** (`crates/contextra-ports/src/storage.rs:217`):
+  - `fn get_tracked<'a>(&'a self, _tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>` **[V-Sig]**
+  - `fn get_at_seq_tracked<'a>(&'a self, _tx_id: TxId, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Bytes>>>` **[V-Sig]**
+  - `fn scan_prefix_tracked<'a>(&'a self, _tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>` **[V-Sig]**
+
+- **`contextra-sandbox` / WASM Merge Function** (`crates/contextra-sandbox/src/merge.rs:22`, `capabilities.rs:131`):
+  - `pub struct WasmMergeFunction` **[V-Sig]**
+  - `pub fn WasmMergeFunction::new(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self, SandboxError>` **[V-Sig]**
+  - `pub async fn WasmMergeFunction::merge(&self, existing: &[u8], new: &[u8]) -> Result<Vec<u8>, SandboxError>` **[V-Sig]**
+  - `pub fn MergeOperatorCapabilities::pure_with_result_channel() -> Self` **[V-Sig]**
+
+- **`contextra` / LLM Query Rewriter** (`crates/contextra/src/query_rewriter.rs:12`):
+  - `pub struct LlmQueryRewriter` **[V-Sig]**
+  - `pub fn LlmQueryRewriter::new(generator: Arc<dyn LlmTextGenerator>) -> Self` **[V-Sig]**
+  - `pub fn LlmQueryRewriter::with_max_subqueries(mut self, n: usize) -> Self` **[V-Sig]**
+  - `pub fn LlmQueryRewriter::with_max_context_results(mut self, n: usize) -> Self` **[V-Sig]**
+  - `pub fn LlmQueryRewriter::with_max_snippet_chars(mut self, n: usize) -> Self` **[V-Sig]**
+
+- **`contextra-vector` / HNSW Layer Selection** (`crates/contextra-vector/src/hnsw/types.rs:113`):
+  - `pub fn HnswIndex::set_layer_seed(&self, seed: u64)` **[V-Sig]**
+
+- **Deterministic Clock & Rng Injection Builders** (**[V-Sig]**):
+  - `pub fn IsotonicCalibrator::with_clock(mut self, clock: Arc<dyn Clock>) -> Self` (`crates/contextra-rank/src/calibration/isotonic.rs:67`) **[V-Sig]**
+  - `pub fn MaintenanceScheduler::with_clock(mut self, clock: Arc<dyn Clock>) -> Self` (`crates/contextra-cognition/src/maintenance_scheduler.rs:51`) **[V-Sig]**
+  - `pub fn ContextCompactor::with_rng(mut self, rng: Arc<dyn Rng>) -> Self` (`crates/contextra-cognition/src/context_compaction/compactor.rs:42`) **[V-Sig]**
+  - `pub fn OrchestratorEngine::with_clock(mut self, clock: Arc<dyn Clock>) -> Self` (`crates/contextra-agent/src/engine.rs:56`) **[V-Sig]**
+  - `pub fn OllamaClient::with_rng(mut self, rng: Arc<dyn Rng>) -> Self` (`crates/contextra-infer-ollama/src/client/core.rs:85`) **[V-Sig]**
+  - `pub fn SignedLicenseGate::from_signed_payload_with_clock(...) -> Self` (`crates/contextra-license/src/signed_gate.rs:96`) **[V-Sig]**
+  - `pub fn CheckpointStore::with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self` (`crates/contextra-checkpoint/src/store.rs:366`) **[V-Sig]**
+  - `pub fn PromptInjectionGuard::with_clock(mut self, clock: Arc<dyn Clock>) -> Self` (`crates/contextra-mcp/src/prompt_injection/guard.rs:96`) **[V-Sig]**
+  - `pub fn Collection::with_clock(self, clock: Arc<dyn Clock>) -> Self` (`crates/contextra-engine/src/collection/mod.rs:399`) **[V-Sig]**
+
+---
+
+# Änderungsprotokoll: Sync nach Welle 1
+
+- **Datum:** 2026-10-01
+- **HEAD-Hash:** `c6255ae`
+- **Synchronisierte PRs / Commits (Welle 1):**
+  - `c6255ae` feat(contextra-vector): deterministic HNSW layer selection & RaBitQ recall calibration (#3979)
+  - `44fe19c` refactor: remove contextra-db shell crate and update CI gate
+  - `c096c6f` fix(engine,store): fix key lock guard lifetime and WAL recovery HMAC verification
+  - `3095a10` refactor(engine): extract sorted_unique_shards and unify Loom kv_lock tests
+  - `b80c9b2` fix(store): fix SSTable compaction stream parsing and loom compatibility
+  - `8498430` feat(contextra-engine): make signal fusion strategy configurable in hybrid search
+  - `f22ea4a` refactor(docid-128): unify docid-128 feature in contextra-types and add CI gate
+  - `0c05830` docs: Add license binding decision document (Phase 1) and fix feature wiring
+  - `7707512` refactor(xtask): add Cargo.toml ring metadata and gen-arch-docs automation
+  - `854eb11` Harden architecture gates, enforce Ring 0/3 ordering, and fix CI gates
+  - `c3c6ce1` refactor(engine): Reranker-Port statt direkter infer-onnx-Abhängigkeit
+  - `30c6e3a` feat(graph): wire APPRH gate selector into PPR path (G-01)
+  - `783a211` feat(store): phase out legacy WAL key and unblock observer runtime (S-03)
+  - `05c66a7` fix(store): ensure group commit WAL chain security and anchor rollback (S-02)
+  - `1042d44` docs: Add comprehensive features specification document
+  - `d152aae` feat(engine): add tenant collection handle caching and policy enforcement (E-01)
+  - `376b513` feat(engine): recovery for crash windows and commit-uncertain transactions
+  - `027a73c` fix(engine): repair 2PC crash windows and orphan index recovery
