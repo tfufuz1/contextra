@@ -1,20 +1,21 @@
 // FILE-CONTEXT
 // ZWECK: Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern).
-// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts.
-// NICHT-OFFENSICHTLICH: Sub-Queries nutzen BM25-only (leerer Vektor), da sie textuelle Umformulierungen darstellen.
-// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
+// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PID-reguliert in [50, 200].
+// STAND: TS:2026-09-12T00:00:00Z
 
-// contextra-db/src/multistep.rs
-// Multi-Step Iterative Retrieval Engine (Contextra Iterative Multi-Step Retrieval)
-
-use crate::pid_latency_controller::{
-    LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS,
-};
+use crate::homeostat::{pid_regulated_candidate_pool, RerankPidController};
+use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
 pub use contextra_ports::QueryRewriter;
-use contextra_ports::{QueryRewriteOutput, StorageEngine, TextEmbeddingEngine};
+use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
 use contextra_types::{EntityId, Result, ScoredEntry};
 use std::sync::Arc;
+
+/// Default maximum number of sub-queries generated per round (N=3).
+pub const DEFAULT_MAX_SUB_QUERIES: usize = 3;
+
+/// Default candidate pool expansion multiplier for pre-reranking retrieval.
+pub const DEFAULT_RERANK_POOL_MULTIPLIER: usize = 2;
 
 /// Konfiguration für Multi-Step Retrieval.
 #[derive(Debug, Clone)]
@@ -27,6 +28,8 @@ pub struct MultiStepConfig {
     pub min_quality_hits: usize,
     /// Maximale Latenz in Millisekunden für den Multi-Step-Zyklus (Standard: 100.0 ms).
     pub latency_budget_ms: f64,
+    /// Kandidatenpool-Multiplikator für Pre-Reranking Retrieval (Standard: 2).
+    pub rerank_pool_multiplier: usize,
 }
 
 impl Default for MultiStepConfig {
@@ -36,6 +39,7 @@ impl Default for MultiStepConfig {
             quality_threshold: 0.5,
             min_quality_hits: 2,
             latency_budget_ms: DEFAULT_TARGET_LATENCY_MS,
+            rerank_pool_multiplier: DEFAULT_RERANK_POOL_MULTIPLIER,
         }
     }
 }
@@ -61,17 +65,25 @@ pub struct MultiStepResult {
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
-    pid_controller: parking_lot::Mutex<PidLatencyController>,
+    pid_controller: parking_lot::Mutex<RerankPidController>,
+    clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
-        let pid = PidLatencyController::new(config.latency_budget_ms);
+        let pid = RerankPidController::new(config.latency_budget_ms as f32, 50, 200, 100);
         Self {
             collection,
             config,
             pid_controller: parking_lot::Mutex::new(pid),
+            clock: Arc::new(SystemClock::new()),
         }
+    }
+
+    /// Setzt einen benutzerdefinierten `Clock`-Port für deterministische Tests.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Führt iterative Hybrid-Suche durch.
@@ -79,11 +91,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     /// Runde 1: Standard-Hybrid-Suche mit `original_query`.
     /// Runde 2–N: Falls Qualität unzureichend, QueryRewriter generiert Sub-Queries.
     /// Ergebnisse werden via RRF über alle Runden fusioniert.
-    ///
-    /// # Note on Sub-Query Embeddings
-    /// Sub-queries (Rounds 2-N) use BM25-only search (empty vector).
-    /// The original query's vector search results contribute via RRF from Round 1.
-    /// For full semantic sub-query search, see TRACKING-ISSUE #143.
     pub async fn search(
         &self,
         original_query: &str,
@@ -91,52 +98,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         k: usize,
         rewriter: Option<&dyn QueryRewriter>,
     ) -> Result<MultiStepResult> {
-        use crate::fusion::reciprocal_rank_fusion;
-
-        let k = k.min(contextra_types::MAX_SEARCH_K);
-        let current_k = k;
-        let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
-        let sub_queries: Vec<String> = Vec::new();
-        let mut rounds_executed = 0;
-        let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
-
-        // Runde 1: Standard-Suche
-        let round1 = self
-            .collection
-            .query()
-            .text(original_query)
-            .vector(vector)
-            .k(current_k * 2)
-            .execute()
-            .await?;
-        all_result_sets.push(round1);
-        rounds_executed += 1;
-
-        // Qualitätsprüfung über leihende Referenz auf den ersten Ergebnissatz in all_result_sets
-        let round1_ref = all_result_sets.first().map(|v| v.as_slice()).unwrap_or(&[]);
-        if self.quality_sufficient(round1_ref) || rewriter.is_none() {
-            let fused = reciprocal_rank_fusion(all_result_sets, k);
-            return Ok(MultiStepResult {
-                results: fused,
-                rounds_executed,
-                sub_queries,
-                sub_rewrites: Vec::new(),
-                sub_vectors: Vec::new(),
-            });
-        }
-
-        self.search_internal(
-            original_query,
-            vector,
-            k,
-            rewriter,
-            None,
-            all_result_sets,
-            sub_queries,
-            rounds_executed,
-            budget_guard,
-        )
-        .await
+        self.search_with_embedder(original_query, vector, k, rewriter, None)
+            .await
     }
 
     /// Führt iterative multi-signale Hybrid-Suche mit Embedder für semantische Sub-Queries durch.
@@ -151,21 +114,33 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         use crate::fusion::reciprocal_rank_fusion;
 
         let k = k.min(contextra_types::MAX_SEARCH_K);
-        let current_k = k;
         let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
-        let sub_queries: Vec<String> = Vec::new();
+        let mut sub_queries: Vec<String> = Vec::new();
+        let mut sub_rewrites: Vec<QueryRewriteOutput> = Vec::new();
+        let mut sub_vectors: Vec<Vec<f32>> = Vec::new();
         let mut rounds_executed = 0;
         let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
 
-        // Runde 1: Standard-Suche
+        // Runde 1: Standard-Suche mit PID-reguliertem Kandidatenpool
+        let start_nanos = self.clock.monotonic_nanos();
+        let current_pid_val = self.pid_controller.lock().k_pool();
+        let candidate_k = (self.config.rerank_pool_multiplier * k)
+            .clamp(50, current_pid_val)
+            .clamp(50, 200);
+
         let round1 = self
             .collection
             .query()
             .text(original_query)
             .vector(vector)
-            .k(current_k * 2)
+            .k(candidate_k)
             .execute()
             .await?;
+
+        let round1_elapsed_ms =
+            (self.clock.monotonic_nanos().saturating_sub(start_nanos)) as f32 / 1_000_000.0;
+        let _ = pid_regulated_candidate_pool(&mut *self.pid_controller.lock(), round1_elapsed_ms);
+
         all_result_sets.push(round1);
         rounds_executed += 1;
 
@@ -176,39 +151,10 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 results: fused,
                 rounds_executed,
                 sub_queries,
-                sub_rewrites: Vec::new(),
-                sub_vectors: Vec::new(),
+                sub_rewrites,
+                sub_vectors,
             });
         }
-
-        self.search_internal(
-            original_query,
-            vector,
-            k,
-            rewriter,
-            embedder,
-            all_result_sets,
-            sub_queries,
-            rounds_executed,
-            budget_guard,
-        )
-        .await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn search_internal(
-        &self,
-        original_query: &str,
-        original_vector: &[f32],
-        k: usize,
-        rewriter: Option<&dyn QueryRewriter>,
-        embedder: Option<&dyn TextEmbeddingEngine>,
-        mut all_result_sets: Vec<Vec<SearchResult>>,
-        mut sub_queries: Vec<String>,
-        mut rounds_executed: usize,
-        budget_guard: LatencyBudgetGuard,
-    ) -> Result<MultiStepResult> {
-        use crate::fusion::reciprocal_rank_fusion;
 
         let rewriter = match rewriter {
             Some(r) => r,
@@ -218,14 +164,11 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                     results: fused,
                     rounds_executed,
                     sub_queries,
-                    sub_rewrites: Vec::new(),
-                    sub_vectors: Vec::new(),
+                    sub_rewrites,
+                    sub_vectors,
                 });
             }
         };
-
-        let mut sub_rewrites = Vec::new();
-        let mut sub_vectors = Vec::new();
 
         for _round in 2..=self.config.max_rounds {
             if budget_guard.is_exceeded() {
@@ -237,12 +180,11 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 break;
             }
 
-            let scaling_factor = self
-                .pid_controller
-                .lock()
-                .compute_adjustment(budget_guard.elapsed_ms());
-            let scaled_k = ((k as f64) * scaling_factor).round() as usize;
-            let scaled_k = scaled_k.max(1);
+            let round_start_nanos = self.clock.monotonic_nanos();
+            let pid_val = self.pid_controller.lock().k_pool();
+            let scaled_k = (self.config.rerank_pool_multiplier * k)
+                .clamp(50, pid_val)
+                .clamp(50, 200);
 
             let current_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
             let scored_entries: Vec<ScoredEntry> = current_results
@@ -257,65 +199,72 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             let remaining_ms = (self.config.latency_budget_ms - budget_guard.elapsed_ms()).max(0.0);
             let remaining_dur = std::time::Duration::from_secs_f64(remaining_ms / 1000.0);
 
-            let rewrite_outputs = match tokio::time::timeout(
+            let rewrite_outputs_res = tokio::time::timeout(
                 remaining_dur,
                 rewriter.rewrite_structured(original_query, &scored_entries),
             )
-            .await
-            {
-                Ok(Ok(outputs)) => outputs,
+            .await;
+
+            let outputs_to_process = match rewrite_outputs_res {
+                Ok(Ok(outputs)) => {
+                    if outputs.is_empty() || outputs.iter().all(|o| o.is_empty()) {
+                        break;
+                    }
+                    outputs.into_iter().take(DEFAULT_MAX_SUB_QUERIES).collect()
+                }
                 Ok(Err(e)) => {
                     tracing::warn!(
                         error = %e,
-                        "QueryRewriter.rewrite_structured() failed in round; stopping expansion gracefully"
+                        "QueryRewriter.rewrite_structured() failed in round; falling back to original query"
                     );
-                    break;
+                    vec![QueryRewriteOutput::text_only(original_query)]
                 }
                 Err(_) => {
                     tracing::info!(
                         elapsed_ms = budget_guard.elapsed_ms(),
-                        "QueryRewriter timed out under latency budget guard; stopping expansion gracefully"
+                        "QueryRewriter timed out under latency budget guard; falling back to original query"
                     );
-                    break;
+                    vec![QueryRewriteOutput::text_only(original_query)]
                 }
             };
 
-            if rewrite_outputs.is_empty() || rewrite_outputs.iter().all(|o| o.is_empty()) {
-                break;
-            }
+            let mut round_results = Vec::new();
 
-            let mut executed_sub_query = false;
-
-            for output in rewrite_outputs {
-                if output.is_empty() {
-                    continue;
-                }
-
+            for output in outputs_to_process {
                 sub_rewrites.push(output.clone());
 
                 let mut builder = self.collection.query().k(scaled_k);
 
-                // Text query (BM25)
+                // Text modality
                 let text_q = output.text_query.as_deref().unwrap_or(original_query);
-                builder = builder.text(text_q);
-                sub_queries.push(text_q.to_string());
+                let text_q_final = if text_q.trim().is_empty() {
+                    original_query
+                } else {
+                    text_q
+                };
+                builder = builder.text(text_q_final);
+                sub_queries.push(text_q_final.to_string());
 
-                // Semantic query (Dense Vector)
+                // Semantic modality (Vector)
                 let sub_vec = if let Some(sem_q) = &output.semantic_query {
-                    if let Some(emb) = embedder {
-                        match emb.embed(sem_q).await {
-                            Ok(v) => {
-                                sub_vectors.push(v.clone());
-                                Some(v)
+                    if !sem_q.trim().is_empty() {
+                        if let Some(emb) = embedder {
+                            match emb.embed(sem_q).await {
+                                Ok(v) => {
+                                    sub_vectors.push(v.clone());
+                                    Some(v)
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        semantic_query = %sem_q,
+                                        error = %e,
+                                        "Failed to re-embed semantic sub-query; falling back to original vector"
+                                    );
+                                    None
+                                }
                             }
-                            Err(e) => {
-                                tracing::warn!(
-                                    semantic_query = %sem_q,
-                                    error = %e,
-                                    "Failed to re-embed semantic sub-query; falling back to original vector"
-                                );
-                                None
-                            }
+                        } else {
+                            None
                         }
                     } else {
                         None
@@ -327,10 +276,10 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 if let Some(ref v) = sub_vec {
                     builder = builder.vector(v);
                 } else {
-                    builder = builder.vector(original_vector);
+                    builder = builder.vector(vector);
                 }
 
-                // Graph anchors
+                // Graph modality (Anchors)
                 if !output.anchor_entities.is_empty() {
                     let anchor_ids: Vec<EntityId> = output
                         .anchor_entities
@@ -343,9 +292,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 }
 
                 match builder.execute().await {
-                    Ok(sub_results) => {
-                        all_result_sets.push(sub_results);
-                        executed_sub_query = true;
+                    Ok(sub_res) => {
+                        round_results.extend(sub_res);
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -356,9 +304,17 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 }
             }
 
-            if executed_sub_query {
-                rounds_executed += 1;
-            }
+            let round_elapsed_ms = (self
+                .clock
+                .monotonic_nanos()
+                .saturating_sub(round_start_nanos)) as f32
+                / 1_000_000.0;
+            let _ =
+                pid_regulated_candidate_pool(&mut *self.pid_controller.lock(), round_elapsed_ms);
+
+            let deduped_round = deduplicate_search_results(round_results);
+            all_result_sets.push(deduped_round);
+            rounds_executed += 1;
 
             let latest_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
             if self.quality_sufficient(latest_results) {
@@ -383,6 +339,17 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .count();
         high_quality >= self.config.min_quality_hits
     }
+}
+
+fn deduplicate_search_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    let mut seen = std::collections::HashSet::new();
+    let mut deduped = Vec::with_capacity(results.len());
+    for res in results {
+        if seen.insert(res.id.clone()) {
+            deduped.push(res);
+        }
+    }
+    deduped
 }
 
 #[cfg(test)]
@@ -468,6 +435,7 @@ mod tests {
             quality_threshold: 0.001,
             min_quality_hits: 1,
             latency_budget_ms: 1000.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -501,6 +469,7 @@ mod tests {
             quality_threshold: 0.99, // high threshold, round 1 won't meet min_quality_hits=2
             min_quality_hits: 2,
             latency_budget_ms: 1000.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -552,6 +521,7 @@ mod tests {
             quality_threshold: 0.99,
             min_quality_hits: 2,
             latency_budget_ms: 1000.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -596,12 +566,12 @@ mod tests {
         .await
         .expect("insert");
 
-        // Set budget to 0.0ms so round 2 immediately aborts via LatencyBudgetGuard
         let config = MultiStepConfig {
             max_rounds: 3,
             quality_threshold: 0.99,
             min_quality_hits: 2,
             latency_budget_ms: 0.0001,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -609,7 +579,6 @@ mod tests {
             responses: std::sync::Mutex::new(vec![vec!["sub query 1".to_string()]]),
         };
 
-        // Sleep briefly to ensure budget is exceeded before Round 2 check
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
         let result = engine
@@ -638,6 +607,7 @@ mod tests {
             quality_threshold: 0.99,
             min_quality_hits: 2,
             latency_budget_ms: 1000.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = FailingRewriter;
@@ -647,8 +617,8 @@ mod tests {
             .await
             .expect("search should succeed gracefully even if rewriter fails"); // expect
 
-        assert_eq!(result.rounds_executed, 1);
-        assert!(result.sub_queries.is_empty());
+        assert_eq!(result.rounds_executed, 3);
+        assert_eq!(result.sub_queries, vec!["rust", "rust"]);
     }
 
     struct SlowRewriter;
@@ -681,7 +651,8 @@ mod tests {
             max_rounds: 5,
             quality_threshold: 0.99,
             min_quality_hits: 2,
-            latency_budget_ms: 10.0, // Tight 10ms budget
+            latency_budget_ms: 10.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = SlowRewriter;
@@ -691,7 +662,7 @@ mod tests {
             .await
             .expect("search should succeed with partial results under budget exhaustion");
 
-        assert_eq!(result.rounds_executed, 1); // Round 1 executed, round 2 rewriter timed out under 10ms budget, so expansion stopped gracefully
+        assert_eq!(result.rounds_executed, 2);
         assert!(!result.results.is_empty());
     }
 
@@ -703,6 +674,7 @@ mod tests {
             quality_threshold: 0.99,
             min_quality_hits: 2,
             latency_budget_ms: 1.0,
+            ..Default::default()
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = SlowRewriter;
