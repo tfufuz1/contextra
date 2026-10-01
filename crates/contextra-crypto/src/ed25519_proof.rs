@@ -106,6 +106,8 @@ pub fn verify_deletion_proof_v3(
 
 /// `SignatureVersion`-Enum für typsichere Versionierung von DeletionProof-Signaturen.
 ///
+/// Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1 (die physische Bereinigungsreihenfolge bleibt
+/// unverändert, die Versions-Validierung wird gehärtet).
 /// AI-TAG[TODO][RESOLVED] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld
 /// über TryFrom<u8> und `signature_version_typed()` konvertieren und in `verify()` absichern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
