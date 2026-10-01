@@ -439,7 +439,7 @@ async fn test_disk_full_mid_append_batch_rollback() -> Result<()> {
         value: b"fail_v2".to_vec(),
     };
 
-    let (batch, prev_hmac_snapshot) = wal
+    let (batch, _prev_hmac_snapshot) = wal
         .prepare_batch(vec![(op_fail1, 2), (op_fail2, 3)])
         .await?;
 

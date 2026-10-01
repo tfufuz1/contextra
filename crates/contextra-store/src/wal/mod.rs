@@ -350,6 +350,45 @@ impl Wal {
         Self::open_with_config(path, WalConfig::default()).await
     }
 
+    /// Explicitly migrates a legacy WAL segment to the V3 format signed with a secure integrity key.
+    ///
+    /// **INV-WAL-LEGACY-KEY-1**: Legacy migration requires explicit operator invocation.
+    /// Fallback to the legacy static integrity key is NEVER enabled implicitly during standard database open.
+    ///
+    /// # Prerequisites for Future Permanent Removal of `LEGACY_INTEGRITY_KEY_OBFUSCATED`:
+    /// 1. Operator migration complete across all active deployments (zero unmigrated V1/V2 WAL files).
+    /// 2. Every migrated WAL segment has a `.rekeyed` retirement marker on disk and V3 payload format.
+    /// 3. Audit verification (`has_pending_legacy_wal_migration_path`) returns `false` across all paths.
+    /// 4. Feature gate `legacy-wal-key` deprecation window elapsed.
+    ///
+    /// Returns `Ok(true)` if legacy entries were detected and successfully rekeyed to V3 format,
+    /// or `Ok(false)` if the segment was already migrated or contained no legacy entries.
+    pub async fn migrate_legacy_wal(
+        path: impl AsRef<Path>,
+        key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<bool> {
+        let path_ref = path.as_ref();
+        if Self::has_migration_marker(path_ref).await {
+            tracing::info!(
+                wal_path = %path_ref.display(),
+                "WAL segment already has migration marker; no legacy migration needed."
+            );
+            return Ok(false);
+        }
+
+        let config = WalConfig {
+            allow_legacy_integrity_key_fallback: true,
+            key_manager,
+            min_wal_version: WalVersion::V1,
+            ..Default::default()
+        };
+        let wal = Self::open_with_config(path_ref, config).await?;
+        let was_rekeyed = wal.rekey_from_legacy().await?;
+        wal.was_legacy_rekeyed
+            .store(was_rekeyed, std::sync::atomic::Ordering::SeqCst);
+        Ok(was_rekeyed)
+    }
+
     /// Explicitly opens a legacy WAL file requiring migration using the legacy integrity key fallback.
     ///
     /// **INV-WAL-LEGACY-KEY-1**: This is the ONLY entry point permitted to enable

@@ -61,7 +61,7 @@ async fn test_blocking_observer_no_preemptive_timeout_and_eviction_on_return() {
     // Inject ManualClock so latency measurement is completely deterministic and fast in test time
     let clock = Arc::new(ManualClock::new(1_000_000_000));
     storage.set_clock(clock.clone());
-    storage.set_max_observer_latency(Duration::from_millis(1));
+    storage.set_max_observer_latency(Duration::from_millis(200));
 
     let unblock_signal = Arc::new(AtomicBool::new(false));
     let calls = Arc::new(AtomicUsize::new(0));
@@ -110,8 +110,8 @@ async fn test_blocking_observer_no_preemptive_timeout_and_eviction_on_return() {
         "commit() returned early! Preemptive timeout guarantee does not exist."
     );
 
-    // Advance clock by 5ms (> 1ms max latency) while observer is blocked
-    clock_clone.advance(Duration::from_millis(5));
+    // Advance clock by 300ms (> 200ms max latency) while observer is blocked
+    clock_clone.advance(Duration::from_millis(300));
 
     // Signal observer to unblock and return
     unblock_signal_clone.store(true, Ordering::SeqCst);

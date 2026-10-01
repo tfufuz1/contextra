@@ -326,7 +326,7 @@ async fn test_wal_legacy_key_fallback_migration() {
             value: b"legacy_val".to_vec(),
         };
         let legacy_entry =
-            WalEntry::try_new(op, 1, &legacy_integrity_key(), [0u8; 32]).expect("legacy entry"); // expect
+            WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32]).expect("legacy entry"); // expect
 
         let mut wal_bytes = Vec::new();
         wal_bytes.extend_from_slice(&WAL_V3_HEADER);
@@ -600,7 +600,7 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
             key: b"mig_key".to_vec(),
             value: b"mig_val".to_vec(),
         };
-        let entry = WalEntry::try_new(op, 1, &legacy_integrity_key(), [0u8; 32]).expect("v1 entry"); // expect
+        let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32]).expect("v1 entry"); // expect
 
         let mut v1_bytes = Vec::new();
         // V1 WAL file has no MFW3 or MFW2 header prefix
@@ -687,7 +687,7 @@ async fn test_full_rewrite_crash_recovery_pipeline() {
         key: b"k_crash".to_vec(),
         value: b"v_crash".to_vec(),
     };
-    let entry = WalEntry::try_new(op, 1, &legacy_integrity_key(), [0u8; 32]).expect("v1 entry");
+    let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32]).expect("v1 entry");
     let v1_bytes = entry.to_bytes().expect("to_bytes");
     tokio::fs::write(&wal_path, &v1_bytes)
         .await
@@ -746,7 +746,7 @@ async fn test_v1_plaintext_rejected_when_key_manager_active() {
         key: b"unencrypted_key".to_vec(),
         value: b"unencrypted_val".to_vec(),
     };
-    let entry = WalEntry::try_new(op, 1, &legacy_integrity_key(), [0u8; 32]).expect("entry");
+    let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32]).expect("entry");
     let entry_bytes = entry.to_bytes().expect("to_bytes");
 
     // Write directly to file (bypassing Wal API)
@@ -802,7 +802,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     let wal_path = dir.path().join("split_brain.wal");
 
     let normal_key = b"normal-integrity-key-32-bytes---";
-    let legacy_key = legacy_integrity_key();
+    let legacy_key = Wal::legacy_integrity_key_for_test();
 
     // 1. Entry 1: created with normal key, prev_hmac = [0u8; 32]
     let op1 = WalOp::Put {

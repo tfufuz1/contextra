@@ -317,6 +317,9 @@ where
                                 };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
+                                    target: "contextra_store::wal::legacy_fallback",
+                                    wal_path = %path.display(),
+                                    event = "legacy_integrity_key_fallback_used",
                                     "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
                                     path.display()
                                 );
@@ -452,6 +455,9 @@ where
                         };
                         if legacy_res.is_ok() {
                             tracing::warn!(
+                                target: "contextra_store::wal::legacy_fallback",
+                                wal_path = %path.display(),
+                                event = "legacy_integrity_key_fallback_used",
                                 "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
                                 path.display()
                             );
