@@ -77,14 +77,20 @@ async fn test_ssi_coverage_link_memories() -> Result<()> {
     let doc1_tracked = col.get_tracked(tx1.tx_id, "mem_x").await?;
     assert!(doc1_tracked.is_some());
 
-    col.update("mem_x", &emb, Some(json!({ "title": "Memory X Updated" })))
-        .await?;
-
-    // link_memories internally calls get_at_seq_tracked
+    // link_memories internally calls get_at_seq_tracked and updates mem_x
     col.link_memories(
         doc_x,
         doc_y,
         contextra_types::domain::LinkRelation::Elaborates,
+    )
+    .await?;
+
+    // Stage a write on Tx1 so it becomes a read-write transaction
+    col.update_op(
+        &tx1,
+        "mem_x",
+        &emb,
+        Some(json!({ "title": "Tx1 Overwrite" })),
     )
     .await?;
 
