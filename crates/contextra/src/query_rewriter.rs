@@ -4,6 +4,7 @@
 
 use contextra_core::error::Result;
 use contextra_db::QueryRewriter;
+use contextra_types::ScoredEntry;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::ScoredEntry;
 use std::collections::HashSet;
