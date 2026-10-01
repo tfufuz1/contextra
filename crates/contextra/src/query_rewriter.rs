@@ -112,11 +112,7 @@ fn build_prompt(
     prompt.push_str("\n</query>\n\n");
 
     prompt.push_str("<untrusted_context>\n");
-    for (i, res) in current_results
-        .iter()
-        .take(max_context_results)
-        .enumerate()
-    {
+    for (i, res) in current_results.iter().take(max_context_results).enumerate() {
         let raw_text = extract_snippet(res);
         let snippet = truncate_str_chars(&raw_text, max_snippet_chars);
         prompt.push_str(&format!("[{}] {}\n", i + 1, snippet));
@@ -130,7 +126,9 @@ fn clean_line(line: &str) -> &str {
     if s.starts_with("```") {
         return "";
     }
-    s = s.trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+')).trim();
+    s = s
+        .trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+'))
+        .trim();
     if s.starts_with('[') {
         if let Some(closing) = s.find(']') {
             let inside = &s[1..closing];

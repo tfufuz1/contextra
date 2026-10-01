@@ -41,7 +41,9 @@ fn test_unwired_eviction_worker_uses_null_attention_score_source() {
     let source = worker.attention_source();
     // NullAttentionScoreSource always returns None for all segment IDs
     assert!(
-        source.importance_score_for_tenant(TenantId::SYSTEM, 1).is_none(),
+        source
+            .importance_score_for_tenant(TenantId::SYSTEM, 1)
+            .is_none(),
         "Unwired EvictionWorker must return None from NullAttentionScoreSource"
     );
 }
@@ -60,7 +62,9 @@ fn test_build_eviction_worker_wires_candle_attention_exporter() {
     worker.register_segment_request(tenant, segment_id, request_id);
 
     // Before recording weights in CandleAttentionExporter, it returns None
-    assert!(source.importance_score_for_tenant(tenant, segment_id).is_none());
+    assert!(source
+        .importance_score_for_tenant(tenant, segment_id)
+        .is_none());
 
     // Clean shutdown
     worker.shutdown();

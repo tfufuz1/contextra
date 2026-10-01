@@ -396,7 +396,10 @@ pub fn check_ring_layering_from_metadata_json(
     // Detect stale allowlist entries (entries in LAYER_ALLOWLIST that were not matched by any active violation)
     for entry in LAYER_ALLOWLIST {
         if !matched_allowlist_entries.contains(&(entry.from_crate, entry.to_crate)) {
-            let from_ring = ring_map.get(entry.from_crate).copied().unwrap_or(Ring::Ring0);
+            let from_ring = ring_map
+                .get(entry.from_crate)
+                .copied()
+                .unwrap_or(Ring::Ring0);
             let to_ring = ring_map.get(entry.to_crate).copied().unwrap_or(Ring::Ring0);
             violations.push(RingViolation {
                 from_crate: entry.from_crate.to_string(),

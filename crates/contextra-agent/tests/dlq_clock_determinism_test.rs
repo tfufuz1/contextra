@@ -60,7 +60,12 @@ async fn test_dlq_failed_at_secs_uses_injected_clock() -> Result<()> {
 
     let mut graph = StateGraph::new();
     graph.try_add_node("start", "Start Node", NodeType::Start, None)?;
-    graph.try_add_node("task_fail", "Failing Task", NodeType::Task, Some("always_failing"))?;
+    graph.try_add_node(
+        "task_fail",
+        "Failing Task",
+        NodeType::Task,
+        Some("always_failing"),
+    )?;
     graph.try_add_node("end", "End Node", NodeType::End, None)?;
     graph.try_add_edge("start", "task_fail", None, 1)?;
     graph.try_add_edge("task_fail", "end", None, 1)?;

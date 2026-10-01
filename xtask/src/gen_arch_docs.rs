@@ -194,7 +194,10 @@ pub fn generate_arch_docs_content(json_str: &str) -> Result<String, String> {
 }
 
 pub fn run_gen_arch_docs(check_only: bool) -> Result<(), String> {
-    println!("=== Running xtask gen-arch-docs (check_only={}) ===", check_only);
+    println!(
+        "=== Running xtask gen-arch-docs (check_only={}) ===",
+        check_only
+    );
 
     let output = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--no-deps"])
@@ -285,6 +288,8 @@ mod tests {
         assert!(content.contains("`contextra-core` | Ring 0 | Core primitives"));
         assert!(content.contains("`contextra-store` | Ring 1 | LSM store"));
         assert!(content.contains("```mermaid"));
-        assert!(content.contains("contextra_store[contextra-store] --> contextra_core[contextra-core]"));
+        assert!(
+            content.contains("contextra_store[contextra-store] --> contextra_core[contextra-core]")
+        );
     }
 }

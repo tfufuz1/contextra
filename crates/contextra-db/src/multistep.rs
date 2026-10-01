@@ -296,10 +296,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 let mut builder = self.collection.query().k(scaled_k);
 
                 // Text query (BM25)
-                let text_q = output
-                    .text_query
-                    .as_deref()
-                    .unwrap_or(original_query);
+                let text_q = output.text_query.as_deref().unwrap_or(original_query);
                 builder = builder.text(text_q);
                 sub_queries.push(text_q.to_string());
 

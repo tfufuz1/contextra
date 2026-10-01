@@ -28,6 +28,6 @@ pub use fusion::{
     weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
     weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
     GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext,
-    SignalContribution, SignalKind,
+    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
+    SignalKind,
 };

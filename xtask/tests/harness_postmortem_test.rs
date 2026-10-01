@@ -56,5 +56,7 @@ fn test_postmortem_new() {
 
     let exit = postmortem::run_postmortem(&args);
     assert_eq!(exit, 0);
-    assert!(root.join("docs/postmortems/PM-0001-test-incident.md").exists());
+    assert!(root
+        .join("docs/postmortems/PM-0001-test-incident.md")
+        .exists());
 }

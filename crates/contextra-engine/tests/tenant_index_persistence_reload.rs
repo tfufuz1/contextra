@@ -62,7 +62,8 @@ async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_t
 }
 
 #[tokio::test]
-async fn test_tenant_drop_collection_invalidates_cache_and_clears_data() -> contextra_types::Result<()> {
+async fn test_tenant_drop_collection_invalidates_cache_and_clears_data(
+) -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
     let db = Contextra::open_with_config(dir.path(), ContextraConfig::default()).await?;
 
@@ -72,8 +73,12 @@ async fn test_tenant_drop_collection_invalidates_cache_and_clears_data() -> cont
     // 1. Create collection & insert document
     let col1 = db.collection_for_tenant("drop_col", tenant_1).await?;
     let vec = vec![0.2f32; 768];
-    col1.insert("doc_drop", &vec, Some(serde_json::json!({"text": "to be dropped"})))
-        .await?;
+    col1.insert(
+        "doc_drop",
+        &vec,
+        Some(serde_json::json!({"text": "to be dropped"})),
+    )
+    .await?;
 
     // 2. Drop collection for tenant
     let proof = db.drop_collection("drop_col", tenant_1, proof_key).await?;

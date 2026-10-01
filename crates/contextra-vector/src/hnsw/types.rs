@@ -250,7 +250,9 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
-                    metrics_sink: RwLock::new(std::sync::Arc::new(contextra_ports::NoopMetricsSink)),
+                    metrics_sink: RwLock::new(std::sync::Arc::new(
+                        contextra_ports::NoopMetricsSink,
+                    )),
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
@@ -316,7 +318,9 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
-                    metrics_sink: RwLock::new(std::sync::Arc::new(contextra_ports::NoopMetricsSink)),
+                    metrics_sink: RwLock::new(std::sync::Arc::new(
+                        contextra_ports::NoopMetricsSink,
+                    )),
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
@@ -366,10 +370,7 @@ impl HnswIndex {
     }
 
     /// Builder method to set the metrics sink.
-    pub fn with_metrics_sink(
-        self,
-        sink: std::sync::Arc<dyn contextra_ports::MetricsSink>,
-    ) -> Self {
+    pub fn with_metrics_sink(self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.set_metrics_sink(sink);
         self
     }

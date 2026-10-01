@@ -5,9 +5,9 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::{
-    compute_record_commitment, AuditChain, DeletionLayer, DeletionProof, DeletionProofKeyPair,
-    DeletionScope, EncryptedCommitmentSalt, ExcludedScope, KeyManager, KeyRegistry,
-    LayerCleanupProof, DataClass,
+    compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,
+    DeletionProofKeyPair, DeletionScope, EncryptedCommitmentSalt, ExcludedScope, KeyManager,
+    KeyRegistry, LayerCleanupProof,
 };
 use contextra_types::{DocId, TenantId, TxId};
 
@@ -54,29 +54,17 @@ fn test_audit_chain_integrity_and_tamper_detection() {
 
     // Tamper with middle entry's doc_id
     let mut tampered_chain = chain.clone();
-    tampered_chain
-        .entries
-        .get_mut(1)
-        .unwrap()
-        .doc_id = DocId(999);
+    tampered_chain.entries.get_mut(1).unwrap().doc_id = DocId(999);
     assert!(!tampered_chain.verify_chain().unwrap());
 
     // Tamper with middle entry's prev_hash
     let mut tampered_chain2 = chain.clone();
-    tampered_chain2
-        .entries
-        .get_mut(1)
-        .unwrap()
-        .prev_hash = [0xFFu8; 32];
+    tampered_chain2.entries.get_mut(1).unwrap().prev_hash = [0xFFu8; 32];
     assert!(!tampered_chain2.verify_chain().unwrap());
 
     // Tamper with rules_hash
     let mut tampered_chain3 = chain.clone();
-    tampered_chain3
-        .entries
-        .get_mut(0)
-        .unwrap()
-        .rules_hash = [0x11u8; 32];
+    tampered_chain3.entries.get_mut(0).unwrap().rules_hash = [0x11u8; 32];
     assert!(!tampered_chain3.verify_chain().unwrap());
 }
 
@@ -115,7 +103,9 @@ fn test_audit_chain_head_signature_verification() {
     // Tamper with head_hash in signature structure
     let mut tampered_hash_sig = head_sig;
     tampered_hash_sig.head_hash[0] ^= 0xFF;
-    assert!(!AuditChain::verify_head_signature(&tampered_hash_sig, &keypair.verifying_key).unwrap());
+    assert!(
+        !AuditChain::verify_head_signature(&tampered_hash_sig, &keypair.verifying_key).unwrap()
+    );
 }
 
 #[test]
@@ -136,7 +126,10 @@ fn test_commitment_shredding_and_dictionary_attack_resilience() {
     // Verification before shredding: Salt can be decrypted and commitment verified
     let decrypted_salt = enc_salt.decrypt(&registry).unwrap();
     assert_eq!(decrypted_salt, real_salt);
-    assert_eq!(compute_record_commitment(&decrypted_salt, real_attr), commitment);
+    assert_eq!(
+        compute_record_commitment(&decrypted_salt, real_attr),
+        commitment
+    );
 
     // 3. Shred the salt key in registry
     assert!(registry.revoke_subkey(group_id));
@@ -155,8 +148,14 @@ fn test_commitment_shredding_and_dictionary_attack_resilience() {
     let dummy_salt_guess_1 = [0x01u8; 32];
     let dummy_salt_guess_2 = [0x02u8; 32];
 
-    assert_ne!(compute_record_commitment(&dummy_salt_guess_1, cand_a), commitment);
-    assert_ne!(compute_record_commitment(&dummy_salt_guess_2, cand_b), commitment);
+    assert_ne!(
+        compute_record_commitment(&dummy_salt_guess_1, cand_a),
+        commitment
+    );
+    assert_ne!(
+        compute_record_commitment(&dummy_salt_guess_2, cand_b),
+        commitment
+    );
     assert_ne!(
         compute_record_commitment(&dummy_salt_guess_1, cand_a),
         compute_record_commitment(&dummy_salt_guess_1, cand_b)
@@ -216,10 +215,12 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
 #[test]
 fn test_inv_deletion_1_physical_cleanup_enforced() {
     // LayerCleanupProof fails if remaining live entries exist (> 0)
-    let incomplete_cleanup = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 1);
+    let incomplete_cleanup =
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 1);
     assert!(incomplete_cleanup.is_err());
 
     // Verification closure returning false fails
-    let failed_verification = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
+    let failed_verification =
+        LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
     assert!(failed_verification.is_err());
 }
