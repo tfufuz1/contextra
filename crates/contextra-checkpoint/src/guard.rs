@@ -584,6 +584,7 @@ mod tests {
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         let dummy_storage = Arc::new(MockStorage::new());
         let consumed_guard = CheckpointGuard::<MockStorage> {
             checkpoint: None,
@@ -591,6 +592,7 @@ mod tests {
             namespace: "test".to_string(),
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
+            clock: clock.clone(),
         };
         assert!(matches!(
             consumed_guard.checkpoint(),
@@ -603,6 +605,7 @@ mod tests {
             namespace: "test".to_string(),
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
+            clock: clock.clone(),
         };
         assert!(matches!(
             consumed_guard2.commit(),
@@ -615,6 +618,7 @@ mod tests {
             namespace: "test".to_string(),
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
+            clock,
         };
         let res = consumed_guard3.rollback().await;
         assert!(matches!(res, Err(ContextraError::Internal(_))));
