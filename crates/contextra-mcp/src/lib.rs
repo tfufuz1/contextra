@@ -11,6 +11,7 @@ pub mod io;
 pub mod plugin_status;
 pub mod prompt_injection;
 pub mod proof_key;
+pub mod proof_key_env;
 pub mod protocol;
 pub mod routing;
 pub mod sandbox;
