@@ -2,7 +2,7 @@
 
 Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25 / BM25F), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
-> **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v14 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
+> **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v15 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
 ---
 

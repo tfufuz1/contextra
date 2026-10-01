@@ -1,6 +1,6 @@
 # Contextra — Vollständige Feature- und Funktionsspezifikation
 
-**Stand:** 2026-09-30 (Systemspezifikation v14)
+**Stand:** 2026-09-30 (Systemspezifikation v15)
 **Quelle der Wahrheit:** Quellcode-Audit über alle 35 Workspace-Crates (HEAD)
 **Status:** Verbindliche Spezifikation aller sichtbaren, opt-in, versteckten und internen Features
 

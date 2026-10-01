@@ -110,6 +110,9 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/collection/tests/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit-Tests für Collection-CRUD, Indizierung, Repair und Grenzwerte. |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/transaction/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-10-01T00:00:00Z` | `crates/contextra-sandbox/src/merge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Pure, deterministic WASM merge function executor (§4.18) |
+| `2026-10-01` | `crates/contextra-mcp/src/proof_key_env.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Einziger Resolver für DeletionProof-Schlüssel (CONTEXTRA_DELETION_PROOF_KEY / CONTEXTRA_PROOF_KEY) |
+| `2026-09-30` | `crates/contextra-mcp/src/proof_key.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Lösen und Validieren des DeletionProof Schlüssel-Materials aus Umgebungsvariablen. |
 | `2026-09-29 (S-01 / T-04)` | `crates/contextra-store/src/manifest/core.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables. |
 | `2026-09-29 (S-01 / T-04)` | `crates/contextra-store/src/manifest/entry.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry). |
 | `2026-09-28T00:00:00Z (SESSION: e459bd5f)` | `crates/contextra-mvcc/src/tx_buffer.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking. |
@@ -117,6 +120,7 @@
 | `2026-09-28T00:00:00Z` | `crates/contextra-mvcc/src/ssi.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung. |
 | `2026-09-28T00:00:00Z` | `crates/contextra-store/src/tenant_codec.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Tenant Key Isolation & Encoding für LSM Storage Engine |
 | `2026-09-28T00:00:00Z` | `crates/contextra-store/tests/memtable_shard_distribution.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests für MemTable Systempräfix-Hash-Sharding und Scans. |
+| `2026-09-28` | `crates/contextra-graph/src/path_rag/snapshot.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Version Concurrency Control (MVCC) snapshot-isolated PathGraph for PathRAG. |
 | `2026-09-28` | `crates/contextra-store/tests/crash_prefix_enumeration.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `2026-09-28` | `crates/contextra-store/tests/model_based_mvcc_flush.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `2026-09-28` | `crates/contextra-store/tests/test_wp02_flush_mvcc_bug.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
@@ -362,6 +366,7 @@
 | `` | `crates/contextra-engine/src/collection/search/hybrid/query.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Hybrid-Familie Submodule für Query-basierte Suche. |
 | `` | `crates/contextra-engine/src/collection/search/hydrate.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Hydrierungs-Familie (hydrate_from_scored_at, hydrate_from_tuples_at) für Collection. |
 | `` | `crates/contextra-engine/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Core Engine Orchestrator & Facade (Layer 3 - Engine). |
+| `` | `crates/contextra-engine/src/merge_operator_adapter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Synchronous bridge from contextra-store MergeOperator to async WasmMergeFunction |
 | `` | `crates/contextra-engine/tests/auto_extraction_default_enabled.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Testet den kompilierte Default-Wert fuer AutoExtractionConfig (enabled: true vs. opt-out). |
 | `` | `crates/contextra-engine/tests/auto_extraction_runtime_mode.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests fuer AutoExtractionMode Laufzeit-Verhalten und Profil-Wechsel. |
 | `` | `crates/contextra-engine/tests/auto_extraction_wiring.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests fuer die Verdrahtung von AutoExtraction in Collection::insert_text_only. |
@@ -411,11 +416,14 @@
 | `` | `crates/contextra-store/tests/wal_hmac_chain_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit. |
 | `` | `crates/contextra-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
+| `` | `crates/contextra-text/src/domain/legal_de.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Definiert Komposita-Staemme und geschuetzte Begriffe fuer domaenenspezifische Sprachanforderungen. |
+| `` | `crates/contextra-text/src/domain/medical_de.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Definiert Komposita-Staemme und geschuetzte Begriffe fuer domaenenspezifische Sprachanforderungen. |
 | `` | `crates/contextra-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |
 | `` | `crates/contextra-text/src/wand.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding. |
 | `` | `crates/contextra-text/tests/bm25_edge_cases.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Testet score_term_with_params und score_term mit degenerierten/Grenzfall-Eingaben. |
 | `` | `crates/contextra-text/tests/bm25_reference_values.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Verifiziert BM25 score_term_with_params und score_term_bm25f gegen unabhängig berechnete Referenzwerte der publizierten Formeln. |
 | `` | `crates/contextra-text/tests/bm25f_field_weighting.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft Formel-Korrektheit, Degeneration zu einfeldigem BM25 und Zero-Panic Invarianten. |
+| `` | `crates/contextra-text/tests/domain_vocab_quality.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Verifiziert Invarianten (keine Duplikate, Kleinschreibung, Disjunktheit, Mindestgroessen, exakte Sortierung) und Zerlegungsverhalten. |
 | `` | `crates/contextra-vector/benches/acorn_vs_post_filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Criterion Benchmark für ACORN Naive-Reference Search vs. Post-Filtering Baseline. |
 | `` | `crates/contextra-vector/benches/filtered_search_selectivity_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Criterion-Benchmark zur Messung des Recall-Abfalls und der Latenz von search_filtered_internal |
 | `` | `crates/contextra-vector/benches/hnsw_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
@@ -448,6 +456,9 @@
 | `` | `crates/contextra/src/collection_profile.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05) |
 | `` | `crates/contextra/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Primary Facade & Composition Root (Ring 4). |
 | `` | `crates/contextra/src/performance_profile.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05) |
+| `` | `crates/contextra/src/query_rewriter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | LLM-gestützter QueryRewriter für MultiStep-Retrieval in der Facade (Ring 4). |
 | `` | `crates/contextra/tests/collection_profile_matrix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Test matrix of PerformanceProfile x KvDeleteMode combinations (Spec B.1.8) |
 | `` | `crates/contextra/tests/deployment_tier_presets_valid.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Test deployment tier presets validation (Spec B.1.8 / INV-COLLECTION-PROFILE-2) |
+| `` | `crates/contextra/tests/llm_query_rewriter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests für LLM-gestützten QueryRewriter in contextra. |
+| `` | `crates/contextra/tests/regulated_auto_extraction_default.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Verify DeploymentTier presets auto_extraction defaults (Spec D.6 / J.16/B-08) |
 | `` | `crates/contextra/tests/wiring_matrix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | End-to-End Facade Wiring Matrix Integration Tests (§20.2 / Regel R1). |
