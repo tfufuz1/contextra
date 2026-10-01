@@ -234,6 +234,7 @@ pub mod fusion;
 pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
+pub mod metrics_names;
 #[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
@@ -424,6 +425,8 @@ pub struct ContextraConfig {
     pub consolidation_launcher: Option<ConsolidationLauncher>,
     /// Policy controlling whether multi-tenant isolation is required.
     pub tenant_policy: TenantPolicy,
+    /// Configured metrics sink for recording engine operational metrics.
+    pub metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 #[cfg(not(loom))]
@@ -435,6 +438,11 @@ impl ContextraConfig {
 
     pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self {
         self.tenant_policy = policy;
+        self
+    }
+
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        self.metrics_sink = Some(sink);
         self
     }
 }
@@ -471,6 +479,10 @@ impl std::fmt::Debug for ContextraConfig {
                 &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"),
             )
             .field("tenant_policy", &self.tenant_policy)
+            .field(
+                "metrics_sink",
+                &self.metrics_sink.as_ref().map(|_| "dyn MetricsSink"),
+            )
             .finish()
     }
 }
@@ -498,6 +510,7 @@ impl Default for ContextraConfig {
             max_llm_calls_per_cycle: 10,
             consolidation_launcher: None,
             tenant_policy: TenantPolicy::Optional,
+            metrics_sink: None,
         }
     }
 }
@@ -531,6 +544,7 @@ pub struct Contextra {
         Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
     >,
     kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
+    metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 #[cfg(not(loom))]
