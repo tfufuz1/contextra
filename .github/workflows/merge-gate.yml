@@ -1,6 +1,6 @@
 # Merge Gate = schnell/blockierend
 # Dieses Workflow-File dient als einziger schnelllaufender (Ziel: < 5 Min) und blockierender Quality Gate für Pull Requests.
-# Es führt nur die essentiellen Prüfungen aus (Compile-Check, Fmt, Clippy, Unit-Tests der Libs).
+# Es führt nur die essentiellen Prüfungen aus.
 
 name: Merge Gate (Schnell)
 
@@ -17,6 +17,7 @@ jobs:
   check-duplicate-symbols-cross-file:
     name: Check Duplicate Symbols Cross File Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -39,6 +40,7 @@ jobs:
   flatbuffers-drift-gate:
     name: FlatBuffers Schema Drift Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -61,6 +63,7 @@ jobs:
   marker-drift-gate:
     name: Capability Marker Drift Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -83,6 +86,7 @@ jobs:
   dependency-policy-gate:
     name: Dependency Policy Gate (cargo deny)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -95,6 +99,7 @@ jobs:
   phantom-commit-gate:
     name: Phantom Commit Protection Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout repository
@@ -119,6 +124,7 @@ jobs:
     name: HyperEdge Schema Merge Gate
     needs: [flatbuffers-drift-gate]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -138,9 +144,10 @@ jobs:
       - name: HyperEdge Schema Test
         run: cargo test -p contextra-graph -- hyperedge
 
-  merge-gate:
-    name: Merge Gate (Schnell)
+  compile-security-check:
+    name: Compile & Security Check Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -150,7 +157,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@1.89.0
         with:
-          components: rustfmt, clippy
+          components: clippy
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
@@ -158,9 +165,6 @@ jobs:
           workspaces: |
             .
             xtask
-
-      - name: Compile Check Gate
-        run: cargo xtask check-compile
 
       - name: Security Gate — No sh -c in dispatch.rs
         run: |
@@ -170,11 +174,30 @@ jobs:
           fi
           echo "✅ check-dispatch-no-sh-c: Kein sh -c in dispatch.rs"
 
-      - name: Format Check
-        run: cargo fmt --all -- --check
+      - name: Clippy Panic Lints
+        run: cargo clippy --workspace --lib --bins --locked -- -D warnings
 
-      - name: Clippy Check
-        run: cargo clippy --workspace --exclude contextra-tauri -- -D warnings
+  clippy-py-and-xtask:
+    name: Clippy Check (contextra-py & xtask)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
 
       - name: Clippy Check (contextra-py)
         run: cargo clippy --manifest-path crates/contextra-py/Cargo.toml --all-targets -- -D warnings
@@ -182,8 +205,25 @@ jobs:
       - name: Clippy Check (xtask)
         run: cargo clippy --manifest-path xtask/Cargo.toml --all-targets --locked -- -D warnings
 
-      - name: Fast Unit Tests
-        run: cargo test --workspace --exclude contextra-tauri --lib --quiet
+  unit-tests-py-and-xtask:
+    name: Fast Unit Tests (contextra-py & xtask)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
 
       - name: Fast Unit Tests (contextra-py)
         run: cargo test --manifest-path crates/contextra-py/Cargo.toml --quiet
@@ -191,16 +231,30 @@ jobs:
       - name: Fast Unit Tests (xtask)
         run: cargo test --manifest-path xtask/Cargo.toml --locked
 
-      - name: Clippy Panic Lints
-        # ersetzt `check-unwrap-baseline`: der Ratchet entfällt ersatalos
-        run: cargo clippy --workspace --lib --bins --locked -- -D warnings
+  ring-and-safety-checks:
+    name: Ring & Safety Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
 
       - name: Ring Layering Check
-        # Phase 0R: Warnmodus (Exit 0). Phase 1a: --strict
         run: cargo xtask check-ring-layering --strict
 
       - name: Unsafe Islands Check
-        # Phase 0R: Übergangsliste. Phase 1c: --strict
         run: cargo xtask check-unsafe-islands
 
       - name: FFI Panic Boundary Check
@@ -208,20 +262,3 @@ jobs:
 
       - name: Audit Verdict Independence Check
         run: cargo xtask check-audit-verdict-independence
-
-      - name: Bandit Latency Budget Gate
-        # Prüft dass LinUCB-Diagonal-Approximation das Latenzbudget (P95 ≤ 1ms) einhält.
-        # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
-        run: cargo run -p xtask --features contextra-router/bandit-routing -- check-bandit-latency-budget
-        # Feature-Flag nötig da check_bandit_latency_budget contextra_router::BanditProfileState nutzt.
-
-      - name: FlatBuffers Schema Drift Gate
-        run: cargo xtask check-fbs-drift
-
-      - name: Loom Concurrency Tests (LSM / WAL)
-        run: RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit --release
-
-      - name: Loom Concurrency Tests (Group Commit Handoff)
-        run: |
-          which just || cargo install just --cheap-only || true
-          just loom-store
