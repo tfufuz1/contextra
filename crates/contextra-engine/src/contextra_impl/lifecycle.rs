@@ -110,6 +110,9 @@ impl Contextra {
             &orphan_path,
         ));
 
+        let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store);
+
         let db = Self {
             storage,
             next_tx,
@@ -127,6 +130,7 @@ impl Contextra {
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
             pid_controller: parking_lot::RwLock::new(None),
+            kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
         };
 
         db.initialize_collections().await?;
