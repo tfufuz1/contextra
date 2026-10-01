@@ -174,10 +174,8 @@ impl CrossEncoderReranker {
                 .map(|(i, _)| {
                     let score = 1.0 - (i as f32 * 0.01);
                     RerankResult {
-                        index: i,
                         original_index: i,
                         score,
-                        calibrated_score: score,
                     }
                 })
                 .collect()),

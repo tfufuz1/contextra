@@ -1,10 +1,10 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-Stand: 2026-09-30 (Systemspezifikation v14)
+Stand: 2026-09-30 (Systemspezifikation v15)
 
 ## 1. Geltungsbereich und Rangfolge
 Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
-Bei Konflikten gilt stets folgende Rangfolge: Code + grüne Gates > AGENTS.md > docs/spec (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` / `docs/spec/CONTEXTRA_SPEZIFIKATION_v14.md`) > alle sonstigen Vorgaben.
+Bei Konflikten gilt stets folgende Rangfolge: Code + grüne Gates > AGENTS.md > docs/spec (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` / `docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`) > alle sonstigen Vorgaben.
 
 ## 2. Start
 Arbeitskontext zu Beginn der Session laden:
@@ -28,7 +28,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 - Ausschließlich Dateien im explizit freigegebenen Scope der Task-Karte bearbeiten.
 - Mängel außerhalb des Scopes nicht direkt beheben, sondern im PR-Text unter „Out-of-scope Findings" melden.
 
-## 6. Invarianten (verbindlich, v14 Teil F)
+## 6. Invarianten (verbindlich, v15 Teil F)
 - **Zero-Panic (P7):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
 - **Prozessaufrufe:** Niemals über `sh -c`; Parameter via `shlex` parsen und als Argument-Array übergeben.
 - **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
@@ -42,7 +42,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 ## Anti-Gaming
 Das Abschwächen, Umgehen oder Deaktivieren von Qualitäts-Gates, Lints, Schwellenwerten oder Toolchain-Pins ist streng verboten. Gate-Schutz erfolgt über `protected-paths` <!-- harness:planned -->, `gate-weakening` <!-- harness:planned --> und `ratchet` <!-- harness:planned -->.
 
-## 7. Nicht tun (Explizite Scope-Ausschlüsse v14 Teil 0.5)
+## 7. Nicht tun (Explizite Scope-Ausschlüsse v15 Teil 0.5)
 - Kein unkontrolliertes, globales Teilgraph-Rebuilding im HNSW-Index durchführen (Ausnahme: ADR-097).
 - Keine mandantenübergreifenden Datenflüsse oder Cross-Tenant-Aggregationen herstellen (`TenantId` isolation).
 - Keine Realtime-Audio- oder Voice-Funktionen integrieren.
