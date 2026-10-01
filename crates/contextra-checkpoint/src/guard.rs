@@ -94,6 +94,8 @@ pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
     pub(crate) orphan_registry: Arc<InstanceOrphanRegistry>,
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
     pub(crate) clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    pub(crate) created_at: std::time::Instant,
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
@@ -173,7 +175,22 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             orphan_registry,
             skipped_rollbacks,
             clock,
+            metrics_sink: None,
+            created_at: std::time::Instant::now(),
         }
+    }
+
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+
+    pub fn with_metrics_sink_opt(
+        mut self,
+        sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    ) -> Self {
+        self.metrics_sink = sink;
+        self
     }
 
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
@@ -233,6 +250,14 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             .checkpoint
             .take()
             .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
+        if let Some(ref sink) = self.metrics_sink {
+            let elapsed = self.created_at.elapsed().as_secs_f64();
+            sink.record_histogram(
+                "checkpoint_duration_seconds",
+                elapsed,
+                &[("status", "commit")],
+            );
+        }
         let reg = Arc::clone(&self.orphan_registry);
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
@@ -252,6 +277,14 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     /// einem Fehler fehl, um Datenverlust neuerer Transaktionen zu verhindern.
     pub async fn rollback(mut self) -> Result<()> {
         if let Some(cp) = self.checkpoint.take() {
+            if let Some(ref sink) = self.metrics_sink {
+                let elapsed = self.created_at.elapsed().as_secs_f64();
+                sink.record_histogram(
+                    "checkpoint_duration_seconds",
+                    elapsed,
+                    &[("status", "rollback")],
+                );
+            }
             let last_tx = self.storage.last_tx_id().await?;
             if last_tx > cp.tx_id {
                 return Err(ContextraError::Transaction(format!(
@@ -292,6 +325,15 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             .take()
             .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
 
+        if let Some(ref sink) = self.metrics_sink {
+            let elapsed = self.created_at.elapsed().as_secs_f64();
+            sink.record_histogram(
+                "checkpoint_duration_seconds",
+                elapsed,
+                &[("status", "rollback")],
+            );
+        }
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -318,6 +360,14 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
 impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
     fn drop(&mut self) {
         if let Some(mut cp) = self.checkpoint.take() {
+            if let Some(ref sink) = self.metrics_sink {
+                let elapsed = self.created_at.elapsed().as_secs_f64();
+                sink.record_histogram(
+                    "checkpoint_duration_seconds",
+                    elapsed,
+                    &[("status", "rollback")],
+                );
+            }
             cp.namespace = Some(self.namespace.clone());
             self.skipped_rollbacks.fetch_add(1, Ordering::SeqCst);
             tracing::error!(
@@ -593,6 +643,8 @@ mod tests {
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
             clock: clock.clone(),
+            metrics_sink: None,
+            created_at: std::time::Instant::now(),
         };
         assert!(matches!(
             consumed_guard.checkpoint(),
@@ -606,6 +658,8 @@ mod tests {
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
             clock: clock.clone(),
+            metrics_sink: None,
+            created_at: std::time::Instant::now(),
         };
         assert!(matches!(
             consumed_guard2.commit(),
@@ -619,8 +673,68 @@ mod tests {
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
             clock,
+            metrics_sink: None,
+            created_at: std::time::Instant::now(),
         };
         let res = consumed_guard3.rollback().await;
         assert!(matches!(res, Err(ContextraError::Internal(_))));
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_metrics_commit_duration() {
+        use contextra_ports::{MetricEvent, TestMetricsSink};
+
+        let storage = Arc::new(MockStorage::new());
+        let metrics = Arc::new(TestMetricsSink::new());
+
+        let cp = StateCheckpoint {
+            tx_id: TxId::new(100),
+            timestamp_ms: 1000,
+            namespace: Some("test".to_string()),
+        };
+        let guard = CheckpointGuard::new(cp, storage, "test")
+            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+
+        let committed = guard.commit().unwrap();
+        assert_eq!(committed.tx_id, TxId::new(100));
+
+        let events = metrics.events();
+        assert_eq!(events.len(), 1);
+        if let MetricEvent::Histogram { name, value, labels } = &events[0] {
+            assert_eq!(name, "checkpoint_duration_seconds");
+            assert!(*value >= 0.0);
+            assert_eq!(labels, &vec![("status".to_string(), "commit".to_string())]);
+        } else {
+            panic!("Expected Histogram metric event");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_metrics_drop_rollback_duration() {
+        use contextra_ports::{MetricEvent, TestMetricsSink};
+
+        let storage = Arc::new(MockStorage::new());
+        let metrics = Arc::new(TestMetricsSink::new());
+
+        let cp = StateCheckpoint {
+            tx_id: TxId::new(101),
+            timestamp_ms: 1000,
+            namespace: Some("test".to_string()),
+        };
+        let guard = CheckpointGuard::new(cp, storage, "test")
+            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+
+        // Drop guard without calling commit
+        drop(guard);
+
+        let events = metrics.events();
+        assert_eq!(events.len(), 1);
+        if let MetricEvent::Histogram { name, value, labels } = &events[0] {
+            assert_eq!(name, "checkpoint_duration_seconds");
+            assert!(*value >= 0.0);
+            assert_eq!(labels, &vec![("status".to_string(), "rollback".to_string())]);
+        } else {
+            panic!("Expected Histogram metric event");
+        }
     }
 }

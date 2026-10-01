@@ -42,6 +42,7 @@ fn check_json_for_tx_id(val_bytes: &[u8], target_tx_id: u64) -> bool {
 pub struct DeadLetterQueue {
     storage: Arc<dyn StorageEngine>,
     next_tx: OnceCell<AtomicU64>,
+    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 impl DeadLetterQueue {
@@ -51,7 +52,29 @@ impl DeadLetterQueue {
         Self {
             storage,
             next_tx: OnceCell::new(),
+            metrics_sink: None,
         }
+    }
+
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+
+    pub fn new_with_metrics(
+        storage: Arc<dyn StorageEngine>,
+        sink: Arc<dyn contextra_ports::MetricsSink>,
+    ) -> Self {
+        Self {
+            storage,
+            next_tx: OnceCell::new(),
+            metrics_sink: Some(sink),
+        }
+    }
+
+    async fn report_depth(&self) -> Result<usize> {
+        let letters = self.list().await?;
+        Ok(letters.len())
     }
 
     pub async fn push(&self, letter: &StepDeadLetter) -> Result<()> {
@@ -75,6 +98,7 @@ impl DeadLetterQueue {
             }
             return Err(e);
         }
+        self.report_depth().await?;
         Ok(())
     }
 
@@ -106,6 +130,10 @@ impl DeadLetterQueue {
             }
         }
 
+        if let Some(ref sink) = self.metrics_sink {
+            sink.record_gauge("dlq_depth", 0.0, &[]);
+        }
+
         Ok(letters)
     }
 
@@ -117,6 +145,10 @@ impl DeadLetterQueue {
             let letter: StepDeadLetter = serde_json::from_slice(&val)
                 .map_err(|e| ContextraError::Serialization(e.to_string()))?;
             letters.push(letter);
+        }
+
+        if let Some(ref sink) = self.metrics_sink {
+            sink.record_gauge("dlq_depth", letters.len() as f64, &[]);
         }
 
         Ok(letters)
@@ -141,6 +173,7 @@ impl DeadLetterQueue {
             }
             return Err(e);
         }
+        self.report_depth().await?;
         Ok(true)
     }
 
@@ -257,6 +290,100 @@ mod tests {
         let tx1 = dlq.allocate_tx().await?;
         let tx2 = dlq.allocate_tx().await?;
         assert_ne!(tx1, tx2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dlq_metrics_gauge_depth() -> Result<()> {
+        use contextra_ports::{MetricEvent, TestMetricsSink};
+
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let metrics = Arc::new(TestMetricsSink::new());
+        let dlq = DeadLetterQueue::new(storage)
+            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+
+        let letter1 = StepDeadLetter {
+            session_id: "sess-1".to_string(),
+            node_id: "node-a".to_string(),
+            step_index: 0,
+            tx_id: None,
+            failure_reason: DeadLetterReason::Timeout { timeout_ms: 5000 },
+            input: serde_json::json!({"query": "test"}),
+            attempt: 0,
+            failed_at_secs: 1000,
+        };
+
+        let letter2 = StepDeadLetter {
+            session_id: "sess-1".to_string(),
+            node_id: "node-b".to_string(),
+            step_index: 1,
+            tx_id: None,
+            failure_reason: DeadLetterReason::ToolError {
+                message: "Tool failed".to_string(),
+            },
+            input: serde_json::json!({"action": "exec"}),
+            attempt: 1,
+            failed_at_secs: 1005,
+        };
+
+        // 1. Push letter1 -> Gauge depth = 1.0
+        dlq.push(&letter1).await?;
+        let events = metrics.events();
+        assert!(!events.is_empty());
+        let last_event = events.last().cloned().unwrap();
+        assert_eq!(
+            last_event,
+            MetricEvent::Gauge {
+                name: "dlq_depth".to_string(),
+                value: 1.0,
+                labels: vec![],
+            }
+        );
+
+        // 2. Push letter2 -> Gauge depth = 2.0
+        metrics.clear();
+        dlq.push(&letter2).await?;
+        let events = metrics.events();
+        let last_event = events.last().cloned().unwrap();
+        assert_eq!(
+            last_event,
+            MetricEvent::Gauge {
+                name: "dlq_depth".to_string(),
+                value: 2.0,
+                labels: vec![],
+            }
+        );
+
+        // 3. Remove letter1 -> Gauge depth = 1.0
+        metrics.clear();
+        let removed = dlq.remove(&letter1).await?;
+        assert!(removed);
+        let events = metrics.events();
+        let last_event = events.last().cloned().unwrap();
+        assert_eq!(
+            last_event,
+            MetricEvent::Gauge {
+                name: "dlq_depth".to_string(),
+                value: 1.0,
+                labels: vec![],
+            }
+        );
+
+        // 4. Drain remaining -> Gauge depth = 0.0
+        metrics.clear();
+        let drained = dlq.drain().await?;
+        assert_eq!(drained.len(), 1);
+        let events = metrics.events();
+        let last_event = events.last().cloned().unwrap();
+        assert_eq!(
+            last_event,
+            MetricEvent::Gauge {
+                name: "dlq_depth".to_string(),
+                value: 0.0,
+                labels: vec![],
+            }
+        );
+
         Ok(())
     }
 }
