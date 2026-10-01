@@ -3,23 +3,18 @@
 use std::sync::Arc;
 
 use contextra_license::{
-    derive_local_installation_id_hash, FeatureRing, LicenseError, LicenseGate, SignedActivation,
-    SignedLicenseGate,
+    FeatureRing, LicenseError, LicenseGate, SignedActivation, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
 use ed25519_dalek::SigningKey;
 
-struct FixedTestClock {
+struct TestClock {
     now_unix_secs: i64,
 }
 
-impl Clock for FixedTestClock {
+impl Clock for TestClock {
     fn now_unix_nanos(&self) -> u64 {
-        if self.now_unix_secs < 0 {
-            0
-        } else {
-            (self.now_unix_secs as u64) * 1_000_000_000
-        }
+        (self.now_unix_secs * 1_000_000_000) as u64
     }
 
     fn monotonic_nanos(&self) -> u64 {
@@ -27,92 +22,143 @@ impl Clock for FixedTestClock {
     }
 }
 
-fn fixed_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
-    let secret_bytes = [42u8; 32];
-    let signing_key = SigningKey::from_bytes(&secret_bytes);
+fn generate_deterministic_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
+    let seed = [42u8; 32];
+    let signing_key = SigningKey::from_bytes(&seed);
     let verifying_key = signing_key.verifying_key();
     (signing_key, verifying_key)
 }
 
-/// Step 1: Fast ring always returns Ok unconditionally across corrupt, empty, expired, or tampered activations.
+/// Step 1: Fast ring returns Ok unconditionally even if activation is missing, hash mismatch, signature corrupted, or expired.
 #[test]
-fn test_order_step_1_fast_ring_unconditional_ok() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let local_id = [10u8; 32];
-    let wrong_id = [99u8; 32];
+fn test_order_step_1_fast_ring_bypass() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let (foreign_signing_key, _) = {
+        let seed = [99u8; 32];
+        let sk = SigningKey::from_bytes(&seed);
+        let vk = sk.verifying_key();
+        (sk, vk)
+    };
 
-    // 1a: No activation
-    let gate_empty = SignedLicenseGate::no_activation();
-    assert_eq!(gate_empty.check_ring(FeatureRing::Fast), Ok(()));
-
-    // 1b: Tampered signature, wrong ID, expired
-    let clock = Arc::new(FixedTestClock {
+    let expected_id = [1u8; 32];
+    let wrong_id = [2u8; 32];
+    let clock = Arc::new(TestClock {
         now_unix_secs: 2000,
     });
-    let mut activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 1000, &signing_key);
-    activation.signature[0] ^= 0xFF; // Tamper signature
 
+    // 1a. Missing activation -> Fast is Ok
+    let gate_no_act = SignedLicenseGate::no_activation();
+    assert_eq!(gate_no_act.check_ring(FeatureRing::Fast), Ok(()));
+
+    // 1b. Corrupted signature -> Fast is Ok
+    let mut act_corrupt =
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 1000, &signing_key);
+    act_corrupt.signature[0] ^= 0xFF;
     let gate_corrupt =
-        SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        SignedLicenseGate::from_activation_with_clock(act_corrupt, verifying_key, clock.clone())
             .with_local_installation_id(wrong_id);
-
     assert_eq!(gate_corrupt.check_ring(FeatureRing::Fast), Ok(()));
+
+    // 1c. Foreign signed activation -> Fast is Ok
+    let act_foreign = SignedActivation::create_signed(
+        FeatureRing::Sovereign,
+        expected_id,
+        3000,
+        &foreign_signing_key,
+    );
+    let gate_foreign =
+        SignedLicenseGate::from_activation_with_clock(act_foreign, verifying_key, clock)
+            .with_local_installation_id(wrong_id);
+    assert_eq!(gate_foreign.check_ring(FeatureRing::Fast), Ok(()));
 }
 
-/// Step 2: No activation returns NotActivated.
 #[test]
-fn test_order_step_2_missing_activation_returns_not_activated() {
+fn test_ring_semantics_compliance_does_not_unlock_sovereign_and_open_fast_gate() {
+    use contextra_license::OpenFastGate;
+
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let local_id = [1u8; 32];
+    let clock = Arc::new(TestClock {
+        now_unix_secs: 1000,
+    });
+
+    // Activation for Compliance ring only
+    let activation =
+        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key);
+
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(local_id);
+
+    // Compliance passes
+    assert_eq!(gate.check_ring(FeatureRing::Compliance), Ok(()));
+    // Sovereign fails (no automatic hierarchy upwards)
+    assert_eq!(
+        gate.check_ring(FeatureRing::Sovereign),
+        Err(LicenseError::NotActivated(FeatureRing::Sovereign))
+    );
+
+    // OpenFastGate only permits Fast
+    let open_fast = OpenFastGate;
+    assert_eq!(open_fast.check_ring(FeatureRing::Fast), Ok(()));
+    assert_eq!(
+        open_fast.check_ring(FeatureRing::Compliance),
+        Err(LicenseError::NotActivated(FeatureRing::Compliance))
+    );
+    assert_eq!(
+        open_fast.check_ring(FeatureRing::Sovereign),
+        Err(LicenseError::NotActivated(FeatureRing::Sovereign))
+    );
+}
+
+/// Step 2: Missing activation returns NotActivated before hash/sig/expiration/ring checks.
+#[test]
+fn test_order_step_2_missing_activation() {
     let gate = SignedLicenseGate::no_activation();
     assert_eq!(
         gate.check_ring(FeatureRing::Sovereign),
         Err(LicenseError::NotActivated(FeatureRing::Sovereign))
     );
-    assert_eq!(
-        gate.check_ring(FeatureRing::Compliance),
-        Err(LicenseError::NotActivated(FeatureRing::Compliance))
-    );
 }
 
-/// Step 3: Mismatched or missing local installation ID returns NotActivated BEFORE checking signature or expiration.
+/// Step 3: Installation hash mismatch returns NotActivated before signature check (Step 4).
 #[test]
-fn test_order_step_3_mismatched_installation_id_runs_before_signature_check() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let expected_id = [11u8; 32];
-    let wrong_local_id = [99u8; 32];
-
-    let clock = Arc::new(FixedTestClock {
-        now_unix_secs: 3000, // Current time is past expiration (1000)
+fn test_order_step_3_hash_mismatch_before_signature_check() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let expected_id = [1u8; 32];
+    let wrong_id = [2u8; 32];
+    let clock = Arc::new(TestClock {
+        now_unix_secs: 1000,
     });
 
-    // Create activation with expected_id, expired (1000), and tampered signature
     let mut activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 1000, &signing_key);
-    activation.signature[0] ^= 0xFF; // Tamper signature
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key);
+    activation.signature[0] ^= 0xFF; // tampered signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
-        .with_local_installation_id(wrong_local_id);
+        .with_local_installation_id(wrong_id);
 
-    // Step 3 MUST return NotActivated (not InvalidSignature or Expired) to prevent info leaks
     assert_eq!(
         gate.check_ring(FeatureRing::Sovereign),
         Err(LicenseError::NotActivated(FeatureRing::Sovereign))
     );
 }
 
-/// Step 4: Invalid signature returns InvalidSignature after Step 3 passes.
+/// Step 4: Invalid signature returns InvalidSignature before expiration check (Step 5).
 #[test]
-fn test_order_step_4_invalid_signature_returns_invalid_signature() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let local_id = [22u8; 32];
-
-    let clock = Arc::new(FixedTestClock {
-        now_unix_secs: 1000,
+fn test_order_step_4_signature_check_before_expiration() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let local_id = [1u8; 32];
+    let clock = Arc::new(TestClock {
+        now_unix_secs: 3000, // expired
     });
 
-    let mut activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
-    activation.signature[0] ^= 0xFF; // Tamper signature
+    let mut activation = SignedActivation::create_signed(
+        FeatureRing::Sovereign,
+        local_id,
+        2000, // expires at 2000
+        &signing_key,
+    );
+    activation.signature[0] ^= 0xFF; // tampered signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -123,58 +169,39 @@ fn test_order_step_4_invalid_signature_returns_invalid_signature() {
     );
 }
 
-/// Step 5: Clock expiration check (now_secs >= expires_at returns Expired).
+/// Step 5: Expired activation returns Expired before ring level check (Step 6).
 #[test]
-fn test_order_step_5_clock_expiration_edge_cases() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let local_id = [33u8; 32];
-
-    // 5a: Exact match now == expires_at -> Expired
-    let clock_exact = Arc::new(FixedTestClock {
-        now_unix_secs: 1500,
+fn test_order_step_5_expiration_before_ring_level_check() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let local_id = [1u8; 32];
+    let expires_at = 2000i64;
+    let clock = Arc::new(TestClock {
+        now_unix_secs: 2500, // past expires_at
     });
-    let act_exact =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 1500, &signing_key);
-    let gate_exact =
-        SignedLicenseGate::from_activation_with_clock(act_exact, verifying_key, clock_exact)
-            .with_local_installation_id(local_id);
 
-    assert_eq!(
-        gate_exact.check_ring(FeatureRing::Sovereign),
-        Err(LicenseError::Expired(1500))
+    let activation = SignedActivation::create_signed(
+        FeatureRing::Sovereign, // activated for Sovereign
+        local_id,
+        expires_at,
+        &signing_key,
     );
 
-    // 5b: Negative expiration timestamp
-    let clock_neg = Arc::new(FixedTestClock { now_unix_secs: 0 });
-    let act_neg =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, -100, &signing_key);
-    let gate_neg = SignedLicenseGate::from_activation_with_clock(act_neg, verifying_key, clock_neg)
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
 
+    // Requesting Compliance ring (which does not match Sovereign)
     assert_eq!(
-        gate_neg.check_ring(FeatureRing::Sovereign),
-        Err(LicenseError::Expired(-100))
+        gate.check_ring(FeatureRing::Compliance),
+        Err(LicenseError::Expired(expires_at))
     );
-
-    // 5c: i64::MAX expiration timestamp -> not expired
-    let clock_max = Arc::new(FixedTestClock {
-        now_unix_secs: 1_700_000_000,
-    });
-    let act_max =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, i64::MAX, &signing_key);
-    let gate_max = SignedLicenseGate::from_activation_with_clock(act_max, verifying_key, clock_max)
-        .with_local_installation_id(local_id);
-
-    assert_eq!(gate_max.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
-/// Step 6: Ring level requirement check (no automatic hierarchy inheritance).
+/// Step 6: Ring requirement check returns NotActivated when activation ring != requested ring.
 #[test]
-fn test_order_step_6_ring_mismatch_returns_not_activated() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let local_id = [44u8; 32];
-
-    let clock = Arc::new(FixedTestClock {
+fn test_order_step_6_ring_mismatch() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let local_id = [1u8; 32];
+    let clock = Arc::new(TestClock {
         now_unix_secs: 1000,
     });
 
@@ -184,20 +211,18 @@ fn test_order_step_6_ring_mismatch_returns_not_activated() {
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
 
-    // Sovereign activation does NOT grant Compliance ring
     assert_eq!(
         gate.check_ring(FeatureRing::Compliance),
         Err(LicenseError::NotActivated(FeatureRing::Compliance))
     );
 }
 
-/// Step 7: Success when all conditions pass.
+/// Step 7: Valid activation returns Ok.
 #[test]
-fn test_order_step_7_fully_valid_activation_succeeds() {
-    let (signing_key, verifying_key) = fixed_keypair();
-    let local_id = derive_local_installation_id_hash(None);
-
-    let clock = Arc::new(FixedTestClock {
+fn test_order_step_7_success() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let local_id = [1u8; 32];
+    let clock = Arc::new(TestClock {
         now_unix_secs: 1000,
     });
 

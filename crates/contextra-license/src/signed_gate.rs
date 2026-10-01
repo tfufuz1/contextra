@@ -11,12 +11,11 @@ pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Constant-time comparison helper for 32-byte hashes to prevent timing side-channel leaks.
 #[inline]
 fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
     let mut res = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        res |= x ^ y;
+    for i in 0..32 {
+        res |= a[i] ^ b[i];
     }
     res == 0
 }
@@ -249,11 +248,11 @@ impl SignedLicenseGate {
             .verify(payload_bytes, &sig)
             .map_err(|_| LicenseError::InvalidSignature)?;
 
-        let bincode_options = bincode::options()
+        let bincode_opts = bincode::options()
             .with_fixint_encoding()
             .reject_trailing_bytes();
 
-        if let Ok(license_payload) = bincode_options.deserialize::<LicensePayload>(payload_bytes) {
+        if let Ok(license_payload) = bincode_opts.deserialize::<LicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
                 activation: None,
@@ -263,7 +262,7 @@ impl SignedLicenseGate {
             });
         }
 
-        if let Ok(legacy) = bincode_options.deserialize::<LegacyLicensePayload>(payload_bytes) {
+        if let Ok(legacy) = bincode_opts.deserialize::<LegacyLicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
                 activation: None,
@@ -334,23 +333,23 @@ impl LicenseGate for SignedLicenseGate {
             return Err(LicenseError::NotActivated(ring));
         }
 
-        // (3) Step 3: Installation ID hash mismatch check.
-        // Return NotActivated on mismatch to prevent information leaks about expected vs actual hash.
+        // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed without leaking details)
         if let Some(ref act) = self.activation {
             match self.local_installation_id {
-                Some(ref local_hash)
-                    if constant_time_eq_32(local_hash, &act.installation_id_hash) => {}
+                Some(local_hash) if constant_time_eq_32(&local_hash, &act.installation_id_hash) => {
+                }
                 _ => return Err(LicenseError::NotActivated(ring)),
             }
         } else if let Some(ref payload) = self.license_payload {
             if let Some(ref expected_hash) = payload.installation_id_hash {
                 match self.local_installation_id {
-                    Some(ref local_hash) if constant_time_eq_32(local_hash, expected_hash) => {}
+                    Some(local_hash) if constant_time_eq_32(&local_hash, &expected_hash) => {}
                     _ => return Err(LicenseError::NotActivated(ring)),
                 }
             } else {
-                // Legacy payload schema (installation_id_hash == None):
-                // Installation ID verification bypassed for backwards compatibility with legacy payloads.
+                tracing::warn!(
+                    "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
+                );
             }
         }
 
@@ -363,11 +362,12 @@ impl LicenseGate for SignedLicenseGate {
             if !sig_valid {
                 return Err(LicenseError::InvalidSignature);
             }
+        } else if self.license_payload.is_some() && self.verifying_key.is_none() {
+            return Err(LicenseError::InvalidSignature);
         }
         // Note: For license_payload, signature verification was performed during `from_signed_payload_with_clock`.
 
-        // (5) Step 5: Clock-based expiration check (P28)
-        let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
+        // (5) Step 5: Expiration check using clock port (P28)
         let expires_at = if let Some(ref act) = self.activation {
             act.expires_at_unix
         } else if let Some(ref payload) = self.license_payload {
@@ -376,11 +376,12 @@ impl LicenseGate for SignedLicenseGate {
             i64::MAX
         };
 
+        let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
         if now_secs >= expires_at {
             return Err(LicenseError::Expired(expires_at));
         }
 
-        // (6) Step 6: Ring level requirement check (no automatic hierarchy inheritance)
+        // (6) Step 6: Ring level requirement check (explicit allowed_rings / ring matching, no automatic hierarchy)
         if let Some(ref act) = self.activation {
             if act.ring != ring {
                 return Err(LicenseError::NotActivated(ring));
