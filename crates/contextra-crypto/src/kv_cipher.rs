@@ -9,8 +9,8 @@
 //! # Migration Strategy (Zwei-Schritt-Migrationsstrategie)
 //! - **Schritt 1 (Dieses Modul):** Erstellung des eigenständigen Krypto-Moduls `KvSegmentCipher`
 //!   mit kryptographischer Tenant-Isolation und Modell-Versionierungs-Trennung in `contextra-crypto`.
-//! - **Schritt 2 (Folge-Task / Prompt 5):** Verdrahtung von `KvSegmentCipher` und `EncryptedKvLayer`
-//!   in `crates/contextra-kv-bridge` zur Erweiterung der `KvSegment`-Struktur.
+//! - **Schritt 2:** Verdrahtung von `KvSegmentCipher` und `EncryptedKvLayer`
+//!   in `contextra-kvcache` und `contextra-infer-candle` (kv_bridge) zur Erweiterung der `KvSegment`-Struktur.
 //!
 //! # Nonce-Sicherheit & Nonce-Misuse-Resistance (RFC 8452)
 //! Das Modul verwendet AES-256-GCM-SIV mit per-call `OsRng` generierten 12-Byte-Nonces.
