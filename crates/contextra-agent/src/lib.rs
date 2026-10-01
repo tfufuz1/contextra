@@ -74,17 +74,21 @@
 
 pub mod audit;
 pub mod budget;
+pub mod clm_scratchpad;
 pub mod context;
 pub mod dlq;
 pub mod engine;
 pub mod event_source;
+pub mod goal_condition;
 pub mod graph;
 pub mod step;
 
 pub use budget::{BudgetStrategy, Reservation, TokenBudget};
+pub use clm_scratchpad::{ClmScratchpad, PinnedRegionId, ScratchpadCheckpoint, ScratchpadEditOp};
 pub use context::{AgentContext, AgentStatus};
 pub use dlq::DeadLetterQueue;
 pub use engine::{EventLoopExitReason, OrchestratorEngine, MAX_WORKFLOW_STEPS};
 pub use event_source::{BackgroundEvent, EventSource, PollingDocumentEventSource, VecEventSource};
+pub use goal_condition::{parse_legacy_condition_string, GoalCondition};
 pub use graph::{AgentNode, NodeType, StateGraph, WorkflowEdge};
 pub use step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};

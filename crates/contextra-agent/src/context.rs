@@ -98,6 +98,8 @@ pub struct AgentContext {
         Arc<contextra_router::DefaultRouterEngine>,
         contextra_router::DecisionId,
     )>,
+    /// Optionales CLM Scratchpad für temporären Arbeitskontext.
+    pub clm_scratchpad: Option<crate::clm_scratchpad::ClmScratchpad>,
 }
 
 impl AgentContext {
@@ -138,7 +140,14 @@ impl AgentContext {
             memory: HashMap::new(),
             events: VecDeque::new(),
             pending_routing_decision: None,
+            clm_scratchpad: None,
         })
+    }
+
+    /// Attaches an optional [`ClmScratchpad`](crate::clm_scratchpad::ClmScratchpad) to the agent context (Builder pattern).
+    pub fn with_clm_scratchpad(mut self, scratchpad: crate::clm_scratchpad::ClmScratchpad) -> Self {
+        self.clm_scratchpad = Some(scratchpad);
+        self
     }
 
     /// Sets the active cache directive for the context.
@@ -250,6 +259,36 @@ impl AgentEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_agent_context_with_clm_scratchpad() -> contextra_types::Result<()> {
+        let temp_dir = tempfile::TempDir::new()?;
+        let config = contextra_db::ContextraConfig::default();
+        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let state_coll = db.collection("test_clm").await?;
+
+        let vault_config = contextra_db::volatile_vault::VaultConfig {
+            max_capacity_bytes: 1024 * 1024,
+            attempt_mlock: false,
+        };
+        let scratchpad = crate::clm_scratchpad::ClmScratchpad::new("task-clm".to_string(), vault_config);
+
+        let ctx = AgentContext::try_new(
+            "task-clm",
+            "start",
+            db,
+            state_coll,
+            TokenBudget::new(1000, 0),
+        )?
+        .with_clm_scratchpad(scratchpad);
+
+        assert!(ctx.clm_scratchpad.is_some());
+        assert_eq!(
+            ctx.clm_scratchpad.as_ref().map(|s| s.task_id()),
+            Some("task-clm")
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_validate_task_id_guards() {
