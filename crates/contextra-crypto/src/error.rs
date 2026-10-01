@@ -54,6 +54,9 @@ pub enum CryptoError {
 
     #[error("WAL truncation detected: tail HMAC mismatch")]
     WalTruncationDetected,
+
+    #[error("key or group has been revoked: {0}")]
+    KeyRevoked(String),
 }
 
 impl CryptoError {

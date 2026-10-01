@@ -9,6 +9,7 @@
 
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
+use crate::revocation_log::{RevocationLog, RevocationTarget};
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
@@ -16,7 +17,7 @@ use aes_gcm_siv::{
 use hkdf::Hkdf;
 use sha2::Sha256;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use zeroize::ZeroizeOnDrop;
 
 /// Default size of a shred key group (number of records sharing one sub-key).
@@ -56,10 +57,11 @@ pub fn derive_subkey(master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
     Ok(SubKey(sub_key_bytes))
 }
 
-/// In-memory thread-safe registry for shred group sub-keys.
+/// In-memory thread-safe registry for shred group sub-keys, integrated with persistent `RevocationLog`.
 #[derive(Debug, Default)]
 pub struct KeyRegistry {
     entries: RwLock<HashMap<u64, SubKey>>,
+    revocation_log: RwLock<Option<Arc<RevocationLog>>>,
 }
 
 impl KeyRegistry {
@@ -67,12 +69,44 @@ impl KeyRegistry {
     pub fn new() -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),
+            revocation_log: RwLock::new(None),
         }
     }
 
+    /// Attaches a persistent `RevocationLog` to this registry.
+    pub fn with_revocation_log(self, log: Arc<RevocationLog>) -> Self {
+        if let Ok(mut guard) = self.revocation_log.write() {
+            *guard = Some(log);
+        }
+        self
+    }
+
+    /// Attaches a persistent `RevocationLog` by reference.
+    pub fn set_revocation_log(&self, log: Arc<RevocationLog>) {
+        if let Ok(mut guard) = self.revocation_log.write() {
+            *guard = Some(log);
+        }
+    }
+
+    /// Checks if a group target is actively revoked in the attached `RevocationLog`.
+    fn check_revocation(&self, group_id: u64) -> Result<()> {
+        if let Ok(guard) = self.revocation_log.read() {
+            if let Some(ref log) = *guard {
+                if log.is_revoked(&RevocationTarget::Group(group_id)) {
+                    return Err(CryptoError::KeyRevoked(format!(
+                        "Shred group {group_id} has been revoked"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Derives or retrieves a sub-key for the specified `group_id`.
-    /// If the key does not exist or was revoked, derives a new sub-key from `master_key` and stores it.
+    /// Consults the `RevocationLog` prior to retrieval/derivation and actively rejects revoked groups.
     pub fn get_or_derive(&self, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
+        self.check_revocation(group_id)?;
+
         {
             let read_guard = self
                 .entries
@@ -96,14 +130,22 @@ impl KeyRegistry {
         Ok(subkey)
     }
 
-    /// Revokes (destroys) the sub-key for `group_id` in O(1).
-    /// Returns `true` if a key was present and removed.
+    /// Revokes (destroys) the sub-key for `group_id` in O(1) and records revocation in `RevocationLog` if attached.
+    /// Returns `true` if a key was present and removed or if recorded in the log.
     pub fn revoke_subkey(&self, group_id: u64) -> bool {
-        if let Ok(mut write_guard) = self.entries.write() {
+        let removed = if let Ok(mut write_guard) = self.entries.write() {
             write_guard.remove(&group_id).is_some()
         } else {
             false
+        };
+
+        if let Ok(guard) = self.revocation_log.read() {
+            if let Some(ref log) = *guard {
+                let _ = log.append(RevocationTarget::Group(group_id));
+            }
         }
+
+        removed
     }
 
     /// Returns `true` if `group_id` has an active sub-key in the registry.
@@ -138,13 +180,16 @@ impl KeyRegistry {
     }
 
     /// Decrypts ciphertext using the sub-key for `group_id`.
-    /// Returns `Err(CryptoError::Crypto(...))` if key was revoked or decryption fails.
+    /// Returns `Err(CryptoError::KeyRevoked(...))` if group was revoked in the log,
+    /// or `Err(CryptoError::Crypto(...))` if missing or decryption fails.
     pub fn decrypt_with_group(
         &self,
         group_id: u64,
         ciphertext: &[u8],
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
+        self.check_revocation(group_id)?;
+
         let read_guard = self
             .entries
             .read()
