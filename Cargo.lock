@@ -830,6 +830,8 @@ dependencies = [
  "contextra-checkpoint",
  "contextra-crypto",
  "contextra-graph",
+ "contextra-infer-candle",
+ "contextra-kvcache",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",

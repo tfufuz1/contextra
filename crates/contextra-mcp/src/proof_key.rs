@@ -16,6 +16,7 @@ use crate::protocol::McpError;
 use zeroize::Zeroizing;
 
 /// Ergebnis des reinen Schlüssel-Resolvers.
+#[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ResolvedProofKey {
     /// Das aufgelöste Schlüsselmaterial als zeroizendes String-Wrapper.
@@ -27,6 +28,7 @@ pub(crate) struct ResolvedProofKey {
 }
 
 /// Fehler beim Auflösen des DeletionProof-Schlüssels.
+#[cfg(test)]
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum ProofKeyError {
     #[error("deletion proof key not configured")]
@@ -34,12 +36,7 @@ pub(crate) enum ProofKeyError {
 }
 
 /// Reine Hilfsfunktion zur Auflösung des DeletionProof-Schlüssels ohne Zugriff auf die Prozess-Umgebung.
-///
-/// # Vorrangregeln
-/// - `primary` (`CONTEXTRA_DELETION_PROOF_KEY`) ist der kanonische Schlüssel.
-/// - `alias` (`CONTEXTRA_PROOF_KEY`) ist ein veralteter (deprecated) Alias.
-/// - Wenn beide gesetzt und unterschiedlich sind, gewinnt `primary`, und `has_conflict` wird auf `true` gesetzt.
-/// - Leere Strings oder Strings, die nur Whitespace enthalten, zählen als nicht gesetzt.
+#[cfg(test)]
 pub(crate) fn resolve_deletion_proof_key(
     primary: Option<&str>,
     alias: Option<&str>,

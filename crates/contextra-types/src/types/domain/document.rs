@@ -193,15 +193,6 @@ impl Embedding {
     }
 }
 
-/// Result from cross-encoder post-retrieval reranking.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RerankResult {
-    /// Original index in the candidate list before reranking.
-    pub original_index: usize,
-    /// Calibrated cross-encoder relevance score.
-    pub score: f32,
-}
-
 /// A scored search result.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ScoredDocument {
