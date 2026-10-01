@@ -2,82 +2,13 @@
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
-// ZWECK: MemoryLifecycleManager, GroundingValidator, ResponseGroundingValidator & DistanceCalculator Trait-Definitionen.
+// ZWECK: GroundingValidator, ResponseGroundingValidator & ContextPreparer Trait-Definitionen.
 // INVARIANTEN: Zero-panic doctrine, BoxFuture dyn-safety for async validators.
 
 use super::BoxFuture;
-use crate::types::{ContextChunk, ContextWindow, DocId, TokenBudget, TxId};
+use crate::types::{ContextChunk, ContextWindow, TokenBudget};
 use crate::Result;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
-
-/// Distance calculator trait for vector comparison.
-pub trait DistanceCalculator: Send + Sync {
-    /// Computes the distance between two f32 vectors.
-    fn compute_f32(&self, a: &[f32], b: &[f32]) -> Result<f32>;
-
-    /// Computes the distance between two u8 vectors.
-    fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32>;
-}
-
-/// Report summarizing statistics of a memory lifecycle sweep operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LifecycleSweepReport {
-    /// Total number of entries evaluated during the sweep.
-    pub swept_count: u64,
-    /// Number of entries deleted due to time-to-live (TTL) expiration.
-    pub deleted_by_ttl: u64,
-    /// Number of entries deleted due to importance score recency decay.
-    pub deleted_by_decay: u64,
-    /// Number of entries skipped because they are pinned or exempt.
-    pub skipped_pinned: u64,
-}
-
-/// Actions planned during memory consolidation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum ConsolidationAction {
-    /// Keep document as is.
-    Keep {
-        /// ID of the document to keep.
-        doc_id: DocId,
-    },
-    /// Merge two or more documents into a new consolidated entry.
-    Merge {
-        /// Source document IDs to merge.
-        source_ids: Vec<DocId>,
-        /// Hint or context summary for the consolidated entry.
-        summary_hint: String,
-    },
-    /// Replace an old document with a new updated entry.
-    Supersede {
-        /// Old document ID to supersede.
-        old_id: DocId,
-        /// Replacement document ID.
-        new_id: DocId,
-    },
-    /// Drop a document due to obsolete or low-relevance memory state.
-    Drop {
-        /// ID of the document to drop.
-        doc_id: DocId,
-    },
-}
-
-/// Trait controlling active Memory Lifecycle management: Decay sweep and Consolidation planning.
-///
-/// Decouples decision planning (`plan_consolidation`) from execution (`sweep`) for auditability.
-pub trait MemoryLifecycleManager: Send + Sync {
-    /// Performs a decay and TTL sweep.
-    /// Returns a report summarizing deleted, retained, and skipped entries.
-    fn sweep(&self, now_tx: TxId) -> impl Future<Output = Result<LifecycleSweepReport>> + Send;
-
-    /// Plans consolidation of similar entries (Mem0 ADD/UPDATE/NOOP pattern).
-    /// Returns an action plan without performing automatic execution.
-    fn plan_consolidation(
-        &self,
-        candidates: &[DocId],
-    ) -> impl Future<Output = Result<Vec<ConsolidationAction>>> + Send;
-}
 
 /// Result of a post-hoc grounding / attribution validation check.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
