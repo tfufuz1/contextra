@@ -208,6 +208,8 @@ impl std::fmt::Display for ContextWindow {
     }
 }
 
+pub use super::domain::RerankResult;
+
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoredEntry {
