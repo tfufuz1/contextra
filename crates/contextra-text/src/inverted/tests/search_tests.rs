@@ -6,6 +6,78 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 #[tokio::test]
+async fn test_wand_exact_threshold_tie_break_determinism(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let storage = Arc::new(MockStorage::new());
+    let index = InvertedIndex::new(storage.clone(), "wand_tie_break");
+
+    let tx = TxId::new(1);
+
+    // We want to construct documents such that their BM25 score for query "apple banana"
+    // produces exact tie at the k-th threshold boundary.
+    // Document text:
+    // Doc 10: "apple banana cherry" (doc_len = 3)
+    // Doc 20: "apple banana cherry" (doc_len = 3)
+    // Doc 30: "apple banana cherry" (doc_len = 3)
+    // Doc 40: "apple banana cherry" (doc_len = 3)
+    // Doc 50: "apple banana cherry" (doc_len = 3)
+    // All 5 documents have identical TF for "apple" (1) and "banana" (1) and identical document length (3).
+    // Thus, all 5 documents will have EXACTLY the same BM25 score.
+
+    for id_val in [10u64, 20, 30, 40, 50] {
+        #[cfg(not(feature = "docid-128"))]
+        let doc_id = DocId::new(id_val);
+        #[cfg(feature = "docid-128")]
+        let doc_id = DocId::new(id_val as u128);
+
+        index
+            .upsert_document(tx, doc_id, "apple banana cherry")
+            .await?;
+    }
+    index.commit_stats(tx).await?;
+    storage.commit(tx).await?;
+
+    // Request Top-3 results (k = 3).
+    // Scores for all 5 documents are identical.
+    // The threshold after filling top_k with 3 elements will be equal to this exact score.
+    // System tie-break rule: Score descending, DocId ascending.
+    // Therefore, Top-3 MUST deterministically be: DocId 10, DocId 20, DocId 30.
+
+    let k = 3;
+    for run in 1..=10 {
+        let results = index.search_bm25("apple banana", k, None).await?;
+        assert_eq!(
+            results.len(),
+            k,
+            "Run {}: Expected exactly {} results",
+            run,
+            k
+        );
+
+        let doc_ids: Vec<u64> = results.iter().map(|(id, _)| id.inner() as u64).collect();
+        assert_eq!(
+            doc_ids,
+            vec![10, 20, 30],
+            "Run {}: Search results must deterministically follow tie-break rule (DocId ascending)",
+            run
+        );
+
+        // Verify all returned scores are non-NaN, positive, and identical
+        let first_score = results[0].1;
+        assert!(first_score > 0.0 && first_score.is_finite());
+        for (idx, (_, score)) in results.iter().enumerate() {
+            assert_eq!(
+                *score, first_score,
+                "Run {}, Rank {}: Score must be identical",
+                run, idx
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_bm25_ranks_exact_keyword_higher(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(MockStorage::new());
