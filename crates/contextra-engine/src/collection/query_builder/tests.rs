@@ -45,9 +45,14 @@ impl Reranker for MockReranker {
             Ok(candidates
                 .iter()
                 .enumerate()
-                .map(|(i, _)| RerankResult {
-                    original_index: i,
-                    score: 1.0 - (i as f32 * 0.01),
+                .map(|(i, _)| {
+                    let score = 1.0 - (i as f32 * 0.01);
+                    RerankResult {
+                        index: i,
+                        original_index: i,
+                        score,
+                        calibrated_score: score,
+                    }
                 })
                 .collect())
         })

@@ -16,6 +16,7 @@ use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
 use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
+use std::time::SystemTime;
 use contextra_ports::{Clock, StorageEngine, SystemClock};
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, Result};

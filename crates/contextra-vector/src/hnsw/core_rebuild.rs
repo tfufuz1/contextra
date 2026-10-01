@@ -1,5 +1,4 @@
 use ahash::AHashSet;
-use rand::Rng;
 use roaring::RoaringTreemap;
 use std::sync::atomic::Ordering;
 
@@ -37,8 +36,7 @@ impl HnswIndexCore {
     }
 
     pub(super) fn random_layer(&self) -> usize {
-        let mut rng = rand::thread_rng();
-        let r: f32 = rng.gen::<f32>();
+        let r = self.cold.rng.next_unit_f64() as f32;
         let r_clamped = r.max(f32::EPSILON);
         let layer = (-(r_clamped.ln()) as f64 * self.hot.ml) as usize;
         layer.min(32)
@@ -616,7 +614,7 @@ impl HnswIndexCore {
             (all, self.cold.config.clone(), snapshot_tx)
         };
 
-        let new_index = HnswIndex::try_new(config)?;
+        let new_index = HnswIndex::try_new_with_rng(config, self.cold.rng.clone())?;
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {
