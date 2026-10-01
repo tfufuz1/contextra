@@ -4,7 +4,7 @@
 
 use crate::collection::Collection;
 #[cfg(feature = "background-maintenance")]
-use contextra_adapt::{AdaptiveDecayController, DecayControllerConfig};
+use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
 use contextra_ports::StorageEngine;
 #[cfg(feature = "background-maintenance")]
 use contextra_ports::VectorIndex;

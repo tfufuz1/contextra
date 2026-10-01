@@ -683,7 +683,7 @@ async fn test_decay_eviction_thresholds() {
 #[cfg(feature = "background-maintenance")]
 #[tokio::test]
 async fn test_start_decay_cleanup_worker_background_task() {
-    use contextra_adapt::DecayControllerConfig;
+    use crate::decay_controller::DecayControllerConfig;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};

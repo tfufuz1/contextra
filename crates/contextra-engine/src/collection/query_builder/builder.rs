@@ -41,6 +41,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) reranker: Option<&'a (dyn Reranker + 'a)>,
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
+    pub(super) on_signal_failure: contextra_types::OnSignalFailure,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub(super) pid_controller: Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>,
     pub(super) seq: Option<u64>,
@@ -71,6 +72,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             reranker: None,
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
+            on_signal_failure: contextra_types::OnSignalFailure::default(),
             #[cfg(feature = "adaptive-candidate-pool-sizing")]
             pid_controller: None,
             seq: None,
@@ -216,6 +218,12 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 
+    /// Sets the signal failure handling policy ([`OnSignalFailure`](contextra_types::OnSignalFailure)) (Spec Teil 6.5).
+    pub fn on_signal_failure(mut self, policy: contextra_types::OnSignalFailure) -> Self {
+        self.on_signal_failure = policy;
+        self
+    }
+
     /// Sets optional PID controller for adaptive reranking candidate pool sizing.
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub fn pid_controller(
@@ -273,6 +281,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self.include_provenance = query.include_provenance;
         self.rerank_pool_multiplier = query.rerank_pool_multiplier;
         self.rerank_pool_max = query.rerank_pool_max;
+        self.on_signal_failure = query.on_signal_failure;
         self.k = Some(query.k);
         self
     }
