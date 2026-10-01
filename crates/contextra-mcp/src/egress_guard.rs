@@ -61,12 +61,14 @@ impl EgressGuard {
 
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
+    /// Gemäß **v17 Teil 10.3** und dem generellen **Fail-Closed-Prinzip** (Teil 12, "Fail-closed als Default"):
     /// - Liefert `Allow`, wenn `payload.len() < min_bytes`.
     /// - Führt k-NN Suche ($k=1$) via `search_text` aus.
     /// - Bei Score $\ge$ `threshold`: `Block(BlockReason::SensitivePattern("bulk-exfiltration-hnsw-match"))`.
     /// - Bei Score < `threshold`: `Allow`.
-    /// - Bei Timeout, Index-Fehler oder leeren Ergebnissen: strikt **Fail-Closed** mit
+    /// - Bei Index-Fehler oder leeren Ergebnissen: strikt **Fail-Closed** mit
     ///   `Block(BlockReason::InternalError("egress guard index unavailable — fail-closed"))`.
+    /// - Bei Timeout (200 ms): strikt **Fail-Closed** mit `Block(BlockReason::ClassificationTimeout)`.
     #[allow(deprecated)]
     pub async fn check(&self, payload: &str) -> EgressClassification {
         if payload.len() < self.min_bytes {
@@ -113,9 +115,7 @@ impl EgressGuard {
                     timeout_ms = self.timeout.as_millis(),
                     "EgressGuard vector search timed out — fail-closed"
                 );
-                EgressClassification::Block(BlockReason::InternalError(
-                    "egress guard index unavailable — fail-closed".to_string(),
-                ))
+                EgressClassification::Block(BlockReason::ClassificationTimeout)
             }
         }
     }
