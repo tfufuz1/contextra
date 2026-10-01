@@ -63,18 +63,40 @@ impl SurrogateVault {
     }
 
     /// Generates a session-stable surrogate identifier for `entity_text` and stores the surrogate -> entity mapping.
-    pub fn generate_surrogate(&self, entity_text: &str) -> String {
+    ///
+    /// # Backward Compatibility & Token Format Note
+    ///
+    /// The surrogate format uses 16 hex characters (64-bit entropy derived from Blake3 hash over `entity_text ‖ session_salt`).
+    /// Legacy/historical sessions prior to v17 used 4 hex characters (16-bit entropy).
+    /// Older 16-bit tokens from previous sessions/runs are intentionally NOT automatically migrated to 64-bit tokens;
+    /// sessions starting under the new format generate 64-bit surrogate tokens.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EgressVaultError::SurrogateCollision`] if the generated surrogate key already maps to a
+    /// different entity text within the current vault session.
+    pub fn generate_surrogate(&self, entity_text: &str) -> Result<String, EgressVaultError> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(entity_text.as_bytes());
         hasher.update(&self.session_salt);
         let hash_hex = hasher.finalize().to_hex();
-        let surrogate = format!("[USER_ENTITY_{}]", &hash_hex[..4]);
+        let surrogate = format!("[USER_ENTITY_{}]", &hash_hex[..16]);
 
         if let Ok(mut guard) = self.map.lock() {
-            guard.insert(surrogate.clone(), entity_text.to_string());
+            if let Some(existing) = guard.get(&surrogate) {
+                if existing != entity_text {
+                    return Err(EgressVaultError::SurrogateCollision {
+                        surrogate,
+                        existing_plaintext: existing.clone(),
+                        new_plaintext: entity_text.to_string(),
+                    });
+                }
+            } else {
+                guard.insert(surrogate.clone(), entity_text.to_string());
+            }
         }
 
-        surrogate
+        Ok(surrogate)
     }
 
     /// Retrieves the original entity text for a given surrogate key if present.
@@ -191,6 +213,12 @@ pub enum EgressVaultError {
     PayloadTooLarge { size: usize, limit: usize },
     #[error("Tenant scope violation: {0}")]
     TenantScopeViolation(#[from] contextra_types::TenantScopeViolation),
+    #[error("Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'")]
+    SurrogateCollision {
+        surrogate: String,
+        existing_plaintext: String,
+        new_plaintext: String,
+    },
 }
 
 /// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation.
@@ -409,7 +437,7 @@ impl EgressVault {
             for m in cp.regex.find_iter(&current_text) {
                 new_text.push_str(&current_text[last_end..m.start()]);
                 let entity_text = m.as_str();
-                let surrogate = self.surrogate_vault.generate_surrogate(entity_text);
+                let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                 new_text.push_str(&surrogate);
                 last_end = m.end();
                 replacement_count += 1;
@@ -440,7 +468,7 @@ impl EgressVault {
             for (range, _category) in valid_spans {
                 if range.end <= last_processed_start {
                     let entity_text = &current_text[range.clone()];
-                    let surrogate = self.surrogate_vault.generate_surrogate(entity_text);
+                    let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                     current_text.replace_range(range.clone(), &surrogate);
                     last_processed_start = range.start;
                     replacement_count += 1;
@@ -675,11 +703,12 @@ mod tests {
     #[test]
     fn test_surrogate_determinism_same_session() {
         let vault = SurrogateVault::new([42u8; 16]);
-        let s1 = vault.generate_surrogate("alice@example.com");
-        let s2 = vault.generate_surrogate("alice@example.com");
+        let s1 = vault.generate_surrogate("alice@example.com").unwrap();
+        let s2 = vault.generate_surrogate("alice@example.com").unwrap();
 
         assert_eq!(s1, s2);
         assert!(s1.starts_with("[USER_ENTITY_"));
+        assert_eq!(s1.len(), "[USER_ENTITY_".len() + 16 + 1); // [USER_ENTITY_ + 16 hex chars + ]
         assert_eq!(vault.get_entity(&s1), Some("alice@example.com".to_string()));
     }
 
@@ -688,8 +717,8 @@ mod tests {
         let v1 = SurrogateVault::new([1u8; 16]);
         let v2 = SurrogateVault::new([2u8; 16]);
 
-        let s1 = v1.generate_surrogate("alice@example.com");
-        let s2 = v2.generate_surrogate("alice@example.com");
+        let s1 = v1.generate_surrogate("alice@example.com").unwrap();
+        let s2 = v2.generate_surrogate("alice@example.com").unwrap();
 
         assert_ne!(s1, s2);
         assert_eq!(v1.get_entity(&s1), Some("alice@example.com".to_string()));
@@ -746,7 +775,7 @@ mod tests {
     #[test]
     fn test_zeroize_on_drop_behavior() {
         let surrogate_vault = Arc::new(SurrogateVault::new([7u8; 16]));
-        let s = surrogate_vault.generate_surrogate("secret_token");
+        let s = surrogate_vault.generate_surrogate("secret_token").unwrap();
         assert_eq!(
             surrogate_vault.get_entity(&s),
             Some("secret_token".to_string())
@@ -809,5 +838,82 @@ mod tests {
 
         Zeroize::zeroize(&mut *sensitive_buf);
         assert_eq!(*sensitive_buf, [0u8; 64], "RAM zeroized in place");
+    }
+
+    #[test]
+    fn test_generate_surrogate_100k_no_collisions() {
+        let vault = SurrogateVault::random_salt();
+        let count = 100_000;
+
+        for i in 0..count {
+            let entity = format!("user_pii_entry_{i}@example.com");
+            let surrogate = vault
+                .generate_surrogate(&entity)
+                .expect("64-bit entropy prevents collisions");
+            assert!(
+                surrogate.starts_with("[USER_ENTITY_"),
+                "token starts with prefix"
+            );
+            assert_eq!(
+                surrogate.len(),
+                "[USER_ENTITY_".len() + 16 + 1,
+                "token is 64-bit hex"
+            );
+        }
+
+        assert_eq!(vault.len(), count, "all 100,000 entities stored without collision");
+    }
+
+    #[test]
+    fn test_forced_surrogate_collision_detected_and_rejected() {
+        let vault = SurrogateVault::new([99u8; 16]);
+
+        let entity_a = "alice@example.com";
+        let token_a = vault
+            .generate_surrogate(entity_a)
+            .expect("initial insertion succeeds");
+
+        // Idempotent insertion for identical plaintext must succeed
+        let token_a_again = vault
+            .generate_surrogate(entity_a)
+            .expect("idempotent insert succeeds");
+        assert_eq!(token_a, token_a_again);
+
+        // Force a collision in the map: insert a manufactured token key with a different plaintext
+        let forced_token = "[USER_ENTITY_0123456789abcdef]".to_string();
+        vault
+            .map
+            .lock()
+            .unwrap()
+            .insert(forced_token.clone(), "bob@example.com".to_string());
+
+        // Mutate the map so token_a maps to a tampered plaintext, simulating a hash collision with token_a
+        if let Ok(mut guard) = vault.map.lock() {
+            guard.insert(token_a.clone(), "tampered_plaintext@example.com".to_string());
+        }
+
+        // Test directly with entity_a against tampered_plaintext
+        let collision_err = vault
+            .generate_surrogate(entity_a)
+            .expect_err("Must detect collision when token_a points to tampered_plaintext != entity_a");
+
+        if let EgressVaultError::SurrogateCollision {
+            surrogate,
+            existing_plaintext,
+            new_plaintext,
+        } = collision_err
+        {
+            assert_eq!(surrogate, token_a);
+            assert_eq!(existing_plaintext, "tampered_plaintext@example.com");
+            assert_eq!(new_plaintext, entity_a);
+        } else {
+            panic!("Expected SurrogateCollision error variant, got {:?}", collision_err);
+        }
+
+        // Verify the vault mapping was NOT overwritten or mutated
+        assert_eq!(
+            vault.get_entity(&token_a),
+            Some("tampered_plaintext@example.com".to_string())
+        );
     }
 }
