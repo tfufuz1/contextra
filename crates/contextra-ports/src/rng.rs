@@ -1,7 +1,11 @@
 //! Random number generator port trait and deterministic SplitMix64 implementation.
 
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+static ENTROPY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Port trait for random number generators, enabling deterministic testing by decoupling
 /// non-deterministic entropy sources.
@@ -39,6 +43,32 @@ impl SeededRng {
         Self {
             state: AtomicU64::new(seed),
         }
+    }
+
+    /// Creates a new [`SeededRng`] seeded from process/runtime entropy.
+    ///
+    /// # Non-Cryptographic Usage
+    /// This entropy source uses [`std::collections::hash_map::RandomState`] and an internal counter.
+    /// It is intended strictly for non-cryptographic usages such as jitter, load balancing,
+    /// and randomized algorithm initialization. Cryptographic keys and salts MUST use
+    /// dedicated cryptographic RNGs (`OsRng`).
+    ///
+    /// # Composition Root Architecture
+    /// Only Composition Roots (application entry points) should construct a [`SeededRng`] via `from_entropy`.
+    /// Internal library logic MUST accept an injected [`Rng`] instance instead of calling `from_entropy` directly.
+    pub fn from_entropy() -> Self {
+        let counter = ENTROPY_COUNTER.fetch_add(1, Ordering::Relaxed);
+
+        let mut hasher1 = RandomState::new().build_hasher();
+        hasher1.write_u64(counter);
+        let h1 = hasher1.finish();
+
+        let mut hasher2 = RandomState::new().build_hasher();
+        hasher2.write_u64(h1);
+        let h2 = hasher2.finish();
+
+        let seed = h1 ^ h2.rotate_left(32) ^ GOLDEN_RATIO_64.wrapping_mul(counter);
+        Self::new(seed)
     }
 }
 
@@ -99,6 +129,20 @@ mod tests {
         for _ in 0..10 {
             assert_eq!(rng1.next_u64(), rng2.next_u64());
         }
+    }
+
+    #[test]
+    fn test_from_entropy_different_sequences() {
+        let rng1 = SeededRng::from_entropy();
+        let rng2 = SeededRng::from_entropy();
+
+        let draws1: Vec<u64> = (0..4).map(|_| rng1.next_u64()).collect();
+        let draws2: Vec<u64> = (0..4).map(|_| rng2.next_u64()).collect();
+
+        assert_ne!(
+            draws1, draws2,
+            "from_entropy instances generated identical 4-draw sequences"
+        );
     }
 
     #[test]

@@ -141,6 +141,31 @@ pub trait GraphIndex: Send + Sync + 'static {
         })
     }
 
+    /// Executes PathRAG graph traversal starting from multiple anchor entities up to `max_hops` at a specific sequence number (`seq_no`).
+    ///
+    /// # Contract
+    /// - The result is the set of entities along with their relevance scores visible at sequence number `seq_no`.
+    /// - Results are sorted by score descending, with ties broken by EntityId ascending.
+    /// - A backend implementation without snapshot support returns the default [`ContextraError::SnapshotUnsupportedForSignal`][crate::error::ContextraError::SnapshotUnsupportedForSignal] error.
+    ///
+    /// # Errors
+    /// Returns [`ContextraError::SnapshotUnsupportedForSignal`][crate::error::ContextraError::SnapshotUnsupportedForSignal]
+    /// if snapshot-isolated PathRAG traversal is not implemented by the backend.
+    fn path_rag_at<'a>(
+        &'a self,
+        _start_nodes: &'a [EntityId],
+        _max_hops: usize,
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+        Box::pin(async move {
+            Err(
+                crate::error::ContextraError::snapshot_unsupported_for_signal(
+                    "PathRag strategy does not support snapshot-isolated retrieval",
+                ),
+            )
+        })
+    }
+
     /// Traverses the entity graph using BFS up to a maximum number of hops at a specific sequence number.
     ///
     /// # Errors
@@ -479,6 +504,17 @@ mod tests {
                 assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
             }
             _ => panic!("Expected CapabilityUnsupported for personalized_page_rank_at"),
+        }
+
+        let res_path_rag_at = index.path_rag_at(&[EntityId::new(1)], 2, 42).await;
+        match res_path_rag_at {
+            Err(crate::error::ContextraError::SnapshotUnsupportedForSignal(msg)) => {
+                assert_eq!(
+                    msg,
+                    "PathRag strategy does not support snapshot-isolated retrieval"
+                );
+            }
+            _ => panic!("Expected SnapshotUnsupportedForSignal for path_rag_at"),
         }
     }
 }
