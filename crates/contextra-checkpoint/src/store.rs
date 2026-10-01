@@ -363,6 +363,10 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         self.checkpoint_counter.load(Ordering::Relaxed)
     }
 
+    /// Setzt den Zeitgeber für den `PersistentCheckpointStore`.
+    ///
+    /// # Composition Root
+    /// Der Composition Root setzt per `with_clock` eine injizierte Uhr (Default ist `SystemClock`).
     pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
         if let Some(reg) = Arc::get_mut(&mut self.orphan_registry) {
             reg.set_clock(clock.clone());
