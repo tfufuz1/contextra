@@ -168,9 +168,9 @@ impl KvSegmentCipher {
         model_fingerprint: ModelFingerprint,
         plaintext: &[u8],
     ) -> Result<EncryptedKvLayer> {
-        let (ciphertext, nonce) = self
-            .registry
-            .encrypt_with_group(&self.key_manager, segment_id, plaintext)?;
+        let (ciphertext, nonce) =
+            self.registry
+                .encrypt_with_group(&self.key_manager, segment_id, plaintext)?;
 
         Ok(EncryptedKvLayer {
             format_version: CURRENT_KV_FORMAT_VERSION,

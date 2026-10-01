@@ -133,7 +133,9 @@ pub fn run_symbol_exists(args: &[String]) -> i32 {
             let res = SymbolExistsGateResult {
                 gate: "symbol-exists".to_string(),
                 status: "error".to_string(),
-                summary: "Kein Symbol angegeben. Nutzung: symbol-exists <crate::pfad::Item> [--json]".to_string(),
+                summary:
+                    "Kein Symbol angegeben. Nutzung: symbol-exists <crate::pfad::Item> [--json]"
+                        .to_string(),
                 findings: vec![],
             };
             return symbol_exists_emit(res, json_output, 2);
@@ -145,7 +147,10 @@ pub fn run_symbol_exists(args: &[String]) -> i32 {
         let res = SymbolExistsGateResult {
             gate: "symbol-exists".to_string(),
             status: "error".to_string(),
-            summary: format!("Ungültiger Symbolpfad '{}'. Erwartet: <crate::pfad::Item>", raw_symbol),
+            summary: format!(
+                "Ungültiger Symbolpfad '{}'. Erwartet: <crate::pfad::Item>",
+                raw_symbol
+            ),
             findings: vec![],
         };
         return symbol_exists_emit(res, json_output, 2);
@@ -158,7 +163,10 @@ pub fn run_symbol_exists(args: &[String]) -> i32 {
             let res = SymbolExistsGateResult {
                 gate: "symbol-exists".to_string(),
                 status: "error".to_string(),
-                summary: format!("Crate '{}' konnte in capabilities.toml/crates/ nicht gefunden werden", crate_name),
+                summary: format!(
+                    "Crate '{}' konnte in capabilities.toml/crates/ nicht gefunden werden",
+                    crate_name
+                ),
                 findings: vec![],
             };
             return symbol_exists_emit(res, json_output, 2);
@@ -178,7 +186,13 @@ pub fn run_symbol_exists(args: &[String]) -> i32 {
         } else {
             format!(
                 "Symbol '{}' (Kind: {}, Name: {}, Sichtbarkeit: {}) gefunden: {} in {}:{}",
-                raw_symbol, info.kind, info.name, info.visibility, info.signature, info.file, info.line
+                raw_symbol,
+                info.kind,
+                info.name,
+                info.visibility,
+                info.signature,
+                info.file,
+                info.line
             )
         };
         let res = SymbolExistsGateResult {
@@ -191,7 +205,10 @@ pub fn run_symbol_exists(args: &[String]) -> i32 {
     } else {
         let suggestions = finder.get_similar_candidates(&target_symbol, 5);
         let msg = if suggestions.is_empty() {
-            format!("Symbol '{}' wurde in Crate '{}' nicht gefunden.", raw_symbol, crate_name)
+            format!(
+                "Symbol '{}' wurde in Crate '{}' nicht gefunden.",
+                raw_symbol, crate_name
+            )
         } else {
             format!(
                 "Symbol '{}' wurde in Crate '{}' nicht gefunden. Ähnliche Symbole: {}",
@@ -278,7 +295,9 @@ impl SymbolExistsCrateFinder {
                             &key[prefix_pattern.len()..]
                         };
                         let alias_full = join_mod_path(mod_path, rel);
-                        if !self.items.contains_key(&alias_full) && !new_glob_items.contains_key(&alias_full) {
+                        if !self.items.contains_key(&alias_full)
+                            && !new_glob_items.contains_key(&alias_full)
+                        {
                             new_glob_items.insert(alias_full, item.clone());
                         }
                     }
@@ -312,7 +331,9 @@ impl SymbolExistsCrateFinder {
     }
 
     pub fn parse_module_file(&mut self, file_path: &Path, mod_path: &str) {
-        let canon = file_path.canonicalize().unwrap_or_else(|_| file_path.to_path_buf());
+        let canon = file_path
+            .canonicalize()
+            .unwrap_or_else(|_| file_path.to_path_buf());
         if self.visited_files.contains(&canon) {
             return;
         }
@@ -460,12 +481,18 @@ impl SymbolExistsCrateFinder {
             Item::Impl(imp) => {
                 let self_ty = &imp.self_ty;
                 let type_name = quote::quote!(#self_ty).to_string();
-                let clean_type = type_name.split('<').next().unwrap_or(&type_name).trim().to_string();
+                let clean_type = type_name
+                    .split('<')
+                    .next()
+                    .unwrap_or(&type_name)
+                    .trim()
+                    .to_string();
 
                 for impl_item in &imp.items {
                     if let syn::ImplItem::Fn(im_fn) = impl_item {
                         let method_name = im_fn.sig.ident.to_string();
-                        let method_full = join_mod_path(mod_path, &format!("{}::{}", clean_type, method_name));
+                        let method_full =
+                            join_mod_path(mod_path, &format!("{}::{}", clean_type, method_name));
                         let info = SymbolExistsItemInfo {
                             kind: "fn".to_string(),
                             name: method_name,
@@ -473,7 +500,10 @@ impl SymbolExistsCrateFinder {
                             file: rel_file.to_string(),
                             line: 1,
                             signature: quote::quote!(#im_fn).to_string(),
-                            parent_trait: imp.trait_.as_ref().map(|(_, path, _)| quote::quote!(#path).to_string()),
+                            parent_trait: imp
+                                .trait_
+                                .as_ref()
+                                .map(|(_, path, _)| quote::quote!(#path).to_string()),
                         };
                         self.items.insert(method_full, info);
                     }
@@ -503,11 +533,13 @@ impl SymbolExistsCrateFinder {
                     let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                     let file_stem = file_path.file_stem().and_then(|n| n.to_str()).unwrap_or("");
 
-                    let parent_dir = if file_name == "mod.rs" || file_name == "lib.rs" || file_name == "main.rs" {
-                        file_path.parent().unwrap_or(Path::new(".")).to_path_buf()
-                    } else {
-                        file_path.parent().unwrap_or(Path::new(".")).join(file_stem)
-                    };
+                    let parent_dir =
+                        if file_name == "mod.rs" || file_name == "lib.rs" || file_name == "main.rs"
+                        {
+                            file_path.parent().unwrap_or(Path::new(".")).to_path_buf()
+                        } else {
+                            file_path.parent().unwrap_or(Path::new(".")).join(file_stem)
+                        };
 
                     let sub_f1 = parent_dir.join(format!("{}.rs", mod_name));
                     let sub_f2 = parent_dir.join(&mod_name).join("mod.rs");
@@ -552,7 +584,8 @@ impl SymbolExistsCrateFinder {
                 }
             }
             UseTree::Glob(_) => {
-                self.glob_reexports.push((mod_path.to_string(), prefix.to_string()));
+                self.glob_reexports
+                    .push((mod_path.to_string(), prefix.to_string()));
             }
         }
     }

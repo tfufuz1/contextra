@@ -74,7 +74,11 @@ fn test_protected_paths_pass_no_protected_changes() {
     let (temp_dir, base_rev) = setup_temp_repo();
     let path = temp_dir.path();
 
-    fs::write(path.join("src/lib.rs"), "pub fn hello() { println!(\"hi\"); }\n").unwrap();
+    fs::write(
+        path.join("src/lib.rs"),
+        "pub fn hello() { println!(\"hi\"); }\n",
+    )
+    .unwrap();
     let status = Command::new("git")
         .current_dir(path)
         .args(["add", "."])

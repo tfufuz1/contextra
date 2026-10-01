@@ -227,11 +227,7 @@ fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8
         }
         let mut lcp = chunk[0].clone();
         for k in &chunk[1..] {
-            let common_len = lcp
-                .iter()
-                .zip(k.iter())
-                .take_while(|(a, b)| a == b)
-                .count();
+            let common_len = lcp.iter().zip(k.iter()).take_while(|(a, b)| a == b).count();
             lcp.truncate(common_len);
             if lcp.is_empty() {
                 break;
@@ -565,7 +561,10 @@ impl SequenceLogSsiValidator {
         self.diagnose_pruning_blocker_internal(&writes)
     }
 
-    fn diagnose_pruning_blocker_internal(&self, writes: &CommittedWrites) -> Option<PruningBlockerInfo> {
+    fn diagnose_pruning_blocker_internal(
+        &self,
+        writes: &CommittedWrites,
+    ) -> Option<PruningBlockerInfo> {
         let min_unpruned_seq = writes.seq_index.keys().copied().next()?;
         let total_seq_buckets = writes.seq_index.len();
         let coarsened_seq_buckets = writes

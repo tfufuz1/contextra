@@ -347,7 +347,9 @@ impl LsmStorage {
         })?;
 
         let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
-            Some(Arc::new(crate::wal::KeyManager::try_new(passphrase, &salt)?))
+            Some(Arc::new(crate::wal::KeyManager::try_new(
+                passphrase, &salt,
+            )?))
         } else {
             None
         };
@@ -368,7 +370,8 @@ impl LsmStorage {
             if is_wal_file {
                 let file_path = entry.path();
                 if !Wal::has_migration_marker(&file_path).await {
-                    let wal = Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;
+                    let wal =
+                        Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;
 
                     if wal.was_legacy_rekeyed() {
                         let timestamp_nanos = clock.now_unix_nanos();

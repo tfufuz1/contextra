@@ -23,7 +23,11 @@ fn main() {
         let entries = match fs::read_dir(&harness_dir) {
             Ok(e) => e,
             Err(e) => {
-                panic!("Failed to read harness directory {}: {}", harness_dir.display(), e);
+                panic!(
+                    "Failed to read harness directory {}: {}",
+                    harness_dir.display(),
+                    e
+                );
             }
         };
 
@@ -73,14 +77,21 @@ fn main() {
 
     let generated_code = generate_harness_code(&manifest_dir, &modules);
     let dest_path = out_dir.join("harness_generated.rs");
-    fs::write(&dest_path, generated_code)
-        .unwrap_or_else(|e| panic!("Failed to write generated harness code to {}: {}", dest_path.display(), e));
+    fs::write(&dest_path, generated_code).unwrap_or_else(|e| {
+        panic!(
+            "Failed to write generated harness code to {}: {}",
+            dest_path.display(),
+            e
+        )
+    });
 }
 
 fn validate_stem(stem: &str, path: &Path) {
     let valid = !stem.is_empty()
         && stem.chars().next().is_some_and(|c| c.is_ascii_lowercase())
-        && stem.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+        && stem
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
 
     if !valid {
         panic!(
@@ -146,10 +157,7 @@ fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> St
             .join("harness")
             .join(format!("{}.rs", stem));
         let path_str = harness_path.to_str().unwrap().replace('\\', "/");
-        code.push_str(&format!(
-            "#[path = \"{}\"]\nmod {};\n\n",
-            path_str, stem
-        ));
+        code.push_str(&format!("#[path = \"{}\"]\nmod {};\n\n", path_str, stem));
     }
 
     code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");

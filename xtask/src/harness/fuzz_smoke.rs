@@ -47,7 +47,9 @@ pub fn fuzz_smoke_get_touched_fuzz_crates(
                         if let Ok(entries) = fs::read_dir(&fuzz_dir) {
                             for entry in entries.flatten() {
                                 if entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
-                                    if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str()) {
+                                    if let Some(stem) =
+                                        entry.path().file_stem().and_then(|s| s.to_str())
+                                    {
                                         targets.push(stem.to_string());
                                     }
                                 }
@@ -142,7 +144,10 @@ pub fn run_fuzz_smoke(args: &[String]) -> i32 {
             findings: vec![],
         };
         if json {
-            println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&output).unwrap_or_default()
+            );
         } else {
             println!("fuzz-smoke: not_applicable (no fuzz targets touched)");
         }
@@ -174,14 +179,20 @@ pub fn run_fuzz_smoke(args: &[String]) -> i32 {
                     let combined = format!("{}\n{}", stdout, stderr);
 
                     if !o.status.success() {
-                        if combined.contains("no such subcommand") || combined.contains("toolchain 'nightly") || combined.contains("error:") {
+                        if combined.contains("no such subcommand")
+                            || combined.contains("toolchain 'nightly")
+                            || combined.contains("error:")
+                        {
                             has_error = true;
                             findings.push(FuzzSmokeFinding {
                                 id: "FUZZ_TOOLCHAIN_MISSING".to_string(),
                                 severity: "error".to_string(),
                                 file: format!("crates/{}/fuzz/fuzz_targets/{}.rs", cname, target),
                                 line: 0,
-                                message: format!("cargo-fuzz or +nightly toolchain missing for {}", cname),
+                                message: format!(
+                                    "cargo-fuzz or +nightly toolchain missing for {}",
+                                    cname
+                                ),
                                 fix: "Install cargo-fuzz and nightly toolchain".to_string(),
                             });
                             continue;
@@ -198,8 +209,12 @@ pub fn run_fuzz_smoke(args: &[String]) -> i32 {
                             severity: "error".to_string(),
                             file: format!("crates/{}/fuzz/fuzz_targets/{}.rs", cname, target),
                             line: 0,
-                            message: format!("Fuzz target {} in {} crashed: {}", target, cname, artifact_path),
-                            fix: "Fix panic or memory safety issue triggered by fuzz input".to_string(),
+                            message: format!(
+                                "Fuzz target {} in {} crashed: {}",
+                                target, cname, artifact_path
+                            ),
+                            fix: "Fix panic or memory safety issue triggered by fuzz input"
+                                .to_string(),
                         });
                     }
                 }
@@ -240,11 +255,19 @@ pub fn run_fuzz_smoke(args: &[String]) -> i32 {
     };
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
     } else {
         println!("{}", summary);
         for f in &findings {
-            println!("  [{}] {}: {}", f.severity.to_uppercase(), f.file, f.message);
+            println!(
+                "  [{}] {}: {}",
+                f.severity.to_uppercase(),
+                f.file,
+                f.message
+            );
         }
     }
 

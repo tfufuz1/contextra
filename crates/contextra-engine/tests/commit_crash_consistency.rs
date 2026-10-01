@@ -2,7 +2,6 @@
 // FILE-CONTEXT
 // ZWECK: Targeted crash simulation tests for multi-index 2-Phase Commit consistency.
 // INVARIANTEN: No orphaned index entries (Text/Graph/Vector) can exist without a corresponding storage record.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_engine::collection::{StoredDocument, StoredDocumentMeta};
@@ -231,7 +230,10 @@ async fn test_storage_commit_failure_leaves_no_orphaned_index_entries() -> Resul
     let tx = DbTransaction::new(col.clone(), tx_id);
 
     let doc_id = DocId::new(501);
-    tx.stage_text_insert(doc_id, "Critical crash window test document text".to_string());
+    tx.stage_text_insert(
+        doc_id,
+        "Critical crash window test document text".to_string(),
+    );
     tx.stage_graph_entity(Entity::new(
         EntityId::from_key("501")?,
         "Node501",
@@ -290,8 +292,12 @@ async fn test_crash_after_storage_commit_recovers_indices_from_storage() -> Resu
     };
     let stored_meta = StoredDocumentMeta::from(&stored_doc);
 
-    col.storage().put(tx_id, &user_key, &serde_json::to_vec(&stored_doc)?).await?;
-    col.storage().put(tx_id, &doc_key, &serde_json::to_vec(&stored_meta)?).await?;
+    col.storage()
+        .put(tx_id, &user_key, &serde_json::to_vec(&stored_doc)?)
+        .await?;
+    col.storage()
+        .put(tx_id, &doc_key, &serde_json::to_vec(&stored_meta)?)
+        .await?;
     tx.record_keys(user_key.clone(), doc_key.clone(), doc_id);
     tx.stage_text_insert(doc_id, "Storage committed recovery doc".to_string());
 

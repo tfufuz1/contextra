@@ -130,8 +130,16 @@ pub fn run_blast_radius(args: &[String]) -> i32 {
 
     for (crate_name, crate_val) in crates_table {
         let mut deps = Vec::new();
-        let ring = crate_val.get("ring").and_then(|v| v.as_str()).unwrap_or("Ring ?").to_string();
-        let test_cmd = crate_val.get("test").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let ring = crate_val
+            .get("ring")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Ring ?")
+            .to_string();
+        let test_cmd = crate_val
+            .get("test")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         crate_rings.insert(crate_name.clone(), ring);
         crate_tests.insert(crate_name.clone(), test_cmd);
@@ -140,7 +148,10 @@ pub fn run_blast_radius(args: &[String]) -> i32 {
             for dep_val in arr {
                 if let Some(dep) = dep_val.as_str() {
                     deps.push(dep.to_string());
-                    reverse_graph.entry(dep.to_string()).or_default().push(crate_name.clone());
+                    reverse_graph
+                        .entry(dep.to_string())
+                        .or_default()
+                        .push(crate_name.clone());
                 }
             }
         }
@@ -234,7 +245,11 @@ pub fn run_blast_radius(args: &[String]) -> i32 {
         println!("=== Auswirkungsbereich (Blast Radius) ===");
         println!("Betroffene Crates (transitiv):");
         for c in &sorted_affected {
-            println!(" - {} ({})", c, crate_rings.get(c).unwrap_or(&"Ring ?".to_string()));
+            println!(
+                " - {} ({})",
+                c,
+                crate_rings.get(c).unwrap_or(&"Ring ?".to_string())
+            );
         }
         println!("\nAffected Tests:");
         for t in &affected_tests {

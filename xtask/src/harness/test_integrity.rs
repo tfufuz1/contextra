@@ -170,10 +170,17 @@ pub fn run_test_integrity(args: &[String]) -> i32 {
 
     // Check script files in diff for insta bless / INSTA_UPDATE
     for file in &diff_files {
-        if file.ends_with(".sh") || file.ends_with(".py") || file.ends_with(".yml") || file.ends_with(".yaml") {
+        if file.ends_with(".sh")
+            || file.ends_with(".py")
+            || file.ends_with(".yml")
+            || file.ends_with(".yaml")
+        {
             let full_path = root_dir.join(file);
             if let Ok(content) = fs::read_to_string(&full_path) {
-                if content.contains("INSTA_UPDATE") || content.contains("cargo insta accept") || content.contains("--bless") {
+                if content.contains("INSTA_UPDATE")
+                    || content.contains("cargo insta accept")
+                    || content.contains("--bless")
+                {
                     findings.push(TestIntegrityFinding {
                         id: "TI-006".to_string(),
                         severity: "error".to_string(),
@@ -209,7 +216,8 @@ pub fn run_test_integrity(args: &[String]) -> i32 {
                 file: del.clone(),
                 line: 0,
                 message: format!("Testdatei '{}' wurde ohne Ersatz gelöscht", del),
-                fix: "Gelöschte Testdatei wiederherstellen oder Ersatz im selben Diff nachweisen".to_string(),
+                fix: "Gelöschte Testdatei wiederherstellen oder Ersatz im selben Diff nachweisen"
+                    .to_string(),
             });
         }
     }
@@ -256,7 +264,10 @@ pub fn run_test_integrity(args: &[String]) -> i32 {
         let res = TestIntegrityGateResult {
             gate: "test-integrity".to_string(),
             status: "fail".to_string(),
-            summary: format!("{} Test-Integritätsverstoß/Verstöße gefunden", findings.len()),
+            summary: format!(
+                "{} Test-Integritätsverstoß/Verstöße gefunden",
+                findings.len()
+            ),
             findings,
         };
         test_integrity_emit(res, json_output, 1)
@@ -335,7 +346,10 @@ pub fn test_integrity_check_fn(
             severity: "error".to_string(),
             file: file.to_string(),
             line: 0,
-            message: format!("Tautologische Assertion 'assert!(true)' in Test '{}'", fn_name),
+            message: format!(
+                "Tautologische Assertion 'assert!(true)' in Test '{}'",
+                fn_name
+            ),
             fix: "Tautologische Assertion durch aussagekräftige Prüfung ersetzen".to_string(),
         });
     }
