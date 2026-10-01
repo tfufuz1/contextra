@@ -19,6 +19,7 @@ contextra-ports = { workspace = true }
 contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
+contextra-sandbox = { workspace = true, optional = true }
 contextra-store = { workspace = true }
 blake3 = { workspace = true }
 contextra-vector = { workspace = true }
@@ -46,12 +47,14 @@ sha2 = "0.10"
 loom = "0.7"
 
 [dev-dependencies]
+contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"
 loom = "0.7"
+wat = "1"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
@@ -60,7 +63,7 @@ reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
 encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
 bench = []
-sandbox = []
+sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["contextra-graph/physio-percolation"]
