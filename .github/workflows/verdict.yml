@@ -11,6 +11,7 @@ jobs:
   protected-paths:
     name: protected-paths
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -44,6 +45,7 @@ jobs:
   gate-weakening:
     name: gate-weakening
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -77,6 +79,7 @@ jobs:
   ratchet:
     name: ratchet
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -110,6 +113,7 @@ jobs:
   doc-truth:
     name: doc-truth
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -143,6 +147,7 @@ jobs:
   registry-check:
     name: registry-check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -176,6 +181,7 @@ jobs:
   scope-guard:
     name: scope-guard
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -209,6 +215,7 @@ jobs:
   diff-budget:
     name: diff-budget
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -242,6 +249,7 @@ jobs:
   claims-in-pr:
     name: claims-in-pr
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -275,6 +283,7 @@ jobs:
   test-integrity:
     name: test-integrity
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -308,6 +317,7 @@ jobs:
   task-card:
     name: task-card
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -341,6 +351,7 @@ jobs:
   ledger:
     name: ledger
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -374,6 +385,7 @@ jobs:
   can-merge:
     name: can-merge
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -406,10 +418,12 @@ jobs:
 
   deep-gates:
     uses: ./.github/workflows/deep-gates.yml
+    timeout-minutes: 30
 
   verdict:
     name: verdict
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs:
       - protected-paths
       - gate-weakening

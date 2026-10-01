@@ -27,6 +27,7 @@ jobs:
   mutation-testing:
     name: Cargo Mutants Runner
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
