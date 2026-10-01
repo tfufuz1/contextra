@@ -2,6 +2,8 @@
 // ZWECK: Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04).
 // STAND: TS:2026-09-15T00:00:00Z
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_kvcache::{KvReusePolicy, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};
 
@@ -97,7 +99,7 @@ fn test_golden_greedy_decode_single_prompt_bit_identity() -> Result<(), Contextr
 #[test]
 fn test_golden_greedy_decode_multi_prompt_suite() -> Result<(), ContextraError> {
     let tenant_id = TenantId::try_new(202)?;
-    let test_prompts = vec![
+    let test_prompts = [
         vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         vec![1, 2, 3, 4, 100, 200, 300],
         vec![50, 60, 70, 80, 90, 100, 110, 120, 130],
