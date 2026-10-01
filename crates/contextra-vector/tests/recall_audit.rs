@@ -99,7 +99,7 @@ async fn test_hnsw_recall_matrix() {
             for i in 0..n {
                 let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
                 vectors.push(v);
-                ids.push(DocId::new((i + 1) as u64));
+                ids.push(DocId::new(((i + 1) as u64).into()));
             }
 
             let config = HnswConfig {
@@ -175,7 +175,7 @@ async fn test_diskann_recall_matrix() {
             for i in 0..n {
                 let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
                 vectors.push(v);
-                ids.push(DocId::new((i + 1) as u64));
+                ids.push(DocId::new(((i + 1) as u64).into()));
             }
 
             let config = DiskAnnConfig {
@@ -223,7 +223,7 @@ async fn test_insert_order_insensitivity() {
     for i in 0..n {
         let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
         vectors.push(v);
-        ids.push(DocId::new((i + 1) as u64));
+        ids.push(DocId::new(((i + 1) as u64).into()));
     }
 
     // Index 1: Sequential insertion
@@ -422,7 +422,7 @@ async fn test_concurrency_stress_inserts_and_searches() {
                 let doc_raw = 100 + (worker_id * 20) + i;
                 let tx = TxId::new(200 + doc_raw);
                 let vec = vec![(doc_raw as f32) * 0.05; dim];
-                idx.insert(tx, DocId::new(doc_raw), &vec).await.unwrap();
+                idx.insert(tx, DocId::new(doc_raw.into()), &vec).await.unwrap();
                 idx.commit(tx).await.unwrap();
             }
         });

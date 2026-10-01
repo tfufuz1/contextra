@@ -351,7 +351,7 @@ async fn test_search_with_k_greater_than_index_size() -> Result<(), Box<dyn std:
 
     for i in 1..=5u64 {
         let vec = vec![i as f32, 0.0, 0.0, 0.0];
-        index.insert(tx, DocId::new(i), &vec).await?;
+        index.insert(tx, DocId::new(i.into()), &vec).await?;
     }
     index.commit(tx).await?;
 

@@ -26,11 +26,11 @@ async fn test_ram_reduction_4x() {
     for i in 0..num_vectors {
         let v: Vec<f32> = (0..dim).map(|_| 0.5).collect();
         index_f32
-            .insert(tx, DocId::new(i as u64), &v)
+            .insert(tx, DocId::new((i as u64).into()), &v)
             .await
             .unwrap();
         index_sq8
-            .insert(tx, DocId::new(i as u64), &v)
+            .insert(tx, DocId::new((i as u64).into()), &v)
             .await
             .unwrap();
     }
