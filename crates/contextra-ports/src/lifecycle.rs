@@ -1,4 +1,4 @@
-//! Memory lifecycle management, grounding validator traits, and distance calculator contracts.
+//! Grounding validator traits and context preparer contracts.
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z

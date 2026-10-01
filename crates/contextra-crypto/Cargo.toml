@@ -25,6 +25,7 @@ bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
@@ -41,6 +42,7 @@ cloud-egress-guard = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
 criterion = { workspace = true }

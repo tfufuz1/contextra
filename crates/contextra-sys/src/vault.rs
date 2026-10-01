@@ -26,11 +26,17 @@ impl LockedRegions {
 
     /// Attempts to lock a byte slice in RAM (best-effort) if `attempt_mlock` is `true`.
     ///
+    /// Returns `true` if the slice is successfully memory-locked (or if `slice` is empty).
+    /// Returns `false` if `attempt_mlock` is `false` (for non-empty slices) or if `mem_lock` failed.
+    ///
     /// If locking succeeds, the region is tracked and will be unlocked when [`unlock_all`](Self::unlock_all)
     /// or [`Drop::drop`] is called.
-    pub fn lock_slice(&mut self, slice: &[u8], attempt_mlock: bool) {
-        if !attempt_mlock || slice.is_empty() {
-            return;
+    pub fn lock_slice(&mut self, slice: &[u8], attempt_mlock: bool) -> bool {
+        if slice.is_empty() {
+            return true;
+        }
+        if !attempt_mlock {
+            return false;
         }
 
         let ptr = slice.as_ptr();
@@ -38,6 +44,9 @@ impl LockedRegions {
 
         if mem_lock(ptr, len) {
             self.regions.push((ptr as usize, len));
+            true
+        } else {
+            false
         }
     }
 
@@ -75,10 +84,17 @@ mod tests {
         assert!(tracker.is_empty());
 
         let data = vec![1u8, 2, 3, 4, 5];
-        tracker.lock_slice(&data, true);
+        let locked = tracker.lock_slice(&data, true);
 
-        #[cfg(target_os = "linux")]
-        assert_eq!(tracker.len(), 1);
+        #[cfg(any(unix, windows))]
+        {
+            // Note: On some CI environments without CAP_IPC_LOCK, mlock may fail and return false.
+            if locked {
+                assert_eq!(tracker.len(), 1);
+            } else {
+                assert_eq!(tracker.len(), 0);
+            }
+        }
 
         tracker.unlock_all();
         assert!(tracker.is_empty());
@@ -88,7 +104,8 @@ mod tests {
     fn test_locked_regions_disabled() {
         let mut tracker = LockedRegions::new();
         let data = vec![1u8, 2, 3, 4, 5];
-        tracker.lock_slice(&data, false);
+        let locked = tracker.lock_slice(&data, false);
+        assert!(!locked);
         assert!(tracker.is_empty());
     }
 }

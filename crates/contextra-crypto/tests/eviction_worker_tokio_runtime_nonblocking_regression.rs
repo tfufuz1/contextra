@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_crypto::kv_segment::segment::KvSegment;
 use contextra_crypto::kv_segment::store::TenantIsolatedKvStore;
 use contextra_crypto::kv_segment::EvictionWorker;

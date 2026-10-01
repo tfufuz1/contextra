@@ -305,27 +305,29 @@ mod tests {
 
     #[test]
     #[cfg(feature = "kv-encryption")]
-    fn test_kv_segment_v1_vs_v0_key_separation() {
+    fn test_kv_segment_shredding_revocation() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"version 1 plaintext payload";
 
-        // Create new_encrypted segment (defaults to version 1)
-        let mut segment =
+        // Create new_encrypted segment
+        let segment =
             KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
 
-        // Roundtrip with version 1 MUST succeed
+        // Roundtrip MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
 
-        // Tampering version to 0 MUST fail decryption because key_v0 != key_v1
-        segment.key_derivation_version = 0;
+        // Revoke key in single consolidated KeyRegistry
+        let revoked = cipher.registry().revoke_subkey(segment.segment_id);
+        assert!(revoked, "Subkey revocation must succeed");
+
         let res = segment.decrypt_data(&cipher);
         assert!(
             res.is_err(),
-            "Decryption of v1 ciphertext with v0 key derivation MUST fail"
+            "Decryption of segment after KeyRegistry subkey revocation MUST fail"
         );
     }
 

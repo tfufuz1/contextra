@@ -321,6 +321,7 @@ pub struct Wal {
     pub(crate) fallback_integrity_key: Option<[u8; 32]>,
     pub(crate) allow_legacy_integrity_key_fallback: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) legacy_key_used: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) was_legacy_rekeyed: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
     pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,
     pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
@@ -387,18 +388,21 @@ impl Wal {
             ..Default::default()
         };
         let wal = Self::open_with_config(path_ref, config).await?;
-        wal.rekey_from_legacy().await?;
+        let was_rekeyed = wal.rekey_from_legacy().await?;
+        wal.was_legacy_rekeyed
+            .store(was_rekeyed, std::sync::atomic::Ordering::SeqCst);
         Ok(wal)
     }
 
     /// Performs forced rekeying of a legacy WAL segment to a secure integrity key.
-    pub(crate) async fn rekey_from_legacy(&self) -> Result<()> {
+    /// Returns `true` if legacy key entries were detected and rekeyed.
+    pub(crate) async fn rekey_from_legacy(&self) -> Result<bool> {
         if Self::has_migration_marker(&self.path).await {
             self.allow_legacy_integrity_key_fallback
                 .store(false, std::sync::atomic::Ordering::SeqCst);
             self.legacy_key_used
                 .store(false, std::sync::atomic::Ordering::SeqCst);
-            return Ok(());
+            return Ok(false);
         }
 
         if !self
@@ -408,7 +412,7 @@ impl Wal {
             Self::write_migration_marker_atomically(&self.path).await?;
             self.allow_legacy_integrity_key_fallback
                 .store(false, std::sync::atomic::Ordering::SeqCst);
-            return Ok(());
+            return Ok(false);
         }
 
         // 1. Replay all entries using current legacy-enabled handle
@@ -434,7 +438,7 @@ impl Wal {
             self.path
         );
 
-        Ok(())
+        Ok(true)
     }
 
     /// Opens an existing WAL file solely for read-only replay, without spawning
@@ -496,6 +500,7 @@ impl Wal {
                 allow_legacy_fallback,
             )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),
@@ -607,6 +612,7 @@ impl Wal {
                 allow_legacy_fallback,
             )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),
@@ -702,6 +708,16 @@ impl Wal {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    pub fn legacy_key_used_for_test(&self) -> bool {
+        self.legacy_key_used
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn was_legacy_rekeyed(&self) -> bool {
+        self.was_legacy_rekeyed
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Recovers a poisoned `Wal` handle after a suspected torn write event.
     ///
     /// Re-verifies physical file state via offline replay against the last valid HMAC chain,
@@ -767,6 +783,7 @@ impl Wal {
                 false,
             )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),

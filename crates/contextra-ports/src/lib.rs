@@ -47,7 +47,7 @@ pub mod kv;
 pub mod kv_bridge_port;
 /// License and activation gate port traits.
 pub mod license;
-/// Memory lifecycle, grounding validator, and distance calculator contracts.
+/// Grounding validator traits and context preparer contracts.
 pub mod lifecycle;
 /// Metrics reporting port trait.
 pub mod metrics;
@@ -122,3 +122,13 @@ mod dyn_safety {
         _assert_dyn_reranker(None);
     }
 }
+
+// =============================================================================
+// ÄNDERUNGSNOTIZ / CHANGELOG (v17 Teil 2.2 Cleanup)
+// =============================================================================
+// Bereinigung verwaister und überholter Port-Definitionen gemäß Spec v17 Teil 2.2:
+// - `DistanceCalculator`: Verwaister Trait, ersetzt durch `DistanceMetric::compute` in `contextra-types`.
+// - `MemoryLifecycleManager`: Verwaister Trait ohne Implementierung im Workspace.
+// - `StorageRead`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
+// - `StorageWrite`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
+// =============================================================================

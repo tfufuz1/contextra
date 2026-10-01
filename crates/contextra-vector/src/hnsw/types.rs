@@ -113,6 +113,16 @@ impl HnswIndexCore {
     pub fn set_layer_seed(&self, seed: u64) {
         self.hot.layer_seed.store(seed, Ordering::Relaxed);
     }
+
+    /// Returns the metrics sink.
+    pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+        self.cold.metrics_sink.read().clone()
+    }
+
+    /// Sets the metrics sink.
+    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+        *self.cold.metrics_sink.write() = sink;
+    }
 }
 
 impl HnswHotCore {
@@ -172,6 +182,9 @@ pub struct HnswColdCore {
     pub deleted_nodes: RwLock<RoaringTreemap>,
     pub compute_pool: crate::compute_pool::ComputePool,
     pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
+    pub last_rebuild_instant: Mutex<Option<std::time::Instant>>,
+    pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
     #[cfg(test)]
@@ -237,6 +250,9 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
+                    metrics_sink: RwLock::new(std::sync::Arc::new(contextra_ports::NoopMetricsSink)),
+                    last_rebuild_instant: Mutex::new(None),
+                    consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -300,6 +316,9 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
+                    metrics_sink: RwLock::new(std::sync::Arc::new(contextra_ports::NoopMetricsSink)),
+                    last_rebuild_instant: Mutex::new(None),
+                    consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -334,6 +353,25 @@ impl HnswIndex {
     /// Returns the calibrated SQ8 quantization bias statistics.
     pub fn sq8_bias(&self) -> Sq8Bias {
         *self.inner.cold.sq8_bias.read()
+    }
+
+    /// Returns the metrics sink.
+    pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+        self.inner.metrics_sink()
+    }
+
+    /// Sets the metrics sink.
+    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+        self.inner.set_metrics_sink(sink);
+    }
+
+    /// Builder method to set the metrics sink.
+    pub fn with_metrics_sink(
+        self,
+        sink: std::sync::Arc<dyn contextra_ports::MetricsSink>,
+    ) -> Self {
+        self.set_metrics_sink(sink);
+        self
     }
 
     /// Sets the random seed used for HNSW layer selection during insertions.

@@ -65,6 +65,10 @@ pub struct CompactionConfig {
     pub enable_adaptive_compaction: bool,
     /// Leselast-Schwellenwert (0.0 bis 1.0) zur Aktivierung der lese-optimierten Compaction.
     pub adaptive_read_ratio_threshold: f64,
+    /// Maximale Fuel-Menge (CPU-Budget) für WASM MergeOperator Ausführung (Default: 10.000.000).
+    pub merge_max_fuel: u64,
+    /// Wall-Clock-Timeout für die Gesamtausführung eines Merge-Aufrufs (Default: 5s).
+    pub merge_wall_clock_timeout: Duration,
 }
 
 impl Default for CompactionConfig {
@@ -80,6 +84,8 @@ impl Default for CompactionConfig {
             max_io_bytes_per_second: None,
             enable_adaptive_compaction: false,
             adaptive_read_ratio_threshold: 0.70,
+            merge_max_fuel: 10_000_000,
+            merge_wall_clock_timeout: Duration::from_millis(5_000),
         }
     }
 }

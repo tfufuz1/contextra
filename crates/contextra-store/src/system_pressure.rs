@@ -1,3 +1,12 @@
+//! Observability Mandate (v17 Teil 11 & Teil 2.2):
+//! SystemPressureMonitor tracks backpressure levels (Normal/Elevated/Critical) and emits gauge metric
+//! `lsm_backpressure_level` via `MetricsSink` (0.0 = Normal, 1.0 = Elevated, 2.0 = Critical).
+//! Measurement point scope:
+//! - Commit-Latenz & Backpressure-Level: Covered by Prompt 13 (`contextra-store`)
+//! - Suchlatenz je Signal: Prompt 14
+//! - Rebuild-Dauer (HNSW): Prompt 15
+//! - Checkpoint-Dauer & DLQ-Tiefe: Prompt 25
+//!
 //! INTEGRATION GUIDE:
 //! 1. In LsmStorage::new(): SystemPressureMonitor::run() is spawned as a background task
 //!    monitoring group-commit follower queue depth (`wal_queue_depth_fn`).
@@ -15,6 +24,7 @@
 //!   KV engine decoupled from embedding crates (`contextra-embed` / `contextra-candle`), which manage
 //!   their own semaphore permits.
 
+use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
@@ -97,7 +107,33 @@ impl SystemPressureMonitor {
         embedding_permits_fn: impl Fn() -> usize + Send + 'static,
         max_embedding_permits: usize,
     ) {
+        self.run_with_metrics_sink(
+            cancellation,
+            wal_queue_depth_fn,
+            embedding_permits_fn,
+            max_embedding_permits,
+            None,
+        )
+        .await
+    }
+
+    pub async fn run_with_metrics_sink(
+        self,
+        cancellation: CancellationToken,
+        wal_queue_depth_fn: impl Fn() -> usize + Send + 'static,
+        embedding_permits_fn: impl Fn() -> usize + Send + 'static,
+        max_embedding_permits: usize,
+        metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+    ) {
         let mut last_level = PressureLevel::Normal;
+
+        // Emit initial gauge status for Normal pressure level (0.0)
+        if let Some(ref sink_lock) = metrics_sink {
+            sink_lock
+                .read()
+                .record_gauge("lsm_backpressure_level", 0.0, &[("level", "Normal")]);
+        }
+
         loop {
             tokio::select! {
                 _ = cancellation.cancelled() => break,
@@ -118,6 +154,20 @@ impl SystemPressureMonitor {
                     );
 
                     if pressure.pressure_level != last_level {
+                        let (gauge_val, level_str) = match pressure.pressure_level {
+                            PressureLevel::Normal => (0.0, "Normal"),
+                            PressureLevel::Elevated => (1.0, "Elevated"),
+                            PressureLevel::Critical => (2.0, "Critical"),
+                        };
+
+                        if let Some(ref sink_lock) = metrics_sink {
+                            sink_lock.read().record_gauge(
+                                "lsm_backpressure_level",
+                                gauge_val,
+                                &[("level", level_str)],
+                            );
+                        }
+
                         tracing::info!(
                             previous_level = ?last_level,
                             new_level = ?pressure.pressure_level,

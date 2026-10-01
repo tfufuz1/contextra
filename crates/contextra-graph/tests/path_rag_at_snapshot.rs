@@ -211,3 +211,61 @@ async fn test_path_rag_at_hub_entity_budget() {
     let res = graph.path_rag_at(&[hub], 2, 15).await.unwrap();
     assert!(!res.is_empty());
 }
+
+#[tokio::test]
+async fn test_path_rag_at_via_graph_index_trait_snapshot_isolation() {
+    // Verifies that path_rag_at invoked via GraphIndex trait object (dyn GraphIndex)
+    // is snapshot-isolated from subsequent writes (v17 Teil 6.3 & Teil 12).
+    use std::sync::Arc;
+
+    let graph = Arc::new(CsrGraph::new());
+    let index: Arc<dyn GraphIndex> = graph.clone();
+
+    let e1 = EntityId::new(1001);
+    let e2 = EntityId::new(1002);
+    let e3 = EntityId::new(1003);
+
+    let tx10 = TxId::new(10);
+    index
+        .add_entity(tx10, Entity::new(e1, "e1", "Node"))
+        .await
+        .unwrap();
+    index
+        .add_entity(tx10, Entity::new(e2, "e2", "Node"))
+        .await
+        .unwrap();
+    index
+        .add_edge(tx10, Edge::new(e1, e2, "rel").with_weight(1.0))
+        .await
+        .unwrap();
+    index.commit(tx10).await.unwrap();
+
+    // Query via GraphIndex trait at seq_no = 15 before subsequent writes
+    let res_before = index.path_rag_at(&[e1], 2, 15).await.unwrap();
+    assert!(!res_before.is_empty());
+    assert!(res_before.iter().any(|(id, _)| *id == e2));
+    assert!(!res_before.iter().any(|(id, _)| *id == e3));
+
+    // Perform subsequent write operation at tx20 (new edge e2 -> e3)
+    let tx20 = TxId::new(20);
+    index
+        .add_entity(tx20, Entity::new(e3, "e3", "Node"))
+        .await
+        .unwrap();
+    index
+        .add_edge(tx20, Edge::new(e2, e3, "rel").with_weight(1.0))
+        .await
+        .unwrap();
+    index.commit(tx20).await.unwrap();
+
+    // Query again at seq_no = 15 via GraphIndex trait: must remain identical to res_before
+    let res_after = index.path_rag_at(&[e1], 2, 15).await.unwrap();
+    assert_eq!(
+        res_before, res_after,
+        "path_rag_at at seq 15 must be strictly isolated from writes at tx 20"
+    );
+
+    // Query at seq_no = 25 sees the updated state (e3 is reachable)
+    let res_at_25 = index.path_rag_at(&[e1], 2, 25).await.unwrap();
+    assert!(res_at_25.iter().any(|(id, _)| *id == e3));
+}

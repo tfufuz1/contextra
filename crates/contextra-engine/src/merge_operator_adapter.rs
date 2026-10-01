@@ -51,19 +51,36 @@ impl std::fmt::Debug for WasmMergeOperator {
 }
 
 impl WasmMergeOperator {
-    /// Creates a new `WasmMergeOperator` with a pre-validated WASM binary and worker thread.
+    /// Creates a new `WasmMergeOperator` with default capability limits (10,000,000 fuel, 5s timeout).
+    pub fn new(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self> {
+        let caps = MergeOperatorCapabilities::pure_with_result_channel();
+        Self::new_with_config(
+            wasm_bytes,
+            caps.max_fuel,
+            Duration::from_millis(caps.max_wall_clock_ms),
+        )
+    }
+
+    /// Creates a new `WasmMergeOperator` with custom `max_fuel` and `wall_clock_timeout` configuration.
     ///
     /// # Errors
     /// Returns `ContextraError::Sandbox` if WASM validation fails, or `ContextraError::Internal`
     /// if the worker thread or runtime initialization fails.
-    pub fn new(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self> {
+    pub fn new_with_config(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        max_fuel: u64,
+        wall_clock_timeout: Duration,
+    ) -> Result<Self> {
         let wasm_bytes = wasm_bytes.into();
+        let mut caps = MergeOperatorCapabilities::pure_with_result_channel();
+        caps.max_fuel = max_fuel;
+        caps.max_wall_clock_ms = wall_clock_timeout.as_millis() as u64;
+
         let merge_fn = Arc::new(
-            WasmMergeFunction::new(wasm_bytes)
+            WasmMergeFunction::new_with_capabilities(wasm_bytes, caps.clone())
                 .map_err(|e| ContextraError::Sandbox(format!("WASM validation failed: {}", map_sandbox_err(&e))))?,
         );
 
-        let caps = MergeOperatorCapabilities::pure_with_result_channel();
         // Wall-clock limit plus 1 second reserve for thread communication
         let recv_timeout = Duration::from_millis(caps.max_wall_clock_ms.saturating_add(1_000));
 

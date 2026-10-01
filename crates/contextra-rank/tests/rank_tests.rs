@@ -123,4 +123,177 @@ mod tests {
         }
         assert_eq!(detector.overall_drift_status(), "kritisch");
     }
+
+    #[test]
+    fn test_g_function_standalone_properties() {
+        use contextra_rank::g;
+
+        // (c) g(0) is exactly 0
+        assert_eq!(g(0.0), 0.0);
+        assert_eq!(g(-0.0), 0.0);
+
+        // g(x) bounded towards 1 for x -> infinity
+        assert!((g(1000.0) - 1.0).abs() < 0.01);
+        assert!((g(1_000_000.0) - 1.0).abs() < 0.0001);
+
+        // g(x) bounded towards -1 for x -> -infinity
+        assert!((g(-1000.0) - (-1.0)).abs() < 0.01);
+
+        // Non-finite float safety
+        assert_eq!(g(f32::NAN), 0.0);
+        assert_eq!(g(f32::INFINITY), 0.0);
+        assert_eq!(g(f32::NEG_INFINITY), 0.0);
+    }
+
+    #[test]
+    fn test_mrrf_determinism_baseline() {
+        use contextra_rank::fusion::{
+            weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
+            MetadataMergePriority, SearchResult, SignalCalibrationContext,
+        };
+        use contextra_rank::drift::DriftStatus;
+
+        let res_a = vec![
+            SearchResult {
+                id: "doc1".to_string(),
+                score: 0.9,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+            SearchResult {
+                id: "doc2".to_string(),
+                score: 0.8,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+        ];
+        let res_b = vec![
+            SearchResult {
+                id: "doc2".to_string(),
+                score: 0.85,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+            SearchResult {
+                id: "doc1".to_string(),
+                score: 0.75,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+        ];
+
+        let sets = vec![
+            ("signal_a".to_string(), res_a.clone(), 1.0),
+            ("signal_b".to_string(), res_b.clone(), 1.0),
+        ];
+
+        // Baseline standard weighted RRF
+        let standard_fused = weighted_reciprocal_rank_fusion_with_options(
+            sets.clone(),
+            10,
+            MetadataMergePriority::default(),
+            true,
+            None,
+        );
+
+        // mRRF with beta = 0.0
+        let mrrf_fused_beta0 = weighted_reciprocal_rank_fusion_mrrf(
+            sets.clone(),
+            10,
+            MetadataMergePriority::default(),
+            true,
+            None,
+            None,
+            0.0,
+        );
+
+        // mRRF with beta = 1.0 but uncalibrated/unstable signal context (so m_s defaults to 0)
+        let uncalibrated_ctxs = vec![
+            SignalCalibrationContext::new("signal_a", false, DriftStatus::Stable { mean_shift: 0.0 }),
+            SignalCalibrationContext::new("signal_b", true, DriftStatus::DriftDetected { mean_shift: 0.3, threshold: 0.1 }),
+        ];
+        let mrrf_fused_uncalibrated = weighted_reciprocal_rank_fusion_mrrf(
+            sets,
+            10,
+            MetadataMergePriority::default(),
+            true,
+            None,
+            Some(&uncalibrated_ctxs),
+            1.0,
+        );
+
+        assert_eq!(standard_fused, mrrf_fused_beta0);
+        assert_eq!(standard_fused, mrrf_fused_uncalibrated);
+    }
+
+    #[test]
+    fn test_mrrf_margin_modulation_relative_weight_effect() {
+        use contextra_rank::fusion::{
+            modulate_and_renormalize_weights, SearchResult, SignalCalibrationContext,
+        };
+        use contextra_rank::drift::DriftStatus;
+
+        // Signal A: Close tie (m_s = 0.80 - 0.79 = 0.01)
+        let res_a = vec![
+            SearchResult {
+                id: "docA1".to_string(),
+                score: 0.80,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+            SearchResult {
+                id: "docA2".to_string(),
+                score: 0.79,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+        ];
+
+        // Signal B: Clear margin (m_s = 0.90 - 0.40 = 0.50)
+        let res_b = vec![
+            SearchResult {
+                id: "docB1".to_string(),
+                score: 0.90,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+            SearchResult {
+                id: "docB2".to_string(),
+                score: 0.40,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            },
+        ];
+
+        let sets = vec![
+            ("signal_a".to_string(), res_a, 1.0),
+            ("signal_b".to_string(), res_b, 1.0),
+        ];
+
+        let contexts = vec![
+            SignalCalibrationContext::new("signal_a", true, DriftStatus::Stable { mean_shift: 0.0 }),
+            SignalCalibrationContext::new("signal_b", true, DriftStatus::Stable { mean_shift: 0.0 }),
+        ];
+
+        let beta = 1.0;
+        let modulated_weights = modulate_and_renormalize_weights(&sets, Some(&contexts), beta);
+
+        let w_a = modulated_weights[0];
+        let w_b = modulated_weights[1];
+
+        // Verify total weight sum is preserved (sum = 2.0, within [0.999, 1.001] factor)
+        let total_weight = w_a + w_b;
+        assert!((total_weight - 2.0).abs() < 0.001, "Weight sum invariant violated: {total_weight}");
+
+        // Signal B has a much larger margin, so after modulation and renormalization, w_B > w_A
+        assert!(w_b > w_a, "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})");
+    }
 }
