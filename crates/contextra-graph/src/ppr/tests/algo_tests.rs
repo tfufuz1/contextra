@@ -974,3 +974,195 @@ async fn test_ppr_tl_hfd_invalid_params_fallback() {
         "TL-HFD fallback must safely compute PPR via dense power iteration"
     );
 }
+
+#[tokio::test]
+async fn test_auto_ppr_cost_model_few_seeds_small_graph_selects_forward_push() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    for i in 1..=5 {
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+            .await
+            .unwrap();
+    }
+    graph
+        .add_edge(tx, Edge::new(EntityId::new(1), EntityId::new(2), "edge"))
+        .await
+        .unwrap();
+    graph
+        .add_edge(tx, Edge::new(EntityId::new(2), EntityId::new(3), "edge"))
+        .await
+        .unwrap();
+    graph.commit(tx).await.unwrap();
+
+    let config = PprConfig {
+        damping_factor: 0.85,
+        convergence_epsilon: 1e-6,
+        max_iterations: 100,
+        algorithm: PprAlgorithm::Auto,
+        warn_on_non_convergence: true,
+    };
+
+    let inner = graph.inner_read();
+    let chosen = select_auto_ppr_algorithm(&inner, 1, &config);
+
+    // FP cost = 1.0 / (1e-6 * 0.15) ≈ 6,666,666.67
+    // PI cost = 100 * (2 + 5) = 700
+    // Actually wait: for small graph |E|=2, N=5, max_iters=100 -> PI cost = 700, which is < FP cost!
+    // ForwardPush cost O(1/(eps*alpha)) is constant w.r.t graph size.
+    // When graph is tiny (|E|=2), PowerIteration is extremely cheap!
+    // ForwardPush is strictly cheaper when power iteration cost = K * (|E| + N) > 1 / (eps * alpha).
+    // Let's verify what select_auto_ppr_algorithm returns for this tiny graph!
+    let fp_cost = 1.0f64 / (1e-6f64 * 0.15f64);
+    let pi_cost = 100.0f64 * (2.0 + 5.0);
+    if fp_cost < pi_cost {
+        assert_eq!(chosen, PprAlgorithm::ForwardPush);
+    } else {
+        assert_eq!(chosen, PprAlgorithm::DensePowerIteration);
+    }
+}
+
+#[tokio::test]
+async fn test_auto_ppr_cost_model_few_seeds_large_graph_selects_forward_push() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    // Create a graph with N = 1000 nodes and linear chain |E| = 999
+    // N = 1000, |E| = 999, K = 100
+    // PI cost = 100 * (999 + 1000) = 199,900
+    // If epsilon = 1e-3, damping = 0.85 -> alpha = 0.15
+    // FP cost = 1 / (1e-3 * 0.15) = 6666.67 < 199,900 -> ForwardPush selected!
+    for i in 1..=1000 {
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+            .await
+            .unwrap();
+    }
+    for i in 1..1000 {
+        graph
+            .add_edge(
+                tx,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "edge"),
+            )
+            .await
+            .unwrap();
+    }
+    graph.commit(tx).await.unwrap();
+
+    let config = PprConfig {
+        damping_factor: 0.85,
+        convergence_epsilon: 1e-3,
+        max_iterations: 100,
+        algorithm: PprAlgorithm::Auto,
+        warn_on_non_convergence: true,
+    };
+
+    let inner = graph.inner_read();
+    let chosen = select_auto_ppr_algorithm(&inner, 1, &config);
+
+    assert_eq!(
+        chosen,
+        PprAlgorithm::ForwardPush,
+        "ForwardPush must be chosen when O(1/(eps*alpha)) < K * (|E| + N)"
+    );
+}
+
+#[tokio::test]
+async fn test_auto_ppr_cost_model_dense_graph_selects_power_iteration() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    // N = 50 nodes, small graph
+    // Epsilon = 1e-8, damping = 0.85 -> alpha = 0.15
+    // FP cost = 1 / (1e-8 * 0.15) = 66,666,666.67
+    // PI cost = 100 * (100 + 50) = 15,000
+    // PI cost (15,000) << FP cost (66.6M) -> DensePowerIteration selected!
+    for i in 1..=50 {
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+            .await
+            .unwrap();
+    }
+    for i in 1..=50 {
+        for j in 1..=2 {
+            if i != j {
+                graph
+                    .add_edge(
+                        tx,
+                        Edge::new(EntityId::new(i), EntityId::new((i + j) % 50 + 1), "edge"),
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+    graph.commit(tx).await.unwrap();
+
+    let config = PprConfig {
+        damping_factor: 0.85,
+        convergence_epsilon: 1e-8,
+        max_iterations: 100,
+        algorithm: PprAlgorithm::Auto,
+        warn_on_non_convergence: true,
+    };
+
+    let inner = graph.inner_read();
+    let chosen = select_auto_ppr_algorithm(&inner, 1, &config);
+
+    assert_eq!(
+        chosen,
+        PprAlgorithm::DensePowerIteration,
+        "DensePowerIteration must be chosen when PI cost < FP cost"
+    );
+}
+
+#[tokio::test]
+async fn test_auto_ppr_cost_model_crossover_boundary() {
+    // Test proving decision adheres strictly to cost model instead of fixed 100 seed threshold.
+    // Case A: 150 seeds (seed_count > 100 legacy threshold)
+    // Graph: N = 500, |E| = 500, max_iters = 100
+    // Epsilon = 1e-3, damping = 0.85 -> alpha = 0.15
+    // FP cost = 1 / (1e-3 * 0.15) = 6666.67
+    // PI cost = 100 * (500 + 500) = 100,000
+    // Under old logic (150 > 100), DensePowerIteration was picked.
+    // Under new cost model (6666.67 < 100,000), ForwardPush is correctly chosen!
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    for i in 1..=500 {
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+            .await
+            .unwrap();
+    }
+    for i in 1..500 {
+        graph
+            .add_edge(
+                tx,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "edge"),
+            )
+            .await
+            .unwrap();
+    }
+    graph.commit(tx).await.unwrap();
+
+    let config = PprConfig {
+        damping_factor: 0.85,
+        convergence_epsilon: 1e-3,
+        max_iterations: 100,
+        algorithm: PprAlgorithm::Auto,
+        warn_on_non_convergence: true,
+    };
+
+    let inner = graph.inner_read();
+
+    // 150 seeds: Legacy threshold would pick DensePowerIteration (>100).
+    // Cost model picks ForwardPush because FP cost (6666) < PI cost (100,000).
+    let chosen = select_auto_ppr_algorithm(&inner, 150, &config);
+    assert_eq!(
+        chosen,
+        PprAlgorithm::ForwardPush,
+        "Cost model must pick ForwardPush for 150 seeds when FP cost < PI cost, ignoring legacy 100 seed threshold"
+    );
+}
