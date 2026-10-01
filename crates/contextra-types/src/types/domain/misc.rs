@@ -40,15 +40,6 @@ mod hex {
     }
 }
 
-/// Result from cross-encoder post-retrieval reranking.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RerankResult {
-    /// Original index of candidate item in the input batch.
-    pub original_index: usize,
-    /// Score output by the cross-encoder reranker.
-    pub score: f32,
-}
-
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowState {

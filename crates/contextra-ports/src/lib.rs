@@ -55,6 +55,8 @@ pub mod metrics;
 pub mod observability;
 /// Plugin registry and dependency resolution.
 pub mod plugin;
+/// QueryRewriter port trait for multi-step retrieval sub-query generation.
+pub mod query_rewriter;
 /// Reranker port trait for cross-encoder post-retrieval ranking.
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
@@ -80,6 +82,7 @@ pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
 pub use plugin::*;
+pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
 pub use storage::*;
@@ -104,6 +107,7 @@ mod dyn_safety {
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
+    fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -120,6 +124,7 @@ mod dyn_safety {
         _assert_dyn_license_gate(None);
         _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
+        _assert_dyn_query_rewriter(None);
     }
 }
 
