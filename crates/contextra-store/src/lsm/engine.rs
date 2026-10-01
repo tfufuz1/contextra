@@ -55,7 +55,7 @@ pub struct LsmStorage {
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
-    pub(super) metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
+    pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
 }
 
 impl Drop for LsmStorage {
