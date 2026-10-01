@@ -91,7 +91,7 @@ impl WasmMergeFunction {
             .checked_add(existing.len())
             .and_then(|l| l.checked_add(new.len()))
             .ok_or(SandboxError::InputTooLarge {
-                len: usize::MAX,
+                len: usize::MAX, // UNBOUNDED-OK: sentinel value for arithmetic overflow
                 limit: caps.max_stdin_bytes,
             })?;
 
