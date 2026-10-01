@@ -171,6 +171,7 @@ pub struct HnswColdCore {
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
     pub compute_pool: crate::compute_pool::ComputePool,
+    pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
     #[cfg(test)]
@@ -196,8 +197,11 @@ pub enum RebuildStatus {
 }
 
 impl HnswIndex {
-    /// Creates a new HNSW index, validating configuration upfront.
-    pub fn try_new(config: HnswConfig) -> Result<Self> {
+    /// Creates a new HNSW index with an explicit random number generator for deterministic testing or custom seeding.
+    pub fn try_new_with_rng(
+        config: HnswConfig,
+        rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    ) -> Result<Self> {
         config.validate()?;
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
@@ -232,6 +236,7 @@ impl HnswIndex {
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
+                    rng,
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -245,6 +250,14 @@ impl HnswIndex {
         })
     }
 
+    /// Creates a new HNSW index, validating configuration upfront.
+    ///
+    /// Uses an internal, non-cryptographic, reproducible default RNG seeded with [`DEFAULT_LAYER_SEED`].
+    pub fn try_new(config: HnswConfig) -> Result<Self> {
+        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        Self::try_new_with_rng(config, rng)
+    }
+
     /// Creates a new HNSW index.
     #[deprecated(
         note = "Nutze try_new() für sofortige Fehlererkennung — new() versteckt Konfigurationsfehler bis zum ersten insert()/search()"
@@ -253,6 +266,8 @@ impl HnswIndex {
         let validation_error = config.validate().err().map(|e| e.to_string());
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
+        let rng: std::sync::Arc<dyn contextra_ports::Rng> =
+            std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
@@ -284,6 +299,7 @@ impl HnswIndex {
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
+                    rng,
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -410,6 +426,20 @@ impl HnswIndex {
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
             .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
             .collect()
+    }
+
+    /// Returns all non-deleted document IDs and their assigned HNSW max layers.
+    pub fn all_doc_ids_and_layers(&self) -> Vec<(DocId, usize)> {
+        let map = self.inner.hot.doc_to_node.read();
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let mut list: Vec<(DocId, usize)> = map
+            .iter()
+            .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
+            .map(|(&doc_id_raw, &node_idx)| (DocId::new(doc_id_raw), nodes[node_idx].max_layer))
+            .collect();
+        list.sort_by_key(|(id, _)| id.inner());
+        list
     }
 
     pub fn trigger_rebuild_async(&self) {

@@ -1268,6 +1268,7 @@ dependencies = [
  "bincode",
  "contextra-core",
  "contextra-crypto",
+ "contextra-ports",
  "contextra-simd",
  "contextra-sys",
  "contextra-types",
