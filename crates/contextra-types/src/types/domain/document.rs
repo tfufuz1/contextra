@@ -196,10 +196,14 @@ impl Embedding {
 /// Result from cross-encoder post-retrieval reranking.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RerankResult {
+    /// Original index of the candidate item in the input batch.
+    pub index: usize,
     /// Original index in the candidate list before reranking.
     pub original_index: usize,
     /// Calibrated cross-encoder relevance score.
     pub score: f32,
+    /// Calibrated probability / relevance estimate [0.0, 1.0].
+    pub calibrated_score: f32,
 }
 
 /// A scored search result.

@@ -208,14 +208,6 @@ impl std::fmt::Display for ContextWindow {
     }
 }
 
-/// Result of a cross-encoder reranking operation for a candidate document.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RerankResult {
-    /// Original index of the candidate in the input candidate list.
-    pub original_index: usize,
-    /// Computed relevance score from the cross-encoder reranker.
-    pub score: f32,
-}
 
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

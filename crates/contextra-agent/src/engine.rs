@@ -364,10 +364,7 @@ impl OrchestratorEngine {
                                                         },
                                                     input: input.clone(),
                                                     attempt,
-                                                    failed_at_secs: SystemTime::now()
-                                                        .duration_since(std::time::UNIX_EPOCH)
-                                                        .unwrap_or_default()
-                                                        .as_secs(),
+                                                    failed_at_secs: self.now_secs(),
                                                 };
                                                 if let Err(dlq_err) = dlq.push(&letter).await {
                                                     tracing::error!("DLQ push failed: {}", dlq_err);

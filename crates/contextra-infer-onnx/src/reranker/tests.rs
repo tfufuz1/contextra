@@ -215,16 +215,22 @@ fn test_record_implicit_feedback_top_k_marked_relevant() {
     // Manually record outcomes on reranker directly
     let results = vec![
         RerankResult {
+            index: 0,
             original_index: 0,
             score: 2.5,
+            calibrated_score: 2.5,
         },
         RerankResult {
+            index: 1,
             original_index: 1,
             score: 1.8,
+            calibrated_score: 1.8,
         },
         RerankResult {
+            index: 2,
             original_index: 5,
             score: -0.5,
+            calibrated_score: -0.5,
         },
     ];
     // With passthrough, implicit feedback is skipped
@@ -275,12 +281,16 @@ fn test_implicit_feedback_passthrough_skipped() {
     let reranker = CrossEncoderReranker::passthrough();
     let results = vec![
         RerankResult {
+            index: 0,
             original_index: 0,
             score: 0.9,
+            calibrated_score: 0.9,
         },
         RerankResult {
+            index: 1,
             original_index: 1,
             score: 0.8,
+            calibrated_score: 0.8,
         },
     ];
     reranker.record_implicit_feedback(&results, 1);
