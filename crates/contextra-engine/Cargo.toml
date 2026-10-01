@@ -27,6 +27,8 @@ contextra-checkpoint = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
+contextra-kvcache = { workspace = true }
+contextra-infer-candle = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }

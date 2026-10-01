@@ -236,6 +236,11 @@ pub mod import;
 pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
+#[cfg(not(loom))]
+pub mod kv_cache_integration;
+
+#[cfg(not(loom))]
+pub use kv_cache_integration::build_eviction_worker;
 
 #[cfg(feature = "sandbox")]
 pub mod merge_operator_adapter;
@@ -525,6 +530,7 @@ pub struct Contextra {
     pid_controller: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
     >,
+    kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
 }
 
 #[cfg(not(loom))]
@@ -548,6 +554,16 @@ impl Contextra {
     /// Returns a reference to the attached [`LicenseGate`].
     pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
         Arc::clone(&self.license_gate)
+    }
+
+    /// Returns the active KV eviction worker's attention score source if initialized.
+    pub fn kv_eviction_attention_source(
+        &self,
+    ) -> Option<Arc<dyn contextra_kvcache::AttentionScoreSource>> {
+        self.kv_eviction_worker
+            .read()
+            .as_ref()
+            .map(|w| w.attention_source())
     }
 }
 
