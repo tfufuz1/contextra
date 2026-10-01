@@ -31,6 +31,41 @@ impl MockReranker {
     }
 }
 
+struct SlowPartialMockReranker {
+    deadline_ms: u64,
+    cutoff_after: usize,
+}
+
+impl Reranker for SlowPartialMockReranker {
+    fn rerank<'a>(
+        &'a self,
+        _query: &'a str,
+        candidates: &'a [String],
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<RerankResult>>> {
+        let cutoff = self.cutoff_after;
+        Box::pin(async move {
+            if candidates.len() == 1 {
+                // Individual item processing: simulate delay for items beyond cutoff
+                if candidates[0].contains(&format!("topic {}", cutoff)) || candidates[0].contains(&format!("doc-{}", cutoff)) {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+            }
+            Ok(candidates
+                .iter()
+                .enumerate()
+                .map(|(i, _)| RerankResult {
+                    original_index: i,
+                    score: 0.99 - (i as f32 * 0.05),
+                })
+                .collect())
+        })
+    }
+
+    fn rerank_deadline_ms(&self) -> Option<u64> {
+        Some(self.deadline_ms)
+    }
+}
+
 impl Reranker for MockReranker {
     fn rerank<'a>(
         &'a self,
@@ -575,4 +610,89 @@ fn test_reranker_expands_to_100_for_k10() {
         candidate_k >= 100,
         "With reranker, candidate_k ({candidate_k}) must be >= 100 for k=10"
     );
+}
+
+#[tokio::test]
+async fn test_anytime_rerank_partial_results() {
+    let (col, _dir) = create_test_collection("test_anytime_partial").await;
+    for i in 0..10 {
+        let id = format!("doc-{i}");
+        col.insert(
+            &id,
+            &[1.0 - (i as f32 * 0.05), 0.0, 0.0, 0.0],
+            Some(json!({ "text": format!("rust topic {i}") })),
+        )
+        .await
+        .unwrap();
+    }
+
+    // Deadline 50ms, item at cutoff index 3 causes 200ms delay triggering Anytime cutoff
+    let reranker = SlowPartialMockReranker {
+        deadline_ms: 50,
+        cutoff_after: 3,
+    };
+
+    let res = col
+        .query()
+        .text("rust")
+        .embedding([1.0, 0.0, 0.0, 0.0])
+        .reranker(&reranker)
+        .k(5)
+        .execute()
+        .await
+        .unwrap();
+
+    assert_eq!(res.len(), 5, "Should return top 5 items");
+
+    // Evaluated items before deadline hit have ce_score attached
+    assert!(res[0].metadata.as_ref().unwrap().get("ce_score").is_some());
+    assert!(res[1].metadata.as_ref().unwrap().get("ce_score").is_some());
+    assert!(res[2].metadata.as_ref().unwrap().get("ce_score").is_some());
+
+    // Unevaluated items appended in original fusion order without ce_score
+    assert!(res[3].metadata.as_ref().unwrap().get("ce_score").is_none());
+    assert!(res[4].metadata.as_ref().unwrap().get("ce_score").is_none());
+}
+
+#[tokio::test]
+async fn test_pool_clamping_bounds_extreme_k_and_multipliers() {
+    let (col, _dir) = create_test_collection("test_pool_bounds").await;
+    for i in 0..250 {
+        let id = format!("doc-{:03}", i);
+        col.insert(
+            &id,
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(json!({ "text": format!("document {:03}", i) })),
+        )
+        .await
+        .unwrap();
+    }
+
+    let reranker = MockReranker::passthrough();
+
+    // Extreme low: k=1, multiplier=1 -> base_pool = (1*1).clamp(50, 200) = 50
+    let res_min = col
+        .query()
+        .text("document")
+        .embedding([1.0, 0.0, 0.0, 0.0])
+        .reranker(&reranker)
+        .rerank_pool_multiplier(1)
+        .k(1)
+        .execute()
+        .await
+        .unwrap();
+    assert_eq!(res_min.len(), 1);
+
+    // Extreme high: k=100, multiplier=50 -> base_pool = (5000).clamp(50, 200) = 200
+    let res_max = col
+        .query()
+        .text("document")
+        .embedding([1.0, 0.0, 0.0, 0.0])
+        .reranker(&reranker)
+        .rerank_pool_multiplier(50)
+        .k(50)
+        .execute()
+        .await
+        .unwrap();
+    assert_eq!(res_max.len(), 50);
 }

@@ -1,5 +1,6 @@
 use super::*;
 use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
+use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {
     HnswConfig {
@@ -155,4 +156,138 @@ async fn test_delete() {
     index.commit(tx2).await.expect("commit");
 
     assert_eq!(index.len().await, 0);
+}
+
+#[derive(Default)]
+struct TestMetricsSink {
+    counters: Mutex<Vec<(String, u64, Vec<(String, String)>)>>,
+    histograms: Mutex<Vec<(String, f64, Vec<(String, String)>)>>,
+}
+
+impl contextra_ports::MetricsSink for TestMetricsSink {
+    fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
+        let label_vec = labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.counters
+            .lock()
+            .push((name.to_string(), value, label_vec));
+    }
+
+    fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
+
+    fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        let label_vec = labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.histograms
+            .lock()
+            .push((name.to_string(), value, label_vec));
+    }
+}
+
+#[tokio::test]
+async fn test_hnsw_rebuild_metrics_duration() {
+    let sink = std::sync::Arc::new(TestMetricsSink::default());
+    let config = test_config(4);
+    let index = HnswIndex::try_new(config)
+        .expect("valid config")
+        .with_metrics_sink(sink.clone());
+
+    let tx = TxId::new(1);
+    index
+        .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
+        .await
+        .expect("insert");
+    index.commit(tx).await.expect("commit");
+
+    index.rebuild().await.expect("rebuild must succeed");
+
+    let hists = sink.histograms.lock();
+    assert!(
+        hists
+            .iter()
+            .any(|(name, _, _)| name == "vector_rebuild_duration_seconds"),
+        "vector_rebuild_duration_seconds histogram must be recorded"
+    );
+
+    let cnts = sink.counters.lock();
+    assert!(
+        cnts.iter().any(|(name, val, labels)| name == "vector_rebuild_total"
+            && *val == 1
+            && labels.contains(&("status".to_string(), "success".to_string()))),
+        "vector_rebuild_total success counter must be recorded"
+    );
+}
+
+#[tokio::test]
+async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
+    let sink = std::sync::Arc::new(TestMetricsSink::default());
+    let config = HnswConfigBuilder::new(4)
+        .rebuild_threshold(0.9)
+        .backoff_base_delay(std::time::Duration::from_millis(200))
+        .backoff_max_delay(std::time::Duration::from_secs(2))
+        .backoff_alert_threshold(2)
+        .build()
+        .expect("valid config");
+
+    let index = HnswIndex::try_new(config)
+        .expect("valid index")
+        .with_metrics_sink(sink.clone());
+
+    let tx1 = TxId::new(1);
+    index
+        .insert(tx1, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
+        .await
+        .expect("insert 1");
+    index
+        .insert(tx1, DocId::from(2u64), &[0.0, 1.0, 0.0, 0.0])
+        .await
+        .expect("insert 2");
+    index.commit(tx1).await.expect("commit 1");
+
+    // Artificially induce high deletion rate (> 10%)
+    let tx2 = TxId::new(2);
+    index.delete(tx2, DocId::from(1u64)).await.expect("delete 1");
+    index.commit(tx2).await.expect("commit 2");
+
+    assert!(
+        index.is_rebuild_required(),
+        "rebuild must be required due to high deletion ratio"
+    );
+
+    // First rebuild attempt -> succeeds
+    index.rebuild().await.expect("first rebuild must succeed");
+
+    // Second rapid rebuild attempt -> suppressed by backoff cooldown
+    let res2 = index.rebuild().await;
+    assert!(res2.is_err(), "rapid rebuild must fail due to backoff");
+    let err_msg2 = format!("{}", res2.unwrap_err());
+    assert!(err_msg2.contains("Rebuild rate limited by backoff cooldown"));
+
+    // Third rapid rebuild attempt -> suppressed and triggers alert threshold alarm
+    let res3 = index.rebuild().await;
+    assert!(res3.is_err(), "subsequent rapid rebuild must fail due to backoff");
+
+    let cnts = sink.counters.lock();
+    assert!(
+        cnts.iter()
+            .any(|(name, _, _)| name == "vector_rebuild_backoff_suppressed_total"),
+        "vector_rebuild_backoff_suppressed_total must be incremented"
+    );
+    assert!(
+        cnts.iter().any(|(name, _, labels)| name == "vector_rebuild_alarm_total"
+            && labels.contains(&("reason".to_string(), "excessive_rapid_rebuilds".to_string()))),
+        "vector_rebuild_alarm_total alarm metric must be recorded"
+    );
+
+    drop(cnts);
+
+    // Wait for exponential backoff cooldown (400ms) to expire
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Rebuild after cooldown expires -> succeeds
+    index.rebuild().await.expect("rebuild after cooldown must succeed");
 }

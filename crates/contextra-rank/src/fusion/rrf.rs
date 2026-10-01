@@ -1,11 +1,24 @@
 use super::normalized::score_normalized_fusion_with_options;
 use super::provenance::ProvenanceBuilder;
 use super::resonance::{apply_resonance_bonus, ResonanceConfig};
-use super::signal::{FusedEntry, MetadataMergePriority, SignalKey, SignalKind};
+use super::signal::{
+    FusedEntry, MetadataMergePriority, SignalCalibrationContext, SignalKey, SignalKind,
+};
 use super::topk::{BoundedTopK, TopKCandidate};
 use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
 use ahash::AHashMap;
 pub use contextra_types::FusionStrategy;
+
+/// Bounded smooth influence function $g(x) = \frac{x}{1 + |x|}$.
+///
+/// Returns $x / (1 + |x|)$, bounded in $(-1.0, 1.0)$ for all finite $x$.
+/// Returns `0.0` if $x$ is non-finite (`NaN` or `Infinity`).
+pub fn g(x: f32) -> f32 {
+    if !x.is_finite() {
+        return 0.0;
+    }
+    x / (1.0 + x.abs())
+}
 
 /// Fuses multiple sets of ranked search results into a single ranked list using Reciprocal Rank Fusion (RRF).
 pub fn reciprocal_rank_fusion(
@@ -78,19 +91,121 @@ pub fn weighted_reciprocal_rank_fusion_with_priority(
     weighted_reciprocal_rank_fusion_with_options(result_sets, max_results, priority, true, None)
 }
 
+/// Modulates signal weights using mRRF margin formula:
+/// $m_s = S_1 - S_2$ (when signal is calibrated AND `drift_status` is `Stable` and $\ge 2$ candidates exist).
+/// $w_s' = w_s \times (1 + g(\beta \times m_s))$.
+/// Renormalizes modulated weights to maintain sum equal to original weight sum (preserving weight norm in [0.999, 1.001]).
+pub fn modulate_and_renormalize_weights(
+    result_sets: &[(String, Vec<SearchResult>, f32)],
+    calibration_contexts: Option<&[SignalCalibrationContext]>,
+    beta: f32,
+) -> Vec<f32> {
+    let raw_weights: Vec<f32> = result_sets.iter().map(|(_, _, w)| *w).collect();
+    if beta == 0.0 || !beta.is_finite() {
+        return raw_weights;
+    }
+
+    let mut total_orig = 0.0_f32;
+    let mut modulated_weights = Vec::with_capacity(result_sets.len());
+
+    for (signal_name, set, weight) in result_sets.iter() {
+        let w = *weight;
+        if !w.is_finite() || w <= 0.0 {
+            modulated_weights.push(w);
+            continue;
+        }
+
+        total_orig += w;
+
+        // Check calibration context if provided
+        let cal_ctx = calibration_contexts.and_then(|ctxs| {
+            ctxs.iter()
+                .find(|c| c.signal_name.eq_ignore_ascii_case(signal_name))
+        });
+
+        let use_calibrated = cal_ctx.is_some_and(|c| c.should_use_calibrated_scores());
+
+        let m_s = if use_calibrated {
+            // Calculate m_s = score(rank_1) - score(rank_2) if at least 2 candidates exist
+            // Note: If fewer than 2 candidates exist for a signal, m_s is undefined,
+            // so we explicitly set m_s = 0.0 (documented edge-case handling).
+            if set.len() >= 2 {
+                let s1 = set[0].score;
+                let s2 = set[1].score;
+                if s1.is_finite() && s2.is_finite() {
+                    (s1 - s2).max(0.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        let w_prime = w * (1.0 + g(beta * m_s));
+        modulated_weights.push(if w_prime.is_finite() && w_prime > 0.0 {
+            w_prime
+        } else {
+            w
+        });
+    }
+
+    let total_mod: f32 = modulated_weights
+        .iter()
+        .filter(|w| w.is_finite() && **w > 0.0)
+        .sum();
+
+    if total_orig > 0.0 && total_mod > 0.0 {
+        let renorm_factor = total_orig / total_mod;
+        for w in &mut modulated_weights {
+            if w.is_finite() && *w > 0.0 {
+                *w *= renorm_factor;
+            }
+        }
+    }
+
+    modulated_weights
+}
+
 /// Weighted Reciprocal Rank Fusion with options.
 pub fn weighted_reciprocal_rank_fusion_with_options(
+    result_sets: Vec<(String, Vec<SearchResult>, f32)>,
+    max_results: usize,
+    priority: MetadataMergePriority,
+    include_provenance: bool,
+    resonance_config: Option<&ResonanceConfig>,
+) -> Vec<SearchResult> {
+    weighted_reciprocal_rank_fusion_mrrf(
+        result_sets,
+        max_results,
+        priority,
+        include_provenance,
+        resonance_config,
+        None,
+        0.0,
+    )
+}
+
+/// Weighted Reciprocal Rank Fusion with mRRF margin-based calibration weight modulation.
+pub fn weighted_reciprocal_rank_fusion_mrrf(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
     priority: MetadataMergePriority,
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
+    calibration_contexts: Option<&[SignalCalibrationContext]>,
+    beta: f32,
 ) -> Vec<SearchResult> {
     if max_results == 0 {
         return Vec::new();
     }
 
     result_sets.sort_by_key(|(signal_name, _, _)| priority.signal_rank(signal_name));
+
+    let modulated_weights =
+        modulate_and_renormalize_weights(&result_sets, calibration_contexts, beta);
 
     let k = 60;
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
@@ -99,8 +214,8 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
     let mut entries: Vec<FusedEntry<'_>> = Vec::new();
     let mut valid_signal_count = 0usize;
 
-    for (signal_name, result_set, weight) in &result_sets {
-        let weight = *weight;
+    for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
+        let weight = modulated_weights[idx];
         if !weight.is_finite() || weight <= 0.0 {
             tracing::warn!(
                 signal = %signal_name,

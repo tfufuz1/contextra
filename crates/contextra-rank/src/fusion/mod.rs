@@ -19,6 +19,6 @@ pub use rrf::{
     reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
     weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
 };
-pub use signal::{MetadataMergePriority, SignalKind};
+pub use signal::{MetadataMergePriority, SignalCalibrationContext, SignalKind};
 pub use topk::BoundedTopK;
 pub use types::{FusedScore, ProvenanceRecord, SearchResult, SignalContribution};

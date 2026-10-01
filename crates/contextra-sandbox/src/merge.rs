@@ -18,28 +18,47 @@ use crate::{capabilities::MergeOperatorCapabilities, error::SandboxError, execut
 ///
 /// Encapsulates a pre-validated WASM module and executes pure merge logic
 /// over binary inputs via stdin/stdout.
+use crate::capabilities::WasmCapabilities;
+
+/// Standalone, pure, deterministic WASM merge operator executor.
+///
+/// Encapsulates a pre-validated WASM module and executes pure merge logic
+/// over binary inputs via stdin/stdout.
 #[derive(Debug)]
 pub struct WasmMergeFunction {
     executor: WasmExecutor,
     wasm_bytes: Arc<[u8]>,
+    caps: WasmCapabilities,
 }
 
 impl WasmMergeFunction {
     /// Creates a new `WasmMergeFunction` and validates the WASM binary once upon creation.
+    /// Uses default pure merge capabilities (`MergeOperatorCapabilities::pure_with_result_channel()`).
     ///
     /// # Errors
     /// Returns `SandboxError::InvalidModule` if the WASM binary fails validation or exceeds
     /// module size limits, or `SandboxError::Runtime` if engine initialization fails.
     pub fn new(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self, SandboxError> {
+        Self::new_with_capabilities(
+            wasm_bytes,
+            MergeOperatorCapabilities::pure_with_result_channel(),
+        )
+    }
+
+    /// Creates a new `WasmMergeFunction` with custom capability limits (e.g. `max_fuel` or `max_wall_clock_ms`).
+    pub fn new_with_capabilities(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        caps: WasmCapabilities,
+    ) -> Result<Self, SandboxError> {
         let executor = WasmExecutor::new()?;
         let wasm_bytes: Arc<[u8]> = wasm_bytes.into();
-        let caps = MergeOperatorCapabilities::pure_with_result_channel();
 
         executor.validate_module(&wasm_bytes, caps.max_module_size_bytes)?;
 
         Ok(Self {
             executor,
             wasm_bytes,
+            caps,
         })
     }
 
@@ -56,7 +75,7 @@ impl WasmMergeFunction {
     /// Returns `SandboxError` on fuel exhaustion, timeout, memory exceeded, WASM trap,
     /// process exit error, or capability violation without panicking.
     pub async fn merge(&self, existing: &[u8], new: &[u8]) -> Result<Vec<u8>, SandboxError> {
-        let caps = MergeOperatorCapabilities::pure_with_result_channel();
+        let caps = &self.caps;
 
         let len_existing =
             u32::try_from(existing.len()).map_err(|_| SandboxError::InputTooLarge {
@@ -92,7 +111,7 @@ impl WasmMergeFunction {
         let timeout = Duration::from_millis(caps.max_wall_clock_ms);
         let output = self
             .executor
-            .execute(&self.wasm_bytes, &input, &caps, timeout)
+            .execute(&self.wasm_bytes, &input, caps, timeout)
             .await?;
 
         Ok(output.stdout.to_vec())

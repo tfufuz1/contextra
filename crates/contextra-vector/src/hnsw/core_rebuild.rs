@@ -35,8 +35,15 @@ impl HnswIndexCore {
         true
     }
 
+    /// Assigns a random layer for node insertion using geometric distribution.
+    ///
+    /// Governance Rule P28 Compliance:
+    /// Uhrzeit und Zufall im Produktionscode muessen ausschliesslich über injizierte
+    /// Ports (`Rng` aus `contextra-ports`) bezogen werden. Diese Methode bezieht den
+    /// Pseudozufallswert direkt ueber `self.cold.rng.read()`.
     pub(super) fn random_layer(&self) -> usize {
-        let r = self.cold.rng.next_unit_f64() as f32;
+        let rng = self.cold.rng.read();
+        let r = rng.next_unit_f64() as f32;
         let r_clamped = r.max(f32::EPSILON);
         let layer = (-(r_clamped.ln()) as f64 * self.hot.ml) as usize;
         layer.min(32)
@@ -451,6 +458,60 @@ impl HnswIndexCore {
     }
 
     pub fn rebuild_sync(&self) -> Result<()> {
+        let now = std::time::Instant::now();
+        {
+            let last_rebuild_guard = self.cold.last_rebuild_instant.lock();
+            if let Some(last_instant) = *last_rebuild_guard {
+                let elapsed = now.duration_since(last_instant);
+                let consecutive = self.cold.consecutive_rapid_rebuilds.load(Ordering::SeqCst);
+
+                let cooldown = if consecutive == 0 {
+                    self.cold.config.backoff_base_delay
+                } else {
+                    let shift = consecutive.saturating_sub(1).min(30);
+                    let multiplier = 1u64.checked_shl(shift).unwrap_or(u64::MAX);
+                    let calc = self.cold.config.backoff_base_delay.saturating_mul(multiplier as u32);
+                    calc.min(self.cold.config.backoff_max_delay)
+                };
+
+                if elapsed < cooldown {
+                    let new_consecutive =
+                        self.cold.consecutive_rapid_rebuilds.fetch_add(1, Ordering::SeqCst) + 1;
+                    let sink = self.cold.metrics_sink.read().clone();
+                    sink.record_counter(
+                        "vector_rebuild_backoff_suppressed_total",
+                        1,
+                        &[("reason", "rapid_rebuild")],
+                    );
+
+                    if new_consecutive >= self.cold.config.backoff_alert_threshold {
+                        sink.record_counter(
+                            "vector_rebuild_alarm_total",
+                            1,
+                            &[("reason", "excessive_rapid_rebuilds")],
+                        );
+                        tracing::warn!(
+                            consecutive_rebuilds = new_consecutive,
+                            cooldown_seconds = cooldown.as_secs_f64(),
+                            "Excessive HNSW rebuilds triggered in rapid succession; suppressing rebuild due to backoff"
+                        );
+                    } else {
+                        tracing::warn!(
+                            cooldown_seconds = cooldown.as_secs_f64(),
+                            "HNSW rebuild suppressed by backoff cooldown"
+                        );
+                    }
+
+                    return Err(ContextraError::Index(format!(
+                        "Rebuild rate limited by backoff cooldown ({:?})",
+                        cooldown
+                    )));
+                } else if elapsed >= self.cold.config.backoff_max_delay.saturating_mul(2) {
+                    self.cold.consecutive_rapid_rebuilds.store(0, Ordering::SeqCst);
+                }
+            }
+        }
+
         if self.hot.rebuilding.swap(true, Ordering::SeqCst) {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
@@ -460,15 +521,28 @@ impl HnswIndexCore {
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
         let start_time = std::time::Instant::now();
 
-        let (new_index, snapshot_tx) = self.rebuild_phase1_snapshot_and_build()?;
+        let rebuild_res = self
+            .rebuild_phase1_snapshot_and_build()
+            .and_then(|(new_index, snapshot_tx)| {
+                tracing::info!("HNSW index rebuild Phase 1 completed, starting Phase 2 merge & swap");
+                self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
+            });
 
-        tracing::info!("HNSW index rebuild Phase 1 completed, starting Phase 2 merge & swap");
+        let elapsed_secs = start_time.elapsed().as_secs_f64();
+        let sink = self.cold.metrics_sink.read().clone();
 
-        self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)?;
+        if rebuild_res.is_ok() {
+            self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
+            *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
+            self.cold.consecutive_rapid_rebuilds.store(0, Ordering::SeqCst);
+            sink.record_histogram("vector_rebuild_duration_seconds", elapsed_secs, &[]);
+            sink.record_counter("vector_rebuild_total", 1, &[("status", "success")]);
+            tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
+        } else {
+            sink.record_counter("vector_rebuild_total", 1, &[("status", "error")]);
+        }
 
-        self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
-        tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
-        Ok(())
+        rebuild_res
     }
 
     pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
@@ -614,7 +688,8 @@ impl HnswIndexCore {
             (all, self.cold.config.clone(), snapshot_tx)
         };
 
-        let new_index = HnswIndex::try_new_with_rng(config, self.cold.rng.clone())?;
+        let rng = self.cold.rng.read().clone();
+        let new_index = HnswIndex::try_new_with_rng(config, rng)?;
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {

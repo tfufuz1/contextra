@@ -94,12 +94,14 @@ impl EgressGuard {
 
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
+    /// Gemäß **v17 Teil 10.3** und dem generellen **Fail-Closed-Prinzip** (Teil 12, "Fail-closed als Default"):
     /// - Liefert `Allow`, wenn `payload.len() < min_bytes`.
     /// - Führt k-NN Suche ($k=1$) via `search_text` aus.
     /// - Bei Score $\ge$ `threshold`: `Block(BlockReason::SensitivePattern("bulk-exfiltration-hnsw-match"))`.
     /// - Bei Score < `threshold`: `Allow`.
-    /// - Bei Timeout, Index-Fehler oder leeren Ergebnissen: strikt **Fail-Closed** mit
+    /// - Bei Index-Fehler oder leeren Ergebnissen: strikt **Fail-Closed** mit
     ///   `Block(BlockReason::InternalError("egress guard index unavailable — fail-closed"))`.
+    /// - Bei Timeout (200 ms): strikt **Fail-Closed** mit `Block(BlockReason::ClassificationTimeout)`.
     pub async fn check(&self, payload: &str) -> EgressClassification {
         if payload.len() < self.min_bytes {
             return EgressClassification::Allow;
@@ -145,9 +147,7 @@ impl EgressGuard {
                     timeout_ms = self.timeout.as_millis(),
                     "EgressGuard vector search timed out — fail-closed"
                 );
-                EgressClassification::Block(BlockReason::InternalError(
-                    "egress guard index unavailable — fail-closed".to_string(),
-                ))
+                EgressClassification::Block(BlockReason::ClassificationTimeout)
             }
         }
     }
@@ -295,9 +295,90 @@ mod tests {
             .await;
         assert_eq!(
             res,
+            EgressClassification::Block(BlockReason::ClassificationTimeout)
+        );
+    }
+
+    struct FailingSearchEngine {
+        error_msg: String,
+    }
+
+    impl TextSearchEngine for FailingSearchEngine {
+        fn search_text<'a>(
+            &'a self,
+            _text: &'a str,
+            _limit: usize,
+        ) -> BoxFuture<'a, Result<Vec<TextSearchResult>, String>> {
+            let err = self.error_msg.clone();
+            Box::pin(async move { Err(err) })
+        }
+    }
+
+    struct MockClock {
+        nanos: u64,
+    }
+
+    impl contextra_ports::Clock for MockClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.nanos
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.nanos
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_failure_and_timeout_fail_closed_audit_trace() {
+        use crate::audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+
+        let clock = MockClock {
+            nanos: 1_600_000_000_000_000_000,
+        };
+        let payload = "Payload text exceeding minimum byte limit for testing exfiltration checks";
+
+        // Case 1: Index Error
+        let failing_engine = Arc::new(FailingSearchEngine {
+            error_msg: "vector index corrupted or uninitialized".to_string(),
+        });
+        let guard_fail = EgressGuard::new(failing_engine, 0.85, 10);
+
+        let (class_fail, trace_fail) = guard_fail.classify_with_trace(payload, &clock).await;
+        assert_eq!(
+            class_fail,
             EgressClassification::Block(BlockReason::InternalError(
                 "egress guard index unavailable — fail-closed".to_string()
             ))
         );
+
+        let rule_fail = extract_rule_id(&class_fail);
+        assert_eq!(
+            rule_fail,
+            "INTERNAL_ERROR:egress guard index unavailable — fail-closed"
+        );
+        let expected_trace_fail =
+            compute_audit_trace(payload, &rule_fail, 1_600_000_000_000_000_000);
+        assert_eq!(trace_fail, expected_trace_fail);
+
+        // Case 2: Timeout
+        let timing_out_engine = Arc::new(MockSearchEngine {
+            results: Ok(vec![]),
+            delay: Some(Duration::from_millis(200)),
+        });
+        let guard_timeout =
+            EgressGuard::new(timing_out_engine, 0.85, 10).with_timeout(Duration::from_millis(5));
+
+        let (class_timeout, trace_timeout) =
+            guard_timeout.classify_with_trace(payload, &clock).await;
+        assert_eq!(
+            class_timeout,
+            EgressClassification::Block(BlockReason::ClassificationTimeout)
+        );
+
+        let rule_timeout = extract_rule_id(&class_timeout);
+        assert_eq!(rule_timeout, "CLASSIFICATION_TIMEOUT");
+        let expected_trace_timeout =
+            compute_audit_trace(payload, &rule_timeout, 1_600_000_000_000_000_000);
+        assert_eq!(trace_timeout, expected_trace_timeout);
     }
 }

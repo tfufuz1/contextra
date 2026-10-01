@@ -4,6 +4,9 @@
 //! Präzisions-Scope: Nur für Multi-Hop-Anfragen verwenden (arXiv:2506.05690).
 //! Sufficiency-Gate verhindert Precision-Kollaps (arXiv:2506.00610).
 //!
+//! SNAPSHOT ISOLATION: Erfüllt v17 Teil 6.3 ("PathRAG-Lücke") und Teil 12 (Snapshot-Isolation-Prinzip 6).
+//! Ermöglicht snapshot-isolierte PathRAG-Abfragen über `SnapshotPathGraph` an einem festen `seq` (TxId).
+//!
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 

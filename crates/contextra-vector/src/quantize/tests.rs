@@ -167,11 +167,15 @@ fn test_quantize_dequantize_roundtrip() {
 
 #[test]
 fn test_quantized_search_no_panic() {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    use contextra_ports::{Rng, SeededRng};
+    let rng = SeededRng::new(12345);
+    let next_range = |min: f32, max: f32| -> f32 {
+        min + (rng.next_unit_f64() as f32) * (max - min)
+    };
+
     let mut vectors = Vec::new();
     for _ in 0..100 {
-        let v: Vec<f32> = (0..128).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..128).map(|_| next_range(-1.0, 1.0)).collect();
         vectors.push(v);
     }
 
@@ -182,7 +186,7 @@ fn test_quantized_search_no_panic() {
 
     // Random queries
     for _ in 0..100 {
-        let qv: Vec<f32> = (0..128).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let qv: Vec<f32> = (0..128).map(|_| next_range(-1.0, 1.0)).collect();
         let qq = q.quantize(&qv).unwrap();
 
         let mut top = 0;

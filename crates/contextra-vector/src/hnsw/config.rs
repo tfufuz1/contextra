@@ -18,6 +18,12 @@ pub struct HnswConfig {
     pub distance_metric: DistanceMetric,
     /// Rebuild threshold.
     pub rebuild_threshold: f64,
+    /// Base delay for rebuild exponential backoff cooldown.
+    pub backoff_base_delay: std::time::Duration,
+    /// Maximum cap for rebuild exponential backoff cooldown.
+    pub backoff_max_delay: std::time::Duration,
+    /// Consecutive rapid rebuild threshold triggering warning alerts.
+    pub backoff_alert_threshold: u32,
     /// Whether to apply SQ8 Scalar Quantization to the index vectors to reduce RAM.
     pub quantize: bool,
     /// Sample size used for ScalarQuantizer recalibration during rebuilds.
@@ -41,6 +47,9 @@ impl Default for HnswConfig {
             ef_search: 64,
             distance_metric: DistanceMetric::Cosine,
             rebuild_threshold: 1.0 - HNSW_REBUILD_DELETION_RATIO,
+            backoff_base_delay: std::time::Duration::from_secs(1),
+            backoff_max_delay: std::time::Duration::from_secs(60),
+            backoff_alert_threshold: 3,
             quantize: false,
             quantizer_recalibration_sample_size: 10_000,
             quantizer_drift_threshold: 0.10,
@@ -162,6 +171,24 @@ impl HnswConfigBuilder {
     /// Sets the rebuild threshold.
     pub fn rebuild_threshold(mut self, threshold: f64) -> Self {
         self.config.rebuild_threshold = threshold.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Sets the base delay for rebuild exponential backoff cooldown.
+    pub fn backoff_base_delay(mut self, delay: std::time::Duration) -> Self {
+        self.config.backoff_base_delay = delay;
+        self
+    }
+
+    /// Sets the maximum cap for rebuild exponential backoff cooldown.
+    pub fn backoff_max_delay(mut self, delay: std::time::Duration) -> Self {
+        self.config.backoff_max_delay = delay;
+        self
+    }
+
+    /// Sets the threshold of consecutive rapid rebuilds that trigger warning alerts.
+    pub fn backoff_alert_threshold(mut self, threshold: u32) -> Self {
+        self.config.backoff_alert_threshold = threshold;
         self
     }
 

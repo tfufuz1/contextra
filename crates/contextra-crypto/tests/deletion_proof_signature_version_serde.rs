@@ -39,6 +39,7 @@ fn test_deletion_proof_typed_signature_version_accessor() {
         excluded_scopes: vec![],
         graph_repair: vec![],
         wal_chain_receipt: None,
+        audit_chain_position: None,
         integrity_warning: None,
     };
 
@@ -155,6 +156,7 @@ fn test_verify_rejects_unknown_versions_fail_closed() {
         excluded_scopes: vec![],
         graph_repair: vec![],
         wal_chain_receipt: None,
+        audit_chain_position: None,
         integrity_warning: None,
     };
 
