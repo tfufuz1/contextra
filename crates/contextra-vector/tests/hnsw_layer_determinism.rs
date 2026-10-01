@@ -47,7 +47,7 @@ async fn test_hnsw_layer_determinism_same_seed_same_results() {
 
     let tx = TxId::new(1);
     for (i, v) in vecs.iter().enumerate() {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         idx1.insert(tx, doc_id, v).await.unwrap();
         idx2.insert(tx, doc_id, v).await.unwrap();
     }
@@ -91,7 +91,7 @@ async fn test_hnsw_layer_determinism_different_seeds_different_layer_sequences()
 
     let tx = TxId::new(1);
     for (i, v) in vecs.iter().enumerate() {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         idx1.insert(tx, doc_id, v).await.unwrap();
         idx2.insert(tx, doc_id, v).await.unwrap();
     }
@@ -121,7 +121,7 @@ async fn test_hnsw_layer_distribution_m16() {
     let mut sm = SplitMix64::new(3003);
     let tx = TxId::new(1);
     for i in 0..n {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         let v: Vec<f32> = (0..dim).map(|_| sm.next_f32()).collect();
         idx.insert(tx, doc_id, &v).await.unwrap();
     }

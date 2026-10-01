@@ -35,7 +35,7 @@ async fn test_hnsw_determinism_explicit_rng_same_topology() {
 
     let tx = TxId::new(1);
     for (i, v) in vecs.iter().enumerate() {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         idx1.insert(tx, doc_id, v).await.unwrap();
         idx2.insert(tx, doc_id, v).await.unwrap();
     }
@@ -70,7 +70,7 @@ async fn test_hnsw_determinism_default_try_new_reproducible() {
     let input_rng = SeededRng::new(888);
     let tx = TxId::new(1);
     for i in 0..n {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         let mut v = vec![0.0f32; dim];
         for val in v.iter_mut() {
             *val = input_rng.next_unit_f64() as f32;
@@ -110,7 +110,7 @@ async fn test_hnsw_determinism_different_seeds_produce_different_layers() {
     let input_rng = SeededRng::new(777);
     let tx = TxId::new(1);
     for i in 0..n {
-        let doc_id = DocId::new(i as u64 + 1);
+        let doc_id = DocId::new((i as u64 + 1).into());
         let mut v = vec![0.0f32; dim];
         for val in v.iter_mut() {
             *val = input_rng.next_unit_f64() as f32;

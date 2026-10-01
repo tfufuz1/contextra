@@ -57,7 +57,7 @@ fn brute_force_knn(
             .filter(|(idx, _)| !deleted_set.contains(&(*idx as u64)))
             .map(|(idx, v)| {
                 let dist = 1.0 - dot_product(query, v);
-                (DocId::new(idx as u64), dist)
+                (DocId::new((idx as u64).into()), dist)
             })
             .collect();
 
@@ -86,7 +86,7 @@ async fn build_hnsw_index(vectors: &[Vec<f32>]) -> HnswIndex {
     let tx = TxId::new(1);
     for (i, v) in vectors.iter().enumerate() {
         index
-            .insert(tx, DocId::new(i as u64), v)
+            .insert(tx, DocId::new((i as u64).into()), v)
             .await
             .expect("insert failed");
     }
@@ -188,7 +188,7 @@ async fn test_partial_rebuild_recall_regression() {
         let tx_del = TxId::new(2);
         for &id in &tombstone_ids {
             index
-                .delete(tx_del, DocId::new(id))
+                .delete(tx_del, DocId::new(id.into()))
                 .await
                 .expect("delete failed");
         }
@@ -238,7 +238,7 @@ async fn test_partial_rebuild_recall_regression() {
         let tx_del = TxId::new(2);
         for &id in &tombstone_ids {
             index
-                .delete(tx_del, DocId::new(id))
+                .delete(tx_del, DocId::new(id.into()))
                 .await
                 .expect("delete failed");
         }
@@ -291,7 +291,7 @@ async fn test_partial_rebuild_node_degree_no_isolation() {
     let tx_del = TxId::new(2);
     for &id in &tombstone_ids {
         index
-            .delete(tx_del, DocId::new(id))
+            .delete(tx_del, DocId::new(id.into()))
             .await
             .expect("delete failed");
     }
@@ -358,7 +358,7 @@ async fn test_partial_rebuild_node_degree_no_isolation() {
     // Kriterien-Assertion 2: Navigierbarkeitstest via Direktabfrage aller verbleibenden aktiven Knoten
     let mut isolated_search_nodes = Vec::new();
     for (idx, vec) in vectors.iter().enumerate() {
-        let doc_id = DocId::new(idx as u64);
+        let doc_id = DocId::new((idx as u64).into());
         if !tombstone_set.contains(&(idx as u64)) {
             let res = index.search(vec, 1).await.expect("search failed");
             if res.is_empty() || res[0].doc_id != doc_id {

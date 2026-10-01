@@ -38,7 +38,7 @@ async fn test_diskann_rebuild_fault_injection_preserves_previous_index() {
         .await
         .expect("initial search succeeds");
     assert_eq!(initial_res.len(), 1);
-    assert_eq!(initial_res[0].doc_id, DocId::from(102));
+    assert_eq!(initial_res[0].doc_id, DocId::from(102u64));
 
     // 2. Simulate interrupted rebuild by creating a partial/corrupt `.tmp` file and failing write
     let tmp_path = index_path.with_extension("idx.tmp");
@@ -52,7 +52,7 @@ async fn test_diskann_rebuild_fault_injection_preserves_previous_index() {
     let mut large_vectors = initial_vectors.clone();
     large_vectors.push(vec![99.0f32, 0.0, 0.0, 0.0]);
     let mut large_ids = initial_ids.clone();
-    large_ids.push(DocId::from(999));
+    large_ids.push(DocId::from(999u64));
 
     // Spawn build in a task and abort it mid-air to simulate abrupt process kill / crash
     let build_task =
@@ -75,7 +75,7 @@ async fn test_diskann_rebuild_fault_injection_preserves_previous_index() {
     assert_eq!(reloaded_res.len(), 1);
     assert_eq!(
         reloaded_res[0].doc_id,
-        DocId::from(102),
+        DocId::from(102u64),
         "Previous index state must remain searchable and deliver original doc_id=102"
     );
 

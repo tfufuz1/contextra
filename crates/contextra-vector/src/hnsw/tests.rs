@@ -1,5 +1,6 @@
 use super::*;
 use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::Rng;
 use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {
@@ -14,6 +15,71 @@ fn test_config(dim: usize) -> HnswConfig {
         rebuild_threshold: 0.8,
         quantize: false,
         ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn test_hnsw_topology_and_search_determinism() {
+    let dim = 8;
+    let n = 100;
+    let seed = 424242u64;
+
+    let config = HnswConfigBuilder::new(dim)
+        .m(16)
+        .ef_construction(64)
+        .ef_search(32)
+        .build()
+        .expect("valid config");
+
+    let rng1 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+    let rng2 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+
+    let idx1 = HnswIndex::try_new_with_rng(config.clone(), rng1).expect("idx1 creation");
+    let idx2 = HnswIndex::try_new_with_rng(config, rng2).expect("idx2 creation");
+
+    let sm = contextra_ports::SeededRng::new(1001);
+    let mut vecs = Vec::with_capacity(n);
+    for _ in 0..n {
+        let v: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
+        vecs.push(v);
+    }
+
+    let tx = TxId::new(1);
+    for (i, v) in vecs.iter().enumerate() {
+        let doc_id = DocId::from((i as u64 + 1) as u64);
+        idx1.insert(tx, doc_id, v).await.expect("idx1 insert");
+        idx2.insert(tx, doc_id, v).await.expect("idx2 insert");
+    }
+    idx1.commit(tx).await.expect("idx1 commit");
+    idx2.commit(tx).await.expect("idx2 commit");
+
+    // 1. Verify exact layer assignments (topology) across all documents
+    let docs_and_layers1 = idx1.all_doc_ids_and_layers();
+    let docs_and_layers2 = idx2.all_doc_ids_and_layers();
+
+    assert_eq!(
+        docs_and_layers1.len(),
+        n,
+        "index 1 doc count matches inserted batch"
+    );
+    assert_eq!(
+        docs_and_layers1, docs_and_layers2,
+        "HNSW layer assignments must be identical when seeded with identical RNG"
+    );
+
+    // 2. Verify search results are bitwise/identical
+    let query: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
+    let res1 = idx1.search(&query, 10).await.expect("idx1 search");
+    let res2 = idx2.search(&query, 10).await.expect("idx2 search");
+
+    assert_eq!(res1.len(), res2.len());
+    for (r1, r2) in res1.iter().zip(res2.iter()) {
+        assert_eq!(r1.doc_id, r2.doc_id);
+        assert_eq!(
+            r1.score.to_bits(),
+            r2.score.to_bits(),
+            "Search scores must match identically"
+        );
     }
 }
 
