@@ -11,6 +11,7 @@ jobs:
   post-merge-verify:
     name: Post-Merge Jules Preflight Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:

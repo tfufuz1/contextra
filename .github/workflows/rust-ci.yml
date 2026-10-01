@@ -19,6 +19,7 @@ jobs:
   compile-check:
     name: Compile Check (cargo check)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@1.89.0
@@ -29,6 +30,7 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@1.89.0
@@ -41,6 +43,7 @@ jobs:
   supply-chain:
     name: Dependency Security & License Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -52,6 +55,7 @@ jobs:
   coverage:
     name: Line Coverage Gate (>= 50%)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -73,6 +77,7 @@ jobs:
   per-crate-coverage-report:
     name: Per-Crate Coverage Report (Non-blocking)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -101,6 +106,7 @@ jobs:
   clippy:
     name: Clippy (-D warnings)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -117,6 +123,7 @@ jobs:
   asan-contextra-vector:
     name: AddressSanitizer Gate (contextra-vector)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -130,6 +137,7 @@ jobs:
   asan-contextra-vector-unequal-lengths:
     name: ASan Gate — u8 Distance Unequal Length Slices (contextra-vector)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [compile-check]
     # Dieser Job schlägt FEHL, solange P-G1 (AVX2 OOB-Fix) nicht gemergt ist.
     # Er ist absichtlich als Sicherheitsnetz konzipiert, kein continue-on-error.
@@ -149,6 +157,7 @@ jobs:
   miri-contextra-vector:
     name: Miri Gate (contextra-vector unsafe fn boundary tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true  # Miri-Failures blockieren nicht den Merge, werden aber sichtbar
     steps:
@@ -170,6 +179,7 @@ jobs:
   cargo-hack-feature-check:
     name: Cargo Hack Feature Flag Matrix Check
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -183,6 +193,7 @@ jobs:
   feature-matrix:
     name: Feature Matrix Checks (Powerset CI §17)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -260,6 +271,7 @@ jobs:
   maturin-dry-run:
     name: PyPI Wheel Build Check (Maturin Dry-Run)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -277,6 +289,7 @@ jobs:
   test:
     name: Test Suite (cargo-nextest)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -300,6 +313,7 @@ jobs:
   clippy-py:
     name: Clippy (contextra-py)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -313,6 +327,7 @@ jobs:
   test-py:
     name: Test Suite (contextra-py)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -324,6 +339,7 @@ jobs:
   lockfile-check-py:
     name: Check contextra-py Lockfile in sync
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
     steps:
@@ -339,6 +355,7 @@ jobs:
   docid-128-check:
     name: DocId 128-bit Validation Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -361,6 +378,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     needs: [compile-check]
     continue-on-error: true
     steps:

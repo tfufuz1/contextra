@@ -14,6 +14,7 @@ jobs:
   simd-cross-validation:
     name: SIMD vs Scalar Cross-Validation (${{ matrix.target }}, rustflags="${{ matrix.rustflags }}")
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
