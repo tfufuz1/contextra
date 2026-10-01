@@ -68,12 +68,8 @@ fn test_step_3_mismatched_installation_id_returns_not_activated_before_signature
         SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key);
     activation.signature[0] ^= 0xFF; // Tamper signature
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock,
-    )
-    .with_local_installation_id(wrong_local_id);
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(wrong_local_id);
 
     // Step 3 MUST return NotActivated (not InvalidSignature) to prevent info leaks
     assert_eq!(
@@ -96,12 +92,8 @@ fn test_step_4_tampered_signature_returns_invalid_signature() {
         SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
     activation.signature[0] ^= 0xFF; // Tamper signature
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock,
-    )
-    .with_local_installation_id(local_id);
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(local_id);
 
     assert_eq!(
         gate.check_ring(FeatureRing::Sovereign),
@@ -127,12 +119,8 @@ fn test_step_5_expired_activation_returns_expired() {
         &signing_key,
     );
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock,
-    )
-    .with_local_installation_id(local_id);
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(local_id);
 
     assert_eq!(
         gate.check_ring(FeatureRing::Sovereign),
@@ -154,12 +142,8 @@ fn test_step_6_insufficient_activated_ring_returns_not_activated() {
     let activation =
         SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock,
-    )
-    .with_local_installation_id(local_id);
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(local_id);
 
     assert_eq!(
         gate.check_ring(FeatureRing::Compliance),
@@ -180,12 +164,8 @@ fn test_step_7_fully_valid_activation_returns_ok() {
     let activation =
         SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key);
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock,
-    )
-    .with_local_installation_id(local_id);
+    let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
+        .with_local_installation_id(local_id);
 
     assert_eq!(gate.check_ring(FeatureRing::Compliance), Ok(()));
 }

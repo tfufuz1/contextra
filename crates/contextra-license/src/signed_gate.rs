@@ -75,7 +75,8 @@ impl SignedActivation {
 
     /// Verifies whether the Ed25519 signature on this activation record is valid for the given verifying key.
     pub fn verify_signature(&self, verifying_key: &VerifyingKey) -> bool {
-        let payload = Self::payload_bytes(self.ring, self.installation_id_hash, self.expires_at_unix);
+        let payload =
+            Self::payload_bytes(self.ring, self.installation_id_hash, self.expires_at_unix);
         let sig = Signature::from_bytes(&self.signature);
         verifying_key.verify(&payload, &sig).is_ok()
     }
@@ -104,7 +105,7 @@ pub fn derive_local_installation_id_hash(storage_path: Option<&std::path::Path>)
             blake3::hash(path.to_string_lossy().as_bytes()).to_hex()
         );
         if std::fs::create_dir_all(path).is_ok() {
-            let _ = std::fs::write(&id_file, &generated);
+            if let Ok(()) = std::fs::write(&id_file, &generated) {}
         }
         return *blake3::hash(generated.as_bytes()).as_bytes();
     }
@@ -186,11 +187,7 @@ impl SignedLicenseGate {
 
     /// Constructs a [`SignedLicenseGate`] from a [`SignedActivation`].
     pub fn from_activation(activation: SignedActivation, verifying_key: VerifyingKey) -> Self {
-        Self::from_activation_with_clock(
-            activation,
-            verifying_key,
-            Arc::new(SystemClock::new()),
-        )
+        Self::from_activation_with_clock(activation, verifying_key, Arc::new(SystemClock::new()))
     }
 
     /// Constructs a [`SignedLicenseGate`] from a [`SignedActivation`] with an injected [`Clock`].
@@ -318,26 +315,36 @@ impl LicenseGate for SignedLicenseGate {
         }
 
         // Extract activation attributes from SignedActivation or legacy LicensePayload
-        let (act_ring, _act_hash, act_expires, is_sig_valid) = if let Some(ref act) = self.activation {
-            let sig_valid = match &self.verifying_key {
-                Some(vk) => act.verify_signature(vk),
-                None => false,
-            };
-            (act.ring, act.installation_id_hash, act.expires_at_unix, sig_valid)
-        } else if let Some(ref payload) = self.license_payload {
-            let sig_valid = true;
-            let hash = payload.installation_id_hash.unwrap_or_default();
-            let expires = payload.expires_at.unwrap_or(i64::MAX);
-            let mapped_ring = if payload.allowed_rings.contains(&ring) {
-                ring
+        let (act_ring, _act_hash, act_expires, is_sig_valid) =
+            if let Some(ref act) = self.activation {
+                let sig_valid = match &self.verifying_key {
+                    Some(vk) => act.verify_signature(vk),
+                    None => false,
+                };
+                (
+                    act.ring,
+                    act.installation_id_hash,
+                    act.expires_at_unix,
+                    sig_valid,
+                )
+            } else if let Some(ref payload) = self.license_payload {
+                let sig_valid = true;
+                let hash = payload.installation_id_hash.unwrap_or_default();
+                let expires = payload.expires_at.unwrap_or(i64::MAX);
+                let mapped_ring = if payload.allowed_rings.contains(&ring) {
+                    ring
+                } else {
+                    payload
+                        .allowed_rings
+                        .first()
+                        .copied()
+                        .unwrap_or(FeatureRing::Fast)
+                };
+                (mapped_ring, hash, expires, sig_valid)
             } else {
-                payload.allowed_rings.first().copied().unwrap_or(FeatureRing::Fast)
+                // (2) Step 2: Missing activation
+                return Err(LicenseError::NotActivated(ring));
             };
-            (mapped_ring, hash, expires, sig_valid)
-        } else {
-            // (2) Step 2: Missing activation
-            return Err(LicenseError::NotActivated(ring));
-        };
 
         // (3) Step 3: Installation ID hash mismatch check.
         // Return NotActivated on mismatch to prevent information leaks about expected vs actual hash.
