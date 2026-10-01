@@ -544,6 +544,7 @@ impl LsmStorage {
             ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
                 ssi_max_tracked_keys,
             )),
+            metrics_sink: parking_lot::RwLock::new(Arc::new(contextra_ports::NoopMetricsSink)),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {

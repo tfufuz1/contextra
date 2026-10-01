@@ -200,6 +200,23 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
 /// 3. `truncate_lock` (`tokio::sync::Mutex`): Serializes physical WAL append, flush, and truncation.
 /// 4. `state` (`tokio::sync::RwLock`): Read guard protects `MemTable` and `immutable_memtables` vector structure.
 pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+    let start = std::time::Instant::now();
+    let res = commit_internal(storage, tx_id).await;
+    let elapsed_secs = start.elapsed().as_secs_f64();
+    let status_label = if res.is_ok() { "success" } else { "failure" };
+
+    let sink = storage.metrics_sink();
+    sink.record_histogram(
+        "lsm_commit_duration_seconds",
+        elapsed_secs,
+        &[("status", status_label)],
+    );
+    sink.record_counter("lsm_commit_total", 1, &[("status", status_label)]);
+
+    res
+}
+
+async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
