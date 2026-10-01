@@ -90,8 +90,8 @@ impl WasmMergeFunction {
         let total_stdin_len = 8usize
             .checked_add(existing.len())
             .and_then(|l| l.checked_add(new.len()))
-            .ok_or(SandboxError::InputTooLarge {
-                len: usize::MAX,
+            .ok_or_else(|| SandboxError::InputTooLarge {
+                len: existing.len().saturating_add(new.len()).saturating_add(8),
                 limit: caps.max_stdin_bytes,
             })?;
 
