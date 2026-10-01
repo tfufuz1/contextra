@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-27T19:30:00Z
 // ZWECK: Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
