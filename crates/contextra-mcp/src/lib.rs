@@ -1,6 +1,26 @@
 #![deny(dead_code)]
 #![forbid(unsafe_code)]
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
+//!
+//! ## MCP Tool Category Mapping
+//!
+//! | Tool Name | ToolCategory | Description |
+//! |---|---|---|
+//! | `contextra_search` | `DatabaseRead` | Hybrid semantic search over stored documents |
+//! | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
+//! | `contextra_collections` | `DatabaseRead` | List all collections |
+//! | `contextra_explain` | `DatabaseRead` | Provenance breakdown & retrieval explanation |
+//! | `contextra_plugin_status` | `DatabaseRead` | Status of active plugins & rings |
+//! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
+//! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
+//! | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
+//! | `contextra_forget` | `DatabaseWrite` | Delete document/collection with DeletionProof |
+//! | `contextra_relate` | `DatabaseWrite` | Create binary directed/bidirectional relationship |
+//! | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
+//! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
+//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+//! | `contextra_consolidate` | `DatabaseWrite` | Synchronous trigger for memory consolidation pass |
+//! | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 
 pub mod bulk_exfiltration_detector;
 pub mod config;

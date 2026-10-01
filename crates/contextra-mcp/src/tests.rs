@@ -107,7 +107,7 @@ async fn test_tools_list_returns_all_tools() {
 
     // Dynamic assertion: every tool returned in tools/list MUST NOT classify as CodeExecution (INV-MCP-CLASSIFY-1)
     for name in &names {
-        let cat = crate::sandbox::McpSandbox::classify_method(name);
+        let cat = crate::sandbox::McpSandbox::try_classify_method(name).expect("registered tool");
         assert_ne!(
             cat,
             crate::sandbox::ToolCategory::CodeExecution,
@@ -124,8 +124,10 @@ async fn test_unknown_method_rejected_via_code_execution_fail_closed_path() {
 
     // 1. Direct classification of unlisted method yields CodeExecution fallback
     let unknown_method = "unlisted_arbitrary_eval";
+    #[allow(deprecated)]
+    let legacy_cat = McpSandbox::classify_method(unknown_method);
     assert_eq!(
-        McpSandbox::classify_method(unknown_method),
+        legacy_cat,
         ToolCategory::CodeExecution,
         "Unknown method must fall back to CodeExecution category"
     );
