@@ -13,12 +13,7 @@
 //              Schlüsselwerte werden NIEMALS geloggt. Zero-Panic im Produktionspfad.
 
 use crate::protocol::McpError;
-use std::sync::Once;
 use zeroize::Zeroizing;
-
-/// Warnungs-Guards für einmaliges Emittieren von Tracing-Warnungen.
-static DEPRECATION_WARN_ONCE: Once = Once::new();
-static CONFLICT_WARN_ONCE: Once = Once::new();
 
 /// Ergebnis des reinen Schlüssel-Resolvers.
 #[derive(Debug, PartialEq, Eq)]
@@ -86,31 +81,9 @@ pub(crate) fn resolve_deletion_proof_key(
 /// (`CONTEXTRA_DELETION_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`), ruft die reine Auflösungsfunktion auf
 /// und gibt bei Warnzuständen einmalige `tracing::warn!`-Meldungen aus.
 pub fn deletion_proof_key_from_env() -> Result<Zeroizing<String>, McpError> {
-    let primary_env = std::env::var("CONTEXTRA_DELETION_PROOF_KEY").ok();
-    let alias_env = std::env::var("CONTEXTRA_PROOF_KEY").ok();
-
-    let resolved = resolve_deletion_proof_key(primary_env.as_deref(), alias_env.as_deref())
-        .map_err(|ProofKeyError::MissingKey| {
-            McpError::invalid_params("deletion proof key not configured")
-        })?;
-
-    if resolved.used_deprecated_alias {
-        DEPRECATION_WARN_ONCE.call_once(|| {
-            tracing::warn!(
-                "CONTEXTRA_PROOF_KEY ist veraltet (deprecated). Bitte CONTEXTRA_DELETION_PROOF_KEY verwenden."
-            );
-        });
-    }
-
-    if resolved.has_conflict {
-        CONFLICT_WARN_ONCE.call_once(|| {
-            tracing::warn!(
-                "Konflikt: Sowohl CONTEXTRA_DELETION_PROOF_KEY als auch CONTEXTRA_PROOF_KEY sind mit unterschiedlichen Werten gesetzt. CONTEXTRA_DELETION_PROOF_KEY wird bevorzugt."
-            );
-        });
-    }
-
-    Ok(resolved.key)
+    let res = crate::proof_key_env::resolve_proof_key_from_env();
+    res.key
+        .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))
 }
 
 #[cfg(test)]

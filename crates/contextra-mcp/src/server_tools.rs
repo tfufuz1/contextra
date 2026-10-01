@@ -439,7 +439,11 @@ impl McpServer {
                         "proof_scope": "collection_only"
                     }))
                 } else {
-                    let proof_key = crate::proof_key::deletion_proof_key_from_env()?;
+                    let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
+                        .key
+                        .ok_or_else(|| {
+                            McpError::invalid_params("deletion proof key not configured")
+                        })?;
 
                     let tenant_id = contextra_types::TenantId::try_new(1)
                         .unwrap_or(contextra_types::TenantId::SYSTEM);

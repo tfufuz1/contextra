@@ -363,7 +363,10 @@ impl McpSandbox {
 
     /// Validiert ob ein Tool-Call erlaubt ist.
     ///
-    /// HINWEIS: Die Prüfung von `ToolCategory::CloudEgress` ist **additiv** zur
+    /// HINWEIS: Unbekannte Tool-Namen (die nicht in `TOOL_REGISTRY` gelistet sind)
+    /// werden sofort per `try_classify_method` abgelehnt, unabhängig von `allow_code_execution`.
+    ///
+    /// Die Prüfung von `ToolCategory::CloudEgress` ist **additiv** zur
     /// Egress-Guard- / Egress-Vault-Prüfung (`EgressClassifier`/`EgressGuardCheck` in `egress_gateway.rs`).
     /// Die Sandbox-Policy entscheidet, ob die Methode überhaupt aufgerufen werden darf,
     /// während der Egress-Guard zusätzlich prüft, ob der konkrete Payload bei erlaubtem Aufruf
@@ -375,7 +378,7 @@ impl McpSandbox {
                 method.len()
             )));
         }
-        let category = Self::classify_method(method);
+        let category = Self::try_classify_method(method)?;
         match category {
             ToolCategory::DatabaseRead => {
                 if !self.policy.allow_db_reads {
@@ -409,14 +412,25 @@ impl McpSandbox {
         Ok(())
     }
 
-    /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
-    pub fn classify_method(method: &str) -> ToolCategory {
+    /// Klassifiziert den MCP-Tool-Namen strikt anhand von `TOOL_REGISTRY`.
+    ///
+    /// Gibt `Err(ContextraError::InvalidInput("unknown tool"))` zurück, falls der Name nicht registriert ist.
+    pub fn try_classify_method(method: &str) -> Result<ToolCategory> {
         for tool in TOOL_REGISTRY {
             if tool.name == method {
-                return tool.category.clone();
+                return Ok(tool.category.clone());
             }
         }
-        ToolCategory::CodeExecution
+        Err(ContextraError::InvalidInput("unknown tool".to_string()))
+    }
+
+    /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
+    /// Falls die Methode unbekannt ist, wird als Fallback `ToolCategory::CodeExecution` zurückgegeben.
+    ///
+    /// HINWEIS: Neuer Code sollte `try_classify_method` nutzen, um unbekannte Tools
+    /// direkt als Fehler behandeln zu können.
+    pub fn classify_method(method: &str) -> ToolCategory {
+        Self::try_classify_method(method).unwrap_or(ToolCategory::CodeExecution)
     }
 
     /// Führt eine Asynchrone Tool-Future mit Timeout gemäß SandboxPolicy aus.
@@ -719,10 +733,7 @@ mod tests {
                 ToolCategory::CodeExecution,
                 "Listed tool '{name}' must not classify as CodeExecution"
             );
-            assert_eq!(
-                cat, *expected_cat,
-                "Tool '{name}' category mismatch"
-            );
+            assert_eq!(cat, *expected_cat, "Tool '{name}' category mismatch");
         }
 
         // Assert explain is DatabaseRead
@@ -739,8 +750,42 @@ mod tests {
     }
 
     #[test]
+    fn test_try_classify_method_and_unknown_tool_rejection() {
+        // 5a. Jedes Tool aus TOOL_REGISTRY liefert Ok aus try_classify_method und dieselbe Kategorie wie classify_method
+        for tool in TOOL_REGISTRY {
+            let try_cat = McpSandbox::try_classify_method(tool.name).expect("must be Ok");
+            let cat = McpSandbox::classify_method(tool.name);
+            assert_eq!(try_cat, cat);
+            assert_eq!(try_cat, tool.category);
+        }
+
+        // 5b. Ein unbekannter Name ergibt Err
+        assert!(McpSandbox::try_classify_method("unknown_unlisted_method").is_err());
+        assert!(McpSandbox::try_classify_method("system.eval").is_err());
+
+        // 5c. Auch bei allow_code_execution = true bleibt ein unbekannter Name nicht aufrufbar
+        let policy = SandboxPolicy {
+            allow_db_reads: true,
+            allow_db_writes: true,
+            allow_code_execution: true,
+            allow_cloud_egress: true,
+            max_execution_ms: 5_000,
+        };
+        let sandbox = McpSandbox::new(policy).unwrap();
+        let err = sandbox.validate_tool_call("unknown_unlisted_method", &Value::Null);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("unknown tool"));
+
+        // 5d. contextra_explain läuft weiterhin unter SandboxPolicy::default()
+        let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap();
+        assert!(default_sandbox
+            .validate_tool_call("contextra_explain", &Value::Null)
+            .is_ok());
+    }
+
+    #[test]
     fn test_unknown_method_classifies_as_code_execution() {
-        // Unknown method -> CodeExecution (fail-closed catch-all)
+        // Unknown method -> CodeExecution (legacy classify_method fallback)
         assert_eq!(
             McpSandbox::classify_method("unknown_unlisted_method"),
             ToolCategory::CodeExecution
