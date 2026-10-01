@@ -91,7 +91,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         weights: Option<&contextra_types::FusionWeights>,
         strategy: Option<&contextra_types::GraphTraversalStrategy>,
         same_community_as: Option<EntityId>,
-        fusion_strategy: Option<contextra_types::FusionStrategy>,
+        fusion_strategy: Option<contextra_types::SignalFusionStrategies>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
             return Ok(Vec::new());
@@ -233,7 +233,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let selected_fusion_strategy = fusion_strategy.unwrap_or_default();
 
-            let mut fused = crate::fusion::fuse_search_results_with_strategy(
+            let mut fused = crate::fusion::fuse_search_results_with_signal_strategies(
                 signal_sets,
                 k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),

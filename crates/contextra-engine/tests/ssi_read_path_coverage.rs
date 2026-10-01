@@ -85,12 +85,11 @@ async fn test_ssi_coverage_link_memories() -> Result<()> {
     )
     .await?;
 
-    // Stage a write on Tx1 so it becomes a read-write transaction
     col.update_op(
         &tx1,
-        "mem_x",
+        "mem_y",
         &emb,
-        Some(json!({ "title": "Tx1 Overwrite" })),
+        Some(json!({ "title": "Tx1 Overwrite Y" })),
     )
     .await?;
 

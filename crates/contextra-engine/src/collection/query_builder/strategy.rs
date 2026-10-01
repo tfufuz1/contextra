@@ -1,4 +1,4 @@
-use contextra_types::{FusionStrategy, GraphTraversalStrategy};
+use contextra_types::{FusionStrategy, GraphTraversalStrategy, SignalFusionStrategies};
 
 /// Strategy for hybrid search and graph signal traversal.
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +53,11 @@ impl SearchStrategy {
             SearchStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
             _ => FusionStrategy::Rrf,
         }
+    }
+
+    /// Converts `SearchStrategy` into core `SignalFusionStrategies`.
+    pub fn to_signal_fusion_strategies(&self) -> SignalFusionStrategies {
+        self.to_fusion_strategy().into()
     }
 }
 

@@ -25,6 +25,82 @@ pub enum FusionStrategy {
     ScoreNormalized,
 }
 
+/// Strategy configuration mapping per retrieval signal (vector, text, graph).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct SignalFusionStrategies {
+    /// Strategy used for vector search signal fusion.
+    pub vector: FusionStrategy,
+    /// Strategy used for full-text search signal fusion.
+    pub text: FusionStrategy,
+    /// Strategy used for graph search signal fusion.
+    pub graph: FusionStrategy,
+}
+
+impl Default for SignalFusionStrategies {
+    fn default() -> Self {
+        Self {
+            vector: FusionStrategy::Rrf,
+            text: FusionStrategy::Rrf,
+            graph: FusionStrategy::Rrf,
+        }
+    }
+}
+
+impl From<FusionStrategy> for SignalFusionStrategies {
+    fn from(s: FusionStrategy) -> Self {
+        Self {
+            vector: s,
+            text: s,
+            graph: s,
+        }
+    }
+}
+
+impl SignalFusionStrategies {
+    /// Creates a uniform configuration where all signals use the specified strategy.
+    pub fn uniform(strategy: FusionStrategy) -> Self {
+        strategy.into()
+    }
+
+    /// Returns the fusion strategy configured for a specific signal name ("vector", "text", "graph").
+    pub fn strategy_for_signal(&self, signal_name: &str) -> FusionStrategy {
+        match signal_name {
+            "vector" => self.vector,
+            "text" => self.text,
+            "graph" => self.graph,
+            _ => FusionStrategy::Rrf,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SignalFusionStrategies {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StrategyHelper {
+            Single(FusionStrategy),
+            PerSignal {
+                #[serde(default)]
+                vector: FusionStrategy,
+                #[serde(default)]
+                text: FusionStrategy,
+                #[serde(default)]
+                graph: FusionStrategy,
+            },
+        }
+
+        match StrategyHelper::deserialize(deserializer)? {
+            StrategyHelper::Single(s) => Ok(SignalFusionStrategies::from(s)),
+            StrategyHelper::PerSignal { vector, text, graph } => {
+                Ok(SignalFusionStrategies { vector, text, graph })
+            }
+        }
+    }
+}
+
 /// Strategy used for graph retrieval in hybrid search queries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GraphTraversalStrategy {
@@ -235,9 +311,9 @@ pub struct HybridQuery {
     pub graph_strategy: GraphTraversalStrategy,
     /// Fusion weights across vector, text, and graph signals.
     pub fusion_weights: FusionWeights,
-    /// Fusion strategy used to combine search signals (default: Rrf).
+    /// Fusion strategy used to combine search signals (default: all Rrf).
     #[serde(default)]
-    pub fusion_strategy: FusionStrategy,
+    pub fusion_strategy: SignalFusionStrategies,
     /// Optional metadata expression filter.
     pub filter: Option<FilterExpr>,
     /// Optional entity ID to filter/boost results in the same community.
@@ -284,7 +360,7 @@ pub struct HybridQueryBuilder {
     graph_start_node: Option<String>,
     graph_strategy: Option<GraphTraversalStrategy>,
     fusion_weights: Option<FusionWeights>,
-    fusion_strategy: Option<FusionStrategy>,
+    fusion_strategy: Option<SignalFusionStrategies>,
     filter: Option<FilterExpr>,
     same_community_as: Option<EntityId>,
     memory_type_filter: Option<Vec<MemoryType>>,
@@ -331,9 +407,9 @@ impl HybridQueryBuilder {
         self
     }
 
-    /// Sets search fusion strategy (`FusionStrategy::Rrf` or `FusionStrategy::ScoreNormalized`).
-    pub fn with_fusion_strategy(mut self, strategy: FusionStrategy) -> Self {
-        self.fusion_strategy = Some(strategy);
+    /// Sets search fusion strategy per signal or globally (`FusionStrategy` or `SignalFusionStrategies`).
+    pub fn with_fusion_strategy(mut self, strategy: impl Into<SignalFusionStrategies>) -> Self {
+        self.fusion_strategy = Some(strategy.into());
         self
     }
 
