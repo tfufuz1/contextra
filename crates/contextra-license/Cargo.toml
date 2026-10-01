@@ -16,6 +16,7 @@ ring = "4"
 thiserror = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
+blake3 = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
