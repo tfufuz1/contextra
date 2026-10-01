@@ -77,9 +77,7 @@ pub mod decay_controller {
     pub use contextra_adapt::decay_controller::*;
 }
 pub use contextra_engine::fusion;
-pub mod homeostat {
-    pub use contextra_adapt::homeostat::*;
-}
+pub mod homeostat;
 pub mod multistep;
 pub mod pid_latency_controller {
     pub use contextra_adapt::pid_latency_controller::*;
