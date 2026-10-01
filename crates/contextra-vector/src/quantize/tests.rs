@@ -169,9 +169,8 @@ fn test_quantize_dequantize_roundtrip() {
 fn test_quantized_search_no_panic() {
     use contextra_ports::{Rng, SeededRng};
     let rng = SeededRng::new(12345);
-    let next_range = |min: f32, max: f32| -> f32 {
-        min + (rng.next_unit_f64() as f32) * (max - min)
-    };
+    let next_range =
+        |min: f32, max: f32| -> f32 { min + (rng.next_unit_f64() as f32) * (max - min) };
 
     let mut vectors = Vec::new();
     for _ in 0..100 {

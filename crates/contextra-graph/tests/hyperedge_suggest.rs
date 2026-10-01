@@ -25,10 +25,7 @@ impl MockTextGenerator {
 }
 
 impl LlmTextGenerator for MockTextGenerator {
-    fn generate<'a>(
-        &'a self,
-        _prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_ports::Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_ports::Result<String>> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         let resp = self.response.clone();
         Box::pin(async move { Ok(resp) })

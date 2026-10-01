@@ -35,7 +35,11 @@ impl AccessCounterAttentionExporter {
 
     /// Returns the current access count for the given request ID.
     pub fn get_access_count(&self, request_id: RequestId) -> u64 {
-        self.access_counts.read().get(&request_id).copied().unwrap_or(0)
+        self.access_counts
+            .read()
+            .get(&request_id)
+            .copied()
+            .unwrap_or(0)
     }
 }
 

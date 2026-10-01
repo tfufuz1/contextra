@@ -68,8 +68,7 @@ impl DiskAnnIndex {
             ));
         }
 
-        let ep_passes =
-            !tombstones.contains(ep_node.doc_id.inner()) && filter(ep_node.doc_id);
+        let ep_passes = !tombstones.contains(ep_node.doc_id.inner()) && filter(ep_node.doc_id);
 
         let mut queue = BinaryHeap::new(); // Min-heap by distance ( Reverse(SearchCandidate) )
         let mut matching_results = Vec::new();

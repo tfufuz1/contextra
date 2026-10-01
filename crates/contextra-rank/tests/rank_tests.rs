@@ -147,11 +147,11 @@ mod tests {
 
     #[test]
     fn test_mrrf_determinism_baseline() {
+        use contextra_rank::drift::DriftStatus;
         use contextra_rank::fusion::{
             weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
             MetadataMergePriority, SearchResult, SignalCalibrationContext,
         };
-        use contextra_rank::drift::DriftStatus;
 
         let res_a = vec![
             SearchResult {
@@ -213,8 +213,19 @@ mod tests {
 
         // mRRF with beta = 1.0 but uncalibrated/unstable signal context (so m_s defaults to 0)
         let uncalibrated_ctxs = vec![
-            SignalCalibrationContext::new("signal_a", false, DriftStatus::Stable { mean_shift: 0.0 }),
-            SignalCalibrationContext::new("signal_b", true, DriftStatus::DriftDetected { mean_shift: 0.3, threshold: 0.1 }),
+            SignalCalibrationContext::new(
+                "signal_a",
+                false,
+                DriftStatus::Stable { mean_shift: 0.0 },
+            ),
+            SignalCalibrationContext::new(
+                "signal_b",
+                true,
+                DriftStatus::DriftDetected {
+                    mean_shift: 0.3,
+                    threshold: 0.1,
+                },
+            ),
         ];
         let mrrf_fused_uncalibrated = weighted_reciprocal_rank_fusion_mrrf(
             sets,
@@ -232,10 +243,10 @@ mod tests {
 
     #[test]
     fn test_mrrf_margin_modulation_relative_weight_effect() {
+        use contextra_rank::drift::DriftStatus;
         use contextra_rank::fusion::{
             modulate_and_renormalize_weights, SearchResult, SignalCalibrationContext,
         };
-        use contextra_rank::drift::DriftStatus;
 
         // Signal A: Close tie (m_s = 0.80 - 0.79 = 0.01)
         let res_a = vec![
@@ -279,8 +290,16 @@ mod tests {
         ];
 
         let contexts = vec![
-            SignalCalibrationContext::new("signal_a", true, DriftStatus::Stable { mean_shift: 0.0 }),
-            SignalCalibrationContext::new("signal_b", true, DriftStatus::Stable { mean_shift: 0.0 }),
+            SignalCalibrationContext::new(
+                "signal_a",
+                true,
+                DriftStatus::Stable { mean_shift: 0.0 },
+            ),
+            SignalCalibrationContext::new(
+                "signal_b",
+                true,
+                DriftStatus::Stable { mean_shift: 0.0 },
+            ),
         ];
 
         let beta = 1.0;
@@ -291,9 +310,15 @@ mod tests {
 
         // Verify total weight sum is preserved (sum = 2.0, within [0.999, 1.001] factor)
         let total_weight = w_a + w_b;
-        assert!((total_weight - 2.0).abs() < 0.001, "Weight sum invariant violated: {total_weight}");
+        assert!(
+            (total_weight - 2.0).abs() < 0.001,
+            "Weight sum invariant violated: {total_weight}"
+        );
 
         // Signal B has a much larger margin, so after modulation and renormalization, w_B > w_A
-        assert!(w_b > w_a, "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})");
+        assert!(
+            w_b > w_a,
+            "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
+        );
     }
 }

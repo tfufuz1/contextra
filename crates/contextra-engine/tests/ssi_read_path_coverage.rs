@@ -20,8 +20,10 @@ async fn test_ssi_coverage_get_tracked() -> Result<()> {
     let col = db.collection("default").await?;
     let emb = vec![1.0, 0.0, 0.0, 0.0];
 
-    col.insert("res_a", &emb, Some(json!({ "val": 100 }))).await?;
-    col.insert("res_b", &emb, Some(json!({ "val": 200 }))).await?;
+    col.insert("res_a", &emb, Some(json!({ "val": 100 })))
+        .await?;
+    col.insert("res_b", &emb, Some(json!({ "val": 200 })))
+        .await?;
 
     let tx1 = col.begin_transaction()?;
     let tx2 = col.begin_transaction()?;

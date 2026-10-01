@@ -146,7 +146,10 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
     // Soft delete 150 vectors
     let tx2 = TxId::new(2);
     for i in 1..=150u64 {
-        index_a.delete(tx2, DocId::new(i.into())).await.expect("delete_a");
+        index_a
+            .delete(tx2, DocId::new(i.into()))
+            .await
+            .expect("delete_a");
     }
     index_a.commit(tx2).await.expect("commit_a2");
 

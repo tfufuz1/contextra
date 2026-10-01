@@ -233,11 +233,11 @@ pub mod fusion;
 #[cfg(not(loom))]
 pub mod import;
 #[cfg(not(loom))]
+pub mod kv_cache_integration;
+#[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
-#[cfg(not(loom))]
-pub mod kv_cache_integration;
 
 #[cfg(not(loom))]
 pub use kv_cache_integration::build_eviction_worker;
@@ -569,14 +569,29 @@ impl Contextra {
 
 #[cfg(feature = "sandbox")]
 pub trait SandboxBridge: Send + Sync {
-    fn db_search<'a>(&'a self, query: &'a [u8], k: usize) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
-    fn db_insert<'a>(&'a self, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<()>>;
-    fn db_get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
+    fn db_search<'a>(
+        &'a self,
+        query: &'a [u8],
+        k: usize,
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
+    fn db_insert<'a>(
+        &'a self,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<()>>;
+    fn db_get<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
 }
 
 #[cfg(feature = "sandbox")]
 impl SandboxBridge for Contextra {
-    fn db_search<'a>(&'a self, query: &'a [u8], k: usize) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
+    fn db_search<'a>(
+        &'a self,
+        query: &'a [u8],
+        k: usize,
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
         Box::pin(async move {
             let f32_count = query.len() / 4;
             let mut vector = Vec::with_capacity(f32_count);
@@ -602,7 +617,11 @@ impl SandboxBridge for Contextra {
         })
     }
 
-    fn db_insert<'a>(&'a self, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<()>> {
+    fn db_insert<'a>(
+        &'a self,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             let id = String::from_utf8_lossy(key).to_string();
             let val_json: Value = serde_json::from_slice(value)
@@ -612,7 +631,10 @@ impl SandboxBridge for Contextra {
         })
     }
 
-    fn db_get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
+    fn db_get<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
         Box::pin(async move {
             let id = String::from_utf8_lossy(key).to_string();
             let doc = self.get(&id).await?;

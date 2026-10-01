@@ -123,12 +123,7 @@ fn test_domain_vocabulary_sample_term_recognition() {
     let med_stems_set: HashSet<_> = medical.compound_stems().iter().copied().collect();
     let med_prot_set: HashSet<_> = medical.protected_terms().iter().copied().collect();
 
-    let sample_med_stems = [
-        "acetylsalicylsaeure",
-        "aorten",
-        "entzuendung",
-        "adipositas",
-    ];
+    let sample_med_stems = ["acetylsalicylsaeure", "aorten", "entzuendung", "adipositas"];
 
     for stem in &sample_med_stems {
         assert!(
@@ -138,7 +133,9 @@ fn test_domain_vocabulary_sample_term_recognition() {
         );
     }
 
-    let sample_med_prot = ["muskel", "herz", "arzt", "dosis", "ekg", "labor", "virus", "wunde"];
+    let sample_med_prot = [
+        "muskel", "herz", "arzt", "dosis", "ekg", "labor", "virus", "wunde",
+    ];
     for prot in &sample_med_prot {
         assert!(
             med_prot_set.contains(prot),

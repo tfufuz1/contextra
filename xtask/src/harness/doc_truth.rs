@@ -71,11 +71,7 @@ pub fn run_doc_truth(args: &[String]) -> i32 {
 
     let has_errors = findings.iter().any(|f| f.severity == "error");
 
-    let status = if has_errors {
-        "fail"
-    } else {
-        "pass"
-    };
+    let status = if has_errors { "fail" } else { "pass" };
 
     let exit_code = if status == "fail" { 1 } else { 0 };
 
@@ -160,7 +156,11 @@ fn doc_truth_target_files(root: &Path) -> Vec<(String, PathBuf, bool)> {
     {
         if entry.file_type().is_file() && entry.file_name() == "AGENTS.md" {
             if let Ok(rel) = entry.path().strip_prefix(root) {
-                files.push((rel.to_string_lossy().to_string(), entry.path().to_path_buf(), true));
+                files.push((
+                    rel.to_string_lossy().to_string(),
+                    entry.path().to_path_buf(),
+                    true,
+                ));
             }
         }
     }
@@ -201,8 +201,14 @@ pub fn doc_truth_check_paths_pub(root: &Path, findings: &mut Vec<DocTruthFinding
                         line: line_num,
                         id: "DOC-TRUTH-PATH".to_string(),
                         severity: if is_warn_only { "warn" } else { "error" }.to_string(),
-                        message: format!("Referenzierter Pfad '{}' existiert nicht im Repository.", token),
-                        fix: format!("Pfade in '{}' korrigieren oder '<!-- doc-ref-ignore -->' anhängen.", rel_file),
+                        message: format!(
+                            "Referenzierter Pfad '{}' existiert nicht im Repository.",
+                            token
+                        ),
+                        fix: format!(
+                            "Pfade in '{}' korrigieren oder '<!-- doc-ref-ignore -->' anhängen.",
+                            rel_file
+                        ),
                     });
                 }
             }
@@ -227,7 +233,11 @@ fn doc_truth_is_path_candidate(token: &str) -> bool {
     let valid_exts = [
         ".rs", ".toml", ".md", ".json", ".txt", ".yml", ".yaml", ".fbs", ".html",
     ];
-    if valid_exts.iter().any(|ext| trimmed.ends_with(ext)) && trimmed != ".rs" && trimmed != ".toml" && trimmed != ".md" {
+    if valid_exts.iter().any(|ext| trimmed.ends_with(ext))
+        && trimmed != ".rs"
+        && trimmed != ".toml"
+        && trimmed != ".md"
+    {
         return true;
     }
 
@@ -342,7 +352,10 @@ pub fn doc_truth_check_commands_pub(root: &Path, findings: &mut Vec<DocTruthFind
     let valid_commands = doc_truth_get_xtask_commands(root);
     let target_files = doc_truth_target_files(root);
 
-    let cmd_re = Regex::new(r"(?:cargo\s+xtask|cargo\s+run\s+--manifest-path\s+xtask/Cargo\.toml\s+--)\s+([a-z0-9-]+)").unwrap();
+    let cmd_re = Regex::new(
+        r"(?:cargo\s+xtask|cargo\s+run\s+--manifest-path\s+xtask/Cargo\.toml\s+--)\s+([a-z0-9-]+)",
+    )
+    .unwrap();
 
     for (rel_file, full_path, is_warn_only) in target_files {
         let content = match fs::read_to_string(&full_path) {
@@ -364,7 +377,10 @@ pub fn doc_truth_check_commands_pub(root: &Path, findings: &mut Vec<DocTruthFind
                             line: line_num,
                             id: "DOC-TRUTH-CMD-PLANNED".to_string(),
                             severity: "info".to_string(),
-                            message: format!("Geplantes xtask Kommando '{}' ist noch nicht implementiert.", cmd_name),
+                            message: format!(
+                                "Geplantes xtask Kommando '{}' ist noch nicht implementiert.",
+                                cmd_name
+                            ),
                             fix: "Keine Aktion erforderlich (geplantes Kommando).".to_string(),
                         });
                     } else {
@@ -459,7 +475,9 @@ pub fn doc_truth_check_unsafe_islands_pub(root: &Path, findings: &mut Vec<DocTru
         for entry_file in &[lib_rs, main_rs] {
             if entry_file.exists() {
                 if let Ok(content) = fs::read_to_string(entry_file) {
-                    if content.contains("#![forbid(unsafe_code)]") || content.contains("#![deny(unsafe_code)]") {
+                    if content.contains("#![forbid(unsafe_code)]")
+                        || content.contains("#![deny(unsafe_code)]")
+                    {
                         enforces_forbid = true;
                         break;
                     }
@@ -489,7 +507,10 @@ fn doc_truth_get_capabilities_unsafe_islands(root: &Path) -> BTreeSet<String> {
         for line in content.lines() {
             let line_trimmed = line.trim();
             if line_trimmed.starts_with("[crates.") {
-                current_crate = line_trimmed.trim_start_matches("[crates.").trim_end_matches(']').to_string();
+                current_crate = line_trimmed
+                    .trim_start_matches("[crates.")
+                    .trim_end_matches(']')
+                    .to_string();
             } else if line_trimmed == "unsafe_island = true" && !current_crate.is_empty() {
                 islands.insert(current_crate.clone());
             }
@@ -676,8 +697,14 @@ pub fn doc_truth_check_crate_table_pub(root: &Path, findings: &mut Vec<DocTruthF
                 line: 1,
                 id: "DOC-TRUTH-CRATE-TABLE-MISSING".to_string(),
                 severity: "error".to_string(),
-                message: format!("Fehlender Crate '{}' in Crate-Tabelle in JULES_CONTEXT.md.", active),
-                fix: format!("Crate '{}' in Crate-Tabelle von JULES_CONTEXT.md aufnehmen.", active),
+                message: format!(
+                    "Fehlender Crate '{}' in Crate-Tabelle in JULES_CONTEXT.md.",
+                    active
+                ),
+                fix: format!(
+                    "Crate '{}' in Crate-Tabelle von JULES_CONTEXT.md aufnehmen.",
+                    active
+                ),
             });
         }
     }

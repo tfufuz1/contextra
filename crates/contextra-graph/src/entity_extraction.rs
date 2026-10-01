@@ -101,7 +101,12 @@ impl RuleBasedEntityExtractor {
                 base_confidence: 0.90,
             },
             RelationPattern {
-                triggers: vec!["ist verbunden mit", "is connected to", "gehoert zu", "belongs to"],
+                triggers: vec![
+                    "ist verbunden mit",
+                    "is connected to",
+                    "gehoert zu",
+                    "belongs to",
+                ],
                 relation_type: "CONNECTED_TO",
                 base_confidence: 0.75,
             },
@@ -146,7 +151,8 @@ impl RuleBasedEntityExtractor {
 
         if selected.is_empty() {
             // Fallback: Nimm das letzte/erste nicht-leere Wort falls kein capitalized Wort gefunden wurde
-            tokens.iter()
+            tokens
+                .iter()
                 .map(|t| Self::clean_entity_name(t))
                 .find(|s| !s.is_empty())
         } else {

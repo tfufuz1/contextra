@@ -66,7 +66,12 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
                 "Base doc '{doc_id}' must be present at long snapshot seq {long_snapshot_seq}"
             );
             assert_eq!(
-                snap_doc.unwrap().metadata.as_ref().and_then(|m| m.get("version")).and_then(|v| v.as_u64()),
+                snap_doc
+                    .unwrap()
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("version"))
+                    .and_then(|v| v.as_u64()),
                 Some(1)
             );
         }
@@ -116,7 +121,9 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
                         }
                         Err(other_err) => {
                             // Undokumentierter / unerwarteter interner Fehler
-                            eprintln!("Unexpected internal error in task {task_idx}: {other_err:?}");
+                            eprintln!(
+                                "Unexpected internal error in task {task_idx}: {other_err:?}"
+                            );
                             err_counter.fetch_add(1, Ordering::Relaxed);
                         }
                     }
@@ -137,7 +144,10 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
 
                 // Verifizieren: Die während der Schreiblast neu erzeugten Keys sind im langen Snapshot NICHT sichtbar
                 let new_key = format!("doc_task_0_{check_cycle}");
-                if let Ok(snap_res) = coll_snapshot_reader.get_at_snapshot(&new_key, long_snapshot_seq).await {
+                if let Ok(snap_res) = coll_snapshot_reader
+                    .get_at_snapshot(&new_key, long_snapshot_seq)
+                    .await
+                {
                     if snap_res.is_some() {
                         eprintln!("Snapshot isolation breach: new key '{new_key}' visible at snapshot {long_snapshot_seq}");
                         snapshot_check_passed_clone.store(false, Ordering::Relaxed);
@@ -147,8 +157,15 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
 
                 // Verifizieren: Die Basisdokumente behalten im langen Snapshot stets ihren ursprünglichen Stand (version == 1)
                 let base_key = format!("base_doc_{}", check_cycle % base_doc_count);
-                if let Ok(Some(doc)) = coll_snapshot_reader.get_at_snapshot(&base_key, long_snapshot_seq).await {
-                    let version = doc.metadata.as_ref().and_then(|m| m.get("version")).and_then(|v| v.as_u64());
+                if let Ok(Some(doc)) = coll_snapshot_reader
+                    .get_at_snapshot(&base_key, long_snapshot_seq)
+                    .await
+                {
+                    let version = doc
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("version"))
+                        .and_then(|v| v.as_u64());
                     if version != Some(1) {
                         eprintln!("Snapshot consistency breach for '{base_key}': version is {:?}, expected 1", version);
                         snapshot_check_passed_clone.store(false, Ordering::Relaxed);
@@ -178,8 +195,14 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
         println!("  Unerwartete/interne Fehler:                 {n_err}");
         println!("  Gesamtdauer:                                {elapsed:.2?}");
         if total_tx_target > 0 {
-            println!("  Erfolgsquote:                               {:.2}%", (n_succ as f64 / total_tx_target as f64) * 100.0);
-            println!("  Konfliktrate:                               {:.2}%", (n_conf as f64 / total_tx_target as f64) * 100.0);
+            println!(
+                "  Erfolgsquote:                               {:.2}%",
+                (n_succ as f64 / total_tx_target as f64) * 100.0
+            );
+            println!(
+                "  Konfliktrate:                               {:.2}%",
+                (n_conf as f64 / total_tx_target as f64) * 100.0
+            );
         }
         println!("============================================================");
 
@@ -204,7 +227,12 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
                 "Base doc '{doc_id}' must remain present in long snapshot after write load"
             );
             assert_eq!(
-                snap_doc.unwrap().metadata.as_ref().and_then(|m| m.get("version")).and_then(|v| v.as_u64()),
+                snap_doc
+                    .unwrap()
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("version"))
+                    .and_then(|v| v.as_u64()),
                 Some(1)
             );
         }
@@ -215,11 +243,13 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
         let mut post_load_successes = 0;
         for i in 0..post_load_writes {
             let doc_id = format!("post_load_doc_{i}");
-            let res = coll.insert(
-                &doc_id,
-                &dummy_vector(dim, 0.99),
-                Some(dummy_metadata("post_load", i)),
-            ).await;
+            let res = coll
+                .insert(
+                    &doc_id,
+                    &dummy_vector(dim, 0.99),
+                    Some(dummy_metadata("post_load", i)),
+                )
+                .await;
 
             if res.is_ok() {
                 post_load_successes += 1;

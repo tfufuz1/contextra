@@ -35,7 +35,10 @@ async fn test_regular_open_rejects_legacy_wal_without_migration() {
     let has_pending = LsmStorage::has_pending_legacy_wal_migration_path(&db_path)
         .await
         .expect("has_pending_legacy_wal_migration_path");
-    assert!(has_pending, "Database must indicate pending legacy WAL migration");
+    assert!(
+        has_pending,
+        "Database must indicate pending legacy WAL migration"
+    );
 
     // 2. Regular LsmStorage::open without migration must fail
     let config = LsmConfig {
@@ -95,7 +98,9 @@ async fn test_explicit_migration_rekeys_and_clears_pending_status() {
         .await
         .expect("LsmStorage::open after migration");
     assert!(
-        !db.has_pending_legacy_wal_migration().await.expect("has_pending"),
+        !db.has_pending_legacy_wal_migration()
+            .await
+            .expect("has_pending"),
         "has_pending_legacy_wal_migration() must return false on active db"
     );
     db.close().await.expect("close");

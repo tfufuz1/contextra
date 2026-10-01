@@ -65,7 +65,10 @@ pub fn run_risk(args: &[String]) -> i32 {
         if f_lower.contains("crypto") || f_lower.contains("privacy") {
             max_tier = "sec";
             touched_wal_crypto = true;
-        } else if f_lower.contains("wal") || f_lower.contains("store") || f_lower.contains("checkpoint") {
+        } else if f_lower.contains("wal")
+            || f_lower.contains("store")
+            || f_lower.contains("checkpoint")
+        {
             if max_tier != "sec" {
                 max_tier = "crash";
             }
@@ -84,7 +87,8 @@ pub fn run_risk(args: &[String]) -> i32 {
             touched_cargo = true;
         }
 
-        if f_lower.starts_with(".github/") || f_lower == "constitution.md" || f_lower == "deny.toml" {
+        if f_lower.starts_with(".github/") || f_lower == "constitution.md" || f_lower == "deny.toml"
+        {
             touched_protected = true;
         }
     }

@@ -4,7 +4,9 @@ use contextra_cognition::memory_consolidation::{
 };
 use contextra_graph::CsrGraph;
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
-use contextra_ports::{BoxFuture, GroundingValidator, LlmTextGenerator, ResponseGroundingValidator};
+use contextra_ports::{
+    BoxFuture, GroundingValidator, LlmTextGenerator, ResponseGroundingValidator,
+};
 use contextra_store::LsmStorage;
 use contextra_types::Result;
 use contextra_vector::HnswIndex;
@@ -75,7 +77,10 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         .await
         .unwrap();
 
-    collection.relate("doc_1", "doc_2", "co_occurrence").await.unwrap();
+    collection
+        .relate("doc_1", "doc_2", "co_occurrence")
+        .await
+        .unwrap();
 
     let turns = vec![
         (contextra_types::DocId::new(1), vec![1.0, 0.0, 0.0, 0.0]),
@@ -96,7 +101,8 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         ..Default::default()
     });
 
-    let test_response = "Die Synthese ergab eine wesentliche Steigerung des Gesamtergebnisses im Jahr 2025.";
+    let test_response =
+        "Die Synthese ergab eine wesentliche Steigerung des Gesamtergebnisses im Jahr 2025.";
     let test_source = "Der Umsatz im Jahr 2025 betrug genau 50 Millionen Euro.";
 
     // 1. Evaluate using ONLY ResponseGroundingValidator (uncalibrated score_grounding).
@@ -158,7 +164,7 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         &consolidation_config,
         Some(&synthesis_config),
         Some(&llm),
-        None, // No standard validator
+        None,                  // No standard validator
         Some(&gasp_validator), // Rich GaspValidator
         Some(&mut tracker),
     )

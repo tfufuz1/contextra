@@ -77,8 +77,9 @@ impl WasmMergeOperator {
         caps.max_wall_clock_ms = wall_clock_timeout.as_millis() as u64;
 
         let merge_fn = Arc::new(
-            WasmMergeFunction::new_with_capabilities(wasm_bytes, caps.clone())
-                .map_err(|e| ContextraError::Sandbox(format!("WASM validation failed: {}", map_sandbox_err(&e))))?,
+            WasmMergeFunction::new_with_capabilities(wasm_bytes, caps.clone()).map_err(|e| {
+                ContextraError::Sandbox(format!("WASM validation failed: {}", map_sandbox_err(&e)))
+            })?,
         );
 
         // Wall-clock limit plus 1 second reserve for thread communication
@@ -96,7 +97,9 @@ impl WasmMergeOperator {
                 {
                     Ok(rt) => rt,
                     Err(e) => {
-                        tracing::error!("Failed to create tokio runtime in WasmMergeOperator worker: {e}");
+                        tracing::error!(
+                            "Failed to create tokio runtime in WasmMergeOperator worker: {e}"
+                        );
                         return;
                     }
                 };
@@ -108,7 +111,9 @@ impl WasmMergeOperator {
                     }
                 });
             })
-            .map_err(|e| ContextraError::Internal(format!("Failed to spawn WASM merge worker thread: {e}")))?;
+            .map_err(|e| {
+                ContextraError::Internal(format!("Failed to spawn WASM merge worker thread: {e}"))
+            })?;
 
         Ok(Self {
             tx: Some(tx),
@@ -133,7 +138,9 @@ impl MergeOperator for WasmMergeOperator {
 
         if let Err(e) = tx.send(job) {
             tracing::warn!("WasmMergeOperator worker channel send error: {e}");
-            return Err(ContextraError::Sandbox("Merge worker channel disconnected".into()));
+            return Err(ContextraError::Sandbox(
+                "Merge worker channel disconnected".into(),
+            ));
         }
 
         match respond_rx.recv_timeout(self.recv_timeout) {
@@ -141,15 +148,21 @@ impl MergeOperator for WasmMergeOperator {
             Ok(Err(sandbox_err)) => {
                 let err_msg = map_sandbox_err(&sandbox_err);
                 tracing::warn!("WasmMergeOperator guest execution failed: {err_msg}");
-                Err(ContextraError::Sandbox(format!("WASM merge function failed: {err_msg}")))
+                Err(ContextraError::Sandbox(format!(
+                    "WASM merge function failed: {err_msg}"
+                )))
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 tracing::warn!("WasmMergeOperator execution timed out waiting for worker response");
-                Err(ContextraError::Sandbox("WASM merge function execution timed out".into()))
+                Err(ContextraError::Sandbox(
+                    "WASM merge function execution timed out".into(),
+                ))
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 tracing::warn!("WasmMergeOperator worker thread disconnected or panicked");
-                Err(ContextraError::Sandbox("WASM merge worker thread disconnected".into()))
+                Err(ContextraError::Sandbox(
+                    "WASM merge worker thread disconnected".into(),
+                ))
             }
         }
     }

@@ -1,6 +1,4 @@
-use contextra_graph::{
-    validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate,
-};
+use contextra_graph::{validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -24,10 +22,7 @@ impl MockLlmTextGenerator {
 }
 
 impl LlmTextGenerator for MockLlmTextGenerator {
-    fn generate<'a>(
-        &'a self,
-        _prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_ports::Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_ports::Result<String>> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         let resp = self.response.clone();
         Box::pin(async move { Ok(resp) })
@@ -62,7 +57,11 @@ async fn test_validate_candidates_llm_budget_guard() {
         matches!(err, GraphMutationError::Internal(ref msg) if msg.contains("LLM validation budget exceeded")),
         "Expected budget exceeded error, got: {err:?}"
     );
-    assert_eq!(generator.calls(), 0, "No LLM calls should be made when budget guard triggers");
+    assert_eq!(
+        generator.calls(),
+        0,
+        "No LLM calls should be made when budget guard triggers"
+    );
 }
 
 #[tokio::test]
@@ -93,7 +92,10 @@ async fn test_validate_candidates_llm_success() {
     assert_eq!(generator.calls(), 2);
 
     for item in &validated {
-        assert!(item.accepted, "Candidate should be accepted on YES response");
+        assert!(
+            item.accepted,
+            "Candidate should be accepted on YES response"
+        );
         assert_eq!(item.predicate, "interacts_with");
         assert!((item.llm_confidence - 0.9).abs() < f32::EPSILON);
     }
@@ -119,7 +121,10 @@ async fn test_validate_candidates_llm_rejection() {
     assert_eq!(validated.len(), 1);
     assert_eq!(generator.calls(), 1);
 
-    assert!(!validated[0].accepted, "Candidate should be rejected on NO response");
+    assert!(
+        !validated[0].accepted,
+        "Candidate should be rejected on NO response"
+    );
     assert!(validated[0].predicate.is_empty());
     assert_eq!(validated[0].llm_confidence, 0.0);
 }

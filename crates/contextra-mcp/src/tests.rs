@@ -207,13 +207,12 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         EXPECTED_TOOLS.iter().cloned().collect();
 
     for tool in &tools {
-        let name = tool["name"]
-            .as_str()
-            .expect("tool name must be a string");
+        let name = tool["name"].as_str().expect("tool name must be a string");
 
         // (a) Prüfen, dass es eine ToolCategory ungleich eines impliziten Fallbacks (CodeExecution) trägt
-        let try_cat = crate::sandbox::McpSandbox::try_classify_method(name)
-            .unwrap_or_else(|_| panic!("Tool '{name}' from tools/list was not found in TOOL_REGISTRY"));
+        let try_cat = crate::sandbox::McpSandbox::try_classify_method(name).unwrap_or_else(|_| {
+            panic!("Tool '{name}' from tools/list was not found in TOOL_REGISTRY")
+        });
 
         assert_ne!(
             try_cat,
