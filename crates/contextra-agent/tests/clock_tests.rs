@@ -41,9 +41,7 @@ impl AgentTool for FailingTool {
         _: &'a AgentContext,
         _: serde_json::Value,
     ) -> BoxFuture<'a, Result<StepResult>> {
-        Box::pin(async move {
-            Err(ContextraError::Internal("intentional failure".to_string()))
-        })
+        Box::pin(async move { Err(ContextraError::Internal("intentional failure".to_string())) })
     }
 }
 
@@ -126,12 +124,11 @@ async fn test_orchestrator_deterministic_clock_identical_runs() -> Result<()> {
 
     // Run 1
     let tmp1 = TempDir::new()?;
-    let db1 = Arc::new(
-        contextra_db::Contextra::open_with_config(tmp1.path(), Default::default()).await?,
-    );
+    let db1 =
+        Arc::new(contextra_db::Contextra::open_with_config(tmp1.path(), Default::default()).await?);
     let col1 = db1.collection("state").await?;
-    let mut engine1 = OrchestratorEngine::try_from_db(&db1)?
-        .with_clock(Arc::new(TestClock::new(fixed_secs)));
+    let mut engine1 =
+        OrchestratorEngine::try_from_db(&db1)?.with_clock(Arc::new(TestClock::new(fixed_secs)));
     engine1.try_register_tool(Box::new(FailingTool))?;
 
     let mut graph1 = StateGraph::new();
@@ -148,12 +145,11 @@ async fn test_orchestrator_deterministic_clock_identical_runs() -> Result<()> {
 
     // Run 2
     let tmp2 = TempDir::new()?;
-    let db2 = Arc::new(
-        contextra_db::Contextra::open_with_config(tmp2.path(), Default::default()).await?,
-    );
+    let db2 =
+        Arc::new(contextra_db::Contextra::open_with_config(tmp2.path(), Default::default()).await?);
     let col2 = db2.collection("state").await?;
-    let mut engine2 = OrchestratorEngine::try_from_db(&db2)?
-        .with_clock(Arc::new(TestClock::new(fixed_secs)));
+    let mut engine2 =
+        OrchestratorEngine::try_from_db(&db2)?.with_clock(Arc::new(TestClock::new(fixed_secs)));
     engine2.try_register_tool(Box::new(FailingTool))?;
 
     let mut graph2 = StateGraph::new();

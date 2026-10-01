@@ -313,8 +313,7 @@ mod tests {
         let plaintext = b"version 1 plaintext payload";
 
         // Create new_encrypted segment
-        let segment =
-            KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
+        let segment = KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
 
         // Roundtrip MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();

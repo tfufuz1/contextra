@@ -1,10 +1,11 @@
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Integrationstests fuer die Verdrahtung von AutoExtraction in Collection::insert_text_only.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::collection::crud::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
+use contextra_engine::collection::crud::{
+    AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig,
+};
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};
 use contextra_types::{ContextraError, Result};
 use std::sync::atomic::{AtomicUsize, Ordering};

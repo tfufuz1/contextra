@@ -700,7 +700,12 @@ mod tests {
 
         let events = metrics.events();
         assert_eq!(events.len(), 1);
-        if let MetricEvent::Histogram { name, value, labels } = &events[0] {
+        if let MetricEvent::Histogram {
+            name,
+            value,
+            labels,
+        } = &events[0]
+        {
             assert_eq!(name, "checkpoint_duration_seconds");
             assert!(*value >= 0.0);
             assert_eq!(labels, &vec![("status".to_string(), "commit".to_string())]);
@@ -729,10 +734,18 @@ mod tests {
 
         let events = metrics.events();
         assert_eq!(events.len(), 1);
-        if let MetricEvent::Histogram { name, value, labels } = &events[0] {
+        if let MetricEvent::Histogram {
+            name,
+            value,
+            labels,
+        } = &events[0]
+        {
             assert_eq!(name, "checkpoint_duration_seconds");
             assert!(*value >= 0.0);
-            assert_eq!(labels, &vec![("status".to_string(), "rollback".to_string())]);
+            assert_eq!(
+                labels,
+                &vec![("status".to_string(), "rollback".to_string())]
+            );
         } else {
             panic!("Expected Histogram metric event");
         }

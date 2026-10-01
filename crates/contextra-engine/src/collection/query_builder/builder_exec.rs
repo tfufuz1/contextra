@@ -15,13 +15,19 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         let fusion_weights = self.weights.unwrap_or_default();
         let fusion_strategy = self
             .fusion_strategy
-            .or_else(|| self.strategy.as_ref().map(|s| s.to_signal_fusion_strategies()))
+            .or_else(|| {
+                self.strategy
+                    .as_ref()
+                    .map(|s| s.to_signal_fusion_strategies())
+            })
             .unwrap_or_default();
 
         // Calculate candidate pool limits according to requirements:
         // Base candidate pool size is user wish multiplier * k (default multiplier = 10).
         // Enforce pool bounds [50, 200].
-        let raw_mult = self.rerank_pool_multiplier.unwrap_or(super::builder::DEFAULT_RERANK_POOL_MULTIPLIER);
+        let raw_mult = self
+            .rerank_pool_multiplier
+            .unwrap_or(super::builder::DEFAULT_RERANK_POOL_MULTIPLIER);
         let base_pool = (raw_mult * k).clamp(50, 200);
 
         #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -29,11 +35,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             let pid_pool = pid.lock().current_pool_size().unwrap_or(base_pool);
             base_pool.min(pid_pool).clamp(50, 200)
         } else {
-            self.rerank_pool_max.map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200))
+            self.rerank_pool_max
+                .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200))
         };
 
         #[cfg(not(feature = "adaptive-candidate-pool-sizing"))]
-        let effective_pool_max = self.rerank_pool_max.map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200));
+        let effective_pool_max = self
+            .rerank_pool_max
+            .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200));
 
         let hybrid_query = contextra_types::HybridQuery {
             text_query: self.text.clone(),
@@ -159,11 +168,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                     let remaining = rerank_deadline - elapsed;
                     let start_candidate_idx = chunk_idx * chunk_size;
 
-                    let rerank_res = tokio::time::timeout(
-                        remaining,
-                        reranker.rerank(text_str, chunk),
-                    )
-                    .await;
+                    let rerank_res =
+                        tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;
 
                     match rerank_res {
                         Ok(Ok(ranked_chunk)) => {
@@ -193,14 +199,15 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                 let _elapsed = start_time.elapsed();
                 #[cfg(feature = "adaptive-candidate-pool-sizing")]
                 if let Some(ref pid) = self.pid_controller {
-                    pid.lock()
-                        .update(_elapsed, _elapsed.as_millis() as f32);
+                    pid.lock().update(_elapsed, _elapsed.as_millis() as f32);
                 }
 
                 if !accumulated_ranked.is_empty() {
                     // Sort evaluated candidates by score descending
                     accumulated_ranked.sort_by(|a, b| {
-                        b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                        b.score
+                            .partial_cmp(&a.score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
 
                     // Implizites Calibration-Feedback (k=5 als Relevanz-Cutoff)
@@ -235,7 +242,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                     }
 
                     final_results.truncate(k);
-                    tracing::debug!("Anytime reranking applied: {} candidates", final_results.len());
+                    tracing::debug!(
+                        "Anytime reranking applied: {} candidates",
+                        final_results.len()
+                    );
                     return Ok(final_results);
                 } else {
                     // Complete timeout before any candidate completed: fallback to original fusion results

@@ -5,9 +5,7 @@
 // ZWECK: Observability-Modul für Grounding-Validierung.
 // INVARIANTEN: Re-exportiert primäre Grounding Trait-Definitionen aus `lifecycle`.
 
-pub use super::lifecycle::{
-    GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
-};
+pub use super::lifecycle::{GroundingAssessment, GroundingValidator, ResponseGroundingValidator};
 
 /// Trait for querying Lyapunov drift status from an attached router engine without creating a cyclic dependency (ADR-080).
 pub trait DriftStatusProvider: Send + Sync {

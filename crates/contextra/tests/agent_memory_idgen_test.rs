@@ -16,7 +16,8 @@ impl TextEmbeddingEngine for MockEmbedder {
 }
 
 #[tokio::test]
-async fn test_agent_memory_deterministic_id_generation() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn test_agent_memory_deterministic_id_generation(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let temp_dir_1 = tempfile::tempdir()?;
     let engine_1 = builder(16)
         .with_storage_path(temp_dir_1.path())
@@ -60,7 +61,8 @@ async fn test_agent_memory_deterministic_id_generation() -> std::result::Result<
 }
 
 #[tokio::test]
-async fn test_agent_memory_fallback_uuid_generation() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn test_agent_memory_fallback_uuid_generation(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
     let engine = builder(16)
         .with_storage_path(temp_dir.path())

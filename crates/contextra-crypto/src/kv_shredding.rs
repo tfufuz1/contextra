@@ -10,6 +10,7 @@
 
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
+use crate::revocation_log::{RevocationLog, RevocationTarget};
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
@@ -99,7 +100,11 @@ struct GroupEntry {
 }
 
 /// Derives or retrieves a random sub-key (Group KEK) for a shred group via `KeyRegistry`.
-pub fn derive_subkey(registry: &KeyRegistry, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
+pub fn derive_subkey(
+    registry: &KeyRegistry,
+    master_key: &KeyManager,
+    group_id: u64,
+) -> Result<SubKey> {
     registry.get_or_derive(master_key, group_id)
 }
 
@@ -503,10 +508,7 @@ mod tests {
 
         // Record 10 MUST fail decryption
         let res_10 = registry.decrypt_record(&km, &payloads[10]);
-        assert!(
-            res_10.is_err(),
-            "Revoked record 10 MUST fail decryption"
-        );
+        assert!(res_10.is_err(), "Revoked record 10 MUST fail decryption");
 
         // All remaining 63 neighbor records MUST remain readable
         for (i, payload) in payloads.iter().enumerate() {

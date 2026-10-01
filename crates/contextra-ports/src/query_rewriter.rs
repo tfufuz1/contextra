@@ -14,7 +14,9 @@ pub trait QueryRewriter: Send + Sync {
         current_results: &'a [ScoredEntry],
     ) -> BoxFuture<'a, Result<Vec<String>>> {
         Box::pin(async move {
-            let outputs = self.rewrite_structured(original_query, current_results).await?;
+            let outputs = self
+                .rewrite_structured(original_query, current_results)
+                .await?;
             let text_queries = outputs
                 .into_iter()
                 .filter_map(|out| out.text_query)

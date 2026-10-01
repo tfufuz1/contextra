@@ -861,7 +861,11 @@ mod tests {
             );
         }
 
-        assert_eq!(vault.len(), count, "all 100,000 entities stored without collision");
+        assert_eq!(
+            vault.len(),
+            count,
+            "all 100,000 entities stored without collision"
+        );
     }
 
     #[test]
@@ -889,13 +893,16 @@ mod tests {
 
         // Mutate the map so token_a maps to a tampered plaintext, simulating a hash collision with token_a
         if let Ok(mut guard) = vault.map.lock() {
-            guard.insert(token_a.clone(), "tampered_plaintext@example.com".to_string());
+            guard.insert(
+                token_a.clone(),
+                "tampered_plaintext@example.com".to_string(),
+            );
         }
 
         // Test directly with entity_a against tampered_plaintext
-        let collision_err = vault
-            .generate_surrogate(entity_a)
-            .expect_err("Must detect collision when token_a points to tampered_plaintext != entity_a");
+        let collision_err = vault.generate_surrogate(entity_a).expect_err(
+            "Must detect collision when token_a points to tampered_plaintext != entity_a",
+        );
 
         if let EgressVaultError::SurrogateCollision {
             surrogate,
@@ -907,7 +914,10 @@ mod tests {
             assert_eq!(existing_plaintext, "tampered_plaintext@example.com");
             assert_eq!(new_plaintext, entity_a);
         } else {
-            panic!("Expected SurrogateCollision error variant, got {:?}", collision_err);
+            panic!(
+                "Expected SurrogateCollision error variant, got {:?}",
+                collision_err
+            );
         }
 
         // Verify the vault mapping was NOT overwritten or mutated

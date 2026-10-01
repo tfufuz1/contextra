@@ -424,7 +424,10 @@ async fn test_merge_operator_fuel_exhausted_fail_safe() {
 
     let config = CompactionConfig::default();
     assert_eq!(config.merge_max_fuel, 10_000_000);
-    assert_eq!(config.merge_wall_clock_timeout, Duration::from_millis(5_000));
+    assert_eq!(
+        config.merge_wall_clock_timeout,
+        Duration::from_millis(5_000)
+    );
 
     let engine = CompactionEngine::new(
         config,
@@ -471,12 +474,18 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
 
     let sst1_path = dir.path().join("sst1.sst");
     let mut builder1 = SstableBuilder::create(&sst1_path).await.unwrap();
-    builder1.add(b"key_timeout", b"old_data", 1, 1).await.unwrap();
+    builder1
+        .add(b"key_timeout", b"old_data", 1, 1)
+        .await
+        .unwrap();
     builder1.finish().await.unwrap();
 
     let sst2_path = dir.path().join("sst2.sst");
     let mut builder2 = SstableBuilder::create(&sst2_path).await.unwrap();
-    builder2.add(b"key_timeout", b"new_data", 2, 2).await.unwrap();
+    builder2
+        .add(b"key_timeout", b"new_data", 2, 2)
+        .await
+        .unwrap();
     builder2.finish().await.unwrap();
 
     let reader1 = Arc::new(
@@ -541,16 +550,37 @@ async fn test_merge_operator_pure_capabilities_enforcement() {
     use contextra_sandbox::MergeOperatorCapabilities;
 
     let pure_caps = MergeOperatorCapabilities::pure();
-    assert!(!pure_caps.allow_stdout, "stdout must be disabled in pure MergeOperatorCapabilities");
-    assert!(!pure_caps.allow_stderr, "stderr must be disabled in pure MergeOperatorCapabilities");
-    assert!(!pure_caps.allow_filesystem, "filesystem must be disabled in pure MergeOperatorCapabilities");
-    assert!(!pure_caps.allow_network, "network must be disabled in pure MergeOperatorCapabilities");
-    assert!(!pure_caps.allow_clock, "clock time access must be disabled in pure MergeOperatorCapabilities");
-    assert!(pure_caps.random_seed.is_none(), "PRNG seed must be None in pure MergeOperatorCapabilities");
+    assert!(
+        !pure_caps.allow_stdout,
+        "stdout must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_stderr,
+        "stderr must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_filesystem,
+        "filesystem must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_network,
+        "network must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_clock,
+        "clock time access must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        pure_caps.random_seed.is_none(),
+        "PRNG seed must be None in pure MergeOperatorCapabilities"
+    );
     assert_eq!(pure_caps.max_fuel, 10_000_000);
     assert_eq!(pure_caps.max_wall_clock_ms, 5_000);
 
     let config = CompactionConfig::default();
     assert_eq!(config.merge_max_fuel, pure_caps.max_fuel);
-    assert_eq!(config.merge_wall_clock_timeout, Duration::from_millis(pure_caps.max_wall_clock_ms));
+    assert_eq!(
+        config.merge_wall_clock_timeout,
+        Duration::from_millis(pure_caps.max_wall_clock_ms)
+    );
 }

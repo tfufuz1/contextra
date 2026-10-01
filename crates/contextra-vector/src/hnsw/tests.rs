@@ -215,9 +215,10 @@ async fn test_hnsw_rebuild_metrics_duration() {
 
     let cnts = sink.counters.lock();
     assert!(
-        cnts.iter().any(|(name, val, labels)| name == "vector_rebuild_total"
-            && *val == 1
-            && labels.contains(&("status".to_string(), "success".to_string()))),
+        cnts.iter()
+            .any(|(name, val, labels)| name == "vector_rebuild_total"
+                && *val == 1
+                && labels.contains(&("status".to_string(), "success".to_string()))),
         "vector_rebuild_total success counter must be recorded"
     );
 }
@@ -250,7 +251,10 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     // Artificially induce high deletion rate (> 10%)
     let tx2 = TxId::new(2);
-    index.delete(tx2, DocId::from(1u64)).await.expect("delete 1");
+    index
+        .delete(tx2, DocId::from(1u64))
+        .await
+        .expect("delete 1");
     index.commit(tx2).await.expect("commit 2");
 
     assert!(
@@ -269,7 +273,10 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     // Third rapid rebuild attempt -> suppressed and triggers alert threshold alarm
     let res3 = index.rebuild().await;
-    assert!(res3.is_err(), "subsequent rapid rebuild must fail due to backoff");
+    assert!(
+        res3.is_err(),
+        "subsequent rapid rebuild must fail due to backoff"
+    );
 
     let cnts = sink.counters.lock();
     assert!(
@@ -278,8 +285,10 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
         "vector_rebuild_backoff_suppressed_total must be incremented"
     );
     assert!(
-        cnts.iter().any(|(name, _, labels)| name == "vector_rebuild_alarm_total"
-            && labels.contains(&("reason".to_string(), "excessive_rapid_rebuilds".to_string()))),
+        cnts.iter()
+            .any(|(name, _, labels)| name == "vector_rebuild_alarm_total"
+                && labels
+                    .contains(&("reason".to_string(), "excessive_rapid_rebuilds".to_string()))),
         "vector_rebuild_alarm_total alarm metric must be recorded"
     );
 
@@ -289,5 +298,8 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     // Rebuild after cooldown expires -> succeeds
-    index.rebuild().await.expect("rebuild after cooldown must succeed");
+    index
+        .rebuild()
+        .await
+        .expect("rebuild after cooldown must succeed");
 }
