@@ -393,13 +393,19 @@ mod tests {
             nanos: 1_700_000_000_000_000_000,
         };
         // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
-        let payload = "Sensitive outbound data stream exceeding minimum byte threshold for inspection. ".repeat(2);
+        let payload =
+            "Sensitive outbound data stream exceeding minimum byte threshold for inspection. "
+                .repeat(2);
         assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
 
         let failing_engine = Arc::new(FailingSearchEngine {
             error_msg: "vector index not initialized or query failed".to_string(),
         });
-        let guard = EgressGuard::new(failing_engine, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
+        let guard = EgressGuard::new(
+            failing_engine,
+            DEFAULT_EGRESS_GUARD_THRESHOLD,
+            DEFAULT_EGRESS_GUARD_MIN_BYTES,
+        );
 
         // (a) Result is always Block, never Allow
         let classification = guard.check(&payload).await;
@@ -426,19 +432,28 @@ mod tests {
             nanos: 1_750_000_000_000_000_000,
         };
         // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
-        let payload = "Outbound candidate text exceeding minimum byte limit for timeout verification. ".repeat(2);
+        let payload =
+            "Outbound candidate text exceeding minimum byte limit for timeout verification. "
+                .repeat(2);
         assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
 
         let timing_out_engine = Arc::new(MockSearchEngine {
             results: Ok(vec![]),
             delay: Some(Duration::from_millis(300)),
         });
-        let guard = EgressGuard::new(timing_out_engine, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES)
-            .with_timeout(Duration::from_millis(10));
+        let guard = EgressGuard::new(
+            timing_out_engine,
+            DEFAULT_EGRESS_GUARD_THRESHOLD,
+            DEFAULT_EGRESS_GUARD_MIN_BYTES,
+        )
+        .with_timeout(Duration::from_millis(10));
 
         // (a) Result is always Block(ClassificationTimeout), never Allow
         let classification = guard.check(&payload).await;
-        assert_eq!(classification, EgressClassification::Block(BlockReason::ClassificationTimeout));
+        assert_eq!(
+            classification,
+            EgressClassification::Block(BlockReason::ClassificationTimeout)
+        );
 
         // (b) Audit trace entry is generated correctly (INV-EGRESS-AUDIT-1)
         let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;
@@ -451,7 +466,9 @@ mod tests {
     #[tokio::test]
     async fn test_normal_operation_when_vector_index_available() {
         // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
-        let payload = "Normal outbound document context exceeding minimum length limit for inspection. ".repeat(2);
+        let payload =
+            "Normal outbound document context exceeding minimum length limit for inspection. "
+                .repeat(2);
         assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
 
         // Below threshold (0.5 < 0.85) -> Allow
@@ -462,8 +479,15 @@ mod tests {
             }]),
             delay: None,
         });
-        let guard_allow = EgressGuard::new(normal_engine_allow, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
-        assert_eq!(guard_allow.check(&payload).await, EgressClassification::Allow);
+        let guard_allow = EgressGuard::new(
+            normal_engine_allow,
+            DEFAULT_EGRESS_GUARD_THRESHOLD,
+            DEFAULT_EGRESS_GUARD_MIN_BYTES,
+        );
+        assert_eq!(
+            guard_allow.check(&payload).await,
+            EgressClassification::Allow
+        );
 
         // Above threshold (0.9 >= 0.85) -> Block
         let normal_engine_block = Arc::new(MockSearchEngine {
@@ -473,7 +497,11 @@ mod tests {
             }]),
             delay: None,
         });
-        let guard_block = EgressGuard::new(normal_engine_block, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
+        let guard_block = EgressGuard::new(
+            normal_engine_block,
+            DEFAULT_EGRESS_GUARD_THRESHOLD,
+            DEFAULT_EGRESS_GUARD_MIN_BYTES,
+        );
         assert_eq!(
             guard_block.check(&payload).await,
             EgressClassification::Block(BlockReason::SensitivePattern(
