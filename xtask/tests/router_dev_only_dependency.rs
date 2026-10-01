@@ -37,7 +37,12 @@ fn test_router_ring0_and_db_deps_are_dev_only() {
     let parsed: toml::Table = toml::from_str(&content)
         .unwrap_or_else(|e| panic!("Failed to parse TOML in {}: {}", manifest_path.display(), e));
 
-    let forbidden_deps = ["contextra-db", "contextra-vector", "contextra-graph", "contextra-text"];
+    let forbidden_deps = [
+        "contextra-db",
+        "contextra-vector",
+        "contextra-graph",
+        "contextra-text",
+    ];
 
     if let Some(deps_value) = parsed.get("dependencies") {
         if let Some(deps) = deps_value.as_table() {
