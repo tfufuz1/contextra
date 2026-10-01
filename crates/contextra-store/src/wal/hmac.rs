@@ -8,9 +8,23 @@ use super::{PreparedBatch, Wal, WalEntry, WalOp};
 #[cfg(feature = "legacy-wal-key")]
 const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
 
-// INV-WAL-LEGACY-KEY-1: Obfuscated legacy static HMAC integrity key used strictly
-// for backward-compatibility fallback during WAL replay of legacy databases.
-// Dieser Schlüssel hat keine Geheimhaltungseigenschaft mehr, sobald der Quellcode öffentlich einsehbar ist.
+/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback
+/// during WAL replay of legacy databases (INV-WAL-LEGACY-KEY-1).
+///
+/// # PREREQUISITES FOR FUTURE PERMANENT REMOVAL OF `LEGACY_INTEGRITY_KEY_OBFUSCATED`:
+/// To safely remove this constant, the static key fallback, and `deobfuscate_legacy_integrity_key()`
+/// in a future separate step without breaking existing operational databases, the following
+/// conditions MUST be verified and fulfilled:
+///
+/// 1. **Complete Operator Migration**: All legacy WAL files (V1/V2) across all active deployments
+///    must have been explicitly migrated using `Wal::migrate_legacy_wal` or `open_for_legacy_migration`.
+/// 2. **Retirement Marker Verification**: Every stored WAL segment in active deployment data
+///    directories must possess a corresponding `.rekeyed` retirement marker file containing a valid
+///    BLAKE3 key binding and be rewritten in V3 format.
+/// 3. **Zero Pending Migrations**: Audit checks via `LsmStorage::has_pending_legacy_wal_migration_path`
+///    return `false` across all operational environments, proven by an operator migration report audit artifact.
+/// 4. **Feature Gate Deprecation**: Cargo feature `legacy-wal-key` is formally deprecated and removed
+///    from crate feature definitions, enforcing fail-closed compilation errors on legacy key usage.
 #[cfg(feature = "legacy-wal-key")]
 const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
 
@@ -24,6 +38,9 @@ static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
 pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
     LEGACY_KEY_WARN_ONCE.call_once(|| {
         tracing::warn!(
+            target: "contextra_store::wal::legacy_key",
+            event = "legacy_integrity_key_accessed",
+            context = %context_msg,
             "Legacy-WAL-Integritätsschlüssel im Einsatz ({context_msg}) — dieses Format bietet keine echte Manipulationssicherheit, da der Schlüssel öffentlich ist. Bitte migriere die WAL-Datei auf ein neues Schlüsselformat."
         );
     });

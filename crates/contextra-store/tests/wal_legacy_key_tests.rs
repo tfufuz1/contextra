@@ -128,3 +128,107 @@ async fn test_open_for_legacy_migration_accepts_and_logs_warning() {
         *captured_logs
     );
 }
+
+#[tokio::test]
+async fn test_fallback_remains_inactive_without_explicit_migration_call() {
+    let dir = tempdir().expect("tempdir");
+    let wal_path = dir.path().join("legacy_inactive.wal");
+
+    let op = WalOp::Put {
+        tx_id: TxId::new(42),
+        key: b"unmigrated_key".to_vec(),
+        value: b"unmigrated_val".to_vec(),
+    };
+    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_entry = WalEntry::try_new(op, 42, &legacy_key, [0u8; 32]).expect("entry");
+
+    let mut wal_bytes = Vec::new();
+    wal_bytes.extend_from_slice(&WAL_V3_HEADER);
+    wal_bytes.extend_from_slice(&legacy_entry.to_bytes().expect("to_bytes"));
+    fs::write(&wal_path, wal_bytes).await.expect("write wal");
+
+    // Standard open MUST fail without explicit migration call
+    let open_res = Wal::open(&wal_path).await;
+    assert!(
+        open_res.is_err(),
+        "Standard Wal::open must fail on unmigrated legacy WAL file"
+    );
+
+    // Read-only handle replay MUST fail without explicit migration call
+    let read_only_wal = Wal::open_read_only(&wal_path, None)
+        .await
+        .expect("open_read_only creates read-only handle");
+    let read_only_replay = read_only_wal.replay().await;
+    assert!(
+        read_only_replay.is_err(),
+        "Replay on unmigrated legacy WAL file without explicit migration must fail"
+    );
+
+    let marker_path = dir.path().join("legacy_inactive.wal.rekeyed");
+    assert!(
+        !marker_path.exists(),
+        ".rekeyed marker must not be written without explicit migration"
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_explicit_migrate_legacy_wal_produces_structured_audit_log_and_v3_segment() {
+    let dir = tempdir().expect("tempdir");
+    let wal_path = dir.path().join("legacy_structured_mig.wal");
+
+    let op = WalOp::Put {
+        tx_id: TxId::new(100),
+        key: b"mig_key".to_vec(),
+        value: b"mig_val".to_vec(),
+    };
+    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_entry = WalEntry::try_new(op, 100, &legacy_key, [0u8; 32]).expect("entry");
+
+    let mut wal_bytes = Vec::new();
+    wal_bytes.extend_from_slice(&WAL_V3_HEADER);
+    wal_bytes.extend_from_slice(&legacy_entry.to_bytes().expect("to_bytes"));
+    fs::write(&wal_path, wal_bytes).await.expect("write wal");
+
+    let logs = Arc::new(Mutex::new(Vec::<String>::new()));
+    let collector = LogCollector(logs.clone());
+
+    let _guard = tracing::subscriber::set_default(collector);
+    tracing::callsite::rebuild_interest_cache();
+
+    // Explicit operator invocation
+    let migrated = Wal::migrate_legacy_wal(&wal_path, None)
+        .await
+        .expect("migrate_legacy_wal must succeed");
+    assert!(migrated, "migrate_legacy_wal must return true on legacy segment");
+
+    // Check structured audit log
+    let captured_logs = logs.lock().unwrap();
+    let audit_found = captured_logs.iter().any(|msg| {
+        msg.contains("legacy_integrity_key_fallback_used")
+            || msg.contains("Legacy-WAL-Integritätsschlüssel aktiv für Segment")
+    });
+
+    assert!(
+        audit_found,
+        "Expected structured audit log for legacy key fallback. Captured logs: {:?}",
+        *captured_logs
+    );
+
+    // Re-opening with standard Wal::open MUST now succeed without legacy fallback
+    let std_wal = Wal::open(&wal_path)
+        .await
+        .expect("Standard open must succeed on migrated WAL");
+
+    assert!(
+        !std_wal.legacy_key_used_for_test(),
+        "Legacy key path must NOT be taken for post-migration WAL segment"
+    );
+    assert!(
+        !std_wal.allow_legacy_fallback_for_test(),
+        "Legacy fallback flag must be false after migration"
+    );
+
+    let entries = std_wal.replay().await.expect("replay migrated wal");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].1.seq_no, 100);
+}

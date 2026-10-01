@@ -20,7 +20,7 @@ fn test_manifest_entry_roundtrip() {
             ],
             added: PathBuf::from("sst-compact-00000000000000000003-0000.sst"),
             added_max_tx: 50,
-            rank: 1,
+            rank: 0,
         },
     ];
 
@@ -184,13 +184,13 @@ fn test_reconstruct_valid_sstables() {
             removed: vec![PathBuf::from("sst-2.sst"), PathBuf::from("sst-3.sst")],
             added: PathBuf::from("sst-compact-1.sst"),
             added_max_tx: 30,
-            rank: 1,
+            rank: 0,
         },
     ];
 
     let valid = Manifest::reconstruct_valid_sstables(&entries);
     assert_eq!(valid.len(), 1);
-    assert_eq!(valid[0], (PathBuf::from("sst-compact-1.sst"), 1));
+    assert_eq!(valid[0], (PathBuf::from("sst-compact-1.sst"), 3));
 
     let dead = Manifest::reconstruct_dead_sstables(&entries);
     assert_eq!(dead.len(), 3);

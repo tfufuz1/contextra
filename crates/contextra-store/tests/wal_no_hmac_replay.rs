@@ -24,7 +24,7 @@ async fn test_wal_no_hmac_multi_batch_replay_and_corruption() {
         key: b"nohmac_key_2".to_vec(),
         value: b"nohmac_val_2".to_vec(),
     };
-    let entry2 = WalEntry::try_new(op2, 2, &zero_key, zero_chain).expect("entry 2");
+    let entry2 = WalEntry::try_new(op2, 2, &zero_key, entry1.checksum).expect("entry 2");
 
     let mut wal_bytes = Vec::new();
     wal_bytes.extend_from_slice(&WAL_V3_HEADER);
