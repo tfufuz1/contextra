@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::audit::SecurityAuditLogger;
 use super::guard::PromptInjectionGuard;
 use super::policy::{QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};

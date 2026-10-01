@@ -166,17 +166,110 @@ pub trait SsiValidator {
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
+/// Represents a sequence bucket storing either exact committed write keys or coarsened prefix summaries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SeqBucket {
+    Exact(Vec<Vec<u8>>),
+    Coarsened {
+        prefixes: Vec<Vec<u8>>,
+        original_key_count: usize,
+    },
+}
+
+/// Diagnostic information identifying an unreleased snapshot or sequence that blocks pruning in [`SequenceLogSsiValidator`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PruningBlockerInfo {
+    /// The lowest sequence number currently unpruned in the validator register.
+    pub min_unpruned_seq: u64,
+    /// The current `pruned_through` watermark sequence number.
+    pub pruned_through_seq: u64,
+    /// Total tracked committed keys currently retained.
+    pub tracked_commit_keys: usize,
+    /// Total sequence buckets currently retained.
+    pub total_seq_buckets: usize,
+    /// Number of coarsened sequence buckets.
+    pub coarsened_seq_buckets: usize,
+    /// Configured maximum tracked keys capacity limit.
+    pub max_tracked_keys: usize,
+}
+
+/// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
+///
+/// # Architecture Decision & Invariant (B-16 / INV-MVCC-SSI-1)
+/// To prevent total outage when `DEFAULT_MAX_TRACKED_COMMIT_KEYS` capacity is reached (finding B-16),
+/// individual exact keys in older sequence buckets are coarsened into prefix summaries.
+///
+/// ## Soundness Invariant (0% False Negatives)
+/// Coarsening guarantees that no real write-skew conflict is ever missed:
+/// - Every original key $k$ in a coarsened bucket starts with at least one extracted prefix $p$.
+/// - Any point read or range prefix read that would have conflicted with $k$ is guaranteed to overlap
+///   with $p$.
+/// - False positives may occur (a commit may be conservatively flagged as a conflict), but false
+///   negatives are mathematically impossible.
+/// - Fail-closed protection remains intact under `INV-MVCC-SSI-1`.
+fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8>> {
+    if keys.is_empty() {
+        return Vec::new();
+    }
+    if keys.len() <= max_prefixes {
+        return keys.to_vec();
+    }
+
+    let mut sorted_keys = keys.to_vec();
+    sorted_keys.sort_unstable();
+
+    let chunk_size = sorted_keys.len().div_ceil(max_prefixes);
+    let mut prefixes = Vec::with_capacity(max_prefixes);
+
+    for chunk in sorted_keys.chunks(chunk_size) {
+        if chunk.is_empty() {
+            continue;
+        }
+        let mut lcp = chunk[0].clone();
+        for k in &chunk[1..] {
+            let common_len = lcp
+                .iter()
+                .zip(k.iter())
+                .take_while(|(a, b)| a == b)
+                .count();
+            lcp.truncate(common_len);
+            if lcp.is_empty() {
+                break;
+            }
+        }
+        if !prefixes.contains(&lcp) {
+            prefixes.push(lcp);
+        }
+    }
+
+    prefixes
+}
+
 #[derive(Debug, Default)]
 struct CommittedWrites {
     keys: AHashMap<Vec<u8>, u64>,
-    seq_index: BTreeMap<u64, Vec<Vec<u8>>>,
+    seq_index: BTreeMap<u64, SeqBucket>,
 }
 
 impl CommittedWrites {
+    fn tracked_count(&self) -> usize {
+        self.keys.len() + self.coarsened_prefix_count()
+    }
+
+    fn coarsened_prefix_count(&self) -> usize {
+        let mut count = 0;
+        for bucket in self.seq_index.values() {
+            if let SeqBucket::Coarsened { prefixes, .. } = bucket {
+                count += prefixes.len();
+            }
+        }
+        count
+    }
+
     fn insert(&mut self, key: Vec<u8>, commit_seq: u64) {
         if let Some(old_seq) = self.keys.insert(key.clone(), commit_seq) {
             if old_seq != commit_seq {
-                if let Some(keys) = self.seq_index.get_mut(&old_seq) {
+                if let Some(SeqBucket::Exact(keys)) = self.seq_index.get_mut(&old_seq) {
                     keys.retain(|k| k != &key);
                     if keys.is_empty() {
                         self.seq_index.remove(&old_seq);
@@ -184,18 +277,129 @@ impl CommittedWrites {
                 }
             }
         }
-        self.seq_index.entry(commit_seq).or_default().push(key);
+
+        match self.seq_index.entry(commit_seq) {
+            std::collections::btree_map::Entry::Vacant(e) => {
+                e.insert(SeqBucket::Exact(vec![key]));
+            }
+            std::collections::btree_map::Entry::Occupied(mut e) => match e.get_mut() {
+                SeqBucket::Exact(keys) => {
+                    if !keys.contains(&key) {
+                        keys.push(key);
+                    }
+                }
+                SeqBucket::Coarsened {
+                    original_key_count, ..
+                } => {
+                    *original_key_count += 1;
+                }
+            },
+        }
+    }
+
+    fn coarsen_oldest_buckets(&mut self) -> usize {
+        let mut coarsened_count = 0;
+        let seqs: Vec<u64> = self.seq_index.keys().copied().collect();
+
+        for seq in seqs {
+            if let Some(SeqBucket::Exact(keys)) = self.seq_index.get(&seq) {
+                let original_keys = keys.clone();
+                let prefixes = coarsen_keys_to_prefixes(&original_keys, 2);
+
+                for k in &original_keys {
+                    if self.keys.get(k) == Some(&seq) {
+                        self.keys.remove(k);
+                    }
+                }
+
+                self.seq_index.insert(
+                    seq,
+                    SeqBucket::Coarsened {
+                        prefixes,
+                        original_key_count: original_keys.len(),
+                    },
+                );
+                coarsened_count += 1;
+            }
+        }
+
+        coarsened_count
+    }
+
+    fn merge_adjacent_buckets(&mut self) -> usize {
+        if self.seq_index.len() < 2 {
+            return 0;
+        }
+
+        let seqs: Vec<u64> = self.seq_index.keys().copied().collect();
+        let mut merged_count = 0;
+
+        for chunk in seqs.chunks(2) {
+            if chunk.len() == 2 {
+                let s1 = chunk[0];
+                let s2 = chunk[1];
+
+                if let (Some(b1), Some(b2)) =
+                    (self.seq_index.remove(&s1), self.seq_index.remove(&s2))
+                {
+                    let mut prefixes = Vec::new();
+                    let mut total_keys = 0;
+
+                    for (b, seq) in [(b1, s1), (b2, s2)] {
+                        match b {
+                            SeqBucket::Exact(keys) => {
+                                for k in &keys {
+                                    if self.keys.get(k) == Some(&seq) {
+                                        self.keys.remove(k);
+                                    }
+                                }
+                                total_keys += keys.len();
+                                prefixes.extend(coarsen_keys_to_prefixes(&keys, 2));
+                            }
+                            SeqBucket::Coarsened {
+                                prefixes: p,
+                                original_key_count,
+                            } => {
+                                total_keys += original_key_count;
+                                prefixes.extend(p);
+                            }
+                        }
+                    }
+
+                    let coarsened_prefixes = coarsen_keys_to_prefixes(&prefixes, 2);
+                    self.seq_index.insert(
+                        s2,
+                        SeqBucket::Coarsened {
+                            prefixes: coarsened_prefixes,
+                            original_key_count: total_keys,
+                        },
+                    );
+                    merged_count += 1;
+                }
+            }
+        }
+
+        merged_count
     }
 
     fn remove_from_seq(&mut self, first_seq: u64) -> usize {
         let mut removed = 0;
         let mut seqs_to_remove = Vec::new();
 
-        for (&seq, keys) in self.seq_index.range(first_seq..) {
+        for (&seq, bucket) in self.seq_index.range(first_seq..) {
             seqs_to_remove.push(seq);
-            for key in keys {
-                if self.keys.remove(key).is_some() {
-                    removed += 1;
+            match bucket {
+                SeqBucket::Exact(keys) => {
+                    for key in keys {
+                        if self.keys.get(key) == Some(&seq) && self.keys.remove(key).is_some() {
+                            removed += 1;
+                        }
+                    }
+                }
+                SeqBucket::Coarsened {
+                    original_key_count, ..
+                } => {
+                    removed += *original_key_count;
                 }
             }
         }
@@ -211,11 +415,20 @@ impl CommittedWrites {
         let mut removed = 0;
         let mut seqs_to_remove = Vec::new();
 
-        for (&seq, keys) in self.seq_index.range(..=bound_seq) {
+        for (&seq, bucket) in self.seq_index.range(..=bound_seq) {
             seqs_to_remove.push(seq);
-            for key in keys {
-                if self.keys.remove(key).is_some() {
-                    removed += 1;
+            match bucket {
+                SeqBucket::Exact(keys) => {
+                    for key in keys {
+                        if self.keys.get(key) == Some(&seq) && self.keys.remove(key).is_some() {
+                            removed += 1;
+                        }
+                    }
+                }
+                SeqBucket::Coarsened {
+                    original_key_count, ..
+                } => {
+                    removed += *original_key_count;
                 }
             }
         }
@@ -228,7 +441,7 @@ impl CommittedWrites {
     }
 
     fn len(&self) -> usize {
-        self.keys.len()
+        self.tracked_count()
     }
 
     fn get(&self, key: &[u8]) -> Option<u64> {
@@ -318,10 +531,64 @@ impl SequenceLogSsiValidator {
         self.max_tracked_keys
     }
 
+    /// Checks register capacity utilization and triggers coarsening or diagnostic warnings if threshold is reached.
+    fn check_and_coarsen_if_needed(&self, writes: &mut CommittedWrites) {
+        let threshold = (self.max_tracked_keys * 80) / 100;
+        let mut rounds = 0;
+        while writes.len() >= threshold && rounds < 10 {
+            let coarsened = writes.coarsen_oldest_buckets();
+            let merged = writes.merge_adjacent_buckets();
+            rounds += 1;
+            if coarsened == 0 && merged == 0 {
+                break;
+            }
+        }
+
+        if writes.len() >= threshold {
+            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes) {
+                tracing::warn!(
+                    min_unpruned_seq = blocker.min_unpruned_seq,
+                    pruned_through_seq = blocker.pruned_through_seq,
+                    tracked_commit_keys = blocker.tracked_commit_keys,
+                    total_seq_buckets = blocker.total_seq_buckets,
+                    coarsened_seq_buckets = blocker.coarsened_seq_buckets,
+                    max_tracked_keys = blocker.max_tracked_keys,
+                    "SequenceLogSsiValidator capacity utilization reached threshold (>= 80%). Coarsening active. Pruning may be blocked by active snapshot or unpruned sequence."
+                );
+            }
+        }
+    }
+
+    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning in this validator.
+    pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
+        let writes = self.committed_writes.read();
+        self.diagnose_pruning_blocker_internal(&writes)
+    }
+
+    fn diagnose_pruning_blocker_internal(&self, writes: &CommittedWrites) -> Option<PruningBlockerInfo> {
+        let min_unpruned_seq = writes.seq_index.keys().copied().next()?;
+        let total_seq_buckets = writes.seq_index.len();
+        let coarsened_seq_buckets = writes
+            .seq_index
+            .values()
+            .filter(|b| matches!(b, SeqBucket::Coarsened { .. }))
+            .count();
+
+        Some(PruningBlockerInfo {
+            min_unpruned_seq,
+            pruned_through_seq: self.pruned_through(),
+            tracked_commit_keys: writes.tracked_count(),
+            total_seq_buckets,
+            coarsened_seq_buckets,
+            max_tracked_keys: self.max_tracked_keys,
+        })
+    }
+
     /// Records a committed write for `key` at sequence number `commit_seq`.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
         let mut writes = self.committed_writes.write();
         writes.insert(key.to_vec(), commit_seq);
+        self.check_and_coarsen_if_needed(&mut writes);
     }
 
     /// Records committed writes for multiple keys at sequence number `commit_seq`.
@@ -334,6 +601,7 @@ impl SequenceLogSsiValidator {
         for key in keys {
             writes.insert(key.to_vec(), commit_seq);
         }
+        self.check_and_coarsen_if_needed(&mut writes);
     }
 
     /// Validates `read_set` against `committed_writes` map and `sequence_log`.
@@ -374,7 +642,7 @@ impl SequenceLogSsiValidator {
                 )));
             }
 
-            // 1. Direct key commit sequence check
+            // 1. Direct key commit sequence check & coarsened bucket prefix check
             if let Some(commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
                     return Err(ContextraError::Conflict(format!(
@@ -384,6 +652,25 @@ impl SequenceLogSsiValidator {
                         commit_seq,
                         snapshot_seq
                     )));
+                }
+            }
+
+            for (&commit_seq, bucket) in &committed_writes.seq_index {
+                if commit_seq > snapshot_seq {
+                    if let SeqBucket::Coarsened { prefixes, .. } = bucket {
+                        for p in prefixes {
+                            if key.starts_with(p) {
+                                return Err(ContextraError::Conflict(format!(
+                                    "Serializable isolation violation for TxId({}): key '{:?}' matches coarsened commit prefix '{:?}' at commit_seq {} > snapshot_seq {}",
+                                    tx_id.inner(),
+                                    String::from_utf8_lossy(key),
+                                    String::from_utf8_lossy(p),
+                                    commit_seq,
+                                    snapshot_seq
+                                )));
+                            }
+                        }
+                    }
                 }
             }
 
@@ -432,6 +719,29 @@ impl SequenceLogSsiValidator {
                         commit_seq,
                         snapshot_seq
                     )));
+                }
+            }
+
+            for (&commit_seq, bucket) in &committed_writes.seq_index {
+                if commit_seq > snapshot_seq {
+                    if let SeqBucket::Coarsened {
+                        prefixes: c_prefixes,
+                        ..
+                    } = bucket
+                    {
+                        for cp in c_prefixes {
+                            if cp.starts_with(prefix) || prefix.starts_with(cp) {
+                                return Err(ContextraError::Conflict(format!(
+                                    "Serializable isolation phantom violation for TxId({}): coarsened prefix '{:?}' overlapping range prefix '{:?}' committed at commit_seq {} > snapshot_seq {}",
+                                    tx_id.inner(),
+                                    String::from_utf8_lossy(cp),
+                                    String::from_utf8_lossy(prefix),
+                                    commit_seq,
+                                    snapshot_seq
+                                )));
+                            }
+                        }
+                    }
                 }
             }
         }

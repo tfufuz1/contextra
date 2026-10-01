@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra::Contextra;
 use contextra_mcp::{protocol::JsonRpcRequest, McpServer};
 use contextra_ports::BoxFuture;

@@ -311,6 +311,19 @@ impl GraphIndex for CsrGraph {
         })
     }
 
+    /// Executes PathRAG graph retrieval starting from multiple anchor entities up to `max_hops` at a specific sequence number (`seq_no`).
+    ///
+    /// Ref: v17 Teil 6.3 ("PathRAG-Lücke") & Teil 12 (Snapshot-Isolation-Prinzip 6).
+    /// Enforces MVCC snapshot-isolated retrieval at sequence number `seq_no`.
+    fn path_rag_at<'a>(
+        &'a self,
+        start_nodes: &'a [EntityId],
+        max_hops: usize,
+        seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+        self.path_rag_at(start_nodes, max_hops, seq_no)
+    }
+
     fn traverse_at<'a>(
         &'a self,
         start_node: EntityId,

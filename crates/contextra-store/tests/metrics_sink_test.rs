@@ -1,10 +1,12 @@
 use contextra_core::{StorageEngine, TxId};
-use contextra_ports::MetricsSink;
+use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use std::sync::atomic::{AtomicU64, Ordering};
+use contextra_store::system_pressure::{SystemPressureMonitor, WAL_QUEUE_CRITICAL_THRESHOLD, WAL_QUEUE_ELEVATED_THRESHOLD};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
 struct SpyMetricsSink {
@@ -51,6 +53,63 @@ impl MetricsSink for SpyMetricsSink {
                     .fetch_add(1, Ordering::SeqCst);
             }
         }
+    }
+}
+
+#[tokio::test]
+async fn test_metrics_sink_records_commit_events_with_test_metrics_sink() {
+    let temp_dir = TempDir::new().expect("create temp dir");
+    let mut config = LsmConfig::default();
+    config.path = temp_dir.path().to_path_buf();
+    config.group_commit_window_micros = 0; // Immediate single commits
+
+    let storage = LsmStorage::new(config).await.expect("create storage");
+    #[cfg(feature = "fault-injection")]
+    storage.restore_wal_file_handle_for_test().await;
+
+    let test_sink = Arc::new(TestMetricsSink::new());
+    storage.set_metrics_sink(test_sink.clone());
+
+    let tx_id = TxId::new(1);
+    storage.put(tx_id, b"key1", b"val1").await.expect("put key");
+    storage.commit(tx_id).await.expect("commit tx");
+
+    let events = test_sink.events();
+
+    let commit_counter_events: Vec<&MetricEvent> = events
+        .iter()
+        .filter(|e| matches!(e, MetricEvent::Counter { name, .. } if name == "lsm_commit_total"))
+        .collect();
+
+    let commit_histogram_events: Vec<&MetricEvent> = events
+        .iter()
+        .filter(|e| matches!(e, MetricEvent::Histogram { name, .. } if name == "lsm_commit_duration_seconds"))
+        .collect();
+
+    assert_eq!(
+        commit_counter_events.len(), 1,
+        "Exactly 1 lsm_commit_total counter event must be recorded for a single commit"
+    );
+    assert_eq!(
+        commit_histogram_events.len(), 1,
+        "Exactly 1 lsm_commit_duration_seconds histogram event must be recorded for a single commit"
+    );
+
+    assert_eq!(
+        commit_counter_events[0],
+        &MetricEvent::Counter {
+            name: "lsm_commit_total".to_string(),
+            value: 1,
+            labels: vec![("status".to_string(), "success".to_string())],
+        }
+    );
+
+    if let MetricEvent::Histogram { name, value, labels } = commit_histogram_events[0] {
+        assert_eq!(name, "lsm_commit_duration_seconds");
+        assert!(*value > 0.0, "Recorded commit duration must be > 0.0 seconds");
+        assert_eq!(labels, &vec![("status".to_string(), "success".to_string())]);
+    } else {
+        panic!("Expected Histogram event");
     }
 }
 
@@ -147,4 +206,83 @@ async fn test_metrics_sink_records_commit_failures() {
     assert_eq!(success_count, 0, "No successful commits expected");
     assert_eq!(failure_count, 1, "Counter must record 1 commit failure");
     assert_eq!(hist_failure_count, 1, "Histogram must record 1 duration observation for failure");
+}
+
+#[tokio::test]
+async fn test_metrics_sink_backpressure_level_transitions() {
+    let test_sink = Arc::new(TestMetricsSink::new());
+    let sink_container = Arc::new(parking_lot::RwLock::new(
+        test_sink.clone() as Arc<dyn MetricsSink>
+    ));
+
+    let monitor = SystemPressureMonitor::new(Duration::from_millis(10));
+    let cancellation = CancellationToken::new();
+    let cancel_token = cancellation.clone();
+
+    let wal_depth = Arc::new(AtomicUsize::new(0));
+    let wal_depth_clone = Arc::clone(&wal_depth);
+
+    let handle = tokio::spawn(async move {
+        monitor
+            .run_with_metrics_sink(
+                cancel_token,
+                move || wal_depth_clone.load(Ordering::Relaxed),
+                || 10,
+                10,
+                Some(sink_container),
+            )
+            .await;
+    });
+
+    // Wait briefly for initial Normal gauge emission (0.0)
+    tokio::time::sleep(Duration::from_millis(30)).await;
+
+    // Simulate transition to Elevated
+    wal_depth.store(WAL_QUEUE_ELEVATED_THRESHOLD + 10, Ordering::Relaxed);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Simulate transition to Critical
+    wal_depth.store(WAL_QUEUE_CRITICAL_THRESHOLD + 10, Ordering::Relaxed);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Simulate transition back to Normal
+    wal_depth.store(0, Ordering::Relaxed);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    cancellation.cancel();
+    let _ = handle.await;
+
+    let events = test_sink.events();
+    let gauge_events: Vec<&MetricEvent> = events
+        .iter()
+        .filter(|e| matches!(e, MetricEvent::Gauge { name, .. } if name == "lsm_backpressure_level"))
+        .collect();
+
+    assert!(
+        gauge_events.len() >= 4,
+        "Expected at least 4 backpressure gauge events (Initial Normal, Elevated, Critical, Normal), got {}",
+        gauge_events.len()
+    );
+
+    // Verify presence of Elevated (1.0) and Critical (2.0) gauge values
+    let values: Vec<f64> = gauge_events
+        .iter()
+        .map(|e| match e {
+            MetricEvent::Gauge { value, .. } => *value,
+            _ => unreachable!(),
+        })
+        .collect();
+
+    assert!(
+        values.contains(&1.0),
+        "Gauge events must contain Elevated value 1.0"
+    );
+    assert!(
+        values.contains(&2.0),
+        "Gauge events must contain Critical value 2.0"
+    );
+    assert!(
+        values.contains(&0.0),
+        "Gauge events must contain Normal value 0.0"
+    );
 }

@@ -466,13 +466,19 @@ impl LsmStorage {
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
+        let metrics_sink_container = Arc::new(parking_lot::RwLock::new(
+            Arc::new(contextra_ports::NoopMetricsSink) as Arc<dyn contextra_ports::MetricsSink>,
+        ));
+        let metrics_sink_for_pressure = Arc::clone(&metrics_sink_container);
+
         task_tracker.spawn(async move {
             pressure_monitor
-                .run(
+                .run_with_metrics_sink(
                     ct_pressure,
                     move || wal_queue_depth_clone.load(Ordering::Relaxed),
                     || 0,
                     0,
+                    Some(metrics_sink_for_pressure),
                 )
                 .await;
         });
@@ -544,7 +550,7 @@ impl LsmStorage {
             ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
                 ssi_max_tracked_keys,
             )),
-            metrics_sink: parking_lot::RwLock::new(Arc::new(contextra_ports::NoopMetricsSink)),
+            metrics_sink: metrics_sink_container,
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {

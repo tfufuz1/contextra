@@ -3,6 +3,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-28
 // ZWECK: Multi-Version Concurrency Control (MVCC) snapshot-isolated PathGraph for PathRAG.
+// REFERENZ: v17 Teil 6.3 ("PathRAG-Lücke") & Teil 12 (Snapshot-Isolation-Prinzip 6).
 // INVARIANTEN: Zero-allocation view over `GraphInner`; Panic-free execution; Strict visibility rules matching `multi_traverse_at`.
 
 use std::collections::HashSet;

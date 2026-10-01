@@ -193,6 +193,12 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
 
 /// Commits staged transaction operations to disk and memory.
 ///
+/// Observability Mandate (v17 Teil 11 & Teil 2.2):
+/// Emits commit latency histogram `lsm_commit_duration_seconds` and counter `lsm_commit_total`
+/// with status label `status: "success" | "failure"`.
+/// Scope: Commit-Latenz & Backpressure-Level are covered by Prompt 13 (`contextra-store`);
+/// Suchlatenz je Signal is Prompt 14; Rebuild-Dauer is Prompt 15; Checkpoint-Dauer & DLQ-Tiefe are Prompt 25.
+///
 /// # Lock Hierarchy Invariant
 /// To prevent deadlocks and ensure strict durability & ordering:
 /// 1. `commit_mutex` (`tokio::sync::Mutex`): Serializes transaction seq_no allocation and group batch preparation.
