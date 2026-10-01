@@ -982,6 +982,7 @@ name = "contextra-license"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "blake3",
  "contextra-ports",
  "contextra-types",
  "ed25519-dalek",

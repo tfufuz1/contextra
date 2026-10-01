@@ -188,3 +188,86 @@ async fn test_orchestrator_recover_orphans_succeeds() {
     let orchestrator = OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
     assert!(orchestrator.recover_orphans().await.is_ok());
 }
+
+struct GoalMatchingTool;
+
+impl AgentTool for GoalMatchingTool {
+    fn name(&self) -> &str {
+        "goal_tool"
+    }
+
+    fn execute<'a>(
+        &'a self,
+        _ctx: &'a AgentContext,
+        _input: serde_json::Value,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<StepResult>> {
+        Box::pin(async move {
+            Ok(StepResult {
+                node_id: "task1".to_string(),
+                output: serde_json::json!({
+                    "status": {
+                        "done": true
+                    }
+                }),
+                tokens_consumed: 20,
+                next_edge: None,
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn test_goal_condition_triggers_scratchpad_checkpoint_and_reset() {
+    let (mut ctx, _tmp) = create_dummy_context().await;
+    let vault_config = contextra_db::volatile_vault::VaultConfig {
+        max_capacity_bytes: 1024 * 1024,
+        attempt_mlock: false,
+    };
+    let mut scratchpad = crate::clm_scratchpad::ClmScratchpad::new(ctx.task_id.clone(), vault_config);
+
+    scratchpad
+        .apply_edit(
+            crate::clm_scratchpad::ScratchpadEditOp::Append {
+                content: b"working memory chunk".to_vec(),
+                label: Some("chunk1".to_string()),
+            },
+            contextra_types::TxId(1),
+        )
+        .expect("scratchpad edit");
+
+    assert_eq!(scratchpad.current_subgoal_index(), 0);
+    assert!(scratchpad.total_bytes() > 0);
+
+    ctx = ctx.with_clm_scratchpad(scratchpad);
+
+    let mut orchestrator = OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
+    orchestrator
+        .try_register_tool(Box::new(GoalMatchingTool))
+        .expect("register tool");
+
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node("start", "Start Node", NodeType::Start, None)
+        .expect("add start");
+    graph
+        .try_add_node("task1", "Task 1 Node", NodeType::Task, Some("goal_tool"))
+        .expect("add task1");
+    graph
+        .try_add_node("end", "End Node", NodeType::End, None)
+        .expect("add end");
+
+    graph
+        .try_add_edge("start", "task1", None, 1)
+        .expect("edge start->task1");
+    graph
+        .try_add_edge("task1", "end", Some("status.done == true"), 1)
+        .expect("edge task1->end");
+
+    let res = orchestrator.run(&mut ctx, &graph).await;
+    assert!(res.is_ok());
+    assert_eq!(ctx.status, crate::context::AgentStatus::Completed);
+
+    let scratchpad_after = ctx.clm_scratchpad.as_ref().expect("scratchpad exists");
+    assert_eq!(scratchpad_after.current_subgoal_index(), 1);
+    assert_eq!(scratchpad_after.total_bytes(), 0);
+}

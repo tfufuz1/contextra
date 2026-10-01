@@ -16,7 +16,8 @@
 // SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
 use crate::error::{ContextraError, Result};
-use crate::seq_log::SequenceLog;
+use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
+use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
@@ -24,6 +25,7 @@ use std::collections::BTreeMap;
 use std::hash::Hasher;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
@@ -191,6 +193,12 @@ pub struct PruningBlockerInfo {
     pub coarsened_seq_buckets: usize,
     /// Configured maximum tracked keys capacity limit.
     pub max_tracked_keys: usize,
+    /// Sequence number of the longest active snapshot pinning sequence, if any.
+    pub longest_active_snapshot_seq: Option<u64>,
+    /// Pin duration of the longest active snapshot, if any.
+    pub longest_pin_duration: Option<Duration>,
+    /// True if the longest active snapshot pin duration exceeds `max_pin_duration` (e.g. 300s).
+    pub is_pin_expired: bool,
 }
 
 /// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
@@ -456,8 +464,10 @@ impl CommittedWrites {
 pub struct SequenceLogSsiValidator {
     committed_writes: Arc<RwLock<CommittedWrites>>,
     sequence_log: Option<Arc<RwLock<SequenceLog>>>,
+    snapshot_registry: Option<Arc<SnapshotRegistry>>,
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
+    max_pin_duration: Duration,
 }
 
 impl Default for SequenceLogSsiValidator {
@@ -477,8 +487,10 @@ impl SequenceLogSsiValidator {
         Self {
             committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
             sequence_log: None,
+            snapshot_registry: None,
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys,
+            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
         }
     }
 
@@ -487,9 +499,28 @@ impl SequenceLogSsiValidator {
         Self {
             committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
             sequence_log: Some(seq_log),
+            snapshot_registry: None,
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys: DEFAULT_MAX_TRACKED_COMMIT_KEYS,
+            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
         }
+    }
+
+    /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
+    pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
+        self.snapshot_registry = Some(registry);
+        self
+    }
+
+    /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
+    pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {
+        self.snapshot_registry = Some(registry);
+    }
+
+    /// Sets a custom maximum pin duration before diagnostic alarms are triggered for unreleased snapshots.
+    pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
+        self.max_pin_duration = duration;
+        self
     }
 
     /// Prunes tracked committed writes with `commit_seq <= bound_seq`.
@@ -541,7 +572,7 @@ impl SequenceLogSsiValidator {
         }
 
         if writes.len() >= threshold {
-            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes) {
+            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes, Instant::now()) {
                 tracing::warn!(
                     min_unpruned_seq = blocker.min_unpruned_seq,
                     pruned_through_seq = blocker.pruned_through_seq,
@@ -549,6 +580,9 @@ impl SequenceLogSsiValidator {
                     total_seq_buckets = blocker.total_seq_buckets,
                     coarsened_seq_buckets = blocker.coarsened_seq_buckets,
                     max_tracked_keys = blocker.max_tracked_keys,
+                    longest_active_snapshot_seq = ?blocker.longest_active_snapshot_seq,
+                    longest_pin_duration = ?blocker.longest_pin_duration,
+                    is_pin_expired = blocker.is_pin_expired,
                     "SequenceLogSsiValidator capacity utilization reached threshold (>= 80%). Coarsening active. Pruning may be blocked by active snapshot or unpruned sequence."
                 );
             }
@@ -557,13 +591,19 @@ impl SequenceLogSsiValidator {
 
     /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning in this validator.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
+        self.diagnose_pruning_blocker_at(Instant::now())
+    }
+
+    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to timestamp `now`.
+    pub fn diagnose_pruning_blocker_at(&self, now: Instant) -> Option<PruningBlockerInfo> {
         let writes = self.committed_writes.read();
-        self.diagnose_pruning_blocker_internal(&writes)
+        self.diagnose_pruning_blocker_internal(&writes, now)
     }
 
     fn diagnose_pruning_blocker_internal(
         &self,
         writes: &CommittedWrites,
+        now: Instant,
     ) -> Option<PruningBlockerInfo> {
         let min_unpruned_seq = writes.seq_index.keys().copied().next()?;
         let total_seq_buckets = writes.seq_index.len();
@@ -573,6 +613,15 @@ impl SequenceLogSsiValidator {
             .filter(|b| matches!(b, SeqBucket::Coarsened { .. }))
             .count();
 
+        let longest_pin = self
+            .snapshot_registry
+            .as_ref()
+            .and_then(|reg| reg.longest_active_pin_at(now));
+
+        let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
+        let longest_pin_duration = longest_pin.map(|(_, dur)| dur);
+        let is_pin_expired = longest_pin.is_some_and(|(_, dur)| dur > self.max_pin_duration);
+
         Some(PruningBlockerInfo {
             min_unpruned_seq,
             pruned_through_seq: self.pruned_through(),
@@ -580,6 +629,9 @@ impl SequenceLogSsiValidator {
             total_seq_buckets,
             coarsened_seq_buckets,
             max_tracked_keys: self.max_tracked_keys,
+            longest_active_snapshot_seq,
+            longest_pin_duration,
+            is_pin_expired,
         })
     }
 
