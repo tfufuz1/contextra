@@ -4,6 +4,7 @@
 
 use contextra_core::error::ContextraError;
 use contextra_db::{Contextra, ProvenanceRecord, SearchResult};
+use contextra_ports::IdGen;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -99,6 +100,7 @@ impl From<SearchResult> for Memory {
 #[derive(Clone)]
 pub struct AgentMemory {
     engine: Arc<Contextra>,
+    id_gen: Option<Arc<dyn IdGen>>,
 }
 
 impl AgentMemory {
@@ -106,12 +108,30 @@ impl AgentMemory {
     pub fn new(engine: Contextra) -> Self {
         Self {
             engine: Arc::new(engine),
+            id_gen: None,
         }
     }
 
     /// Constructs a new `AgentMemory` wrapper around an `Arc<Contextra>` engine instance.
     pub fn new_arc(engine: Arc<Contextra>) -> Self {
-        Self { engine }
+        Self {
+            engine,
+            id_gen: None,
+        }
+    }
+
+    /// Constructs a new `AgentMemory` wrapper around a `Contextra` engine instance with an explicit ID generator.
+    pub fn new_with_id_gen(engine: Contextra, id_gen: Arc<dyn IdGen>) -> Self {
+        Self {
+            engine: Arc::new(engine),
+            id_gen: Some(id_gen),
+        }
+    }
+
+    /// Builder method to inject or update the ID generator on an `AgentMemory` instance.
+    pub fn with_id_gen(mut self, id_gen: Arc<dyn IdGen>) -> Self {
+        self.id_gen = Some(id_gen);
+        self
     }
 
     /// Returns a reference to the underlying `Contextra` engine instance.
@@ -121,13 +141,24 @@ impl AgentMemory {
 
     /// Stores a text memory entry with optional JSON metadata.
     ///
-    /// Generates a unique memory identifier and delegates directly to `Contextra::insert_text_only`.
+    /// Generates a unique memory identifier via the injected `IdGen` if available,
+    /// or falls back to `uuid::Uuid::new_v4()` when no `IdGen` is provided.
+    ///
+    /// Delegates directly to `Contextra::insert_text_only`.
     pub async fn remember(
         &self,
         text: &str,
         metadata: Option<Value>,
     ) -> Result<MemoryId, ContextraError> {
-        let id = uuid::Uuid::new_v4().to_string();
+        // Fallback documentation:
+        // Falls kein `IdGen` injiziert ist (id_gen == None), nutzen wir weiterhin `Uuid::new_v4()` als Fallback.
+        // Nicht-deterministische IDs sind an dieser Stelle funktional unkritisch.
+        // Die Option zur Injizierung eines `IdGen` (z.B. `SequentialIdGen`) dient dazu,
+        // deterministische ID-Sequenzen für Tests und Replay-Szenarien zu ermöglichen.
+        let id = match &self.id_gen {
+            Some(gen) => gen.next_id().to_string(),
+            None => uuid::Uuid::new_v4().to_string(),
+        };
         self.engine.insert_text_only(&id, text, metadata).await?;
         Ok(MemoryId(id))
     }

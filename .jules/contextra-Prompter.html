@@ -453,14 +453,51 @@ kbd{font-family:monospace;font-size:8px}
         <span>⚙️ SDLC COCKPIT v32 — PROMPTER-EBENE WÄHLEN</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
-        <button id="tab-ebene-crate" class="chip on" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('crate')">1. Crate</button>
+        <button id="tab-ebene-function" class="chip on" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('function')">0. Funktionsbereich (Empfohlen)</button>
+<button id="tab-ebene-crate" class="chip" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('crate')">1. Crate</button>
         <button id="tab-ebene-subsystem" class="chip" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('subsystem')">2. Subsystem</button>
         <button id="tab-ebene-eigenbau" class="chip" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('eigenbau')">3. Eigenbau</button>
         <button id="tab-ebene-prozess" class="chip" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('prozess')">4. Prozess</button>
+<button id="tab-ebene-wiring" class="chip" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('wiring')">5. Verdrahtung</button>
       </div>
     </div>
 
-<div class="card" id="c-crate">
+
+  <div class="card" id="c-function" style="margin-top:12px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px">0. Funktionsbereich & Aufgabentyp wählen</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:12px;font-weight:600">Funktionsbereich (Domäne)</label>
+        <select id="function-domain-select" class="inp" onchange="selFunctionDomain(this.value)">
+          <option value="">-- bitte wählen --</option>
+          <option value="durability">🛡️ Durability & Recovery</option>
+          <option value="concurrency">⚡ Concurrency & MVCC Isolation</option>
+          <option value="security">🔐 Security, Isolation & Privacy</option>
+          <option value="retrieval">🔍 Hybrid Retrieval & Indexing</option>
+          <option value="graph">🕸️ Graph, Propagation & Consolidation</option>
+          <option value="ffi">🔌 FFI, IPC & External Boundaries</option>
+          <option value="governance">📜 Governance, Tooling & Automation</option>
+          <option value="scaling">📊 Adaptive Scaling, Tuning & Performance</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600">Aufgabentyp</label>
+        <select id="function-tasktype-select" class="inp" onchange="SS.functionTaskType=this.value">
+          <option value="close_gap">🎯 Lücke schließen (Soll-Ist Abweichung beheben)</option>
+          <option value="harden">💎 Härten (Tests, Beweise & Invarianten nachrüsten)</option>
+          <option value="extend">🚀 Erweitern (Neue Soll-Fähigkeit implementieren)</option>
+          <option value="update_governance">🏛️ Governance aktualisieren (Prompter/xtask/Gates anpassen)</option>
+        </select>
+      </div>
+    </div>
+    <div id="function-domain-details" style="display:none;background:var(--bg-subtle, #f8f9fa);padding:10px;border-radius:6px;font-size:12px">
+      <div id="function-domain-desc" style="font-weight:600;margin-bottom:6px"></div>
+      <div style="font-size:11px;color:var(--text-muted, #6c757d);margin-bottom:6px"><strong>Primäre Invarianten:</strong> <span id="function-domain-invariants"></span></div>
+      <div style="font-size:11px;color:var(--text-muted, #6c757d)"><strong>Abgedeckte Dateien:</strong> <span id="function-domain-files-count"></span></div>
+    </div>
+  </div>
+
+<div class="card locked" id="c-crate">
       <div class="ch" onclick="toggle('c-crate')">
         <div class="cico" style="background:rgba(79,172,254,.12);color:var(--ac)">📦</div>
         <div class="clbl">Crate wählen<small>Layer 0→4 DAG · 15 Workspace-Crates</small></div>
@@ -739,7 +776,8 @@ kbd{font-family:monospace;font-size:8px}
       </div>
       <div class="ob">
         <div id="pt-empty">Wähle entweder <strong>Crate + Aufgabe</strong> <em>oder</em> <strong>Subsystem + Task</strong><br>um den Jules-Prompt zu generieren. Beide Pfade schließen sich gegenseitig aus (kein Mischen).<br><br><span style="color:var(--td);font-size:9px">Prompts sind täglich einsetzbar · keine direkten Bug-Referenzen<br>APM-1..42 (13 Kategorien) · Domain-Risikoprofil-Pflicht-APMs immer aktiv · parallel-sicher<br>14 spezialisierte Task-Typen: audit · deep · impl · fix · test · sec · review · adr · deps · korrektur · calib · flaky · chaos · replay<br>Verifikations-Loop (Plan→Act→Verify→Reflect) + ROLE-LOCK (Audit≠Fix) + Branch-Disziplin automatisch<br>Komponenten-Scope: alle Dateien aktiv = kompakt, Teilauswahl = maximal präzise<br><br><span style="color:var(--warn)">v23-Änderungen:</span> Strukturelle Reaktion auf gefundenes Inventar-Drift-Problem (siehe Review) — exakte Datei-LOC-Zahlen aus allen generierten Prompt-Texten entfernt (Größenklassen S/M/L/XL sind drift-resistent, exakte LOC nicht) · verpflichtender Inventar-Realitätsabgleich (\`find\`+Diff gegen gelistete Dateien) jetzt fester Bestandteil JEDES generierten Prompts, nicht mehr nur bei Vollauswahl · sichtbares Inventar-Stand-Datum + Frische-Anzeige in der UI · manueller Offline-Abgleich-Assistent (Paste von \`find | xargs wc -l\`, rein clientseitig, kein Repo-/Build-Zugriff) im neuen Karten-Block „Inventar-Frische"</span><br><span style="color:#ff6b9d">v28-Änderungen:</span> Subsysteme (WAL · LSM-Tree · MCP-Sandbox) sind jetzt eine eigenständige Kategorie auf derselben Ebene wie „Crate wählen" — nicht mehr frei mit jeder Crate kombinierbar, strukturell gesperrt statt nur per Laufzeit-Warnung · Audit-Reports tragen jetzt das Datum im Dateinamen (\`AUDIT_&lt;crate&gt;_JJJJ-MM-TT.md\`), ältere Läufe werden nie überschrieben · jeder Subsystem-Audit schließt mit einem eigenen, expliziten „Audit≠Fix"-Hinweis</span></span></div>
-        <pre id="pt-output"></pre>
+        <div id="claim-warning-banner" style="display:none;background:#fff3cd;color:#856404;border:1px solid #ffeeba;padding:10px;border-radius:6px;margin-bottom:10px;font-size:12px;"></div>
+<pre id="pt-output"></pre>
       </div>
       <div class="obtn-row">
         <button class="obtn obtn-copy" onclick="copyPrompt()">📋 Kopieren</button>
@@ -759,7 +797,25 @@ kbd{font-family:monospace;font-size:8px}
         <button class="obtn obtn-queue" onclick="genCliScript()">🖥️ Als Jules-Tools-CLI-Skript exportieren</button>
       </div>
     </div>
-  </div><!-- /ocol -->
+  </d
+  <div class="card locked" id="c-wiring" style="margin-top:12px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px">5. Verdrahtungs-Audit-Muster wählen</div>
+    <div id="wiring-grid" class="subsys-grid"></div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label style="font-size:12px;font-weight:600">Ziel-Scope</label>
+        <select id="wiring-scope-select" class="inp" onchange="SS.wiringScope=this.value">
+          <option value="workspace">Gesamter Workspace (crates/)</option>
+          <option value="crate">Spezifisches Crate</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600">Konkreter Trait/API-Name (optional)</label>
+        <input type="text" id="wiring-target-input" class="inp" placeholder="z.B. Clock, Rng, LsmStorage" oninput="SS.wiringTarget=this.value.trim()">
+      </div>
+    </div>
+  </div>
+iv><!-- /ocol -->
 </div>
 
 <div id="toast"></div>
@@ -1223,6 +1279,22 @@ const DEFAULT_COMPONENTS = {
     { file:'lib.rs', size:'XL', risk:'FFI/Panic', desc:'PyO3-Bindings — einzige Datei des Crates, Zero-Panic-Boundary', focus:'JEDER Panic in einer PyO3-Methode crasht den Python-Prozess (segfault-artig) — 0 .unwrap()/.expect() außerhalb von Tests. block_on() OHNE py.allow_threads() blockiert den Python-Interpreter. OnceLock-Runtime-Initialisierung muss race-sicher exakt 1 Runtime erzeugen, auch wenn 2 Python-Threads gleichzeitig initialisieren. ContextraError→PyErr-Mapping muss lückenlos sein — fehlende Variante crasht statt Exception zu werfen.' },
   ],
 };
+
+
+const WIRING_PATTERNS = [
+  { id:'orphan-port', icon:'🔌', name:'Verwaister Port',
+    desc:'Trait in contextra-ports definiert/implementiert, aber 0 Konsumenten außerhalb von Tests im gesamten Workspace.',
+    grep_hint:'impl .* for|dyn <Trait>|: <Trait>' },
+  { id:'local-bypass', icon:'🧭', name:'Lokale Umgehung',
+    desc:'Abstraktion ist im selben Modul injiziert UND genutzt, aber an einzelnen Stellen trotzdem direkte Low-Level-API statt der Abstraktion (z.B. Clock injiziert, SystemTime::now() trotzdem aufgerufen).',
+    grep_hint:'SystemTime::now\\(\\)|thread_rng\\(\\)|Instant::now\\(\\)' },
+  { id:'broken-pipeline', icon:'🔗', name:'Halbfertige Pipeline',
+    desc:'Schritt 1 und 3 eines beabsichtigten Ablaufs existieren und sind verdrahtet, Schritt 2 fehlt oder ist nie aufgerufener Stub.',
+    grep_hint:null },
+  { id:'duplicate-abstraction', icon:'👯', name:'Doppelte/konkurrierende Implementierung',
+    desc:'Zwei Mechanismen für dieselbe Sache, nur einer aktiv verdrahtet, der andere totes Scaffolding.',
+    grep_hint:null }
+];
 
 const FUNCTIONS = {
   'durability': {
@@ -5306,31 +5378,21 @@ function initSubsystems() {
 
 function setEbene(mode) {
   SS.mode = mode;
-  ['crate','subsystem','eigenbau','prozess'].forEach(m => {
+  ['function','crate','subsystem','eigenbau','prozess','wiring'].forEach(m => {
     const tab = document.getElementById('tab-ebene-' + m);
     if (tab) tab.classList.toggle('on', m === mode);
   });
-  if (mode === 'crate') {
-    unlockCrateTaskCards();
-    document.getElementById('c-subsystem')?.classList.add('locked');
-    document.getElementById('c-eigenbau')?.classList.add('locked');
-    document.getElementById('c-prozess')?.classList.add('locked');
-  } else if (mode === 'subsystem') {
-    lockCrateTaskCards();
-    document.getElementById('c-subsystem')?.classList.remove('locked');
-    document.getElementById('c-eigenbau')?.classList.add('locked');
-    document.getElementById('c-prozess')?.classList.add('locked');
-  } else if (mode === 'eigenbau') {
-    lockCrateTaskCards();
-    document.getElementById('c-subsystem')?.classList.add('locked');
-    document.getElementById('c-eigenbau')?.classList.remove('locked');
-    document.getElementById('c-prozess')?.classList.add('locked');
-  } else if (mode === 'prozess') {
-    lockCrateTaskCards();
-    document.getElementById('c-subsystem')?.classList.add('locked');
-    document.getElementById('c-eigenbau')?.classList.add('locked');
-    document.getElementById('c-prozess')?.classList.remove('locked');
-  }
+  ['function','crate','subsystem','eigenbau','prozess','wiring'].forEach(m => {
+    const card = document.getElementById('c-' + m);
+    if (!card) return;
+    if (m === mode) {
+      card.classList.remove('locked');
+      if (m === 'function' || m === 'crate') unlockCrateTaskCards();
+      else lockCrateTaskCards();
+    } else {
+      card.classList.add('locked');
+    }
+  });
 }
 
 function initEigenbau() {
@@ -5732,7 +5794,159 @@ ${ROLE_LOCK_BLOCK('prozess_ingenieur', claimCrate)}
   document.getElementById('ochar').textContent = chars + ' Z.';
   document.getElementById('ochar2').textContent = chars + ' Zeichen';
 }
+
+function selFunctionDomain(domainKey) {
+  SS.functionDomain = domainKey;
+  const detailsEl = document.getElementById('function-domain-details');
+  if (!domainKey || !FUNCTIONS[domainKey]) {
+    if (detailsEl) detailsEl.style.display = 'none';
+    return;
+  }
+  const f = FUNCTIONS[domainKey];
+  document.getElementById('function-domain-desc').textContent = f.description;
+  document.getElementById('function-domain-invariants').textContent = (f.primary_invariants || []).join(' | ');
+  document.getElementById('function-domain-files-count').textContent = (f.files || []).length + ' Dateien quer über Workspace';
+  if (detailsEl) detailsEl.style.display = 'block';
+}
+
+function checkFunctionsCoverage() {
+  const allCompFiles = new Set();
+  for (const [crate, files] of Object.entries(DEFAULT_COMPONENTS)) {
+    for (const f of files) {
+      allCompFiles.add(crate + ':' + (f.file || f.path));
+    }
+  }
+
+  const funcFiles = new Set();
+  for (const [fKey, fObj] of Object.entries(FUNCTIONS)) {
+    if (fObj.files) {
+      for (const f of fObj.files) {
+        funcFiles.add(f.crate + ':' + (f.file || f.path));
+      }
+    }
+  }
+
+  const uncovered = [];
+  for (const file of allCompFiles) {
+    if (!funcFiles.has(file)) uncovered.push(file);
+  }
+
+  if (uncovered.length > 0) {
+    console.warn('⚠️ checkFunctionsCoverage: ' + uncovered.length + ' files in DEFAULT_COMPONENTS are not mapped in FUNCTIONS:', uncovered);
+  } else {
+    console.log('✅ checkFunctionsCoverage: 100% file coverage in FUNCTIONS!');
+  }
+  return uncovered;
+}
+
+function initWiring() {
+  const grid = document.getElementById('wiring-grid');
+  if (!grid) return;
+  grid.innerHTML = WIRING_PATTERNS.map(w => {
+    return '<div class="subsys-card wiring-card" data-id="' + w.id + '" onclick="selWiring(\'' + w.id + '\')">' +
+      '<div class="sub-name">' + w.icon + ' ' + w.name + '</div>' +
+      '<div class="sub-desc">' + w.desc + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function selWiring(id) {
+  SS.wiring = id;
+  document.querySelectorAll('.wiring-card').forEach(c => {
+    c.classList.toggle('sel', c.dataset.id === id);
+  });
+}
+
+function checkClaimWarnings(fileList) {
+  const claimWarningEl = document.getElementById('claim-warning-banner');
+  if (!claimWarningEl) return;
+
+  const activeClaims = window.ACTIVE_CLAIMS || [];
+  if (!activeClaims || activeClaims.length === 0) {
+    claimWarningEl.style.display = 'none';
+    return;
+  }
+
+  const collisions = [];
+  for (const file of fileList) {
+    if (activeClaims.some(c => c.file === file || file.endsWith(c.file))) {
+      collisions.push(file);
+    }
+  }
+
+  if (collisions.length > 0) {
+    claimWarningEl.innerHTML = '⚠️ <strong>Achtung: Überschneidung mit aktiver Claim-Reservierung!</strong><br>Folgende Dateien sind bereits in einer aktiven Session reserviert:<br>' +
+      collisions.map(c => '• ' + c).join('<br>') + '<br><em>Empfehlung: Alternativen Funktionsbereich wählen oder WIRING-Audit nutzen.</em>';
+    claimWarningEl.style.display = 'block';
+  } else {
+    claimWarningEl.style.display = 'none';
+  }
+}
+
+function generateWiringPrompt() {
+  const w = WIRING_PATTERNS.find(x => x.id === SS.wiring);
+  if (!w) { alert('⚠️ Bitte wähle ein Verdrahtungs-Muster aus.'); return; }
+  const scope = SS.wiringScope === 'crate' ? (SS.crate || 'contextra-core') : 'workspace-weit (crates/)';
+  const target = SS.wiringTarget ? ' API/Trait: ' + SS.wiringTarget : '';
+  const hint = w.grep_hint ? ' (Such-Hinweis: ' + w.grep_hint + ')' : '';
+
+  const promptText = 'Du bist Principal Architecture Audit Engineer für Contextra.\n\n' +
+'Ziel: Verdrahtungs-Audit nach Muster "' + w.name + '" (' + w.icon + ').\n' +
+'Scope: ' + scope + target + '.\n' +
+'Beschreibung: ' + w.desc + hint + '\n\n' +
+'Aufgabe:\n' +
+'1. Durchsuche den angegebenen Scope systematisch nach Abweichungen vom Muster.\n' +
+'2. Identifiziere tote Abstraktionen, Umgehungen oder unvollständige Pipeline-Glieder.\n' +
+'3. Erstelle eine Ergebnistabelle mit Befund, Datei, Zeile und empfohlenem Refactoring.';
+
+  const out = document.getElementById('pt-output');
+  if (out) { out.style.display = 'block'; out.textContent = promptText; }
+  if (typeof toast === 'function') toast('Prompt erzeugt!');
+}
+
+function generateFunctionPrompt() {
+  const domainKey = SS.functionDomain;
+  if (!domainKey || !FUNCTIONS[domainKey]) {
+    alert('⚠️ Bitte wähle einen Funktionsbereich (Domäne) aus.');
+    return;
+  }
+
+  const f = FUNCTIONS[domainKey];
+  const taskTypeMap = {
+    close_gap: 'Lücke schließen (Soll-Ist Abweichung beheben)',
+    harden: 'Härten (Tests, Beweise & Invarianten nachrüsten)',
+    extend: 'Erweitern (Neue Soll-Fähigkeit implementieren)',
+    update_governance: 'Governance aktualisieren (Prompter/xtask/Gates anpassen)'
+  };
+  const taskTypeLabel = taskTypeMap[SS.functionTaskType] || SS.functionTaskType;
+
+  const crateSet = new Set((f.files || []).map(x => PKG(x.crate)));
+  const cargoFlags = Array.from(crateSet).map(c => '-p ' + c).join(' ');
+
+  const fileListText = (f.files || []).map(x => '- ' + x.crate + '/' + (x.file || x.path)).join('\n');
+  const invariantsText = (f.primary_invariants || []).map(inv => '- ' + inv).join('\n');
+
+  const promptText = 'Du bist Principal Senior Architect für den Contextra-Funktionsbereich "' + f.label + '".\n\n' +
+'Repository: https://github.com/tfufuz1/contextra — arbeite auf einem Feature-Branch.\n\n' +
+'Domäne: ' + f.label + '\n' +
+'Beschreibung: ' + f.description + '\n' +
+'Aufgabentyp: ' + taskTypeLabel + '\n\n' +
+'Verbindliche System-Invarianten:\n' + invariantsText + '\n\n' +
+'Relevanter Datei-Scope (über Crate-Grenzen hinweg):\n' + fileListText + '\n\n' +
+'Anweisungen:\n' +
+'1. Analysiere den angegebenen Scope im Hinblick auf den Aufgabentyp "' + taskTypeLabel + '".\n' +
+'2. Führe notwendige Anpassungen durch. Nutze Cargo-Befehle: cargo test ' + cargoFlags + '\n' +
+'3. Validiere alle Invarianten und verifiziere, dass keine Layering- oder Isolations-Regeln verletzt werden.';
+
+  const out = document.getElementById('pt-output');
+  if (out) { out.style.display = 'block'; out.textContent = promptText; }
+  checkClaimWarnings((f.files || []).map(x => x.crate + '/' + (x.file || x.path)));
+  if (typeof toast === 'function') toast('Funktionsbereich-Prompt erzeugt!');
+}
+
 function generate() {
+  if (SS.mode === "function" || (SS.functionDomain && !SS.crate)) { generateFunctionPrompt(); return; }
+  if (SS.mode === "wiring" || SS.wiring) { generateWiringPrompt(); return; }
   if (INVENTORY_SOURCE === 'bundled') {
       toast('⚠️ Warnung: Veraltete (bundled) Daten!');
   }
@@ -6248,7 +6462,7 @@ function resetProjectData() {
 
 // INIT
 initCrates();
-initSubsystems(); initEigenbau(); initProcess();
+initSubsystems(); initEigenbau(); initProcess(); initWiring(); checkFunctionsCoverage();
 initAPM();
 renderComponents();
 renderInventoryBadge();
