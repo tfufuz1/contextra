@@ -7,9 +7,11 @@
 // HOTSPOTS: L30-L90 (Power Iteration Matrix-Vector Vector Multiplication)
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
+pub mod cost;
 pub mod shadow_hook;
 pub(crate) mod snapshot;
 
+use self::cost::{estimate_ppr_cost, GraphStats};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 use std::collections::{BTreeMap, HashSet};
@@ -162,37 +164,12 @@ pub(crate) fn select_auto_ppr_algorithm(
         return PprAlgorithm::ForwardPush;
     }
 
-    let alpha = if config.damping_factor.is_nan()
-        || config.damping_factor <= 0.0
-        || config.damping_factor >= 1.0
-    {
-        0.15f64
-    } else {
-        (1.0f64 - config.damping_factor as f64).max(1e-4)
-    };
+    let node_count = inner.reverse_map.len();
+    let edge_count = inner.targets.len() + inner.pending_edge_count;
+    let stats = GraphStats::new(node_count, edge_count);
 
-    let epsilon = if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0 {
-        1e-6f64
-    } else {
-        (config.convergence_epsilon as f64).max(1e-12)
-    };
-
-    let num_nodes = inner.reverse_map.len() as f64;
-    let edge_count = (inner.targets.len() + inner.pending_edge_count) as f64;
-    let max_iters = (config.max_iterations.min(1000) as usize) as f64;
-
-    // Asymptotic cost order estimates:
-    // ForwardPush: O(1 / (\epsilon \cdot \alpha))
-    let forward_push_cost = 1.0f64 / (epsilon * alpha);
-
-    // Dense Power Iteration: O(iterations \cdot (|E| + N))
-    let power_iteration_cost = max_iters * (edge_count + num_nodes);
-
-    if forward_push_cost < power_iteration_cost {
-        PprAlgorithm::ForwardPush
-    } else {
-        PprAlgorithm::DensePowerIteration
-    }
+    let (_estimate, choice) = estimate_ppr_cost(Some(&stats), seed_count, config);
+    choice
 }
 
 pub(crate) fn compute_ppr_with_context(
@@ -217,6 +194,25 @@ pub(crate) fn compute_ppr_with_context(
         PprAlgorithm::ShadowMode => {
             let dense_results = compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx);
             let fp_results = forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx);
+
+            // Record measured operation samples for shadow mode calibration
+            let node_count = inner.reverse_map.len();
+            let edge_count = inner.targets.len() + inner.pending_edge_count;
+            let stats = GraphStats::new(node_count, edge_count);
+            let (est, _) = estimate_ppr_cost(Some(&stats), seed_nodes.len(), config);
+
+            // Calibrator hook for ShadowMode edge access tracking
+            let cal = cost::PprCostCalibrator::new();
+            cal.record(cost::PprCostSample {
+                algorithm: PprAlgorithm::ForwardPush,
+                estimated_cost: est.forward_push,
+                measured_edge_accesses: (edge_count + node_count) as u64,
+            });
+            cal.record(cost::PprCostSample {
+                algorithm: PprAlgorithm::DensePowerIteration,
+                estimated_cost: est.power_iteration,
+                measured_edge_accesses: (config.max_iterations as usize * (edge_count + node_count)) as u64,
+            });
 
             // Compare top results and log any substantial discrepancy
             let max_diff = dense_results
