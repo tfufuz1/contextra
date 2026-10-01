@@ -1,5 +1,4 @@
-use super::block_search::get_entry_at_index;
-use super::reader::{parse_block_trailer, SstableReader};
+use super::reader::SstableReader;
 use bytes::Bytes;
 use contextra_core::{ContextraError, Result};
 use std::sync::Arc;

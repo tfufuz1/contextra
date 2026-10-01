@@ -1,5 +1,5 @@
 use super::*;
-use crate::compaction::CompactionEngine;
+use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
@@ -102,6 +102,13 @@ struct PendingTxOp {
 
 impl LsmStorage {
     pub async fn new(config: LsmConfig) -> Result<Self> {
+        Self::new_with_merge_operator(config, None).await
+    }
+
+    pub async fn new_with_merge_operator(
+        config: LsmConfig,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
         if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
             return Err(ContextraError::InvalidInput(format!(
                 "block_cache_shards must be > 0 and a power of two, got {}",
@@ -287,7 +294,9 @@ impl LsmStorage {
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
             let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
-                || valid_manifest_sstables.as_ref().is_some_and(|s| !s.is_empty())
+                || valid_manifest_sstables
+                    .as_ref()
+                    .is_some_and(|s| !s.is_empty())
             {
                 expected_hwm
             } else {
@@ -468,17 +477,21 @@ impl LsmStorage {
                 .await;
         });
 
-        let compaction_engine = Arc::new(
-            CompactionEngine::new(
-                config.compaction.clone(),
-                Arc::clone(&snapshot_registry),
-                Arc::clone(&block_cache),
-                key_manager.clone(),
-                Arc::clone(&resource_tracker),
-                Some(Arc::clone(&manifest)),
-            )
-            .with_pressure_rx(pressure_rx.clone()),
-        );
+        let mut compaction_engine_builder = CompactionEngine::new(
+            config.compaction.clone(),
+            Arc::clone(&snapshot_registry),
+            Arc::clone(&block_cache),
+            key_manager.clone(),
+            Arc::clone(&resource_tracker),
+            Some(Arc::clone(&manifest)),
+        )
+        .with_pressure_rx(pressure_rx.clone());
+
+        if let Some(mo) = merge_operator {
+            compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);
+        }
+
+        let compaction_engine = Arc::new(compaction_engine_builder);
 
         let compaction_engine_for_loop = Arc::clone(&compaction_engine);
         let compaction_sstables = Arc::clone(&sstables);
@@ -528,11 +541,9 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            ssi_validator: Arc::new(
-                contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
-                    ssi_max_tracked_keys,
-                ),
-            ),
+            ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
+                ssi_max_tracked_keys,
+            )),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {

@@ -23,6 +23,7 @@ pub(crate) async fn get_tracked(
 /// sequence number must reflect the actual sequence number observed at the time of the read,
 /// rather than `u64::MAX`. Therefore, the registered sequence number is clamped to
 /// `min(snapshot_seq, storage.last_applied_seq.load(Ordering::Acquire))`, captured *before* reading.
+/// Registrieren eines Werts, der nicht größer ist als der tatsächlich gelesene, ist konservativ (im Zweifel ein Konflikt, nie ein übersehener).
 /// Reading semantics remain unchanged and continue to query `storage.get_at_seq(key, snapshot_seq)`.
 ///
 /// # Hinweis zu Phantomschutz
