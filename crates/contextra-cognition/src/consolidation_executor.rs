@@ -20,7 +20,9 @@ use crate::memory_consolidation::{
 use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_engine::decay_controller::AdaptiveDecayController;
 use contextra_graph::{detect_communities, CommunityDetectionConfig};
-use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex};
+use contextra_ports::{
+    GroundingValidator, LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
+};
 use contextra_types::{DocId, Result};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -159,6 +161,60 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
 /// 1. Structural Consolidation Pass: Segmentierung & Near-Duplicate Tombstoning.
 /// 2. Generative Synthesis Pass (falls `synthesis_config` und `llm` angegeben): Wissenssynthese über stabile Graph-Communities.
 ///    Synthetisierte MetaChunks werden in die Collection eingefügt.
+/// Adapter, der einen `GroundingValidator` (mit kalibrierter GroundingAssessment- und PolicyViolation-Semantik)
+/// an das `ResponseGroundingValidator`-Trait anpasst.
+pub struct GroundingValidatorAdapter<'a>(pub &'a dyn GroundingValidator);
+
+impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
+    fn score_grounding(&self, response: &str, sources: &[&str]) -> Result<f32> {
+        let chunks: Vec<contextra_types::ContextChunk> = sources
+            .iter()
+            .enumerate()
+            .map(|(i, src)| contextra_types::ContextChunk {
+                doc_id: DocId::from(i as u64 + 1),
+                content: src.to_string(),
+                relevance: 1.0,
+                token_count: 0,
+                metadata: None,
+                contextual_prefix: None,
+                links: Vec::new(),
+            })
+            .collect();
+
+        let mut future = self.0.validate_grounding(response, &chunks);
+        let waker = std::task::Waker::noop();
+        let mut cx = std::task::Context::from_waker(&waker);
+        let assessment_res = match std::future::Future::poll(future.as_mut(), &mut cx) {
+            std::task::Poll::Ready(res) => res,
+            std::task::Poll::Pending => {
+                if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                    tokio::task::block_in_place(move || handle.block_on(future))
+                } else {
+                    Err(contextra_types::ContextraError::Internal(
+                        "GroundingValidator pending unexpectedly in synchronous score_grounding call"
+                            .to_string(),
+                    ))
+                }
+            }
+        };
+
+        match assessment_res {
+            Ok(assessment) => Ok(assessment.score),
+            Err(contextra_types::ContextraError::PolicyViolation(msg)) => {
+                tracing::warn!(
+                    reason = %msg,
+                    "GroundingValidatorAdapter: PolicyViolation / LowConfidenceGrounding caught"
+                );
+                // Liefert 0.0, um den ungroundeten Synthese-Chunk in run_structural_synthesis_pass zu verwerfen
+                Ok(0.0)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Führt die vollständige Hintergrund-Konsolidierung aus.
+/// Abwärtskompatibler Wrapper um [`execute_background_consolidation_with_rich_validator`].
 pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -166,6 +222,38 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     synthesis_config: Option<&SynthesisConfig>,
     llm: Option<&dyn LlmTextGenerator>,
     validator: Option<&dyn ResponseGroundingValidator>,
+    stability_tracker: Option<&mut CommunityStabilityTracker>,
+) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)> {
+    execute_background_consolidation_with_rich_validator(
+        collection,
+        turns,
+        consolidation_config,
+        synthesis_config,
+        llm,
+        validator,
+        None,
+        stability_tracker,
+    )
+    .await
+}
+
+/// Führt die vollständige Hintergrund-Konsolidierung mit Unterstützung für `rich_validator` (`GroundingValidator`) aus.
+///
+/// 1. Structural Consolidation Pass: Segmentierung & Near-Duplicate Tombstoning.
+/// 2. Generative Synthesis Pass (falls `synthesis_config` und `llm` angegeben): Wissenssynthese über stabile Graph-Communities.
+///    Synthetisierte MetaChunks werden in die Collection eingefügt.
+///    WENN `rich_validator` angegeben ist, wird dessen kalibrierte Grounding-/PolicyViolation-Semantik bevorzugt.
+pub async fn execute_background_consolidation_with_rich_validator<
+    S: StorageEngine,
+    V: VectorIndex,
+>(
+    collection: &Collection<S, V>,
+    turns: &[(DocId, Vec<f32>)],
+    consolidation_config: &ConsolidationConfig,
+    synthesis_config: Option<&SynthesisConfig>,
+    llm: Option<&dyn LlmTextGenerator>,
+    validator: Option<&dyn ResponseGroundingValidator>,
+    rich_validator: Option<&dyn GroundingValidator>,
     stability_tracker: Option<&mut CommunityStabilityTracker>,
 ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)> {
     let consolidation_result =
@@ -240,14 +328,23 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
         }
 
         // Structural Consolidation Pass über stabile Communities ausführen.
-        // HINWEIS: Grounding-Validierung wird ausgeführt, wenn ein `ResponseGroundingValidator` (z. B. `GaspValidator` aus dem Candle-Backend) übergeben wird.
-        // Bei LLM-Backends ohne GaspValidator-Unterstützung ist validator `None` und die Validierung wird übersprungen.
+        // HINWEIS: WENN ein `rich_validator` (GroundingValidator) übergeben wird, wird dieser bevorzugt
+        // über GroundingValidatorAdapter adaptiert, sodass Isotonic-Kalibrierung & PolicyViolation-Abstention greifen.
+        let adapter;
+        let effective_validator: Option<&dyn ResponseGroundingValidator> =
+            if let Some(rv) = rich_validator {
+                adapter = GroundingValidatorAdapter(rv);
+                Some(&adapter)
+            } else {
+                validator
+            };
+
         let synth_res = run_structural_synthesis_pass(
             &stable_communities,
             &source_texts,
             llm_gen,
             synth_cfg,
-            validator,
+            effective_validator,
         )
         .await?;
 
@@ -363,6 +460,7 @@ pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = contextra_vect
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
     validator: Option<Arc<dyn ResponseGroundingValidator>>,
+    rich_validator: Option<Arc<dyn GroundingValidator>>,
     consolidation_config: ConsolidationConfig,
     synthesis_config: SynthesisConfig,
     leanrag: Option<AggregationConfig>,
@@ -384,6 +482,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             collection,
             llm: None,
             validator: None,
+            rich_validator: None,
             consolidation_config,
             synthesis_config,
             leanrag: None,
@@ -408,6 +507,12 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
     /// Fügt einen optionalen Grounding-Validator für den Generative Synthesis Pass hinzu.
     pub fn with_validator(mut self, validator: Arc<dyn ResponseGroundingValidator>) -> Self {
         self.validator = Some(validator);
+        self
+    }
+
+    /// Fügt einen optionalen reichhaltigen Grounding-Validator (`GroundingValidator`) mit Kalibrierung & Policy-Violation-Semantik hinzu.
+    pub fn with_rich_validator(mut self, validator: Arc<dyn GroundingValidator>) -> Self {
+        self.rich_validator = Some(validator);
         self
     }
 
@@ -548,17 +653,23 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             .validator
             .as_ref()
             .map(|v| v.as_ref() as &dyn ResponseGroundingValidator);
+        let rich_validator_ref = self
+            .rich_validator
+            .as_ref()
+            .map(|v| v.as_ref() as &dyn GroundingValidator);
 
-        let (consolidation_res, synthesis_res) = execute_background_consolidation(
-            self.collection.as_ref(),
-            &turns,
-            &self.consolidation_config,
-            Some(&self.synthesis_config),
-            llm_ref,
-            validator_ref,
-            Some(&mut *tracker_guard),
-        )
-        .await?;
+        let (consolidation_res, synthesis_res) =
+            execute_background_consolidation_with_rich_validator(
+                self.collection.as_ref(),
+                &turns,
+                &self.consolidation_config,
+                Some(&self.synthesis_config),
+                llm_ref,
+                validator_ref,
+                rich_validator_ref,
+                Some(&mut *tracker_guard),
+            )
+            .await?;
 
         // APM-Datenverlust-Bei-Absturz:
         // Synthetisierte Summaries wurden bereits in execute_background_consolidation erzeugt & persistiert.

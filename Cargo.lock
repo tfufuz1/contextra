@@ -727,6 +727,7 @@ dependencies = [
  "bytes",
  "contextra-engine",
  "contextra-graph",
+ "contextra-infer-candle",
  "contextra-ports",
  "contextra-store",
  "contextra-types",
