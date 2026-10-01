@@ -286,6 +286,9 @@ pub struct DeletionProof {
     /// Kryptographische Quittung H(hmac_prev || delete_event) der WAL-HMAC-Kette.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub wal_chain_receipt: Option<[u8; 32]>,
+    /// Verweis auf die Position (Index) des zugehörigen Audit-Chain-Eintrags.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub audit_chain_position: Option<u64>,
     /// Integritätswarnung für Legacy-Proofs (Version 1).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub integrity_warning: Option<String>,
@@ -368,7 +371,7 @@ impl DeletionProof {
         )?;
 
         Ok(Self {
-            signature_version: 2,
+            signature_version: SignatureVersion::V2.as_u8(),
             scope,
             deleted_keys_hash,
             deleted_after_tx,
@@ -378,6 +381,7 @@ impl DeletionProof {
             excluded_scopes,
             graph_repair: Vec::new(),
             wal_chain_receipt,
+            audit_chain_position: None,
             integrity_warning: None,
         })
     }
@@ -407,15 +411,70 @@ impl DeletionProof {
         )
     }
 
+    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_v3_with_audit_position(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        audit_chain_position: Option<u64>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        Self::create_full_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            None,
+            audit_chain_position,
+            attested_at,
+            graph_repair,
+            signing_key,
+        )
+    }
+
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_wal_receipt_v3(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        wal_chain_receipt: Option<[u8; 32]>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        Self::create_full_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            wal_chain_receipt,
+            None,
+            attested_at,
+            graph_repair,
+            signing_key,
+        )
+    }
+
+    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_full_v3(
         scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
         wal_chain_receipt: Option<[u8; 32]>,
+        audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
         signing_key: &ed25519_dalek::SigningKey,
@@ -441,7 +500,7 @@ impl DeletionProof {
         };
 
         let proof_stub = Self {
-            signature_version: 3,
+            signature_version: SignatureVersion::V3.as_u8(),
             scope,
             deleted_keys_hash,
             deleted_after_tx,
@@ -451,6 +510,7 @@ impl DeletionProof {
             excluded_scopes,
             graph_repair: graph_repair.to_vec(),
             wal_chain_receipt,
+            audit_chain_position,
             integrity_warning: None,
         };
 
@@ -478,6 +538,7 @@ impl DeletionProof {
     }
 
     /// Verifiziert Signatur.
+    /// Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1.
     /// NICHT-GARANTIE: Prüft nur Signatur, nicht ob Storage tatsächlich bereinigt ist.
     pub fn verify<'a>(&self, key: impl Into<VerificationKey<'a>>) -> Result<bool> {
         let version = self
@@ -580,6 +641,13 @@ impl DeletionProof {
             &[]
         };
 
+        let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
+        let audit_pos_part = if let Some(ref pos_b) = audit_pos_bytes {
+            pos_b.as_slice()
+        } else {
+            &[]
+        };
+
         let mut payload = Vec::with_capacity(
             scope_bytes.len()
                 + 32
@@ -587,7 +655,8 @@ impl DeletionProof {
                 + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
-                + receipt_part.len(),
+                + receipt_part.len()
+                + audit_pos_part.len(),
         );
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
@@ -596,6 +665,7 @@ impl DeletionProof {
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
+        payload.extend_from_slice(audit_pos_part);
 
         Ok(payload)
     }
@@ -634,7 +704,13 @@ impl DeletionProof {
         &self,
         public_key: &ed25519_dalek::VerifyingKey,
     ) -> std::result::Result<(), CryptoError> {
-        if self.signature_version != 3 {
+        // Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1
+        // Verzweigung ausschließlich über den typisierten SignatureVersion-Wert.
+        let version = self
+            .signature_version_typed()
+            .map_err(|_| CryptoError::UnsupportedProofVersion(self.signature_version))?;
+
+        if version != SignatureVersion::V3 {
             return Err(CryptoError::UnsupportedProofVersion(self.signature_version));
         }
 
@@ -652,7 +728,13 @@ impl DeletionProof {
     /// Exportiert Proof als JSON für Compliance-Dokumentation.
     /// ExcludedScope-Liste ist maschinenlesbar enthalten.
     pub fn export_for_audit(&self) -> Result<String> {
-        if self.signature_version == 1 {
+        // Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1
+        // Typisierte Versionsprüfung über SignatureVersion.
+        let version = self
+            .signature_version_typed()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+        if version == SignatureVersion::V1 {
             let mut clone = self.clone();
             clone.integrity_warning = Some(
                 "covered_layers/excluded_scopes are not cryptographically signed in this legacy proof version"
@@ -947,6 +1029,7 @@ mod tests {
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
         assert_eq!(v1_proof.signature_version, 1);
@@ -1280,6 +1363,7 @@ mod tests {
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
 
@@ -1338,6 +1422,7 @@ mod tests {
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
 
@@ -1515,11 +1600,110 @@ mod tests {
         let mut proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
 
-        proof.signature_version = 255;
-        let res = proof.verify(&test_key());
-        assert!(
-            matches!(res, Err(ContextraError::Internal(ref msg)) if msg.contains("Unsupported DeletionProof signature_version: 255"))
-        );
+        for unknown_byte in [0x00, 0x04, 0xAA, 0xFF] {
+            proof.signature_version = unknown_byte;
+
+            // 1. signature_version_typed() MUST return DeletionProofError::UnsupportedVersion
+            let typed_res = proof.signature_version_typed();
+            assert_eq!(
+                typed_res,
+                Err(DeletionProofError::UnsupportedVersion(unknown_byte))
+            );
+
+            // 2. verify() MUST reject unknown version fail-closed with error and no panic
+            let verify_res = proof.verify(&test_key());
+            assert!(
+                matches!(verify_res, Err(ContextraError::Internal(ref msg)) if msg.contains(&format!("Unsupported DeletionProof signature_version: {unknown_byte}"))),
+                "verify() MUST reject unknown byte 0x{unknown_byte:02X} fail-closed"
+            );
+
+            // 3. verify_external() MUST reject unknown version
+            let keypair = DeletionProofKeyPair::generate();
+            let ext_res = proof.verify_external(&keypair.verifying_key);
+            assert!(
+                matches!(ext_res, Err(CryptoError::UnsupportedProofVersion(v)) if v == unknown_byte),
+                "verify_external() MUST reject unknown byte 0x{unknown_byte:02X} fail-closed"
+            );
+
+            // 4. export_for_audit() MUST fail on unknown version
+            let audit_res = proof.export_for_audit();
+            assert!(
+                audit_res.is_err(),
+                "export_for_audit() MUST fail on unknown version byte 0x{unknown_byte:02X}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_bit_flipped_signature_rejected_for_all_valid_versions() {
+        // Befund v17 Teil 10.1 & INV-DELETION-1 Regressionstest:
+        // Ein um ein Bit manipulierter Signaturwert schlägt bei allen gültigen Versionen (v1, v2, v3) fehl.
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+
+        // --- Version 1 ---
+        let scope_bytes = bincode::serialize(&scope).unwrap();
+        let deleted_keys_hash = [0u8; 32];
+        let tx_bytes = TxId(10).0.to_le_bytes();
+        let v1_signature =
+            compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
+                .unwrap();
+
+        let mut v1_proof = DeletionProof {
+            signature_version: 1,
+            scope: scope.clone(),
+            deleted_keys_hash,
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: v1_signature.to_vec(),
+            covered_layers: vec![],
+            excluded_scopes: vec![],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            integrity_warning: None,
+        };
+        assert!(v1_proof.verify(&test_key()).unwrap());
+        v1_proof.signature[0] ^= 0x01; // Bit-flip
+        assert!(!v1_proof.verify(&test_key()).unwrap());
+
+        // --- Version 2 ---
+        let mut v2_proof = DeletionProof::create(
+            scope.clone(),
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+            vec![ExcludedScope::LlmParameterMemory],
+            &test_key(),
+        )
+        .unwrap();
+        assert!(v2_proof.verify(&test_key()).unwrap());
+        v2_proof.signature[0] ^= 0x01; // Bit-flip
+        assert!(!v2_proof.verify(&test_key()).unwrap());
+
+        // --- Version 3 ---
+        let keypair = DeletionProofKeyPair::generate();
+        let mut v3_proof = DeletionProof::create_v3(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+            vec![ExcludedScope::LlmParameterMemory],
+            1700000000,
+            &[],
+            keypair.signing_key(),
+        )
+        .unwrap();
+        assert!(v3_proof.verify(&keypair.verifying_key).unwrap());
+        assert!(v3_proof.verify_external(&keypair.verifying_key).is_ok());
+
+        v3_proof.signature[0] ^= 0x01; // Bit-flip
+        assert!(!v3_proof.verify(&keypair.verifying_key).unwrap());
+        assert!(matches!(
+            v3_proof.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
     }
 
     #[test]

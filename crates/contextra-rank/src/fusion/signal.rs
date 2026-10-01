@@ -1,5 +1,39 @@
 use super::types::SignalContribution;
+use crate::drift::DriftStatus;
 use ahash::AHashMap;
+
+/// Calibration and drift context for a search signal during mRRF weight modulation.
+#[derive(Debug, Clone)]
+pub struct SignalCalibrationContext {
+    /// Signal identifier matching the result set signal name (e.g., "vector", "text", "graph").
+    pub signal_name: String,
+    /// Indicates whether the calibrator for this signal is warm and calibrated.
+    pub is_calibrated: bool,
+    /// Current statistical drift status for this signal.
+    pub drift_status: DriftStatus,
+}
+
+impl SignalCalibrationContext {
+    /// Creates a new `SignalCalibrationContext`.
+    pub fn new(
+        signal_name: impl Into<String>,
+        is_calibrated: bool,
+        drift_status: DriftStatus,
+    ) -> Self {
+        Self {
+            signal_name: signal_name.into(),
+            is_calibrated,
+            drift_status,
+        }
+    }
+
+    /// Evaluates whether calibrated scores should be used for margin calculation.
+    ///
+    /// Returns `true` if and only if `is_calibrated` is true AND `drift_status` is `DriftStatus::Stable`.
+    pub fn should_use_calibrated_scores(&self) -> bool {
+        self.is_calibrated && matches!(self.drift_status, DriftStatus::Stable { .. })
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum SignalKey<'a> {

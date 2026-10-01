@@ -139,17 +139,26 @@ pub struct VolatileContextVault {
     mlock_regions: LockedRegions,
     /// Interne Konsumptions-Flag: verhindert doppeltes purge()/commit().
     consumed: bool,
+    /// Tracking ob alle Chunk-Inhalte im RAM speicher-fixiert (locked) wurden.
+    is_memory_locked: bool,
 }
 
 impl VolatileContextVault {
     /// Neuen leeren Vault öffnen. Kein I/O.
     pub fn open(config: VaultConfig) -> Self {
+        let initial_locked = config.attempt_mlock;
+        if !config.attempt_mlock {
+            tracing::info!(
+                "VolatileContextVault: attempt_mlock is false. Memory-locking disabled (swap risk)."
+            );
+        }
         Self {
             chunks: Vec::new(),
             current_bytes: 0,
             config,
             mlock_regions: LockedRegions::new(),
             consumed: false,
+            is_memory_locked: initial_locked,
         }
     }
 
@@ -173,8 +182,20 @@ impl VolatileContextVault {
         }
 
         // Memory-Locking (best-effort): chunk.content im RAM fixieren.
-        self.mlock_regions
+        let locked = self
+            .mlock_regions
             .lock_slice(&chunk.content, self.config.attempt_mlock);
+
+        if !locked && !chunk.content.is_empty() {
+            self.is_memory_locked = false;
+            if self.config.attempt_mlock {
+                tracing::warn!(
+                    "VolatileContextVault: Memory-locking failed for chunk id={:?}. \
+                     Sensitive content is not locked in RAM (swap risk).",
+                    chunk.id
+                );
+            }
+        }
 
         self.current_bytes += new_bytes;
         self.chunks.push(chunk);
@@ -228,6 +249,15 @@ impl VolatileContextVault {
 
     pub fn is_empty(&self) -> bool {
         self.chunks.is_empty()
+    }
+
+    /// Gibt zurück, ob alle sensitiven Chunk-Inhalte im RAM fixiert (memory-locked) sind.
+    ///
+    /// Liefert `false`, wenn `attempt_mlock` in der [`VaultConfig`] deaktiviert war,
+    /// falls das Betriebssystem das Locking verweigert hat (z. B. fehlendes `CAP_IPC_LOCK`
+    /// oder Limit erreicht), oder falls die Plattform kein Speicher-Locking unterstützt.
+    pub fn is_memory_locked(&self) -> bool {
+        self.is_memory_locked
     }
 
     /// Lesezugriff auf Chunks (für User-Preview vor Commit/Purge-Entscheidung).
@@ -370,5 +400,52 @@ mod tests {
         assert_eq!(meta[0].size_bytes, b"very secret".len());
         assert_eq!(meta[0].label.as_deref(), Some("test"));
         // Kein Feld, das den Inhalt `b"very secret"` exponiert.
+    }
+
+    /// Status-Propagierung von `is_memory_locked` bei `attempt_mlock: false`.
+    #[test]
+    fn test_is_memory_locked_disabled_config() {
+        let config = VaultConfig {
+            attempt_mlock: false,
+            ..Default::default()
+        };
+        let mut vault = VolatileContextVault::open(config);
+        assert!(!vault.is_memory_locked());
+        vault.ingest(make_chunk(1, b"unlocked secret")).unwrap();
+        assert!(!vault.is_memory_locked());
+    }
+
+    /// Status-Propagierung von `is_memory_locked` bei `attempt_mlock: true`.
+    #[test]
+    fn test_is_memory_locked_status_propagation() {
+        let config = VaultConfig {
+            attempt_mlock: true,
+            ..Default::default()
+        };
+        let mut vault = VolatileContextVault::open(config);
+        assert!(vault.is_memory_locked());
+        vault.ingest(make_chunk(1, b"test payload")).unwrap();
+
+        // turns out whether mlock succeeded or failed on this platform,
+        // is_memory_locked reflects the true state (does not blindly return true).
+        let locked = vault.is_memory_locked();
+        if locked {
+            assert_eq!(vault.mlock_regions.len(), 1);
+        } else {
+            assert_eq!(vault.mlock_regions.len(), 0);
+        }
+    }
+
+    /// Ingestion leerer Chunks beeinflusst nicht den Lock-Status.
+    #[test]
+    fn test_empty_chunk_ingest_preserves_lock_status() {
+        let config = VaultConfig {
+            attempt_mlock: true,
+            ..Default::default()
+        };
+        let mut vault = VolatileContextVault::open(config);
+        assert!(vault.is_memory_locked());
+        vault.ingest(make_chunk(1, b"")).unwrap();
+        assert!(vault.is_memory_locked());
     }
 }

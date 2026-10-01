@@ -14,6 +14,9 @@ impl From<EgressError> for McpError {
             EgressError::InvalidParams(msg) => McpError::invalid_params(msg),
             EgressError::PolicyViolation(msg) => McpError::invalid_params(msg),
             EgressError::InternalError(msg) => McpError::internal_error(msg),
+            EgressError::SurrogateCollision { ref surrogate, .. } => {
+                McpError::internal_error(format!("Surrogate collision for {surrogate}"))
+            }
         }
     }
 }

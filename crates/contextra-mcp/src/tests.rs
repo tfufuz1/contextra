@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 #[cfg(test)]
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
 use crate::McpServer;
@@ -110,6 +112,124 @@ async fn test_tools_list_returns_all_tools() {
             cat,
             crate::sandbox::ToolCategory::CodeExecution,
             "Tool '{name}' listed in tools/list classified as CodeExecution"
+        );
+    }
+}
+
+/// Verification Test: Confirms that an unregistered method classifies as CodeExecution fallback
+/// and is rejected fail-closed under default SandboxPolicy.
+#[tokio::test]
+async fn test_unknown_method_rejected_via_code_execution_fail_closed_path() {
+    use crate::sandbox::{McpSandbox, SandboxPolicy, ToolCategory};
+
+    // 1. Direct classification of unlisted method yields CodeExecution fallback
+    let unknown_method = "unlisted_arbitrary_eval";
+    assert_eq!(
+        McpSandbox::classify_method(unknown_method),
+        ToolCategory::CodeExecution,
+        "Unknown method must fall back to CodeExecution category"
+    );
+
+    // 2. Under default policy (allow_code_execution = false), validation rejects unknown method
+    let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap();
+    let val_res = default_sandbox.validate_tool_call(unknown_method, &json!({}));
+    assert!(val_res.is_err());
+    let err_msg = val_res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("unknown tool") || err_msg.contains("Code-Ausführung ist gesperrt"),
+        "Expected unknown tool / code execution rejection, got: '{err_msg}'"
+    );
+
+    // 3. RPC server invocation of unknown method via tools/call returns isError in tool execution
+    let (server, _tmp) = create_mock_server().await;
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": unknown_method,
+            "arguments": {}
+        }),
+    );
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains("unknown tool") || text.contains("Code-Ausführung"),
+        "Expected unknown tool error text in tools/call response, got: '{text}'"
+    );
+}
+
+/// Inv-MCP-CLASSIFY-1 Verification Test: Iterates over tools/list and asserts explicit classification.
+#[tokio::test]
+async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapping() {
+    use crate::sandbox::ToolCategory;
+
+    // bei neuem Tool hier ergänzen
+    const EXPECTED_TOOLS: &[(&str, ToolCategory)] = &[
+        ("contextra_search", ToolCategory::DatabaseRead),
+        ("contextra_insert", ToolCategory::DatabaseWrite),
+        ("contextra_get", ToolCategory::DatabaseRead),
+        ("contextra_forget", ToolCategory::DatabaseWrite),
+        ("contextra_collections", ToolCategory::DatabaseRead),
+        // contextra_consolidate: Triggert Memory Consolidation (Tombstone-Erstellung, Synthese-Chunks, Graph-Mutations in contextra-engine/contextra-cognition) -> DatabaseWrite
+        ("contextra_consolidate", ToolCategory::DatabaseWrite),
+        ("contextra_cloud_query", ToolCategory::CloudEgress),
+        ("contextra_relate", ToolCategory::DatabaseWrite),
+        ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
+        ("contextra_explain", ToolCategory::DatabaseRead),
+        ("contextra_plugin_status", ToolCategory::DatabaseRead),
+        ("contextra_upsert", ToolCategory::DatabaseWrite),
+        ("contextra_delete", ToolCategory::DatabaseWrite),
+        ("contextra_create_collection", ToolCategory::DatabaseWrite),
+        ("contextra_drop_collection", ToolCategory::DatabaseWrite),
+    ];
+
+    let (server, _tmp) = create_mock_server().await;
+    let req = make_request("tools/list", json!({}));
+    let response = server.handle(req).await;
+    assert_eq!(response.jsonrpc, "2.0");
+
+    let tools = response.result.expect("result expected")["tools"]
+        .as_array()
+        .expect("tools array expected")
+        .clone();
+
+    // Verification 1: Registry length matches expected list (fails if new tool added without classification update)
+    assert_eq!(
+        tools.len(),
+        EXPECTED_TOOLS.len(),
+        "Mismatch between tools/list count ({}) and EXPECTED_TOOLS count ({}). Bei neuem Tool hier ergänzen!",
+        tools.len(),
+        EXPECTED_TOOLS.len()
+    );
+
+    let expected_map: std::collections::HashMap<&str, ToolCategory> =
+        EXPECTED_TOOLS.iter().cloned().collect();
+
+    for tool in &tools {
+        let name = tool["name"]
+            .as_str()
+            .expect("tool name must be a string");
+
+        // (a) Prüfen, dass es eine ToolCategory ungleich eines impliziten Fallbacks (CodeExecution) trägt
+        let try_cat = crate::sandbox::McpSandbox::try_classify_method(name)
+            .unwrap_or_else(|_| panic!("Tool '{name}' from tools/list was not found in TOOL_REGISTRY"));
+
+        assert_ne!(
+            try_cat,
+            ToolCategory::CodeExecution,
+            "Tool '{name}' must not rely on CodeExecution fallback"
+        );
+
+        // (b) Prüfen, dass diese Kategorie mit der Zuordnungstabelle übereinstimmt
+        let expected_cat = expected_map
+            .get(name)
+            .unwrap_or_else(|| panic!("Tool '{name}' missing from EXPECTED_TOOLS list"));
+
+        assert_eq!(
+            &try_cat, expected_cat,
+            "Tool '{name}' category mismatch: expected {:?}, got {:?}",
+            expected_cat, try_cat
         );
     }
 }
@@ -523,7 +643,7 @@ async fn test_create_collection_with_auto_extraction_param() {
     assert_eq!(json2["collection"], "enabled_ae_col");
     assert_eq!(json2["auto_extraction"], "enabled");
 
-    // 3. Create collection omitting auto_extraction (inherits tier default: "enabled")
+    // 3. Create collection omitting auto_extraction (inherits tier default: "disabled" for EnterpriseRegulated)
     let req3 = make_request(
         "tools/call",
         json!({
@@ -540,7 +660,7 @@ async fn test_create_collection_with_auto_extraction_param() {
     let text3 = res3_val["result"]["content"][0]["text"].as_str().unwrap();
     let json3: Value = serde_json::from_str(text3).unwrap();
     assert_eq!(json3["ok"], true);
-    assert_eq!(json3["auto_extraction"], "enabled");
+    assert_eq!(json3["auto_extraction"], "disabled");
 }
 
 #[tokio::test]

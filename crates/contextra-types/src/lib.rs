@@ -9,6 +9,7 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![allow(ambiguous_glob_reexports)]
 
 pub mod error;
 pub mod error_dto;

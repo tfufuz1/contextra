@@ -4,7 +4,7 @@
 // Kein thread_rng(), kein Random-Nonce, Zero-Panic.
 
 use crate::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
+    BlockReason, BoxFuture, EgressClassification, EgressClassifier,
 };
 use contextra_ports::Clock;
 
@@ -60,7 +60,7 @@ pub trait EgressClassifierTrace: EgressClassifier {
     ) -> BoxFuture<'a, (EgressClassification, [u8; 32])>;
 }
 
-impl EgressClassifierTrace for EgressVault {
+impl<T: EgressClassifier + ?Sized> EgressClassifierTrace for T {
     fn classify_with_trace<'a>(
         &'a self,
         payload: &'a str,

@@ -351,6 +351,9 @@ impl CsrGraph {
     }
 
     /// Runs PathRAG graph retrieval starting from multiple anchor entities up to `max_hops` at a specific sequence number (`seq_no`).
+    ///
+    /// Ref: v17 Teil 6.3 ("PathRAG-Lücke") & Teil 12 (Snapshot-Isolation-Prinzip 6).
+    /// Ensures that all signals of a hybrid search query read the exact same snapshot sequence number (`seq_no`).
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],
