@@ -5,7 +5,7 @@ use super::compensating_actions::{
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, EntityId, Result, TenantId, TxId};
+use contextra_types::{ContextraError, Result, TenantId, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -228,7 +228,47 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        // Phase (b): Execute staged index steps and commit vector, text, graph indices
+        // Phase (b): Commit LSM storage first so document payload and metadata are durable before index staging/commit
+        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
+            ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(format!(
+                "Storage commit failed: {}",
+                storage_err
+            )));
+        }
+
+        ledger.push(CompensateLsmAction::new(
+            self.collection.clone(),
+            intent_key.clone(),
+            Arc::clone(&doc_ids),
+            f_keys,
+            r_keys,
+        ));
+
+        // Persist stages_completed = 1 marker in pending intent to record LSM storage commit completion
+        let stage1_intent = CommitIntent::Pending {
+            doc_ids: Arc::clone(&doc_ids),
+            has_text,
+            has_graph,
+            stages_completed: 1,
+        };
+        if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {
+            let stage1_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            if let Ok(()) = self
+                .collection
+                .storage
+                .put(stage1_tx, &intent_key, &stage1_bytes)
+                .await
+            {
+                let _ = self.collection.storage.commit(stage1_tx).await;
+            }
+        }
+
+        // Phase (c): Execute staged index steps and commit vector, text, graph indices
         if let Err(e) = self.commit_text_staged().await {
             ledger.execute_rollback().await;
             return Err(e);
@@ -255,18 +295,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
             ledger.execute_rollback().await;
-            let comp_tx = TxId::new(
-                self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
-            for &doc_id in doc_ids.iter() {
-                let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
-                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
-                }
-            }
             return Err(ContextraError::Transaction(format!(
                 "Text index commit failed: {}",
                 text_err
@@ -279,18 +307,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
             ledger.execute_rollback().await;
-            let comp_tx = TxId::new(
-                self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
-            for &doc_id in doc_ids.iter() {
-                let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
-                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
-                }
-            }
             return Err(ContextraError::Transaction(format!(
                 "Graph index commit failed: {}",
                 graph_err
@@ -300,32 +316,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             collection: self.collection.clone(),
             doc_ids: Arc::clone(&doc_ids),
         });
-
-        // Phase (c): Commit storage
-        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
-            let comp_tx = TxId::new(
-                self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
-            for &doc_id in doc_ids.iter() {
-                let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
-                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
-                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
-                }
-            }
-            return Err(ContextraError::Transaction(storage_err.to_string()));
-        }
-
-        ledger.push(CompensateLsmAction::new(
-            self.collection.clone(),
-            intent_key.clone(),
-            Arc::clone(&doc_ids),
-            f_keys,
-            r_keys,
-        ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
