@@ -10,12 +10,116 @@
 //! Folgt dem Context-Language-Model-Prinzip (CLM): Der laufende Arbeitskontext ist editierbar
 //! und wird bei Erfüllung eines Teilziels geleert (zurückgesetzt), anstatt append-only
 //! ins Unermessliche zu wachsen.
+//!
+//! # Port-Entscheidung & Lokale Traits
+//! `ContextEditAuditSink` und `ScratchpadCacheInvalidator` sind als schlanke, lokale Traits
+//! in diesem Modul definiert, da die endgültige Entscheidung über eine Auslagerung in `contextra-ports`
+//! noch aussteht (siehe ADR-106). Sie verhindern direkte Ring-Verstöße gegen `contextra-privacy`
+//! und `contextra-kvcache`.
 
 use contextra_db::volatile_vault::{
     PurgeReceipt, SignalModality, VaultChunk, VaultConfig, VolatileContextVault,
 };
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_ports::{Clock, SystemClock};
+use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+/// Audit-Datensatz für Scratchpad-Kontextänderungen und Resets.
+#[derive(Debug, Clone)]
+pub struct ContextEditAuditRecord {
+    pub tenant_id: TenantId,
+    pub task_id: String,
+    pub operation: String,
+    pub subgoal_index: u64,
+    pub timestamp_nanos: u64,
+}
+
+/// Lokaler Trait für Audit-Benachrichtigungen bei Scratchpad-Änderungen.
+pub trait ContextEditAuditSink: Send + Sync {
+    fn record_edit(&self, record: ContextEditAuditRecord);
+}
+
+/// No-op-Implementierung von [`ContextEditAuditSink`].
+#[derive(Debug, Default)]
+pub struct NoopContextEditAuditSink;
+
+impl ContextEditAuditSink for NoopContextEditAuditSink {
+    fn record_edit(&self, _record: ContextEditAuditRecord) {}
+}
+
+/// Test-Implementierung von [`ContextEditAuditSink`], die Aufrufe zählt.
+#[derive(Debug, Default)]
+pub struct CountingContextEditAuditSink {
+    count: AtomicU64,
+}
+
+impl CountingContextEditAuditSink {
+    pub fn new() -> Self {
+        Self {
+            count: AtomicU64::new(0),
+        }
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count.load(Ordering::Relaxed)
+    }
+}
+
+impl ContextEditAuditSink for CountingContextEditAuditSink {
+    fn record_edit(&self, _record: ContextEditAuditRecord) {
+        self.count.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Lokaler Trait zur Cache-Invalidierung des Scratchpad-Scopes bei Resets.
+pub trait ScratchpadCacheInvalidator: Send + Sync {
+    fn invalidate_scratchpad_scope(&self, tenant_id: TenantId, task_id: &str, subgoal_index: u64);
+}
+
+/// No-op-Implementierung von [`ScratchpadCacheInvalidator`].
+#[derive(Debug, Default)]
+pub struct NoopScratchpadCacheInvalidator;
+
+impl ScratchpadCacheInvalidator for NoopScratchpadCacheInvalidator {
+    fn invalidate_scratchpad_scope(
+        &self,
+        _tenant_id: TenantId,
+        _task_id: &str,
+        _subgoal_index: u64,
+    ) {
+    }
+}
+
+/// Test-Implementierung von [`ScratchpadCacheInvalidator`], die Aufrufe zählt.
+#[derive(Debug, Default)]
+pub struct CountingScratchpadCacheInvalidator {
+    count: AtomicU64,
+}
+
+impl CountingScratchpadCacheInvalidator {
+    pub fn new() -> Self {
+        Self {
+            count: AtomicU64::new(0),
+        }
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count.load(Ordering::Relaxed)
+    }
+}
+
+impl ScratchpadCacheInvalidator for CountingScratchpadCacheInvalidator {
+    fn invalidate_scratchpad_scope(
+        &self,
+        _tenant_id: TenantId,
+        _task_id: &str,
+        _subgoal_index: u64,
+    ) {
+        self.count.fetch_add(1, Ordering::Relaxed);
+    }
+}
 
 /// Marker für unveränderliche Kontextteile (Systemprompt, Gesamtziel, Safety-Regeln).
 ///
@@ -80,12 +184,17 @@ pub struct ScratchpadCheckpoint {
 /// (mlock, Zeroize bei Drop) ohne persistenten Disk-Schreibpfad.
 pub struct ClmScratchpad {
     task_id: String,
+    tenant_id: TenantId,
     current_subgoal_index: u64,
     created_at_tx: u64,
     config: VaultConfig,
     vault: VolatileContextVault,
     chunks: Vec<VaultChunk>,
     next_chunk_id: u64,
+    pinned_regions: Vec<PinnedRegionId>,
+    clock: Arc<dyn Clock>,
+    audit_sink: Arc<dyn ContextEditAuditSink>,
+    cache_invalidator: Arc<dyn ScratchpadCacheInvalidator>,
 }
 
 /// Hilfsfunktion zum Duplizieren eines [`VaultChunk`] ohne `Clone`-Derivierung.
@@ -97,7 +206,7 @@ fn clone_chunk(chunk: &VaultChunk) -> VaultChunk {
         TxId(chunk.captured_tx),
     );
     if let Some(ref label) = chunk.label {
-        cloned = cloned.with_label(label.clone());
+        cloned = cloned.with_label(label.as_str());
     }
     cloned
 }
@@ -108,13 +217,53 @@ impl ClmScratchpad {
         let vault = VolatileContextVault::open(config.clone());
         Self {
             task_id,
+            tenant_id: TenantId::SYSTEM,
             current_subgoal_index: 0,
             created_at_tx: 0,
             config,
             vault,
             chunks: Vec::new(),
             next_chunk_id: 1,
+            pinned_regions: Vec::new(),
+            clock: Arc::new(SystemClock::new()),
+            audit_sink: Arc::new(NoopContextEditAuditSink),
+            cache_invalidator: Arc::new(NoopScratchpadCacheInvalidator),
         }
+    }
+
+    /// Setzt die Mandanten-ID (Builder-Muster).
+    pub fn with_tenant_id(mut self, tenant_id: TenantId) -> Self {
+        self.tenant_id = tenant_id;
+        self
+    }
+
+    /// Setzt die Clock für deterministisches Zeitmanagement (Builder-Muster).
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Setzt die Audit-Sink (Builder-Muster).
+    pub fn with_audit_sink(mut self, audit_sink: Arc<dyn ContextEditAuditSink>) -> Self {
+        self.audit_sink = audit_sink;
+        self
+    }
+
+    /// Setzt den Cache-Invalidator (Builder-Muster).
+    pub fn with_cache_invalidator(
+        mut self,
+        cache_invalidator: Arc<dyn ScratchpadCacheInvalidator>,
+    ) -> Self {
+        self.cache_invalidator = cache_invalidator;
+        self
+    }
+
+    /// Registriert eine gepinnte Region (unveränderlicher Kontextteil).
+    pub fn with_pinned_region(mut self, region_id: PinnedRegionId) -> Self {
+        if !self.pinned_regions.contains(&region_id) {
+            self.pinned_regions.push(region_id);
+        }
+        self
     }
 
     /// Setzt die Transaktions-ID der Erstellung (Builder-Muster).
@@ -128,6 +277,11 @@ impl ClmScratchpad {
         &self.task_id
     }
 
+    /// Gibt die Mandanten-ID zurück.
+    pub fn tenant_id(&self) -> TenantId {
+        self.tenant_id
+    }
+
     /// Gibt den aktuellen Subgoal-Index zurück.
     pub fn current_subgoal_index(&self) -> u64 {
         self.current_subgoal_index
@@ -138,25 +292,64 @@ impl ClmScratchpad {
         self.created_at_tx
     }
 
+    /// Gibt eine immutable Referenz auf die registrierten gepinnten Regionen zurück.
+    pub fn pinned_regions(&self) -> &[PinnedRegionId] {
+        &self.pinned_regions
+    }
+
     /// Wendet eine Bearbeitungs-Operation ([`ScratchpadEditOp`]) auf das Scratchpad an.
     ///
     /// # Fehler
-    /// Liefert `ContextraError::InvalidInput` falls ein anzusprechendes Label nicht
-    /// existiert oder die Kapazität des Vaults überschritten wird.
+    /// Liefert `ContextraError::InvalidInput` falls:
+    /// - Versucht wird, eine gepinnte Region zu verändern oder mit einem Chunk zu überschreiben,
+    /// - Ein anzusprechendes Label nicht existiert,
+    /// - Die Kapazität des Vaults überschritten wird.
     pub fn apply_edit(&mut self, op: ScratchpadEditOp, captured_tx: TxId) -> Result<()> {
+        // Governance check: Edit darf keine gepinnte Region adressieren
+        match &op {
+            ScratchpadEditOp::Append {
+                label: Some(lbl), ..
+            } => {
+                if self.pinned_regions.iter().any(|p| p.as_str() == lbl) {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Anhängen mit Label '{lbl}' nicht erlaubt: Label adressiert eine gepinnte Region"
+                    )));
+                }
+            }
+            ScratchpadEditOp::Replace { chunk_label, .. } => {
+                if self
+                    .pinned_regions
+                    .iter()
+                    .any(|p| p.as_str() == chunk_label)
+                {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Gepinnte Region '{chunk_label}' darf nicht ersetzt werden"
+                    )));
+                }
+            }
+            ScratchpadEditOp::Remove { chunk_label } => {
+                if self
+                    .pinned_regions
+                    .iter()
+                    .any(|p| p.as_str() == chunk_label)
+                {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Gepinnte Region '{chunk_label}' darf nicht entfernt werden"
+                    )));
+                }
+            }
+            _ => {}
+        }
+
         match op {
             ScratchpadEditOp::Append { content, label } => {
                 let doc_id = DocId::new(self.next_chunk_id);
                 self.next_chunk_id += 1;
 
-                let mut chunk = VaultChunk::new(
-                    doc_id,
-                    content,
-                    SignalModality::TextInput,
-                    captured_tx,
-                );
-                if let Some(lbl) = label {
-                    chunk = chunk.with_label(lbl);
+                let mut chunk =
+                    VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
+                if let Some(ref lbl) = label {
+                    chunk = chunk.with_label(lbl.as_str());
                 }
 
                 // Ingest in den bestehenden Vault
@@ -168,7 +361,6 @@ impl ClmScratchpad {
                 })?;
 
                 self.chunks.push(chunk);
-                Ok(())
             }
             ScratchpadEditOp::Replace {
                 chunk_label,
@@ -202,7 +394,6 @@ impl ClmScratchpad {
                 self.chunks = candidate_chunks;
                 let old_vault = std::mem::replace(&mut self.vault, test_vault);
                 let _ = old_vault.purge();
-                Ok(())
             }
             ScratchpadEditOp::Remove { chunk_label } => {
                 let idx = self
@@ -231,12 +422,23 @@ impl ClmScratchpad {
                 self.chunks = candidate_chunks;
                 let old_vault = std::mem::replace(&mut self.vault, test_vault);
                 let _ = old_vault.purge();
-                Ok(())
             }
         }
+
+        // Audit-Meldung für die Bearbeitung
+        self.audit_sink.record_edit(ContextEditAuditRecord {
+            tenant_id: self.tenant_id,
+            task_id: self.task_id.clone(),
+            operation: "apply_edit".to_string(),
+            subgoal_index: self.current_subgoal_index,
+            timestamp_nanos: self.clock.now_unix_nanos(),
+        });
+
+        Ok(())
     }
 
     /// Erzeugt eine [`ScratchpadCheckpoint`]-Zusammenfassung, leert den Vault intern via `purge()`
+    /// (inkl. Zeroize aller RAM-Inhalte), meldet Audit und Cache-Invalidierung genau einmal,
     /// und inkrementiert den `current_subgoal_index`.
     pub fn checkpoint_and_reset(&mut self) -> Result<ScratchpadCheckpoint> {
         let chunk_count = self.chunks.len();
@@ -247,6 +449,23 @@ impl ClmScratchpad {
         let purge_receipt = old_vault.purge();
 
         let completed_subgoal = self.current_subgoal_index;
+
+        // INV-CLM-SCRATCHPAD-1: Audit-Meldung für den Reset
+        self.audit_sink.record_edit(ContextEditAuditRecord {
+            tenant_id: self.tenant_id,
+            task_id: self.task_id.clone(),
+            operation: "checkpoint_and_reset".to_string(),
+            subgoal_index: completed_subgoal,
+            timestamp_nanos: self.clock.now_unix_nanos(),
+        });
+
+        // INV-CLM-SCRATCHPAD-2: Cache-Invalidierung nur für den eigenen Scratchpad-Scope
+        self.cache_invalidator.invalidate_scratchpad_scope(
+            self.tenant_id,
+            &self.task_id,
+            completed_subgoal,
+        );
+
         self.current_subgoal_index += 1;
 
         Ok(ScratchpadCheckpoint {
@@ -273,8 +492,8 @@ mod tests {
             max_capacity_bytes: 1024 * 1024,
             attempt_mlock: false,
         };
-        let mut pad = ClmScratchpad::new("task-42".to_string(), config)
-            .with_created_at_tx(TxId(100));
+        let mut pad =
+            ClmScratchpad::new("task-42".to_string(), config).with_created_at_tx(TxId(100));
 
         assert_eq!(pad.task_id(), "task-42");
         assert_eq!(pad.created_at_tx(), 100);
@@ -348,7 +567,10 @@ mod tests {
             TxId(11),
         )?;
 
-        assert_eq!(pad.total_bytes(), b"Subgoal 0 chunk A".len() + b"Subgoal 0 chunk B".len());
+        assert_eq!(
+            pad.total_bytes(),
+            b"Subgoal 0 chunk A".len() + b"Subgoal 0 chunk B".len()
+        );
 
         let checkpoint = pad.checkpoint_and_reset()?;
         assert_eq!(checkpoint.task_id, "task-reset");
@@ -426,5 +648,48 @@ mod tests {
             TxId(2),
         );
         assert!(res_remove.is_err());
+    }
+
+    #[test]
+    fn test_pinned_region_immutability_guards() {
+        let config = VaultConfig {
+            max_capacity_bytes: 1024,
+            attempt_mlock: false,
+        };
+        let pinned = PinnedRegionId::new("sys_prompt");
+        let mut pad = ClmScratchpad::new("task-pinned".to_string(), config)
+            .with_pinned_region(pinned.clone());
+
+        assert_eq!(pad.pinned_regions().len(), 1);
+        assert_eq!(pad.pinned_regions()[0], pinned);
+
+        // 1. Attempt to append with pinned region label -> Err
+        let err_append = pad.apply_edit(
+            ScratchpadEditOp::Append {
+                content: b"malicious append".to_vec(),
+                label: Some("sys_prompt".to_string()),
+            },
+            TxId(1),
+        );
+        assert!(err_append.is_err());
+
+        // 2. Attempt to replace pinned region -> Err
+        let err_replace = pad.apply_edit(
+            ScratchpadEditOp::Replace {
+                chunk_label: "sys_prompt".to_string(),
+                new_content: b"overwrite".to_vec(),
+            },
+            TxId(2),
+        );
+        assert!(err_replace.is_err());
+
+        // 3. Attempt to remove pinned region -> Err
+        let err_remove = pad.apply_edit(
+            ScratchpadEditOp::Remove {
+                chunk_label: "sys_prompt".to_string(),
+            },
+            TxId(3),
+        );
+        assert!(err_remove.is_err());
     }
 }
