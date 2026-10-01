@@ -55,6 +55,7 @@ pub struct LsmStorage {
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
+    pub(super) metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 impl Drop for LsmStorage {
@@ -157,6 +158,22 @@ impl LsmStorage {
     /// Returns the current maximum latency threshold for observer callbacks.
     pub fn max_observer_latency(&self) -> std::time::Duration {
         self.observer_registry.max_observer_latency()
+    }
+
+    /// Returns the currently configured [`MetricsSink`].
+    pub fn metrics_sink(&self) -> Arc<dyn contextra_ports::MetricsSink> {
+        self.metrics_sink.read().clone()
+    }
+
+    /// Sets the [`MetricsSink`] for recording operational metrics.
+    pub fn set_metrics_sink(&self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+        *self.metrics_sink.write() = sink;
+    }
+
+    /// Configures the [`MetricsSink`] fluently on `self` and returns `self`.
+    pub fn with_metrics_sink(self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        *self.metrics_sink.write() = sink;
+        self
     }
 
     /// Sets the injected clock port for deterministic observer latency evaluation (P28).
