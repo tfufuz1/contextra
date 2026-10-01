@@ -94,14 +94,17 @@ impl EgressGuard {
 
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
-    /// Gemäß **v17 Teil 10.3** und dem generellen **Fail-Closed-Prinzip** (Teil 12, "Fail-closed als Default"):
+    /// Gemäß **v17 Teil 10.3** (Priorität P1, "Fail-Closed-Randfall"), Invariante **INV-EGRESS-AUDIT-1**
+    /// und dem generellen **Fail-Closed-Prinzip** (Teil 12, "Fail-closed als Default"):
     /// - Liefert `Allow`, wenn `payload.len() < min_bytes`.
     /// - Führt k-NN Suche ($k=1$) via `search_text` aus.
-    /// - Bei Score $\ge$ `threshold`: `Block(BlockReason::SensitivePattern("bulk-exfiltration-hnsw-match"))`.
+    /// - Bei Score $\ge$ `threshold` (0.85): `Block(BlockReason::SensitivePattern("bulk-exfiltration-hnsw-match"))`.
     /// - Bei Score < `threshold`: `Allow`.
-    /// - Bei Index-Fehler oder leeren Ergebnissen: strikt **Fail-Closed** mit
+    /// - Bei Index-Fehler, uninitialisiertem Index oder leeren Ergebnissen: strikt **Fail-Closed** mit
     ///   `Block(BlockReason::InternalError("egress guard index unavailable — fail-closed"))`.
     /// - Bei Timeout (200 ms): strikt **Fail-Closed** mit `Block(BlockReason::ClassificationTimeout)`.
+    /// - Jede Egress-Entscheidung (inkl. aller Fail-Closed-Entscheidungen) wird über `EgressClassifierTrace`
+    ///   vollständig auditiert (**INV-EGRESS-AUDIT-1**).
     pub async fn check(&self, payload: &str) -> EgressClassification {
         if payload.len() < self.min_bytes {
             return EgressClassification::Allow;
@@ -380,5 +383,102 @@ mod tests {
         let expected_trace_timeout =
             compute_audit_trace(payload, &rule_timeout, 1_600_000_000_000_000_000);
         assert_eq!(trace_timeout, expected_trace_timeout);
+    }
+
+    #[tokio::test]
+    async fn test_uninitialized_or_failing_vector_index_fails_closed_with_audit_trace() {
+        use crate::audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+
+        let clock = MockClock {
+            nanos: 1_700_000_000_000_000_000,
+        };
+        // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
+        let payload = "Sensitive outbound data stream exceeding minimum byte threshold for inspection. ".repeat(2);
+        assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
+
+        let failing_engine = Arc::new(FailingSearchEngine {
+            error_msg: "vector index not initialized or query failed".to_string(),
+        });
+        let guard = EgressGuard::new(failing_engine, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
+
+        // (a) Result is always Block, never Allow
+        let classification = guard.check(&payload).await;
+        assert_eq!(
+            classification,
+            EgressClassification::Block(BlockReason::InternalError(
+                "egress guard index unavailable — fail-closed".to_string()
+            ))
+        );
+
+        // (b) Audit trace entry is generated correctly (INV-EGRESS-AUDIT-1)
+        let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;
+        assert_eq!(traced_class, classification);
+        let rule_id = extract_rule_id(&traced_class);
+        let expected_trace = compute_audit_trace(&payload, &rule_id, 1_700_000_000_000_000_000);
+        assert_eq!(trace, expected_trace);
+    }
+
+    #[tokio::test]
+    async fn test_vector_index_timeout_fails_closed_with_audit_trace() {
+        use crate::audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+
+        let clock = MockClock {
+            nanos: 1_750_000_000_000_000_000,
+        };
+        // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
+        let payload = "Outbound candidate text exceeding minimum byte limit for timeout verification. ".repeat(2);
+        assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
+
+        let timing_out_engine = Arc::new(MockSearchEngine {
+            results: Ok(vec![]),
+            delay: Some(Duration::from_millis(300)),
+        });
+        let guard = EgressGuard::new(timing_out_engine, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES)
+            .with_timeout(Duration::from_millis(10));
+
+        // (a) Result is always Block(ClassificationTimeout), never Allow
+        let classification = guard.check(&payload).await;
+        assert_eq!(classification, EgressClassification::Block(BlockReason::ClassificationTimeout));
+
+        // (b) Audit trace entry is generated correctly (INV-EGRESS-AUDIT-1)
+        let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;
+        assert_eq!(traced_class, classification);
+        let rule_id = extract_rule_id(&traced_class);
+        let expected_trace = compute_audit_trace(&payload, &rule_id, 1_750_000_000_000_000_000);
+        assert_eq!(trace, expected_trace);
+    }
+
+    #[tokio::test]
+    async fn test_normal_operation_when_vector_index_available() {
+        // Payload must be >= DEFAULT_EGRESS_GUARD_MIN_BYTES (128 bytes) to trigger similarity evaluation.
+        let payload = "Normal outbound document context exceeding minimum length limit for inspection. ".repeat(2);
+        assert!(payload.len() >= DEFAULT_EGRESS_GUARD_MIN_BYTES);
+
+        // Below threshold (0.5 < 0.85) -> Allow
+        let normal_engine_allow = Arc::new(MockSearchEngine {
+            results: Ok(vec![TextSearchResult {
+                id: "non_sensitive_doc".to_string(),
+                score: 0.5,
+            }]),
+            delay: None,
+        });
+        let guard_allow = EgressGuard::new(normal_engine_allow, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
+        assert_eq!(guard_allow.check(&payload).await, EgressClassification::Allow);
+
+        // Above threshold (0.9 >= 0.85) -> Block
+        let normal_engine_block = Arc::new(MockSearchEngine {
+            results: Ok(vec![TextSearchResult {
+                id: "sensitive_doc".to_string(),
+                score: 0.9,
+            }]),
+            delay: None,
+        });
+        let guard_block = EgressGuard::new(normal_engine_block, DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_MIN_BYTES);
+        assert_eq!(
+            guard_block.check(&payload).await,
+            EgressClassification::Block(BlockReason::SensitivePattern(
+                "bulk-exfiltration-hnsw-match".to_string()
+            ))
+        );
     }
 }
