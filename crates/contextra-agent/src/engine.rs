@@ -467,7 +467,30 @@ impl OrchestratorEngine {
                     // 4. Atomic commit to LSM - Source of truth for "what was accepted".
                     self.commit_step(ctx, &result).await?;
 
-                    // 6. Resolve next edge
+                    // 6. Evaluate outgoing GoalCondition & Scratchpad Checkpoint if matched
+                    if let Some(edge) = self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
+                        if let Some(ref cond_str) = edge.condition {
+                            if let Some(goal_cond) =
+                                crate::goal_condition::parse_legacy_condition_string(cond_str)
+                            {
+                                if goal_cond.evaluate(&result) && ctx.clm_scratchpad.is_some() {
+                                    if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
+                                        if let Ok(checkpoint) = scratchpad.checkpoint_and_reset() {
+                                            // TODO: Audit-Kopplung an contextra-privacy::context_edit_audit, siehe ADR-106
+                                            tracing::info!(
+                                                task_id = %checkpoint.task_id,
+                                                completed_subgoal = checkpoint.completed_subgoal_index,
+                                                chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                                                "CLM scratchpad checkpoint_and_reset executed on goal condition match"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 7. Resolve next edge
                     let next_node = match self.resolve_next_node(graph, &ctx.current_node, &result)
                     {
                         Ok(next) => next,
@@ -748,6 +771,27 @@ impl OrchestratorEngine {
         });
 
         ctx.state_collection.put_kv(&final_id, &metadata).await
+    }
+
+    fn resolve_outgoing_edge<'a>(
+        &self,
+        graph: &'a StateGraph,
+        current_node: &str,
+        result: &StepResult,
+    ) -> Option<&'a crate::graph::WorkflowEdge> {
+        let edges = graph
+            .edges
+            .iter()
+            .filter(|e| e.from == current_node)
+            .collect::<Vec<_>>();
+
+        if let Some(ref forced_next) = result.next_edge {
+            if let Some(e) = edges.iter().find(|e| &e.to == forced_next) {
+                return Some(*e);
+            }
+        }
+
+        edges.into_iter().max_by_key(|e| e.priority)
     }
 
     fn resolve_next_node(

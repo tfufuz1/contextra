@@ -98,6 +98,7 @@ pub struct AgentContext {
         Arc<contextra_router::DefaultRouterEngine>,
         contextra_router::DecisionId,
     )>,
+    pub clm_scratchpad: Option<crate::clm_scratchpad::ClmScratchpad>,
 }
 
 impl AgentContext {
@@ -138,7 +139,14 @@ impl AgentContext {
             memory: HashMap::new(),
             events: VecDeque::new(),
             pending_routing_decision: None,
+            clm_scratchpad: None,
         })
+    }
+
+    /// Sets the optional CLM scratchpad (builder pattern).
+    pub fn with_clm_scratchpad(mut self, scratchpad: crate::clm_scratchpad::ClmScratchpad) -> Self {
+        self.clm_scratchpad = Some(scratchpad);
+        self
     }
 
     /// Sets the active cache directive for the context.
