@@ -24,6 +24,7 @@ pub struct CompactionEngine {
     workload_metrics: WorkloadMetrics,
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
+    clock: Arc<dyn contextra_ports::Clock>,
 }
 
 impl CompactionEngine {
@@ -59,12 +60,19 @@ impl CompactionEngine {
             workload_metrics: WorkloadMetrics::new(),
             adaptive_planner,
             merge_operator: None,
+            clock: Arc::new(contextra_ports::SystemClock::new()),
         }
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
     pub fn with_merge_operator(mut self, merge_operator: Arc<dyn MergeOperator>) -> Self {
         self.merge_operator = Some(merge_operator);
+        self
+    }
+
+    /// Attaches a custom clock port for deterministic execution timing (P28).
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = clock;
         self
     }
 
@@ -663,8 +671,23 @@ impl CompactionEngine {
                                 .iter()
                                 .any(|h| h.key == item.key && (h.seq & TOMBSTONE_BIT) != 0)
                         {
+                            let start_nanos = self.clock.monotonic_nanos();
+                            let merge_res = merge_op.merge(&next_item.value, &item.value);
+                            let elapsed_nanos =
+                                self.clock.monotonic_nanos().saturating_sub(start_nanos);
+                            let timeout_nanos =
+                                self.config.merge_wall_clock_timeout.as_nanos() as u64;
+
+                            let merge_res = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
+                                Err(contextra_core::ContextraError::Sandbox(
+                                    "Merge operator wall-clock timeout exceeded".into(),
+                                ))
+                            } else {
+                                merge_res
+                            };
+
                             // existing_val is older version (next_item), new_val is newer version (item)
-                            match merge_op.merge(&next_item.value, &item.value) {
+                            match merge_res {
                                 Ok(merged_val) => {
                                     // Consume next_item from heap and advance its stream
                                     if let Some(popped_next) = heap.pop() {

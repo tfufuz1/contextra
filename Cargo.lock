@@ -1177,6 +1177,7 @@ dependencies = [
  "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
+ "contextra-sandbox",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
