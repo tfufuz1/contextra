@@ -234,7 +234,7 @@ fn test_legacy_payload_bytes_without_installation_id_hash() {
     )
     .expect("legacy gate creation succeeds");
 
-    assert_eq!(gate.license_payload().installation_id_hash, None);
+    assert_eq!(gate.license_payload().unwrap().installation_id_hash, None);
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 

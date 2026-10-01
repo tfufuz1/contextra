@@ -262,6 +262,11 @@ pub struct DeletionProof {
     /// `covered_layers`, `excluded_scopes` und optional `wal_chain_receipt` mit HMAC-SHA256.
     ///
     /// Version 3 (Aktuell Ed25519): Signiert mit Ed25519, `deleted_keys_hash` ist längenpräfixiert.
+    ///
+    /// DOKUMENTATION ZUR TYPSICHEREN VALIDIERUNG (Teil 10.1):
+    /// Aus serialisierten/empfangenen Bytes gelesene Werte werden über `signature_version_typed()`
+    /// mittels `SignatureVersion::try_from(u8)` typisiert. Unbekannte oder ungültige Werte werden
+    /// fail-closed abgelehnt, bevor jegliche Signatur- oder Krypto-Verifikation versucht wird.
     #[serde(default = "default_signature_version")]
     pub signature_version: u8,
     /// Target scope of deletion.

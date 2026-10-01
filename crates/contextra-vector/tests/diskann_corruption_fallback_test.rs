@@ -24,7 +24,7 @@ async fn test_corrupted_diskann_fail_fast_policy_returns_typed_error() {
     // 1. Build a valid DiskANN index
     let index = DiskAnnIndex::try_new(config.clone()).expect("try_new");
     let vectors = vec![vec![1.0f32; 8]; 3];
-    let ids = vec![DocId::from(1), DocId::from(2), DocId::from(3)];
+    let ids = vec![DocId::from(1u64), DocId::from(2u64), DocId::from(3u64)];
     index.build(&vectors, &ids).await.expect("build");
 
     // 2. Deliberately corrupt bytes (bit-flip) in the index file payload
@@ -76,7 +76,7 @@ async fn test_corrupted_diskann_use_hnsw_fallback_policy() {
     // 1. Build a valid DiskANN index
     let index = DiskAnnIndex::try_new(config.clone()).expect("try_new");
     let vectors = vec![vec![0.5f32; 8], vec![1.5f32; 8]];
-    let ids = vec![DocId::from(10), DocId::from(20)];
+    let ids = vec![DocId::from(10u64), DocId::from(20u64)];
     index.build(&vectors, &ids).await.expect("build");
 
     // 2. Corrupt index file
@@ -98,7 +98,7 @@ async fn test_corrupted_diskann_use_hnsw_fallback_policy() {
 
     // Dynamic operations (e.g. insert, search) on the HNSW fallback must now work seamlessly
     let tx = contextra_core::TxId::new(1);
-    let doc_id = DocId::from(30);
+    let doc_id = DocId::from(30u64);
     let new_vec = vec![0.5f32; 8];
 
     reloaded
@@ -116,5 +116,5 @@ async fn test_corrupted_diskann_use_hnsw_fallback_policy() {
         .await
         .expect("search on fallback HNSW must succeed");
     assert_eq!(search_res.len(), 1);
-    assert_eq!(search_res[0].doc_id, DocId::from(30));
+    assert_eq!(search_res[0].doc_id, DocId::from(30u64));
 }

@@ -1,14 +1,57 @@
 // FILE-CONTEXT
-// ZWECK: Markdown-basierte semantische Textzerlegung (WP-7.1) und UTF-8-sicheres Chunken.
-// INVARIANTEN: Aufteilung respektiert Überschriften-Hierarchien; UTF-8-Grenzen bleiben gewahrt.
+// ZWECK: Markdown-basierte semantische Textzerlegung (WP-7.1 / Teil 6.12 Spezifikation) und UTF-8-sicheres Chunken.
+// INVARIANTEN: Aufteilung respektiert Überschriften-Hierarchien, Codeblöcke & Tabellen-Atomarität; UTF-8-Grenzen bleiben gewahrt.
 // NICHT-OFFENSICHTLICH: Brotbrösel (Breadcrumbs) werden als Metadaten an Chunks angehängt.
-// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
+// STAND: TS:2026-09-17T00:00:00Z
 
-//! Markdown Semantic Chunker (WP-7.1)
+//! Markdown Semantic Chunker (WP-7.1 / Teil 6.12 Ingestion Chunking Spezifikation)
 //!
-//! Deterministically splits Markdown documents into ContextChunks based on
-//! heading hierarchy. Merges small sections and attaches heading paths as
-//! metadata breadcrumbs.
+//! # Ingestion Chunking Spezifikation (Teil 6.12)
+//!
+//! Dieser Chunker zerlegt Markdown-Dokumente deterministisch in semantisch zusammenhängende
+//! [`ContextChunk`]-Instanzen zur Weiterverarbeitung in der Contextra Ingestion Pipeline.
+//!
+//! ## 1. Zielgröße je Chunk (Target Size)
+//! - **Standard-Zielgröße (`max_tokens`)**: 512 Tokens (konfigurierbar über [`ChunkerConfig::max_tokens`]).
+//!   *Begründung*: Orientiert an typischen Kontextfenstern verbreiteter Embedding-Modelle (z. B. 512 Tokens
+//!   bei BERT/BGE/Nomic-Embed), um maximale Informationsdichte ohne ungewollte Kürzungs- oder Truncation-Verluste
+//!   bei der Vektorisierung zu garantieren.
+//! - **Toleranzgrenze (Hard Limit)**: `hard_limit = max_tokens * 1.2` (Standard: 614 Tokens).
+//!   Abschnitte innerhalb dieses Rahmens werden ohne Aufspaltung zusammengehalten.
+//! - **BPE / Zeichen-Verhältnis (`CHARS_PER_TOKEN`)**: 4 Zeichen pro Token (Heuristik in [`estimate_tokens`]).
+//!
+//! ## 2. Overlap-Strategie & Sliding-Window-Fallback
+//! - Wenn ein einzelner Fließtext-Absatz (Paragraph) die Toleranzgrenze `hard_limit` überschreitet,
+//!   greift der Overlap-Fallback mittels [`chunk_text_with_overlap`].
+//! - **Window-Größe**: `window_chars = hard_limit * CHARS_PER_TOKEN` (Standard: ~2456 Zeichen).
+//! - **Overlap**: 20% der Window-Größe (`overlap_chars = window_chars / 5`, Standard: ~491 Zeichen).
+//! - **Garantie**: Der Sliding-Window-Algorithmus wahrt strikt UTF-8-Codepoint-Grenzen und schneidet niemals
+//!   mitten in Multi-Byte-Sequenzen oder Unicode-Zeichen.
+//!
+//! ## 3. Behandlung von Codeblöcken und Tabellen (Strukturerhalt)
+//! - **Codeblöcke** (eingefasst mit Triple-Backticks ` ``` `) und **Markdown-Tabellen** (`| ... |`) werden
+//!   als atomare strukturelle Einheiten behandelt.
+//! - **Regel**: Passt ein Codeblock oder eine Tabelle in die Zielgröße (`tokens <= hard_limit`), wird der Block
+//!   **niemals** mitten im Block oder mitten in einer Zeile zerschnitten.
+//! - **Fallback bei übergroßen Codeblöcken**:
+//!   Codeblöcke, die `hard_limit` überschreiten, werden primär an Zeilengrenzen (`\n`) aufgeteilt, wobei die
+//!   Code-Fence-Kopfzeile (z. B. ` ```rust `) und der schließende Fence (` ``` `) bei jedem erzeugten Teil-Chunk
+//!   wiederholt werden, um die Gültigkeit der Code-Syntax zu bewahren.
+//! - **Fallback bei übergroßen Tabellen**:
+//!   Tabellen, die `hard_limit` überschreiten, werden an Tabellenzeilen-Grenzen (`\n`) getrennt. Jedes erzeugte
+//!   Tabellen-Fragment behält die ursprünglichen Kopfzeilen (Header-Zeile + Trennzeile `|---|...|`) bei,
+//!   sodass das Schema in allen Teil-Chunks erhalten bleibt.
+//!
+//! ## 4. Beziehung zur ContextPrefixEngine (Teil 6.13)
+//! - **Ablaufreihenfolge in der Pipeline**:
+//!   1. **MarkdownChunker**: Das Dokument wird in saubere Markdown-Chunks zerlegt.
+//!   2. **ContextPrefixEngine** (`contextra-infer-ollama`): Für jeden fertigen Chunk wird über ein kleines
+//!      LLM-Modell (z. B. `llama3.2:3b`, `max_document_chars` Default 8000, `max_prefix_tokens` Default 80)
+//!      ein 1–2-Satz-Kontextpräfix generiert (unter XML-Escaping zur Prompt-Injection-Isolation).
+//!   3. Das generierte Präfix wird im Feld [`ContextChunk::contextual_prefix`] gespeichert bzw. vor BM25/Embedding
+//!      dem Chunk-Text vorangestellt.
+//! - **Garantie**: Chunking erfolgt **strikt vor** der Präfix-Generierung. Der Chunker operiert ausschließlich
+//!   auf dem reinen Quelltext des Dokuments und beeinflusst nicht die Präfix-Synthese.
 
 use contextra_types::{ContextChunk, DocId};
 use serde_json::json;
@@ -82,8 +125,10 @@ pub fn estimate_tokens(text: &str) -> usize {
 }
 
 /// Configuration for the Markdown chunker.
+#[derive(Debug, Clone)]
 pub struct ChunkerConfig {
     /// Maximum tokens per chunk (soft limit, hard limit is this * 1.2).
+    /// Default: 512 tokens (aligned with standard dense embedding models).
     pub max_tokens: usize,
     /// Minimum tokens per chunk (merge threshold).
     pub min_tokens: usize,
@@ -104,7 +149,8 @@ impl Default for ChunkerConfig {
     }
 }
 
-/// A deterministic chunker for markdown files.
+/// A deterministic chunker for markdown files respecting structural blocks
+/// (headings, code blocks, tables, paragraphs) and UTF-8 safety.
 pub struct MarkdownChunker {
     config: ChunkerConfig,
 }
@@ -116,6 +162,313 @@ struct RawSection {
     heading_level: u8,
     source_line: usize,
     tokens: usize,
+}
+
+#[derive(Debug, Clone)]
+enum MarkdownBlock {
+    CodeBlock {
+        fence: String,
+        body_lines: Vec<String>,
+    },
+    Table {
+        header_lines: Vec<String>,
+        body_lines: Vec<String>,
+    },
+    Paragraph {
+        lines: Vec<String>,
+    },
+}
+
+impl MarkdownBlock {
+    fn to_text(&self) -> String {
+        match self {
+            MarkdownBlock::CodeBlock { fence, body_lines } => {
+                let mut s = fence.clone();
+                s.push('\n');
+                s.push_str(&body_lines.join("\n"));
+                if !s.ends_with('\n') {
+                    s.push('\n');
+                }
+                s.push_str("```");
+                s
+            }
+            MarkdownBlock::Table {
+                header_lines,
+                body_lines,
+            } => {
+                let mut lines = header_lines.clone();
+                lines.extend(body_lines.iter().cloned());
+                lines.join("\n")
+            }
+            MarkdownBlock::Paragraph { lines } => lines.join("\n"),
+        }
+    }
+
+    fn estimate_tokens(&self) -> usize {
+        estimate_tokens(&self.to_text())
+    }
+}
+
+fn parse_markdown_blocks(lines: &[String]) -> Vec<MarkdownBlock> {
+    let mut blocks = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = &lines[i];
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("```") {
+            let fence = line.clone();
+            let mut body_lines = Vec::new();
+            i += 1;
+            while i < lines.len() {
+                let inner_trim = lines[i].trim();
+                if inner_trim.starts_with("```") {
+                    i += 1;
+                    break;
+                }
+                body_lines.push(lines[i].clone());
+                i += 1;
+            }
+            blocks.push(MarkdownBlock::CodeBlock { fence, body_lines });
+        } else if is_table_row(line) {
+            let mut table_lines = Vec::new();
+            while i < lines.len() && is_table_row(&lines[i]) {
+                table_lines.push(lines[i].clone());
+                i += 1;
+            }
+            let (header_lines, body_lines) =
+                if table_lines.len() >= 2 && is_table_delimiter_row(&table_lines[1]) {
+                    (table_lines[..2].to_vec(), table_lines[2..].to_vec())
+                } else if !table_lines.is_empty() && is_table_delimiter_row(&table_lines[0]) {
+                    (table_lines[..1].to_vec(), table_lines[1..].to_vec())
+                } else {
+                    (Vec::new(), table_lines)
+                };
+            blocks.push(MarkdownBlock::Table {
+                header_lines,
+                body_lines,
+            });
+        } else {
+            let mut para_lines = Vec::new();
+            while i < lines.len() {
+                let cur = &lines[i];
+                let cur_trim = cur.trim();
+                if cur_trim.starts_with("```") || is_table_row(cur) {
+                    break;
+                }
+                if cur_trim.is_empty() && !para_lines.is_empty() {
+                    i += 1;
+                    break;
+                }
+                if !cur_trim.is_empty() || !para_lines.is_empty() {
+                    para_lines.push(cur.clone());
+                }
+                i += 1;
+            }
+            if !para_lines.is_empty() {
+                blocks.push(MarkdownBlock::Paragraph { lines: para_lines });
+            }
+        }
+    }
+
+    blocks
+}
+
+fn is_table_row(line: &str) -> bool {
+    let t = line.trim();
+    if t.is_empty() {
+        return false;
+    }
+    t.starts_with('|') || (t.ends_with('|') && t.contains('|'))
+}
+
+fn is_table_delimiter_row(line: &str) -> bool {
+    let t = line.trim();
+    t.contains("---") || t.contains("-|-")
+}
+
+fn split_raw_section(
+    sec: RawSection,
+    hard_limit: usize,
+    window_chars: usize,
+    overlap_chars: usize,
+) -> Vec<RawSection> {
+    if sec.tokens <= hard_limit {
+        return vec![sec];
+    }
+
+    let blocks = parse_markdown_blocks(&sec.lines);
+    let mut result = Vec::new();
+    let mut current_block_texts = Vec::new();
+    let mut current_tokens = 0;
+
+    let flush_current = |texts: &mut Vec<String>, target: &mut Vec<RawSection>| {
+        if !texts.is_empty() {
+            let content = texts.join("\n");
+            let tokens = estimate_tokens(&content);
+            target.push(RawSection {
+                lines: vec![content],
+                breadcrumb: sec.breadcrumb.clone(),
+                heading_level: sec.heading_level,
+                source_line: sec.source_line,
+                tokens,
+            });
+            texts.clear();
+        }
+    };
+
+    for block in blocks {
+        let block_text = block.to_text();
+        let block_tokens = block.estimate_tokens();
+
+        if block_tokens <= hard_limit {
+            if current_tokens + block_tokens > hard_limit && !current_block_texts.is_empty() {
+                flush_current(&mut current_block_texts, &mut result);
+                current_tokens = 0;
+            }
+            current_block_texts.push(block_text);
+            current_tokens += block_tokens;
+        } else {
+            flush_current(&mut current_block_texts, &mut result);
+            current_tokens = 0;
+
+            match block {
+                MarkdownBlock::CodeBlock { fence, body_lines } => {
+                    let mut code_chunk_lines = Vec::new();
+                    let base_tokens = estimate_tokens(&format!("{}\n```", fence));
+                    let mut code_chunk_tokens = base_tokens;
+
+                    for line in body_lines {
+                        let line_tokens = estimate_tokens(&line);
+                        if code_chunk_tokens + line_tokens > hard_limit && !code_chunk_lines.is_empty() {
+                            let content = format!("{}\n{}\n```", fence, code_chunk_lines.join("\n"));
+                            let tokens = estimate_tokens(&content);
+                            result.push(RawSection {
+                                lines: vec![content],
+                                breadcrumb: sec.breadcrumb.clone(),
+                                heading_level: sec.heading_level,
+                                source_line: sec.source_line,
+                                tokens,
+                            });
+                            code_chunk_lines.clear();
+                            code_chunk_tokens = base_tokens;
+                        }
+
+                        if base_tokens + line_tokens > hard_limit {
+                            let windows = chunk_text_with_overlap(&line, window_chars, overlap_chars);
+                            for w in windows {
+                                let w_content = format!("{}\n{}\n```", fence, w);
+                                let w_tokens = estimate_tokens(&w_content);
+                                result.push(RawSection {
+                                    lines: vec![w_content],
+                                    breadcrumb: sec.breadcrumb.clone(),
+                                    heading_level: sec.heading_level,
+                                    source_line: sec.source_line,
+                                    tokens: w_tokens,
+                                });
+                            }
+                        } else {
+                            code_chunk_lines.push(line);
+                            code_chunk_tokens += line_tokens;
+                        }
+                    }
+
+                    if !code_chunk_lines.is_empty() {
+                        let content = format!("{}\n{}\n```", fence, code_chunk_lines.join("\n"));
+                        let tokens = estimate_tokens(&content);
+                        result.push(RawSection {
+                            lines: vec![content],
+                            breadcrumb: sec.breadcrumb.clone(),
+                            heading_level: sec.heading_level,
+                            source_line: sec.source_line,
+                            tokens,
+                        });
+                    }
+                }
+                MarkdownBlock::Table {
+                    header_lines,
+                    body_lines,
+                } => {
+                    let header_prefix = header_lines.join("\n");
+                    let header_tokens = estimate_tokens(&header_prefix);
+                    let mut table_chunk_lines = Vec::new();
+                    let mut table_chunk_tokens = header_tokens;
+
+                    for line in body_lines {
+                        let line_tokens = estimate_tokens(&line);
+                        if table_chunk_tokens + line_tokens > hard_limit && !table_chunk_lines.is_empty() {
+                            let mut full_table_lines = header_lines.clone();
+                            full_table_lines.append(&mut table_chunk_lines);
+                            let content = full_table_lines.join("\n");
+                            let tokens = estimate_tokens(&content);
+                            result.push(RawSection {
+                                lines: vec![content],
+                                breadcrumb: sec.breadcrumb.clone(),
+                                heading_level: sec.heading_level,
+                                source_line: sec.source_line,
+                                tokens,
+                            });
+                            table_chunk_tokens = header_tokens;
+                        }
+
+                        if header_tokens + line_tokens > hard_limit {
+                            let windows = chunk_text_with_overlap(&line, window_chars, overlap_chars);
+                            for w in windows {
+                                let content = if header_prefix.is_empty() {
+                                    w.to_string()
+                                } else {
+                                    format!("{}\n{}", header_prefix, w)
+                                };
+                                let tokens = estimate_tokens(&content);
+                                result.push(RawSection {
+                                    lines: vec![content],
+                                    breadcrumb: sec.breadcrumb.clone(),
+                                    heading_level: sec.heading_level,
+                                    source_line: sec.source_line,
+                                    tokens,
+                                });
+                            }
+                        } else {
+                            table_chunk_lines.push(line);
+                            table_chunk_tokens += line_tokens;
+                        }
+                    }
+
+                    if !table_chunk_lines.is_empty() {
+                        let mut full_table_lines = header_lines;
+                        full_table_lines.extend(table_chunk_lines);
+                        let content = full_table_lines.join("\n");
+                        let tokens = estimate_tokens(&content);
+                        result.push(RawSection {
+                            lines: vec![content],
+                            breadcrumb: sec.breadcrumb.clone(),
+                            heading_level: sec.heading_level,
+                            source_line: sec.source_line,
+                            tokens,
+                        });
+                    }
+                }
+                MarkdownBlock::Paragraph { lines } => {
+                    let content = lines.join("\n");
+                    let windows = chunk_text_with_overlap(&content, window_chars, overlap_chars);
+                    for w in windows {
+                        let w_tokens = estimate_tokens(w);
+                        result.push(RawSection {
+                            lines: vec![w.to_string()],
+                            breadcrumb: sec.breadcrumb.clone(),
+                            heading_level: sec.heading_level,
+                            source_line: sec.source_line,
+                            tokens: w_tokens,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    flush_current(&mut current_block_texts, &mut result);
+    result
 }
 
 impl MarkdownChunker {
@@ -142,13 +495,19 @@ impl MarkdownChunker {
         let mut current_source_line = 1;
 
         let mut heading_stack: Vec<(u8, String)> = Vec::new();
+        let mut in_code_block = false;
 
         for (i, line) in markdown.lines().enumerate() {
             let line_num = i + 1;
 
+            let trimmed = line.trim();
+            if trimmed.starts_with("```") {
+                in_code_block = !in_code_block;
+            }
+
             let mut is_heading = false;
             let mut h_level = 0;
-            if line.starts_with('#') {
+            if !in_code_block && line.starts_with('#') {
                 let parts: Vec<&str> = line.splitn(2, ' ').collect();
                 if parts.len() == 2 && parts[0].chars().all(|c| c == '#') {
                     h_level = parts[0].len() as u8;
@@ -201,70 +560,13 @@ impl MarkdownChunker {
             });
         }
 
-        let mut limited_sections = Vec::new();
         let window_chars = hard_limit * CHARS_PER_TOKEN;
         let overlap_chars = window_chars / 5;
 
+        let mut limited_sections = Vec::new();
         for sec in raw_sections {
-            if sec.tokens > hard_limit {
-                let content = sec.lines.join("\n");
-                let paragraphs: Vec<&str> = content.split("\n\n").collect();
-                let mut current_p_lines = Vec::new();
-                let mut current_p_tokens = 0;
-
-                let push_paragraph_section = |lines: Vec<String>, target: &mut Vec<RawSection>| {
-                    let p_content = lines.join("\n");
-                    let actual_tokens = estimate_tokens(&p_content);
-                    if actual_tokens > hard_limit {
-                        let windows =
-                            chunk_text_with_overlap(&p_content, window_chars, overlap_chars);
-                        for w in windows {
-                            let w_tokens = estimate_tokens(w);
-                            target.push(RawSection {
-                                lines: vec![w.to_string()],
-                                breadcrumb: sec.breadcrumb.clone(),
-                                heading_level: sec.heading_level,
-                                source_line: sec.source_line,
-                                tokens: w_tokens,
-                            });
-                        }
-                    } else {
-                        target.push(RawSection {
-                            lines,
-                            breadcrumb: sec.breadcrumb.clone(),
-                            heading_level: sec.heading_level,
-                            source_line: sec.source_line,
-                            tokens: actual_tokens,
-                        });
-                    }
-                };
-
-                for p in paragraphs {
-                    let p_tokens = estimate_tokens(p);
-                    let p_text = if current_p_lines.is_empty() {
-                        p.to_string()
-                    } else {
-                        format!("\n\n{}", p)
-                    };
-
-                    if current_p_tokens + p_tokens > hard_limit && !current_p_lines.is_empty() {
-                        let lines = std::mem::take(&mut current_p_lines);
-                        push_paragraph_section(lines, &mut limited_sections);
-                        current_p_tokens = 0;
-                        current_p_lines.push(p.to_string());
-                        current_p_tokens += p_tokens;
-                    } else {
-                        current_p_lines.push(p_text);
-                        current_p_tokens += p_tokens;
-                    }
-                }
-                if !current_p_lines.is_empty() {
-                    let lines = std::mem::take(&mut current_p_lines);
-                    push_paragraph_section(lines, &mut limited_sections);
-                }
-            } else {
-                limited_sections.push(sec);
-            }
+            let split_secs = split_raw_section(sec, hard_limit, window_chars, overlap_chars);
+            limited_sections.extend(split_secs);
         }
 
         let mut final_sections: Vec<RawSection> = Vec::new();
@@ -529,6 +831,102 @@ mod tests {
                 chunk.token_count,
                 limit
             );
+        }
+    }
+
+    #[test]
+    fn test_code_block_within_target_size_preserved_atomically() {
+        let code = "```rust\nfn main() {\n    let mut x = 10;\n    x += 5;\n    println!(\"Val: {}\", x);\n}\n```";
+        let markdown = format!("# Code Test\n\nSome introductory paragraph.\n\n{}", code);
+
+        let config = ChunkerConfig {
+            max_tokens: 500,
+            min_tokens: 0,
+            ..Default::default()
+        };
+        let chunker = MarkdownChunker::new(config);
+        let chunks = chunker.chunk(DocId::new(10), &markdown);
+
+        let code_chunk = chunks
+            .iter()
+            .find(|c| c.content.contains("fn main()"))
+            .expect("Should find chunk containing code block");
+
+        assert!(
+            code_chunk.content.contains("```rust") && code_chunk.content.contains("```"),
+            "Code block within max_tokens must be preserved atomically without mid-block splits"
+        );
+    }
+
+    #[test]
+    fn test_table_header_retention_and_row_splitting() {
+        let mut table_md = String::from("| ID | Name | Role |\n|---|---|---|\n");
+        for i in 0..50 {
+            table_md.push_str(&format!("| {} | User_{} | Role_{} |\n", i, i, i));
+        }
+
+        let config = ChunkerConfig {
+            max_tokens: 30,
+            min_tokens: 0,
+            ..Default::default()
+        };
+        let chunker = MarkdownChunker::new(config);
+        let chunks = chunker.chunk(DocId::new(20), &table_md);
+
+        assert!(chunks.len() > 1, "Oversized table should be split into multiple chunks");
+
+        for chunk in &chunks {
+            assert!(
+                chunk.content.contains("| ID | Name | Role |"),
+                "Every sub-chunk of an oversized table must retain the table header row"
+            );
+            assert!(
+                chunk.content.contains("|---|---|---|"),
+                "Every sub-chunk of an oversized table must retain the table delimiter row"
+            );
+        }
+    }
+
+    #[test]
+    fn test_oversized_paragraph_sliding_window_fallback() {
+        let long_para = "Satz mit vielen Informationen und Details. ".repeat(100);
+        let config = ChunkerConfig {
+            max_tokens: 20,
+            min_tokens: 0,
+            ..Default::default()
+        };
+        let chunker = MarkdownChunker::new(config);
+        let chunks = chunker.chunk(DocId::new(30), &long_para);
+
+        assert!(chunks.len() > 1, "Oversized paragraph must be split into multiple chunks");
+
+        let limit = (20.0 * 1.2) as usize;
+        for chunk in &chunks {
+            assert!(
+                chunk.token_count <= limit || chunk.content.len() <= limit * CHARS_PER_TOKEN,
+                "Sliding window sub-chunk must respect hard limit"
+            );
+            assert!(
+                std::str::from_utf8(chunk.content.as_bytes()).is_ok(),
+                "Sliding window sub-chunk must remain valid UTF-8"
+            );
+        }
+    }
+
+    #[test]
+    fn test_chunker_determinism() {
+        let markdown = "# Title\n\nParagraph 1 text.\n\n```python\ndef hello():\n    print('world')\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |\n";
+        let chunker = MarkdownChunker::with_defaults();
+
+        let run1 = chunker.chunk(DocId::new(40), markdown);
+        let run2 = chunker.chunk(DocId::new(40), markdown);
+
+        assert_eq!(run1.len(), run2.len());
+        for (c1, c2) in run1.iter().zip(run2.iter()) {
+            assert_eq!(c1.content, c2.content);
+            assert_eq!(c1.token_count, c2.token_count);
+            assert_eq!(c1.metadata, c2.metadata);
+            assert_eq!(c1.doc_id, c2.doc_id);
         }
     }
 

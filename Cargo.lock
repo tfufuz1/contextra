@@ -831,6 +831,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
+ "contextra-core",
  "contextra-crypto",
  "contextra-graph",
  "contextra-infer-candle",
@@ -838,6 +839,7 @@ dependencies = [
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",
+ "contextra-sandbox",
  "contextra-store",
  "contextra-sys",
  "contextra-testkit",
@@ -856,6 +858,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "wat",
  "zeroize",
 ]
 
@@ -982,6 +985,7 @@ name = "contextra-license"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "blake3",
  "contextra-ports",
  "contextra-types",
  "ed25519-dalek",

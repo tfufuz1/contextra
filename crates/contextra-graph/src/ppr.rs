@@ -145,13 +145,56 @@ pub fn compute_ppr_with_apprh_selector(
     }
 }
 
-/// Calculates Personalized PageRank (PPR) over a compacted `GraphInner` state using a reusable [`PprContext`].
+/// Evaluates the cost model for PPR algorithm selection under `PprAlgorithm::Auto`.
 ///
-/// # Invarianten
-/// - `inner` MUSS vor dem Aufruf kompaktiert sein (`inner.compact()`).
-/// - Determinismus: Bitidentische Sortierung bei identischem Graph & Inputs.
-/// - Zero-Hang: Bounded execution by `config.max_iterations`.
-/// - Zero O(N) Allocations when reusing `ctx`.
+/// Compares the approximate computational costs:
+/// - ForwardPush cost: $O(1 / (\epsilon \cdot \alpha))$
+/// - DensePowerIteration cost: $O(\text{iterations} \cdot (|E| + N))$
+///
+/// Deterministically selects `ForwardPush` if its estimated cost is lower than
+/// `DensePowerIteration`, otherwise selects `DensePowerIteration`.
+pub(crate) fn select_auto_ppr_algorithm(
+    inner: &GraphInner,
+    seed_count: usize,
+    config: &PprConfig,
+) -> PprAlgorithm {
+    if seed_count == 0 {
+        return PprAlgorithm::ForwardPush;
+    }
+
+    let alpha = if config.damping_factor.is_nan()
+        || config.damping_factor <= 0.0
+        || config.damping_factor >= 1.0
+    {
+        0.15f64
+    } else {
+        (1.0f64 - config.damping_factor as f64).max(1e-4)
+    };
+
+    let epsilon = if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0 {
+        1e-6f64
+    } else {
+        (config.convergence_epsilon as f64).max(1e-12)
+    };
+
+    let num_nodes = inner.reverse_map.len() as f64;
+    let edge_count = (inner.targets.len() + inner.pending_edge_count) as f64;
+    let max_iters = (config.max_iterations.min(1000) as usize) as f64;
+
+    // Asymptotic cost order estimates:
+    // ForwardPush: O(1 / (\epsilon \cdot \alpha))
+    let forward_push_cost = 1.0f64 / (epsilon * alpha);
+
+    // Dense Power Iteration: O(iterations \cdot (|E| + N))
+    let power_iteration_cost = max_iters * (edge_count + num_nodes);
+
+    if forward_push_cost < power_iteration_cost {
+        PprAlgorithm::ForwardPush
+    } else {
+        PprAlgorithm::DensePowerIteration
+    }
+}
+
 pub(crate) fn compute_ppr_with_context(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -160,13 +203,7 @@ pub(crate) fn compute_ppr_with_context(
     ctx: &mut PprContext,
 ) -> Vec<(EntityId, f32)> {
     let chosen_algorithm = match config.algorithm {
-        PprAlgorithm::Auto => {
-            if seed_nodes.len() <= 100 {
-                PprAlgorithm::ForwardPush
-            } else {
-                PprAlgorithm::DensePowerIteration
-            }
-        }
+        PprAlgorithm::Auto => select_auto_ppr_algorithm(inner, seed_nodes.len(), config),
         other => other,
     };
 
@@ -287,13 +324,12 @@ pub(crate) fn compute_ppr_with_context(
                 }
             }
         }
-        PprAlgorithm::Auto => {
-            if seed_nodes.len() <= 100 {
+        PprAlgorithm::Auto => match select_auto_ppr_algorithm(inner, seed_nodes.len(), config) {
+            PprAlgorithm::ForwardPush => {
                 forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx)
-            } else {
-                compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx)
             }
-        }
+            _ => compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx),
+        },
     }
 }
 

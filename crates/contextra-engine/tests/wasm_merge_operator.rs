@@ -131,7 +131,7 @@ fn test_determinism_identical_inputs_yield_identical_outputs() {
 
 #[test]
 fn test_invalid_module_returns_error_on_new() {
-    let invalid_bytes = b"NOT_A_WASM_BINARY";
+    let invalid_bytes: &[u8] = b"NOT_A_WASM_BINARY";
     let res = WasmMergeOperator::new(invalid_bytes);
     assert!(res.is_err());
     assert!(matches!(res.unwrap_err(), ContextraError::Sandbox(_)));
@@ -145,4 +145,221 @@ fn test_clean_drop_terminates_worker_thread() {
         .expect("merge");
     assert_eq!(u64::from_le_bytes(res.try_into().unwrap()), 10);
     drop(op);
+}
+
+#[test]
+fn test_wasm_merge_operator_denies_clock_and_rng_access() {
+    // WAT module that attempts clock_time_get and panics/traps if ERRNO_ACCES (2) is returned
+    let clock_wat = r#"
+        (module
+            (import "wasi_snapshot_preview1" "clock_time_get"
+                (func $clock_time_get (param i32 i64 i32) (result i32)))
+            (memory (export "memory") 1)
+            (func (export "_start")
+                (local $res i32)
+                (local.set $res (call $clock_time_get (i32.const 1) (i64.const 0) (i32.const 100)))
+                ;; If ERRNO_ACCES (2) returned, trap unreachable
+                (if (i32.eq (local.get $res) (i32.const 2))
+                    (then (unreachable))
+                )
+            )
+        )
+    "#;
+    let clock_wasm = wat::parse_str(clock_wat).expect("valid WAT");
+    let op_clock = WasmMergeOperator::new(clock_wasm).expect("valid WASM operator");
+    let clock_res = op_clock.merge(&[1, 2, 3], &[4, 5, 6]);
+    assert!(
+        clock_res.is_err(),
+        "Expected clock access to be denied resulting in WASM trap"
+    );
+
+    // WAT module that attempts random_get and panics/traps if ERRNO_NOSYS (52) is returned
+    let rng_wat = r#"
+        (module
+            (import "wasi_snapshot_preview1" "random_get"
+                (func $random_get (param i32 i32) (result i32)))
+            (memory (export "memory") 1)
+            (func (export "_start")
+                (local $res i32)
+                (local.set $res (call $random_get (i32.const 100) (i32.const 16)))
+                ;; If ERRNO_NOSYS (52) returned, trap unreachable
+                (if (i32.eq (local.get $res) (i32.const 52))
+                    (then (unreachable))
+                )
+            )
+        )
+    "#;
+    let rng_wasm = wat::parse_str(rng_wat).expect("valid WAT");
+    let op_rng = WasmMergeOperator::new(rng_wasm).expect("valid WASM operator");
+    let rng_res = op_rng.merge(&[1, 2, 3], &[4, 5, 6]);
+    assert!(
+        rng_res.is_err(),
+        "Expected PRNG random_get to be denied returning ERRNO_NOSYS"
+    );
+
+    // WAT module that attempts host_cloud_query and triggers capability violation
+    let cloud_wat = r#"
+        (module
+            (import "contextra" "host_cloud_query"
+                (func $host_cloud_query (result i32)))
+            (memory (export "memory") 1)
+            (func (export "_start")
+                (drop (call $host_cloud_query))
+            )
+        )
+    "#;
+    let cloud_wasm = wat::parse_str(cloud_wat).expect("valid WAT");
+    let op_cloud = WasmMergeOperator::new(cloud_wasm).expect("valid WASM operator");
+    let cloud_res = op_cloud.merge(&[1, 2, 3], &[4, 5, 6]);
+    assert!(
+        cloud_res.is_err(),
+        "Expected host_cloud_query to fail with capability violation"
+    );
+    let err_msg = cloud_res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("capability violation"),
+        "Expected error message to contain capability violation, got: {}",
+        err_msg
+    );
+}
+
+#[tokio::test]
+async fn test_wasm_merge_operator_normal_case_in_compaction() {
+    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_store::compaction::{CompactionConfig, CompactionEngine};
+    use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let cache = Arc::new(BlockCache::new(1024 * 1024));
+    let snapshot_reg = Arc::new(SnapshotRegistry::new());
+    let budget = Arc::new(ResourceTracker::new(ResourceBudget {
+        memory_limit: 100 * 1024 * 1024,
+    }));
+
+    let sst1_path = dir.path().join("sst1.sst");
+    let mut builder1 = SstableBuilder::create(&sst1_path).await.unwrap();
+    builder1
+        .add(b"key_wasm", &100u64.to_le_bytes(), 1, 1)
+        .await
+        .unwrap();
+    builder1.finish().await.unwrap();
+
+    let sst2_path = dir.path().join("sst2.sst");
+    let mut builder2 = SstableBuilder::create(&sst2_path).await.unwrap();
+    builder2
+        .add(b"key_wasm", &200u64.to_le_bytes(), 2, 2)
+        .await
+        .unwrap();
+    builder2.finish().await.unwrap();
+
+    let reader1 = Arc::new(SstableReader::open(&sst1_path, cache.clone()).await.unwrap());
+    let reader2 = Arc::new(SstableReader::open(&sst2_path, cache.clone()).await.unwrap());
+
+    let wasm_op = Arc::new(WasmMergeOperator::new(COUNTER_WASM).unwrap());
+
+    let config = CompactionConfig::default();
+    let engine = CompactionEngine::new(
+        config,
+        snapshot_reg.clone(),
+        cache.clone(),
+        None,
+        budget,
+        None,
+    )
+    .with_merge_operator(wasm_op);
+
+    let out_path = dir.path().join("compacted_wasm.sst");
+    let min_seq = snapshot_reg.min_active_seqno();
+
+    engine
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, true)
+        .await
+        .unwrap();
+
+    let compacted_reader = SstableReader::open(&out_path, cache).await.unwrap();
+    let (val, _seq, _tx) = compacted_reader.get(b"key_wasm").await.unwrap().unwrap();
+    let sum = u64::from_le_bytes(val.as_ref().try_into().unwrap());
+    assert_eq!(sum, 300, "WASM merge operator correctly summed values during compaction");
+}
+
+#[tokio::test]
+async fn test_wasm_merge_operator_fuel_exhausted_in_compaction() {
+    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_store::compaction::{CompactionConfig, CompactionEngine};
+    use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use tempfile::tempdir;
+    use std::time::Duration;
+
+    let dir = tempdir().unwrap();
+    let cache = Arc::new(BlockCache::new(1024 * 1024));
+    let snapshot_reg = Arc::new(SnapshotRegistry::new());
+    let budget = Arc::new(ResourceTracker::new(ResourceBudget {
+        memory_limit: 100 * 1024 * 1024,
+    }));
+
+    let sst1_path = dir.path().join("sst1.sst");
+    let mut builder1 = SstableBuilder::create(&sst1_path).await.unwrap();
+    builder1
+        .add(b"key_infinite", b"value_old", 1, 1)
+        .await
+        .unwrap();
+    builder1.finish().await.unwrap();
+
+    let sst2_path = dir.path().join("sst2.sst");
+    let mut builder2 = SstableBuilder::create(&sst2_path).await.unwrap();
+    builder2
+        .add(b"key_infinite", b"value_new", 2, 2)
+        .await
+        .unwrap();
+    builder2.finish().await.unwrap();
+
+    let reader1 = Arc::new(SstableReader::open(&sst1_path, cache.clone()).await.unwrap());
+    let reader2 = Arc::new(SstableReader::open(&sst2_path, cache.clone()).await.unwrap());
+
+    // Create WasmMergeOperator with low fuel limit (1000) so infinite loop exhausts fuel immediately
+    let were_op = Arc::new(
+        WasmMergeOperator::new_with_config(
+            INFINITE_LOOP_WASM,
+            1_000,
+            Duration::from_secs(5),
+        )
+        .unwrap(),
+    );
+
+    let config = CompactionConfig::default();
+    let engine = CompactionEngine::new(
+        config,
+        snapshot_reg.clone(),
+        cache.clone(),
+        None,
+        budget,
+        None,
+    )
+    .with_merge_operator(were_op);
+
+    let out_path = dir.path().join("compacted_fuel_exhausted.sst");
+    let min_seq = snapshot_reg.min_active_seqno();
+
+    engine
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .await
+        .unwrap();
+
+    let compacted_reader = SstableReader::open(&out_path, cache).await.unwrap();
+
+    // Verify fail-safe behaviour: both versions remain intact in compacted SSTable
+    let (val_new, _seq, _tx) = compacted_reader
+        .get_at(b"key_infinite", 2, 2)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(val_new.as_ref(), b"value_new");
+
+    let (val_old, _seq, _tx) = compacted_reader
+        .get_at(b"key_infinite", 1, 1)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(val_old.as_ref(), b"value_old");
 }

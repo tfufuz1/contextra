@@ -111,7 +111,7 @@ fn test_sq8_kendall_tau_rank_correlation() {
             .enumerate()
             .map(|(idx, v)| {
                 let d = contextra_vector::distance::cosine_distance_scalar(&q_uniform, v);
-                (DocId::new((idx + 1) as u64), d)
+                (DocId::new(((idx + 1) as u64).into()), d)
             })
             .collect();
         f32_dists_u.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -124,7 +124,7 @@ fn test_sq8_kendall_tau_rank_correlation() {
                 let d = quantizer_uniform
                     .asymmetric_dist(&q_uniform, qv, DistanceMetric::Cosine)
                     .unwrap();
-                (DocId::new((idx + 1) as u64), d)
+                (DocId::new(((idx + 1) as u64).into()), d)
             })
             .collect();
         sq8_dists_u.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -143,7 +143,7 @@ fn test_sq8_kendall_tau_rank_correlation() {
             .enumerate()
             .map(|(idx, v)| {
                 let d = contextra_vector::distance::cosine_distance_scalar(&q_skewed, v);
-                (DocId::new((idx + 1) as u64), d)
+                (DocId::new(((idx + 1) as u64).into()), d)
             })
             .collect();
         f32_dists_s.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -156,7 +156,7 @@ fn test_sq8_kendall_tau_rank_correlation() {
                 let d = quantizer_skewed
                     .asymmetric_dist(&q_skewed, qv, DistanceMetric::Cosine)
                     .unwrap();
-                (DocId::new((idx + 1) as u64), d)
+                (DocId::new(((idx + 1) as u64).into()), d)
             })
             .collect();
         sq8_dists_s.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -197,7 +197,7 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
     for i in 0..n {
         let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
         vectors.push(v);
-        ids.push(DocId::new((i + 1) as u64));
+        ids.push(DocId::new(((i + 1) as u64).into()));
     }
 
     // 1. HNSW Persistence Roundtrip
