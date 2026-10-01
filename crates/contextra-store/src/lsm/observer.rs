@@ -166,7 +166,9 @@ impl BoundedObserverWorker {
     }
 
     fn is_circuit_breaker_open(&self, now_nanos: u64) -> bool {
-        let open_until = self.circuit_breaker_open_until_nanos.load(Ordering::Relaxed);
+        let open_until = self
+            .circuit_breaker_open_until_nanos
+            .load(Ordering::Relaxed);
         open_until > 0 && now_nanos < open_until
     }
 }
@@ -214,13 +216,7 @@ impl AsyncObserverAdapter {
             }
         });
 
-        (
-            Self {
-                inner,
-                sender: tx,
-            },
-            handle,
-        )
+        (Self { inner, sender: tx }, handle)
     }
 }
 
@@ -230,7 +226,9 @@ impl WalObserver for AsyncObserverAdapter {
     }
 
     fn on_commit(&self, _batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId) {
-        let _ = self.sender.try_send((seq_no, tx_id, WriteOrigin::UserWrite));
+        let _ = self
+            .sender
+            .try_send((seq_no, tx_id, WriteOrigin::UserWrite));
     }
 }
 
@@ -257,8 +255,10 @@ impl ObserverRegistry {
         let mut guard = self.observers.write();
         guard.retain(|worker| {
             if Arc::ptr_eq(&worker.inner, observer) {
-                self.historical_drops
-                    .fetch_add(worker.dropped_count.load(Ordering::Relaxed), Ordering::Relaxed);
+                self.historical_drops.fetch_add(
+                    worker.dropped_count.load(Ordering::Relaxed),
+                    Ordering::Relaxed,
+                );
                 false
             } else {
                 true
@@ -325,7 +325,9 @@ impl ObserverRegistry {
     pub fn clear_circuit_breaker(&self, observer: &Arc<dyn WalObserver>) {
         let guard = self.observers.read();
         if let Some(worker) = guard.iter().find(|w| Arc::ptr_eq(&w.inner, observer)) {
-            worker.circuit_breaker_open_until_nanos.store(0, Ordering::Relaxed);
+            worker
+                .circuit_breaker_open_until_nanos
+                .store(0, Ordering::Relaxed);
             worker.consecutive_drops.store(0, Ordering::Relaxed);
         }
     }
@@ -393,10 +395,9 @@ impl ObserverRegistry {
                         if elapsed_nanos > max_latency_nanos {
                             worker.dropped_count.fetch_add(1, Ordering::Relaxed);
                             worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
-                            worker.circuit_breaker_open_until_nanos.store(
-                                now_nanos.saturating_add(cooldown_nanos),
-                                Ordering::Relaxed,
-                            );
+                            worker
+                                .circuit_breaker_open_until_nanos
+                                .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
                             tracing::warn!(
                                 elapsed_us = elapsed_nanos / 1_000,
                                 max_allowed_us = max_latency_nanos / 1_000,
@@ -424,10 +425,9 @@ impl ObserverRegistry {
                     Err(RecvTimeoutError::Timeout) => {
                         worker.dropped_count.fetch_add(1, Ordering::Relaxed);
                         worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
-                        worker.circuit_breaker_open_until_nanos.store(
-                            now_nanos.saturating_add(cooldown_nanos),
-                            Ordering::Relaxed,
-                        );
+                        worker
+                            .circuit_breaker_open_until_nanos
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
                         tracing::warn!(
                             max_allowed_us = max_latency_nanos / 1_000,
                             tx_id = ctx.tx_id.inner(),

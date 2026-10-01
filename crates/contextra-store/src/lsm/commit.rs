@@ -94,6 +94,7 @@ impl LsmStorage {
     ///   concurrent readers.
     /// - `MemTable` internally uses `parking_lot::RwLock` for thread-safe concurrent mutations during `put()`.
     /// - `state.write()` is strictly reserved for atomic `MemTable` and `WAL` rotation in `flush()`.
+    ///
     /// INVARIANTE: LOCK-REIHENFOLGE: commit_mutex → state.read → MemTable-RwLock.
     pub(super) fn apply_mem_updates(
         &self,

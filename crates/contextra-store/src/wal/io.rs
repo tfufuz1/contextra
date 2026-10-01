@@ -302,8 +302,7 @@ where
                     if let Err(e) = verify_res {
                         if !using_legacy_key && allow_legacy_integrity_key_fallback {
                             let legacy_key = legacy_integrity_key()?;
-                            let mut legacy_verifier =
-                                IntegrityVerifier::new(&legacy_key);
+                            let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                             legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
                             let legacy_res =
                                 match version {

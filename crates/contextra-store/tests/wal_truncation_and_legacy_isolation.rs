@@ -17,7 +17,9 @@ async fn test_external_wal_truncation_attack_detected() {
     let wal_path = dir.path().join("wal.log");
 
     // Write SALT file so directory pristine check passes when LsmStorage opens
-    fs::write(dir.path().join("SALT"), &[0u8; 32]).await.expect("write salt");
+    fs::write(dir.path().join("SALT"), &[0u8; 32])
+        .await
+        .expect("write salt");
 
     // 1. Write 2 WAL entries and record high-water-mark of entry 2 in MANIFEST
     let hwm_hmac = {
@@ -94,7 +96,9 @@ async fn test_crash_incomplete_tail_write_recovered_without_truncation_error() {
     let wal_path = dir.path().join("wal.log");
 
     // Write SALT file so directory pristine check passes when LsmStorage opens
-    fs::write(dir.path().join("SALT"), &[0u8; 32]).await.expect("write salt");
+    fs::write(dir.path().join("SALT"), &[0u8; 32])
+        .await
+        .expect("write salt");
 
     // 1. Write 2 valid WAL entries and record high-water-mark of entry 2 in MANIFEST
     {

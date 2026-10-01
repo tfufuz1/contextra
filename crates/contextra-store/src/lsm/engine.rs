@@ -3,7 +3,7 @@ use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
 use super::observer::{ObserverRegistry, WalObserver};
 use super::ops::read;
-use crate::compaction::CompactionEngine;
+use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
@@ -66,7 +66,15 @@ impl Drop for LsmStorage {
 impl LsmStorage {
     /// Opens or recovers an LSM storage instance with the given configuration.
     pub async fn open(config: LsmConfig) -> Result<Self> {
-        Self::new(config).await
+        Self::new_with_merge_operator(config, None).await
+    }
+
+    /// Opens or recovers an LSM storage instance with the given configuration and a `MergeOperator`.
+    pub async fn open_with_merge_operator(
+        config: LsmConfig,
+        merge_operator: Arc<dyn MergeOperator>,
+    ) -> Result<Self> {
+        Self::new_with_merge_operator(config, Some(merge_operator)).await
     }
 
     /// Returns a watch receiver for monitoring system pressure levels.
