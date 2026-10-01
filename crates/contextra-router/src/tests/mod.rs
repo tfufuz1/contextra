@@ -12,6 +12,7 @@
 pub(crate) mod tests {
     pub(crate) mod bandit_tests;
     pub(crate) mod fixtures;
+    pub(crate) mod id_gen_determinism_test;
     pub(crate) mod latency_tests;
     pub(crate) mod misc_tests;
     pub(crate) mod routing_tests;
