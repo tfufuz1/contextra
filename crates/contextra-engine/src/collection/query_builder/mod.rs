@@ -13,6 +13,15 @@ mod weights;
 #[cfg(test)]
 mod tests;
 
+/// Metric counter name for vector search signal latency in seconds.
+pub const METRIC_SEARCH_LATENCY_VECTOR: &str = "search.latency.vector";
+
+/// Metric counter name for full-text search signal latency in seconds.
+pub const METRIC_SEARCH_LATENCY_TEXT: &str = "search.latency.text";
+
+/// Metric counter name for graph search signal latency in seconds.
+pub const METRIC_SEARCH_LATENCY_GRAPH: &str = "search.latency.graph";
+
 pub use builder::{HybridQueryBuilder, DEFAULT_RERANK_POOL_MAX, DEFAULT_RERANK_POOL_MULTIPLIER};
 pub use scope::ScopeConstraint;
 pub use strategy::SearchStrategy;

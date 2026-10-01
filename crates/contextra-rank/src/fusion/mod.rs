@@ -22,4 +22,7 @@ pub use rrf::{
 };
 pub use signal::{MetadataMergePriority, SignalCalibrationContext, SignalKind};
 pub use topk::BoundedTopK;
-pub use types::{FusedScore, ProvenanceRecord, SearchResult, SignalContribution};
+pub use types::{
+    FusedScore, ProvenanceRecord, SearchReport, SearchResult, Signal, SignalContribution,
+    SignalFailurePolicy,
+};

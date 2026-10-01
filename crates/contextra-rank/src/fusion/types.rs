@@ -129,3 +129,45 @@ pub struct SearchResult {
 
 /// Type alias for fused score output item.
 pub type FusedScore = SearchResult;
+
+/// Query retrieval signal identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Signal {
+    /// Dense vector similarity signal.
+    Vector,
+    /// Full-text BM25 keyword signal.
+    Text,
+    /// Graph entity relationship signal.
+    Graph,
+}
+
+impl std::fmt::Display for Signal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Signal::Vector => write!(f, "vector"),
+            Signal::Text => write!(f, "text"),
+            Signal::Graph => write!(f, "graph"),
+        }
+    }
+}
+
+/// Policy governing multi-signal retrieval error handling semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SignalFailurePolicy {
+    /// Return an explicit error if any retrieval signal fails (default).
+    #[default]
+    Fail,
+    /// Degrade gracefully by skipping failing signals and recording degraded signals in SearchReport.
+    Degrade,
+}
+
+/// Execution report for search query execution.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct SearchReport {
+    /// List of signals that failed during query execution when using Degrade policy.
+    pub degraded_signals: Vec<Signal>,
+    /// Warnings captured during query processing (e.g. anchor entity mismatch).
+    pub warnings: Vec<String>,
+    /// Number of adaptive candidate overfetch stages executed (1, 2, or 3).
+    pub overfetch_stages: u8,
+}

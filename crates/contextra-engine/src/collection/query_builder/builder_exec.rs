@@ -3,11 +3,38 @@ use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};
 
 impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
-    /// Executes search query, delegating core signal retrieval to `Collection::hybrid_search_with_query()`.
+    /// Executes search query, delegating core signal retrieval to `execute_with_report()`.
+    ///
+    /// Under `SignalFailurePolicy::Fail` (default), returns an error if any signal fails.
+    /// Under `SignalFailurePolicy::Degrade`, returns available search results.
     pub async fn execute(self) -> Result<Vec<crate::SearchResult>> {
+        let policy = self.on_signal_failure;
+        let (results, report) = self.execute_with_report().await?;
+        if policy == crate::fusion::SignalFailurePolicy::Fail && !report.degraded_signals.is_empty()
+        {
+            let sig_names: Vec<String> = report
+                .degraded_signals
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            return Err(contextra_types::ContextraError::invalid_input(format!(
+                "Query execution failed due to failing signal(s): {}",
+                sig_names.join(", ")
+            )));
+        }
+        Ok(results)
+    }
+
+    /// Executes search query and returns both search results and an execution `SearchReport`.
+    ///
+    /// The `SearchReport` captures degraded signals (when using `SignalFailurePolicy::Degrade`),
+    /// warnings (e.g. anchor entity mismatches), and adaptive candidate overfetch stage counts.
+    pub async fn execute_with_report(
+        self,
+    ) -> Result<(Vec<crate::SearchResult>, crate::fusion::SearchReport)> {
         let k = self.k.unwrap_or(10);
         if k == 0 {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), crate::fusion::SearchReport::default()));
         }
 
         let _has_reranker = self.reranker.is_some();
@@ -85,9 +112,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         }
 
         #[allow(deprecated)]
-        let mut results = self
+        let (mut results, report) = self
             .collection
-            .hybrid_search_with_query_at(&hybrid_query, seq_no)
+            .hybrid_search_with_query_and_report_at(
+                &hybrid_query,
+                seq_no,
+                self.on_signal_failure,
+                self.metrics.as_deref(),
+            )
             .await?;
 
         if let Some(ref filter_expr) = self.filter {
@@ -247,17 +279,17 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                         "Anytime reranking applied: {} candidates",
                         final_results.len()
                     );
-                    return Ok(final_results);
+                    return Ok((final_results, report));
                 } else {
                     // Complete timeout before any candidate completed: fallback to original fusion results
                     results.truncate(k);
-                    return Ok(results);
+                    return Ok((results, report));
                 }
             }
         }
 
         results.truncate(k);
-        Ok(results)
+        Ok((results, report))
     }
 }
 
