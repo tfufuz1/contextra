@@ -6,9 +6,16 @@ use contextra_text::domain::{
     medical_de::{MEDICAL_COMPOUND_STEMS, MEDICAL_PROTECTED_TERMS},
     DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary,
 };
-use contextra_text::morphology::{GermanCompoundSplitter, MorphologicalTokenizer};
+use contextra_text::morphology::{
+    normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer,
+};
 use std::collections::HashSet;
 use std::time::Instant;
+
+const MIN_LEGAL_STEMS: usize = 2000;
+const MIN_LEGAL_PROTECTED: usize = 100;
+const MIN_MEDICAL_STEMS: usize = 2000;
+const MIN_MEDICAL_PROTECTED: usize = 100;
 
 #[test]
 fn test_no_duplicates_and_valid_formatting() {
@@ -94,25 +101,90 @@ fn test_minimum_list_sizes() {
     let legal = LegalDomainVocabulary;
 
     assert!(
-        medical.compound_stems().len() >= 2000,
-        "Medical stems count {} < 2000",
-        medical.compound_stems().len()
+        medical.compound_stems().len() >= MIN_MEDICAL_STEMS,
+        "Medical stems count {} < {}",
+        medical.compound_stems().len(),
+        MIN_MEDICAL_STEMS
     );
     assert!(
-        medical.protected_terms().len() >= 100,
-        "Medical protected terms count {} < 100",
-        medical.protected_terms().len()
+        medical.protected_terms().len() >= MIN_MEDICAL_PROTECTED,
+        "Medical protected terms count {} < {}",
+        medical.protected_terms().len(),
+        MIN_MEDICAL_PROTECTED
     );
     assert!(
-        legal.compound_stems().len() >= 2000,
-        "Legal stems count {} < 2000",
-        legal.compound_stems().len()
+        legal.compound_stems().len() >= MIN_LEGAL_STEMS,
+        "Legal stems count {} < {}",
+        legal.compound_stems().len(),
+        MIN_LEGAL_STEMS
     );
     assert!(
-        legal.protected_terms().len() >= 100,
-        "Legal protected terms count {} < 100",
-        legal.protected_terms().len()
+        legal.protected_terms().len() >= MIN_LEGAL_PROTECTED,
+        "Legal protected terms count {} < {}",
+        legal.protected_terms().len(),
+        MIN_LEGAL_PROTECTED
     );
+}
+
+#[test]
+fn test_umlaut_normalization_consistency() {
+    let medical = MedicalDomainVocabulary;
+    let legal = LegalDomainVocabulary;
+
+    for term in medical
+        .compound_stems()
+        .iter()
+        .chain(medical.protected_terms().iter())
+    {
+        let norm = normalize_umlauts(term);
+        assert_eq!(
+            *term, norm,
+            "Medical vocabulary term '{}' is not normalized with normalize_umlauts()",
+            term
+        );
+    }
+
+    for term in legal
+        .compound_stems()
+        .iter()
+        .chain(legal.protected_terms().iter())
+    {
+        let norm = normalize_umlauts(term);
+        assert_eq!(
+            *term, norm,
+            "Legal vocabulary term '{}' is not normalized with normalize_umlauts()",
+            term
+        );
+    }
+}
+
+#[test]
+fn test_no_empty_lines_in_raw_data_blocks() {
+    let check_raw_file = |raw_data: &str, file_name: &str| {
+        let mut in_data_block = false;
+        let total_lines = raw_data.lines().count();
+        for (line_idx, line) in raw_data.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed == "[compound_stems]" || trimmed == "[protected_terms]" {
+                in_data_block = true;
+                continue;
+            }
+            if in_data_block && line_idx < total_lines - 1 {
+                assert!(
+                    !trimmed.is_empty(),
+                    "File {} contains an empty line inside data block at line {}",
+                    file_name,
+                    line_idx + 1
+                );
+            }
+        }
+    };
+
+    let legal_raw = include_str!("../data/legal_de.txt");
+    let medical_raw = include_str!("../data/medical_de.txt");
+
+    check_raw_file(legal_raw, "legal_de.txt");
+    check_raw_file(medical_raw, "medical_de.txt");
 }
 
 #[test]
@@ -205,13 +277,13 @@ fn test_domain_vocabulary_cold_start_loading_performance() {
 
 #[test]
 fn test_compound_splitter_before_after_domain_expansion_comparison() {
-    // Vorher: Basis-Splitter ohne Domänenvokabular (nur allgemeines KMU-Wörterbuch)
+    // Vorher: Basis-Splitter ohne Domaenenvokabular (nur allgemeines KMU-Woerterbuch)
     let old_splitter = GermanCompoundSplitter::new();
 
-    // Nachher: Erweiterter Splitter mit beiden Domänenvokabularen (Legal & Medical)
+    // Nachher: Erweiterter Splitter mit beiden Domaenenvokabularen (Legal & Medical)
     let expanded_splitter = GermanCompoundSplitter::new_with_all_domains();
 
-    // Medizinische Fachbegriff-Komposita (mindestens 5 konstruierte Testfälle)
+    // Medizinische Fachbegriff-Komposita (mindestens 5 konstruierte Testfaelle)
     let med_test_cases = [
         "herzmuskelentzuendung",
         "aortenklappenstenose",
@@ -246,7 +318,7 @@ fn test_compound_splitter_before_after_domain_expansion_comparison() {
         );
     }
 
-    // Juristische Fachbegriff-Komposita (mindestens 5 konstruierte Testfälle)
+    // Juristische Fachbegriff-Komposita (mindestens 5 konstruierte Testfaelle)
     let leg_test_cases = [
         "datenschutzgrundverordnung",
         "behandlungsfehleranspruch",
