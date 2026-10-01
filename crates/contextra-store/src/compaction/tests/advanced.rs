@@ -395,6 +395,7 @@ async fn test_compaction_pressure_awareness() {
     let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(SystemPressure {
         wal_queue_depth: 0,
         scheduler_queue_depth: 0.0,
+        blocking_util: 0.0,
         embedding_queue_depth: 0,
         pressure_level: PressureLevel::Normal,
     });
@@ -470,6 +471,7 @@ async fn test_compaction_pressure_awareness() {
         .send(SystemPressure {
             wal_queue_depth: 600,
             scheduler_queue_depth: 0.9,
+            blocking_util: 0.0,
             embedding_queue_depth: 0,
             pressure_level: PressureLevel::Critical,
         })

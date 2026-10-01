@@ -46,6 +46,7 @@ pub enum PressureLevel {
 pub struct SystemPressure {
     pub wal_queue_depth: usize,
     pub scheduler_queue_depth: f32, // 0.0–1.0 (Tokio global scheduler queue depth ratio)
+    pub blocking_util: f32,          // 0.0–1.0 (Blocking pool workload / utilization ratio)
     pub embedding_queue_depth: usize, // via Semaphore-Permits
     pub pressure_level: PressureLevel,
 }
@@ -61,6 +62,7 @@ impl SystemPressureMonitor {
         let default_pressure = SystemPressure {
             wal_queue_depth: 0,
             scheduler_queue_depth: 0.0,
+            blocking_util: 0.0,
             embedding_queue_depth: 0,
             pressure_level: PressureLevel::Normal,
         };
@@ -76,15 +78,18 @@ impl SystemPressureMonitor {
         &self,
         wal_depth: usize,
         scheduler_queue_depth: f32,
+        blocking_util: f32,
         embedding_queue: usize,
         max_permits: usize,
     ) -> SystemPressure {
         let level = if scheduler_queue_depth > SCHEDULER_QUEUE_CRITICAL
+            || blocking_util > BLOCKING_UTIL_CRITICAL
             || wal_depth > WAL_QUEUE_CRITICAL_THRESHOLD
             || (max_permits > 0 && embedding_queue == 0)
         {
             PressureLevel::Critical
         } else if scheduler_queue_depth > SCHEDULER_QUEUE_ELEVATED
+            || blocking_util > BLOCKING_UTIL_ELEVATED
             || wal_depth > WAL_QUEUE_ELEVATED_THRESHOLD
         {
             PressureLevel::Elevated
@@ -95,6 +100,7 @@ impl SystemPressureMonitor {
         SystemPressure {
             wal_queue_depth: wal_depth,
             scheduler_queue_depth,
+            blocking_util,
             embedding_queue_depth: embedding_queue,
             pressure_level: level,
         }
@@ -146,9 +152,26 @@ impl SystemPressureMonitor {
                     } else {
                         0.0
                     };
+
+                    // Sample blocking thread pool utilization using a probe task with timeout.
+                    // Probe measures task execution/dispatch latency through the blocking queue.
+                    let sample_start = std::time::Instant::now();
+                    let blocking_probe = tokio::task::spawn_blocking(|| {
+                        // Minimal work in blocking thread
+                    });
+                    let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {
+                        Ok(Ok(())) => {
+                            let elapsed = sample_start.elapsed().as_secs_f32();
+                            // Latency > 10ms indicates elevated blocking queue contention; > 50ms indicates critical.
+                            (elapsed / 0.05).min(1.0)
+                        }
+                        _ => 1.0, // Timeout or join error indicates blocking pool saturation
+                    };
+
                     let pressure = self.compute_pressure(
                         wal_queue_depth_fn(),
                         scheduler_queue_depth,
+                        blocking_util,
                         embedding_permits_fn(),
                         max_embedding_permits,
                     );
@@ -197,24 +220,30 @@ mod tests {
         let monitor = SystemPressureMonitor::new(Duration::from_millis(100));
 
         // Normal state
-        let normal = monitor.compute_pressure(50, 0.2, 5, 10);
+        let normal = monitor.compute_pressure(50, 0.2, 0.1, 5, 10);
         assert_eq!(normal.pressure_level, PressureLevel::Normal);
 
         // Elevated states
-        let elevated_wal = monitor.compute_pressure(150, 0.2, 5, 10);
+        let elevated_wal = monitor.compute_pressure(150, 0.2, 0.1, 5, 10);
         assert_eq!(elevated_wal.pressure_level, PressureLevel::Elevated);
 
-        let elevated_util = monitor.compute_pressure(50, 0.7, 5, 10);
+        let elevated_util = monitor.compute_pressure(50, 0.7, 0.1, 5, 10);
         assert_eq!(elevated_util.pressure_level, PressureLevel::Elevated);
 
+        let elevated_blocking = monitor.compute_pressure(50, 0.2, 0.7, 5, 10);
+        assert_eq!(elevated_blocking.pressure_level, PressureLevel::Elevated);
+
         // Critical states
-        let critical_wal = monitor.compute_pressure(501, 0.2, 5, 10);
+        let critical_wal = monitor.compute_pressure(501, 0.2, 0.1, 5, 10);
         assert_eq!(critical_wal.pressure_level, PressureLevel::Critical);
 
-        let critical_util = monitor.compute_pressure(50, 0.9, 5, 10);
+        let critical_util = monitor.compute_pressure(50, 0.9, 0.1, 5, 10);
         assert_eq!(critical_util.pressure_level, PressureLevel::Critical);
 
-        let critical_permits = monitor.compute_pressure(50, 0.2, 0, 10);
+        let critical_blocking = monitor.compute_pressure(50, 0.2, 0.9, 5, 10);
+        assert_eq!(critical_blocking.pressure_level, PressureLevel::Critical);
+
+        let critical_permits = monitor.compute_pressure(50, 0.2, 0.1, 0, 10);
         assert_eq!(critical_permits.pressure_level, PressureLevel::Critical);
     }
 
@@ -273,5 +302,56 @@ mod tests {
 
         cancellation.cancel();
         let _ = handle.await;
+    }
+
+    #[tokio::test]
+    async fn test_blocking_pool_load_triggers_pressure() {
+        let monitor = SystemPressureMonitor::new(Duration::from_millis(20));
+        let mut rx = monitor.pressure_rx.clone();
+        let cancellation = CancellationToken::new();
+        let cancel_token = cancellation.clone();
+
+        let handle = tokio::spawn(async move {
+            monitor
+                .run(
+                    cancel_token,
+                    || 0,
+                    || 10,
+                    10,
+                )
+                .await;
+        });
+
+        // Spawn blocking tasks to saturate default 512 max blocking pool threads
+        let mut handles = Vec::new();
+        for _ in 0..512 {
+            handles.push(tokio::task::spawn_blocking(|| {
+                std::thread::sleep(Duration::from_millis(150));
+            }));
+        }
+
+        // Wait for SystemPressureMonitor to detect blocking queue delay/saturation
+        let mut reacted = false;
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(2) {
+            if rx.changed().await.is_ok() {
+                let p = rx.borrow().clone();
+                if p.blocking_util > BLOCKING_UTIL_ELEVATED || p.pressure_level != PressureLevel::Normal {
+                    reacted = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            reacted,
+            "SystemPressureMonitor should react to simulated blocking pool saturation"
+        );
+
+        cancellation.cancel();
+        let _ = handle.await;
+        for h in handles {
+            let _ = h.await;
+        }
     }
 }
