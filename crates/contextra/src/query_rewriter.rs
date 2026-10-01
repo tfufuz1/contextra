@@ -4,7 +4,8 @@
 
 use contextra_core::error::Result;
 use contextra_db::QueryRewriter;
-use contextra_ports::{BoxFuture, LlmTextGenerator, ScoredEntry};
+use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::ScoredEntry;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -127,7 +128,7 @@ fn clean_line(line: &str) -> &str {
         return "";
     }
     s = s
-        .trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+'))
+        .trim_start_matches(['-', '*', '•', '+'])
         .trim();
     if s.starts_with('[') {
         if let Some(closing) = s.find(']') {
