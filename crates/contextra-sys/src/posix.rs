@@ -49,15 +49,15 @@ mod tests {
     use std::io::{Read, Write};
 
     #[test]
-    fn test_reopen_and_dup2() {
+    fn test_reopen_and_dup2() -> Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_posix_test_{}.bin",
             std::process::id()
         ));
         {
-            let mut file = File::create(&path).expect("create file");
-            file.write_all(b"posix dup2 test").expect("write");
+            let mut file = File::create(&path)?;
+            file.write_all(b"posix dup2 test")?;
         }
 
         #[cfg(target_os = "linux")]
@@ -66,18 +66,16 @@ mod tests {
                 "contextra_sys_posix_dummy_{}.bin",
                 std::process::id()
             ));
-            let target_file = File::create(&dummy_path).expect("create dummy");
+            let target_file = File::create(&dummy_path)?;
             use std::os::unix::io::AsRawFd;
             let target_fd = target_file.as_raw_fd();
-            reopen_and_dup2(&path, target_fd, libc::O_RDONLY).expect("reopen_and_dup2 failed");
+            reopen_and_dup2(&path, target_fd, libc::O_RDONLY)?;
             let mut buf = Vec::new();
             // SAFETY: target_fd is valid and open.
             let mut duped_file = unsafe {
                 <File as std::os::unix::io::FromRawFd>::from_raw_fd(libc::dup(target_fd))
             };
-            duped_file
-                .read_to_end(&mut buf)
-                .expect("read from duped fd");
+            duped_file.read_to_end(&mut buf)?;
             assert_eq!(&buf[..], b"posix dup2 test");
             let _ = std::fs::remove_file(dummy_path);
         }
@@ -89,5 +87,6 @@ mod tests {
         }
 
         let _ = std::fs::remove_file(path);
+        Ok(())
     }
 }
