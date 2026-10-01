@@ -61,3 +61,64 @@ fn test_b16_coarsening_prevents_false_negatives() {
 
     assert!(validator.validate(tx_ok, &rs_ok).is_ok());
 }
+
+#[test]
+fn test_long_lived_snapshot_pin_blocker_alarm() {
+    use contextra_mvcc::SnapshotRegistry;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    let registry = Arc::new(SnapshotRegistry::new());
+    let now = Instant::now();
+    let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
+
+    // Register a snapshot guard at past_350s (350s ago > DEFAULT_MAX_PIN_DURATION of 300s)
+    let _guard = registry.register_at(42, past_350s);
+
+    let validator = SequenceLogSsiValidator::new_with_bounds(10)
+        .with_snapshot_registry(registry.clone());
+
+    // Record keys to trigger coarsening check / diagnostic check
+    for i in 1..=10 {
+        let key = format!("data:{i:02}");
+        validator.record_commit_key(key.as_bytes(), 50 + i as u64);
+    }
+
+    // Query pruning blocker diagnostics at `now`
+    let blocker = validator
+        .diagnose_pruning_blocker_at(now)
+        .expect("pruning blocker info must be present");
+
+    assert_eq!(blocker.longest_active_snapshot_seq, Some(42));
+    assert!(blocker.longest_pin_duration.unwrap() >= Duration::from_secs(350));
+    assert!(
+        blocker.is_pin_expired,
+        "Snapshot active for 350s must be marked as expired pin"
+    );
+}
+
+#[test]
+fn test_fail_closed_snapshot_pruned_still_enforced_after_coarsening() {
+    let validator = SequenceLogSsiValidator::new_with_bounds(10);
+
+    // Commit keys to fill register
+    for i in 1..=10 {
+        let key = format!("item:{i:02}");
+        validator.record_commit_key(key.as_bytes(), 20);
+    }
+
+    // Prune up to sequence 15
+    validator.prune_through(15);
+    assert_eq!(validator.pruned_through(), 15);
+
+    // Try validating a transaction with snapshot_seq 10 (< pruned_through 15)
+    let tx = TxId::new(500);
+    let mut rs = ReadSet::new();
+    rs.record_read(b"item:01", 10);
+
+    let res = validator.validate(tx, &rs);
+    assert!(
+        res.is_err(),
+        "Fail-closed check failed: snapshot_seq 10 < pruned_through 15 MUST return conflict error"
+    );
+}
