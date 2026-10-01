@@ -123,7 +123,9 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         Ok(SignatureVersion::V3)
     );
     assert!(valid_v3_proof.verify(&keypair.verifying_key).unwrap());
-    assert!(valid_v3_proof.verify_external(&keypair.verifying_key).is_ok());
+    assert!(valid_v3_proof
+        .verify_external(&keypair.verifying_key)
+        .is_ok());
 
     // 2. Test that mutating signature_version to any unknown byte (0, 4, 128, 255)
     // causes immediate failure before signature validation is attempted.
