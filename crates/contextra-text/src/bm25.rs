@@ -144,6 +144,9 @@ impl FieldWeight {
 }
 
 /// BM25F field-weighted scoring model configuration (§11.3).
+///
+/// **Opt-in Feature Note**: BM25F field-weighted scoring requires the explicit Cargo feature
+/// `bm25f` and is strictly an opt-in model. It is not part of the default execution path or default features.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BM25F {
     pub k1: f32,

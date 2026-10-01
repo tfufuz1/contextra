@@ -4480,7 +4480,6 @@ zwangswert
 zwangung
 zwangvoll
 zwangwert
-
 [protected_terms]
 aemter
 akte

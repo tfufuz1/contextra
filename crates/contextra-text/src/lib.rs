@@ -10,6 +10,11 @@
 //!
 //! Evaluates Inverse Document Frequencies integrating natively into the
 //! `fusion.rs` layer in `contextra-db`.
+//!
+//! ## Scoring Models & Opt-in Features
+//! - **Standard BM25**: Default scoring algorithm used for keyword and morphological search.
+//! - **BM25F (Field-Weighted BM25)**: Opt-in field-weighted scoring model available via the
+//!   `bm25f` Cargo feature. BM25F is strictly opt-in and is not part of the default execution path.
 
 #![forbid(unsafe_code)]
 
