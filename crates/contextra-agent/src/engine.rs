@@ -468,29 +468,29 @@ impl OrchestratorEngine {
                     self.commit_step(ctx, &result).await?;
 
                     // 6. Resolve next edge
-                    let outgoing_edge = match self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
-                        Some(edge) => edge,
-                        None => {
-                            let err = ContextraError::Internal(format!("Dead end at node {}", ctx.current_node));
-                            self.audit_log_failure(ctx, &err.to_string()).await?;
-                            return Err(err);
-                        }
-                    };
-
-                    if let Some(ref cond_str) = outgoing_edge.condition {
-                        if let Some(goal_cond) = crate::goal_condition::parse_legacy_condition_string(cond_str) {
-                            if goal_cond.evaluate(&result) {
-                                if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
-                                    let checkpoint = scratchpad.checkpoint_and_reset()?;
-                                    tracing::info!(
-                                        task_id = %ctx.task_id,
-                                        completed_subgoal = checkpoint.completed_subgoal_index,
-                                        chunks_purged = checkpoint.purge_receipt.chunks_purged,
-                                        "CLM Scratchpad checkpointed and reset on goal condition match"
-                                    );
-                                    // TODO: Audit-Kopplung an contextra-privacy::context_edit_audit, siehe ADR-106
-                                }
+                    let outgoing_edge =
+                        match self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
+                            Some(edge) => edge,
+                            None => {
+                                let err = ContextraError::Internal(format!(
+                                    "Dead end at node {}",
+                                    ctx.current_node
+                                ));
+                                self.audit_log_failure(ctx, &err.to_string()).await?;
+                                return Err(err);
                             }
+                        };
+
+                    if outgoing_edge.has_condition() && outgoing_edge.evaluate_condition(&result) {
+                        if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
+                            let checkpoint = scratchpad.checkpoint_and_reset()?;
+                            tracing::info!(
+                                task_id = %ctx.task_id,
+                                completed_subgoal = checkpoint.completed_subgoal_index,
+                                chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                                "CLM Scratchpad checkpointed and reset on goal condition match"
+                            );
+                            ctx.latest_scratchpad_checkpoint = Some(checkpoint);
                         }
                     }
 
@@ -802,12 +802,7 @@ impl OrchestratorEngine {
     ) -> Result<String> {
         self.resolve_outgoing_edge(graph, current_node, result)
             .map(|e| e.to.clone())
-            .ok_or_else(|| {
-                ContextraError::Internal(format!(
-                    "Dead end at node {}",
-                    current_node
-                ))
-            })
+            .ok_or_else(|| ContextraError::Internal(format!("Dead end at node {}", current_node)))
     }
 
     fn evaluate_decision(

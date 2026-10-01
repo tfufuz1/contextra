@@ -20,7 +20,7 @@ test-utils = []
 contextra-types      = { workspace = true }
 contextra-ports      = { workspace = true }
 bytes = { workspace = true }
-contextra-db         = { workspace = true }
+contextra-db         = { workspace = true, features = ["volatile-vault"] }
 contextra-graph      = { workspace = true }
 contextra-checkpoint = { workspace = true }
 contextra-store      = { workspace = true }
