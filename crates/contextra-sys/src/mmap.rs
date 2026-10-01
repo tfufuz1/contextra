@@ -20,20 +20,20 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    fn test_mmap_readonly() {
+    fn test_mmap_readonly() -> Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_mmap_test_{}.bin",
             std::process::id()
         ));
         {
-            let mut file = File::create(&path).expect("failed to create temp file");
-            file.write_all(b"contextra mmap readonly test payload")
-                .expect("failed to write payload");
+            let mut file = File::create(&path)?;
+            file.write_all(b"contextra mmap readonly test payload")?;
         }
-        let file = File::open(&path).expect("failed to open temp file");
-        let mmap = mmap_readonly(&file).expect("mmap_readonly failed");
+        let file = File::open(&path)?;
+        let mmap = mmap_readonly(&file)?;
         assert_eq!(&mmap[..], b"contextra mmap readonly test payload");
         let _ = std::fs::remove_file(path);
+        Ok(())
     }
 }
