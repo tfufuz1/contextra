@@ -21,5 +21,5 @@ pub mod tx_buffer;
 
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
-pub use ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
+pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tx_buffer::{IndexOp, TxBuffer};
