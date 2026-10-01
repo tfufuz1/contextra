@@ -4,7 +4,7 @@
 //! and provides LLM validation before candidates are committed via `relate_n_ary`.
 
 use crate::error::GraphMutationError;
-use contextra_ports::TextGenerator;
+use contextra_ports::LlmTextGenerator;
 use contextra_types::{DocId, EntityId};
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -102,7 +102,7 @@ pub fn compute_co_occurrence_candidates(
     candidates
 }
 
-/// Validates hyperedge candidates using an LLM text generator.
+/// Validates hyperedge candidates using an [`LlmTextGenerator`].
 ///
 /// For each candidate (up to `max_llm_calls_per_cycle`), queries the LLM to confirm
 /// if the joint occurrence implies a semantically meaningful relation and suggest a predicate.
@@ -113,7 +113,7 @@ pub fn compute_co_occurrence_candidates(
 pub async fn validate_candidates_with_llm(
     candidates: &[HyperEdgeCandidate],
     entity_labels: &dyn Fn(EntityId) -> Option<String>,
-    generator: &dyn TextGenerator,
+    generator: &dyn LlmTextGenerator,
     max_llm_calls_per_cycle: usize,
 ) -> Result<Vec<ValidatedHyperEdgeCandidate>, GraphMutationError> {
     if candidates.len() > max_llm_calls_per_cycle {
@@ -139,7 +139,7 @@ pub async fn validate_candidates_with_llm(
         );
 
         let response = generator
-            .generate_text(&prompt)
+            .generate(&prompt)
             .await
             .map_err(|e| GraphMutationError::Internal(e.to_string()))?;
 
