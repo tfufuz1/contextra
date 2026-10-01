@@ -10,7 +10,6 @@
 
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-use crate::revocation_log::{RevocationLog, RevocationTarget};
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
