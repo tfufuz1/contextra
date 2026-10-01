@@ -11,8 +11,9 @@ use crate::pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS,
 };
 use crate::{Collection, SearchResult};
-use contextra_ports::{BoxFuture, StorageEngine};
-use contextra_types::Result;
+pub use contextra_ports::QueryRewriter;
+use contextra_ports::{QueryRewriteOutput, StorageEngine, TextEmbeddingEngine};
+use contextra_types::{EntityId, Result, ScoredEntry};
 use std::sync::Arc;
 
 /// Konfiguration für Multi-Step Retrieval.
@@ -40,17 +41,18 @@ impl Default for MultiStepConfig {
 }
 
 /// Ergebnis einer Multi-Step-Suche mit Audit-Informationen.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MultiStepResult {
     pub results: Vec<SearchResult>,
     /// Anzahl der tatsächlich durchgeführten Runden.
     pub rounds_executed: usize,
     /// Queries die in den Folgerunden verwendet wurden.
     pub sub_queries: Vec<String>,
+    /// Multi-signal query reformulations generated in rounds 2..N.
+    pub sub_rewrites: Vec<QueryRewriteOutput>,
+    /// Dense vector embeddings computed for semantic sub-queries in rounds 2..N.
+    pub sub_vectors: Vec<Vec<f32>>,
 }
-
-// ANCHOR[MULTISTEP:QUERY-REWRITER] STATUS:DONE (TS:2026-06-01T00:00:00Z) — External QueryRewriter trait contract and error isolation.
-// TRACKING-ISSUE: #142 (Ollama / LLM-based QueryRewriter implementation in contextra-ollama crate)
 
 /// Multi-Step Retrieval Engine.
 ///
@@ -60,20 +62,6 @@ pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
     pid_controller: parking_lot::Mutex<PidLatencyController>,
-}
-
-/// Trait für Query-Rewriting (LLM-agnostisch).
-pub trait QueryRewriter: Send + Sync {
-    /// Generiert alternative Teil-Queries basierend auf bisherigen Ergebnissen.
-    ///
-    /// `original_query` – die ursprüngliche Anfrage
-    /// `current_results` – bisherige Ergebnisse (leer bei erstem Aufruf)
-    /// Gibt leeren Vec zurück wenn kein Rewriting nötig.
-    fn rewrite<'a>(
-        &'a self,
-        original_query: &'a str,
-        current_results: &'a [SearchResult],
-    ) -> BoxFuture<'a, Result<Vec<String>>>;
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
@@ -108,7 +96,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         let k = k.min(contextra_types::MAX_SEARCH_K);
         let current_k = k;
         let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
-        let mut sub_queries: Vec<String> = Vec::new();
+        let sub_queries: Vec<String> = Vec::new();
         let mut rounds_executed = 0;
         let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
 
@@ -132,10 +120,96 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 results: fused,
                 rounds_executed,
                 sub_queries,
+                sub_rewrites: Vec::new(),
+                sub_vectors: Vec::new(),
             });
         }
 
-        // Runde 2–max_rounds: Query-Rewriting
+        self.search_internal(
+            original_query,
+            vector,
+            k,
+            rewriter,
+            None,
+            all_result_sets,
+            sub_queries,
+            rounds_executed,
+            budget_guard,
+        )
+        .await
+    }
+
+    /// Führt iterative multi-signale Hybrid-Suche mit Embedder für semantische Sub-Queries durch.
+    pub async fn search_with_embedder(
+        &self,
+        original_query: &str,
+        vector: &[f32],
+        k: usize,
+        rewriter: Option<&dyn QueryRewriter>,
+        embedder: Option<&dyn TextEmbeddingEngine>,
+    ) -> Result<MultiStepResult> {
+        use crate::fusion::reciprocal_rank_fusion;
+
+        let k = k.min(contextra_types::MAX_SEARCH_K);
+        let current_k = k;
+        let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
+        let sub_queries: Vec<String> = Vec::new();
+        let mut rounds_executed = 0;
+        let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
+
+        // Runde 1: Standard-Suche
+        let round1 = self
+            .collection
+            .query()
+            .text(original_query)
+            .vector(vector)
+            .k(current_k * 2)
+            .execute()
+            .await?;
+        all_result_sets.push(round1);
+        rounds_executed += 1;
+
+        let round1_ref = all_result_sets.first().map(|v| v.as_slice()).unwrap_or(&[]);
+        if self.quality_sufficient(round1_ref) || rewriter.is_none() {
+            let fused = reciprocal_rank_fusion(all_result_sets, k);
+            return Ok(MultiStepResult {
+                results: fused,
+                rounds_executed,
+                sub_queries,
+                sub_rewrites: Vec::new(),
+                sub_vectors: Vec::new(),
+            });
+        }
+
+        self.search_internal(
+            original_query,
+            vector,
+            k,
+            rewriter,
+            embedder,
+            all_result_sets,
+            sub_queries,
+            rounds_executed,
+            budget_guard,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn search_internal(
+        &self,
+        original_query: &str,
+        original_vector: &[f32],
+        k: usize,
+        rewriter: Option<&dyn QueryRewriter>,
+        embedder: Option<&dyn TextEmbeddingEngine>,
+        mut all_result_sets: Vec<Vec<SearchResult>>,
+        mut sub_queries: Vec<String>,
+        mut rounds_executed: usize,
+        budget_guard: LatencyBudgetGuard,
+    ) -> Result<MultiStepResult> {
+        use crate::fusion::reciprocal_rank_fusion;
+
         let rewriter = match rewriter {
             Some(r) => r,
             None => {
@@ -144,17 +218,16 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                     results: fused,
                     rounds_executed,
                     sub_queries,
+                    sub_rewrites: Vec::new(),
+                    sub_vectors: Vec::new(),
                 });
             }
         };
 
-        // Note on result set ownership:
-        // `all_result_sets` owns historical result sets directly (moved without cloning).
-        // `quality_sufficient` and `rewriter.rewrite` receive borrowed slices `&[SearchResult]`.
-        // If SearchResult metadata structures (serde_json::Value) grow large in future extensions,
-        // using `Arc<SearchResult>` will further optimize internal fusion moves.
+        let mut sub_rewrites = Vec::new();
+        let mut sub_vectors = Vec::new();
+
         for _round in 2..=self.config.max_rounds {
-            // Budget-Guard Check: Hart aber panic-frei abbrechen bei Budget-Überschreitung
             if budget_guard.is_exceeded() {
                 tracing::info!(
                     elapsed_ms = budget_guard.elapsed_ms(),
@@ -164,7 +237,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 break;
             }
 
-            // PID-Latenzregler: Skalierung von k_pool für Folgerunden basierend auf gemessener Latenz
             let scaling_factor = self
                 .pid_controller
                 .lock()
@@ -173,47 +245,115 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             let scaled_k = scaled_k.max(1);
 
             let current_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
-            let sub_qs = match rewriter.rewrite(original_query, current_results).await {
-                Ok(qs) => qs,
-                Err(e) => {
+            let scored_entries: Vec<ScoredEntry> = current_results
+                .iter()
+                .map(|r| ScoredEntry {
+                    id: r.id.clone(),
+                    final_score: r.score,
+                    metadata: r.metadata.clone(),
+                })
+                .collect();
+
+            let remaining_ms = (self.config.latency_budget_ms - budget_guard.elapsed_ms()).max(0.0);
+            let remaining_dur = std::time::Duration::from_secs_f64(remaining_ms / 1000.0);
+
+            let rewrite_outputs = match tokio::time::timeout(
+                remaining_dur,
+                rewriter.rewrite_structured(original_query, &scored_entries),
+            )
+            .await
+            {
+                Ok(Ok(outputs)) => outputs,
+                Ok(Err(e)) => {
                     tracing::warn!(
                         error = %e,
-                        "QueryRewriter.rewrite() failed in round; stopping expansion gracefully"
+                        "QueryRewriter.rewrite_structured() failed in round; stopping expansion gracefully"
+                    );
+                    break;
+                }
+                Err(_) => {
+                    tracing::info!(
+                        elapsed_ms = budget_guard.elapsed_ms(),
+                        "QueryRewriter timed out under latency budget guard; stopping expansion gracefully"
                     );
                     break;
                 }
             };
 
-            if sub_qs.is_empty() {
+            if rewrite_outputs.is_empty() || rewrite_outputs.iter().all(|o| o.is_empty()) {
                 break;
             }
 
             let mut executed_sub_query = false;
-            for sub_q in &sub_qs {
-                // Sub-queries use BM25-only (empty vector slice) because:
-                // 1. Sub-queries are textual reformulations, not semantic shifts
-                // 2. Generating sub-query embeddings requires an embedder dependency
-                // 3. The original vector contributes via Round-1 results in RRF fusion
-                // ANCHOR[MULTISTEP:SUBQUERY-EMBEDDING] STATUS:DONE (TS:2026-06-01T00:00:00Z) — See TRACKING-ISSUE #143 for
-                // future improvement: inject TextEmbeddingEngine for sub-query vectors.
-                match self
-                    .collection
-                    .query()
-                    .text(sub_q)
-                    .k(scaled_k)
-                    .execute()
-                    .await
-                {
+
+            for output in rewrite_outputs {
+                if output.is_empty() {
+                    continue;
+                }
+
+                sub_rewrites.push(output.clone());
+
+                let mut builder = self.collection.query().k(scaled_k);
+
+                // Text query (BM25)
+                let text_q = output
+                    .text_query
+                    .as_deref()
+                    .unwrap_or(original_query);
+                builder = builder.text(text_q);
+                sub_queries.push(text_q.to_string());
+
+                // Semantic query (Dense Vector)
+                let sub_vec = if let Some(sem_q) = &output.semantic_query {
+                    if let Some(emb) = embedder {
+                        match emb.embed(sem_q).await {
+                            Ok(v) => {
+                                sub_vectors.push(v.clone());
+                                Some(v)
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    semantic_query = %sem_q,
+                                    error = %e,
+                                    "Failed to re-embed semantic sub-query; falling back to original vector"
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(ref v) = sub_vec {
+                    builder = builder.vector(v);
+                } else {
+                    builder = builder.vector(original_vector);
+                }
+
+                // Graph anchors
+                if !output.anchor_entities.is_empty() {
+                    let anchor_ids: Vec<EntityId> = output
+                        .anchor_entities
+                        .iter()
+                        .filter_map(|e| EntityId::from_key(e).ok())
+                        .collect();
+                    if !anchor_ids.is_empty() {
+                        builder = builder.anchor_entities(anchor_ids);
+                    }
+                }
+
+                match builder.execute().await {
                     Ok(sub_results) => {
                         all_result_sets.push(sub_results);
-                        sub_queries.push(sub_q.clone());
                         executed_sub_query = true;
                     }
                     Err(e) => {
                         tracing::warn!(
-                            sub_query = %sub_q,
                             error = %e,
-                            "Sub-query search failed in multi-step execution; skipping sub-query"
+                            "Multi-signal sub-query search failed; skipping"
                         );
                     }
                 }
@@ -234,6 +374,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             results: fused,
             rounds_executed,
             sub_queries,
+            sub_rewrites,
+            sub_vectors,
         })
     }
 
@@ -255,6 +397,8 @@ mod tests {
     use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
+    use contextra_ports::BoxFuture;
+
     struct DummyRewriter {
         responses: std::sync::Mutex<Vec<Vec<String>>>,
     }
@@ -263,7 +407,7 @@ mod tests {
         fn rewrite<'a>(
             &'a self,
             _original_query: &'a str,
-            _current_results: &'a [SearchResult],
+            _current_results: &'a [ScoredEntry],
         ) -> BoxFuture<'a, Result<Vec<String>>> {
             Box::pin(async move {
                 let mut guard = self.responses.lock().unwrap(); // unwrap
@@ -434,7 +578,7 @@ mod tests {
         fn rewrite<'a>(
             &'a self,
             _original_query: &'a str,
-            _current_results: &'a [SearchResult],
+            _current_results: &'a [ScoredEntry],
         ) -> BoxFuture<'a, Result<Vec<String>>> {
             Box::pin(async move {
                 Err(contextra_types::ContextraError::Internal(
@@ -516,7 +660,7 @@ mod tests {
         fn rewrite<'a>(
             &'a self,
             _original_query: &'a str,
-            _current_results: &'a [SearchResult],
+            _current_results: &'a [ScoredEntry],
         ) -> BoxFuture<'a, Result<Vec<String>>> {
             Box::pin(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(20)).await;
@@ -550,7 +694,7 @@ mod tests {
             .await
             .expect("search should succeed with partial results under budget exhaustion");
 
-        assert_eq!(result.rounds_executed, 2); // Round 1 executed, round 2 rewriter took 20ms (> 10ms budget), so round 3 loop check stops further expansion
+        assert_eq!(result.rounds_executed, 1); // Round 1 executed, round 2 rewriter timed out under 10ms budget, so expansion stopped gracefully
         assert!(!result.results.is_empty());
     }
 
