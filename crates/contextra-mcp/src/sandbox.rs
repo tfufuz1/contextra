@@ -30,6 +30,26 @@ pub struct ToolDefinition {
 }
 
 /// Single Source of Truth für MCP-Tool-Registrierung, Discovery (`tools/list`) und -Klassifizierung.
+///
+/// ## Tool-Kategorie-Tabelle
+///
+/// | Werkzeug | Kategorie | Beschreibung |
+/// |---|---|---|
+/// | `contextra_search` | `DatabaseRead` | Hybrid semantic search over stored documents |
+/// | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
+/// | `contextra_collections` | `DatabaseRead` | List all collections |
+/// | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
+/// | `contextra_plugin_status` | `DatabaseRead` | Active plugin status & rings |
+/// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
+/// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
+/// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
+/// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
+/// | `contextra_relate` | `DatabaseWrite` | Create directed/bidirectional binary relationship |
+/// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
+/// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
+/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+/// | `contextra_consolidate` | `DatabaseWrite` | Trigger synchronous memory consolidation pass |
+/// | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -337,11 +357,7 @@ pub struct McpSandbox {
 impl McpSandbox {
     /// Erstellt eine neue Sandbox-Instanz mit frischem Sitzungsschlüssel.
     pub fn new(policy: SandboxPolicy) -> Result<Self> {
-        use rand::RngCore;
-        let mut salt = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut salt);
-        let mut passphrase = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut passphrase);
+        let (salt, passphrase) = generate_sandbox_crypto_material();
         let key =
             contextra_crypto::CryptoKey::try_new(&hex::encode(passphrase), &salt).map_err(|e| {
                 ContextraError::Internal(format!(
@@ -427,8 +443,12 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     /// Falls die Methode unbekannt ist, wird als Fallback `ToolCategory::CodeExecution` zurückgegeben.
     ///
-    /// HINWEIS: Neuer Code sollte `try_classify_method` nutzen, um unbekannte Tools
-    /// direkt als Fehler behandeln zu können.
+    /// HINWEIS: Neuer Code MUSS `try_classify_method` nutzen, um unbekannte Tools
+    /// direkt als Fehler zu behandeln. Dieser Fallback auf `CodeExecution` gilt ausschließlich
+    /// für nicht registrierte, unbekannte Methoden in Abwärtskompatibilitäts-Aufrufen.
+    #[deprecated(
+        note = "Use try_classify_method for strict classification with error handling on unknown tools."
+    )]
     pub fn classify_method(method: &str) -> ToolCategory {
         Self::try_classify_method(method).unwrap_or(ToolCategory::CodeExecution)
     }
@@ -499,6 +519,19 @@ impl Drop for McpSandbox {
     }
 }
 
+/// Generiert Zufallsmaterial für die Sandbox-Sitzungsverschlüsselung.
+/// P28-Ausnahme: kryptografisches Material
+fn generate_sandbox_crypto_material() -> ([u8; 32], [u8; 32]) {
+    use rand::RngCore;
+    // P28-Ausnahme: kryptografisches Material
+    let mut salt = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut salt);
+    // P28-Ausnahme: kryptografisches Material
+    let mut passphrase = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut passphrase);
+    (salt, passphrase)
+}
+
 // simple hex encoder helper to avoid external crate dependency overhead if needed, or use std formatting
 mod hex {
     pub fn encode(bytes: [u8; 32]) -> String {
@@ -517,11 +550,11 @@ mod tests {
     fn test_cloud_egress_classification_and_policy() {
         // 1. Classification check
         assert_eq!(
-            McpSandbox::classify_method("contextra_cloud_query"),
+            McpSandbox::try_classify_method("contextra_cloud_query").unwrap(),
             ToolCategory::CloudEgress
         );
         assert_eq!(
-            McpSandbox::classify_method("contextra_search"),
+            McpSandbox::try_classify_method("contextra_search").unwrap(),
             ToolCategory::DatabaseRead
         );
 
@@ -552,7 +585,14 @@ mod tests {
     /// Deckt R-01 ab: Schreibzugriff ist im Default gesperrt (Read-Only Safety Policy).
     #[test]
     fn test_sandbox_default_policy() {
-        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
+        let default_policy = SandboxPolicy::default();
+        assert!(default_policy.allow_db_reads);
+        assert!(!default_policy.allow_db_writes);
+        assert!(!default_policy.allow_code_execution);
+        assert!(!default_policy.allow_cloud_egress);
+        assert_eq!(default_policy.max_execution_ms, 5_000);
+
+        let sandbox = McpSandbox::new(default_policy).unwrap(); // unwrap
 
         assert!(sandbox
             .validate_tool_call("contextra_search", &Value::Null)
@@ -728,7 +768,7 @@ mod tests {
         for tool in TOOL_REGISTRY {
             let name = tool.name;
             let expected_cat = &tool.category;
-            let cat = McpSandbox::classify_method(name);
+            let cat = McpSandbox::try_classify_method(name).expect("known tool in registry");
             assert_ne!(
                 cat,
                 ToolCategory::CodeExecution,
@@ -739,18 +779,19 @@ mod tests {
 
         // Assert explain is DatabaseRead
         assert_eq!(
-            McpSandbox::classify_method("contextra_explain"),
+            McpSandbox::try_classify_method("contextra_explain").unwrap(),
             ToolCategory::DatabaseRead
         );
 
         // Assert consolidate is DatabaseWrite
         assert_eq!(
-            McpSandbox::classify_method("contextra_consolidate"),
+            McpSandbox::try_classify_method("contextra_consolidate").unwrap(),
             ToolCategory::DatabaseWrite
         );
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_try_classify_method_and_unknown_tool_rejection() {
         // 5a. Jedes Tool aus TOOL_REGISTRY liefert Ok aus try_classify_method und dieselbe Kategorie wie classify_method
         for tool in TOOL_REGISTRY {
@@ -777,7 +818,30 @@ mod tests {
         assert!(err.is_err());
         assert!(err.unwrap_err().to_string().contains("unknown tool"));
 
-        // 5d. contextra_explain läuft weiterhin unter SandboxPolicy::default()
+        // 5d. Explicit assertion: validate_tool_call rejects unknown tools even when allow_code_execution = true
+        let permissive_code_exec_policy = SandboxPolicy {
+            allow_db_reads: false,
+            allow_db_writes: false,
+            allow_code_execution: true, // code execution explicitly enabled!
+            allow_cloud_egress: false,
+            max_execution_ms: 5_000,
+        };
+        let permissive_sandbox = McpSandbox::new(permissive_code_exec_policy).unwrap();
+        let code_exec_err =
+            permissive_sandbox.validate_tool_call("unlisted_malicious_eval", &Value::Null);
+        assert!(
+            code_exec_err.is_err(),
+            "Unknown tool must be rejected even when allow_code_execution is true"
+        );
+        assert!(
+            code_exec_err
+                .unwrap_err()
+                .to_string()
+                .contains("unknown tool"),
+            "Error message must indicate unknown tool"
+        );
+
+        // 5e. contextra_explain läuft weiterhin unter SandboxPolicy::default()
         let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap();
         assert!(default_sandbox
             .validate_tool_call("contextra_explain", &Value::Null)
@@ -785,6 +849,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_unknown_method_classifies_as_code_execution() {
         // Unknown method -> CodeExecution (legacy classify_method fallback)
         assert_eq!(
