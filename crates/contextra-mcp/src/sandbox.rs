@@ -507,6 +507,7 @@ mod hex {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -605,7 +606,7 @@ mod tests {
             .validate_tool_call("contextra_forget", &Value::Null)
             .is_ok());
         assert!(sandbox
-            .validate_tool_call("some_custom_tool", &Value::Null)
+            .validate_tool_call("contextra_create_collection", &Value::Null)
             .is_ok());
     }
 

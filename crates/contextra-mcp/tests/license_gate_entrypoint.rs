@@ -4,6 +4,8 @@
 // variable (CONTEXTRA_*) can activate a higher feature ring (Sovereign or Compliance).
 // Furthermore, DeletionProof active mode is strictly disabled in Fast-Ring.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra::Contextra;
 use contextra_mcp::{protocol::JsonRpcRequest, McpServer};
 use contextra_ports::license::FeatureRing;
