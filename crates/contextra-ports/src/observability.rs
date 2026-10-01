@@ -2,13 +2,10 @@
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
-// ZWECK: Observability-Modul für Memory-Lifecycle und Grounding-Validierung.
-// INVARIANTEN: Re-exportiert primäre Lifecycle & Grounding Trait-Definitionen aus `lifecycle`.
+// ZWECK: Observability-Modul für Grounding-Validierung.
+// INVARIANTEN: Re-exportiert primäre Grounding Trait-Definitionen aus `lifecycle`.
 
-pub use super::lifecycle::{
-    ConsolidationAction, GroundingAssessment, GroundingValidator, LifecycleSweepReport,
-    MemoryLifecycleManager, ResponseGroundingValidator,
-};
+pub use super::lifecycle::{GroundingAssessment, GroundingValidator, ResponseGroundingValidator};
 
 /// Trait for querying Lyapunov drift status from an attached router engine without creating a cyclic dependency (ADR-080).
 pub trait DriftStatusProvider: Send + Sync {
