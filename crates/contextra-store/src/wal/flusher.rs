@@ -5,6 +5,8 @@ use tokio::io::AsyncWriteExt;
 
 use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
+static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 pub(crate) enum WalCommand {
     Append {
         payload: Vec<u8>,
@@ -400,14 +402,12 @@ impl Wal {
                                 ))
                             })?;
 
-                            let micros = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_micros();
+                            let seq = WAL_SEAL_COUNTER
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let sealed_name = format!(
                                 "{}.sealed.{}",
                                 path.file_name().and_then(|n| n.to_str()).unwrap_or("wal"),
-                                micros
+                                seq
                             );
                             let sealed_path = path.with_file_name(sealed_name);
 

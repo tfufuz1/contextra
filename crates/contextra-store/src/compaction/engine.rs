@@ -6,6 +6,8 @@ use crate::wal::KeyManager;
 use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
+
+static COMPACTION_SST_COUNTER: AtomicU64 = AtomicU64::new(1);
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing;
@@ -805,18 +807,13 @@ impl CompactionEngine {
         Ok(())
     }
 
-    /// Generates a unique SSTable file path using microsecond timestamp.
-    pub(super) fn generate_sst_path(&self, data_path: &std::path::Path) -> Result<PathBuf> {
-        let id = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| {
-                contextra_core::ContextraError::Storage(format!("System clock error: {}", e))
-            })?
-            .as_micros();
+    /// Generates a unique SSTable file path using a monotonic counter.
+    pub fn generate_sst_path(&self, data_path: &std::path::Path) -> Result<PathBuf> {
+        let seq = COMPACTION_SST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let count = self
             .compaction_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Ok(data_path.join(format!("sst-compact-{:020}-{:04}.sst", id, count % 10000)))
+        Ok(data_path.join(format!("sst-compact-{:020}-{:04}.sst", seq, count % 10000)))
     }
 
     /// Runs the background compaction loop.
