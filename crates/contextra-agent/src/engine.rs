@@ -468,14 +468,33 @@ impl OrchestratorEngine {
                     self.commit_step(ctx, &result).await?;
 
                     // 6. Resolve next edge
-                    let next_node = match self.resolve_next_node(graph, &ctx.current_node, &result)
-                    {
-                        Ok(next) => next,
-                        Err(err) => {
+                    let outgoing_edge = match self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
+                        Some(edge) => edge,
+                        None => {
+                            let err = ContextraError::Internal(format!("Dead end at node {}", ctx.current_node));
                             self.audit_log_failure(ctx, &err.to_string()).await?;
                             return Err(err);
                         }
                     };
+
+                    if let Some(ref cond_str) = outgoing_edge.condition {
+                        if let Some(goal_cond) = crate::goal_condition::parse_legacy_condition_string(cond_str) {
+                            if goal_cond.evaluate(&result) {
+                                if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
+                                    let checkpoint = scratchpad.checkpoint_and_reset()?;
+                                    tracing::info!(
+                                        task_id = %ctx.task_id,
+                                        completed_subgoal = checkpoint.completed_subgoal_index,
+                                        chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                                        "CLM Scratchpad checkpointed and reset on goal condition match"
+                                    );
+                                    // TODO: Audit-Kopplung an contextra-privacy::context_edit_audit, siehe ADR-106
+                                }
+                            }
+                        }
+                    }
+
+                    let next_node = self.resolve_next_node(graph, &ctx.current_node, &result)?;
                     ctx.current_node = next_node;
                     ctx.step_count += 1;
 
@@ -750,12 +769,12 @@ impl OrchestratorEngine {
         ctx.state_collection.put_kv(&final_id, &metadata).await
     }
 
-    fn resolve_next_node(
+    fn resolve_outgoing_edge<'a>(
         &self,
-        graph: &StateGraph,
+        graph: &'a StateGraph,
         current_node: &str,
         result: &StepResult,
-    ) -> Result<String> {
+    ) -> Option<&'a crate::graph::WorkflowEdge> {
         let edges = graph
             .edges
             .iter()
@@ -763,24 +782,32 @@ impl OrchestratorEngine {
             .collect::<Vec<_>>();
 
         if edges.is_empty() {
-            return Err(ContextraError::Internal(format!(
-                "Dead end at node {}",
-                current_node
-            )));
+            return None;
         }
 
         if let Some(ref forced_next) = result.next_edge {
-            if edges.iter().any(|e| &e.to == forced_next) {
-                return Ok(forced_next.to_string());
+            if let Some(edge) = edges.iter().find(|e| &e.to == forced_next) {
+                return Some(edge);
             }
         }
 
-        // Default to highest priority
-        let edge = edges
-            .iter()
-            .max_by_key(|e| e.priority)
-            .ok_or_else(|| ContextraError::Internal("No edges found".to_string()))?;
-        Ok(edge.to.to_string())
+        edges.into_iter().max_by_key(|e| e.priority)
+    }
+
+    fn resolve_next_node(
+        &self,
+        graph: &StateGraph,
+        current_node: &str,
+        result: &StepResult,
+    ) -> Result<String> {
+        self.resolve_outgoing_edge(graph, current_node, result)
+            .map(|e| e.to.clone())
+            .ok_or_else(|| {
+                ContextraError::Internal(format!(
+                    "Dead end at node {}",
+                    current_node
+                ))
+            })
     }
 
     fn evaluate_decision(
