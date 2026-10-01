@@ -51,6 +51,11 @@ impl TenantState {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
 
+    /// Mutabler Zugriff auf ein Segment mit LRU-Update.
+    #[cfg(feature = "kv-encryption")]
+    fn get_segment_ref_mut(&mut self, id: u64) -> Option<&mut KvSegment> {
+        self.cache.get_mut(&id)
+    }
 
     /// O(1) entfernen. Gibt das Segment zurück (ZeroizeOnDrop beim Caller).
     fn remove(&mut self, id: u64) -> Option<KvSegment> {
