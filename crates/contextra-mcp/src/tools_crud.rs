@@ -120,7 +120,9 @@ impl McpServer {
             ));
         }
 
-        let proof_key = crate::proof_key::deletion_proof_key_from_env()?;
+        let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
+            .key
+            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
 
         let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
 
@@ -199,7 +201,8 @@ impl McpServer {
                 .map_err(|e| McpError::internal_error(e.to_string()))?,
         ];
 
-        let proof_key = crate::proof_key::deletion_proof_key_from_env().unwrap_or_else(|_| {
+        let proof_key_res = crate::proof_key_env::resolve_proof_key_from_env();
+        let proof_key = proof_key_res.key.unwrap_or_else(|| {
             zeroize::Zeroizing::new("default_test_deletion_proof_key_32_bytes!".to_string())
         });
         let trimmed_key = proof_key.trim();
