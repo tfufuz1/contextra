@@ -134,10 +134,7 @@ pub fn run_postmortem(args: &[String]) -> i32 {
                 })
             );
         } else {
-            println!(
-                "Neues Postmortem erfolgreich angelegt: docs/postmortems/{}",
-                file_name
-            );
+            println!("Neues Postmortem erfolgreich angelegt: docs/postmortems/{}", file_name);
         }
         return 0;
     }
@@ -249,11 +246,7 @@ pub fn run_postmortem(args: &[String]) -> i32 {
         } else {
             eprintln!("VERSTOß: Postmortem-Prüfung fehlgeschlagen:");
             for f in &findings {
-                eprintln!(
-                    " - {}: {}",
-                    f.get("id").and_then(|v| v.as_str()).unwrap_or(""),
-                    f.get("message").and_then(|v| v.as_str()).unwrap_or("")
-                );
+                eprintln!(" - {}: {}", f.get("id").and_then(|v| v.as_str()).unwrap_or(""), f.get("message").and_then(|v| v.as_str()).unwrap_or(""));
             }
         }
         1

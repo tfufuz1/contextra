@@ -302,7 +302,11 @@ impl Manifest {
                     valid_map.remove(&key);
                 }
                 ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
-                ManifestEntry::Replace { removed, added, .. } => {
+                ManifestEntry::Replace {
+                    removed,
+                    added,
+                    ..
+                } => {
                     for p in removed {
                         let key = p
                             .file_name()

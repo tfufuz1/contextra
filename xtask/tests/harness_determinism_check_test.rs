@@ -29,16 +29,8 @@ path = "crates/contextra-store"
     let crate_dir = root.join("crates/contextra-store/src");
     fs::create_dir_all(&crate_dir).unwrap();
 
-    fs::write(
-        crate_dir.join("clean.rs"),
-        "pub fn add(a: i32, b: i32) -> i32 { a + b }\n",
-    )
-    .unwrap();
-    fs::write(
-        crate_dir.join("dirty.rs"),
-        "pub fn now() { let _ = std::time::SystemTime::now(); }\n",
-    )
-    .unwrap();
+    fs::write(crate_dir.join("clean.rs"), "pub fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
+    fs::write(crate_dir.join("dirty.rs"), "pub fn now() { let _ = std::time::SystemTime::now(); }\n").unwrap();
 
     let args = vec![
         "--root".to_string(),

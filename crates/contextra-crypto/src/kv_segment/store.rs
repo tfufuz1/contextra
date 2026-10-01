@@ -51,6 +51,7 @@ impl TenantState {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
 
+
     /// O(1) entfernen. Gibt das Segment zurück (ZeroizeOnDrop beim Caller).
     fn remove(&mut self, id: u64) -> Option<KvSegment> {
         let seg = self.cache.pop(&id)?;

@@ -13,7 +13,7 @@ on:
       - 'crates/contextra-crypto/**'
       - 'crates/contextra-store/**'
       - 'crates/contextra-candle/**'
-      - 'crates/contextra-db/**'
+      - 'crates/contextra-engine/**'
       - 'crates/contextra-vector/**'
       - 'crates/contextra-text/**'
       - 'crates/contextra-graph/**'
@@ -60,8 +60,8 @@ jobs:
             if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-candle/'; then
               CRATES="$CRATES contextra-candle"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-db/'; then
-              CRATES="$CRATES contextra-db"
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-engine/'; then
+              CRATES="$CRATES contextra-engine"
             fi
             if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-vector/'; then
               CRATES="$CRATES contextra-vector"

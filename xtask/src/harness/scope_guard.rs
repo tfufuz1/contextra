@@ -85,8 +85,7 @@ pub fn scope_guard_resolve_card_path(root: &Path, id_or_path: &str) -> PathBuf {
     if id_or_path.ends_with(".toml") {
         root.join(id_or_path)
     } else {
-        root.join(".jules/tasks")
-            .join(format!("{}.toml", id_or_path))
+        root.join(".jules/tasks").join(format!("{}.toml", id_or_path))
     }
 }
 
@@ -202,9 +201,7 @@ pub fn run_scope_guard(args: &[String]) -> i32 {
                         file: "".to_string(),
                         line: 0,
                         message: "Keine Task-Karte gefunden".to_string(),
-                        fix:
-                            "Task-Karte in .jules/tasks/ hinterlegen oder Task-Card Trailer angeben"
-                                .to_string(),
+                        fix: "Task-Karte in .jules/tasks/ hinterlegen oder Task-Card Trailer angeben".to_string(),
                     }],
                 };
                 return scope_guard_emit(res, json_output, 0);
@@ -219,8 +216,7 @@ pub fn run_scope_guard(args: &[String]) -> i32 {
                         file: "".to_string(),
                         line: 0,
                         message: "Keine Task-Karte gefunden".to_string(),
-                        fix: "Task-Karte in .jules/tasks/ hinterlegen oder --card/Trailer angeben"
-                            .to_string(),
+                        fix: "Task-Karte in .jules/tasks/ hinterlegen oder --card/Trailer angeben".to_string(),
                     }],
                 };
                 return scope_guard_emit(res, json_output, 2);
@@ -233,10 +229,7 @@ pub fn run_scope_guard(args: &[String]) -> i32 {
     let mut findings = Vec::new();
     for file in &changed_files {
         // Check forbidden first
-        let is_forbidden = card
-            .forbidden
-            .iter()
-            .any(|g| scope_guard_matches_glob(file, g));
+        let is_forbidden = card.forbidden.iter().any(|g| scope_guard_matches_glob(file, g));
         let is_in_scope = card.scope.iter().any(|g| scope_guard_matches_glob(file, g));
 
         if is_forbidden {
@@ -264,10 +257,7 @@ pub fn run_scope_guard(args: &[String]) -> i32 {
         let res = ScopeGuardGateResult {
             gate: "scope-guard".to_string(),
             status: "pass".to_string(),
-            summary: format!(
-                "Alle {} geänderten Dateien liegen im Scope",
-                changed_files.len()
-            ),
+            summary: format!("Alle {} geänderten Dateien liegen im Scope", changed_files.len()),
             findings: vec![],
         };
         scope_guard_emit(res, json_output, 0)

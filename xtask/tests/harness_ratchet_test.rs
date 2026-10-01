@@ -94,8 +94,11 @@ fn test_ratchet_check_fails_on_increased_unwrap() {
     .unwrap();
 
     // Check should fail
-    let code_check =
-        ratchet::run_ratchet(&["check".to_string(), "--root".to_string(), root.to_string()]);
+    let code_check = ratchet::run_ratchet(&[
+        "check".to_string(),
+        "--root".to_string(),
+        root.to_string(),
+    ]);
     assert_eq!(code_check, 1);
 }
 
@@ -121,8 +124,11 @@ fn test_ratchet_update_increase_rejected_without_adr() {
     .unwrap();
 
     // Update without ADR should return 2 (Exit 2)
-    let code_update =
-        ratchet::run_ratchet(&["update".to_string(), "--root".to_string(), root.to_string()]);
+    let code_update = ratchet::run_ratchet(&[
+        "update".to_string(),
+        "--root".to_string(),
+        root.to_string(),
+    ]);
     assert_eq!(code_update, 2);
 }
 

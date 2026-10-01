@@ -427,7 +427,10 @@ impl<T: Clone> TxBuffer<T> {
         }
 
         entry.0.push(op);
-        shard.staged_bytes.entry(tx).and_modify(|b| *b += op_bytes);
+        shard
+            .staged_bytes
+            .entry(tx)
+            .and_modify(|b| *b += op_bytes);
         self.global_staged_bytes
             .fetch_add(op_bytes, Ordering::Relaxed);
         Ok(())

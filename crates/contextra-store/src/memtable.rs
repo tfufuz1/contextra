@@ -196,9 +196,7 @@ impl MemTable {
             (Bound::Included(s), Bound::Included(e))
             | (Bound::Included(s), Bound::Excluded(e))
             | (Bound::Excluded(s), Bound::Included(e))
-            | (Bound::Excluded(s), Bound::Excluded(e)) => {
-                s <= b"__".as_slice() && e >= b"__".as_slice()
-            }
+            | (Bound::Excluded(s), Bound::Excluded(e)) => s <= b"__".as_slice() && e >= b"__".as_slice(),
         };
 
         if is_system {

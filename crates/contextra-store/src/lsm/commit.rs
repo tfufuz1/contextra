@@ -19,8 +19,7 @@ impl LsmStorage {
             origin,
             durable,
         };
-        self.observer_registry
-            .notify_with_context(entries, seq_no, ctx);
+        self.observer_registry.notify_with_context(entries, seq_no, ctx);
     }
 
     /// Clears intent locks matching a predicate, gracefully recovering from poisoned locks.

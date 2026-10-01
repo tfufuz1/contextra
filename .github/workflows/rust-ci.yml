@@ -88,7 +88,7 @@ jobs:
           echo "| Crate | Line Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
 
-          for crate in contextra-store contextra-candle contextra-db contextra-vector; do
+          for crate in contextra-store contextra-candle contextra-engine contextra-vector; do
             COV_OUTPUT=$(cargo llvm-cov -p "$crate" --locked 2>&1)
             # Parse line coverage percentage from the TOTAL line
             PCT=$(echo "$COV_OUTPUT" | grep -E "^TOTAL" | awk '{print $(NF)}')
@@ -221,12 +221,11 @@ jobs:
           cargo check --locked -p contextra-infer-candle --no-default-features
           cargo check --locked -p contextra-infer-candle --features candle
           cargo check --locked -p contextra-infer-candle --features kv-bridge,kv-stage-b,contextra-store
-      - name: Check contextra-db Feature Combinations
+      - name: Check contextra-engine Feature Combinations
         run: |
-          cargo check --locked -p contextra-db --no-default-features
-          cargo check --locked -p contextra-db --features reranking
-          cargo check --locked -p contextra-db --features volatile-vault
-          cargo check --locked -p contextra-db --features experimental-diskann
+          cargo check --locked -p contextra-engine --no-default-features
+          cargo check --locked -p contextra-engine --features graph-connectivity-health
+          cargo check --locked -p contextra-engine --features edge-reinforcement-learning
       - name: Check contextra-graph Feature Combinations
         run: |
           cargo check --locked -p contextra-graph --no-default-features
@@ -337,7 +336,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Test core storage/crypto crates
-        run: cargo test --locked -p contextra-core -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-db
+        run: cargo test --locked -p contextra-core -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-engine
 
   # KONSOLIDIERUNGS-HINWEIS: Der redundante context-gates Job wurde hier entfernt.
   # Die Kanonische Quelle für Context Integrity Gates ist .github/workflows/context-gates.yml,

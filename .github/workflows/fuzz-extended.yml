@@ -14,7 +14,7 @@ jobs:
           - { crate: contextra-store,  target: wal_mutation_chaos }
           - { crate: contextra-store,  target: fuzz_manifest_load }
           - { crate: contextra-vector,  target: fuzz_hnsw_persistence }
-          - { crate: contextra-db,     target: fuzz_rrf_edge_cases }
+          - { crate: contextra-engine, target: fuzz_rrf_edge_cases }
           - { crate: contextra-text,   target: fuzz_bm25_query }
           - { crate: contextra-vector,  target: fuzz_distance_boundaries }
     steps:

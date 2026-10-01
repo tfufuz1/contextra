@@ -3,8 +3,7 @@ use contextra_types::{ContextraError, TenantId};
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_tenant_policy_optional_allows_non_tenant_collections() -> contextra_types::Result<()>
-{
+async fn test_tenant_policy_optional_allows_non_tenant_collections() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
     let config = ContextraConfig::default().with_tenant_policy(TenantPolicy::Optional);
     let db = Contextra::open_with_config(dir.path(), config).await?;
@@ -20,8 +19,7 @@ async fn test_tenant_policy_optional_allows_non_tenant_collections() -> contextr
 }
 
 #[tokio::test]
-async fn test_tenant_policy_required_denies_non_tenant_collections() -> contextra_types::Result<()>
-{
+async fn test_tenant_policy_required_denies_non_tenant_collections() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
     let config = ContextraConfig::default().with_tenant_policy(TenantPolicy::Required);
     let db = Contextra::open_with_config(dir.path(), config).await?;
@@ -34,9 +32,7 @@ async fn test_tenant_policy_required_denies_non_tenant_collections() -> contextr
     );
     if let Err(ContextraError::InvalidInput(msg)) = col_res {
         assert!(
-            msg.contains("TenantPolicy::Required")
-                || msg.contains("forbidden")
-                || msg.contains("required"),
+            msg.contains("TenantPolicy::Required") || msg.contains("forbidden") || msg.contains("required"),
             "Error message must clearly explain tenant isolation requirement: {msg}"
         );
     } else {

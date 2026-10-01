@@ -73,8 +73,7 @@ pub fn run_registry_check(args: &[String]) -> i32 {
         }
     };
 
-    let registered_names: HashSet<String> =
-        registry_entries.iter().map(|e| e.name.clone()).collect();
+    let registered_names: HashSet<String> = registry_entries.iter().map(|e| e.name.clone()).collect();
 
     // 2. Extract active commands from main.rs
     let main_rs_path = root.join("xtask/src/main.rs");
@@ -121,10 +120,7 @@ pub fn run_registry_check(args: &[String]) -> i32 {
                 severity: "error".to_string(),
                 file: format!("xtask/src/harness/{}.rs", h_cmd.replace('-', "_")),
                 line: 1,
-                message: format!(
-                    "Harness-Kommando '{}' kollidiert mit bestehendem Arm in main.rs",
-                    h_cmd
-                ),
+                message: format!("Harness-Kommando '{}' kollidiert mit bestehendem Arm in main.rs", h_cmd),
                 fix: "Benenne das Harness-Modul um oder entferne den Arm aus main.rs".to_string(),
             });
         }
@@ -138,14 +134,8 @@ pub fn run_registry_check(args: &[String]) -> i32 {
                 severity: "error".to_string(),
                 file: "xtask/registry.toml".to_string(),
                 line: 1,
-                message: format!(
-                    "Kommando '{}' wird verwendet, fehlt aber in xtask/registry.toml",
-                    cmd
-                ),
-                fix: format!(
-                    "Füge einen Eintrag für '{}' in xtask/registry.toml ein",
-                    cmd
-                ),
+                message: format!("Kommando '{}' wird verwendet, fehlt aber in xtask/registry.toml", cmd),
+                fix: format!("Füge einen Eintrag für '{}' in xtask/registry.toml ein", cmd),
             });
         }
     }
@@ -162,14 +152,8 @@ pub fn run_registry_check(args: &[String]) -> i32 {
                 severity: "error".to_string(),
                 file: "xtask/registry.toml".to_string(),
                 line: 1,
-                message: format!(
-                    "Eintrag '{}' in registry.toml ist verwaist (wird nirgends verwendet)",
-                    reg_entry.name
-                ),
-                fix: format!(
-                    "Entferne den verwaisten Eintrag '{}' aus xtask/registry.toml",
-                    reg_entry.name
-                ),
+                message: format!("Eintrag '{}' in registry.toml ist verwaist (wird nirgends verwendet)", reg_entry.name),
+                fix: format!("Entferne den verwaisten Eintrag '{}' aus xtask/registry.toml", reg_entry.name),
             });
         }
     }
@@ -244,36 +228,15 @@ fn registry_check_load_registry(path: &Path) -> Result<Vec<RegistryCheckEntry>, 
     let array = value
         .get("commands")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| {
-            "Schlüssel 'commands' fehlt oder ist kein Array in registry.toml".to_string()
-        })?;
+        .ok_or_else(|| "Schlüssel 'commands' fehlt oder ist kein Array in registry.toml".to_string())?;
 
     let mut entries = Vec::new();
     for item in array {
-        let name = item
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let owner_tier = item
-            .get("owner_tier")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let summary = item
-            .get("summary")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let blocking = item
-            .get("blocking")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let phase = item
-            .get("phase")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let owner_tier = item.get("owner_tier").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let summary = item.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let blocking = item.get("blocking").and_then(|v| v.as_bool()).unwrap_or(false);
+        let phase = item.get("phase").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         if name.is_empty() {
             return Err("Eintrag in registry.toml ohne 'name'".to_string());
@@ -333,13 +296,8 @@ fn registry_check_extract_workflow_commands(root: &Path) -> HashSet<String> {
     let mut cmds = HashSet::new();
     let workflows_dir = root.join(".github/workflows");
     if workflows_dir.exists() {
-        if let Ok(re) =
-            regex::Regex::new(r"(?:cargo\s+run\s+-p\s+xtask\s+--\s+|cargo\s+xtask\s+)([a-z0-9_-]+)")
-        {
-            for entry in WalkDir::new(&workflows_dir)
-                .into_iter()
-                .filter_map(Result::ok)
-            {
+        if let Ok(re) = regex::Regex::new(r"(?:cargo\s+run\s+-p\s+xtask\s+--\s+|cargo\s+xtask\s+)([a-z0-9_-]+)") {
+            for entry in WalkDir::new(&workflows_dir).into_iter().filter_map(Result::ok) {
                 let path = entry.path();
                 if path.is_file() {
                     if let Ok(content) = fs::read_to_string(path) {
@@ -377,12 +335,7 @@ fn registry_check_extract_harness_commands(harness_dir: &Path) -> HashSet<String
     cmds
 }
 
-fn registry_check_finish(
-    json: bool,
-    status: &str,
-    findings: &[RegistryCheckFinding],
-    exit_code: i32,
-) -> i32 {
+fn registry_check_finish(json: bool, status: &str, findings: &[RegistryCheckFinding], exit_code: i32) -> i32 {
     if json {
         let json_findings: Vec<_> = findings
             .iter()
@@ -409,17 +362,9 @@ fn registry_check_finish(
         if exit_code == 0 {
             println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/registry.toml registriert.");
         } else {
-            println!(
-                "❌ [REGISTRY-CHECK]: Konsistenzprüfungen für xtask-Kommandos fehlgeschlagen."
-            );
+            println!("❌ [REGISTRY-CHECK]: Konsistenzprüfungen für xtask-Kommandos fehlgeschlagen.");
             for f in findings {
-                println!(
-                    "  - [{}] {} (Datei: {}:{})",
-                    f.severity.to_uppercase(),
-                    f.message,
-                    f.file,
-                    f.line
-                );
+                println!("  - [{}] {} (Datei: {}:{})", f.severity.to_uppercase(), f.message, f.file, f.line);
                 println!("    Invariante/ADR: Registrierungspflicht in xtask/registry.toml");
                 println!("    FIX: {}", f.fix);
             }

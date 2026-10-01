@@ -216,10 +216,9 @@ impl CompactionEngine {
             let is_contiguous = match start_opt {
                 Some(start) => {
                     if start + input_ssts.len() <= ssts.len() {
-                        input_ssts
-                            .iter()
-                            .enumerate()
-                            .all(|(idx, inp)| Arc::ptr_eq(inp, &ssts[start + idx]))
+                        input_ssts.iter().enumerate().all(|(idx, inp)| {
+                            Arc::ptr_eq(inp, &ssts[start + idx])
+                        })
                     } else {
                         false
                     }

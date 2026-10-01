@@ -1,4 +1,4 @@
-use contextra_engine::Contextra;
+use contextra_db::Contextra;
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

@@ -7,9 +7,8 @@ use std::time::Instant;
 #[tokio::test]
 async fn test_system_prompt_pinning_latency_under_100_micros() -> contextra_types::Result<()> {
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_engine::ContextraConfig::default();
-    let db =
-        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_db::ContextraConfig::default();
+    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("test_latency").await?;
 
     let mut ctx = AgentContext::try_new(
@@ -56,9 +55,8 @@ async fn test_system_prompt_pinning_latency_under_100_micros() -> contextra_type
 #[tokio::test]
 async fn test_system_prompt_pinning_agent_flow() -> contextra_types::Result<()> {
     let temp_dir = tempfile::TempDir::new()?;
-    let config = contextra_engine::ContextraConfig::default();
-    let db =
-        Arc::new(contextra_engine::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let config = contextra_db::ContextraConfig::default();
+    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("test_flow").await?;
 
     let mut ctx = AgentContext::try_new(

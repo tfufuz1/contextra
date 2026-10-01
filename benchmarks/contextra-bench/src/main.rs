@@ -9,7 +9,7 @@ use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
 };
 use contextra_core::Result;
-use contextra_engine::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 #[cfg(feature = "onnx-bench")]
 use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
 use serde::{Deserialize, Serialize};

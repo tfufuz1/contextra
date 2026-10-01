@@ -38,13 +38,13 @@ jobs:
       - name: Benchmark Harness Dry-Run Test
         run: |
           # Verify benchmark compilation and harness functionality without long running timings
-          CONTEXTRA_SCALE_TIERS=10,50 cargo bench --locked -p contextra-db -- --test
+          CONTEXTRA_SCALE_TIERS=10,50 cargo bench --locked -p contextra-engine -- --test
 
       - name: Run Benchmark Group Baseline (Informative)
         run: |
           # Criterion baseline generation for PR artifacts
           # Note: A future session will add comparison gates against main branch baseline with tolerance bands
-          CONTEXTRA_SCALE_TIERS=100,500 cargo bench --locked -p contextra-db --bench scale_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
+          CONTEXTRA_SCALE_TIERS=100,500 cargo bench --locked -p contextra-engine --bench engine_perf_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
 
       - name: Upload Benchmark Results Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,7 +1,7 @@
 use contextra_agent::context::{AgentContext, AgentStatus};
 use contextra_agent::engine::OrchestratorEngine;
 use contextra_agent::graph::{NodeType, StateGraph};
-use contextra_engine::Contextra;
+use contextra_db::Contextra;
 use contextra_types::TokenBudget;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -9,7 +9,7 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn test_atomic_final_state_checkpoint() -> contextra_types::Result<()> {
     let tmp = TempDir::new().unwrap();
-    let config = contextra_engine::ContextraConfig {
+    let config = contextra_db::ContextraConfig {
         dimension: 1,
         ..Default::default()
     };

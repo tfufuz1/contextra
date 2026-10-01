@@ -289,8 +289,7 @@ fn diff_budget_resolve_card_path(root: &Path, id_or_path: &str) -> PathBuf {
     if id_or_path.ends_with(".toml") {
         root.join(id_or_path)
     } else {
-        root.join(".jules/tasks")
-            .join(format!("{}.toml", id_or_path))
+        root.join(".jules/tasks").join(format!("{}.toml", id_or_path))
     }
 }
 

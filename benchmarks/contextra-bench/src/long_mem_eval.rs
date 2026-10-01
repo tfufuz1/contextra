@@ -4,7 +4,7 @@
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
 use contextra_core::{ContextraError, Result, StorageEngine, VectorIndex};
-use contextra_engine::Collection;
+use contextra_db::Collection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;

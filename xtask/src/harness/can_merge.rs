@@ -61,10 +61,7 @@ pub fn run_can_merge(args: &[String]) -> i32 {
 
     if let Some(dir) = results_dir {
         if !dir.exists() || !dir.is_dir() {
-            let msg = format!(
-                "Ergebnisverzeichnis {:?} existiert nicht oder ist kein Ordner.",
-                dir
-            );
+            let msg = format!("Ergebnisverzeichnis {:?} existiert nicht oder ist kein Ordner.", dir);
             if use_json {
                 println!(
                     "{}",
@@ -94,25 +91,12 @@ pub fn run_can_merge(args: &[String]) -> i32 {
                 if path.extension().and_then(|s| s.to_str()) == Some("json") {
                     if let Ok(content) = fs::read_to_string(&path) {
                         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                            let status = val
-                                .get("status")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("error");
-                            let gate = val
-                                .get("gate")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("unknown");
-                            let summary = val
-                                .get("summary")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("Keine Zusammenfassung");
+                            let status = val.get("status").and_then(|s| s.as_str()).unwrap_or("error");
+                            let gate = val.get("gate").and_then(|s| s.as_str()).unwrap_or("unknown");
+                            let summary = val.get("summary").and_then(|s| s.as_str()).unwrap_or("Keine Zusammenfassung");
 
                             if status == "fail" || status == "error" {
-                                failed_gates.push((
-                                    gate.to_string(),
-                                    summary.to_string(),
-                                    status.to_string(),
-                                ));
+                                failed_gates.push((gate.to_string(), summary.to_string(), status.to_string()));
                             }
                         }
                     }
@@ -129,28 +113,17 @@ pub fn run_can_merge(args: &[String]) -> i32 {
                 if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
                     if let Some(arr) = val.as_array() {
                         for item in arr {
-                            let name = item
-                                .get("name")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("unknown");
-                            let state = item
-                                .get("state")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("FAILURE");
+                            let name = item.get("name").and_then(|s| s.as_str()).unwrap_or("unknown");
+                            let state = item.get("state").and_then(|s| s.as_str()).unwrap_or("FAILURE");
                             if state != "SUCCESS" && state != "SKIPPED" {
-                                failed_gates.push((
-                                    name.to_string(),
-                                    format!("PR Check State: {}", state),
-                                    state.to_string(),
-                                ));
+                                failed_gates.push((name.to_string(), format!("PR Check State: {}", state), state.to_string()));
                             }
                         }
                     }
                 }
             }
             _ => {
-                let msg =
-                    "gh CLI ist nicht verfuegbar oder PR-Checks konnten nicht abgerufen werden.";
+                let msg = "gh CLI ist nicht verfuegbar oder PR-Checks konnten nicht abgerufen werden.";
                 if use_json {
                     println!(
                         "{}",
@@ -169,10 +142,7 @@ pub fn run_can_merge(args: &[String]) -> i32 {
                         })
                     );
                 } else {
-                    eprintln!(
-                        "NEIN: {}\nInstallationshinweis: https://cli.github.com/",
-                        msg
-                    );
+                    eprintln!("NEIN: {}\nInstallationshinweis: https://cli.github.com/", msg);
                 }
                 return 2;
             }
@@ -228,10 +198,7 @@ pub fn run_can_merge(args: &[String]) -> i32 {
             println!("Gruende (max. 3):");
             for (gate, cause, _) in top_reasons {
                 println!(" - Gate {}: {}", gate, cause);
-                println!(
-                    "   Fix: cargo run --manifest-path xtask/Cargo.toml -- explain {}",
-                    gate
-                );
+                println!("   Fix: cargo run --manifest-path xtask/Cargo.toml -- explain {}", gate);
             }
         }
         1

@@ -9,7 +9,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use contextra_engine::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 use hdrhistogram::Histogram;
 use serde::{Deserialize, Serialize};
 

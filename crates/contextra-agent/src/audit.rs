@@ -11,7 +11,7 @@
 //! Entries are stored via [`Collection`] and keyed `audit:{task_id}:step:{n}`.
 
 use crate::context::{validate_node_id, validate_task_id};
-use contextra_engine::Collection;
+use contextra_db::Collection;
 #[cfg(any(test, feature = "test-utils"))]
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;

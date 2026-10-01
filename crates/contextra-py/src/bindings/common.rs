@@ -281,8 +281,8 @@ pub fn json_to_py(py: Python<'_>, val: &serde_json::Value) -> PyResult<PyObject>
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Metadata error: {}", e)))
 }
 
-/// Converts a contextra_engine::Document to a PyDocument.
-pub fn doc_to_py(py: Python<'_>, d: contextra_engine::Document) -> PyResult<PyDocument> {
+/// Converts a contextra_db::Document to a PyDocument.
+pub fn doc_to_py(py: Python<'_>, d: contextra_db::Document) -> PyResult<PyDocument> {
     let meta_py = match d.metadata {
         Some(ref m) => Some(json_to_py(py, m)?),
         None => None,
@@ -296,7 +296,7 @@ pub fn doc_to_py(py: Python<'_>, d: contextra_engine::Document) -> PyResult<PyDo
 /// Converts a Vec of SearchResult to Vec of PySearchResult.
 pub fn results_to_py(
     py: Python<'_>,
-    results: Vec<contextra_engine::SearchResult>,
+    results: Vec<contextra_db::SearchResult>,
 ) -> PyResult<Vec<PySearchResult>> {
     let mut py_res = Vec::with_capacity(results.len());
     for r in results {

@@ -307,6 +307,7 @@ impl HnswIndex {
         *self.inner.cold.sq8_bias.read()
     }
 
+
     pub fn deleted_ratio(&self) -> f64 {
         self.inner.deleted_ratio()
     }

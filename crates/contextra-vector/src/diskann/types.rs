@@ -3,7 +3,6 @@
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
-use super::build::TombstoneSet;
 use super::config::{CachedNode, DiskAnnConfig};
 use super::format::DiskAnnHeader;
 use crate::ComputePool;
@@ -11,6 +10,7 @@ use ahash::AHashMap;
 use contextra_core::{ContextraError, DocId, Result};
 use memmap2::Mmap;
 use parking_lot::RwLock;
+use super::build::TombstoneSet;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 

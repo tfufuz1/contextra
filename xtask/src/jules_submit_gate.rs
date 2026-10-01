@@ -426,7 +426,11 @@ mod tests {
     fn test_iso8601_now_rfc3339() {
         let ts = iso8601_now();
         let parsed = chrono::DateTime::parse_from_rfc3339(&ts);
-        assert!(parsed.is_ok(), "Timestamp {} should be valid RFC-3339", ts);
+        assert!(
+            parsed.is_ok(),
+            "Timestamp {} should be valid RFC-3339",
+            ts
+        );
     }
 
     #[test]

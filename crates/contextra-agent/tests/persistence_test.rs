@@ -2,7 +2,7 @@ use contextra_agent::context::{AgentContext, AgentStatus};
 use contextra_agent::engine::OrchestratorEngine;
 use contextra_agent::graph::{NodeType, StateGraph};
 use contextra_agent::step::{AgentTool, StepResult};
-use contextra_engine::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 use contextra_ports::BoxFuture;
 use contextra_types::TokenBudget;
 use std::sync::Arc;

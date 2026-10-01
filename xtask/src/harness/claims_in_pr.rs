@@ -50,11 +50,7 @@ pub fn claims_in_pr_is_placeholder(text: &str) -> bool {
     if lower.starts_with("todo") && lower.len() < 10 {
         return true;
     }
-    if lower.starts_with("n/a")
-        && !lower.contains("weil")
-        && !lower.contains("da ")
-        && lower.len() < 10
-    {
+    if lower.starts_with("n/a") && !lower.contains("weil") && !lower.contains("da ") && lower.len() < 10 {
         return true;
     }
     false
@@ -113,8 +109,7 @@ pub fn claims_in_pr_extract_listed_files(changes_content: &str) -> HashSet<Strin
             .trim();
 
         // Extract path candidate
-        if !clean.is_empty() && (clean.contains('/') || clean.contains('.')) && !clean.contains(' ')
-        {
+        if !clean.is_empty() && (clean.contains('/') || clean.contains('.')) && !clean.contains(' ') {
             files.insert(clean.to_string());
         }
     }
@@ -193,14 +188,8 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
                     severity: "error".to_string(),
                     file: "".to_string(),
                     line: 0,
-                    message: format!(
-                        "Pflichtabschnitt '## {}' ist leer oder Platzhaltertext",
-                        req_header
-                    ),
-                    fix: format!(
-                        "Abschnitt '## {}' mit inhaltlicher Beschreibung füllen",
-                        req_header
-                    ),
+                    message: format!("Pflichtabschnitt '## {}' ist leer oder Platzhaltertext", req_header),
+                    fix: format!("Abschnitt '## {}' mit inhaltlicher Beschreibung füllen", req_header),
                 });
             }
         } else {
@@ -233,10 +222,7 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
             severity: "error".to_string(),
             file: missing.clone(),
             line: 0,
-            message: format!(
-                "Geänderte Datei '{}' ist im PR-Text unter 'Änderungen' nicht aufgeführt",
-                missing
-            ),
+            message: format!("Geänderte Datei '{}' ist im PR-Text unter 'Änderungen' nicht aufgeführt", missing),
             fix: format!("Datei '{}' unter 'Änderungen' eintragen", missing),
         });
     }
@@ -248,14 +234,8 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
             severity: "error".to_string(),
             file: phantom.clone(),
             line: 0,
-            message: format!(
-                "Im PR-Text aufgeführte Datei '{}' existiert nicht im Git-Diff (Phantom-Claim)",
-                phantom
-            ),
-            fix: format!(
-                "Datei '{}' aus 'Änderungen' entfernen oder im Diff ergänzen",
-                phantom
-            ),
+            message: format!("Im PR-Text aufgeführte Datei '{}' existiert nicht im Git-Diff (Phantom-Claim)", phantom),
+            fix: format!("Datei '{}' aus 'Änderungen' entfernen oder im Diff ergänzen", phantom),
         });
     }
 
@@ -275,10 +255,7 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
                     entries.filter_map(|e| e.ok()).any(|e| {
                         if e.path().extension().is_some_and(|ext| ext == "json") {
                             if let Ok(c) = fs::read_to_string(e.path()) {
-                                c.contains(cmd_claim)
-                                    && (c.contains("\"status\":\"pass\"")
-                                        || c.contains("\"status\": \"pass\"")
-                                        || c.contains("ok"))
+                                c.contains(cmd_claim) && (c.contains("\"status\":\"pass\"") || c.contains("\"status\": \"pass\"") || c.contains("ok"))
                             } else {
                                 false
                             }
@@ -299,12 +276,8 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
                     severity: "error".to_string(),
                     file: "".to_string(),
                     line: 0,
-                    message: format!(
-                        "Behauptung für '{}' ist nicht durch Ergebnisse in --results-dir belegt",
-                        cmd_claim
-                    ),
-                    fix: "Beleg-JSON im results-dir ablegen oder Verifikationsbehauptung anpassen"
-                        .to_string(),
+                    message: format!("Behauptung für '{}' ist nicht durch Ergebnisse in --results-dir belegt", cmd_claim),
+                    fix: "Beleg-JSON im results-dir ablegen oder Verifikationsbehauptung anpassen".to_string(),
                 });
             }
         }
@@ -312,8 +285,7 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
 
     // Check CP-004: "Tests hinzugefügt" claim
     let full_text_lower = body_text.to_lowercase();
-    if full_text_lower.contains("test hinzugefügt") || full_text_lower.contains("tests hinzugefügt")
-    {
+    if full_text_lower.contains("test hinzugefügt") || full_text_lower.contains("tests hinzugefügt") {
         let diff_has_new_test = claims_in_pr_diff_has_new_test(&root_dir, &base, &head);
         if !diff_has_new_test {
             findings.push(ClaimsInPrFinding {
@@ -339,10 +311,7 @@ pub fn run_claims_in_pr(args: &[String]) -> i32 {
         let res = ClaimsInPrGateResult {
             gate: "claims-in-pr".to_string(),
             status: "fail".to_string(),
-            summary: format!(
-                "{} Verstoß/Verstöße gegen Claims-Regeln gefunden",
-                findings.len()
-            ),
+            summary: format!("{} Verstoß/Verstöße gegen Claims-Regeln gefunden", findings.len()),
             findings,
         };
         claims_in_pr_emit(res, json_output, 1)
@@ -359,11 +328,7 @@ fn claims_in_pr_emit(res: ClaimsInPrGateResult, json_output: bool, exit_code: i3
             println!(
                 "[{}] {}: {}\n  Fix: {}",
                 f.severity.to_uppercase(),
-                if f.file.is_empty() {
-                    "PR-Text"
-                } else {
-                    &f.file
-                },
+                if f.file.is_empty() { "PR-Text" } else { &f.file },
                 f.message,
                 f.fix
             );
@@ -450,9 +415,7 @@ fn claims_in_pr_diff_has_new_test(root: &Path, base: &str, head: &str) -> bool {
             {
                 return true;
             }
-            if line.starts_with("+++ b/")
-                && (line.contains("/tests/") || line.ends_with("_test.rs"))
-            {
+            if line.starts_with("+++ b/") && (line.contains("/tests/") || line.ends_with("_test.rs")) {
                 return true;
             }
         }

@@ -45,10 +45,7 @@ pub fn unsafe_audit_get_islands_and_crates(
 ) -> Result<(Vec<String>, Vec<UnsafeCrateInfo>), String> {
     let caps_path = root.join("capabilities.toml");
     if !caps_path.exists() {
-        return Err(format!(
-            "capabilities.toml missing at {}",
-            caps_path.display()
-        ));
+        return Err(format!("capabilities.toml missing at {}", caps_path.display()));
     }
 
     let content = fs::read_to_string(&caps_path)
@@ -128,9 +125,8 @@ pub fn unsafe_audit_scan_file(
                     severity: "error".to_string(),
                     file: rel_path.to_string(),
                     line: idx + 1,
-                    message:
-                        "Unsafe code block/function used outside designated unsafe island crate"
-                            .to_string(),
+                    message: "Unsafe code block/function used outside designated unsafe island crate"
+                        .to_string(),
                     fix: "Move unsafe code to designated unsafe island or remove unsafe keyword"
                         .to_string(),
                 });
@@ -340,10 +336,7 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                         findings: vec![],
                     };
                     if json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&output).unwrap_or_default()
-                        );
+                        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
                     }
                     return 2;
                 }
@@ -367,19 +360,11 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
     };
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
     } else {
         println!("{}", summary);
         for f in &findings {
-            println!(
-                "  [{}] {}: {}",
-                f.severity.to_uppercase(),
-                f.file,
-                f.message
-            );
+            println!("  [{}] {}: {}", f.severity.to_uppercase(), f.file, f.message);
         }
     }
 

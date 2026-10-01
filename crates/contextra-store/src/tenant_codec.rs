@@ -564,11 +564,7 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
         })
     }
 
-    fn get_tracked<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+    fn get_tracked<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(async move {
             let physical_key = self.make_key(key);
             self.inner.get_tracked_handle(tx_id, &physical_key).await
@@ -660,9 +656,7 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
     fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move {
             let physical_prefix = self.make_key(prefix);
-            self.inner
-                .delete_prefix_handle(tx_id, &physical_prefix)
-                .await
+            self.inner.delete_prefix_handle(tx_id, &physical_prefix).await
         })
     }
 
@@ -724,7 +718,11 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
             let physical_cursor = cursor.map(|c| self.make_key(c));
             let (raw_batch, next_cursor) = self
                 .inner
-                .scan_prefix_bounded_handle(&physical_prefix, limit, physical_cursor.as_deref())
+                .scan_prefix_bounded_handle(
+                    &physical_prefix,
+                    limit,
+                    physical_cursor.as_deref(),
+                )
                 .await?;
             let stripped_batch = self.filter_strip_batch(raw_batch);
             let stripped_cursor = next_cursor.and_then(|c| self.strip_key(c));

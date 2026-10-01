@@ -95,9 +95,9 @@ fn proof_put_if_absent_default_trait_removed() {
         .map(|s| s.split('}').next().unwrap_or(""))
         .collect();
 
-    let has_toctou = put_if_absent_blocks
-        .iter()
-        .any(|block| block.contains("self.get") && block.contains("self.put"));
+    let has_toctou = put_if_absent_blocks.iter().any(|block| {
+        block.contains("self.get") && block.contains("self.put")
+    });
     assert!(!has_toctou, "REGRESSION B-1: TOCTOU-Default zurückgekehrt");
 }
 

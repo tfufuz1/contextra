@@ -267,7 +267,7 @@ mod tests {
         assert!(validate_db_path("").is_err());
         assert!(validate_db_path("   ").is_err());
         assert!(validate_db_path("path\0null").is_err());
-        assert!(validate_db_path("/tmp/contextra_engine").is_ok());
+        assert!(validate_db_path("/tmp/contextra_db").is_ok());
 
         // validate_query_text
         assert!(validate_query_text("").is_err());

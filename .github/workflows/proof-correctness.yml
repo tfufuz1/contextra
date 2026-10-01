@@ -14,7 +14,7 @@ jobs:
       - name: L1 — NaN Validation Policy (S1-11)
         run: cargo test -p contextra-vector --test nan_validation_policy -- --nocapture
       - name: L1 — Search Result Bound (S1-02)
-        run: cargo test -p contextra-db --test search_result_bound -- --nocapture
+        run: cargo test -p contextra-engine --test hybrid_query_fusion -- --nocapture
       - name: L1 — Manifest Corruption (S1-03)
         run: cargo test -p contextra-store --test manifest_corruption -- --nocapture
       - name: L1 — BM25 Tombstone Read-Your-Writes (S1-04)

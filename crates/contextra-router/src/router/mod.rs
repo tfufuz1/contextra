@@ -79,6 +79,7 @@ impl BanditExploration {
 /// to provide meaningful routing signal — the router behaves as a random router.
 pub(crate) const CALIBRATION_WARMUP_WINDOW: u32 = 100;
 
+
 /// Maximale TTL für ausstehende Routing-Entscheidungen bevor sie bereinigt werden.
 pub(crate) const PENDING_DECISION_TTL: Duration = Duration::from_secs(300);
 

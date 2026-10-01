@@ -67,13 +67,13 @@ pub async fn recover_pending_intents<S: StorageEngine>(
 
             let tx = TxId::new(next_tx.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
             if storage_committed {
-                let committed_bytes =
-                    serde_json::to_vec(&CommitIntent::Committed).unwrap_or_else(|_| b"{}".to_vec());
+                let committed_bytes = serde_json::to_vec(&CommitIntent::Committed)
+                    .unwrap_or_else(|_| b"{}".to_vec());
                 storage.put(tx, &intent_key, &committed_bytes).await?;
                 storage.commit(tx).await?;
             } else {
-                let aborted_bytes =
-                    serde_json::to_vec(&CommitIntent::Aborted).unwrap_or_else(|_| b"{}".to_vec());
+                let aborted_bytes = serde_json::to_vec(&CommitIntent::Aborted)
+                    .unwrap_or_else(|_| b"{}".to_vec());
                 storage.put(tx, &intent_key, &aborted_bytes).await?;
                 storage.commit(tx).await?;
             }
@@ -82,10 +82,7 @@ pub async fn recover_pending_intents<S: StorageEngine>(
     }
 
     if recovered > 0 {
-        tracing::info!(
-            recovered,
-            "Pending transaction intents recovered/reconciled"
-        );
+        tracing::info!(recovered, "Pending transaction intents recovered/reconciled");
     }
     Ok(recovered)
 }

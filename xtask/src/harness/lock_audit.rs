@@ -111,10 +111,7 @@ pub fn lock_audit_check_agents_md(
                     severity: "warn".to_string(),
                     file: format!("crates/{}/AGENTS.md", crate_name),
                     line: 1,
-                    message: format!(
-                        "Documented lock hierarchy found for {}: {}",
-                        crate_name, trimmed
-                    ),
+                    message: format!("Documented lock hierarchy found for {}: {}", crate_name, trimmed),
                     fix: "Ensure code respects lock hierarchy sequence".to_string(),
                 });
             }
@@ -184,10 +181,7 @@ pub fn run_lock_audit(args: &[String]) -> i32 {
             findings: vec![],
         };
         if json {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&output).unwrap_or_default()
-            );
+            println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
         } else {
             println!("lock-audit: not_applicable (no crates touched)");
         }
@@ -298,19 +292,11 @@ pub fn run_lock_audit(args: &[String]) -> i32 {
     };
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
     } else {
         println!("{}", summary);
         for f in &findings {
-            println!(
-                "  [{}] {}: {}",
-                f.severity.to_uppercase(),
-                f.file,
-                f.message
-            );
+            println!("  [{}] {}: {}", f.severity.to_uppercase(), f.file, f.message);
         }
     }
 

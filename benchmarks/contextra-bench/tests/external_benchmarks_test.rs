@@ -9,7 +9,7 @@ use contextra_bench::long_mem_eval::{
 };
 use contextra_bench::path_rag_sweep::{run_pathrag_sweep_locomo, run_pathrag_sweep_long_mem_eval};
 use contextra_core::Result;
-use contextra_engine::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 use std::path::Path;
 use tempfile::TempDir;
 

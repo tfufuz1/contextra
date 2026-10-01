@@ -25,11 +25,7 @@ fn setup_temp_repo() -> TempDir {
         .unwrap();
 
     fs::create_dir_all(p.join("tests")).unwrap();
-    fs::write(
-        p.join("tests/my_test.rs"),
-        "#[test]\nfn test_valid() { assert_eq!(1, 1); }\n",
-    )
-    .unwrap();
+    fs::write(p.join("tests/my_test.rs"), "#[test]\nfn test_valid() { assert_eq!(1, 1); }\n").unwrap();
     Command::new("git")
         .args(["add", "."])
         .current_dir(p)
@@ -147,11 +143,7 @@ fn test_test_integrity_insta_bless_in_script() {
     let dir = setup_temp_repo();
     let p = dir.path();
 
-    fs::write(
-        p.join("bless.sh"),
-        "#!/bin/bash\ncargo insta accept --bless\n",
-    )
-    .unwrap();
+    fs::write(p.join("bless.sh"), "#!/bin/bash\ncargo insta accept --bless\n").unwrap();
     Command::new("git")
         .args(["add", "."])
         .current_dir(p)

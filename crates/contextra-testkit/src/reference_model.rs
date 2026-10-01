@@ -42,8 +42,9 @@ impl ReferenceModel {
 
     /// Stages a `Delete` operation in uncommitted pending buffer.
     pub fn delete(&mut self, key: &[u8]) {
-        self.pending_writes
-            .push(RefOp::Delete { key: key.to_vec() });
+        self.pending_writes.push(RefOp::Delete {
+            key: key.to_vec(),
+        });
     }
 
     /// Clears any uncommitted pending writes without advancing sequence number.

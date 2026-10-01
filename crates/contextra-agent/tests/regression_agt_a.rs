@@ -2,8 +2,7 @@ use contextra_agent::{
     AgentContext, AgentTool, BackgroundEvent, DeadLetterReason, NodeType, OrchestratorEngine,
     StateGraph, StepResult, MAX_WORKFLOW_STEPS,
 };
-use contextra_engine::{Contextra, ContextraConfig};
-use contextra_types::DistanceMetric;
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_types::{ContextraError, TokenBudget};
 use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};

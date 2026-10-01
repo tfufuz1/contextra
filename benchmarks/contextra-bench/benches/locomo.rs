@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
 use contextra_bench::long_mem_eval::ScoredChunk;
-use contextra_engine::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;

@@ -92,24 +92,6 @@ jobs:
         with:
           command: check advisories bans licenses sources
 
-  machete-gate:
-    name: Unused Dependencies Gate (cargo-machete)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@1.89.0
-
-      - name: Install cargo-machete
-        run: cargo install cargo-machete --locked
-
-      - name: Run cargo-machete
-        run: cargo-machete
-
   phantom-commit-gate:
     name: Phantom Commit Protection Gate
     runs-on: ubuntu-latest

@@ -91,9 +91,7 @@ pub fn determinism_check_parse_args(args: &[String]) -> (PathBuf, bool, bool, Op
         .output()
     {
         if git_output.status.success() {
-            let top = String::from_utf8_lossy(&git_output.stdout)
-                .trim()
-                .to_string();
+            let top = String::from_utf8_lossy(&git_output.stdout).trim().to_string();
             if !top.is_empty() {
                 root = PathBuf::from(top);
             }
@@ -106,10 +104,7 @@ pub fn determinism_check_parse_args(args: &[String]) -> (PathBuf, bool, bool, Op
 pub fn determinism_check_get_ring01_crates(root: &Path) -> Result<Vec<(String, PathBuf)>, String> {
     let caps_path = root.join("capabilities.toml");
     if !caps_path.exists() {
-        return Err(format!(
-            "capabilities.toml missing at {}",
-            caps_path.display()
-        ));
+        return Err(format!("capabilities.toml missing at {}", caps_path.display()));
     }
 
     let content = fs::read_to_string(&caps_path)
@@ -136,15 +131,11 @@ pub fn determinism_check_get_ring01_crates(root: &Path) -> Result<Vec<(String, P
 
 pub fn determinism_check_is_test_or_bench(path: &Path, line: &str) -> bool {
     let path_str = path.to_string_lossy();
-    if path_str.contains("/tests/") || path_str.contains("/benches/") || path_str.contains("/fuzz/")
-    {
+    if path_str.contains("/tests/") || path_str.contains("/benches/") || path_str.contains("/fuzz/") {
         return true;
     }
     let trimmed = line.trim();
-    if trimmed.starts_with("#[test]")
-        || trimmed.starts_with("#[cfg(test)]")
-        || trimmed.contains("tokio::test")
-    {
+    if trimmed.starts_with("#[test]") || trimmed.starts_with("#[cfg(test)]") || trimmed.contains("tokio::test") {
         return true;
     }
     false
@@ -161,26 +152,11 @@ pub fn determinism_check_scan_file(
     };
 
     let forbidden_patterns = [
-        (
-            "SystemTime::now",
-            "SystemTime::now() calls non-deterministic clock source",
-        ),
-        (
-            "Instant::now",
-            "Instant::now() calls non-deterministic clock source",
-        ),
-        (
-            "thread_rng",
-            "rand::thread_rng() uses unseeded thread-local random generator",
-        ),
-        (
-            "rand::random",
-            "rand::random() uses unseeded random generation",
-        ),
-        (
-            "Uuid::new_v4",
-            "Uuid::new_v4() generates random UUIDs breaking determinism",
-        ),
+        ("SystemTime::now", "SystemTime::now() calls non-deterministic clock source"),
+        ("Instant::now", "Instant::now() calls non-deterministic clock source"),
+        ("thread_rng", "rand::thread_rng() uses unseeded thread-local random generator"),
+        ("rand::random", "rand::random() uses unseeded random generation"),
+        ("Uuid::new_v4", "Uuid::new_v4() generates random UUIDs breaking determinism"),
     ];
 
     let mut in_test_module = false;
@@ -209,34 +185,19 @@ pub fn determinism_check_scan_file(
                     file: rel_path.to_string(),
                     line: line_num,
                     message: msg.to_string(),
-                    fix: "Inject time/RNG via traits or context, or use collection.allocate_tx()"
-                        .to_string(),
+                    fix: "Inject time/RNG via traits or context, or use collection.allocate_tx()".to_string(),
                 });
             }
         }
 
         let lower_line = line.to_lowercase();
-        if lower_line.contains("fn ")
-            && (lower_line.contains("serialize")
-                || lower_line.contains("encode")
-                || lower_line.contains("to_bytes")
-                || lower_line.contains("write")
-                || lower_line.contains("flush")
-                || lower_line.contains("checkpoint")
-                || lower_line.contains("hash"))
-        {
+        if lower_line.contains("fn ") && (lower_line.contains("serialize") || lower_line.contains("encode") || lower_line.contains("to_bytes") || lower_line.contains("write") || lower_line.contains("flush") || lower_line.contains("checkpoint") || lower_line.contains("hash")) {
             current_fn_is_state_fn = true;
         } else if trimmed.starts_with("fn ") || trimmed.starts_with("pub fn ") {
             current_fn_is_state_fn = false;
         }
 
-        if current_fn_is_state_fn
-            && (line.contains("for ") || line.contains(".iter()"))
-            && (line.contains("hashmap")
-                || line.contains("hashset")
-                || line.contains("HashMap")
-                || line.contains("HashSet"))
-        {
+        if current_fn_is_state_fn && (line.contains("for ") || line.contains(".iter()")) && (line.contains("hashmap") || line.contains("hashset") || line.contains("HashMap") || line.contains("HashSet")) {
             findings.push(DeterminismCheckFinding {
                 id: "NON_DETERMINISTIC_HASH_ITERATION".to_string(),
                 severity: "error".to_string(),
@@ -296,9 +257,7 @@ pub fn run_determinism_check(args: &[String]) -> i32 {
             .into_iter()
             .filter_map(|e| e.ok())
         {
-            if entry.file_type().is_file()
-                && entry.path().extension().and_then(|s| s.to_str()) == Some("rs")
-            {
+            if entry.file_type().is_file() && entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
                 let rel = match entry.path().strip_prefix(&root) {
                     Ok(p) => p.to_string_lossy().to_string(),
                     Err(_) => entry.path().to_string_lossy().to_string(),
@@ -354,9 +313,7 @@ pub fn run_determinism_check(args: &[String]) -> i32 {
 
     for mut finding in filtered_findings {
         let is_in_baseline = baseline_entries.iter().any(|b| {
-            b.file == finding.file
-                && b.pattern == finding.id
-                && (b.line == finding.line || b.line == 0)
+            b.file == finding.file && b.pattern == finding.id && (b.line == finding.line || b.line == 0)
         });
 
         if is_in_baseline {
@@ -409,10 +366,7 @@ pub fn run_determinism_check(args: &[String]) -> i32 {
     };
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
     } else {
         println!("{}", summary);
         if new_error_count > 0 {
