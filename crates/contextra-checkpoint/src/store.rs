@@ -153,6 +153,8 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
     clock: Arc<dyn contextra_ports::Clock>,
+    /// Injected metrics sink for operational monitoring
+    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
@@ -256,6 +258,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             checkpoint_counter,
             skipped_rollbacks,
             clock,
+            metrics_sink: None,
         })
     }
 
@@ -379,6 +382,15 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         &self.clock
     }
 
+    pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+        self.metrics_sink = Some(sink);
+    }
+
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+
     pub fn monotonic_timestamp_ms(&self) -> u64 {
         let wall_ms = clock_timestamp_ms(self.clock.as_ref());
         self.checkpoint_counter
@@ -402,7 +414,8 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             &self.namespace,
             Arc::clone(&self.orphan_registry),
             Arc::clone(&self.skipped_rollbacks),
-        ))
+        )
+        .with_metrics_sink_opt(self.metrics_sink.clone()))
     }
 
     /// Creates a new persistent checkpoint.
@@ -414,6 +427,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         tx_id: TxId,
         metadata: serde_json::Value,
     ) -> Result<CheckpointMeta> {
+        let start = std::time::Instant::now();
         validate_identifier("Checkpoint name", name)?;
         validate_identifier("Collection ID", collection_id)?;
 
@@ -447,6 +461,14 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                     "Failed to unpin new checkpoint after save failure: {unpin_err}"
                 );
             }
+            if let Some(ref sink) = self.metrics_sink {
+                let elapsed = start.elapsed().as_secs_f64();
+                sink.record_histogram(
+                    "checkpoint_duration_seconds",
+                    elapsed,
+                    &[("status", "rollback")],
+                );
+            }
             return Err(e);
         }
 
@@ -473,6 +495,15 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
         // 5. Update the stored checkpoint reference
         self.index.write().insert(meta.clone());
+
+        if let Some(ref sink) = self.metrics_sink {
+            let elapsed = start.elapsed().as_secs_f64();
+            sink.record_histogram(
+                "checkpoint_duration_seconds",
+                elapsed,
+                &[("status", "commit")],
+            );
+        }
 
         Ok(meta)
     }
