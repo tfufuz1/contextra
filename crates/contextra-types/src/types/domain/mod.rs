@@ -9,7 +9,7 @@
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-016, ADR-025, ADR-041)
 
 //! # Architektur
-//! Enthält die zentralen Domänen-Modelle wie `DocId`, `TxId` und `WorkflowState`.
+//! Enthält die kognitiven Domänen-Modelle wie `DocId`, `TxId` und `WorkflowState`.
 //! Diese Typen sind die "Lingua Franca" zwischen allen Crates.
 //!
 //! # Invarianten
@@ -22,7 +22,6 @@ mod misc;
 #[allow(ambiguous_glob_reexports)]
 pub use document::*;
 pub use ids::*;
-pub use misc::RerankResult;
 #[allow(ambiguous_glob_reexports)]
 pub use misc::*;
 

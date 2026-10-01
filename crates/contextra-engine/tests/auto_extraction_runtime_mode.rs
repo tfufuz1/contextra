@@ -7,9 +7,9 @@ use contextra_engine::collection::crud::{
     AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig,
 };
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};
+use contextra_types::Result;
 #[cfg(feature = "entity-extraction")]
 use contextra_types::{DocId, EntityId};
-use contextra_types::Result;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -92,7 +92,11 @@ async fn test_auto_extraction_disabled_mode_creates_no_triples_and_provenance_em
     #[cfg(feature = "entity-extraction")]
     {
         let alice_id = EntityId::from_key("Alice").expect("Alice entity id");
-        let neighbors = col.graph_index().neighbors(alice_id).await.expect("neighbors");
+        let neighbors = col
+            .graph_index()
+            .neighbors(alice_id)
+            .await
+            .expect("neighbors");
         assert!(
             neighbors.is_empty(),
             "No graph edges or triples should exist when auto extraction is disabled"

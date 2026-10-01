@@ -402,8 +402,8 @@ impl Wal {
                                 ))
                             })?;
 
-                            let seq = WAL_SEAL_COUNTER
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let seq =
+                                WAL_SEAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let sealed_name = format!(
                                 "{}.sealed.{}",
                                 path.file_name().and_then(|n| n.to_str()).unwrap_or("wal"),

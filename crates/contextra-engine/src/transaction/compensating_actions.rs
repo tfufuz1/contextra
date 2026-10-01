@@ -183,7 +183,10 @@ pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
 impl<S: StorageEngine, V: VectorIndex> CompensateGraphAction<S, V> {
     #[allow(dead_code)]
     pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
-        Self { collection, doc_ids }
+        Self {
+            collection,
+            doc_ids,
+        }
     }
 }
 
@@ -197,7 +200,11 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
             );
             for &doc_id in self.doc_ids.iter() {
                 let eid = EntityId::new(doc_id.inner());
-                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                let _ = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await;
             }
             if let Err(e) = self.collection.graph_index.commit(comp_tx).await {
                 tracing::error!("[INV-DB-3] Compensating graph commit failed: {}", e);

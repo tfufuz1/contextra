@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::{
     weighted_reciprocal_rank_fusion, GlobalFusionConfig, GlobalFusionStrategy, SearchResult,
 };

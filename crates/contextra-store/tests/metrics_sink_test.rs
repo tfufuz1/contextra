@@ -1,7 +1,9 @@
 use contextra_core::{StorageEngine, TxId};
 use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_store::system_pressure::{SystemPressureMonitor, WAL_QUEUE_CRITICAL_THRESHOLD, WAL_QUEUE_ELEVATED_THRESHOLD};
+use contextra_store::system_pressure::{
+    SystemPressureMonitor, WAL_QUEUE_CRITICAL_THRESHOLD, WAL_QUEUE_ELEVATED_THRESHOLD,
+};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -26,9 +28,11 @@ impl MetricsSink for SpyMetricsSink {
                 .map(|(_, v)| *v)
                 .unwrap_or_default();
             if status == "success" {
-                self.commit_counter_success.fetch_add(value, Ordering::SeqCst);
+                self.commit_counter_success
+                    .fetch_add(value, Ordering::SeqCst);
             } else if status == "failure" {
-                self.commit_counter_failure.fetch_add(value, Ordering::SeqCst);
+                self.commit_counter_failure
+                    .fetch_add(value, Ordering::SeqCst);
             }
         }
     }
@@ -87,7 +91,8 @@ async fn test_metrics_sink_records_commit_events_with_test_metrics_sink() {
         .collect();
 
     assert_eq!(
-        commit_counter_events.len(), 1,
+        commit_counter_events.len(),
+        1,
         "Exactly 1 lsm_commit_total counter event must be recorded for a single commit"
     );
     assert_eq!(
@@ -104,9 +109,17 @@ async fn test_metrics_sink_records_commit_events_with_test_metrics_sink() {
         }
     );
 
-    if let MetricEvent::Histogram { name, value, labels } = commit_histogram_events[0] {
+    if let MetricEvent::Histogram {
+        name,
+        value,
+        labels,
+    } = commit_histogram_events[0]
+    {
         assert_eq!(name, "lsm_commit_duration_seconds");
-        assert!(*value > 0.0, "Recorded commit duration must be > 0.0 seconds");
+        assert!(
+            *value > 0.0,
+            "Recorded commit duration must be > 0.0 seconds"
+        );
         assert_eq!(labels, &vec![("status".to_string(), "success".to_string())]);
     } else {
         panic!("Expected Histogram event");
@@ -156,16 +169,25 @@ async fn test_metrics_sink_records_commit_events() {
         N, success_count, failure_count, hist_success_count, recorded_nanos_sum, total_elapsed
     );
 
-    assert_eq!(success_count, N, "Counter must record exactly N successful commits");
+    assert_eq!(
+        success_count, N,
+        "Counter must record exactly N successful commits"
+    );
     assert_eq!(failure_count, 0, "No commit failures expected");
     assert_eq!(
         hist_success_count, N,
         "Histogram must observe exactly N duration events"
     );
-    assert_eq!(hist_failure_count, 0, "No failure histogram events expected");
+    assert_eq!(
+        hist_failure_count, 0,
+        "No failure histogram events expected"
+    );
 
     // Plausibility check: duration must be > 0 and sum of reported durations <= total wall clock time + small tolerance
-    assert!(recorded_nanos_sum > 0, "Recorded commit duration must be non-zero");
+    assert!(
+        recorded_nanos_sum > 0,
+        "Recorded commit duration must be non-zero"
+    );
     let total_elapsed_nanos = total_elapsed.as_nanos() as u64;
     assert!(
         recorded_nanos_sum <= total_elapsed_nanos + 1_000_000,
@@ -190,10 +212,15 @@ async fn test_metrics_sink_records_commit_failures() {
         .put(tx_id, b"fail_key", b"fail_value")
         .await
         .expect("stage put");
-    storage.simulate_wal_append_failure_for_tx_for_test(100).await;
+    storage
+        .simulate_wal_append_failure_for_tx_for_test(100)
+        .await;
 
     let commit_res = storage.commit(tx_id).await;
-    assert!(commit_res.is_err(), "Commit should fail due to simulated WAL failure");
+    assert!(
+        commit_res.is_err(),
+        "Commit should fail due to simulated WAL failure"
+    );
 
     storage.restore_wal_file_handle_for_test().await;
 
@@ -205,7 +232,10 @@ async fn test_metrics_sink_records_commit_failures() {
 
     assert_eq!(success_count, 0, "No successful commits expected");
     assert_eq!(failure_count, 1, "Counter must record 1 commit failure");
-    assert_eq!(hist_failure_count, 1, "Histogram must record 1 duration observation for failure");
+    assert_eq!(
+        hist_failure_count, 1,
+        "Histogram must record 1 duration observation for failure"
+    );
 }
 
 #[tokio::test]
@@ -255,7 +285,9 @@ async fn test_metrics_sink_backpressure_level_transitions() {
     let events = test_sink.events();
     let gauge_events: Vec<&MetricEvent> = events
         .iter()
-        .filter(|e| matches!(e, MetricEvent::Gauge { name, .. } if name == "lsm_backpressure_level"))
+        .filter(
+            |e| matches!(e, MetricEvent::Gauge { name, .. } if name == "lsm_backpressure_level"),
+        )
         .collect();
 
     assert!(

@@ -40,7 +40,10 @@ async fn test_adaptive_ef_easy_queries_early_exit_and_recall() {
 
     let tx = TxId::new(1);
     for (i, v) in data.iter().enumerate() {
-        index.insert(tx, DocId::new((i as u64).into()), v).await.unwrap();
+        index
+            .insert(tx, DocId::new((i as u64).into()), v)
+            .await
+            .unwrap();
     }
     index.commit(tx).await.unwrap();
 
@@ -206,7 +209,10 @@ async fn test_adaptive_ef_determinism() {
         for x in v.iter_mut() {
             *x /= norm;
         }
-        index.insert(tx, DocId::new((i as u64).into()), &v).await.unwrap();
+        index
+            .insert(tx, DocId::new((i as u64).into()), &v)
+            .await
+            .unwrap();
     }
     index.commit(tx).await.unwrap();
 
@@ -289,7 +295,10 @@ async fn test_adaptive_ef_deleted_nodes_never_returned() {
     let tx1 = TxId::new(1);
     for i in 0..num_vectors {
         let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
-        index.insert(tx1, DocId::new((i as u64).into()), &v).await.unwrap();
+        index
+            .insert(tx1, DocId::new((i as u64).into()), &v)
+            .await
+            .unwrap();
     }
     index.commit(tx1).await.unwrap();
 

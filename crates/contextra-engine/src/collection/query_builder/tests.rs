@@ -1,7 +1,7 @@
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
-use contextra_ports::{BoxFuture, Reranker, RerankResult};
+use contextra_ports::{BoxFuture, RerankResult, Reranker};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{FilterExpr, HybridQuery};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -46,7 +46,9 @@ impl Reranker for SlowPartialMockReranker {
         Box::pin(async move {
             if candidates.len() == 1 {
                 // Individual item processing: simulate delay for items beyond cutoff
-                if candidates[0].contains(&format!("topic {}", cutoff)) || candidates[0].contains(&format!("doc-{}", cutoff)) {
+                if candidates[0].contains(&format!("topic {}", cutoff))
+                    || candidates[0].contains(&format!("doc-{}", cutoff))
+                {
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 }
             }

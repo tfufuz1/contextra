@@ -469,13 +469,20 @@ impl HnswIndexCore {
                 } else {
                     let shift = consecutive.saturating_sub(1).min(30);
                     let multiplier = 1u64.checked_shl(shift).unwrap_or(u64::MAX);
-                    let calc = self.cold.config.backoff_base_delay.saturating_mul(multiplier as u32);
+                    let calc = self
+                        .cold
+                        .config
+                        .backoff_base_delay
+                        .saturating_mul(multiplier as u32);
                     calc.min(self.cold.config.backoff_max_delay)
                 };
 
                 if elapsed < cooldown {
-                    let new_consecutive =
-                        self.cold.consecutive_rapid_rebuilds.fetch_add(1, Ordering::SeqCst) + 1;
+                    let new_consecutive = self
+                        .cold
+                        .consecutive_rapid_rebuilds
+                        .fetch_add(1, Ordering::SeqCst)
+                        + 1;
                     let sink = self.cold.metrics_sink.read().clone();
                     sink.record_counter(
                         "vector_rebuild_backoff_suppressed_total",
@@ -506,7 +513,9 @@ impl HnswIndexCore {
                         cooldown
                     )));
                 } else if elapsed >= self.cold.config.backoff_max_delay.saturating_mul(2) {
-                    self.cold.consecutive_rapid_rebuilds.store(0, Ordering::SeqCst);
+                    self.cold
+                        .consecutive_rapid_rebuilds
+                        .store(0, Ordering::SeqCst);
                 }
             }
         }
@@ -520,12 +529,14 @@ impl HnswIndexCore {
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
         let start_time = std::time::Instant::now();
 
-        let rebuild_res = self
-            .rebuild_phase1_snapshot_and_build()
-            .and_then(|(new_index, snapshot_tx)| {
-                tracing::info!("HNSW index rebuild Phase 1 completed, starting Phase 2 merge & swap");
-                self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
-            });
+        let rebuild_res =
+            self.rebuild_phase1_snapshot_and_build()
+                .and_then(|(new_index, snapshot_tx)| {
+                    tracing::info!(
+                        "HNSW index rebuild Phase 1 completed, starting Phase 2 merge & swap"
+                    );
+                    self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
+                });
 
         let elapsed_secs = start_time.elapsed().as_secs_f64();
         let sink = self.cold.metrics_sink.read().clone();
@@ -533,7 +544,9 @@ impl HnswIndexCore {
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
             *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
-            self.cold.consecutive_rapid_rebuilds.store(0, Ordering::SeqCst);
+            self.cold
+                .consecutive_rapid_rebuilds
+                .store(0, Ordering::SeqCst);
             sink.record_histogram("vector_rebuild_duration_seconds", elapsed_secs, &[]);
             sink.record_counter("vector_rebuild_total", 1, &[("status", "success")]);
             tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());

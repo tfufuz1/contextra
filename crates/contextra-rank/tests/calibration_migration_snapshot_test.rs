@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // ZWECK: Snapshot-Vergleich, der garantiert, dass Isotonic- und Platt-Kalibrierung nach dem Verschieben nach contextra-rank identische Ergebnisse liefern.
 
 use contextra_rank::{IsotonicCalibrator, PlattScaler};

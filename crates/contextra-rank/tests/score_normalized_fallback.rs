@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::fusion::{
     fuse_search_results_with_strategy, MetadataMergePriority, SearchResult,
 };

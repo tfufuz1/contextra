@@ -28,7 +28,10 @@ async fn test_quantizer_recalibration() {
             rng.gen_range(0.0..1.0),
             rng.gen_range(0.0..1.0),
         ];
-        index.insert(TxId(1), DocId((i as u64).into()), &v).await.unwrap();
+        index
+            .insert(TxId(1), DocId((i as u64).into()), &v)
+            .await
+            .unwrap();
     }
     index.commit(TxId(1)).await.unwrap();
 

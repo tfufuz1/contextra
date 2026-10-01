@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(feature = "dibud")]
 
 use contextra_rank::dibud::{fuse_exact_prefix, DiBudFusionState, FusionBudget};

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-11T00:00:00Z (SESSION: JULES-20260911-MUTATION-HARDENING)
 // ZWECK: Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE).

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:37:35Z (SESSION: 20c1aaf4)
 // ZWECK: Deep integration, proptest, and adversarial test suite for contextra-rank calibration.

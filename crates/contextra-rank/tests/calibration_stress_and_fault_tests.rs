@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-15T14:45:00Z (SESSION: 527bbb50)
 // ZWECK: Stress, fault-injection, and multi-threading concurrency tests for contextra-rank calibration.

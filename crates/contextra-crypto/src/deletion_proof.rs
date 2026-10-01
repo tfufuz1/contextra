@@ -1674,7 +1674,9 @@ mod tests {
             scope.clone(),
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -1689,7 +1691,9 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],

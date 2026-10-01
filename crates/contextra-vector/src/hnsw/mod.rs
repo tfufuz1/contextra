@@ -23,11 +23,11 @@ mod vector_index_impl;
 #[cfg(test)]
 mod tests;
 
+pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
-pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,

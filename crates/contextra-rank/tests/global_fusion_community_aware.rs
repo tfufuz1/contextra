@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::{GlobalFusionConfig, GlobalFusionStrategy, SearchResult};
 use contextra_types::ContextraError;
 use serde_json::json;

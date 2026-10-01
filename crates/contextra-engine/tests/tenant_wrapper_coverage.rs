@@ -3,7 +3,6 @@
 // ZWECK: Lückenlose Abdeckung aller Collection- und Storage-Operationen unter Mandanten-Isolation (TenantScopedStorage N21).
 // INVARIANTEN: Strikte Key-Isolation (INV-TENANT-2); Keine un-tenanted Keys im Storage für Mandanten-Aktionen; Mandant B sieht niemals Daten von Mandant A.
 // STAND: TS:2026-09-28
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_engine::{Contextra, ContextraConfig};

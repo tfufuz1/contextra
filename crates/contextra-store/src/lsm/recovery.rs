@@ -466,9 +466,10 @@ impl LsmStorage {
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
-        let metrics_sink_container = Arc::new(parking_lot::RwLock::new(
-            Arc::new(contextra_ports::NoopMetricsSink) as Arc<dyn contextra_ports::MetricsSink>,
-        ));
+        let metrics_sink_container = Arc::new(parking_lot::RwLock::new(Arc::new(
+            contextra_ports::NoopMetricsSink,
+        )
+            as Arc<dyn contextra_ports::MetricsSink>));
         let metrics_sink_for_pressure = Arc::clone(&metrics_sink_container);
 
         task_tracker.spawn(async move {

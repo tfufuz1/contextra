@@ -23,7 +23,7 @@
 
 use crate::error::{CryptoError, Result};
 use contextra_ports::Clock;
-use ed25519_dalek::{Signature, Signer, Verifier, SigningKey, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -155,15 +155,17 @@ impl RevocationLog {
         let mut revoked_targets = HashSet::new();
 
         if path_buf.exists() {
-            let mut file = File::open(&path_buf)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to open revocation log file: {e}")))?;
+            let mut file = File::open(&path_buf).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to open revocation log file: {e}"))
+            })?;
             let mut contents = Vec::new();
-            file.read_to_end(&mut contents)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to read revocation log file: {e}")))?;
+            file.read_to_end(&mut contents).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to read revocation log file: {e}"))
+            })?;
 
             if !contents.is_empty() {
-                let parsed_entries: Vec<RevocationEntry> = bincode::deserialize(&contents)
-                    .map_err(|_| CryptoError::IntegrityViolation)?;
+                let parsed_entries: Vec<RevocationEntry> =
+                    bincode::deserialize(&contents).map_err(|_| CryptoError::IntegrityViolation)?;
 
                 Self::verify_chain_entries(&parsed_entries, &verifying_key)?;
 
@@ -191,7 +193,10 @@ impl RevocationLog {
     }
 
     /// Hilfsfunktion zur Verifikation einer Liste von Eintrags-Ketten.
-    fn verify_chain_entries(entries: &[RevocationEntry], verifying_key: &VerifyingKey) -> Result<()> {
+    fn verify_chain_entries(
+        entries: &[RevocationEntry],
+        verifying_key: &VerifyingKey,
+    ) -> Result<()> {
         let mut expected_prev_hash = [0u8; 32];
 
         for (idx, entry) in entries.iter().enumerate() {
@@ -260,20 +265,25 @@ impl RevocationLog {
         revoked_guard.insert(target);
 
         if let Some(ref path) = self.file_path {
-            let serialized = bincode::serialize(&*entries_guard)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to serialize revocation log: {e}")))?;
+            let serialized = bincode::serialize(&*entries_guard).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
+            })?;
 
             let mut file = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .truncate(true)
                 .open(path)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to write revocation log file: {e}")))?;
+                .map_err(|e| {
+                    CryptoError::Crypto(format!("Failed to write revocation log file: {e}"))
+                })?;
 
-            file.write_all(&serialized)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to flush revocation log file: {e}")))?;
-            file.flush()
-                .map_err(|e| CryptoError::Crypto(format!("Failed to sync revocation log file: {e}")))?;
+            file.write_all(&serialized).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to flush revocation log file: {e}"))
+            })?;
+            file.flush().map_err(|e| {
+                CryptoError::Crypto(format!("Failed to sync revocation log file: {e}"))
+            })?;
         }
 
         Ok(new_entry)
@@ -421,13 +431,12 @@ mod tests {
         }
 
         // Tamper with 1 byte in the file
-        let mut raw_bytes = std::fs::read(&log_path)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let mut raw_bytes =
+            std::fs::read(&log_path).map_err(|e| CryptoError::Crypto(e.to_string()))?;
         assert!(!raw_bytes.is_empty());
         let last_idx = raw_bytes.len() - 1;
         raw_bytes[last_idx] ^= 0xFF; // Flip bits of last byte
-        std::fs::write(&log_path, &raw_bytes)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        std::fs::write(&log_path, &raw_bytes).map_err(|e| CryptoError::Crypto(e.to_string()))?;
 
         // Attempting to open tampered file MUST fail with IntegrityViolation
         let open_res = RevocationLog::open_or_create(&log_path, clock, None, vk);

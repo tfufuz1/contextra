@@ -94,9 +94,15 @@ impl<'de> Deserialize<'de> for SignalFusionStrategies {
 
         match StrategyHelper::deserialize(deserializer)? {
             StrategyHelper::Single(s) => Ok(SignalFusionStrategies::from(s)),
-            StrategyHelper::PerSignal { vector, text, graph } => {
-                Ok(SignalFusionStrategies { vector, text, graph })
-            }
+            StrategyHelper::PerSignal {
+                vector,
+                text,
+                graph,
+            } => Ok(SignalFusionStrategies {
+                vector,
+                text,
+                graph,
+            }),
         }
     }
 }
@@ -324,7 +330,10 @@ impl QueryRewriteOutput {
     /// Returns `true` if all reformulation components are empty or None.
     pub fn is_empty(&self) -> bool {
         self.text_query.as_ref().is_none_or(|s| s.trim().is_empty())
-            && self.semantic_query.as_ref().is_none_or(|s| s.trim().is_empty())
+            && self
+                .semantic_query
+                .as_ref()
+                .is_none_or(|s| s.trim().is_empty())
             && self.anchor_entities.is_empty()
     }
 }

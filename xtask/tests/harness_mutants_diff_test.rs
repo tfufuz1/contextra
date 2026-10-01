@@ -26,7 +26,8 @@ tier = "1"
     let score = mutants_diff::mutants_diff_get_expected_score(root, "contextra-core");
     assert!((score - 0.60).abs() < f64::EPSILON);
 
-    let touched = mutants_diff::mutants_diff_get_tier1_touched_crates(root, "HEAD", "HEAD").unwrap();
+    let touched =
+        mutants_diff::mutants_diff_get_tier1_touched_crates(root, "HEAD", "HEAD").unwrap();
     assert!(touched.is_empty());
 
     let args = vec![
