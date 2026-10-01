@@ -13,7 +13,7 @@ pub struct PinGuard<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
     seq_no: Option<u64>,
     orphan_registry: Arc<InstanceOrphanRegistry>,
-    pinned_at_ms: u64,
+    clock: Arc<dyn contextra_ports::Clock>,
 }
 
 impl<S: contextra_ports::StorageEngine> PinGuard<S> {
@@ -22,14 +22,27 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
         seq_no: u64,
         orphan_registry: Arc<InstanceOrphanRegistry>,
     ) -> Result<Self> {
-        let pinned_at_ms = clock_timestamp_ms(orphan_registry.clock().as_ref());
+        let clock = orphan_registry.clock().clone();
+        Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await
+    }
+
+    pub async fn pin_with_clock(
+        storage: Arc<S>,
+        seq_no: u64,
+        orphan_registry: Arc<InstanceOrphanRegistry>,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Result<Self> {
         storage.pin_checkpoint(seq_no).await?;
         Ok(Self {
             storage,
             seq_no: Some(seq_no),
             orphan_registry,
-            pinned_at_ms,
+            clock,
         })
+    }
+
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+        &self.clock
     }
 
     /// Entschärft den Guard nach erfolgreicher Persistierung, sodass die Sequenznummer gepinnt bleibt.
@@ -52,11 +65,10 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
 impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
     fn drop(&mut self) {
         if let Some(seq_no) = self.seq_no.take() {
-            // Drop has no async context; pinned_at_ms recorded during pin() guarantees
-            // deterministic orphan timestamps regardless of drop execution time.
+            let timestamp_ms = clock_timestamp_ms(self.clock.as_ref());
             let orphan = PinnedSeqNoOrphan {
                 seq_no,
-                timestamp_ms: self.pinned_at_ms,
+                timestamp_ms,
             };
             self.orphan_registry.register_orphan_sync(orphan);
             tracing::warn!(
@@ -81,15 +93,33 @@ pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
     pub(crate) namespace: String,
     pub(crate) orphan_registry: Arc<InstanceOrphanRegistry>,
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
+    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        Self::with_clock(checkpoint, storage, namespace, clock)
+    }
+
+    pub fn with_clock(
+        checkpoint: StateCheckpoint,
+        storage: Arc<S>,
+        namespace: impl Into<String>,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Self {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
-        let registry = Arc::new(InstanceOrphanRegistry::new(orphan_path));
+        let registry = Arc::new(InstanceOrphanRegistry::new(orphan_path).with_clock(clock.clone()));
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
-        Self::with_registry_and_counter(checkpoint, storage, ns, registry, skipped_rollbacks)
+        Self::with_registry_counter_and_clock(
+            checkpoint,
+            storage,
+            ns,
+            registry,
+            skipped_rollbacks,
+            clock,
+        )
     }
 
     pub fn with_registry(
@@ -98,13 +128,15 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         namespace: impl Into<String>,
         orphan_registry: Arc<InstanceOrphanRegistry>,
     ) -> Self {
+        let clock = orphan_registry.clock().clone();
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
-        Self::with_registry_and_counter(
+        Self::with_registry_counter_and_clock(
             checkpoint,
             storage,
             namespace,
             orphan_registry,
             skipped_rollbacks,
+            clock,
         )
     }
 
@@ -115,13 +147,37 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         orphan_registry: Arc<InstanceOrphanRegistry>,
         skipped_rollbacks: Arc<AtomicU64>,
     ) -> Self {
+        let clock = orphan_registry.clock().clone();
+        Self::with_registry_counter_and_clock(
+            checkpoint,
+            storage,
+            namespace,
+            orphan_registry,
+            skipped_rollbacks,
+            clock,
+        )
+    }
+
+    pub fn with_registry_counter_and_clock(
+        checkpoint: StateCheckpoint,
+        storage: Arc<S>,
+        namespace: impl Into<String>,
+        orphan_registry: Arc<InstanceOrphanRegistry>,
+        skipped_rollbacks: Arc<AtomicU64>,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Self {
         Self {
             checkpoint: Some(checkpoint),
             storage,
             namespace: namespace.into(),
             orphan_registry,
             skipped_rollbacks,
+            clock,
         }
+    }
+
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+        &self.clock
     }
 
     /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt.

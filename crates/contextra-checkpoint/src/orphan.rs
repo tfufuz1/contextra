@@ -42,8 +42,19 @@ fn default_data_dir() -> std::path::PathBuf {
     dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
 }
 
-pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
+/// Reads millisecond timestamp from the provided clock implementation.
+pub fn monotonic_timestamp_ms_with(clock: &dyn contextra_ports::Clock) -> u64 {
     clock.now_unix_nanos() / 1_000_000
+}
+
+/// Reads millisecond timestamp using the default SystemClock.
+pub fn monotonic_timestamp_ms() -> u64 {
+    let clock = SystemClock::new();
+    monotonic_timestamp_ms_with(&clock)
+}
+
+pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
+    monotonic_timestamp_ms_with(clock)
 }
 
 fn orphan_pin_file_path() -> std::path::PathBuf {

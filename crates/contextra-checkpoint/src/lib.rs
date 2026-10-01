@@ -45,8 +45,8 @@ pub use meta::{CheckpointMeta, StateCheckpoint};
 pub use orphan::{
     await_pending_rollbacks, clear_all_orphaned_checkpoints, clear_orphaned_checkpoint,
     get_orphaned_checkpoints, get_orphaned_checkpoints_for_namespace, global_orphan_registry,
-    orphaned_checkpoint_count, pending_rollback_count, register_orphaned_checkpoint,
-    register_pinned_seq_no_orphan, InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId,
-    PinnedSeqNoOrphan,
+    monotonic_timestamp_ms, monotonic_timestamp_ms_with, orphaned_checkpoint_count,
+    pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
+    InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan,
 };
 pub use store::{CheckpointRegistry, PersistentCheckpointStore};
