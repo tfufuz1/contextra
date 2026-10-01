@@ -245,8 +245,27 @@ impl AdaptiveCompactionPlanner for CostBasedAdaptivePlanner {
     }
 }
 
+/// Computes a score representing key range contiguity/overlap among SSTables in a window.
+/// Returns the number of adjacent overlapping pairs when sorted by first_key.
+pub(super) fn compute_key_overlap_score(window: &[Arc<SstableReader>]) -> usize {
+    if window.len() < 2 {
+        return 0;
+    }
+    let mut sorted: Vec<&Arc<SstableReader>> = window.iter().collect();
+    sorted.sort_by(|a, b| a.first_key().cmp(b.first_key()));
+
+    let mut overlaps = 0;
+    for i in 0..sorted.len() - 1 {
+        if sorted[i + 1].first_key() <= sorted[i].last_key() {
+            overlaps += 1;
+        }
+    }
+    overlaps
+}
+
 /// Helper function to perform standard Size-Tiered Compaction candidate selection.
-fn select_stcs_candidates(
+/// Prefers contiguous key ranges (overlapping or adjacent key spaces) when evaluating tiers.
+pub(super) fn select_stcs_candidates(
     ssts: &[Arc<SstableReader>],
     min_sstables_per_tier: usize,
     size_ratio: f64,
@@ -258,7 +277,9 @@ fn select_stcs_candidates(
     let min_tier = min_sstables_per_tier;
 
     // 1. Evaluate all contiguous sub-ranges ssts[start..end]
+    // Candidates are selected prioritizing key overlap/contiguity score first, then tier length, then size.
     let mut best_tier_range: Option<(usize, usize)> = None;
+    let mut best_overlap = 0usize;
     let mut best_tier_len = 0usize;
     let mut best_tier_size = u64::MAX;
 
@@ -282,10 +303,16 @@ fn select_stcs_candidates(
             if ratio <= size_ratio {
                 let win_len = end - start;
                 let win_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
+                let overlap = compute_key_overlap_score(window);
 
-                if win_len > best_tier_len
-                    || (win_len == best_tier_len && win_size < best_tier_size)
-                {
+                let is_better = overlap > best_overlap
+                    || (overlap == best_overlap && win_len > best_tier_len)
+                    || (overlap == best_overlap
+                        && win_len == best_tier_len
+                        && win_size < best_tier_size);
+
+                if is_better {
+                    best_overlap = overlap;
                     best_tier_len = win_len;
                     best_tier_size = win_size;
                     best_tier_range = Some((start, end));
@@ -298,18 +325,23 @@ fn select_stcs_candidates(
         return Some(ssts[start..end].to_vec());
     }
 
-    // 2. Fallback for large SSTable counts
+    // 2. Fallback for large SSTable counts: select contiguous window of min_tier size prioritizing key overlap
     if ssts.len() >= min_tier * 2 {
         let mut best_fallback_start = None;
+        let mut best_fallback_overlap = 0usize;
         let mut min_fallback_size = u64::MAX;
 
         for start in 0..=(ssts.len() - min_tier) {
             let end = start + min_tier;
-            let total_size: u64 = ssts[start..end]
-                .iter()
-                .map(|s| s.metadata().file_size)
-                .sum();
-            if total_size < min_fallback_size {
+            let window = &ssts[start..end];
+            let total_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
+            let overlap = compute_key_overlap_score(window);
+
+            let is_better = overlap > best_fallback_overlap
+                || (overlap == best_fallback_overlap && total_size < min_fallback_size);
+
+            if is_better {
+                best_fallback_overlap = overlap;
                 min_fallback_size = total_size;
                 best_fallback_start = Some(start);
             }

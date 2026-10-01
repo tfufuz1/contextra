@@ -348,82 +348,17 @@ impl CompactionEngine {
 
     /// Selects SSTables to compact using Size-Tiered strategy.
     ///
-    /// Groups by size class and returns the first group that meets the threshold.
-    pub(super) fn select_compaction_candidates(
+    /// Groups by size class and returns the group that meets the threshold,
+    /// prioritizing key range overlap and contiguity.
+    pub fn select_compaction_candidates(
         &self,
         ssts: &[Arc<SstableReader>],
     ) -> Option<Vec<Arc<SstableReader>>> {
-        if ssts.len() < self.config.min_sstables_per_tier {
-            return None;
-        }
-
-        let min_tier = self.config.min_sstables_per_tier;
-
-        // 1. Evaluate all contiguous sub-ranges ssts[start..end]
-        // Candidates MUST form a contiguous subslice in `ssts`.
-        let mut best_tier_range: Option<(usize, usize)> = None;
-        let mut best_tier_len = 0usize;
-        let mut best_tier_size = u64::MAX;
-
-        for start in 0..ssts.len() {
-            for end in (start + min_tier)..=ssts.len() {
-                let window = &ssts[start..end];
-                let min_sz = window
-                    .iter()
-                    .map(|s| s.metadata().file_size)
-                    .min()
-                    .unwrap_or(1)
-                    .max(1);
-                let max_sz = window
-                    .iter()
-                    .map(|s| s.metadata().file_size)
-                    .max()
-                    .unwrap_or(1)
-                    .max(1);
-                let ratio = max_sz as f64 / min_sz as f64;
-
-                if ratio <= self.config.size_ratio {
-                    let win_len = end - start;
-                    let win_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
-
-                    if win_len > best_tier_len
-                        || (win_len == best_tier_len && win_size < best_tier_size)
-                    {
-                        best_tier_len = win_len;
-                        best_tier_size = win_size;
-                        best_tier_range = Some((start, end));
-                    }
-                }
-            }
-        }
-
-        if let Some((start, end)) = best_tier_range {
-            return Some(ssts[start..end].to_vec());
-        }
-
-        // 2. Fallback for large SSTable counts: select contiguous window of min_tier size with smallest total size
-        if ssts.len() >= min_tier * 2 {
-            let mut best_fallback_start = None;
-            let mut min_fallback_size = u64::MAX;
-
-            for start in 0..=(ssts.len() - min_tier) {
-                let end = start + min_tier;
-                let total_size: u64 = ssts[start..end]
-                    .iter()
-                    .map(|s| s.metadata().file_size)
-                    .sum();
-                if total_size < min_fallback_size {
-                    min_fallback_size = total_size;
-                    best_fallback_start = Some(start);
-                }
-            }
-
-            if let Some(start) = best_fallback_start {
-                return Some(ssts[start..start + min_tier].to_vec());
-            }
-        }
-
-        None
+        super::adaptive::select_stcs_candidates(
+            ssts,
+            self.config.min_sstables_per_tier,
+            self.config.size_ratio,
+        )
     }
 
     /// Estimates the peak memory consumption (in bytes) during a multi-way merge of candidates.
