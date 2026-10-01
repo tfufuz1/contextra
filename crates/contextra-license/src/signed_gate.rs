@@ -341,7 +341,7 @@ impl LicenseGate for SignedLicenseGate {
                 _ => return Err(LicenseError::NotActivated(ring)),
             }
         } else if let Some(ref payload) = self.license_payload {
-            if let Some(expected_hash) = payload.installation_id_hash {
+            if let Some(ref expected_hash) = payload.installation_id_hash {
                 match self.local_installation_id {
                     Some(local_hash) if constant_time_eq_32(&local_hash, &expected_hash) => {}
                     _ => return Err(LicenseError::NotActivated(ring)),
@@ -365,6 +365,7 @@ impl LicenseGate for SignedLicenseGate {
         } else if self.license_payload.is_some() && self.verifying_key.is_none() {
             return Err(LicenseError::InvalidSignature);
         }
+        // Note: For license_payload, signature verification was performed during `from_signed_payload_with_clock`.
 
         // (5) Step 5: Expiration check using clock port (P28)
         let expires_at = if let Some(ref act) = self.activation {
