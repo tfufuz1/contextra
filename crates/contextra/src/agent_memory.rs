@@ -8,7 +8,23 @@ use contextra_ports::IdGen;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+static FALLBACK_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Generates a deterministic fallback memory ID when no explicit `IdGen` is injected into `AgentMemory`.
+///
+/// # Governance & Determinism Notice
+/// - (a) Non-deterministic `uuid::Uuid::new_v4()` is strictly prohibited to guarantee Contextra's
+///   determinism promise ("reproducible, audited context").
+/// - (b) This fallback mechanism is strictly utilized only when no explicit `IdGen` was injected.
+/// - (c) For production deployments requiring strict replay determinism across process restarts, an `IdGen`
+///   must be explicitly injected via `AgentMemory::with_id_gen` or `AgentMemory::new_with_id_gen`.
+fn next_fallback_id() -> String {
+    let seq = FALLBACK_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("fallback-{seq}")
+}
 
 /// Opaque identifier for a memory stored via `AgentMemory`.
 ///
@@ -142,7 +158,15 @@ impl AgentMemory {
     /// Stores a text memory entry with optional JSON metadata.
     ///
     /// Generates a unique memory identifier via the injected `IdGen` if available,
-    /// or falls back to `uuid::Uuid::new_v4()` when no `IdGen` is provided.
+    /// or falls back to a deterministic sequence (`"fallback-1"`, `"fallback-2"`, ...)
+    /// when no `IdGen` is provided.
+    ///
+    /// # Fallback Determinism Notice
+    /// - (a) `uuid::Uuid::new_v4()` is no longer used to uphold Contextra's determinism promise
+    ///   ("reproducible, audited context") and governance rules forbidding non-deterministic UUIDs in production code.
+    /// - (b) `next_fallback_id()` only triggers when no `IdGen` was injected (`id_gen == None`).
+    /// - (c) For production deployments requiring replay determinism across process restarts,
+    ///   an explicit `IdGen` should be injected via `with_id_gen` or `new_with_id_gen`.
     ///
     /// Delegates directly to `Contextra::insert_text_only`.
     pub async fn remember(
@@ -151,13 +175,14 @@ impl AgentMemory {
         metadata: Option<Value>,
     ) -> Result<MemoryId, ContextraError> {
         // Fallback documentation:
-        // Falls kein `IdGen` injiziert ist (id_gen == None), nutzen wir weiterhin `Uuid::new_v4()` als Fallback.
-        // Nicht-deterministische IDs sind an dieser Stelle funktional unkritisch.
-        // Die Option zur Injizierung eines `IdGen` (z.B. `SequentialIdGen`) dient dazu,
-        // deterministische ID-Sequenzen für Tests und Replay-Szenarien zu ermöglichen.
+        // (a) `uuid::Uuid::new_v4()` is no longer used to uphold Contextra's determinism promise
+        //     ("reproducible, audited context") and governance rules forbidding non-deterministic UUIDs in production code.
+        // (b) `next_fallback_id()` only triggers when no `IdGen` is injected (`id_gen == None`).
+        // (c) For production deployments requiring replay determinism across process restarts,
+        //     an explicit `IdGen` should be injected via `with_id_gen` or `new_with_id_gen`.
         let id = match &self.id_gen {
             Some(gen) => gen.next_id().to_string(),
-            None => uuid::Uuid::new_v4().to_string(),
+            None => next_fallback_id(),
         };
         self.engine.insert_text_only(&id, text, metadata).await?;
         Ok(MemoryId(id))
@@ -240,5 +265,62 @@ impl AgentMemory {
             .await?;
 
         Ok(RelationId(hyperedge_id.inner()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fallback_id_prefix_and_monotonicity() {
+        let id1 = next_fallback_id();
+        let id2 = next_fallback_id();
+
+        assert!(
+            id1.starts_with("fallback-"),
+            "Fallback ID 1 must have prefix 'fallback-': {id1}"
+        );
+        assert!(
+            id2.starts_with("fallback-"),
+            "Fallback ID 2 must have prefix 'fallback-': {id2}"
+        );
+
+        let num1: u64 = id1
+            .strip_prefix("fallback-")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let num2: u64 = id2
+            .strip_prefix("fallback-")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        assert_eq!(num2, num1 + 1, "Fallback IDs must increase monotonically");
+        assert_ne!(id1, id2, "Consecutive fallback IDs must be distinct");
+    }
+
+    #[test]
+    fn test_fallback_id_reproducibility_from_initial_state() {
+        // Simulates two separate process runs starting from identical initial state (counter = 1)
+        let counter_run_1 = AtomicU64::new(1);
+        let run1_id1 = format!("fallback-{}", counter_run_1.fetch_add(1, Ordering::Relaxed));
+        let run1_id2 = format!("fallback-{}", counter_run_1.fetch_add(1, Ordering::Relaxed));
+
+        let counter_run_2 = AtomicU64::new(1);
+        let run2_id1 = format!("fallback-{}", counter_run_2.fetch_add(1, Ordering::Relaxed));
+        let run2_id2 = format!("fallback-{}", counter_run_2.fetch_add(1, Ordering::Relaxed));
+
+        assert_eq!(run1_id1, "fallback-1");
+        assert_eq!(run1_id2, "fallback-2");
+
+        // Runs with identical initial sequence produce identical IDs in identical call order
+        assert_eq!(
+            run1_id1, run2_id1,
+            "First call across identical runs must match"
+        );
+        assert_eq!(
+            run1_id2, run2_id2,
+            "Second call across identical runs must match"
+        );
     }
 }
