@@ -1,11 +1,8 @@
 //! Domänenspezifische Vokabularpakete für die erweiterte Morphologie.
 //!
-//! **Hinweis zur Verdrahtung**: Diese Pakete sind aktuell NICHT automatisch in
-//! `GermanCompoundSplitter` oder `get_german_stopwords` eingehängt (kein automatischer
-//! Seiteneffekt auf bestehendes Verhalten). Die Verdrahtung in den eigentlichen
-//! Splitter/Stopwort-Pfad ist ein bewusst separater Folge-Task, weil er die bestehende,
-//! bereits gehärtete Morphologie-Logik verändern würde und damit außerhalb des isolierten
-//! Scopes dieses Tasks liegt.
+//! Lädt versionierte Wörterbücher aus den Crate-Ressourcendateien (`data/legal_de.txt`,
+//! `data/medical_de.txt`) über `include_str!` und stellt sie mit performantem
+//! In-Memory-Lookup (einmaliges Parsen via `OnceLock`) zur Verfügung.
 
 pub mod legal_de;
 pub mod medical_de;
@@ -13,8 +10,11 @@ pub mod medical_de;
 pub use legal_de::LegalDomainVocabulary;
 pub use medical_de::MedicalDomainVocabulary;
 
+use crate::morphology::normalize_umlauts;
+use std::collections::HashSet;
+
 /// Trait für domänenspezifische Vokabularpakete.
-pub trait DomainVocabulary {
+pub trait DomainVocabulary: Send + Sync {
     /// Domänenspezifische Komposita-Bausteine (Ergänzung, kein Ersatz für das KMU-Basiswörterbuch).
     fn compound_stems(&self) -> &'static [&'static str];
     /// Fachbegriffe, die NICHT als Stopwort behandelt werden dürfen, selbst wenn sie kurz/häufig sind
@@ -22,6 +22,60 @@ pub trait DomainVocabulary {
     fn protected_terms(&self) -> &'static [&'static str];
     /// Kurzname für Logging/Konfiguration, z. B. "legal_de", "medical_de".
     fn domain_id(&self) -> &'static str;
+}
+
+pub(crate) struct ParsedVocabulary {
+    pub compound_stems: &'static [&'static str],
+    pub protected_terms: &'static [&'static str],
+}
+
+pub(crate) fn parse_domain_resource(raw: &'static str) -> ParsedVocabulary {
+    let mut current_section = "stems";
+    let mut stems_vec: Vec<&'static str> = Vec::new();
+    let mut protected_vec: Vec<&'static str> = Vec::new();
+
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed == "[compound_stems]" {
+            current_section = "stems";
+            continue;
+        }
+        if trimmed == "[protected_terms]" {
+            current_section = "protected";
+            continue;
+        }
+
+        let norm = normalize_umlauts(trimmed);
+        if norm.len() < 2 {
+            continue;
+        }
+
+        let leaked_str: &'static str = Box::leak(norm.into_boxed_str());
+        match current_section {
+            "stems" => stems_vec.push(leaked_str),
+            "protected" => protected_vec.push(leaked_str),
+            _ => stems_vec.push(leaked_str),
+        }
+    }
+
+    stems_vec.sort_unstable();
+    stems_vec.dedup();
+    protected_vec.sort_unstable();
+    protected_vec.dedup();
+
+    let protected_set: HashSet<&'static str> = protected_vec.iter().copied().collect();
+    stems_vec.retain(|stem| !protected_set.contains(stem));
+
+    let static_stems: &'static [&'static str] = Box::leak(stems_vec.into_boxed_slice());
+    let static_protected: &'static [&'static str] = Box::leak(protected_vec.into_boxed_slice());
+
+    ParsedVocabulary {
+        compound_stems: static_stems,
+        protected_terms: static_protected,
+    }
 }
 
 #[cfg(test)]
@@ -33,8 +87,8 @@ mod tests {
 
         let stems = vocab.compound_stems();
         assert!(
-            stems.len() >= 40,
-            "Domain {} must have at least 40 compound stems, found {}",
+            stems.len() >= 2000,
+            "Domain {} must have at least 2000 compound stems, found {}",
             expected_id,
             stems.len()
         );
