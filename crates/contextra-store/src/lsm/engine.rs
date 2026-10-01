@@ -250,4 +250,139 @@ impl LsmStorage {
     pub fn next_seq_no_for_test(&self) -> u64 {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
+
+    /// Checks if a database directory contains any legacy WAL files requiring explicit migration.
+    ///
+    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
+    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
+    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
+    pub async fn has_pending_legacy_wal_migration_path(path: &std::path::Path) -> Result<bool> {
+        let mut entries = match tokio::fs::read_dir(path).await {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => {
+                return Err(contextra_core::ContextraError::Storage(format!(
+                    "Failed to read directory for legacy WAL check: {e}"
+                )))
+            }
+        };
+
+        while let Some(entry) = entries.next_entry().await.map_err(|e| {
+            contextra_core::ContextraError::Storage(format!(
+                "Failed to read directory entry for legacy WAL check: {e}"
+            ))
+        })? {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            let is_wal_file = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                || name_str == "wal.log"
+                || name_str.ends_with(".wal");
+
+            if is_wal_file {
+                let file_path = entry.path();
+                if !Wal::has_migration_marker(&file_path).await {
+                    let test_wal = Wal::open_read_only_with_config(
+                        &file_path,
+                        crate::wal::WalConfig {
+                            allow_legacy_integrity_key_fallback: true,
+                            min_wal_version: crate::wal::WalVersion::V1,
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+
+                    let _ = test_wal.replay().await?;
+                    if test_wal.legacy_key_used_for_test() {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Checks if the current storage instance's data directory contains any pending legacy WAL files.
+    ///
+    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
+    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
+    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
+    pub async fn has_pending_legacy_wal_migration(&self) -> Result<bool> {
+        Self::has_pending_legacy_wal_migration_path(&self.config.path).await
+    }
+
+    /// Explicitly migrates all legacy WAL files in the specified directory using the provided clock port.
+    ///
+    /// Returns the number of migrated WAL files.
+    ///
+    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
+    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
+    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
+    pub async fn migrate_legacy_wal_keys(
+        config: &LsmConfig,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Result<usize> {
+        let mut entries = match tokio::fs::read_dir(&config.path).await {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => {
+                return Err(contextra_core::ContextraError::Storage(format!(
+                    "Failed to read directory for legacy WAL migration: {e}"
+                )))
+            }
+        };
+
+        let salt_path = config.path.join("SALT");
+        if !salt_path.exists() {
+            let mut buf = [0u8; 32];
+            use rand::Rng;
+            rand::thread_rng().fill(&mut buf);
+            crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
+        }
+
+        let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
+            contextra_core::ContextraError::Storage(format!(
+                "SALT file read failed during migration: {e}"
+            ))
+        })?;
+
+        let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
+            Some(Arc::new(crate::wal::KeyManager::try_new(passphrase, &salt)?))
+        } else {
+            None
+        };
+
+        let mut migrated_count = 0usize;
+
+        while let Some(entry) = entries.next_entry().await.map_err(|e| {
+            contextra_core::ContextraError::Storage(format!(
+                "Failed to read directory entry for legacy WAL migration: {e}"
+            ))
+        })? {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            let is_wal_file = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                || name_str == "wal.log"
+                || name_str.ends_with(".wal");
+
+            if is_wal_file {
+                let file_path = entry.path();
+                if !Wal::has_migration_marker(&file_path).await {
+                    let wal = Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;
+
+                    if wal.was_legacy_rekeyed() {
+                        let timestamp_nanos = clock.now_unix_nanos();
+                        tracing::info!(
+                            wal_path = %file_path.display(),
+                            timestamp_nanos = timestamp_nanos,
+                            "Legacy WAL key migration executed for segment"
+                        );
+                        migrated_count += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(migrated_count)
+    }
 }
