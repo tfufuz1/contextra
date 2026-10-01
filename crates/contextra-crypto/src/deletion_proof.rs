@@ -1662,6 +1662,7 @@ mod tests {
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
         assert!(v1_proof.verify(&test_key()).unwrap());

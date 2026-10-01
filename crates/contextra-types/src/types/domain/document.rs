@@ -208,3 +208,16 @@ impl ScoredDocument {
         Self { doc_id, score }
     }
 }
+
+/// Result of cross-encoder reranking operation for a candidate item.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Rank position after reranking (0-based).
+    pub index: usize,
+    /// Original index in the input candidate array.
+    pub original_index: usize,
+    /// Raw model output score or logit.
+    pub score: f32,
+    /// Calibrated relevance score (e.g., via Platt scaling or isotonic regression) in [0.0, 1.0].
+    pub calibrated_score: f32,
+}

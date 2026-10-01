@@ -169,8 +169,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                         Ok(Ok(ranked_chunk)) => {
                             for r in ranked_chunk {
                                 accumulated_ranked.push(contextra_types::RerankResult {
+                                    index: r.index,
                                     original_index: start_candidate_idx + r.original_index,
                                     score: r.score,
+                                    calibrated_score: r.calibrated_score,
                                 });
                             }
                         }

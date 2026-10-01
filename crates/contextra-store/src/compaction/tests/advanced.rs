@@ -23,6 +23,7 @@ async fn test_compaction_stress_and_gc() {
             max_io_bytes_per_second: None,
             enable_adaptive_compaction: false,
             adaptive_read_ratio_threshold: 0.70,
+            ..CompactionConfig::default()
         },
         encryption_passphrase: None,
         ..Default::default()
@@ -522,6 +523,7 @@ async fn test_compaction_cancellation() {
         max_io_bytes_per_second: None,
         enable_adaptive_compaction: false,
         adaptive_read_ratio_threshold: 0.70,
+        ..CompactionConfig::default()
     };
     let engine = Arc::new(CompactionEngine::new(
         config,
@@ -586,6 +588,7 @@ async fn concurrent_flush_and_compact_is_safe() {
                 max_io_bytes_per_second: None,
                 enable_adaptive_compaction: false,
                 adaptive_read_ratio_threshold: 0.70,
+                ..CompactionConfig::default()
             },
             encryption_passphrase: None,
             ..Default::default()
