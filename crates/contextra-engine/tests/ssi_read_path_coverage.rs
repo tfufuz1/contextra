@@ -88,6 +88,14 @@ async fn test_ssi_coverage_link_memories() -> Result<()> {
     )
     .await?;
 
+    col.update_op(
+        &tx1,
+        "mem_y",
+        &emb,
+        Some(json!({ "title": "Tx1 Overwrite Y" })),
+    )
+    .await?;
+
     // Tx1 commit should fail because mem_x was concurrently updated
     let tx1_res = tx1.commit().await;
     assert!(

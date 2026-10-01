@@ -15,7 +15,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         let fusion_weights = self.weights.unwrap_or_default();
         let fusion_strategy = self
             .fusion_strategy
-            .or_else(|| self.strategy.as_ref().map(|s| s.to_fusion_strategy()))
+            .or_else(|| self.strategy.as_ref().map(|s| s.to_signal_fusion_strategies()))
             .unwrap_or_default();
 
         let hybrid_query = contextra_types::HybridQuery {

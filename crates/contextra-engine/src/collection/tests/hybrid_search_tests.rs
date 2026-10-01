@@ -458,6 +458,279 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_
 }
 
 #[tokio::test]
+async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextra_types::Result<()> {
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::lsm::{LsmConfig, LsmStorage};
+    use contextra_types::{FusionStrategy, SignalFusionStrategies};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
+    let storage = Arc::new(LsmStorage::new(LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    }).await?);
+    let index = Arc::new(HnswIndex::try_new(HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Collection::new(
+        "score_norm_ranking".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_alpha",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust database search engine"})),
+    )
+    .await?;
+
+    col.insert(
+        "doc_beta",
+        &[0.2, 0.8, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust database search engine rust rust"})),
+    )
+    .await?;
+
+    let score_norm_strat = SignalFusionStrategies::uniform(FusionStrategy::ScoreNormalized);
+    let norm_res = col
+        .hybrid_search_with_strategy(
+            "rust",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(score_norm_strat),
+        )
+        .await?;
+
+    let rrf_strat = SignalFusionStrategies::uniform(FusionStrategy::Rrf);
+    let rrf_res = col
+        .hybrid_search_with_strategy(
+            "rust",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(rrf_strat),
+        )
+        .await?;
+
+    assert_eq!(norm_res.len(), 2);
+    assert_eq!(rrf_res.len(), 2);
+
+    // Verify ScoreNormalized score computation differs from RRF
+    assert_ne!(norm_res[0].score, rrf_res[0].score);
+    assert!(norm_res[0].score.is_finite());
+    assert!(norm_res[1].score.is_finite());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types::Result<()> {
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::lsm::{LsmConfig, LsmStorage};
+    use contextra_types::{FusionStrategy, SignalFusionStrategies};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
+    let storage = Arc::new(LsmStorage::new(LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    }).await?);
+    let index = Arc::new(HnswIndex::try_new(HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Collection::new(
+        "mixed_fusion_strategies".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_v1_t2",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "vector top match"})),
+    )
+    .await?;
+
+    col.insert(
+        "doc_v2_t1",
+        &[0.1, 0.9, 0.0, 0.0],
+        Some(serde_json::json!({"text": "vector top match text top match text top match"})),
+    )
+    .await?;
+
+    let pure_rrf = SignalFusionStrategies::uniform(FusionStrategy::Rrf);
+    let pure_norm = SignalFusionStrategies::uniform(FusionStrategy::ScoreNormalized);
+    let mixed_strat = SignalFusionStrategies {
+        vector: FusionStrategy::Rrf,
+        text: FusionStrategy::ScoreNormalized,
+        graph: FusionStrategy::Rrf,
+    };
+
+    let run_pure_rrf = col
+        .hybrid_search_with_strategy(
+            "text",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(pure_rrf),
+        )
+        .await?;
+
+    let run_pure_norm = col
+        .hybrid_search_with_strategy(
+            "text",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(pure_norm),
+        )
+        .await?;
+
+    let run_mixed = col
+        .hybrid_search_with_strategy(
+            "text",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(mixed_strat),
+        )
+        .await?;
+
+    assert_eq!(run_pure_rrf.len(), 2);
+    assert_eq!(run_pure_norm.len(), 2);
+    assert_eq!(run_mixed.len(), 2);
+
+    // Verify mixed strategy combines vector RRF contribution + text ScoreNormalized contribution
+    // Prove that mixed score for doc_v1_t2 is distinct from pure_rrf and pure_norm
+    let mixed_doc0_score = run_mixed[0].score;
+    let rrf_doc0_score = run_pure_rrf[0].score;
+    let norm_doc0_score = run_pure_norm[0].score;
+
+    assert_ne!(
+        mixed_doc0_score, rrf_doc0_score,
+        "Mixed strategy score must differ from pure RRF score"
+    );
+    assert_ne!(
+        mixed_doc0_score, norm_doc0_score,
+        "Mixed strategy score must differ from pure ScoreNormalized score"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contextra_types::Result<()> {
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::lsm::{LsmConfig, LsmStorage};
+    use contextra_types::{FusionStrategy, SignalFusionStrategies};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
+    let storage = Arc::new(LsmStorage::new(LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    }).await?);
+    let index = Arc::new(HnswIndex::try_new(HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Collection::new(
+        "regression_parity".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "regression parity test document one"})),
+    )
+    .await?;
+
+    col.insert(
+        "doc_2",
+        &[0.5, 0.5, 0.0, 0.0],
+        Some(serde_json::json!({"text": "regression parity test document two"})),
+    )
+    .await?;
+
+    // Calling with single FusionStrategy converted via From<FusionStrategy> (.into())
+    let single_rrf: SignalFusionStrategies = FusionStrategy::Rrf.into();
+    let uniform_rrf = SignalFusionStrategies::uniform(FusionStrategy::Rrf);
+
+    let res_single = col
+        .hybrid_search_with_strategy(
+            "regression",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(single_rrf),
+        )
+        .await?;
+
+    let res_uniform = col
+        .hybrid_search_with_strategy(
+            "regression",
+            &[1.0, 0.0, 0.0, 0.0],
+            2,
+            None,
+            None,
+            None,
+            None,
+            Some(uniform_rrf),
+        )
+        .await?;
+
+    assert_eq!(res_single.len(), res_uniform.len());
+    for (a, b) in res_single.iter().zip(res_uniform.iter()) {
+        assert_eq!(a.id, b.id);
+        assert_eq!(a.score.to_bits(), b.score.to_bits());
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
@@ -522,7 +795,7 @@ async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_typ
             None,
             None,
             None,
-            Some(FusionStrategy::Rrf),
+            Some(FusionStrategy::Rrf.into()),
         )
         .await?;
 
@@ -599,7 +872,7 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
             Some(&weights),
             None,
             None,
-            Some(FusionStrategy::Rrf),
+            Some(FusionStrategy::Rrf.into()),
         )
         .await?;
 
@@ -612,7 +885,7 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
             Some(&weights),
             None,
             None,
-            Some(FusionStrategy::ScoreNormalized),
+            Some(FusionStrategy::ScoreNormalized.into()),
         )
         .await?;
 
@@ -683,7 +956,7 @@ async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf() -
             None,
             None,
             None,
-            Some(FusionStrategy::ScoreNormalized),
+            Some(FusionStrategy::ScoreNormalized.into()),
         )
         .await?;
 
@@ -753,7 +1026,7 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
             None,
             None,
             None,
-            Some(FusionStrategy::ScoreNormalized),
+            Some(FusionStrategy::ScoreNormalized.into()),
         )
         .await?;
 
@@ -767,7 +1040,7 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
                 None,
                 None,
                 None,
-                Some(FusionStrategy::ScoreNormalized),
+                Some(FusionStrategy::ScoreNormalized.into()),
             )
             .await?;
 
@@ -854,7 +1127,7 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
             None,
             None,
             Some(eid_target),
-            Some(FusionStrategy::Rrf),
+            Some(FusionStrategy::Rrf.into()),
         )
         .await?;
 
@@ -868,7 +1141,7 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
             None,
             None,
             Some(eid_target),
-            Some(FusionStrategy::ScoreNormalized),
+            Some(FusionStrategy::ScoreNormalized.into()),
         )
         .await?;
 

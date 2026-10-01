@@ -340,7 +340,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .saturating_mul(Self::OVERFETCH_FACTOR)
                 .min(contextra_types::MAX_SEARCH_K);
 
-            let mut fused_results = crate::fusion::fuse_search_results_with_strategy(
+            let mut fused_results = crate::fusion::fuse_search_results_with_signal_strategies(
                 signal_sets,
                 max_fusion_results,
                 crate::fusion::MetadataMergePriority::default(),

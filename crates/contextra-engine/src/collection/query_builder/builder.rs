@@ -3,7 +3,9 @@ use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
 use contextra_ports::{Reranker, StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType};
+use contextra_types::{
+    DocId, EntityId, FilterExpr, FusionWeights, MemoryType, SignalFusionStrategies,
+};
 
 #[cfg(feature = "adaptive-candidate-pool-sizing")]
 use std::sync::Arc;
@@ -26,7 +28,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) vector: Option<Vec<f32>>,
     pub(super) k: Option<usize>,
     pub(super) weights: Option<FusionWeights>,
-    pub(super) fusion_strategy: Option<FusionStrategy>,
+    pub(super) fusion_strategy: Option<SignalFusionStrategies>,
     pub(super) strategy: Option<SearchStrategy>,
     pub(super) filter: Option<FilterExpr>,
     pub(super) anchor_entities: Option<Vec<EntityId>>,
@@ -118,9 +120,9 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 
-    /// Sets search fusion strategy (`FusionStrategy::Rrf` or `FusionStrategy::ScoreNormalized`).
-    pub fn fusion_strategy(mut self, strategy: FusionStrategy) -> Self {
-        self.fusion_strategy = Some(strategy);
+    /// Sets search fusion strategy per signal or globally (`FusionStrategy` or `SignalFusionStrategies`).
+    pub fn fusion_strategy(mut self, strategy: impl Into<SignalFusionStrategies>) -> Self {
+        self.fusion_strategy = Some(strategy.into());
         self
     }
 
