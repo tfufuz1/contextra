@@ -19,6 +19,7 @@
 //! - Absolut lock-frei und frei von synchronen/asynchronen I/O-Operationen.
 
 pub mod anti_tamper;
+pub mod audit_chain;
 pub mod crypto;
 pub mod deletion_proof;
 pub mod ed25519_proof;
@@ -30,9 +31,15 @@ pub mod kv_shredding;
 pub mod wal_completeness;
 pub mod wal_crypto;
 
+pub use audit_chain::{
+    compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass,
+    EncryptedCommitmentSalt,
+};
 pub use crypto::KeyManager as CryptoKey;
+pub use crypto::KeyManager;
 pub use deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    LayerCleanupProof,
 };
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};

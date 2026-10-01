@@ -286,6 +286,9 @@ pub struct DeletionProof {
     /// Kryptographische Quittung H(hmac_prev || delete_event) der WAL-HMAC-Kette.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub wal_chain_receipt: Option<[u8; 32]>,
+    /// Verweis auf die Position (Index) des zugehörigen Audit-Chain-Eintrags.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub audit_chain_position: Option<u64>,
     /// Integritätswarnung für Legacy-Proofs (Version 1).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub integrity_warning: Option<String>,
@@ -378,6 +381,7 @@ impl DeletionProof {
             excluded_scopes,
             graph_repair: Vec::new(),
             wal_chain_receipt,
+            audit_chain_position: None,
             integrity_warning: None,
         })
     }
@@ -407,15 +411,70 @@ impl DeletionProof {
         )
     }
 
+    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_v3_with_audit_position(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        audit_chain_position: Option<u64>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        Self::create_full_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            None,
+            audit_chain_position,
+            attested_at,
+            graph_repair,
+            signing_key,
+        )
+    }
+
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_wal_receipt_v3(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        wal_chain_receipt: Option<[u8; 32]>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        Self::create_full_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            wal_chain_receipt,
+            None,
+            attested_at,
+            graph_repair,
+            signing_key,
+        )
+    }
+
+    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_full_v3(
         scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
         wal_chain_receipt: Option<[u8; 32]>,
+        audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
         signing_key: &ed25519_dalek::SigningKey,
@@ -451,6 +510,7 @@ impl DeletionProof {
             excluded_scopes,
             graph_repair: graph_repair.to_vec(),
             wal_chain_receipt,
+            audit_chain_position,
             integrity_warning: None,
         };
 
@@ -580,6 +640,13 @@ impl DeletionProof {
             &[]
         };
 
+        let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
+        let audit_pos_part = if let Some(ref pos_b) = audit_pos_bytes {
+            pos_b.as_slice()
+        } else {
+            &[]
+        };
+
         let mut payload = Vec::with_capacity(
             scope_bytes.len()
                 + 32
@@ -587,7 +654,8 @@ impl DeletionProof {
                 + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
-                + receipt_part.len(),
+                + receipt_part.len()
+                + audit_pos_part.len(),
         );
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
@@ -596,6 +664,7 @@ impl DeletionProof {
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
+        payload.extend_from_slice(audit_pos_part);
 
         Ok(payload)
     }
@@ -947,6 +1016,7 @@ mod tests {
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
         assert_eq!(v1_proof.signature_version, 1);
@@ -1280,6 +1350,7 @@ mod tests {
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
 
@@ -1338,6 +1409,7 @@ mod tests {
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
+            audit_chain_position: None,
             integrity_warning: None,
         };
 
