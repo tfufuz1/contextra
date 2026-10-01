@@ -23,6 +23,7 @@ pub use document::RerankResult;
 #[allow(ambiguous_glob_reexports)]
 pub use document::*;
 pub use ids::*;
+pub use document::RerankResult;
 #[allow(ambiguous_glob_reexports)]
 pub use misc::*;
 
