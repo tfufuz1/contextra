@@ -42,6 +42,7 @@ pub mod csr;
 pub mod edge_reinforcement;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub mod edge_reinforcement_buffer;
+pub mod entity_extraction;
 pub mod error;
 pub mod hyperedge;
 pub mod hyperedge_suggest;
@@ -83,6 +84,9 @@ pub use edge_reinforcement::{
 #[cfg(feature = "edge-reinforcement-learning")]
 pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
+};
+pub use entity_extraction::{
+    ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };
 pub use error::GraphMutationError;
 pub use hyperedge::{
