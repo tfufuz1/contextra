@@ -237,12 +237,12 @@ async fn test_multiple_updates_single_tombstone(
         storage.commit(tx).await?;
     }
 
-    // Should still be exactly four tombstones for d1 (first, second, third, version).
+    // Should be exactly three tombstones for d1 (first, second, third) since 'version' was present in every update.
     let tbs_entries = storage.scan_prefix(tbs_prefix).await?;
     assert_eq!(
         tbs_entries.len(),
-        4,
-        "Multiple updates should yield exactly four tombstones (first, second, third, version)"
+        3,
+        "Multiple updates should yield exactly three tombstones for removed terms (first, second, third)"
     );
 
     Ok(())

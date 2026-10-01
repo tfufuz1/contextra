@@ -1,5 +1,6 @@
 use super::stopwords::normalize_umlauts;
 use super::trie::Trie;
+use crate::domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 use std::collections::HashSet;
 
 /// KMU-Fachvokabular und allgemeiner deutscher Wortschatz.
@@ -101,6 +102,43 @@ impl GermanCompoundSplitter {
         Self {
             min_component_len: min_len,
             trie,
+        }
+    }
+
+    /// Creates a splitter with the default vocabulary plus compound stems and protected terms from specific domain packages.
+    pub fn with_domains(min_len: usize, domains: &[&dyn DomainVocabulary]) -> Self {
+        let mut splitter = Self::with_min_length(min_len);
+        for domain in domains {
+            for stem in domain.compound_stems() {
+                let norm = normalize_umlauts(stem);
+                if norm.len() >= 2 {
+                    splitter.trie.insert(&norm);
+                }
+            }
+            for term in domain.protected_terms() {
+                let norm = normalize_umlauts(term);
+                if norm.len() >= 2 {
+                    splitter.trie.insert(&norm);
+                }
+            }
+        }
+        splitter
+    }
+
+    /// Creates a splitter loaded with default German vocabulary and all built-in domain vocabularies (Legal & Medical).
+    pub fn new_with_all_domains() -> Self {
+        let legal = LegalDomainVocabulary;
+        let medical = MedicalDomainVocabulary;
+        Self::with_domains(3, &[&legal, &medical])
+    }
+
+    /// Extends the splitter's dictionary with additional terms.
+    pub fn extend_vocabulary(&mut self, words: impl IntoIterator<Item = impl AsRef<str>>) {
+        for word in words {
+            let norm = normalize_umlauts(word.as_ref());
+            if norm.len() >= 2 {
+                self.trie.insert(&norm);
+            }
         }
     }
 

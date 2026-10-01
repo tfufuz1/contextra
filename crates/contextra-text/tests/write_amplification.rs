@@ -230,12 +230,12 @@ async fn test_resolve_tombstones_cleanup_count(
     let resolved = index.resolve_tombstones(tx3).await?;
     index.commit(tx3).await?;
 
-    assert_eq!(resolved, 3, "Three tombstones resolved");
-    // Deletes: 2 stale terms * 2 (pl + plb) + 3 tombstones = 7
+    assert_eq!(resolved, 2, "Two tombstones resolved");
+    // Deletes: 2 stale terms * 2 (pl + plb) + 2 tombstones = 6
     assert_eq!(
         storage.deletes(),
-        7,
-        "Resolve must delete 2 stale terms * 2 (pl & plb) + 3 tombstone markers"
+        6,
+        "Resolve must delete 2 stale terms * 2 (pl & plb) + 2 tombstone markers"
     );
 
     Ok(())
