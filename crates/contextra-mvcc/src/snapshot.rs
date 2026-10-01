@@ -20,6 +20,7 @@ use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Registry for active read snapshots.
 ///
@@ -37,7 +38,7 @@ use std::sync::Arc;
 ///   reordering across the atomic synchronization boundary.
 #[derive(Debug)]
 pub struct SnapshotRegistry {
-    active: Mutex<BTreeMap<u64, usize>>,
+    active: Mutex<BTreeMap<u64, Vec<Instant>>>,
     min_active_seqno: AtomicU64,
 }
 
@@ -59,13 +60,19 @@ impl SnapshotRegistry {
     /// Registers a read snapshot. Returns an RAII guard that
     /// automatically deregisters on drop.
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
+        self.register_at(seq_no, Instant::now())
+    }
+
+    /// Registers a read snapshot at a specific creation timestamp `at`.
+    pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
-        *active.entry(seq_no).or_default() += 1;
+        active.entry(seq_no).or_default().push(at);
         self.update_min(&active);
         SnapshotGuard {
             registry: self.clone(),
             seq_no,
+            created_at: Some(at),
         }
     }
 
@@ -81,9 +88,14 @@ impl SnapshotRegistry {
 
     /// Persistent pin of a sequence number to prevent GC (SAOS Checkpoint).
     pub fn pin(&self, seq_no: u64) {
+        self.pin_at(seq_no, Instant::now());
+    }
+
+    /// Persistent pin of a sequence number at a specific timestamp `at`.
+    pub fn pin_at(&self, seq_no: u64, at: Instant) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
-        *active.entry(seq_no).or_default() += 1;
+        active.entry(seq_no).or_default().push(at);
         self.update_min(&active);
     }
 
@@ -93,11 +105,23 @@ impl SnapshotRegistry {
     }
 
     pub(crate) fn release(&self, seq_no: u64) {
+        self.release_at(seq_no, None);
+    }
+
+    pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<Instant>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
-        if let Some(count) = active.get_mut(&seq_no) {
-            *count -= 1;
-            if *count == 0 {
+        if let Some(timestamps) = active.get_mut(&seq_no) {
+            if let Some(ts) = created_at {
+                if let Some(pos) = timestamps.iter().position(|&t| t == ts) {
+                    timestamps.swap_remove(pos);
+                } else {
+                    timestamps.pop();
+                }
+            } else {
+                timestamps.pop();
+            }
+            if timestamps.is_empty() {
                 active.remove(&seq_no);
             }
         } else {
@@ -106,7 +130,35 @@ impl SnapshotRegistry {
         self.update_min(&active);
     }
 
-    fn update_min(&self, active: &BTreeMap<u64, usize>) {
+    /// Identifies which active snapshot sequence number has been held the longest relative to `now`,
+    /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
+    pub fn longest_active_pin_at(&self, now: Instant) -> Option<(u64, Duration)> {
+        let active = self.active.lock();
+        let mut longest: Option<(u64, Duration)> = None;
+
+        for (&seq_no, timestamps) in active.iter() {
+            for &ts in timestamps {
+                let duration = now.saturating_duration_since(ts);
+                match longest {
+                    None => longest = Some((seq_no, duration)),
+                    Some((_, max_duration)) if duration > max_duration => {
+                        longest = Some((seq_no, duration));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        longest
+    }
+
+    /// Identifies which active snapshot sequence number has been held the longest,
+    /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
+    pub fn longest_active_pin(&self) -> Option<(u64, Duration)> {
+        self.longest_active_pin_at(Instant::now())
+    }
+
+    fn update_min(&self, active: &BTreeMap<u64, Vec<Instant>>) {
         // SAFETY: u64::MAX is the correct default when no snapshots are active.
         // It allows the LSM compaction to garbage collect ALL tombstones, as
         // all existing records will have seq_no < u64::MAX.
@@ -123,6 +175,7 @@ impl SnapshotRegistry {
 pub struct SnapshotGuard {
     registry: Arc<SnapshotRegistry>,
     seq_no: u64,
+    created_at: Option<Instant>,
 }
 
 impl SnapshotGuard {
@@ -134,7 +187,7 @@ impl SnapshotGuard {
 
 impl Drop for SnapshotGuard {
     fn drop(&mut self) {
-        self.registry.release(self.seq_no);
+        self.registry.release_at(self.seq_no, self.created_at);
     }
 }
 
