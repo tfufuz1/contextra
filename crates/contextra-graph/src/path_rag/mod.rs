@@ -13,6 +13,9 @@ pub mod k_path;
 #[cfg(feature = "k-path-diffusion")]
 pub use k_path::{KPathConfig, KPathDiffusion, KPathResult};
 
+pub mod snapshot;
+pub use snapshot::SnapshotPathGraph;
+
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
 use contextra_types::DocId;
