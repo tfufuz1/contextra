@@ -286,6 +286,49 @@ impl std::fmt::Display for ContextWindow {
 
 pub use super::domain::RerankResult;
 
+/// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct QueryRewriteOutput {
+    /// Textual reformulation intended for BM25 keyword search.
+    pub text_query: Option<String>,
+    /// Semantic reformulation intended for dense vector embedding search.
+    pub semantic_query: Option<String>,
+    /// Extracted anchor entity identifiers or names intended for graph traversal search.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchor_entities: Vec<String>,
+}
+
+impl QueryRewriteOutput {
+    /// Creates a new `QueryRewriteOutput` with text, semantic, and anchor entity reformulations.
+    pub fn new(
+        text_query: Option<String>,
+        semantic_query: Option<String>,
+        anchor_entities: Vec<String>,
+    ) -> Self {
+        Self {
+            text_query,
+            semantic_query,
+            anchor_entities,
+        }
+    }
+
+    /// Creates a simple text-only `QueryRewriteOutput`.
+    pub fn text_only(text: impl Into<String>) -> Self {
+        Self {
+            text_query: Some(text.into()),
+            semantic_query: None,
+            anchor_entities: Vec::new(),
+        }
+    }
+
+    /// Returns `true` if all reformulation components are empty or None.
+    pub fn is_empty(&self) -> bool {
+        self.text_query.as_ref().is_none_or(|s| s.trim().is_empty())
+            && self.semantic_query.as_ref().is_none_or(|s| s.trim().is_empty())
+            && self.anchor_entities.is_empty()
+    }
+}
+
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoredEntry {
