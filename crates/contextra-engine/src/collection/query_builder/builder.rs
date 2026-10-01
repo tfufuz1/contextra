@@ -2,12 +2,11 @@ use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_ports::{Reranker, StorageEngine, VectorIndex};
+use crate::fusion::SignalFailurePolicy;
+use contextra_ports::{MetricsSink, Reranker, StorageEngine, VectorIndex};
 use contextra_types::{
     DocId, EntityId, FilterExpr, FusionWeights, MemoryType, SignalFusionStrategies,
 };
-
-#[cfg(feature = "adaptive-candidate-pool-sizing")]
 use std::sync::Arc;
 
 /// Default candidate pool expansion multiplier for Cross-Encoder reranking (10x requested k).
@@ -47,6 +46,8 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
     pub(super) current_tx: Option<contextra_types::TxId>,
+    pub(super) on_signal_failure: SignalFailurePolicy,
+    pub(super) metrics: Option<Arc<dyn MetricsSink>>,
 }
 
 impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
@@ -77,6 +78,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             as_of_timestamp: None,
             query_timestamp: None,
             current_tx: None,
+            on_signal_failure: SignalFailurePolicy::Fail,
+            metrics: None,
         }
     }
 
@@ -247,6 +250,21 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Sets current system transaction ID for temporal validity filtering (Post-RRF, Pre-Reranking).
     pub fn current_tx(mut self, tx: contextra_types::TxId) -> Self {
         self.current_tx = Some(tx);
+        self
+    }
+
+    /// Sets signal failure policy (`Fail` or `Degrade`).
+    ///
+    /// Spec v17 §6.5: `Fail` (default) fails the entire query if any signal fails.
+    /// `Degrade` skips failing signals, returns partial results, and populates `SearchReport::degraded_signals`.
+    pub fn on_signal_failure(mut self, policy: SignalFailurePolicy) -> Self {
+        self.on_signal_failure = policy;
+        self
+    }
+
+    /// Configures an optional metrics sink for search signal latency instrumentation.
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+        self.metrics = Some(sink);
         self
     }
 

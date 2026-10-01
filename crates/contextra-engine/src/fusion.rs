@@ -6,8 +6,8 @@ pub use contextra_rank::fusion::{
     apply_resonance_bonus, reciprocal_rank_fusion, score_normalized_fusion_with_options,
     weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_with_options,
     weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
-    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, SearchResult,
-    SignalContribution, SignalKind,
+    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, SearchReport,
+    SearchResult, Signal, SignalContribution, SignalFailurePolicy, SignalKind,
 };
 
 pub use contextra_types::{FusionStrategy, SignalFusionStrategies};
