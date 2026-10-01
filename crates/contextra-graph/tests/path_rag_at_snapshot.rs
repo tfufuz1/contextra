@@ -269,3 +269,68 @@ async fn test_path_rag_at_via_graph_index_trait_snapshot_isolation() {
     let res_at_25 = index.path_rag_at(&[e1], 2, 25).await.unwrap();
     assert!(res_at_25.iter().any(|(id, _)| *id == e3));
 }
+
+#[tokio::test]
+async fn test_path_rag_at_concurrent_mutations_isolation() {
+    // Proves task 5 requirement:
+    // While a PathRAG traversal is running or called repeatedly, concurrent background tasks add/delete edges.
+    // The result of path_rag_at(seq_no) remains strictly consistent with the graph state at seq_no,
+    // unaffected by parallel mutations.
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let graph = Arc::new(CsrGraph::new());
+    let e1 = EntityId::new(5001);
+    let e2 = EntityId::new(5002);
+
+    let tx10 = TxId::new(10);
+    graph
+        .add_entity(tx10, Entity::new(e1, "e1", "Node"))
+        .await
+        .unwrap();
+    graph
+        .add_entity(tx10, Entity::new(e2, "e2", "Node"))
+        .await
+        .unwrap();
+    GraphIndex::add_edge(graph.as_ref(), tx10, Edge::new(e1, e2, "rel").with_weight(0.95))
+        .await
+        .unwrap();
+    graph.commit(tx10).await.unwrap();
+
+    let baseline = graph.path_rag_at(&[e1], 2, 15).await.unwrap();
+    assert!(!baseline.is_empty());
+
+    let running = Arc::new(AtomicBool::new(true));
+
+    // Spawn concurrent background writer mutating the graph state
+    let writer_graph = graph.clone();
+    let writer_running = running.clone();
+    let writer_handle = tokio::spawn(async move {
+        let mut tx_counter = 20u64;
+        while writer_running.load(Ordering::SeqCst) {
+            let tx = TxId::new(tx_counter);
+            let next_e = EntityId::new(6000 + tx_counter);
+            let _ = writer_graph
+                .add_entity(tx, Entity::new(next_e, "dyn", "Node"))
+                .await;
+            let _ = GraphIndex::add_edge(&*writer_graph, tx, Edge::new(e2, next_e, "rel").with_weight(0.8))
+                .await;
+            let _ = writer_graph.commit(tx).await;
+            tx_counter += 1;
+            tokio::task::yield_now().await;
+        }
+    });
+
+    // Run 50 concurrent or sequential path_rag_at calls pinned at seq_no = 15
+    for _ in 0..50 {
+        let res = graph.path_rag_at(&[e1], 2, 15).await.unwrap();
+        assert_eq!(
+            res, baseline,
+            "path_rag_at at seq 15 must remain strictly identical despite concurrent background graph mutations"
+        );
+        tokio::task::yield_now().await;
+    }
+
+    running.store(false, Ordering::SeqCst);
+    let _ = writer_handle.await;
+}

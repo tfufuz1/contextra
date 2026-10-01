@@ -99,11 +99,11 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
             }
 
             // Check if a direct edge already exists in either direction
-            if !neighbors_cache.contains_key(&id1) {
+            if let std::collections::hash_map::Entry::Vacant(e) = neighbors_cache.entry(id1) {
                 if let Ok(nbrs) = graph.neighbors(id1).await {
-                    neighbors_cache.insert(id1, nbrs.into_iter().collect());
+                    e.insert(nbrs.into_iter().collect());
                 } else {
-                    neighbors_cache.insert(id1, std::collections::HashSet::new());
+                    e.insert(std::collections::HashSet::new());
                 }
             }
 
@@ -111,11 +111,11 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
                 continue;
             }
 
-            if !neighbors_cache.contains_key(&id2) {
+            if let std::collections::hash_map::Entry::Vacant(e) = neighbors_cache.entry(id2) {
                 if let Ok(nbrs) = graph.neighbors(id2).await {
-                    neighbors_cache.insert(id2, nbrs.into_iter().collect());
+                    e.insert(nbrs.into_iter().collect());
                 } else {
-                    neighbors_cache.insert(id2, std::collections::HashSet::new());
+                    e.insert(std::collections::HashSet::new());
                 }
             }
 
