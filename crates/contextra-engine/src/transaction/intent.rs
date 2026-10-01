@@ -10,6 +10,10 @@ pub(super) type StagedKeyOp = (Vec<u8>, Option<Bytes>);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommitIntent {
     /// Transaction is in the "Prepared" state. Stored DocIds assist recovery.
+    /// `stages_completed` tracks progress:
+    /// 0 = Intent written,
+    /// 1 = Storage (LSM) committed,
+    /// 2 = Indices (Vector, Text, Graph) committed.
     Pending {
         doc_ids: Arc<Vec<DocId>>,
         #[serde(default)]
