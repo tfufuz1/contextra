@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
 use crate::error::GraphMutationError;
-use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_ports::{GraphCollectionMutation, GraphIndex, StorageEngine};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
@@ -920,5 +920,73 @@ impl CsrGraph {
         inner.is_dirty = true;
         inner.add_to_out_weight_sum(from_idx, weight);
         Ok(())
+    }
+}
+
+impl GraphCollectionMutation for CsrGraph {
+    fn relate_n_ary(
+        &self,
+        predicate_tag: u32,
+        participants: &[contextra_ports::graph::RoleBinding],
+        doc_id: DocId,
+    ) -> std::result::Result<
+        contextra_ports::graph::HyperEdgeId,
+        contextra_ports::graph::GraphMutationError,
+    > {
+        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id() + 1);
+        let mapped_participants: Vec<crate::hyperedge::RoleBinding> = participants
+            .iter()
+            .map(|p| {
+                crate::hyperedge::RoleBinding::new(
+                    crate::hyperedge::RoleId::new(p.role.inner()),
+                    p.entity,
+                )
+            })
+            .collect();
+
+        let _ = predicate_tag;
+        let hyperedge = self
+            .relate_n_ary(
+                next_id,
+                crate::csr::EdgeType::Default,
+                mapped_participants,
+                1.0,
+                Some(doc_id),
+            )
+            .map_err(|err| match err {
+                GraphMutationError::LockAcquisitionTimeout(msg) => {
+                    contextra_ports::graph::GraphMutationError::LockAcquisitionTimeout(msg)
+                }
+                GraphMutationError::RoleBindingInvalid(msg) => {
+                    contextra_ports::graph::GraphMutationError::RoleBindingInvalid(msg)
+                }
+                GraphMutationError::EpochReclamationPending(epoch) => {
+                    contextra_ports::graph::GraphMutationError::EpochReclamationPending(epoch)
+                }
+                GraphMutationError::InsufficientParticipants { expected, found } => {
+                    contextra_ports::graph::GraphMutationError::InsufficientParticipants {
+                        expected,
+                        found,
+                    }
+                }
+                GraphMutationError::HyperedgeNotFound(id) => {
+                    contextra_ports::graph::GraphMutationError::HyperedgeNotFound(id)
+                }
+                GraphMutationError::DuplicateHyperEdgeId(id) => {
+                    contextra_ports::graph::GraphMutationError::Internal(format!(
+                        "Duplicate hyperedge ID detected during batch commit: {id}"
+                    ))
+                }
+                GraphMutationError::InvalidWeight { weight, reason } => {
+                    contextra_ports::graph::GraphMutationError::InvalidWeight { weight, reason }
+                }
+                GraphMutationError::Internal(msg) => {
+                    contextra_ports::graph::GraphMutationError::Internal(msg)
+                }
+            })?;
+
+        Ok(contextra_ports::graph::HyperEdgeId::new(
+            hyperedge.id.inner(),
+        ))
     }
 }
