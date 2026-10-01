@@ -336,7 +336,7 @@ Nach Abschluss der Migration alter WAL-Dateien wird `LEGACY_INTEGRITY_KEY_OBFUSC
 ## D.3 Kryptografie (P1–P2)
 - 🔵 KDF-Migration AGT-CRYPTO-002 (Argon2id-Header `MFKD` v1 als Zielformat).
 - 🔵 `SignatureVersion` typisiert über `TryFrom<u8>` und in `verify()` absichern (`ed25519_proof.rs:109`).
-- 🔵 Angleichung der Cipher-Angabe im Manifest („aes-256-gcm") an den Code (überwiegend AES-256-GCM-SIV) und der Unsafe-Insel-Liste (ADR-N03 nennt drei, Manifest vier).
+- 🔵 Angleichung der Cipher-Angabe im Manifest („aes-256-gcm") an den Code (überwiegend AES-256-GCM-SIV); Unsafe-Insel-Liste ist konsistent: ADR-N03 und Code (`xtask check-unsafe-islands`) nennen übereinstimmend drei Inseln (`contextra-sys`, `contextra-simd`, `contextra-wire`).
 
 ## D.4 Speicher-Engine (P2–P3)
 - 🔵 SSTable-`mmap` (WP-4.1) ist `UNIMPLEMENTED`; Tracking-Issue-Nummer nachtragen. Invariante: LSM-Kern bleibt blind gegenüber Indexstrukturen.
