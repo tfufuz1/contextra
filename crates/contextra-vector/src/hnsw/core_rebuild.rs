@@ -42,8 +42,7 @@ impl HnswIndexCore {
     /// Ports (`Rng` aus `contextra-ports`) bezogen werden. Diese Methode bezieht den
     /// Pseudozufallswert direkt ueber `self.cold.rng.read()`.
     pub(super) fn random_layer(&self) -> usize {
-        let rng = self.cold.rng.read();
-        let r = rng.next_unit_f64() as f32;
+        let r = self.cold.rng.next_unit_f64() as f32;
         let r_clamped = r.max(f32::EPSILON);
         let layer = (-(r_clamped.ln()) as f64 * self.hot.ml) as usize;
         layer.min(32)
@@ -688,7 +687,7 @@ impl HnswIndexCore {
             (all, self.cold.config.clone(), snapshot_tx)
         };
 
-        let rng = self.cold.rng.read().clone();
+        let rng = self.cold.rng.clone();
         let new_index = HnswIndex::try_new_with_rng(config, rng)?;
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 

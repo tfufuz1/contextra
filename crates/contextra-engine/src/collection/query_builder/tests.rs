@@ -54,8 +54,10 @@ impl Reranker for SlowPartialMockReranker {
                 .iter()
                 .enumerate()
                 .map(|(i, _)| RerankResult {
+                    index: i,
                     original_index: i,
                     score: 0.99 - (i as f32 * 0.05),
+                    calibrated_score: 0.99 - (i as f32 * 0.05),
                 })
                 .collect())
         })
@@ -81,8 +83,10 @@ impl Reranker for MockReranker {
                 .iter()
                 .enumerate()
                 .map(|(i, _)| RerankResult {
+                    index: i,
                     original_index: i,
                     score: 1.0 - (i as f32 * 0.01),
+                    calibrated_score: 1.0 - (i as f32 * 0.01),
                 })
                 .collect())
         })

@@ -109,6 +109,7 @@ pub fn derive_subkey(registry: &KeyRegistry, master_key: &KeyManager, group_id: 
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
+    pub revocation_log: Option<std::sync::Arc<RevocationLog>>,
 }
 
 impl KeyRegistry {
@@ -117,7 +118,14 @@ impl KeyRegistry {
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            revocation_log: None,
         }
+    }
+
+    /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
+    pub fn with_revocation_log(mut self, log: std::sync::Arc<RevocationLog>) -> Self {
+        self.revocation_log = Some(log);
+        self
     }
 
     /// Retrieves the wrapped KEK and nonce for a group, if available and active.
@@ -146,6 +154,11 @@ impl KeyRegistry {
 
     /// Checks if a group is revoked.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
+        if let Some(ref log) = self.revocation_log {
+            if log.is_revoked(&RevocationTarget::Group(group_id)) {
+                return true;
+            }
+        }
         if let Ok(guard) = self.revoked_groups.read() {
             guard.contains(&group_id)
         } else {
@@ -154,10 +167,10 @@ impl KeyRegistry {
     }
 
     /// Retrieves or generates a random Group KEK for `group_id`.
-    /// Returns `Err(CryptoError::Crypto(...))` if `group_id` has been revoked/shredded.
+    /// Returns `Err(CryptoError::KeyRevoked(...))` if `group_id` has been revoked/shredded.
     pub fn get_or_derive(&self, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
         if self.is_group_revoked(group_id) {
-            return Err(CryptoError::Crypto(format!(
+            return Err(CryptoError::KeyRevoked(format!(
                 "Shred group {group_id} has been revoked and cannot be accessed"
             )));
         }
@@ -351,7 +364,7 @@ impl KeyRegistry {
         payload: &EncryptedRecordPayload,
     ) -> Result<Vec<u8>> {
         if self.is_group_revoked(payload.group_id) {
-            return Err(CryptoError::Crypto(format!(
+            return Err(CryptoError::KeyRevoked(format!(
                 "Group {} has been revoked/shredded",
                 payload.group_id
             )));
@@ -406,6 +419,11 @@ impl KeyRegistry {
         group_id: u64,
         plaintext: &[u8],
     ) -> Result<(Vec<u8>, [u8; 12])> {
+        if self.is_group_revoked(group_id) {
+            return Err(CryptoError::KeyRevoked(format!(
+                "Shred group {group_id} has been revoked and cannot be accessed"
+            )));
+        }
         let subkey = self.get_or_derive(master_key, group_id)?;
         let cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv init failed: {e}")))?;
@@ -430,7 +448,7 @@ impl KeyRegistry {
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
         if self.is_group_revoked(group_id) {
-            return Err(CryptoError::Crypto(format!(
+            return Err(CryptoError::KeyRevoked(format!(
                 "Sub-key for group {group_id} has been revoked or is missing"
             )));
         }

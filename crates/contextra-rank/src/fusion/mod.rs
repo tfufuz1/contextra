@@ -15,9 +15,10 @@ pub use normalized::{score_normalized_fusion_with_options, weights_to_signal_fac
 pub use provenance::ProvenanceBuilder;
 pub use resonance::{apply_resonance_bonus, fuse_signals, ResonanceConfig};
 pub use rrf::{
-    fuse_search_results_with_signal_strategies, fuse_search_results_with_strategy,
-    reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
+    fuse_search_results_with_signal_strategies, fuse_search_results_with_strategy, g,
+    modulate_and_renormalize_weights, reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
+    weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
+    weighted_reciprocal_rank_fusion_with_priority,
 };
 pub use signal::{MetadataMergePriority, SignalCalibrationContext, SignalKind};
 pub use topk::BoundedTopK;
