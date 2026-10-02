@@ -1,8 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::type_complexity)]
 
-use contextra_store::sstable::{
-    create_block_cache, BloomFilter, SstableBuilder, SstableReader,
-};
+use contextra_store::sstable::{create_block_cache, BloomFilter, SstableBuilder, SstableReader};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::BTreeMap;

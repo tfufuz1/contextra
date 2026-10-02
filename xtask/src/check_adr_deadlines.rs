@@ -173,10 +173,7 @@ pub fn check_adr_deadlines_at(
     result
 }
 
-pub fn check_adr_deadlines_with_root_and_date(
-    root: &Path,
-    today_str: &str,
-) -> Result<(), String> {
+pub fn check_adr_deadlines_with_root_and_date(root: &Path, today_str: &str) -> Result<(), String> {
     println!("=== Running xtask check-adr-deadlines ===");
     let decisions_dir = root.join("docs").join("decisions");
 

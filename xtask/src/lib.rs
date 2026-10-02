@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 
 pub mod artifact_header;
+pub mod check_adr_deadlines;
 pub mod check_duplicate_core_primitives;
+pub mod check_vetoes;
 pub mod gates;
 pub mod generate_diagnostics;
 pub mod harness;

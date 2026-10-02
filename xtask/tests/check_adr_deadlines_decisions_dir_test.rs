@@ -69,8 +69,11 @@ fn test_adr_deadline_in_10_days_issues_warning() {
     )
     .unwrap();
 
-    let entries = xtask::check_adr_deadlines::parse_adr_deadlines(&fs::read_to_string(&adr_file).unwrap()).unwrap();
-    let check_res = xtask::check_adr_deadlines::check_adr_deadlines_at(&entries, "2026-10-05", temp.path());
+    let entries =
+        xtask::check_adr_deadlines::parse_adr_deadlines(&fs::read_to_string(&adr_file).unwrap())
+            .unwrap();
+    let check_res =
+        xtask::check_adr_deadlines::check_adr_deadlines_at(&entries, "2026-10-05", temp.path());
 
     assert_eq!(check_res.errors.len(), 0);
     assert_eq!(check_res.warnings.len(), 1);
@@ -93,8 +96,11 @@ fn test_adr_deadline_expired_target_exists_fails() {
     )
     .unwrap();
 
-    let entries = xtask::check_adr_deadlines::parse_adr_deadlines(&fs::read_to_string(&adr_file).unwrap()).unwrap();
-    let check_res = xtask::check_adr_deadlines::check_adr_deadlines_at(&entries, "2026-10-05", temp.path());
+    let entries =
+        xtask::check_adr_deadlines::parse_adr_deadlines(&fs::read_to_string(&adr_file).unwrap())
+            .unwrap();
+    let check_res =
+        xtask::check_adr_deadlines::check_adr_deadlines_at(&entries, "2026-10-05", temp.path());
 
     assert_eq!(check_res.errors.len(), 1);
     assert!(check_res.errors[0].contains("ADR-FRIST ÜBERSCHRITTEN"));
