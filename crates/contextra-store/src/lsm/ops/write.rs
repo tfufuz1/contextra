@@ -205,6 +205,10 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
 /// 2. `pending_commit_queue` (`tokio::sync::Mutex`): Synchronizes follower request queuing for group commit.
 /// 3. `truncate_lock` (`tokio::sync::Mutex`): Serializes physical WAL append, flush, and truncation.
 /// 4. `state` (`tokio::sync::RwLock`): Read guard protects `MemTable` and `immutable_memtables` vector structure.
+///
+/// Deadlock Analysis: Flush pre-allocates immutable memtables under `state.write()`, and takes `commit_mutex`
+/// only during final SST registration. The Leader holding `commit_mutex` never blocks or waits on Flush completion,
+/// avoiding circular lock dependencies.
 pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let start = std::time::Instant::now();
     let res = commit_internal(storage, tx_id).await;
@@ -239,7 +243,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let _intent_guard = IntentLockGuard(storage, tx_id);
 
     // LOCK ORDER 1: commit_mutex
-    let _commit_lock = storage.commit_mutex.lock().await;
+    let commit_lock = storage.commit_mutex.lock().await;
 
     // 1. ReadSet VOR drain_kv
     let read_set = storage.tx_buffer.get_read_set(tx_id);
@@ -340,10 +344,24 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     let start_hmac = wal.last_hmac_snapshot().await;
                     let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
                     if append_res.is_err() {
-                        drop(truncate_guard);
                         if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
-                            tracing::error!("Failed to truncate WAL after failed single append_batch: {trunc_err}");
+                            tracing::error!(
+                                "Failed to truncate WAL after failed single append_batch: {trunc_err}"
+                            );
                         }
+                        if wal.is_poisoned() {
+                            match wal.recover_from_poison().await {
+                                Ok(()) => {
+                                    tracing::info!("WAL successfully recovered from poison state")
+                                }
+                                Err(rec_err) => tracing::error!(
+                                    "Failed to recover WAL from poison state: {rec_err}"
+                                ),
+                            }
+                        }
+                        drop(truncate_guard);
+                    } else {
+                        drop(truncate_guard);
                     }
                     append_res
                 }
@@ -414,7 +432,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             None
         };
         drop(queue_guard);
-        drop(_commit_lock);
+        drop(commit_lock);
 
         if let Some(notify) = notify_full {
             notify.notify_one();
@@ -456,12 +474,22 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     })
                 } else {
                     drop(queue_guard);
-                    if committed_flag.load(Ordering::Acquire) {
-                        Ok(())
-                    } else {
-                        Err(ContextraError::CommitTimeout {
-                            tx_id: tx_id.inner(),
-                        })
+                    // H5: Follower taken by leader awaits leader's batch execution result via oneshot without CommitTimeout
+                    match rx.await {
+                        Ok(res) => res,
+                        Err(_) => {
+                            if committed_flag.load(Ordering::Acquire) {
+                                Ok(())
+                            } else {
+                                if first_seq > 0 {
+                                    storage.ssi_validator.forget_from(first_seq);
+                                }
+                                storage.cleanup_intent_locks_for_tx(tx_id);
+                                Err(ContextraError::Storage(
+                                    "Commit failed at WAL append after leader cancellation".into(),
+                                ))
+                            }
+                        }
                     }
                 }
             }
@@ -482,7 +510,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             committed_flag: committed_flag.clone(),
         });
         drop(queue_guard);
-        drop(_commit_lock);
 
         struct LeaderCancelGuard<'a> {
             storage: &'a LsmStorage,
@@ -534,7 +561,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             _ = notify_full.notified() => {},
         }
 
-        let _commit_lock = storage.commit_mutex.lock().await;
+        // Leader holds commit_mutex continuously from prepare_batch through apply_mem_updates and follower notification
         let mut queue_guard = storage.pending_commit_queue.lock().await;
         let pending_queue = match queue_guard.take() {
             Some(q) => q,
@@ -593,11 +620,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             Vec::new()
         };
 
-        drop(_commit_lock);
-
         let wal_clone = wal.clone();
         let durability_mode = storage.config.durability_mode;
         let batch_for_append = all_wal_entries.clone();
+        let committed_flag_for_task = Arc::clone(&committed_flag);
         let append_handle = tokio::spawn(async move {
             let truncate_guard = wal_clone.truncate_lock.lock().await;
             execute_group_commit_append(
@@ -605,6 +631,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 durability_mode,
                 batch_for_append,
                 truncate_guard,
+                &committed_flag_for_task,
             )
             .await
         });
@@ -615,10 +642,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 "Group commit append task panicked: {join_err}"
             ))),
         };
-
-        if append_res.is_ok() {
-            committed_flag.store(true, Ordering::Release);
-        }
 
         if let Err(e) = append_res {
             if first_seq > 0 {
@@ -687,7 +710,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             all_updates.push((r.tx_id, &r.mem_updates));
         }
 
-        let _commit_lock = storage.commit_mutex.lock().await;
         // LOCK ORDER 4: state (read guard: symmetrical with single-commit, MemTable uses internal RwLock)
         let state = storage.state.read().await;
         for (req_tx_id, mem_updates) in all_updates {
@@ -710,6 +732,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver before group commit notification");
             }
         }
+
+        drop(commit_lock);
 
         Ok(())
     }
