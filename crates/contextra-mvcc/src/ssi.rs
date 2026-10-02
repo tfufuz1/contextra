@@ -474,7 +474,7 @@ impl CommittedWrites {
 /// # INVARIANT (INV-MVCC-SSI-1)
 /// Conflict resolution is strictly data-driven (sequence number comparison) and deterministic.
 /// Given identical commit sequences and read-sets, repeated executions yield identical outcomes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SequenceLogSsiValidator {
     committed_writes: Arc<RwLock<CommittedWrites>>,
     sequence_log: Option<Arc<RwLock<SequenceLog>>>,
@@ -482,6 +482,28 @@ pub struct SequenceLogSsiValidator {
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
     max_pin_duration: Duration,
+    /// Metrics sink container for observability reporting (v17 Teil 2.2 & Teil 4.3 B-16).
+    ///
+    /// # Architecture Decision & Invariant (Hot-Swap Consistency)
+    /// Uses `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
+    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
+    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
+    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
+    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+}
+
+impl std::fmt::Debug for SequenceLogSsiValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SequenceLogSsiValidator")
+            .field("committed_writes", &self.committed_writes)
+            .field("sequence_log", &self.sequence_log)
+            .field("snapshot_registry", &self.snapshot_registry)
+            .field("pruned_through", &self.pruned_through)
+            .field("max_tracked_keys", &self.max_tracked_keys)
+            .field("max_pin_duration", &self.max_pin_duration)
+            .field("has_metrics_sink", &self.metrics_sink.is_some())
+            .finish()
+    }
 }
 
 impl Default for SequenceLogSsiValidator {
@@ -505,6 +527,7 @@ impl SequenceLogSsiValidator {
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys,
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            metrics_sink: None,
         }
     }
 
@@ -517,6 +540,7 @@ impl SequenceLogSsiValidator {
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys: DEFAULT_MAX_TRACKED_COMMIT_KEYS,
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            metrics_sink: None,
         }
     }
 
@@ -529,6 +553,29 @@ impl SequenceLogSsiValidator {
     /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
     pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {
         self.snapshot_registry = Some(registry);
+    }
+
+    /// Attaches a metrics sink container to this validator for observability reporting.
+    ///
+    /// # Architecture Decision & Invariant (v17 Teil 2.2 & Teil 4.3 B-16)
+    /// Accepts an `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
+    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
+    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
+    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
+    pub fn with_metrics_sink(
+        mut self,
+        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    ) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+
+    /// Sets or updates the metrics sink container attached to this validator.
+    pub fn set_metrics_sink(
+        &mut self,
+        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    ) {
+        self.metrics_sink = Some(sink);
     }
 
     /// Sets a custom maximum pin duration before diagnostic alarms are triggered for unreleased snapshots.
@@ -585,6 +632,9 @@ impl SequenceLogSsiValidator {
     /// Checks register capacity utilization and triggers coarsening or diagnostic warnings if threshold is reached.
     fn check_and_coarsen_if_needed(&self, writes: &mut CommittedWrites) {
         let threshold = (self.max_tracked_keys * 80) / 100;
+        let initial_len = writes.len();
+        let reached_threshold = initial_len >= threshold;
+
         let mut rounds = 0;
         while writes.len() >= threshold && rounds < 10 {
             let coarsened = writes.coarsen_oldest_buckets();
@@ -592,6 +642,29 @@ impl SequenceLogSsiValidator {
             rounds += 1;
             if coarsened == 0 && merged == 0 {
                 break;
+            }
+        }
+
+        if let Some(ref sink_lock) = self.metrics_sink {
+            let sink = sink_lock.read().clone();
+            let ratio = initial_len as f64 / self.max_tracked_keys as f64;
+            sink.record_gauge("mvcc_ssi_commit_register_utilization_ratio", ratio, &[]);
+
+            if reached_threshold {
+                if let Some(ref blocker) = self.diagnose_pruning_blocker_internal(writes, Instant::now()) {
+                    sink.record_gauge(
+                        "mvcc_ssi_coarsened_buckets_total",
+                        blocker.coarsened_seq_buckets as f64,
+                        &[],
+                    );
+                    if let Some(dur) = blocker.longest_pin_duration {
+                        sink.record_gauge(
+                            "mvcc_ssi_longest_pin_duration_seconds",
+                            dur.as_secs_f64(),
+                            &[],
+                        );
+                    }
+                }
             }
         }
 
