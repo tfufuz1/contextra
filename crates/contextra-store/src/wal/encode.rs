@@ -4,6 +4,29 @@ use contextra_crypto::wal_crypto::WalHmac;
 
 use super::MAX_WAL_ENTRY_SIZE;
 
+/// Typed parsing errors encountered when decoding WAL entries from raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum WalParseError {
+    #[error("WAL entry too short for CRC header")]
+    HeaderTooShort,
+    #[error("CRC mismatch: stored={stored:#010x}, computed={computed:#010x}")]
+    CrcMismatch { stored: u32, computed: u32 },
+    #[error("WAL payload truncated")]
+    Truncated,
+    #[error("key_len exceeds 1 MiB limit")]
+    OversizedKey,
+    #[error("val_len exceeds {limit} bytes limit")]
+    OversizedValue { limit: usize },
+    #[error("Unknown WAL op type: {0}")]
+    UnknownOp(u8),
+    #[error("Invalid TxEnd committed flag: {0} (must be 0 or 1)")]
+    InvalidCommittedByte(u8),
+    #[error("Trailing bytes after WAL entry operation payload")]
+    TrailingBytes,
+    #[error("Malformed WAL entry: {0}")]
+    Malformed(&'static str),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum WalOp {
     /// Inserts or updates a key-value pair.
@@ -268,167 +291,151 @@ impl WalEntry {
         Ok(buf)
     }
 
-    /// Deserializes a WAL entry from bytes, verifying CRC32.
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        let crc_bytes = data.get(0..4).ok_or_else(|| {
-            ContextraError::Serialization("WAL entry too short for CRC header".into())
-        })?;
-
+    /// Deserializes a WAL entry from bytes, returning a classified `WalParseError` on failure.
+    pub fn from_bytes_classified(data: &[u8]) -> std::result::Result<Self, WalParseError> {
+        let crc_bytes = data.get(0..4).ok_or(WalParseError::HeaderTooShort)?;
         let stored_crc = u32::from_le_bytes(
             crc_bytes
                 .try_into()
-                .map_err(|_| ContextraError::Serialization("Invalid CRC format".into()))?,
+                .map_err(|_| WalParseError::HeaderTooShort)?,
         );
-        let payload = data
-            .get(4..)
-            .ok_or_else(|| ContextraError::Serialization("WAL entry missing payload".into()))?;
+
+        let payload = data.get(4..).ok_or(WalParseError::HeaderTooShort)?;
         let computed_crc = crc32fast::hash(payload);
 
         if stored_crc != computed_crc {
-            // FIND-STO-001: Explicitly return a message that includes "CRC mismatch"
-            // so replay can map it to WalCorruption.
-            return Err(ContextraError::Serialization(format!(
-                "CRC mismatch: stored={:#010x}, computed={:#010x}",
-                stored_crc, computed_crc
-            )));
+            return Err(WalParseError::CrcMismatch {
+                stored: stored_crc,
+                computed: computed_crc,
+            });
         }
 
-        let seq_bytes = payload.get(0..8).ok_or_else(|| {
-            ContextraError::Serialization("WAL payload too short for seq_no".into())
-        })?;
-        let checksum_bytes = payload.get(8..40).ok_or_else(|| {
-            ContextraError::Serialization("WAL payload too short for checksum".into())
-        })?;
-        let prev_hmac_bytes = payload.get(40..72).ok_or_else(|| {
-            ContextraError::Serialization("WAL payload too short for prev_hmac".into())
-        })?;
-        let op_type = *payload.get(72).ok_or_else(|| {
-            ContextraError::Serialization("WAL payload too short for op_type".into())
-        })?;
-        let remaining = payload
-            .get(73..)
-            .ok_or_else(|| ContextraError::Serialization("WAL payload missing op body".into()))?;
+        let seq_bytes = payload.get(0..8).ok_or(WalParseError::Truncated)?;
+        let checksum_bytes = payload.get(8..40).ok_or(WalParseError::Truncated)?;
+        let prev_hmac_bytes = payload.get(40..72).ok_or(WalParseError::Truncated)?;
+        let op_type = *payload.get(72).ok_or(WalParseError::Truncated)?;
+        let remaining = payload.get(73..).ok_or(WalParseError::Truncated)?;
 
-        let seq_no = u64::from_le_bytes(
-            seq_bytes
-                .try_into()
-                .map_err(|_| ContextraError::Serialization("Invalid seq_no format".into()))?,
-        );
+        let seq_no =
+            u64::from_le_bytes(seq_bytes.try_into().map_err(|_| WalParseError::Truncated)?);
         let checksum: [u8; 32] = checksum_bytes
             .try_into()
-            .map_err(|_| ContextraError::Serialization("Invalid checksum format".into()))?;
+            .map_err(|_| WalParseError::Truncated)?;
         let prev_hmac: [u8; 32] = prev_hmac_bytes
             .try_into()
-            .map_err(|_| ContextraError::Serialization("Invalid prev_hmac format".into()))?;
+            .map_err(|_| WalParseError::Truncated)?;
 
-        let op = match op_type {
+        let (op, read_bytes) = match op_type {
             0 => {
                 // Put
-                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
-                    ContextraError::Serialization("Put op too short for tx_id".into())
-                })?;
-                let klen_bytes = remaining.get(8..12).ok_or_else(|| {
-                    ContextraError::Serialization("Put op too short for key_len".into())
-                })?;
+                let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
+                let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_id =
-                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid tx_id format".into())
-                    })?));
-                let key_len =
-                    u32::from_le_bytes(klen_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid key_len format".into())
-                    })?) as usize;
+                let tx_id = TxId::new(u64::from_le_bytes(
+                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
+                ));
+                let key_len = u32::from_le_bytes(
+                    klen_bytes
+                        .try_into()
+                        .map_err(|_| WalParseError::Truncated)?,
+                ) as usize;
+
                 if key_len > 1024 * 1024 {
-                    return Err(ContextraError::Serialization(
-                        "key_len exceeds 1 MiB limit".into(),
-                    ));
+                    return Err(WalParseError::OversizedKey);
                 }
+
+                let key_end = 12usize
+                    .checked_add(key_len)
+                    .ok_or(WalParseError::Malformed("key offset overflow"))?;
 
                 let key = remaining
-                    .get(12..12 + key_len)
-                    .ok_or_else(|| ContextraError::Serialization("Put op missing key data".into()))?
+                    .get(12..key_end)
+                    .ok_or(WalParseError::Truncated)?
                     .to_vec();
 
-                let val_start = 12 + key_len;
-                let vlen_bytes = remaining.get(val_start..val_start + 4).ok_or_else(|| {
-                    ContextraError::Serialization("Put op missing val_len".into())
-                })?;
+                let vlen_start = key_end;
+                let vlen_end = vlen_start
+                    .checked_add(4)
+                    .ok_or(WalParseError::Malformed("val_len offset overflow"))?;
 
-                let val_len =
-                    u32::from_le_bytes(vlen_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid val_len format".into())
-                    })?) as usize;
-                if val_len > 128 * 1024 * 1024 {
-                    return Err(ContextraError::Serialization(
-                        "val_len exceeds 128 MiB limit".into(),
-                    ));
+                let vlen_bytes = remaining
+                    .get(vlen_start..vlen_end)
+                    .ok_or(WalParseError::Truncated)?;
+
+                let val_len = u32::from_le_bytes(
+                    vlen_bytes
+                        .try_into()
+                        .map_err(|_| WalParseError::Truncated)?,
+                ) as usize;
+
+                if val_len > MAX_WAL_ENTRY_SIZE as usize {
+                    return Err(WalParseError::OversizedValue {
+                        limit: MAX_WAL_ENTRY_SIZE as usize,
+                    });
                 }
 
+                let val_start = vlen_end;
+                let val_end = val_start
+                    .checked_add(val_len)
+                    .ok_or(WalParseError::Malformed("value offset overflow"))?;
+
                 let value = remaining
-                    .get(val_start + 4..val_start + 4 + val_len)
-                    .ok_or_else(|| {
-                        ContextraError::Serialization("Put op missing value data".into())
-                    })?
+                    .get(val_start..val_end)
+                    .ok_or(WalParseError::Truncated)?
                     .to_vec();
 
-                WalOp::Put { tx_id, key, value }
+                (WalOp::Put { tx_id, key, value }, val_end)
             }
             1 => {
                 // Delete
-                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
-                    ContextraError::Serialization("Delete op too short for tx_id".into())
-                })?;
-                let klen_bytes = remaining.get(8..12).ok_or_else(|| {
-                    ContextraError::Serialization("Delete op too short for key_len".into())
-                })?;
+                let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
+                let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_id =
-                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid tx_id format".into())
-                    })?));
-                let key_len =
-                    u32::from_le_bytes(klen_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid key_len format".into())
-                    })?) as usize;
+                let tx_id = TxId::new(u64::from_le_bytes(
+                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
+                ));
+                let key_len = u32::from_le_bytes(
+                    klen_bytes
+                        .try_into()
+                        .map_err(|_| WalParseError::Truncated)?,
+                ) as usize;
+
                 if key_len > 1024 * 1024 {
-                    return Err(ContextraError::Serialization(
-                        "key_len exceeds 1 MiB limit".into(),
-                    ));
+                    return Err(WalParseError::OversizedKey);
                 }
 
+                let key_end = 12usize
+                    .checked_add(key_len)
+                    .ok_or(WalParseError::Malformed("key offset overflow"))?;
+
                 let key = remaining
-                    .get(12..12 + key_len)
-                    .ok_or_else(|| {
-                        ContextraError::Serialization("Delete op missing key data".into())
-                    })?
+                    .get(12..key_end)
+                    .ok_or(WalParseError::Truncated)?
                     .to_vec();
 
-                WalOp::Delete { tx_id, key }
+                (WalOp::Delete { tx_id, key }, key_end)
             }
             2 => {
                 // TxEnd
-                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
-                    ContextraError::Serialization("TxEnd op too short for tx_id".into())
-                })?;
-                let committed_byte = *remaining.get(8).ok_or_else(|| {
-                    ContextraError::Serialization("TxEnd op too short for committed flag".into())
-                })?;
+                let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
+                let committed_byte = *remaining.get(8).ok_or(WalParseError::Truncated)?;
 
-                let tx_id =
-                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid tx_id format".into())
-                    })?));
-                let committed = committed_byte != 0;
-                WalOp::TxEnd { tx_id, committed }
+                let tx_id = TxId::new(u64::from_le_bytes(
+                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
+                ));
+                if committed_byte > 1 {
+                    return Err(WalParseError::InvalidCommittedByte(committed_byte));
+                }
+                let committed = committed_byte == 1;
+
+                (WalOp::TxEnd { tx_id, committed }, 9usize)
             }
-            _ => {
-                return Err(ContextraError::Serialization(format!(
-                    "Unknown WAL op type: {}",
-                    op_type
-                )))
-            }
+            _ => return Err(WalParseError::UnknownOp(op_type)),
         };
+
+        if remaining.len() > read_bytes {
+            return Err(WalParseError::TrailingBytes);
+        }
 
         Ok(Self {
             op,
@@ -436,5 +443,10 @@ impl WalEntry {
             checksum,
             prev_hmac,
         })
+    }
+
+    /// Deserializes a WAL entry from bytes, verifying CRC32.
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        Self::from_bytes_classified(data).map_err(|e| ContextraError::Serialization(e.to_string()))
     }
 }
