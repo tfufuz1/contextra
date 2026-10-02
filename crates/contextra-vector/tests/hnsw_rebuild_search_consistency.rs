@@ -1,11 +1,33 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 // FILE-CONTEXT: Integration test verifying HNSW snapshot search consistency before, during, and after index rebuilds. (TS: 2026-09-11)
 
 use contextra_core::{DocId, TxId, VectorIndex};
-use contextra_vector::{HnswConfig, HnswIndex};
+use contextra_ports::{Rng, SeededRng};
+use contextra_vector::{HnswConfig, HnswIndex, RebuildStatus};
 use std::sync::Arc;
 
-#[tokio::test]
+const TEST_SEEDS: [u64; 8] = [
+    0x1234_5678_9ABC_DEF0,
+    0xDEAD_BEEF_CAFE_BABE,
+    0x0000_0000_0000_1001,
+    0x0000_0000_0000_2002,
+    0x0000_0000_0000_3003,
+    0x0000_0000_0000_4004,
+    0x0000_0000_0000_5005,
+    0x0000_0000_0000_6006,
+];
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_hnsw_rebuild_snapshot_consistency_during_concurrent_search() {
+    for &seed in &TEST_SEEDS {
+        run_hnsw_rebuild_snapshot_consistency_for_seed(seed).await;
+    }
+}
+
+async fn run_hnsw_rebuild_snapshot_consistency_for_seed(seed: u64) {
+    let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(seed));
+
     // 1. Initialize HNSW index with rebuild_threshold = 0.50 (rebuild required when active ratio < 50%)
     let config = HnswConfig {
         dimension: 4,
@@ -16,7 +38,7 @@ async fn test_hnsw_rebuild_snapshot_consistency_during_concurrent_search() {
         ..Default::default()
     };
 
-    let index = Arc::new(HnswIndex::try_new(config).expect("valid index"));
+    let index = Arc::new(HnswIndex::try_new_with_rng(config, rng).expect("valid index"));
 
     // 2. Populate index with 40 baseline vectors at tx1 (seq=1)
     let tx1 = TxId::new(1);
@@ -41,7 +63,8 @@ async fn test_hnsw_rebuild_snapshot_consistency_during_concurrent_search() {
     assert_eq!(
         reference_results.len(),
         10,
-        "Reference search must return top 10 documents"
+        "Reference search must return top 10 documents for seed {}",
+        seed
     );
 
     // Extract reference doc_ids and scores
@@ -60,37 +83,60 @@ async fn test_hnsw_rebuild_snapshot_consistency_during_concurrent_search() {
     // Verify index reports rebuild required
     assert!(
         index.is_rebuild_required(),
-        "HNSW index must indicate rebuild is required after deleting >50% of nodes"
+        "HNSW index must indicate rebuild is required after deleting >50% of nodes (seed {})",
+        seed
     );
 
-    // 5. Spawn concurrent search task executing search_at(query, 10, 1) while trigger_rebuild or rebuild runs
+    // 5. Targeted timing harness:
+    // Spawn a search task that explicitly waits until `rebuilding` flag transitions to true
+    // (rebuild_status() == RebuildStatus::Running), ensuring search executes inside the critical
+    // swap window (Phase 1 build & Phase 2 merge/swap).
     let index_clone = Arc::clone(&index);
     let query_clone = query;
 
-    let concurrent_search_task = tokio::spawn(async move {
-        // Execute search at pinned snapshot seq=1 during or right around rebuild
-        index_clone.search_at(&query_clone, 10, 1).await
+    let targeted_search_task = tokio::spawn(async move {
+        // Poll status indicator until rebuild starts or finishes
+        while index_clone.rebuild_status() != RebuildStatus::Running
+            && index_clone.rebuild_count() == 0
+        {
+            tokio::time::sleep(std::time::Duration::from_micros(200)).await;
+        }
+
+        let mut search_runs = Vec::new();
+        // Execute 3 searches sequentially right after rebuild status becomes Running / during rebuild
+        for _ in 0..3 {
+            let res = index_clone
+                .search_at(&query_clone, 10, 1)
+                .await
+                .expect("concurrent search at seq 1 during rebuild");
+            search_runs.push(res);
+            tokio::time::sleep(std::time::Duration::from_micros(100)).await;
+        }
+
+        search_runs
     });
 
     // Explicitly trigger 2-phase rebuild
     index.rebuild().await.expect("rebuild must succeed");
 
-    // Await concurrent search result
-    let concurrent_results = concurrent_search_task
+    // Await targeted search task
+    let concurrent_search_runs = targeted_search_task
         .await
-        .expect("concurrent search task panicked")
-        .expect("concurrent search at seq 1 failed");
+        .expect("targeted search task panicked");
 
-    let concurrent_docs: Vec<_> = concurrent_results
-        .iter()
-        .map(|d| (d.doc_id.inner(), (d.score * 10000.0).round() as i64))
-        .collect();
+    // 6. Verify ALL search runs during/around critical rebuild window match baseline snapshot reference IDENTICALLY
+    for (run_idx, concurrent_results) in concurrent_search_runs.iter().enumerate() {
+        let concurrent_docs: Vec<_> = concurrent_results
+            .iter()
+            .map(|d| (d.doc_id.inner(), (d.score * 10000.0).round() as i64))
+            .collect();
 
-    // 6. Verify concurrent search results match baseline snapshot reference IDENTICALLY
-    assert_eq!(
-        concurrent_docs, reference_docs,
-        "Search results at pinned snapshot seq=1 during rebuild MUST be 100% identical to baseline reference search"
-    );
+        assert_eq!(
+            concurrent_docs, reference_docs,
+            "Search results run {} at pinned snapshot seq=1 during rebuild MUST be 100% identical to baseline reference search (seed {})",
+            run_idx, seed
+        );
+    }
 
     // 7. Verify post-rebuild search_at(query, 10, 1) also remains IDENTICAL
     let post_rebuild_results = index
@@ -105,6 +151,7 @@ async fn test_hnsw_rebuild_snapshot_consistency_during_concurrent_search() {
 
     assert_eq!(
         post_rebuild_docs, reference_docs,
-        "Search results at pinned snapshot seq=1 AFTER rebuild MUST remain 100% identical to baseline reference search"
+        "Search results at pinned snapshot seq=1 AFTER rebuild MUST remain 100% identical to baseline reference search (seed {})",
+        seed
     );
 }

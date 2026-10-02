@@ -370,6 +370,16 @@ impl VectorIndex for HnswIndex {
         Ok(())
     }
 
+    /// Executes a point-in-time HNSW vector search at a pinned sequence number (`seq_no`).
+    ///
+    /// ## Invariant (v17 K-02 / SSI-Determinism & Pin-first):
+    /// This method pins the sequence log via [`SnapshotPinGuard`] and applies `is_visible(doc_id, seq_no)`
+    /// filtering over all candidates. Searches executed concurrently with background index rebuilds
+    /// ([`HnswIndexCore::rebuild`]) are guaranteed to yield 100% identical document results as pre-rebuild
+    /// searches at the same pinned sequence number, regardless of rebuild progress or graph swaps.
+    ///
+    /// Verified by integration test `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`
+    /// across multiple deterministic seeds and targeted timing execution inside the critical rebuild swap window.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
         let log = self.inner.cold.seq_log.read().clone();
