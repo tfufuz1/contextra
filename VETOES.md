@@ -5,7 +5,8 @@
 feature_id: F-02
 status: conditionally_accepted
 conditional_review_due: 2026-10-07
-adr_ref: DECISIONS.md#adr-077
+adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
+affected_paths: ["crates/contextra-vector/", "crates/contextra-store/"]
 keywords: ["partial hnsw rebuild", "nucleation", "rebuild_region", "F-02"]
 reason: >
   Kein partielles HNSW-Rewiring oder Teilgraph-Rebuilding (F-02) durchführen wegen Recall-Kollaps und RwLock-Contention; zulässig ist ausschließlich reines Tombstone-Pruning.
@@ -23,7 +24,7 @@ reason: >
 feature_id: OP-03
 status: conditionally_accepted
 conditional_review_due: 2026-10-07
-adr_ref: DECISIONS.md#adr-077
+adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
 keywords: ["voice assistant", "speech-to-text", "realtime-audio", "jarvis", "OP-03"]
 reason: >
   Keine Realtime-Audio-, Speech-to-Text-, Voice- oder Jarvis-Assistenten-Funktionen (OP-03) integrieren, da Audio-Streaming nicht zum bi-temporalen Speichersubstrat gehört.
@@ -34,4 +35,4 @@ feature_id: VETO-UMGEHUNG
 status: permanent_rejected
 keywords: ["veto bypass", "isolation bypass", "bypass veto"]
 reason: >
-  Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR in DECISIONS.md umgehen.
+  Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR unter docs/decisions/ umgehen.
