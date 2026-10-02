@@ -81,6 +81,12 @@ impl SnapshotRegistry {
     /// Uses `Ordering::Acquire` to synchronize with `Ordering::Release` writes in `update_min`.
     /// This allows reader threads (e.g., compaction processes) to safely query the minimum
     /// active snapshot sequence without acquiring the `active` mutex lock.
+    /// Returns the minimum active sequence number (`u64::MAX` if none).
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` compaction workers query `min_active_seqno()` using lock-free Acquire ordering
+    /// to determine tombstone GC floors. The minimum sequence number will never exceed the creation sequence
+    /// of any live `SnapshotGuard` or active pin.
     #[inline]
     pub fn min_active_seqno(&self) -> u64 {
         self.min_active_seqno.load(Ordering::Acquire)
@@ -320,7 +326,7 @@ mod tests {
                 guards.push(registry.register(seq));
             }
 
-            let min_expected = *seqs.iter().min().unwrap(); // expect
+            let min_expected = *seqs.iter().min().unwrap(); // #[cfg(test)]
             prop_assert_eq!(registry.min_active_seqno(), min_expected);
 
             guards.pop(); // Drop last element
@@ -371,7 +377,7 @@ mod tests {
                 let guard_idx = remaining_indices.remove(idx_in_remaining);
 
                 // Drop the guard
-                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // expect
+                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
                 guards[guard_idx] = None;
 
                 // Remove from reference (one occurrence only)

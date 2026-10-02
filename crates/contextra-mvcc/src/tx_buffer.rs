@@ -355,6 +355,12 @@ impl<T: Clone> TxBuffer<T> {
     /// The returned minimum snapshot sequence is NOT an atomic snapshot across all shards.
     /// Callers determining a safe pruning watermark MUST compute:
     /// `min(min_read_snapshot(), last_allocated_seq_before_call)`.
+    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` uses `min_read_snapshot()` combined with `SnapshotRegistry::min_active_seqno()` to
+    /// prevent pruning SSI write keys active transactions still depend on.
+    /// Locks each shard sequentially in ascending index order (0..N-1) without holding multiple shard locks simultaneously.
     pub fn min_read_snapshot(&self) -> Option<u64> {
         let mut overall_min: Option<u64> = None;
         for shard_lock in &self.shards {
@@ -690,6 +696,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     }
 
     /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// Draining atomizes staging removal and clears the transaction's `ReadSet` and staging byte footprint.
     pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
         let ops = self.drain(tx);
         if !ops.is_empty() {
@@ -779,7 +788,7 @@ mod tests {
         buffer.register_read(tx, b"key_a".to_vec(), 100);
         buffer.record_read(tx, b"key_b".to_vec(), 105);
 
-        let rs = buffer.read_set(tx).expect("read set present");
+        let rs = buffer.read_set(tx).expect("read set present"); // #[cfg(test)]
         assert_eq!(rs.len(), 2);
         assert_eq!(rs.get(b"key_a"), Some(100));
         assert_eq!(rs.get(b"key_b"), Some(105));
@@ -1017,7 +1026,7 @@ mod tests {
 
         let mut txs = Vec::new();
         for h in handles {
-            let tx = h.await.expect("task failed"); // expect
+            let tx = h.await.expect("task failed"); // #[cfg(test)]
             txs.push(tx);
         }
 
@@ -1078,7 +1087,7 @@ mod tests {
                     data: (key_a.clone(), val_a.clone()),
                 },
             )
-            .expect("stage tx1");
+            .expect("stage tx1"); // #[cfg(test)]
 
         // tx1 has key_a staged
         assert!(buffer.is_key_staged_for_tx(tx1, &key_a));
@@ -1147,7 +1156,7 @@ mod tests {
             // 2. Verify each TX only has its own data
             for &id in &tx_ids {
                 let tx = TxId::new(id);
-                let ops = buffer.get_ops(tx).unwrap(); // unwrap
+                let ops = buffer.get_ops(tx).unwrap(); // #[cfg(test)]
                 for op in ops {
                     match op {
                         IndexOp::Insert { doc_id, data } => {
@@ -1277,7 +1286,7 @@ mod tests {
                     prop_assert!(buffer.get_ops(tx).is_none());
                 } else {
                     prop_assert!(buffer.has_tx(tx));
-                    let ops = buffer.get_ops(tx).unwrap(); // unwrap
+                    let ops = buffer.get_ops(tx).unwrap(); // #[cfg(test)]
                     prop_assert_eq!(ops.len(), 1);
                     match &ops[0] {
                         IndexOp::Insert { doc_id, data } => {

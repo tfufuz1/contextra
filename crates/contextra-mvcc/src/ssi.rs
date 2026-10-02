@@ -63,6 +63,7 @@ impl ReadSet {
     /// If the key was previously recorded in the same transaction, the lowest (earliest)
     /// snapshot sequence number is preserved to enforce strict isolation boundaries.
     pub fn record_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let k = key.into();
         self.keys
             .entry(k)
@@ -84,6 +85,7 @@ impl ReadSet {
     /// SSI protects point reads directly; range scans are protected against phantoms
     /// only when `record_prefix` is explicitly called.
     pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let p = prefix.into();
         self.prefixes
             .entry(p)
@@ -165,6 +167,10 @@ pub trait SsiValidator {
     /// # Errors
     /// Returns `Err(ContextraError::Conflict(...))` if a key in `read_set` was committed by a
     /// concurrent transaction at a sequence number strictly greater than the key's snapshot sequence number.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` assumes serializable commit validation ordering (e.g. via `commit_mutex` or engine pipeline)
+    /// during `validate` and `record_commit_key` calls to guarantee atomic, write-skew-free commits.
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
@@ -271,16 +277,8 @@ impl CommittedWrites {
     }
 
     fn insert(&mut self, key: Vec<u8>, commit_seq: u64) {
-        if let Some(old_seq) = self.keys.insert(key.clone(), commit_seq) {
-            if old_seq != commit_seq {
-                if let Some(SeqBucket::Exact(keys)) = self.seq_index.get_mut(&old_seq) {
-                    keys.retain(|k| k != &key);
-                    if keys.is_empty() {
-                        self.seq_index.remove(&old_seq);
-                    }
-                }
-            }
-        }
+        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
+        self.keys.insert(key.clone(), commit_seq);
 
         match self.seq_index.entry(commit_seq) {
             std::collections::btree_map::Entry::Vacant(e) => {
@@ -387,6 +385,7 @@ impl CommittedWrites {
     }
 
     fn remove_from_seq(&mut self, first_seq: u64) -> usize {
+        let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut removed = 0;
         let mut seqs_to_remove = Vec::new();
 
@@ -395,7 +394,21 @@ impl CommittedWrites {
             match bucket {
                 SeqBucket::Exact(keys) => {
                     for key in keys {
-                        if self.keys.get(key) == Some(&seq) && self.keys.remove(key).is_some() {
+                        if self.keys.get(key) == Some(&seq) {
+                            let mut highest_old_seq = None;
+                            for (&old_seq, old_bucket) in self.seq_index.range(..first_seq).rev() {
+                                if let SeqBucket::Exact(old_keys) = old_bucket {
+                                    if old_keys.contains(key) {
+                                        highest_old_seq = Some(old_seq);
+                                        break;
+                                    }
+                                }
+                            }
+                            if let Some(old_seq) = highest_old_seq {
+                                self.keys.insert(key.clone(), old_seq);
+                            } else {
+                                self.keys.remove(key);
+                            }
                             removed += 1;
                         }
                     }
@@ -416,6 +429,7 @@ impl CommittedWrites {
     }
 
     fn prune_through(&mut self, bound_seq: u64) -> usize {
+        let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut removed = 0;
         let mut seqs_to_remove = Vec::new();
 
@@ -527,7 +541,12 @@ impl SequenceLogSsiValidator {
     ///
     /// Atomically updates `pruned_through` watermark monotonically under the `committed_writes` write lock.
     /// Returns the number of entries removed.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` compaction workers compute `bound_seq` as `min(min_read_snapshot(), min_active_seqno())`
+    /// to ensure pruned keys can no longer conflict with any active or future transaction.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
+        let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         let removed = writes.prune_through(bound_seq);
         self.pruned_through.fetch_max(bound_seq, Ordering::SeqCst);
@@ -538,7 +557,12 @@ impl SequenceLogSsiValidator {
     ///
     /// Used when WAL append or commit execution fails after keys were registered conservatively.
     /// Returns the number of entries removed in $O(K_{\text{removed}})$ time using the sequence index.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` invokes `forget_from(first_seq)` during WAL append or commit execution rollbacks
+    /// to strip conservatively registered candidate keys. Earlier valid commits at `old_seq < first_seq` are restored.
     pub fn forget_from(&self, first_seq: u64) -> usize {
+        let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         writes.remove_from_seq(first_seq)
     }
@@ -636,7 +660,12 @@ impl SequenceLogSsiValidator {
     }
 
     /// Records a committed write for `key` at sequence number `commit_seq`.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` assumes strict monotonic `commit_seq` assignment serialized by `commit_mutex`.
+    /// Registering keys must reflect durably committed WAL/engine sequence numbers.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
+        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         writes.insert(key.to_vec(), commit_seq);
         self.check_and_coarsen_if_needed(&mut writes);
@@ -648,6 +677,7 @@ impl SequenceLogSsiValidator {
         keys: impl IntoIterator<Item = &'a [u8]>,
         commit_seq: u64,
     ) {
+        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         for key in keys {
             writes.insert(key.to_vec(), commit_seq);
@@ -808,6 +838,7 @@ impl SequenceLogSsiValidator {
         write_keys: impl IntoIterator<Item = &'a [u8]>,
         commit_seq: u64,
     ) -> Result<()> {
+        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         self.validate_internal(&writes, tx_id, read_set)?;
 
@@ -911,7 +942,7 @@ mod tests {
         let tx = TxId::new(3);
 
         let doc_key = "doc_alpha";
-        let doc_id = DocId::from_key(doc_key).expect("valid doc_id");
+        let doc_id = DocId::from_key(doc_key).expect("valid doc_id"); // #[cfg(test)]
 
         let mut rs = ReadSet::new();
         rs.record_read(doc_key.as_bytes(), 5);
