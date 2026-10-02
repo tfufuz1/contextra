@@ -6,6 +6,10 @@
 
 //! F-02: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen.
 //!
+//! **VETO-F02 SPERRE (REVIEW-DATUM: 2026-10-07):**
+//! `partial-index-rebuild` ist bis zum VETO-F02-Review am 2026-10-07 gesperrt.
+//! Es führt ausschließlich Tombstone-Pruning durch; kein partielles Rewiring.
+//!
 //! FEATURE-FLAG: `partial-index-rebuild` (default: off).
 //! ARCHITEKTUR: Ergänzt den globalen `HNSW_REBUILD_DELETION_RATIO`-Trigger.
 //!              Kein Ersatz — der globale Trigger bleibt aktiv.
@@ -169,6 +173,83 @@ pub fn should_trigger_partial_rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[allow(clippy::unwrap_used, clippy::needless_range_loop)]
+    fn test_veto_f02_edge_subset_invariant_no_rewiring() {
+        use crate::hnsw::{HnswConfigBuilder, HnswIndex};
+        use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+        use contextra_ports::SeededRng;
+        use std::collections::HashSet;
+        use std::sync::Arc;
+
+        let dim = 16;
+        let config = HnswConfigBuilder::new(dim)
+            .m(16)
+            .ef_construction(32)
+            .distance_metric(DistanceMetric::Cosine)
+            .build()
+            .unwrap();
+
+        let index =
+            HnswIndex::try_new_with_rng(config.clone(), Arc::new(SeededRng::new(12345))).unwrap();
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+
+        runtime.block_on(async {
+            let tx = TxId::new(1);
+            for i in 1..=50 {
+                let vec = vec![i as f32 * 0.1; dim];
+                index.insert(tx, DocId::new(i), &vec).await.unwrap();
+            }
+            index.commit(tx).await.unwrap();
+
+            let doc_layers = index.all_doc_ids_and_layers();
+            let nodes_len = index.ram_nodes_len_for_test();
+            let mut edges_before: Vec<Vec<Vec<u32>>> = Vec::new();
+
+            for ram_idx in 0..nodes_len {
+                let max_layer = doc_layers[ram_idx].1;
+                let mut node_layers = Vec::new();
+                for layer in 0..=max_layer {
+                    let conns = index.get_ram_node_connections_for_test(ram_idx, layer);
+                    node_layers.push(conns);
+                }
+                edges_before.push(node_layers);
+            }
+
+            // Delete 5 nodes (DocIds 1..=5)
+            let tx2 = TxId::new(2);
+            for i in 1..=5 {
+                index.delete(tx2, DocId::new(i)).await.unwrap();
+            }
+            index.commit(tx2).await.unwrap();
+
+            // Perform region rebuild on region [0..20]
+            let region: Vec<u64> = (0..20).collect();
+            index.rebuild_region(region).await.unwrap();
+
+            // Record edges after rebuild
+            for ram_idx in 0..nodes_len {
+                let max_layer = doc_layers[ram_idx].1;
+                for layer in 0..=max_layer {
+                    let conns_after = index.get_ram_node_connections_for_test(ram_idx, layer);
+                    let conns_before_set: HashSet<u32> =
+                        edges_before[ram_idx][layer].iter().copied().collect();
+
+                    // VETO-F02 ASSERTION: Every edge post-rebuild MUST be a subset of pre-rebuild edges (NO new rewiring edges)
+                    for &target in &conns_after {
+                        assert!(
+                            conns_before_set.contains(&target),
+                            "VETO-F02 VIOLATION: New edge ({ram_idx} -> {target}) introduced on layer {layer}! Partial rebuild must only prune tombstones, zero rewiring permitted."
+                        );
+                    }
+                }
+            }
+        });
+    }
 
     #[test]
     fn test_partial_rebuild_tracker_records_traversals() {

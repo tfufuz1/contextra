@@ -467,6 +467,17 @@ impl HnswIndex {
             .collect()
     }
 
+    /// Returns graph connections for a given RAM node index and layer (diagnostic helper for test inspection).
+    pub fn get_ram_node_connections_for_test(&self, ram_idx: usize, layer: usize) -> Vec<u32> {
+        let m = self.inner.cold.config.m;
+        self.inner.hot.get_ram_node_connections(ram_idx, layer, m)
+    }
+
+    /// Returns total RAM nodes count (diagnostic helper for test inspection).
+    pub fn ram_nodes_len_for_test(&self) -> usize {
+        self.inner.hot.nodes.read().len()
+    }
+
     /// Returns all non-deleted document IDs and their assigned HNSW max layers.
     pub fn all_doc_ids_and_layers(&self) -> Vec<(DocId, usize)> {
         let map = self.inner.hot.doc_to_node.read();

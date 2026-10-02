@@ -6,6 +6,12 @@
 
 //! RaBitQ Quantizer behind feature flag `experimental-rabitq`.
 //!
+//! # Kalibrierung, Annahmen & Grenzen
+//! - **Parameter:** `dimension` (Dimension $D$ der Vektoren), `rotation_matrix` ($D \times D$ orthogonale Matrix $R$, erzeugt per Gram-Schmidt auf gaußschem Seed).
+//! - **Kalibrierungsablauf:** `RaBitQQuantizer::try_train` prüft Eingabevektoren auf Endlichkeit (`is_finite()`) und Dimensionstreue, und konstruiert deterministisch die Rotationsmatrix $R$.
+//! - **Annahmen:** Eingabevektoren liegen im euklidischen Raum $\mathbb{R}^D$ ohne `NaN`/`Inf`. Orthogonale Rotation erhält euklidische Distanzen ($R R^T = I$).
+//! - **Grenzen & Genauigkeit:** Binarisierung auf 1 Bit pro Dimension komprimiert den Speicherbedarf drastisch ($\lceil D / 8 \rceil + 8$ Bytes), führt jedoch zu Quantisierungsrauschen. Der geschätzte asymmetrische Distanzwert nähert die echte euklidische Distanz an; für höchste Genauigkeiten empfiehlt sich ein exakter Rerank der Top-Kandidaten.
+//!
 //! RaBitQ applies a random orthogonal rotation to high-dimensional vectors,
 //! binarizes the rotated components into 1-bit codes, and stores scalar metadata
 //! (norm and average absolute magnitude) for asymmetric distance estimation.
