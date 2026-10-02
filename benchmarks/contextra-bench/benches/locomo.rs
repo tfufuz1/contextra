@@ -50,11 +50,12 @@ fn bench_locomo_eval(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     let fixture_path = get_fixture_path("tests/fixtures/locomo_fixture.json");
-    let cases = load_locomo_dataset(&fixture_path).expect("Failed to load LoCoMo fixture dataset");
+    let dataset = load_locomo_dataset(&fixture_path).expect("Failed to load LoCoMo fixture dataset");
 
     group.bench_function("hybrid_retrieval_fixture", |b| {
         b.to_async(&rt).iter_custom(|iters| {
-            let cases = &cases;
+            let cases = &dataset.cases;
+            let conversation_index = &dataset.conversation_index;
             async move {
                 let mut total_duration = std::time::Duration::ZERO;
                 for _ in 0..iters {
@@ -89,7 +90,7 @@ fn bench_locomo_eval(c: &mut Criterion) {
                     }
 
                     let start = std::time::Instant::now();
-                    let report = run_locomo_eval(cases, |q| {
+                    let report = run_locomo_eval(cases, conversation_index, |q| {
                         let q_owned = q.to_string();
                         let col_ref = &col;
                         Box::pin(async move {

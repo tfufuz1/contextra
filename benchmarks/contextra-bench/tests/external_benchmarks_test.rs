@@ -68,9 +68,9 @@ async fn test_long_mem_eval_fixture_parsing_and_eval() {
 #[tokio::test]
 async fn test_locomo_fixture_parsing_and_eval() {
     let fixture_path = Path::new("tests/fixtures/locomo_fixture.json");
-    let cases = load_locomo_dataset(fixture_path).expect("Fixture should parse successfully");
+    let dataset = load_locomo_dataset(fixture_path).expect("Fixture should parse successfully");
 
-    assert_eq!(cases.len(), 3);
+    assert_eq!(dataset.cases.len(), 3);
 
     let mock_search = |q: &str| {
         let q_text = q.to_string();
@@ -95,7 +95,7 @@ async fn test_locomo_fixture_parsing_and_eval() {
             >
     };
 
-    let report = run_locomo_eval(&cases, mock_search)
+    let report = run_locomo_eval(&dataset.cases, &dataset.conversation_index, mock_search)
         .await
         .expect("Evaluation should succeed");
 
@@ -282,7 +282,7 @@ async fn test_empty_and_erroring_eval_runs() {
                 contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
-    let locomo_report = run_locomo_eval(&empty_locomo, mock_search_ok)
+    let locomo_report = run_locomo_eval(&empty_locomo, &std::collections::HashMap::new(), mock_search_ok)
         .await
         .unwrap();
     assert_eq!(locomo_report.total_eval_cases, 0);
