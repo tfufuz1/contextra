@@ -191,6 +191,7 @@ pub struct WalEntrySnapshot {
 pub struct IntegrityVerifier {
     last_hmac: [u8; 32],
     integrity_key: Zeroizing<Vec<u8>>,
+    last_seq_no: Option<u64>,
 }
 
 impl IntegrityVerifier {
@@ -198,6 +199,7 @@ impl IntegrityVerifier {
         Self {
             last_hmac: [0u8; 32],
             integrity_key: Zeroizing::new(integrity_key.to_vec()),
+            last_seq_no: None,
         }
     }
 
@@ -216,8 +218,47 @@ impl IntegrityVerifier {
         self.last_hmac
     }
 
+    /// Übernimmt eine bereits bekannte `last_seq_no` für den Verifier-Handoff.
+    pub fn set_last_seq_no(&mut self, seq_no: Option<u64>) {
+        self.last_seq_no = seq_no;
+    }
+
+    /// Gibt die aktuell bekannte `last_seq_no` zurück (für Verifier-Handoff).
+    pub fn last_seq_no_snapshot(&self) -> Option<u64> {
+        self.last_seq_no
+    }
+
     /// Verifies a V3 entry (with tx_id and length prefixes) and updates the chain state.
     pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
+        if entry.op_type > 2 {
+            return Err(CryptoError::wal_corruption(
+                offset,
+                format!("Unsupported op_type {}", entry.op_type),
+            ));
+        }
+
+        if let Some(last_seq) = self.last_seq_no {
+            if entry.seq_no <= last_seq {
+                return Err(CryptoError::wal_corruption(
+                    offset,
+                    format!(
+                        "Duplicate or non-monotonic sequence number {} (last: {})",
+                        entry.seq_no, last_seq
+                    ),
+                ));
+            }
+            if entry.seq_no > last_seq + 1 {
+                return Err(CryptoError::wal_corruption(
+                    offset,
+                    format!(
+                        "Sequence gap detected: expected {}, got {}",
+                        last_seq + 1,
+                        entry.seq_no
+                    ),
+                ));
+            }
+        }
+
         let mut mac = WalHmac::new(&self.integrity_key)?;
         mac.update(&self.last_hmac);
         mac.update(&entry.seq_no.to_le_bytes());
@@ -260,6 +301,7 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
+        self.last_seq_no = Some(entry.seq_no);
         Ok(())
     }
 
@@ -276,6 +318,35 @@ impl IntegrityVerifier {
         note = "Nur für Legacy-Replay von WalVersion::V2-Bestandsdateien. Nicht für neue WAL-Segmente verwenden — siehe Doc-Kommentar. Audit-Referenz: F2."
     )]
     pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
+        if entry.op_type > 2 {
+            return Err(CryptoError::wal_corruption(
+                offset,
+                format!("Unsupported op_type {}", entry.op_type),
+            ));
+        }
+
+        if let Some(last_seq) = self.last_seq_no {
+            if entry.seq_no <= last_seq {
+                return Err(CryptoError::wal_corruption(
+                    offset,
+                    format!(
+                        "Duplicate or non-monotonic sequence number {} (last: {})",
+                        entry.seq_no, last_seq
+                    ),
+                ));
+            }
+            if entry.seq_no > last_seq + 1 {
+                return Err(CryptoError::wal_corruption(
+                    offset,
+                    format!(
+                        "Sequence gap detected: expected {}, got {}",
+                        last_seq + 1,
+                        entry.seq_no
+                    ),
+                ));
+            }
+        }
+
         let mut mac = WalHmac::new(&self.integrity_key)?;
         mac.update(&self.last_hmac);
         mac.update(&entry.seq_no.to_le_bytes());
@@ -310,12 +381,14 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
+        self.last_seq_no = Some(entry.seq_no);
         Ok(())
     }
 
     /// Updates the chain state for legacy V1 entries without HMAC verification.
     pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot) {
         self.last_hmac = entry.checksum;
+        self.last_seq_no = Some(entry.seq_no);
     }
 
     /// Default verification delegating to V3 verification.
@@ -518,7 +591,7 @@ mod tests {
         let err = verifier.verify_and_update(&e3, 30).unwrap_err();
         if let CryptoError::WalCorruption { offset, reason, .. } = err {
             assert_eq!(offset, 30);
-            assert!(reason.contains("HMAC mismatch"));
+            assert!(reason.contains("Sequence gap") || reason.contains("HMAC mismatch"));
         } else {
             panic!("Expected WalCorruption error");
         }
