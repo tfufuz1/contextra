@@ -82,9 +82,7 @@ fn test_clm_pinned_base_preserved_and_invalidation_idempotency() {
 
     // Verify Branch 1 is gone
     assert!(
-        store
-            .lookup(tenant, &key, &scratchpad_branch_1)
-            .is_none(),
+        store.lookup(tenant, &key, &scratchpad_branch_1).is_none(),
         "Branch 1 must be removed from cache"
     );
 

@@ -152,14 +152,7 @@ impl std::fmt::Display for Signal {
 }
 
 /// Policy governing multi-signal retrieval error handling semantics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum SignalFailurePolicy {
-    /// Return an explicit error if any retrieval signal fails (default).
-    #[default]
-    Fail,
-    /// Degrade gracefully by skipping failing signals and recording degraded signals in SearchReport.
-    Degrade,
-}
+pub use contextra_types::OnSignalFailure as SignalFailurePolicy;
 
 /// Execution report for search query execution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

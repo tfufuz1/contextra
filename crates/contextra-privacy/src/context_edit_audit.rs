@@ -170,7 +170,8 @@ pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), Contex
             subgoal_index: record.subgoal_index,
         };
 
-        let computed_hash = compute_record_hash(record.previous_hash, &input, record.recorded_at_tx);
+        let computed_hash =
+            compute_record_hash(record.previous_hash, &input, record.recorded_at_tx);
 
         if record.record_hash != computed_hash {
             return Err(ContextEditAuditError::ChainTampered { index });

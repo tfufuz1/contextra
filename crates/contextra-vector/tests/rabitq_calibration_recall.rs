@@ -117,10 +117,8 @@ async fn test_rabitq_calibration_recall_1bit_vs_4bit() {
         .map(|v| quantizer.quantize(v).expect("quantize 1bit"))
         .collect();
 
-    let codes_4bit_data: Vec<(Vec<u8>, f32, f32)> = vectors
-        .iter()
-        .map(|v| quantize_4bit_vector(v))
-        .collect();
+    let codes_4bit_data: Vec<(Vec<u8>, f32, f32)> =
+        vectors.iter().map(|v| quantize_4bit_vector(v)).collect();
 
     let mut hits_1bit = 0;
     let mut hits_4bit = 0;
