@@ -113,7 +113,9 @@ pub fn protected_paths_parse_args(args: &[String]) -> (String, String, String, b
     }
 
     if base.is_empty() {
+        let work_dir = if root.is_empty() { "." } else { &root };
         if let Ok(out) = Command::new("git")
+            .current_dir(work_dir)
             .args(["merge-base", "HEAD", "origin/main"])
             .output()
         {
@@ -127,6 +129,42 @@ pub fn protected_paths_parse_args(args: &[String]) -> (String, String, String, b
     }
 
     (root, base, head, json)
+}
+
+pub fn check_shallow_repository(root: &str) -> Result<bool, String> {
+    let work_dir = if root.is_empty() { "." } else { root };
+    let output = Command::new("git")
+        .current_dir(work_dir)
+        .args(["rev-parse", "--is-shallow-repository"])
+        .output()
+        .map_err(|e| format!("git rev-parse --is-shallow-repository failed: {e}"))?;
+
+    if output.status.success() {
+        let is_shallow = String::from_utf8_lossy(&output.stdout).trim() == "true";
+        Ok(is_shallow)
+    } else {
+        Err(format!(
+            "git rev-parse --is-shallow-repository error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
+pub fn check_commit_valid(root: &str, rev: &str) -> Result<(), String> {
+    let work_dir = if root.is_empty() { "." } else { root };
+    let output = Command::new("git")
+        .current_dir(work_dir)
+        .args(["cat-file", "-e", &format!("{rev}^{{commit}}")])
+        .output()
+        .map_err(|e| format!("git cat-file check failed: {e}"))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Basis-Commit '{rev}' konnte in Git nicht aufgelöst werden (kein origin/main oder ungültige Revision). Bitte 'git fetch origin main' ausführen."
+        ))
+    }
 }
 
 pub fn protected_paths_get_changed_files(
@@ -245,10 +283,178 @@ pub fn protected_paths_get_commit_trailers(
     Ok(trailers)
 }
 
+pub fn parse_adr_status(content: &str) -> Result<String, String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let stripped = if let Some(s) = trimmed.strip_prefix('*') {
+            s.trim()
+        } else if let Some(s) = trimmed.strip_prefix('-') {
+            s.trim()
+        } else {
+            trimmed
+        };
+        let lower = stripped.to_lowercase();
+        if lower.starts_with("status:")
+            || lower.starts_with("**status**:")
+            || lower.starts_with("**status:**")
+        {
+            if let Some((_, raw_val)) = stripped.split_once(':') {
+                let status_val = raw_val
+                    .trim()
+                    .trim_matches(|c| c == '*' || c == '_' || c == '`')
+                    .trim();
+                return Ok(status_val.to_string());
+            }
+        }
+    }
+    Err("Kein 'Status:' Feld im Dateikopf der ADR gefunden.".to_string())
+}
+
+pub fn is_status_accepted(status_val: &str) -> bool {
+    let lower = status_val.to_lowercase();
+    let cleaned = lower.replace("✅", "").replace("✔", "").trim().to_string();
+
+    cleaned == "accepted"
+        || cleaned.starts_with("accepted ")
+        || cleaned.starts_with("accepted(")
+        || cleaned == "final"
+        || cleaned.starts_with("final ")
+        || cleaned.starts_with("final(")
+}
+
+pub fn validate_adr_on_base_commit(
+    root: &str,
+    base: &str,
+    val: &str,
+    changed_files: &[String],
+) -> Result<String, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["ls-tree", "-r", "--name-only", base, "docs/decisions"])
+        .output()
+        .map_err(|e| format!("git ls-tree failed for base {base}: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ADR-Verzeichnis docs/decisions/ auf Basis-Commit '{base}' nicht gefunden."
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let prefix = format!("{val}-");
+    let exact = format!("{val}.md");
+
+    let mut matched_path: Option<String> = None;
+    for line in stdout.lines() {
+        let path_str = line.trim();
+        if let Some(filename) = Path::new(path_str).file_name().and_then(|f| f.to_str()) {
+            if filename == exact || (filename.starts_with(&prefix) && filename.ends_with(".md")) {
+                matched_path = Some(path_str.to_string());
+                break;
+            }
+        }
+    }
+
+    let adr_path = match matched_path {
+        Some(p) => p,
+        None => {
+            return Err(format!(
+                "ADR-Datei für '{val}' nicht auf Basis-Commit '{base}' in docs/decisions/ gefunden."
+            ));
+        }
+    };
+
+    if changed_files.contains(&adr_path) {
+        return Err(format!(
+            "ADR-Datei '{adr_path}' wurde im selben PR angelegt oder verändert (darf nicht im Diff basis...head enthalten sein)."
+        ));
+    }
+
+    let cat_out = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "-p", &format!("{base}:{adr_path}")])
+        .output()
+        .map_err(|e| format!("git cat-file failed for {base}:{adr_path}: {e}"))?;
+
+    if !cat_out.status.success() {
+        return Err(format!(
+            "Konnte ADR-Inhalt für '{adr_path}' von Basis-Commit '{base}' nicht lesen."
+        ));
+    }
+
+    let content = String::from_utf8_lossy(&cat_out.stdout);
+    let status_val = parse_adr_status(&content)?;
+    if !is_status_accepted(&status_val) {
+        return Err(format!(
+            "ADR '{val}' auf Basis-Commit hat Status '{status_val}', erforderlich ist 'accepted' oder 'final'."
+        ));
+    }
+
+    Ok(adr_path)
+}
+
 pub fn run_protected_paths(args: &[String]) -> i32 {
     let (root, base, head, json) = protected_paths_parse_args(args);
 
-    let config_path = Path::new(&root).join("governance/protected-paths.toml");
+    let work_dir = if root.is_empty() { "." } else { &root };
+
+    // Check for shallow repository
+    match check_shallow_repository(work_dir) {
+        Ok(true) => {
+            let msg = "Flaches Repository erkannt (shallow repository). Bitte führe 'git fetch --unshallow' bzw. 'git fetch origin main' aus.".to_string();
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": msg,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {msg}");
+            }
+            return 2;
+        }
+        Ok(false) => {}
+        Err(e) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": e,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {e}");
+            }
+            return 2;
+        }
+    }
+
+    // Check base commit validity
+    if let Err(e) = check_commit_valid(work_dir, &base) {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": "protected-paths",
+                    "status": "error",
+                    "summary": e,
+                    "findings": []
+                })
+            );
+        } else {
+            eprintln!("FEHLER [protected-paths]: {e}");
+        }
+        return 2;
+    }
+
+    let config_path = Path::new(work_dir).join("governance/protected-paths.toml");
     if !config_path.exists() {
         let msg = format!(
             "Konfigurationsdatei '{}' nicht gefunden.",
@@ -342,7 +548,8 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
                             "file": "governance/protected-paths.toml",
                             "line": 0,
                             "message": msg,
-                            "fix": format!("Füge eine Regel für '{req}' in governance/protected-paths.toml ein.")
+                            "fix": format!("Füge eine Regel für '{req}' in governance/protected-paths.toml ein."),
+                            "reason": "Pflicht-Selbstschutz-Pfad fehlt in Konfiguration."
                         }]
                     })
                 );
@@ -353,7 +560,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
         }
     }
 
-    let changed_files = match protected_paths_get_changed_files(&root, &base, &head) {
+    let changed_files = match protected_paths_get_changed_files(work_dir, &base, &head) {
         Ok(f) => f,
         Err(e) => {
             if json {
@@ -402,7 +609,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
     }
 
     // Check exception rules
-    let commits = match protected_paths_get_commits(&root, &base, &head) {
+    let commits = match protected_paths_get_commits(work_dir, &base, &head) {
         Ok(c) => c,
         Err(e) => {
             if json {
@@ -434,7 +641,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
         missing_adr_reason = "Keine Commits im angegebenen Bereich gefunden.".to_string();
     } else {
         for commit in &commits {
-            let trailers = match protected_paths_get_commit_trailers(&root, commit) {
+            let trailers = match protected_paths_get_commit_trailers(work_dir, commit) {
                 Ok(t) => t,
                 Err(e) => {
                     all_commits_have_valid_adr = false;
@@ -444,45 +651,25 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
             };
 
             let mut commit_valid = false;
+            let mut commit_adr_found = false;
             for (key, val) in trailers {
                 if key == "Protected-Change" {
-                    let adr_path = Path::new(&root)
-                        .join("docs/decisions")
-                        .join(format!("{val}.md"));
-
-                    let mut exists = adr_path.exists();
-                    if !exists {
-                        if let Ok(entries) =
-                            walkdir::WalkDir::new(Path::new(&root).join("docs/decisions"))
-                                .max_depth(1)
-                                .into_iter()
-                                .collect::<Result<Vec<_>, _>>()
-                        {
-                            for entry in entries {
-                                if let Some(name) = entry.file_name().to_str() {
-                                    if name.starts_with(&format!("{val}-")) && name.ends_with(".md")
-                                    {
-                                        exists = true;
-                                        break;
-                                    }
-                                }
-                            }
+                    commit_adr_found = true;
+                    match validate_adr_on_base_commit(work_dir, &base, &val, &changed_files) {
+                        Ok(_adr_path) => {
+                            commit_valid = true;
+                            break;
                         }
-                    }
-
-                    if exists {
-                        commit_valid = true;
-                        break;
-                    } else {
-                        missing_adr_reason =
-                            format!("ADR-Datei für '{val}' nicht in docs/decisions/ gefunden.");
+                        Err(err_msg) => {
+                            missing_adr_reason = err_msg;
+                        }
                     }
                 }
             }
 
             if !commit_valid {
                 all_commits_have_valid_adr = false;
-                if missing_adr_reason.is_empty() {
+                if !commit_adr_found && missing_adr_reason.is_empty() {
                     missing_adr_reason = format!(
                         "Commit {commit} besitzt keinen 'Protected-Change: ADR-NNN' Trailer."
                     );
@@ -490,6 +677,10 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
                 break;
             }
         }
+    }
+
+    if all_commits_have_valid_adr && !has_label {
+        missing_adr_reason = "PR-Label 'protected-change' fehlt in PR_LABELS.".to_string();
     }
 
     if all_commits_have_valid_adr && has_label {
@@ -512,16 +703,17 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
     }
 
     let mut findings = Vec::new();
-    for (file, glob, reason) in &violations {
-        let msg = format!("Geschützter Pfad '{file}' wurde verändert (Regel Glob: '{glob}'). Grund: {reason}. Exception-Status: ADR-Trailer ok = {all_commits_have_valid_adr}, PR-Label 'protected-change' = {has_label}.");
-        let fix = format!("Entferne die Änderungen an '{file}' ODER füge jedem Commit den Trailer 'Protected-Change: ADR-NNN' hinzu, erstelle die ADR-Datei in docs/decisions/ und setze das PR-Label 'protected-change'.");
+    for (file, glob, rule_reason) in &violations {
+        let msg = format!("Geschützter Pfad '{file}' wurde verändert (Regel Glob: '{glob}'). Grund: {rule_reason}. Exception-Status: ADR-Trailer ok = {all_commits_have_valid_adr}, PR-Label 'protected-change' = {has_label}.");
+        let fix = format!("Entferne die Änderungen an '{file}' ODER füge jedem Commit den Trailer 'Protected-Change: ADR-NNN' hinzu, verankere die ADR-Datei in docs/decisions/ auf dem Basis-Commit mit Status 'accepted' und setze das PR-Label 'protected-change'.");
         findings.push(serde_json::json!({
             "id": "PP-PROTECTED-PATH-VIOLATION",
             "severity": "error",
             "file": file,
             "line": 0,
             "message": msg,
-            "fix": fix
+            "fix": fix,
+            "reason": missing_adr_reason
         }));
     }
 
@@ -539,10 +731,11 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
         );
     } else {
         eprintln!("VERSTOSS [protected-paths]: {summary}");
-        for (file, glob, reason) in &violations {
+        for (file, glob, rule_reason) in &violations {
             eprintln!("  WAS: Datei '{file}' verändert (Glob: '{glob}')");
-            eprintln!("  WARUM: {reason} (ADR/AGENTS.md Invariante)");
-            eprintln!("  FIX: Commit Trailer 'Protected-Change: ADR-NNN', ADR in docs/decisions/ erstellen und PR-Label 'protected-change' setzen.");
+            eprintln!("  WARUM: {rule_reason} (ADR/AGENTS.md Invariante)");
+            eprintln!("  FIX: Commit Trailer 'Protected-Change: ADR-NNN', ADR in docs/decisions/ auf Basis-Commit verankern und PR-Label 'protected-change' setzen.");
+            eprintln!("  URSACHE: {missing_adr_reason}");
         }
     }
 
