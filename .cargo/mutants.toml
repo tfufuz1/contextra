@@ -4,6 +4,7 @@ examine_globs = [
     "crates/contextra-crypto/src/**/*.rs",
     "crates/contextra-store/src/**/*.rs",
     "crates/contextra-checkpoint/src/**/*.rs",
+    "crates/contextra-vector/src/**/*.rs",
 ]
 
 exclude_globs = [

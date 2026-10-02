@@ -1,5 +1,9 @@
 name: Mutation Testing
 on:
+  # Wöchentlicher automatischer Lauf jeden Montag um 03:00 UTC
+  # (Frequenz abgestimmt auf die 45-Minuten-Timeout-Begrenzung für Mutation Testing)
+  schedule:
+    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       crate:
@@ -29,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -47,6 +51,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "crates=${{ github.event.inputs.crate }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "crates=contextra-crypto contextra-checkpoint contextra-store contextra-candle contextra-db contextra-vector contextra-text contextra-graph contextra-rank" >> "$GITHUB_OUTPUT"
           else
             CRATES=""
             if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-checkpoint/'; then
@@ -108,6 +114,34 @@ jobs:
             echo "Recording mutation score for $crate: total=$TOTAL, caught=$CAUGHT"
             cargo run -p xtask -- mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT"
           done
+
+      - name: Commit and Push Mutation Score History
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/mutation_score_history.jsonl
+          if git diff --staged --quiet; then
+            echo "ℹ️ Keine Änderungen in docs/mutation_score_history.jsonl."
+          else
+            git commit -m "chore(mutation): update mutation score history [skip ci]"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              git push
+            else
+              git checkout -B gate-status
+              git push origin HEAD:gate-status
+            fi
+            echo "✅ Mutation score history erfolgreich ge-pusht."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Mutation Score History Artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mutation-score-history
+          path: docs/mutation_score_history.jsonl
 
       - name: Enforce Mutation Score Gate
         run: |

@@ -1,6 +1,7 @@
 use crate::lsm::config::DurabilityMode;
 use crate::wal::{PreparedBatch, Wal, WalOp};
 use contextra_core::{Result, TxId};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub(super) async fn execute_group_commit_append(
@@ -8,6 +9,7 @@ pub(super) async fn execute_group_commit_append(
     durability_mode: DurabilityMode,
     all_wal_entries: PreparedBatch,
     truncate_guard: tokio::sync::MutexGuard<'_, ()>,
+    committed_flag: &AtomicBool,
 ) -> Result<()> {
     match durability_mode {
         DurabilityMode::Full | DurabilityMode::WalNoHmac => {
@@ -17,16 +19,31 @@ pub(super) async fn execute_group_commit_append(
                 .append_batch_locked(all_wal_entries, &truncate_guard)
                 .await;
             if append_res.is_err() {
-                drop(truncate_guard);
                 if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
                     tracing::error!(
                         "Failed to truncate WAL after failed group append_batch: {trunc_err}"
                     );
                 }
+                if wal.is_poisoned() {
+                    match wal.recover_from_poison().await {
+                        Ok(()) => tracing::info!("WAL successfully recovered from poison state"),
+                        Err(rec_err) => {
+                            tracing::error!("Failed to recover WAL from poison state: {rec_err}")
+                        }
+                    }
+                }
+                drop(truncate_guard);
+            } else {
+                committed_flag.store(true, Ordering::Release);
+                drop(truncate_guard);
             }
             append_res
         }
-        DurabilityMode::MemoryOnly => Ok(()),
+        DurabilityMode::MemoryOnly => {
+            committed_flag.store(true, Ordering::Release);
+            drop(truncate_guard);
+            Ok(())
+        }
     }
 }
 
@@ -41,19 +58,19 @@ pub(super) struct WalQueueGuard(pub(super) Arc<std::sync::atomic::AtomicUsize>);
 
 impl WalQueueGuard {
     pub(super) fn new(counter: Arc<std::sync::atomic::AtomicUsize>) -> Self {
-        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        counter.fetch_add(1, Ordering::Relaxed);
         Self(counter)
     }
 }
 
 impl Drop for WalQueueGuard {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.0.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
 pub(super) struct PendingCommitQueue {
     pub(super) requests: Vec<GroupCommitRequest>,
     pub(super) notify_full: Arc<tokio::sync::Notify>,
-    pub(super) committed_flag: Arc<std::sync::atomic::AtomicBool>,
+    pub(super) committed_flag: Arc<AtomicBool>,
 }
