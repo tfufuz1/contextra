@@ -182,8 +182,9 @@ where
                     Ok(data) => data,
                     Err(e) => {
                         if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), decryption failed: {}",
+                            // Policy: An AEAD decryption failure at physical tail can be caused by zero-filled/truncated write.
+                            tracing::error!(
+                                "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                 chunk_start_pos,
                                 e
                             );
@@ -199,16 +200,9 @@ where
                 let mut inner_slice = decrypted_data.as_slice();
                 while !inner_slice.is_empty() {
                     if inner_slice.len() < 4 {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner framing",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
                         return Err(ContextraError::wal_corruption(
                             chunk_start_pos,
-                            "Truncated inner WAL entry length in batch",
+                            "Incomplete inner framing in decrypted batch",
                         ));
                     }
                     let inner_len_bytes: [u8; 4] =
@@ -223,16 +217,9 @@ where
                         };
                     let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                     if inner_slice.len() < 4 + inner_len {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner payload",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
                         return Err(ContextraError::wal_corruption(
                             chunk_start_pos,
-                            "Truncated inner WAL entry in batch",
+                            "Truncated inner WAL entry payload in decrypted batch",
                         ));
                     }
                     let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
@@ -240,36 +227,22 @@ where
                         None => {
                             return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
-                                "Truncated inner WAL entry in batch",
+                                "Truncated inner WAL entry payload in decrypted batch",
                             ));
                         }
                     };
                     inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
 
-                    let entry = match WalEntry::from_bytes(inner_entry_bytes) {
+                    let entry = match WalEntry::from_bytes_classified(inner_entry_bytes) {
                         Ok(e) => e,
-                        Err(e) => {
-                            let err_msg = format!("{}", e);
-                            let is_crc_error = err_msg.contains("CRC mismatch");
-
-                            if pos >= file_size && !is_crc_error {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), partial entry: {}",
-                                    chunk_start_pos,
-                                    e
-                                );
-                                break;
-                            } else {
-                                let reason = if is_crc_error {
-                                    format!("CRC validation failed: {e}")
-                                } else {
-                                    format!("Deserialization failed: {e}")
-                                };
-                                return Err(ContextraError::wal_corruption(
-                                    chunk_start_pos,
-                                    reason,
-                                ));
-                            }
+                        Err(parse_err) => {
+                            // Policy: Authenticated data is never a tail!
+                            return Err(ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                format!(
+                                    "Deserialization failed in authenticated batch: {parse_err}"
+                                ),
+                            ));
                         }
                     };
 
@@ -380,8 +353,8 @@ where
                                 )));
                             } else {
                                 if pos >= file_size {
-                                    tracing::warn!(
-                                        "WAL truncation at tail (offset {}), decryption failed: {}",
+                                    tracing::error!(
+                                        "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                         chunk_start_pos,
                                         e
                                     );
@@ -399,12 +372,23 @@ where
                     &entry_data_raw
                 };
 
-                let entry = match WalEntry::from_bytes(entry_data) {
+                let entry = match WalEntry::from_bytes_classified(entry_data) {
                     Ok(e) => e,
-                    Err(e) => {
-                        if let Some(err) =
-                            Wal::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
-                        {
+                    Err(parse_err) => {
+                        if key_manager.is_some() && version != WalVersion::V1 {
+                            return Err(ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                format!(
+                                    "Deserialization failed in authenticated entry: {parse_err}"
+                                ),
+                            ));
+                        }
+                        if let Some(err) = Wal::handle_wal_entry_parse_error(
+                            parse_err,
+                            chunk_start_pos,
+                            pos,
+                            file_size,
+                        ) {
                             return Err(err);
                         }
                         break;
@@ -481,12 +465,15 @@ where
         }
         #[cfg(not(feature = "wal-integrity"))]
         {
-            let entry = match WalEntry::from_bytes(&entry_data_raw) {
+            let entry = match WalEntry::from_bytes_classified(&entry_data_raw) {
                 Ok(e) => e,
-                Err(e) => {
-                    if let Some(err) =
-                        Wal::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
-                    {
+                Err(parse_err) => {
+                    if let Some(err) = Wal::handle_wal_entry_parse_error(
+                        parse_err,
+                        chunk_start_pos,
+                        pos,
+                        file_size,
+                    ) {
                         return Err(err);
                     }
                     break;
@@ -505,23 +492,10 @@ where
 }
 
 impl Wal {
-    pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let ack_rx = {
-            let truncate_guard = self.truncate_lock.lock().await;
-            self.enqueue_append_batch_locked(batch, &truncate_guard)
-                .await?
-        };
-        ack_rx
-            .await
-            .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
-        Ok(())
-    }
-
-    pub async fn enqueue_append_batch_locked(
+    pub(crate) async fn prepare_append_payload(
         &self,
-        batch: PreparedBatch,
-        _guard: &tokio::sync::MutexGuard<'_, ()>,
-    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
+        batch: &PreparedBatch,
+    ) -> Result<(Vec<u8>, [u8; 32])> {
         if self.is_sealed() {
             return Err(ContextraError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -531,9 +505,7 @@ impl Wal {
 
         let entries = &batch.0;
         if entries.is_empty() {
-            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
-            let _ = ack_tx.send(Ok(()));
-            return Ok(ack_rx);
+            return Ok((Vec::new(), [0u8; 32]));
         }
 
         #[cfg(feature = "fault-injection")]
@@ -565,27 +537,114 @@ impl Wal {
         let mut last_hmac_val = [0u8; 32];
 
         if let Some(km) = &self.key_manager {
-            let mut batch_plaintext = Vec::with_capacity(estimated_size);
+            let max_frame_len = MAX_WAL_ENTRY_SIZE as usize;
+            let max_plaintext_per_frame = max_frame_len.saturating_sub(28);
+
+            let mut serialized_entries = Vec::with_capacity(entries.len());
             for entry in entries {
                 let bytes = entry.to_bytes()?;
-                batch_plaintext.extend_from_slice(&bytes);
-                last_hmac_val = entry.checksum;
+                let inner_record_len = bytes.len();
+
+                if inner_record_len > max_plaintext_per_frame {
+                    return Err(ContextraError::invalid_input(format!(
+                        "WAL entry too large for frame: {} bytes plaintext (max frame payload {})",
+                        inner_record_len, max_plaintext_per_frame
+                    )));
+                }
+
+                let is_tx_end = matches!(entry.op, WalOp::TxEnd { .. });
+                serialized_entries.push((is_tx_end, bytes, inner_record_len));
             }
 
             let km_clone = Arc::clone(km);
-            let encrypted_result =
-                tokio::task::spawn_blocking(move || km_clone.encrypt_auto_nonce(&batch_plaintext))
-                    .await
-                    .map_err(|e| {
-                        ContextraError::Storage(format!("WAL encryption task panicked: {e}"))
-                    })?;
+            let frames_payload = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
+                let mut out_bytes = Vec::with_capacity(estimated_size);
+                let mut current_frame_plaintext = Vec::new();
 
-            let (encrypted, nonce) = encrypted_result?;
-            let chunk_len = (12 + encrypted.len()) as u32;
+                for (is_tx_end, bytes, inner_record_len) in serialized_entries {
+                    if !current_frame_plaintext.is_empty()
+                        && current_frame_plaintext
+                            .len()
+                            .saturating_add(inner_record_len)
+                            > max_plaintext_per_frame
+                    {
+                        let (encrypted, nonce) =
+                            km_clone.encrypt_auto_nonce(&current_frame_plaintext)?;
+                        let chunk_len_usize =
+                            12usize.checked_add(encrypted.len()).ok_or_else(|| {
+                                ContextraError::invalid_input("Frame length calculation overflow")
+                            })?;
+                        let chunk_len = u32::try_from(chunk_len_usize).map_err(|_| {
+                            ContextraError::invalid_input("Frame length exceeds u32")
+                        })?;
+                        if chunk_len > MAX_WAL_ENTRY_SIZE {
+                            return Err(ContextraError::invalid_input(format!(
+                                "Frame size {} exceeds MAX_WAL_ENTRY_SIZE {}",
+                                chunk_len, MAX_WAL_ENTRY_SIZE
+                            )));
+                        }
+                        out_bytes.extend_from_slice(&chunk_len.to_le_bytes());
+                        out_bytes.extend_from_slice(&nonce);
+                        out_bytes.extend_from_slice(&encrypted);
 
-            payload_bytes.extend_from_slice(&chunk_len.to_le_bytes());
-            payload_bytes.extend_from_slice(&nonce);
-            payload_bytes.extend_from_slice(&encrypted);
+                        current_frame_plaintext.clear();
+                    }
+
+                    current_frame_plaintext.extend_from_slice(&bytes);
+
+                    if is_tx_end {
+                        let (encrypted, nonce) =
+                            km_clone.encrypt_auto_nonce(&current_frame_plaintext)?;
+                        let chunk_len_usize =
+                            12usize.checked_add(encrypted.len()).ok_or_else(|| {
+                                ContextraError::invalid_input("Frame length calculation overflow")
+                            })?;
+                        let chunk_len = u32::try_from(chunk_len_usize).map_err(|_| {
+                            ContextraError::invalid_input("Frame length exceeds u32")
+                        })?;
+                        if chunk_len > MAX_WAL_ENTRY_SIZE {
+                            return Err(ContextraError::invalid_input(format!(
+                                "Frame size {} exceeds MAX_WAL_ENTRY_SIZE {}",
+                                chunk_len, MAX_WAL_ENTRY_SIZE
+                            )));
+                        }
+                        out_bytes.extend_from_slice(&chunk_len.to_le_bytes());
+                        out_bytes.extend_from_slice(&nonce);
+                        out_bytes.extend_from_slice(&encrypted);
+
+                        current_frame_plaintext.clear();
+                    }
+                }
+
+                if !current_frame_plaintext.is_empty() {
+                    let (encrypted, nonce) =
+                        km_clone.encrypt_auto_nonce(&current_frame_plaintext)?;
+                    let chunk_len_usize =
+                        12usize.checked_add(encrypted.len()).ok_or_else(|| {
+                            ContextraError::invalid_input("Frame length calculation overflow")
+                        })?;
+                    let chunk_len = u32::try_from(chunk_len_usize)
+                        .map_err(|_| ContextraError::invalid_input("Frame length exceeds u32"))?;
+                    if chunk_len > MAX_WAL_ENTRY_SIZE {
+                        return Err(ContextraError::invalid_input(format!(
+                            "Frame size {} exceeds MAX_WAL_ENTRY_SIZE {}",
+                            chunk_len, MAX_WAL_ENTRY_SIZE
+                        )));
+                    }
+                    out_bytes.extend_from_slice(&chunk_len.to_le_bytes());
+                    out_bytes.extend_from_slice(&nonce);
+                    out_bytes.extend_from_slice(&encrypted);
+                }
+
+                Ok(out_bytes)
+            })
+            .await
+            .map_err(|e| ContextraError::Storage(format!("WAL encryption task panicked: {e}")))??;
+
+            payload_bytes = frames_payload;
+            if let Some(last) = entries.last() {
+                last_hmac_val = last.checksum;
+            }
         } else {
             for entry in entries {
                 let bytes = entry.to_bytes()?;
@@ -593,6 +652,35 @@ impl Wal {
                 last_hmac_val = entry.checksum;
             }
         }
+
+        Ok((payload_bytes, last_hmac_val))
+    }
+
+    pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
+    }
+
+    pub async fn enqueue_append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        _guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
+        let entries = &batch.0;
+        if entries.is_empty() {
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = ack_tx.send(Ok(()));
+            return Ok(ack_rx);
+        }
+
+        let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;
 
         let flusher_tx = {
             let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
@@ -645,13 +733,6 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
-        if self.is_sealed() {
-            return Err(ContextraError::Storage(format!(
-                "Cannot append to sealed WAL segment {}",
-                self.path.display()
-            )));
-        }
-
         let entries = &batch.0;
         if entries.is_empty() {
             let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
@@ -659,63 +740,7 @@ impl Wal {
             return Ok(ack_rx);
         }
 
-        #[cfg(feature = "fault-injection")]
-        {
-            let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
-            if fail_tx != 0
-                && entries
-                    .iter()
-                    .any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX)
-            {
-                FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
-                return Err(ContextraError::Storage(
-                    "Simulated WAL append_batch I/O failure via fault injection".into(),
-                ));
-            }
-
-            let delay_tx = DELAY_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
-            if delay_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == delay_tx) {
-                let delay_ms = DELAY_APPEND_MS.load(std::sync::atomic::Ordering::SeqCst);
-                DELAY_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
-                if delay_ms > 0 {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-                }
-            }
-        }
-
-        let estimated_size = entries.len() * 256;
-        let mut payload_bytes = Vec::with_capacity(estimated_size);
-        let mut last_hmac_val = [0u8; 32];
-
-        if let Some(km) = &self.key_manager {
-            let mut batch_plaintext = Vec::with_capacity(estimated_size);
-            for entry in entries {
-                let bytes = entry.to_bytes()?;
-                batch_plaintext.extend_from_slice(&bytes);
-                last_hmac_val = entry.checksum;
-            }
-
-            let km_clone = Arc::clone(km);
-            let encrypted_result =
-                tokio::task::spawn_blocking(move || km_clone.encrypt_auto_nonce(&batch_plaintext))
-                    .await
-                    .map_err(|e| {
-                        ContextraError::Storage(format!("WAL encryption task panicked: {e}"))
-                    })?;
-
-            let (encrypted, nonce) = encrypted_result?;
-            let chunk_len = (12 + encrypted.len()) as u32;
-
-            payload_bytes.extend_from_slice(&chunk_len.to_le_bytes());
-            payload_bytes.extend_from_slice(&nonce);
-            payload_bytes.extend_from_slice(&encrypted);
-        } else {
-            for entry in entries {
-                let bytes = entry.to_bytes()?;
-                payload_bytes.extend_from_slice(&bytes);
-                last_hmac_val = entry.checksum;
-            }
-        }
+        let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;
 
         let flusher_tx = {
             let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
