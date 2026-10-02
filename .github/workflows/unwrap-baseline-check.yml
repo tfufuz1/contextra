@@ -1,0 +1,61 @@
+name: Unwrap Baseline Check
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  unwrap-baseline-check:
+    name: Check & Record Unwrap Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.89.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run xtask panic-inventory and enforce ratchet
+        run: |
+          OUTPUT=$(cargo run -p xtask -- panic-inventory --exclude-tests)
+          echo "$OUTPUT"
+          COUNT=$(echo "$OUTPUT" | grep -oP '\d+(?= panic entries found)')
+          echo "Production panic/unwrap count: $COUNT"
+
+          BASELINE=$(cat .github/unwrap_baseline.txt 2>/dev/null || echo 99999)
+          echo "Current baseline: $BASELINE"
+
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Production panic/unwrap count increased from $BASELINE to $COUNT"
+            exit 1
+          fi
+
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "Ratchet tightening: lowering baseline from $BASELINE to $COUNT"
+            echo "$COUNT" > .github/unwrap_baseline.txt
+          fi
+
+          DATE=$(date -u +%Y-%m-%d)
+          SHA=$(git rev-parse --short HEAD)
+          echo "{\"date\":\"$DATE\",\"commit\":\"$SHA\",\"total\":$COUNT}" >> docs/unwrap_baseline_history.jsonl
+
+      - name: Commit and Push Updated Baseline and History
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/unwrap_baseline.txt docs/unwrap_baseline_history.jsonl
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes in baseline or history — no commit required."
+          else
+            git commit -m "chore(unwrap-baseline): update unwrap baseline history and ratchet [skip ci]"
+            git push origin HEAD:main
+            echo "✅ Successfully updated and pushed unwrap baseline and history."
+          fi

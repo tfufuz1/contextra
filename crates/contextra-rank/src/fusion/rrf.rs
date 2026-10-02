@@ -101,6 +101,7 @@ pub fn modulate_and_renormalize_weights(
     beta: f32,
 ) -> Vec<f32> {
     let raw_weights: Vec<f32> = result_sets.iter().map(|(_, _, w)| *w).collect();
+    // // NAN-CHECK-OK: Check finite beta for calibration
     if beta == 0.0 || !beta.is_finite() {
         return raw_weights;
     }
@@ -132,6 +133,7 @@ pub fn modulate_and_renormalize_weights(
             if set.len() >= 2 {
                 let s1 = set[0].score;
                 let s2 = set[1].score;
+                // // NAN-CHECK-OK: Check score finiteness before calculating margin
                 if s1.is_finite() && s2.is_finite() {
                     (s1 - s2).max(0.0)
                 } else {
@@ -238,6 +240,7 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
         );
 
         for (rank_idx, doc) in result_set.iter().enumerate() {
+            // // NAN-CHECK-OK: Validate upstream raw score finiteness
             if !doc.score.is_finite() {
                 tracing::error!(
                     signal = %signal_name,
@@ -563,6 +566,7 @@ pub fn fuse_search_results_with_signal_strategies(
                 let mut non_finite = false;
 
                 for doc in set.iter() {
+                    // // NAN-CHECK-OK: Validate score finiteness in fusion strategy
                     if !doc.score.is_finite() {
                         non_finite = true;
                         break;
