@@ -431,13 +431,25 @@ async fn test_bloom_filter_integration() {
 
         let data = tokio::fs::read(&old_sst_path).await.expect("read"); // #[cfg(test)]
         let file_size = data.len();
-        let index_off = u64::from_le_bytes(data[file_size - 12..file_size - 4].try_into().unwrap()); // #[cfg(test)]
+        // MFSX 54-byte trailer layout: bloom_offset at file_size - 22..file_size - 14, index_offset at file_size - 14..file_size - 6
+        let bloom_off = usize::try_from(u64::from_le_bytes(
+            data[file_size - 22..file_size - 14].try_into().unwrap(),
+        ))
+        .unwrap(); // #[cfg(test)]
+        let index_off = usize::try_from(u64::from_le_bytes(
+            data[file_size - 14..file_size - 6].try_into().unwrap(),
+        ))
+        .unwrap(); // #[cfg(test)]
 
         let mut f = tokio::fs::File::create(&old_sst_path)
             .await
             .expect("recreate"); // #[cfg(test)]
-        f.write_all(&data[0..file_size - 24]).await.unwrap(); // #[cfg(test)]
-        f.write_u64_le(index_off).await.expect("write ioff"); // #[cfg(test)]
+                                 // Write data blocks without block CRC (data[4..index_off])
+        f.write_all(&data[4..index_off]).await.unwrap(); // #[cfg(test)]
+        let legacy_index_off = (index_off - 4) as u64;
+        // Write index entries (strip MFSX 4-byte index CRC at index_off..index_off+4)
+        f.write_all(&data[index_off + 4..bloom_off]).await.unwrap(); // #[cfg(test)]
+        f.write_u64_le(legacy_index_off).await.expect("write ioff"); // #[cfg(test)]
         f.write_u32_le(0x4D465354).await.expect("write magic"); // #[cfg(test)]
         f.sync_all().await.expect("sync"); // #[cfg(test)]
     }
@@ -579,8 +591,8 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
     let bc = create_block_cache(1);
 
     let mut builder = SstableBuilder::create(&path).await.expect("create"); // #[cfg(test)]
-    builder.add(b"k", b"val1", 1, 10).await.expect("add seq 1"); // #[cfg(test)]
     builder.add(b"k", b"val2", 2, 20).await.expect("add seq 2"); // #[cfg(test)]
+    builder.add(b"k", b"val1", 1, 10).await.expect("add seq 1"); // #[cfg(test)]
     builder.finish().await.expect("finish"); // #[cfg(test)]
 
     let reader = SstableReader::open(&path, bc).await.expect("open"); // #[cfg(test)]
@@ -593,11 +605,11 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
     );
     assert_eq!(
         iter_entries[0],
-        (Bytes::from_static(b"k"), Bytes::from_static(b"val1"), 1)
+        (Bytes::from_static(b"k"), Bytes::from_static(b"val2"), 2)
     );
     assert_eq!(
         iter_entries[1],
-        (Bytes::from_static(b"k"), Bytes::from_static(b"val2"), 2)
+        (Bytes::from_static(b"k"), Bytes::from_static(b"val1"), 1)
     );
 }
 
@@ -613,7 +625,7 @@ fn test_bloom_filter_boundary_clamping() {
 
     let mut valid_header = vec![0u8; 24];
     valid_header[0..8].copy_from_slice(&1u64.to_le_bytes());
-    valid_header[8..16].copy_from_slice(&1000u64.to_le_bytes());
+    valid_header[8..16].copy_from_slice(&64u64.to_le_bytes());
     let bf_res = BloomFilter::from_bytes(&valid_header);
     assert!(bf_res.is_ok());
 }

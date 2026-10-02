@@ -111,6 +111,13 @@ impl BloomFilter {
             ContextraError::ParseError("corrupted bloom filter: invalid num_bits".into())
         })?) as usize;
 
+        if num_hashes == 0 || num_hashes > 64 {
+            return Err(ContextraError::Storage(format!(
+                "corrupted bloom filter: invalid num_hashes ({})",
+                num_hashes
+            )));
+        }
+
         // Safety limit: 128MB for bloom filter bits (approx 1 billion bits)
         if num_bits > 128 * 1024 * 1024 * 8 {
             return Err(ContextraError::Storage(format!(
@@ -119,10 +126,26 @@ impl BloomFilter {
             )));
         }
 
-        let capacity_cap = (num_bits / 64).min((data.len() - 16) / 8);
-        let mut bits = Vec::with_capacity(capacity_cap);
+        let required_words = num_bits.saturating_add(63) / 64;
+        let required_bytes = 16usize
+            .checked_add(required_words.checked_mul(8).ok_or_else(|| {
+                ContextraError::Storage("corrupted bloom filter: overflow calculating size".into())
+            })?)
+            .ok_or_else(|| {
+                ContextraError::Storage("corrupted bloom filter: overflow calculating size".into())
+            })?;
+
+        if data.len() < required_bytes {
+            return Err(ContextraError::Storage(format!(
+                "corrupted bloom filter: data length ({}) insufficient for required bits ({})",
+                data.len(),
+                num_bits
+            )));
+        }
+
+        let mut bits = Vec::with_capacity(required_words);
         let mut offset = 16;
-        while offset + 8 <= data.len() {
+        for _ in 0..required_words {
             bits.push(u64::from_le_bytes(
                 data[offset..offset + 8].try_into().map_err(|_| {
                     ContextraError::ParseError("corrupted bloom filter: invalid word".into())

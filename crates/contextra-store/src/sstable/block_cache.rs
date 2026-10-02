@@ -81,17 +81,16 @@ impl BlockCacheBackend for SieveCacheBackend {
             s.map.insert(key, Arc::clone(&new_node));
             s.nodes.push_back(Arc::clone(&new_node));
             s.current_bytes = s.current_bytes.saturating_sub(old_len) + val_len;
-            return;
+        } else {
+            let new_node = Arc::new(SieveNode {
+                key,
+                value,
+                visited: std::sync::atomic::AtomicBool::new(false),
+            });
+            s.map.insert(key, Arc::clone(&new_node));
+            s.nodes.push_back(Arc::clone(&new_node));
+            s.current_bytes += val_len;
         }
-
-        let new_node = Arc::new(SieveNode {
-            key,
-            value,
-            visited: std::sync::atomic::AtomicBool::new(false),
-        });
-        s.map.insert(key, Arc::clone(&new_node));
-        s.nodes.push_back(Arc::clone(&new_node));
-        s.current_bytes += val_len;
 
         while s.current_bytes > s.capacity_bytes && !s.map.is_empty() {
             if s.nodes.is_empty() {
