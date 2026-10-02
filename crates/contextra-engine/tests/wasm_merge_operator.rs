@@ -253,8 +253,16 @@ async fn test_wasm_merge_operator_normal_case_in_compaction() {
         .unwrap();
     builder2.finish().await.unwrap();
 
-    let reader1 = Arc::new(SstableReader::open(&sst1_path, cache.clone()).await.unwrap());
-    let reader2 = Arc::new(SstableReader::open(&sst2_path, cache.clone()).await.unwrap());
+    let reader1 = Arc::new(
+        SstableReader::open(&sst1_path, cache.clone())
+            .await
+            .unwrap(),
+    );
+    let reader2 = Arc::new(
+        SstableReader::open(&sst2_path, cache.clone())
+            .await
+            .unwrap(),
+    );
 
     let wasm_op = Arc::new(WasmMergeOperator::new(COUNTER_WASM).unwrap());
 
@@ -280,7 +288,10 @@ async fn test_wasm_merge_operator_normal_case_in_compaction() {
     let compacted_reader = SstableReader::open(&out_path, cache).await.unwrap();
     let (val, _seq, _tx) = compacted_reader.get(b"key_wasm").await.unwrap().unwrap();
     let sum = u64::from_le_bytes(val.as_ref().try_into().unwrap());
-    assert_eq!(sum, 300, "WASM merge operator correctly summed values during compaction");
+    assert_eq!(
+        sum, 300,
+        "WASM merge operator correctly summed values during compaction"
+    );
 }
 
 #[tokio::test]
@@ -288,8 +299,8 @@ async fn test_wasm_merge_operator_fuel_exhausted_in_compaction() {
     use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
     use contextra_store::compaction::{CompactionConfig, CompactionEngine};
     use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
-    use tempfile::tempdir;
     use std::time::Duration;
+    use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
     let cache = Arc::new(BlockCache::new(1024 * 1024));
@@ -314,17 +325,21 @@ async fn test_wasm_merge_operator_fuel_exhausted_in_compaction() {
         .unwrap();
     builder2.finish().await.unwrap();
 
-    let reader1 = Arc::new(SstableReader::open(&sst1_path, cache.clone()).await.unwrap());
-    let reader2 = Arc::new(SstableReader::open(&sst2_path, cache.clone()).await.unwrap());
+    let reader1 = Arc::new(
+        SstableReader::open(&sst1_path, cache.clone())
+            .await
+            .unwrap(),
+    );
+    let reader2 = Arc::new(
+        SstableReader::open(&sst2_path, cache.clone())
+            .await
+            .unwrap(),
+    );
 
     // Create WasmMergeOperator with low fuel limit (1000) so infinite loop exhausts fuel immediately
     let were_op = Arc::new(
-        WasmMergeOperator::new_with_config(
-            INFINITE_LOOP_WASM,
-            1_000,
-            Duration::from_secs(5),
-        )
-        .unwrap(),
+        WasmMergeOperator::new_with_config(INFINITE_LOOP_WASM, 1_000, Duration::from_secs(5))
+            .unwrap(),
     );
 
     let config = CompactionConfig::default();

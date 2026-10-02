@@ -481,6 +481,24 @@ impl OrchestratorEngine {
                             }
                         };
 
+                    if let Some(ref cond_str) = outgoing_edge.condition {
+                        if let Some(goal_cond) =
+                            crate::goal_condition::parse_legacy_condition_string(cond_str)
+                        {
+                            if goal_cond.evaluate(&result) {
+                                if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
+                                    let checkpoint = scratchpad.checkpoint_and_reset()?;
+                                    tracing::info!(
+                                        task_id = %ctx.task_id,
+                                        completed_subgoal = checkpoint.completed_subgoal_index,
+                                        chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                                        "CLM Scratchpad checkpointed and reset on goal condition match"
+                                    );
+                                    // TODO: Audit-Kopplung an contextra-privacy::context_edit_audit, siehe ADR-106
+                                }
+                            }
+                        };
+
                     if outgoing_edge.has_condition() && outgoing_edge.evaluate_condition(&result) {
                         if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
                             let checkpoint = scratchpad.checkpoint_and_reset()?;

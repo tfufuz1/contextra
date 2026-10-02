@@ -127,9 +127,7 @@ fn clean_line(line: &str) -> &str {
     if s.starts_with("```") {
         return "";
     }
-    s = s
-        .trim_start_matches(['-', '*', '•', '+'])
-        .trim();
+    s = s.trim_start_matches(['-', '*', '•', '+']).trim();
     if s.starts_with('[') {
         if let Some(closing) = s.find(']') {
             let inside = &s[1..closing];
