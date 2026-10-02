@@ -82,9 +82,7 @@ pub use edge_reinforcement::{
     compute_edge_weight, EdgeReinforcementConfig,
 };
 #[cfg(feature = "edge-reinforcement-learning")]
-pub use edge_reinforcement_buffer::{
-    CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
-};
+pub use edge_reinforcement_buffer::{CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal};
 pub use entity_extraction::{
     ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };

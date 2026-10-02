@@ -64,22 +64,41 @@ impl Manifest {
             .ok_or_else(|| ContextraError::Storage("Invalid MANIFEST parent directory".into()))?;
 
         let pid = std::process::id();
-        let rand_val: u64 = rand::random();
-        let tmp_path = parent.join(format!("MANIFEST.new.{}.{}", pid, rand_val));
 
-        let rollover_res: Result<()> = async {
-            let mut new_file = tokio::fs::OpenOptions::new()
+        const MAX_ATTEMPTS: usize = 100;
+        let mut attempt = 0;
+        let mut tmp_path;
+        let mut new_file = loop {
+            attempt += 1;
+            let counter = crate::lsm::recovery::next_temp_file_counter();
+            tmp_path = parent.join(format!("MANIFEST.new.{}.{}", pid, counter));
+
+            match tokio::fs::OpenOptions::new()
                 .create_new(true)
                 .write(true)
                 .open(&tmp_path)
                 .await
-                .map_err(|e| {
-                    ContextraError::Storage(format!(
+            {
+                Ok(f) => break f,
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if attempt >= MAX_ATTEMPTS {
+                        return Err(ContextraError::Storage(format!(
+                            "Exhausted {} attempts trying to create temporary MANIFEST file {:?}",
+                            MAX_ATTEMPTS, tmp_path
+                        )));
+                    }
+                    continue;
+                }
+                Err(e) => {
+                    return Err(ContextraError::Storage(format!(
                         "Failed to create temporary MANIFEST file {:?}: {e}",
                         tmp_path
-                    ))
-                })?;
+                    )));
+                }
+            }
+        };
 
+        let rollover_res: Result<()> = async {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
             header.push(super::core::CURRENT_MANIFEST_VERSION);

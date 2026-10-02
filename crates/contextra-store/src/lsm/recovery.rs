@@ -13,7 +13,26 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub(super) async fn write_salt_atomically(
+/// Process-wide counter for deterministic temporary file naming.
+/// `Ordering::Relaxed` is sufficient because process ID + atomic sequence guarantees
+/// intra-process collision freedom, while process ID guarantees inter-process collision freedom.
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+pub(crate) fn next_temp_file_counter() -> u64 {
+    TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Helper to generate a 32-byte cryptographic salt.
+///
+/// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
+pub(crate) fn generate_crypto_salt() -> [u8; 32] {
+    let mut buf = [0u8; 32];
+    use rand::Rng;
+    rand::thread_rng().fill(&mut buf);
+    buf
+}
+
+pub(crate) async fn write_salt_atomically(
     salt_path: &std::path::Path,
     buf: &[u8; 32],
 ) -> Result<()> {
@@ -22,20 +41,42 @@ pub(super) async fn write_salt_atomically(
         .ok_or_else(|| ContextraError::Storage("Invalid salt path parent".into()))?;
 
     let pid = std::process::id();
-    let rand_val: u64 = rand::random();
-    let tmp_path = parent.join(format!("SALT.tmp.{}.{}", pid, rand_val));
 
-    let buf_copy = *buf;
-    let write_res: Result<()> = async {
-        let file = tokio::fs::OpenOptions::new()
+    const MAX_ATTEMPTS: usize = 100;
+    let mut attempt = 0;
+    let mut tmp_path;
+    let file = loop {
+        attempt += 1;
+        let counter = next_temp_file_counter();
+        tmp_path = parent.join(format!("SALT.tmp.{}.{}", pid, counter));
+
+        match tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&tmp_path)
             .await
-            .map_err(|e| {
-                ContextraError::Storage(format!("Failed to create temp SALT file: {}", e))
-            })?;
+        {
+            Ok(f) => break f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                if attempt >= MAX_ATTEMPTS {
+                    return Err(ContextraError::Storage(format!(
+                        "Exhausted {} attempts trying to create temporary SALT file {:?}",
+                        MAX_ATTEMPTS, tmp_path
+                    )));
+                }
+                continue;
+            }
+            Err(e) => {
+                return Err(ContextraError::Storage(format!(
+                    "Failed to create temp SALT file: {}",
+                    e
+                )));
+            }
+        }
+    };
 
+    let buf_copy = *buf;
+    let write_res: Result<()> = async {
         let mut std_file = file.into_std().await;
 
         tokio::task::spawn_blocking(move || -> Result<()> {
@@ -141,9 +182,7 @@ impl LsmStorage {
                         "SALT file missing in non-pristine database directory".into(),
                     ));
                 }
-                let mut buf = [0u8; 32];
-                use rand::Rng;
-                rand::thread_rng().fill(&mut buf);
+                let buf = generate_crypto_salt();
                 write_salt_atomically(&salt_path, &buf).await?;
                 buf.to_vec()
             }
