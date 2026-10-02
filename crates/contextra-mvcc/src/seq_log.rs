@@ -456,8 +456,6 @@ mod tests {
         let mut log = SequenceLog::new();
         let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
         let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
-        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
-        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_insert(doc2, 20);
