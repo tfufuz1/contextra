@@ -44,6 +44,10 @@ pub struct LsmStorage {
     pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
+    /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
+    pub(super) flush_mutex: tokio::sync::Mutex<()>,
+    /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
+    pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
     pub(super) task_tracker: tokio_util::task::TaskTracker,
     pub(super) flush_counter: AtomicU64,

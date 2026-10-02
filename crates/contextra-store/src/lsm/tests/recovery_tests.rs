@@ -693,6 +693,12 @@ async fn test_rollback_crash_recovery_startup() {
 async fn test_wal_discovery_mixed_filenames() {
     let tmp = TempDir::new().expect("temp dir");
 
+    let salt_path = tmp.path().join("SALT");
+    let salt = crate::lsm::recovery::generate_crypto_salt();
+    crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
+        .await
+        .expect("write salt");
+
     let legacy_wal_path = tmp.path().join("wal.log");
     let wal = Wal::open_with_key_manager(&legacy_wal_path, None)
         .await
@@ -858,6 +864,12 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
     let tmp = TempDir::new().expect("temp dir");
     let wal_path = tmp.path().join("wal.log");
 
+    let salt_path = tmp.path().join("SALT");
+    let salt = crate::lsm::recovery::generate_crypto_salt();
+    crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
+        .await
+        .expect("write salt");
+
     {
         let wal = Wal::open_with_key_manager(&wal_path, None)
             .await
@@ -932,6 +944,12 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
 async fn test_aborted_transaction_discarded_on_open_recovery() {
     let tmp = TempDir::new().expect("temp dir");
     let wal_path = tmp.path().join("wal.log");
+
+    let salt_path = tmp.path().join("SALT");
+    let salt = crate::lsm::recovery::generate_crypto_salt();
+    crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
+        .await
+        .expect("write salt");
 
     {
         let wal = Wal::open_with_key_manager(&wal_path, None)
