@@ -134,5 +134,7 @@ reason: >
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.contains("UNZULÄSSIGE VETO-VERLÄNGERUNG"));
-    assert!(err.contains("ADR 'docs/decisions/ADR-099-new.md' existiert NICHT auf dem Basis-Branch"));
+    assert!(
+        err.contains("ADR 'docs/decisions/ADR-099-new.md' existiert NICHT auf dem Basis-Branch")
+    );
 }

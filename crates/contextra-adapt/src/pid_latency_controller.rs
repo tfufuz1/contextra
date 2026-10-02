@@ -161,6 +161,7 @@ impl LatencyBudgetGuard {
             DEFAULT_TARGET_LATENCY_MS
         };
 
+        #[allow(clippy::disallowed_methods)]
         Self {
             start: Instant::now(),
             budget_ms,
