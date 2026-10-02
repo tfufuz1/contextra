@@ -326,7 +326,7 @@ mod tests {
                 guards.push(registry.register(seq));
             }
 
-            let min_expected = *seqs.iter().min().unwrap(); // expect
+            let min_expected = *seqs.iter().min().unwrap(); // #[cfg(test)]
             prop_assert_eq!(registry.min_active_seqno(), min_expected);
 
             guards.pop(); // Drop last element
@@ -377,7 +377,7 @@ mod tests {
                 let guard_idx = remaining_indices.remove(idx_in_remaining);
 
                 // Drop the guard
-                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // expect
+                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
                 guards[guard_idx] = None;
 
                 // Remove from reference (one occurrence only)

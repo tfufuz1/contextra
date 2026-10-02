@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_seq_log_entry_is_visible_o1() {
-        let doc = DocId::from_key("doc1").expect("valid doc id");
+        let doc = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
 
         // Active entry (no delete)
         let active_entry = SeqLogEntry {
@@ -454,8 +454,10 @@ mod tests {
     #[test]
     fn test_sequence_log_changes_since() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
-        let doc2 = DocId::from_key("doc2").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_insert(doc2, 20);
@@ -520,7 +522,7 @@ mod tests {
     #[test]
     fn test_sequence_log_pinning_and_retention() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_delete(doc1, 20);

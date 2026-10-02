@@ -942,7 +942,7 @@ mod tests {
         let tx = TxId::new(3);
 
         let doc_key = "doc_alpha";
-        let doc_id = DocId::from_key(doc_key).expect("valid doc_id");
+        let doc_id = DocId::from_key(doc_key).expect("valid doc_id"); // #[cfg(test)]
 
         let mut rs = ReadSet::new();
         rs.record_read(doc_key.as_bytes(), 5);
