@@ -677,6 +677,7 @@ dependencies = [
  "contextra-core",
  "contextra-db",
  "contextra-graph",
+ "contextra-infer-candle",
  "contextra-infer-onnx",
  "contextra-store",
  "contextra-text",

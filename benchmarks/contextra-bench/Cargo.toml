@@ -37,6 +37,7 @@ contextra-text = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-db = { workspace = true }
 contextra-infer-onnx = { workspace = true }
+contextra-infer-candle = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
