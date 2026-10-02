@@ -603,9 +603,10 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
-                ssi_max_tracked_keys,
-            )),
+            ssi_validator: Arc::new(
+                contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
+                    .with_metrics_sink(Arc::clone(&metrics_sink_container)),
+            ),
             metrics_sink: metrics_sink_container,
         };
 

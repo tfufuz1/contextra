@@ -200,7 +200,9 @@ pub fn check_conditional_review_deadlines_scoped(
                             .iter()
                             .any(|file| entry.is_file_affected(file));
 
-                        if touches_feature || (entry.affected_paths.is_empty() && changed_files.is_empty()) {
+                        if touches_feature
+                            || (entry.affected_paths.is_empty() && changed_files.is_empty())
+                        {
                             result.errors.push(format!(
                                 "❌ VETO-FRIST ÜBERSCHRITTEN: {} — Wiedervorlage war am {}, geänderte Dateien berühren das Feature. PR blockiert (adr_ref: {}). Bitte ADR mit Entscheidung erstellen oder Frist per neuem ADR auf Basis-Branch verlängern.",
                                 entry.feature_id,
@@ -249,7 +251,10 @@ pub fn check_veto_date_extensions(
     };
 
     for current in current_entries {
-        if let Some(base) = base_entries.iter().find(|e| e.feature_id == current.feature_id) {
+        if let Some(base) = base_entries
+            .iter()
+            .find(|e| e.feature_id == current.feature_id)
+        {
             if current.conditional_review_due != base.conditional_review_due {
                 // Date was changed/extended
                 if let Some(adr) = &current.adr_ref {
@@ -335,13 +340,16 @@ pub fn check_vetoes_with_root_and_opts(
         }
     }
 
-    let deadline_res = check_conditional_review_deadlines_scoped(&entries, today_str, changed_files);
+    let deadline_res =
+        check_conditional_review_deadlines_scoped(&entries, today_str, changed_files);
     warnings.extend(deadline_res.warnings);
 
     let mut errors = deadline_res.errors;
 
     // Check date extension validity against base branch
-    if let (Some(base_content), Some(check_adr_fn)) = (base_vetoes_override, adr_exists_on_base_override) {
+    if let (Some(base_content), Some(check_adr_fn)) =
+        (base_vetoes_override, adr_exists_on_base_override)
+    {
         let ext_errors = check_veto_date_extensions(&entries, Some(base_content), check_adr_fn);
         errors.extend(ext_errors);
     } else if changed_files_override.is_none() {
@@ -362,7 +370,8 @@ pub fn check_vetoes_with_root_and_opts(
                         Err(_) => false,
                     }
                 };
-                let ext_errors = check_veto_date_extensions(&entries, Some(&base_content), &check_adr_fn);
+                let ext_errors =
+                    check_veto_date_extensions(&entries, Some(&base_content), &check_adr_fn);
                 errors.extend(ext_errors);
             }
         }
@@ -509,7 +518,8 @@ adr_ref: docs/decisions/ADR-077-old.md
 
         let check_adr_fn = |_path: &str| -> bool { false }; // ADR does NOT exist on base branch
 
-        let errors = check_veto_date_extensions(&current_entries, Some(base_content), &check_adr_fn);
+        let errors =
+            check_veto_date_extensions(&current_entries, Some(base_content), &check_adr_fn);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("UNZULÄSSIGE VETO-VERLÄNGERUNG"));
         assert!(errors[0].contains("F-02"));
@@ -518,7 +528,8 @@ adr_ref: docs/decisions/ADR-077-old.md
     #[test]
     fn test_check_vetoes_fail_closed_missing_file() {
         let temp = tempdir().unwrap();
-        let err = check_vetoes_with_root_and_opts(temp.path(), "2026-10-01", Some(&[]), None, None).unwrap_err();
+        let err = check_vetoes_with_root_and_opts(temp.path(), "2026-10-01", Some(&[]), None, None)
+            .unwrap_err();
         assert!(err.contains("FAIL-CLOSED"));
         assert!(err.contains("VETOES.md"));
     }

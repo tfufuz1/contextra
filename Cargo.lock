@@ -1034,6 +1034,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bytes",
+ "contextra-ports",
  "contextra-types",
  "criterion",
  "loom",
