@@ -264,16 +264,14 @@ mod tests {
     async fn test_agent_context_with_clm_scratchpad() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db =
-            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_clm").await?;
 
         let vault_config = contextra_db::volatile_vault::VaultConfig {
             max_capacity_bytes: 1024 * 1024,
             attempt_mlock: false,
         };
-        let scratchpad =
-            crate::clm_scratchpad::ClmScratchpad::new("task-clm".to_string(), vault_config);
+        let scratchpad = crate::clm_scratchpad::ClmScratchpad::new("task-clm".to_string(), vault_config);
 
         let ctx = AgentContext::try_new(
             "task-clm",

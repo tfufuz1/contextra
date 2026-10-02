@@ -142,10 +142,7 @@ async fn test_adaptive_ef_difficult_queries_grows_to_max_ef() {
 
     let tx = TxId::new(1);
     for (i, v) in data.iter().enumerate() {
-        index
-            .insert(tx, DocId::new((i as u64).into()), v)
-            .await
-            .unwrap();
+        index.insert(tx, DocId::new((i as u64).into()), v).await.unwrap();
     }
     index.commit(tx).await.unwrap();
 

@@ -91,8 +91,12 @@ impl GoalCondition {
                     false
                 }
             }
-            GoalCondition::All(conditions) => conditions.iter().all(|cond| cond.evaluate(result)),
-            GoalCondition::Any(conditions) => conditions.iter().any(|cond| cond.evaluate(result)),
+            GoalCondition::All(conditions) => {
+                conditions.iter().all(|cond| cond.evaluate(result))
+            }
+            GoalCondition::Any(conditions) => {
+                conditions.iter().any(|cond| cond.evaluate(result))
+            }
             GoalCondition::Not(condition) => !condition.evaluate(result),
         }
     }
@@ -411,10 +415,7 @@ mod tests {
         let cond_edge = GoalCondition::NextEdgeEquals {
             expected_edge: "retry".to_string(),
         };
-        assert_eq!(
-            cond_edge.describe(),
-            "NextEdgeEquals(next_edge == \"retry\")"
-        );
+        assert_eq!(cond_edge.describe(), "NextEdgeEquals(next_edge == \"retry\")");
 
         let cond_all = GoalCondition::All(vec![cond_eq, cond_tokens]);
         assert_eq!(
@@ -423,10 +424,7 @@ mod tests {
         );
 
         let cond_not = GoalCondition::Not(Box::new(cond_edge));
-        assert_eq!(
-            cond_not.describe(),
-            "Not(NextEdgeEquals(next_edge == \"retry\"))"
-        );
+        assert_eq!(cond_not.describe(), "Not(NextEdgeEquals(next_edge == \"retry\"))");
     }
 
     #[test]
@@ -486,10 +484,7 @@ mod tests {
         );
 
         // Invalid / Non-parsable syntax
-        assert_eq!(
-            parse_legacy_condition_string("invalid condition format"),
-            None
-        );
+        assert_eq!(parse_legacy_condition_string("invalid condition format"), None);
         assert_eq!(parse_legacy_condition_string(""), None);
         assert_eq!(parse_legacy_condition_string("   "), None);
     }

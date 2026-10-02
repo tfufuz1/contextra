@@ -422,9 +422,7 @@ async fn test_concurrency_stress_inserts_and_searches() {
                 let doc_raw = 100 + (worker_id * 20) + i;
                 let tx = TxId::new(200 + doc_raw);
                 let vec = vec![(doc_raw as f32) * 0.05; dim];
-                idx.insert(tx, DocId::new(doc_raw.into()), &vec)
-                    .await
-                    .unwrap();
+                idx.insert(tx, DocId::new(doc_raw.into()), &vec).await.unwrap();
                 idx.commit(tx).await.unwrap();
             }
         });

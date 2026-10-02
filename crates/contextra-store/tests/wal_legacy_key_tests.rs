@@ -199,10 +199,7 @@ async fn test_explicit_migrate_legacy_wal_produces_structured_audit_log_and_v3_s
     let migrated = Wal::migrate_legacy_wal(&wal_path, None)
         .await
         .expect("migrate_legacy_wal must succeed");
-    assert!(
-        migrated,
-        "migrate_legacy_wal must return true on legacy segment"
-    );
+    assert!(migrated, "migrate_legacy_wal must return true on legacy segment");
 
     // Check structured audit log
     let captured_logs = logs.lock().unwrap();

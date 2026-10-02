@@ -223,8 +223,7 @@ async fn test_goal_condition_triggers_scratchpad_checkpoint_and_reset() {
         max_capacity_bytes: 1024 * 1024,
         attempt_mlock: false,
     };
-    let mut scratchpad =
-        crate::clm_scratchpad::ClmScratchpad::new(ctx.task_id.clone(), vault_config);
+    let mut scratchpad = crate::clm_scratchpad::ClmScratchpad::new(ctx.task_id.clone(), vault_config);
 
     scratchpad
         .apply_edit(

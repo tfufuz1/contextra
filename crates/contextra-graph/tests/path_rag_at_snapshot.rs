@@ -292,13 +292,9 @@ async fn test_path_rag_at_concurrent_mutations_isolation() {
         .add_entity(tx10, Entity::new(e2, "e2", "Node"))
         .await
         .unwrap();
-    GraphIndex::add_edge(
-        graph.as_ref(),
-        tx10,
-        Edge::new(e1, e2, "rel").with_weight(0.95),
-    )
-    .await
-    .unwrap();
+    GraphIndex::add_edge(graph.as_ref(), tx10, Edge::new(e1, e2, "rel").with_weight(0.95))
+        .await
+        .unwrap();
     graph.commit(tx10).await.unwrap();
 
     let baseline = graph.path_rag_at(&[e1], 2, 15).await.unwrap();
@@ -317,12 +313,8 @@ async fn test_path_rag_at_concurrent_mutations_isolation() {
             let _ = writer_graph
                 .add_entity(tx, Entity::new(next_e, "dyn", "Node"))
                 .await;
-            let _ = GraphIndex::add_edge(
-                &*writer_graph,
-                tx,
-                Edge::new(e2, next_e, "rel").with_weight(0.8),
-            )
-            .await;
+            let _ = GraphIndex::add_edge(&*writer_graph, tx, Edge::new(e2, next_e, "rel").with_weight(0.8))
+                .await;
             let _ = writer_graph.commit(tx).await;
             tx_counter += 1;
             tokio::task::yield_now().await;

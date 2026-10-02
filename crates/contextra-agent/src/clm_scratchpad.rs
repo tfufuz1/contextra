@@ -149,8 +149,12 @@ impl ClmScratchpad {
                 let doc_id = DocId::new(self.next_chunk_id);
                 self.next_chunk_id += 1;
 
-                let mut chunk =
-                    VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
+                let mut chunk = VaultChunk::new(
+                    doc_id,
+                    content,
+                    SignalModality::TextInput,
+                    captured_tx,
+                );
                 if let Some(lbl) = label {
                     chunk = chunk.with_label(lbl);
                 }
@@ -269,8 +273,8 @@ mod tests {
             max_capacity_bytes: 1024 * 1024,
             attempt_mlock: false,
         };
-        let mut pad =
-            ClmScratchpad::new("task-42".to_string(), config).with_created_at_tx(TxId(100));
+        let mut pad = ClmScratchpad::new("task-42".to_string(), config)
+            .with_created_at_tx(TxId(100));
 
         assert_eq!(pad.task_id(), "task-42");
         assert_eq!(pad.created_at_tx(), 100);
@@ -344,10 +348,7 @@ mod tests {
             TxId(11),
         )?;
 
-        assert_eq!(
-            pad.total_bytes(),
-            b"Subgoal 0 chunk A".len() + b"Subgoal 0 chunk B".len()
-        );
+        assert_eq!(pad.total_bytes(), b"Subgoal 0 chunk A".len() + b"Subgoal 0 chunk B".len());
 
         let checkpoint = pad.checkpoint_and_reset()?;
         assert_eq!(checkpoint.task_id, "task-reset");
