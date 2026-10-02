@@ -334,15 +334,26 @@ impl MemTable {
 
         use contextra_core::{TxId, TOMBSTONE_BIT};
 
-        let idx = match versions.binary_search_by_key(&seq_no, |(s, _, _)| *s & !TOMBSTONE_BIT) {
-            Ok(i) => i,
-            Err(i) => {
-                if i == 0 {
-                    return None;
+        let target_raw_seq = seq_no & !TOMBSTONE_BIT;
+
+        let idx =
+            match versions.binary_search_by_key(&target_raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT) {
+                Ok(i) => {
+                    let mut last = i;
+                    while last + 1 < versions.len()
+                        && (versions[last + 1].0 & !TOMBSTONE_BIT) == target_raw_seq
+                    {
+                        last += 1;
+                    }
+                    last
                 }
-                i - 1
-            }
-        };
+                Err(i) => {
+                    if i == 0 {
+                        return None;
+                    }
+                    i - 1
+                }
+            };
 
         // Linear search backwards for the latest version satisfying (tx <= max_tx || tx >= INTERNAL_BASE)
         for i in (0..=idx).rev() {

@@ -8,6 +8,18 @@ pub(super) enum SstableScanMode<'a> {
 }
 
 #[inline]
+fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
+    let mut ub = prefix.to_vec();
+    while let Some(last) = ub.pop() {
+        if last < 0xFF {
+            ub.push(last + 1);
+            return Some(ub);
+        }
+    }
+    None
+}
+
+#[inline]
 pub(super) fn check_in_range(
     k: &[u8],
     start: std::ops::Bound<&[u8]>,
@@ -100,13 +112,9 @@ impl LsmStorage {
                         if prefix > last.as_ref() {
                             continue;
                         }
-                        let mut prefix_end = prefix.to_vec();
-                        if let Some(last_byte) = prefix_end.last_mut() {
-                            if let Some(next_byte) = last_byte.checked_add(1) {
-                                *last_byte = next_byte;
-                                if first.as_ref() >= prefix_end.as_slice() {
-                                    continue;
-                                }
+                        if let Some(prefix_end) = upper_bound_for_prefix(prefix) {
+                            if first.as_ref() >= prefix_end.as_slice() {
+                                continue;
                             }
                         }
                     }
@@ -152,20 +160,6 @@ impl LsmStorage {
                         target,
                         &entry_filter,
                     );
-                }
-                SstableScanMode::Range(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded) => {
-                    for (k, v, seq, tx) in mt.iter() {
-                        if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                            continue;
-                        }
-                        let raw_seq = seq & !TOMBSTONE_BIT;
-                        if entry_filter(k.as_ref(), raw_seq, tx) {
-                            let entry = target.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                            if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                                *entry = (v.clone(), seq);
-                            }
-                        }
-                    }
                 }
                 SstableScanMode::Range(start, end) => {
                     mt.scan_range_into_matching(
