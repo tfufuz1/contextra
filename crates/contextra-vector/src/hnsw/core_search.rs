@@ -246,11 +246,10 @@ impl HnswIndex {
             }
         }
 
-        let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.cold.deleted_nodes.read();
-
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
+            let nodes = self.inner.hot.nodes.read();
+            let deleted = self.inner.cold.deleted_nodes.read();
             let mmap_guard = self.inner.cold.mmap_index.read();
             let mmap_node_count = mmap_guard
                 .as_ref()
@@ -348,6 +347,9 @@ impl HnswIndex {
         }
 
         let mut results = Vec::with_capacity(k);
+
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let seq_log_guard = if snapshot_seq.is_some() {
             Some(self.inner.cold.seq_log.read())
