@@ -344,13 +344,21 @@ impl KeyManager {
     /// Encrypts a block of data with a deterministically generated 12-byte nonce.
     /// Returns the ciphertext and the full 12-byte nonce used.
     pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
-        let counter_val = self.nonce_counter.fetch_add(1, Ordering::Relaxed);
-        if counter_val == u64::MAX {
-            return Err(CryptoError::Encryption(
-                "Nonce counter exhausted: maximum encryptions reached for KeyManager instance"
-                    .to_string(),
-            ));
-        }
+        let counter_val = self
+            .nonce_counter
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |val| {
+                if val == u64::MAX {
+                    None
+                } else {
+                    Some(val + 1)
+                }
+            })
+            .map_err(|_| {
+                CryptoError::Encryption(
+                    "Nonce counter exhausted: maximum encryptions reached for KeyManager instance"
+                        .to_string(),
+                )
+            })?;
 
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[0..4].copy_from_slice(&self.nonce_prefix);
@@ -553,6 +561,11 @@ mod tests {
         assert!(
             matches!(res, Err(CryptoError::Encryption(ref msg)) if msg.contains("Nonce counter exhausted")),
             "Encryption MUST fail when nonce counter reaches u64::MAX"
+        );
+        let res2 = km.encrypt_auto_nonce(b"test");
+        assert!(
+            matches!(res2, Err(CryptoError::Encryption(ref msg)) if msg.contains("Nonce counter exhausted")),
+            "Subsequent encryptions MUST also fail without wrapping counter to 0"
         );
     }
 
