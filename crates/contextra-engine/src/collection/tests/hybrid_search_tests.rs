@@ -1271,15 +1271,10 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types
         .await;
 
     assert!(
-        path_res.is_err(),
-        "PathRag under snapshot isolation must fail"
+        path_res.is_ok(),
+        "PathRag under snapshot isolation is supported via path_rag_at, got {:?}",
+        path_res
     );
-    match path_res.unwrap_err() {
-        contextra_types::ContextraError::SnapshotUnsupportedForSignal(msg) => {
-            assert!(msg.contains("PathRag"));
-        }
-        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
-    }
 
     Ok(())
 }
