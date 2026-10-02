@@ -39,7 +39,10 @@ impl SeqLogEntry {
     /// $O(1)$ allocation-free, loop-free check using at most two integer comparisons.
     #[inline]
     pub fn is_visible(&self, as_of: u64) -> bool {
-        self.insert_seq <= as_of && self.delete_seq.is_none_or(|del| del > as_of)
+        let as_of = as_of & !crate::types::TOMBSTONE_BIT;
+        let insert_seq = self.insert_seq & !crate::types::TOMBSTONE_BIT;
+        let delete_seq = self.delete_seq.map(|d| d & !crate::types::TOMBSTONE_BIT);
+        insert_seq <= as_of && delete_seq.is_none_or(|del| del > as_of)
     }
 }
 
@@ -129,11 +132,13 @@ impl SequenceLog {
 
     /// Pins a historical sequence number at a specific timestamp for deterministic testing and lease tracking.
     pub fn pin_snapshot_at(&mut self, seq_no: u64, at: Instant) {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         self.pinned_snapshots.entry(seq_no).or_default().push(at);
     }
 
     /// Unpins a historical sequence number.
     pub fn unpin_snapshot(&mut self, seq_no: u64) {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         if let std::collections::hash_map::Entry::Occupied(mut entry) =
             self.pinned_snapshots.entry(seq_no)
         {
@@ -206,6 +211,7 @@ impl SequenceLog {
 
     /// Records an insert operation at the given sequence number `seq`.
     pub fn record_insert(&mut self, doc_id: DocId, seq: u64) {
+        let seq = seq & !crate::types::TOMBSTONE_BIT;
         if let Some(entry) = self
             .entries
             .iter_mut()
@@ -223,6 +229,7 @@ impl SequenceLog {
 
     /// Records a delete operation at the given sequence number `seq`.
     pub fn record_delete(&mut self, doc_id: DocId, seq: u64) {
+        let seq = seq & !crate::types::TOMBSTONE_BIT;
         if let Some(entry) = self
             .entries
             .iter_mut()
@@ -235,13 +242,16 @@ impl SequenceLog {
 
     /// Checks if `doc_id` was inserted at or before `seq_no` and not deleted at or before `seq_no`.
     pub fn is_visible(&self, doc_id: DocId, seq_no: u64) -> bool {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         let mut inserted = false;
         let mut deleted = false;
         for entry in &self.entries {
-            if entry.doc_id == doc_id && entry.insert_seq <= seq_no {
+            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            if entry.doc_id == doc_id && insert_seq <= seq_no {
                 inserted = true;
                 if let Some(del) = entry.delete_seq {
-                    deleted = del <= seq_no;
+                    let del_seq = del & !crate::types::TOMBSTONE_BIT;
+                    deleted = del_seq <= seq_no;
                 } else {
                     deleted = false;
                 }
@@ -252,19 +262,21 @@ impl SequenceLog {
 
     /// Compacts log entries where deletion sequence number is strictly less than `min_active_seqno`.
     pub fn compact(&mut self, min_active_seqno: u64) {
+        let min_active_seqno = min_active_seqno & !crate::types::TOMBSTONE_BIT;
         self.compacted_below = Some(
             self.compacted_below
                 .map_or(min_active_seqno, |c| c.max(min_active_seqno)),
         );
         self.entries.retain(|entry| {
             if let Some(del_seq) = entry.delete_seq {
+                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
                 del_seq >= min_active_seqno
             } else {
                 true
             }
         });
         self.deletions
-            .retain(|_, &mut del_seq| del_seq >= min_active_seqno);
+            .retain(|_, &mut del_seq| (del_seq & !crate::types::TOMBSTONE_BIT) >= min_active_seqno);
     }
 
     /// Returns the number of entries in the sequence log.
@@ -280,15 +292,18 @@ impl SequenceLog {
     /// Returns all sequence log changes that occurred strictly after `snapshot_seq`,
     /// ordered chronologically by sequence number.
     pub fn changes_since(&self, snapshot_seq: u64) -> Vec<SeqLogChange> {
+        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let mut changes = Vec::new();
         for entry in &self.entries {
-            if entry.insert_seq > snapshot_seq {
+            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            if insert_seq > snapshot_seq {
                 changes.push(SeqLogChange::Insert {
                     doc_id: entry.doc_id,
-                    seq: entry.insert_seq,
+                    seq: insert_seq,
                 });
             }
             if let Some(del_seq) = entry.delete_seq {
+                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
                 if del_seq > snapshot_seq {
                     changes.push(SeqLogChange::Delete {
                         doc_id: entry.doc_id,

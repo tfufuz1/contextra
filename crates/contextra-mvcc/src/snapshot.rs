@@ -81,6 +81,12 @@ impl SnapshotRegistry {
     /// Uses `Ordering::Acquire` to synchronize with `Ordering::Release` writes in `update_min`.
     /// This allows reader threads (e.g., compaction processes) to safely query the minimum
     /// active snapshot sequence without acquiring the `active` mutex lock.
+    /// Returns the minimum active sequence number (`u64::MAX` if none).
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` compaction workers query `min_active_seqno()` using lock-free Acquire ordering
+    /// to determine tombstone GC floors. The minimum sequence number will never exceed the creation sequence
+    /// of any live `SnapshotGuard` or active pin.
     #[inline]
     pub fn min_active_seqno(&self) -> u64 {
         self.min_active_seqno.load(Ordering::Acquire)

@@ -355,6 +355,12 @@ impl<T: Clone> TxBuffer<T> {
     /// The returned minimum snapshot sequence is NOT an atomic snapshot across all shards.
     /// Callers determining a safe pruning watermark MUST compute:
     /// `min(min_read_snapshot(), last_allocated_seq_before_call)`.
+    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// `contextra-store` uses `min_read_snapshot()` combined with `SnapshotRegistry::min_active_seqno()` to
+    /// prevent pruning SSI write keys active transactions still depend on.
+    /// Locks each shard sequentially in ascending index order (0..N-1) without holding multiple shard locks simultaneously.
     pub fn min_read_snapshot(&self) -> Option<u64> {
         let mut overall_min: Option<u64> = None;
         for shard_lock in &self.shards {
@@ -690,6 +696,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     }
 
     /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
+    ///
+    /// # INVARIANT (contextra-store Integration)
+    /// Draining atomizes staging removal and clears the transaction's `ReadSet` and staging byte footprint.
     pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
         let ops = self.drain(tx);
         if !ops.is_empty() {
