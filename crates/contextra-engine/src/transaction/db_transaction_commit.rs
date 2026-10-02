@@ -4,6 +4,7 @@ use super::compensating_actions::{
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
+use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, Result, TenantId, TxId};
 use std::sync::atomic::Ordering;
@@ -117,6 +118,24 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
     /// Commits the transaction atomically across all 4 indices (LSM, HNSW, BM25, CSR).
     pub async fn commit(self) -> Result<()> {
+        let start_nanos = self.collection.clock().monotonic_nanos();
+        let res = self.commit_internal().await;
+        let end_nanos = self.collection.clock().monotonic_nanos();
+        let elapsed_secs = (end_nanos.saturating_sub(start_nanos)) as f64 / 1_000_000_000.0;
+        let sink = self.collection.metrics_sink();
+
+        let status_label = if res.is_ok() { "success" } else { "error" };
+        record_histogram_safe(
+            sink.as_ref(),
+            COMMIT_LATENCY,
+            elapsed_secs,
+            &[("status", status_label)],
+        );
+
+        res
+    }
+
+    async fn commit_internal(&self) -> Result<()> {
         let intent_key = self
             .collection
             .namespaced_key(&self.tx_id.inner().to_le_bytes(), 3);

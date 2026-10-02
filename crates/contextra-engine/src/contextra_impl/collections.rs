@@ -70,6 +70,7 @@ impl Contextra {
             language,
         );
         col.set_community_detection_trigger_threshold(self.community_detection_threshold);
+        col.set_metrics_sink(self.metrics_sink.read().clone());
 
         if let Some(emb) = self.embedder.read().as_ref() {
             col = col.with_embedder(Arc::clone(emb));
@@ -179,6 +180,7 @@ impl Contextra {
             language,
         );
         col.set_community_detection_trigger_threshold(self.community_detection_threshold);
+        col.set_metrics_sink(self.metrics_sink.read().clone());
 
         if let Some(emb) = self.embedder.read().as_ref() {
             col = col.with_embedder(Arc::clone(emb));

@@ -6,6 +6,7 @@
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
+use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
 use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
@@ -150,6 +151,24 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// and reconciles them. This is critical for crash recovery.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn repair(&self) -> Result<()> {
+        let start_nanos = self.clock().monotonic_nanos();
+        let res = self.repair_internal().await;
+        let end_nanos = self.clock().monotonic_nanos();
+        let elapsed_secs = (end_nanos.saturating_sub(start_nanos)) as f64 / 1_000_000_000.0;
+        let sink = self.metrics_sink();
+
+        let status_label = if res.is_ok() { "success" } else { "error" };
+        record_histogram_safe(
+            sink.as_ref(),
+            REBUILD_DURATION,
+            elapsed_secs,
+            &[("status", status_label)],
+        );
+
+        res
+    }
+
+    async fn repair_internal(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
         let mut repair_count = 0;
         let docs = self.storage.scan_prefix(&self.prefix).await?;
