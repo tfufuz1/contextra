@@ -611,7 +611,8 @@ impl CompactionEngine {
                             let elapsed_nanos =
                                 self.clock.monotonic_nanos().saturating_sub(start_nanos);
                             let timeout_nanos =
-                                self.config.merge_wall_clock_timeout.as_nanos() as u64;
+                                u64::try_from(self.config.merge_wall_clock_timeout.as_nanos())
+                                    .unwrap_or(u64::MAX);
 
                             let merge_res = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
                                 Err(contextra_core::ContextraError::Sandbox(
@@ -689,10 +690,10 @@ impl CompactionEngine {
 
             if !merged {
                 // LSM Retention Rule:
-                // Keep all versions with raw_seq >= min_snapshot_seq (visible to active or future snapshots)
-                // PLUS the newest version with raw_seq < min_snapshot_seq (the "floor" version).
+                // Keep all versions with raw_seq > min_snapshot_seq (visible to active or future snapshots)
+                // PLUS the newest version with raw_seq <= min_snapshot_seq (the "floor" version).
                 // All further, older versions for the key below min_snapshot_seq are discarded.
-                let keep = if raw_seq >= min_snapshot_seq {
+                let keep = if raw_seq > min_snapshot_seq {
                     true
                 } else if !floor_emitted {
                     if !failed_merge_keep {

@@ -166,10 +166,13 @@ impl ManifestEntry {
                     u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid path_len format".into())
                     })?) as usize;
-                if remaining.len() < 12 + path_len {
-                    return Err(ContextraError::Serialization(
-                        "Add path data truncated".into(),
-                    ));
+                let expected_len = 12 + path_len;
+                if remaining.len() != expected_len {
+                    return Err(ContextraError::Serialization(format!(
+                        "Add payload length mismatch or trailing unparsed bytes: expected {}, got {}",
+                        expected_len,
+                        remaining.len()
+                    )));
                 }
                 let path_bytes = remaining.get(12..12 + path_len).ok_or_else(|| {
                     ContextraError::Serialization("Add path bytes missing".into())
@@ -196,10 +199,13 @@ impl ManifestEntry {
                     u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid path_len format".into())
                     })?) as usize;
-                if remaining.len() < 4 + path_len {
-                    return Err(ContextraError::Serialization(
-                        "Remove path data truncated".into(),
-                    ));
+                let expected_len = 4 + path_len;
+                if remaining.len() != expected_len {
+                    return Err(ContextraError::Serialization(format!(
+                        "Remove payload length mismatch or trailing unparsed bytes: expected {}, got {}",
+                        expected_len,
+                        remaining.len()
+                    )));
                 }
                 let path_bytes = remaining.get(4..4 + path_len).ok_or_else(|| {
                     ContextraError::Serialization("Remove path bytes missing".into())
@@ -213,10 +219,11 @@ impl ManifestEntry {
             }
             2 => {
                 // RollbackComplete
-                if remaining.len() < 8 {
-                    return Err(ContextraError::Serialization(
-                        "RollbackComplete payload too short".into(),
-                    ));
+                if remaining.len() != 8 {
+                    return Err(ContextraError::Serialization(format!(
+                        "RollbackComplete payload length mismatch: expected 8, got {}",
+                        remaining.len()
+                    )));
                 }
                 let target_tx_bytes = remaining.get(0..8).ok_or_else(|| {
                     ContextraError::Serialization("target_tx bytes missing".into())
@@ -286,6 +293,14 @@ impl ManifestEntry {
                     })?) as usize;
                 offset += 4;
 
+                let max_possible_removed = remaining.get(offset..).map_or(0, |r| r.len() / 4);
+                if removed_count > max_possible_removed {
+                    return Err(ContextraError::Serialization(format!(
+                        "Invalid removed_count {} exceeds remaining buffer capacity {}",
+                        removed_count, max_possible_removed
+                    )));
+                }
+
                 let mut removed = Vec::with_capacity(removed_count);
                 for _ in 0..removed_count {
                     if remaining.len() < offset + 4 {
@@ -315,6 +330,14 @@ impl ManifestEntry {
                     offset += r_len;
                 }
 
+                if offset != remaining.len() {
+                    return Err(ContextraError::Serialization(format!(
+                        "Replace payload trailing unparsed bytes: consumed {}, total {}",
+                        offset,
+                        remaining.len()
+                    )));
+                }
+
                 Ok(ManifestEntry::Replace {
                     removed,
                     added,
@@ -324,10 +347,11 @@ impl ManifestEntry {
             }
             4 => {
                 // WalCheckpoint
-                if remaining.len() < 32 {
-                    return Err(ContextraError::Serialization(
-                        "WalCheckpoint payload too short".into(),
-                    ));
+                if remaining.len() != 32 {
+                    return Err(ContextraError::Serialization(format!(
+                        "WalCheckpoint payload length mismatch: expected 32, got {}",
+                        remaining.len()
+                    )));
                 }
                 let hmac_bytes = remaining.get(0..32).ok_or_else(|| {
                     ContextraError::Serialization("WalCheckpoint hmac bytes missing".into())
