@@ -2,12 +2,11 @@ use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_ports::{Reranker, StorageEngine, VectorIndex};
+use crate::fusion::SignalFailurePolicy;
+use contextra_ports::{MetricsSink, Reranker, StorageEngine, VectorIndex};
 use contextra_types::{
     DocId, EntityId, FilterExpr, FusionWeights, MemoryType, SignalFusionStrategies,
 };
-
-#[cfg(feature = "adaptive-candidate-pool-sizing")]
 use std::sync::Arc;
 
 /// Default candidate pool expansion multiplier for Cross-Encoder reranking (10x requested k).
@@ -41,12 +40,15 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) reranker: Option<&'a (dyn Reranker + 'a)>,
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
+    pub(super) on_signal_failure: contextra_types::OnSignalFailure,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub(super) pid_controller: Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>,
     pub(super) seq: Option<u64>,
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
     pub(super) current_tx: Option<contextra_types::TxId>,
+    pub(super) on_signal_failure: SignalFailurePolicy,
+    pub(super) metrics: Option<Arc<dyn MetricsSink>>,
 }
 
 impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
@@ -71,12 +73,15 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             reranker: None,
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
+            on_signal_failure: contextra_types::OnSignalFailure::default(),
             #[cfg(feature = "adaptive-candidate-pool-sizing")]
             pid_controller: None,
             seq: None,
             as_of_timestamp: None,
             query_timestamp: None,
             current_tx: None,
+            on_signal_failure: SignalFailurePolicy::Fail,
+            metrics: None,
         }
     }
 
@@ -216,6 +221,12 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 
+    /// Sets the signal failure handling policy ([`OnSignalFailure`](contextra_types::OnSignalFailure)) (Spec Teil 6.5).
+    pub fn on_signal_failure(mut self, policy: contextra_types::OnSignalFailure) -> Self {
+        self.on_signal_failure = policy;
+        self
+    }
+
     /// Sets optional PID controller for adaptive reranking candidate pool sizing.
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub fn pid_controller(
@@ -250,6 +261,21 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 
+    /// Sets signal failure policy (`Fail` or `Degrade`).
+    ///
+    /// Spec v17 §6.5: `Fail` (default) fails the entire query if any signal fails.
+    /// `Degrade` skips failing signals, returns partial results, and populates `SearchReport::degraded_signals`.
+    pub fn on_signal_failure(mut self, policy: SignalFailurePolicy) -> Self {
+        self.on_signal_failure = policy;
+        self
+    }
+
+    /// Configures an optional metrics sink for search signal latency instrumentation.
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+        self.metrics = Some(sink);
+        self
+    }
+
     /// Configures builder options from an existing `HybridQuery` struct.
     pub fn query_config(mut self, query: &contextra_types::HybridQuery) -> Self {
         if let Some(ref text) = query.text_query {
@@ -273,6 +299,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self.include_provenance = query.include_provenance;
         self.rerank_pool_multiplier = query.rerank_pool_multiplier;
         self.rerank_pool_max = query.rerank_pool_max;
+        self.on_signal_failure = query.on_signal_failure;
         self.k = Some(query.k);
         self
     }

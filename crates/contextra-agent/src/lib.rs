@@ -84,7 +84,11 @@ pub mod graph;
 pub mod step;
 
 pub use budget::{BudgetStrategy, Reservation, TokenBudget};
-pub use clm_scratchpad::{ClmScratchpad, PinnedRegionId, ScratchpadCheckpoint, ScratchpadEditOp};
+pub use clm_scratchpad::{
+    ClmScratchpad, ContextEditAuditSink, CountingContextEditAuditSink,
+    CountingScratchpadCacheInvalidator, NoopContextEditAuditSink, NoopScratchpadCacheInvalidator,
+    PinnedRegionId, ScratchpadCacheInvalidator, ScratchpadCheckpoint, ScratchpadEditOp,
+};
 pub use context::{AgentContext, AgentStatus};
 pub use dlq::DeadLetterQueue;
 pub use engine::{EventLoopExitReason, OrchestratorEngine, MAX_WORKFLOW_STEPS};

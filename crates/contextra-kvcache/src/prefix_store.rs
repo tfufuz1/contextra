@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Mandantenisolierter KV-Prefix-Store mit Byte-Budget & LRU-Eviction (Spec §9.2).
-// STAND: TS:2026-09-15T00:00:00Z
+// ZWECK: Mandantenisolierter KV-Prefix-Store mit Byte-Budget & LRU-Eviction (Spec §9.2 / INV-CLM-SCRATCHPAD-1).
+// STAND: TS:2026-10-01T00:00:00Z
 
 //! # Mandantenisolierter KV-Prefix-Store (`TenantPrefixKvStore`)
 //!
@@ -181,6 +181,66 @@ impl TenantPrefixKvStore {
         } else {
             Ok(0)
         }
+    }
+
+    /// Gezielte Invalidation eines Scratchpad-Scopes für den angegebenen Mandanten über alle oder spezifische PrefixKeys.
+    ///
+    /// Entfernt ausschließlich Einträge, deren Tokens mit `scratchpad_key_prefix` beginnen.
+    /// Gibt die Anzahl der invalidierten Block-Gruppen/Segmente zurück.
+    pub fn invalidate_prefix_scope_keys(
+        &self,
+        tenant: TenantId,
+        scratchpad_key_prefix: &[u32],
+        keys: &[PrefixKey],
+    ) -> Result<usize, ContextraError> {
+        if scratchpad_key_prefix.is_empty() {
+            return Ok(0);
+        }
+
+        let mut map = self.partitions.write();
+        let mut total_invalidated = 0usize;
+
+        // Falls explizite Keys angegeben sind, filtern wir auf diese; andernfalls prüfen wir alle Keys des Tenants.
+        let target_partition_keys: Vec<PrefixKey> = if keys.is_empty() {
+            map.keys()
+                .filter(|(t, _)| *t == tenant)
+                .map(|(_, k)| k.clone())
+                .collect()
+        } else {
+            keys.to_vec()
+        };
+
+        for key in target_partition_keys {
+            let partition_key = (tenant, key);
+            let mut partition_empty = false;
+
+            if let Some(partition) = map.get_mut(&partition_key) {
+                let mut groups_to_remove = Vec::new();
+
+                for (&group_id, group) in &partition.groups {
+                    if group.tokens.starts_with(scratchpad_key_prefix) {
+                        groups_to_remove.push((group_id, group.tokens.clone(), group.bytes));
+                    }
+                }
+
+                for (group_id, tokens, bytes) in groups_to_remove {
+                    partition.groups.remove(&group_id);
+                    partition.tree.remove(&tokens);
+                    partition.total_bytes = partition.total_bytes.saturating_sub(bytes);
+                    total_invalidated = total_invalidated.saturating_add(1);
+                }
+
+                if partition.groups.is_empty() {
+                    partition_empty = true;
+                }
+            }
+
+            if partition_empty {
+                map.remove(&partition_key);
+            }
+        }
+
+        Ok(total_invalidated)
     }
 
     fn evict_to_budget_internal(

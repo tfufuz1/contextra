@@ -3,11 +3,13 @@
 // INVARIANTEN: Distinct from contextra-graph::csr; validates node IDs, handler names, descriptions, and edge conditions.
 // NICHT-OFFENSICHTLICH: try_add_node validates handler when present; add_node/add_edge marked #[deprecated].
 // HOTSPOTS: try_add_node (ll. 60-110), try_add_edge (ll. 130-160).
-// STAND: TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)
+// STAND: TS:2026-10-01T00:00:00Z (SESSION: 5a38054a)
 
 //! Declarative StateGraph definition for Agent Workflows.
 
 use crate::context::{validate_node_id, MAX_ID_LEN};
+use crate::goal_condition::{parse_legacy_condition_string, GoalCondition};
+use crate::step::StepResult;
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,12 +39,62 @@ pub struct AgentNode {
 }
 
 /// Represents a conditional transition between two graph nodes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkflowEdge {
     pub from: NodeId,
     pub to: NodeId,
+    /// Legacy text-based condition string (maintained for 100% backward compatibility).
     pub condition: Option<String>,
     pub priority: u8,
+    /// Structured GoalCondition for deterministic evaluation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<GoalCondition>,
+}
+
+impl WorkflowEdge {
+    /// Returns whether this edge has an explicit condition or goal attached.
+    pub fn has_condition(&self) -> bool {
+        self.goal.is_some()
+            || self
+                .condition
+                .as_ref()
+                .map_or(false, |c| !c.trim().is_empty())
+    }
+
+    /// Evaluates whether this edge's condition/goal is satisfied against a [`StepResult`].
+    ///
+    /// # Evaluation Order & Fail-Closed Semantics:
+    /// 1. If `goal` is present, it is evaluated directly.
+    /// 2. If `goal` is absent but a legacy `condition` string is present:
+    ///    - Parses `condition` via [`parse_legacy_condition_string`].
+    ///    - If parsing succeeds, evaluates the resulting [`GoalCondition`].
+    ///    - If parsing fails (unparseable non-empty legacy string), fails closed (returns `false`)
+    ///      and logs a warning via `tracing::warn!`.
+    /// 3. If neither `goal` nor `condition` is present, returns `true` (unconditional edge).
+    pub fn evaluate_condition(&self, result: &StepResult) -> bool {
+        if let Some(ref goal) = self.goal {
+            return goal.evaluate(result);
+        }
+
+        if let Some(ref cond_str) = self.condition {
+            let trimmed = cond_str.trim();
+            if trimmed.is_empty() {
+                return true;
+            }
+            if let Some(goal) = parse_legacy_condition_string(trimmed) {
+                return goal.evaluate(result);
+            }
+            tracing::warn!(
+                from = %self.from,
+                to = %self.to,
+                condition = %cond_str,
+                "WorkflowEdge legacy condition string could not be parsed into GoalCondition; failing closed (false)"
+            );
+            return false;
+        }
+
+        true
+    }
 }
 
 /// Core declarative structure routing autonomous agent steps.
@@ -144,6 +196,8 @@ impl StateGraph {
         validate_node_id(from)?;
         validate_node_id(to)?;
 
+        let parsed_goal = condition.and_then(|c| parse_legacy_condition_string(c.trim()));
+
         if let Some(cond) = condition {
             if cond.len() > MAX_TEXT_LEN {
                 return Err(ContextraError::InvalidInput(format!(
@@ -164,6 +218,28 @@ impl StateGraph {
             to: to.to_string(),
             condition: condition.map(|s| s.to_string()),
             priority,
+            goal: parsed_goal,
+        });
+        Ok(())
+    }
+
+    /// Tries to insert a new edge with an explicit [`GoalCondition`].
+    pub fn try_add_edge_with_goal(
+        &mut self,
+        from: &str,
+        to: &str,
+        goal: GoalCondition,
+        priority: u8,
+    ) -> Result<()> {
+        validate_node_id(from)?;
+        validate_node_id(to)?;
+
+        self.edges.push(WorkflowEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            condition: Some(goal.describe()),
+            priority,
+            goal: Some(goal),
         });
         Ok(())
     }

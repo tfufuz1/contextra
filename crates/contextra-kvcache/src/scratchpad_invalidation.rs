@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Targeted Invalidation von Agent-Scratchpad-Prefixes im Radix-Baum (Spec §9.2).
-// STAND: TS:2026-09-15T00:00:00Z
+// ZWECK: Targeted Invalidation von Agent-Scratchpad-Prefixes im Radix-Baum (Spec §9.2 / INV-CLM-SCRATCHPAD-1).
+// STAND: TS:2026-10-01T00:00:00Z
 
 //! # Scratchpad-Invalidierung (`ScratchpadCacheScope`, `ScratchpadInvalidator`)
 //!
@@ -39,7 +39,7 @@ pub trait ScratchpadInvalidator {
     /// Invalidiert alle Gruppen/Blöcke im Radix-Baum, die zum angegebenen `ScratchpadCacheScope` gehören.
     ///
     /// # Fehler
-    /// Gibt einen `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Blöcke/Gruppen darstellt.
+    /// Gibt einen `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Segmente/Blöcke darstellt.
     fn invalidate_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize>;
 }
 
@@ -73,18 +73,11 @@ impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
             return Ok(0);
         }
 
-        let mut total_invalidated: usize = 0;
-
-        for key in &self.keys {
-            if let Some(hit) = self.store.lookup(scope.tenant_id, key, &scope.scratchpad_key_prefix) {
-                if hit.matched_tokens >= scope.scratchpad_key_prefix.len() {
-                    let evicted_count = self.store.evict(scope.tenant_id, key)?;
-                    total_invalidated = total_invalidated.saturating_add(evicted_count as usize);
-                }
-            }
-        }
-
-        Ok(total_invalidated)
+        self.store.invalidate_prefix_scope_keys(
+            scope.tenant_id,
+            &scope.scratchpad_key_prefix,
+            &self.keys,
+        )
     }
 }
 

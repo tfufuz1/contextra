@@ -186,10 +186,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(k);
                         raw_tuples
                     }
-                    contextra_types::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(contextra_types::ContextraError::snapshot_unsupported_for_signal(
-                            "PathRag strategy does not support snapshot-isolated retrieval",
-                        ));
+                    contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
+                        let mut raw_tuples = self
+                            .graph_index
+                            .path_rag_at(anchors, *max_hops, seq)
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(k);
+                        raw_tuples
                     }
                 };
                 let doc_tuples = tuples

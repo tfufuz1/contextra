@@ -290,6 +290,48 @@ impl std::fmt::Display for ContextWindow {
     }
 }
 
+/// Individual retrieval signal (vector, text, graph) in multi-signal hybrid search.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Signal {
+    /// Dense vector embedding search signal.
+    Vector,
+    /// Lexical full-text BM25 search signal.
+    Text,
+    /// Graph traversal / PageRank signal.
+    Graph,
+}
+
+impl std::fmt::Display for Signal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vector => write!(f, "Vector"),
+            Self::Text => write!(f, "Text"),
+            Self::Graph => write!(f, "Graph"),
+        }
+    }
+}
+
+/// Strategy for handling actual signal failures during hybrid search orchestration (Spec Teil 6.5).
+///
+/// **Semantik**:
+/// - `Fail` (Default): If an individual signal fails due to an underlying internal error
+///   (e.g., vector index failure or timeout), the search aborts immediately and returns a
+///   structured error ([`ContextraError::SignalFailed`]) explicitly identifying the failing signal.
+/// - `Degrade`: If an individual signal fails, the search logs a warning and proceeds with
+///   fusion across the remaining successful signals. The returned results bear a non-empty
+///   `degraded_signals` list detailing which signals failed.
+///
+/// *Note*: An empty but valid result from a signal (e.g. no documents matched BM25 or zero vector)
+/// is NOT a signal failure and does not trigger this behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum OnSignalFailure {
+    /// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1).
+    #[default]
+    Fail,
+    /// Degrade search gracefully using remaining active signals and report failed signals in `degraded_signals`.
+    Degrade,
+}
+
 pub use super::domain::RerankResult;
 
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
@@ -393,9 +435,15 @@ pub struct HybridQuery {
     /// Controls candidate pool expansion: only expand when true.
     #[serde(default)]
     pub has_reranker: bool,
+    /// Controls behavior when an individual retrieval signal fails (Spec Teil 6.5). Default: Fail.
+    #[serde(default)]
+    pub on_signal_failure: OnSignalFailure,
     /// Maximum number of search results to return.
     pub k: usize,
 }
+
+/// Alias for [`HybridQuery`] representing query options for hybrid retrieval operations (Spec Teil 6.5).
+pub type QueryOptions = HybridQuery;
 
 impl HybridQuery {
     /// Creates a new `HybridQueryBuilder`.
@@ -420,8 +468,12 @@ pub struct HybridQueryBuilder {
     include_provenance: bool,
     rerank_pool_multiplier: Option<usize>,
     rerank_pool_max: Option<usize>,
+    on_signal_failure: OnSignalFailure,
     k: Option<usize>,
 }
+
+/// Alias for [`HybridQueryBuilder`] representing a query options builder for hybrid retrieval operations (Spec Teil 6.5).
+pub type QueryOptionsBuilder = HybridQueryBuilder;
 
 impl HybridQueryBuilder {
     /// Creates a new `HybridQueryBuilder` with empty default options.
@@ -507,6 +559,12 @@ impl HybridQueryBuilder {
         self
     }
 
+    /// Sets the signal failure policy ([`OnSignalFailure`]) for the query (Spec Teil 6.5).
+    pub fn with_on_signal_failure(mut self, policy: OnSignalFailure) -> Self {
+        self.on_signal_failure = policy;
+        self
+    }
+
     /// Sets the top-K limit for the query.
     pub fn with_k(mut self, k: usize) -> Self {
         self.k = Some(k);
@@ -533,6 +591,7 @@ impl HybridQueryBuilder {
             rerank_pool_multiplier: self.rerank_pool_multiplier,
             rerank_pool_max: self.rerank_pool_max,
             has_reranker: false,
+            on_signal_failure: self.on_signal_failure,
             k: self.k.unwrap_or(10),
         })
     }

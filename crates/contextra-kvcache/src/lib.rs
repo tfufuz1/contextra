@@ -11,6 +11,7 @@ pub mod prefix_store;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 pub mod quantize_kivi;
 pub mod radix;
+pub mod scratchpad_invalidation;
 pub mod segment;
 pub mod store;
 
@@ -29,6 +30,9 @@ pub use radix::{
     ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
 };
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
+pub use scratchpad_invalidation::{
+    PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
+};
 pub use segment::{
     KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
     CURRENT_KV_KEY_DERIVATION_VERSION,

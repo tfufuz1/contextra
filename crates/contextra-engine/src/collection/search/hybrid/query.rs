@@ -4,8 +4,10 @@
 use crate::collection::search::checkpoint::{
     with_pinned_checkpoint, with_pinned_checkpoint_at_latest,
 };
+use crate::collection::search::filtered::{MAX_OVERFETCH_SCAN, OVERFETCH_STAGE_MULTIPLIERS};
 use crate::collection::Collection;
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use crate::fusion::{SearchReport, Signal, SignalFailurePolicy};
+use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
@@ -35,8 +37,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         query: &contextra_types::HybridQuery,
         seq: u64,
     ) -> Result<Vec<crate::SearchResult>> {
+        let (results, _) = self
+            .hybrid_search_with_query_and_report_at(query, seq, SignalFailurePolicy::Fail, None)
+            .await?;
+        Ok(results)
+    }
+
+    /// Performs hybrid search returning both search results and an execution `SearchReport`.
+    #[allow(deprecated)]
+    pub async fn hybrid_search_with_query_and_report_at(
+        &self,
+        query: &contextra_types::HybridQuery,
+        seq: u64,
+        on_signal_failure: SignalFailurePolicy,
+        metrics: Option<&dyn MetricsSink>,
+    ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
         if query.k == 0 {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), SearchReport::default()));
         }
         let k = query.k.min(contextra_types::MAX_SEARCH_K);
 
@@ -56,15 +73,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         with_pinned_checkpoint(self.storage.as_ref(), seq, || async move {
+            let mut report = SearchReport::default();
             let is_vector_zero = vector.is_empty() || vector.iter().all(|&v| v == 0.0);
             let is_text_empty = text.trim().is_empty();
 
             // Candidate pool calculation considering pre-reranking multiplier/max bounds and supersedes displacement requirements
             let (mult, max_pool) = if query.has_reranker {
                 (
-                    query
-                        .rerank_pool_multiplier
-                        .unwrap_or(crate::collection::query_builder::DEFAULT_RERANK_POOL_MULTIPLIER),
+                    query.rerank_pool_multiplier.unwrap_or(
+                        crate::collection::query_builder::DEFAULT_RERANK_POOL_MULTIPLIER,
+                    ),
                     query
                         .rerank_pool_max
                         .unwrap_or(crate::collection::query_builder::DEFAULT_RERANK_POOL_MAX),
@@ -111,77 +129,107 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let is_filtered = query.filter.is_some() || query.memory_type_filter.is_some();
 
             // 1. Vector Signal
-            let vector_results = if is_vector_zero {
-                Vec::new()
+            let vec_start = std::time::Instant::now();
+            let vector_res: Result<Vec<crate::SearchResult>> = if is_vector_zero {
+                Ok(Vec::new())
             } else if is_filtered {
                 let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;
                 if let Some(ref matched_ids) = matched_ids_opt {
                     if matched_ids.is_empty() {
-                        Vec::new()
+                        Ok(Vec::new())
                     } else {
                         let matched_ids_cloned = matched_ids.clone();
                         let filter_fn = move |id: DocId| matched_ids_cloned.contains(&id);
-                        let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
-                        let mut oversample = candidate_k;
-                        let mut iterations = 0;
-                        loop {
-                            iterations += 1;
+                        let max_cap = total_docs.min(MAX_OVERFETCH_SCAN).max(candidate_k);
+                        let mut final_filtered = Vec::new();
+
+                        for (stage_idx, &stage_mult) in
+                            OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
+                        {
+                            report.overfetch_stages =
+                                report.overfetch_stages.max((stage_idx + 1) as u8);
+                            let oversample = (candidate_k * stage_mult).min(max_cap);
                             let raw_vec_results = self
                                 .search_filtered_at(vector, oversample, Some(&filter_fn), seq)
                                 .await?;
                             let raw_len = raw_vec_results.len();
-                            let filtered = filter_pre_rrf(raw_vec_results);
+                            final_filtered = filter_pre_rrf(raw_vec_results);
 
-                            if filtered.len() >= candidate_k
+                            if final_filtered.len() >= candidate_k
                                 || oversample >= max_cap
                                 || raw_len < oversample
                             {
                                 tracing::debug!(
-                                    search_iterations_needed = iterations,
+                                    search_stage = stage_idx + 1,
                                     signal = "vector",
-                                    matched_count = filtered.len(),
+                                    matched_count = final_filtered.len(),
                                     "Adaptive oversampling vector signal completed"
                                 );
-                                break filtered;
+                                break;
                             }
-                            oversample = (oversample * 2).min(max_cap);
                         }
+                        Ok(final_filtered)
                     }
                 } else {
-                    let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
-                    let mut oversample = candidate_k;
-                    let mut iterations = 0;
-                    loop {
-                        iterations += 1;
+                    let max_cap = total_docs.min(MAX_OVERFETCH_SCAN).max(candidate_k);
+                    let mut final_filtered = Vec::new();
+
+                    for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
+                        report.overfetch_stages =
+                            report.overfetch_stages.max((stage_idx + 1) as u8);
+                        let oversample = (candidate_k * stage_mult).min(max_cap);
                         let raw_vec_results = self
                             .search_filtered_at(vector, oversample, None, seq)
                             .await?;
                         let raw_len = raw_vec_results.len();
-                        let filtered = filter_pre_rrf(raw_vec_results);
+                        final_filtered = filter_pre_rrf(raw_vec_results);
 
-                        if filtered.len() >= candidate_k
+                        if final_filtered.len() >= candidate_k
                             || oversample >= max_cap
                             || raw_len < oversample
                         {
                             tracing::debug!(
-                                search_iterations_needed = iterations,
+                                search_stage = stage_idx + 1,
                                 signal = "vector",
-                                matched_count = filtered.len(),
+                                matched_count = final_filtered.len(),
                                 "Adaptive oversampling vector signal completed"
                             );
-                            break filtered;
+                            break;
                         }
-                        oversample = (oversample * 2).min(max_cap);
                     }
+                    Ok(final_filtered)
                 }
             } else {
+                report.overfetch_stages = report.overfetch_stages.max(1);
                 self.search_filtered_at(vector, candidate_k, None, seq)
-                    .await?
+                    .await
+            };
+
+            let elapsed_vec = vec_start.elapsed().as_secs_f64();
+            if let Some(sink) = metrics {
+                sink.record_histogram(
+                    crate::collection::query_builder::METRIC_SEARCH_LATENCY_VECTOR,
+                    elapsed_vec,
+                    &[],
+                );
+            }
+
+            let vector_results = match vector_res {
+                Ok(res) => res,
+                Err(err) => {
+                    if on_signal_failure == SignalFailurePolicy::Fail {
+                        return Err(err);
+                    }
+                    report.degraded_signals.push(Signal::Vector);
+                    tracing::warn!("Vector search signal failed under Degrade policy: {err}");
+                    Vec::new()
+                }
             };
 
             // 2. Text Signal
-            let text_results = if is_text_empty {
-                Vec::new()
+            let text_start = std::time::Instant::now();
+            let text_res: Result<Vec<crate::SearchResult>> = if is_text_empty {
+                Ok(Vec::new())
             } else if is_filtered {
                 let selectivity = if let Some(ref filter_expr) = query.filter {
                     self.estimate_filter_selectivity(filter_expr, seq, total_docs)
@@ -189,15 +237,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 } else {
                     0.1
                 };
-                let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
+                let max_cap = total_docs.min(MAX_OVERFETCH_SCAN).max(candidate_k);
                 let calculated_initial =
                     ((candidate_k as f64) / selectivity.max(0.0001)).ceil() as usize;
-                let min_oversample = candidate_k.min(max_cap);
-                let mut oversample = calculated_initial.clamp(min_oversample, max_cap);
 
-                let mut iterations = 0;
-                loop {
-                    iterations += 1;
+                let mut final_filtered = Vec::new();
+
+                for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
+                    report.overfetch_stages = report.overfetch_stages.max((stage_idx + 1) as u8);
+                    let oversample =
+                        (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
                     let bm25_results = self.text_index.search_at(text, oversample, seq).await?;
                     let bm25_len = bm25_results.len();
                     let hydrated = self
@@ -209,20 +258,24 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             seq,
                         )
                         .await?;
-                    let filtered = filter_pre_rrf(hydrated);
+                    final_filtered = filter_pre_rrf(hydrated);
 
-                    if filtered.len() >= candidate_k || oversample >= max_cap || bm25_len < oversample {
+                    if final_filtered.len() >= candidate_k
+                        || oversample >= max_cap
+                        || bm25_len < oversample
+                    {
                         tracing::debug!(
-                            search_iterations_needed = iterations,
+                            search_stage = stage_idx + 1,
                             signal = "text",
-                            matched_count = filtered.len(),
+                            matched_count = final_filtered.len(),
                             "Adaptive oversampling text signal completed"
                         );
-                        break filtered;
+                        break;
                     }
-                    oversample = (oversample * 2).min(max_cap);
                 }
+                Ok(final_filtered)
             } else {
+                report.overfetch_stages = report.overfetch_stages.max(1);
                 let bm25_results = self.text_index.search_at(text, candidate_k, seq).await?;
                 self.hydrate_from_tuples_at(
                     bm25_results
@@ -231,7 +284,28 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .collect(),
                     seq,
                 )
-                .await?
+                .await
+            };
+
+            let elapsed_text = text_start.elapsed().as_secs_f64();
+            if let Some(sink) = metrics {
+                sink.record_histogram(
+                    crate::collection::query_builder::METRIC_SEARCH_LATENCY_TEXT,
+                    elapsed_text,
+                    &[],
+                );
+            }
+
+            let text_results = match text_res {
+                Ok(res) => res,
+                Err(err) => {
+                    if on_signal_failure == SignalFailurePolicy::Fail {
+                        return Err(err);
+                    }
+                    report.degraded_signals.push(Signal::Text);
+                    tracing::warn!("Text search signal failed under Degrade policy: {err}");
+                    Vec::new()
+                }
             };
 
             // 3. Graph Signal
@@ -258,7 +332,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         None
                     }
                 } else if !text_results.is_empty() {
-                    // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
                     implicit_anchors = text_results
                         .iter()
                         .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
@@ -268,55 +341,82 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     None
                 };
 
-            let graph_results = if let Some(anchors) = anchors_ref {
-                let tuples = match query.graph_strategy {
+            let graph_start = std::time::Instant::now();
+            let graph_res: Result<Vec<crate::SearchResult>> = if let Some(anchors) = anchors_ref {
+                let tuples_res = match query.graph_strategy {
                     contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                        let mut raw_tuples = self
-                            .graph_index
+                        self.graph_index
                             .multi_traverse_at(anchors, max_hops, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(candidate_k);
-                        raw_tuples
+                            .await
                     }
                     contextra_types::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
-                        let mut raw_tuples = self
-                            .graph_index
+                        self.graph_index
                             .personalized_page_rank_at(anchors, cfg, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(candidate_k);
-                        raw_tuples
+                            .await
                     }
-                    contextra_types::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(contextra_types::ContextraError::snapshot_unsupported_for_signal(
-                            "PathRag strategy does not support snapshot-isolated retrieval",
-                        ));
+                    contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
+                        self.graph_index.path_rag_at(anchors, max_hops, seq).await
                     }
                 };
-                let doc_tuples = tuples
-                    .into_iter()
-                    .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-                    .collect();
-                let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
-                filter_pre_rrf(hydrated)
+
+                match tuples_res {
+                    Ok(mut raw_tuples) => {
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(candidate_k);
+                        let doc_tuples = raw_tuples
+                            .into_iter()
+                            .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
+                            .collect();
+                        let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
+                        Ok(filter_pre_rrf(hydrated))
+                    }
+                    Err(e) => Err(e),
+                }
             } else {
-                Vec::new()
+                Ok(Vec::new())
             };
 
-            if !text_results.is_empty() && graph_results.is_empty() && query.graph_start_node.is_none()
-            {
-                tracing::warn!(
-                    text_count = text_results.len(),
-                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
+            let elapsed_graph = graph_start.elapsed().as_secs_f64();
+            if let Some(sink) = metrics {
+                sink.record_histogram(
+                    crate::collection::query_builder::METRIC_SEARCH_LATENCY_GRAPH,
+                    elapsed_graph,
+                    &[],
                 );
             }
 
-            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
-                return Ok(Vec::new());
+            let graph_results = match graph_res {
+                Ok(res) => res,
+                Err(err) => {
+                    if on_signal_failure == SignalFailurePolicy::Fail {
+                        return Err(err);
+                    }
+                    report.degraded_signals.push(Signal::Graph);
+                    tracing::warn!("Graph search signal failed under Degrade policy: {err}");
+                    Vec::new()
+                }
+            };
+
+            if !text_results.is_empty()
+                && graph_results.is_empty()
+                && query.graph_start_node.is_none()
+            {
+                let msg =
+                    "Implicit graph anchors derived from text results produced empty graph signal";
+                tracing::warn!(text_count = text_results.len(), "{msg}");
+                report.warnings.push(msg.to_string());
+            } else if query.graph_start_node.is_some() && graph_results.is_empty() {
+                let msg = "Explicit graph anchor produced empty graph signal";
+                tracing::warn!("{msg}");
+                report.warnings.push(msg.to_string());
             }
 
-            let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
+            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
+                return Ok((Vec::new(), report));
+            }
+
+            let (vw, tw, gw) =
+                crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
 
             let target_community_id: Option<u64> =
                 if let Some(same_comm_entity) = query.same_community_as {
@@ -385,26 +485,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 )
                 .await?;
 
-            #[cfg(feature = "edge-reinforcement-learning")]
-            if fused_results.len() >= 2 {
-                let graph_index = self.graph_index.clone();
-                let result_eids: Vec<contextra_types::EntityId> = fused_results
-                    .iter()
-                    .filter_map(|r| contextra_types::EntityId::from_key(&r.id).ok())
-                    .collect();
-                tokio::spawn(async move {
-                    let _config = contextra_graph::edge_reinforcement::EdgeReinforcementConfig::default();
-                    for i in 0..result_eids.len() {
-                        for j in (i + 1)..result_eids.len() {
-                            let e1 = result_eids[i];
-                            let _e2 = result_eids[j];
-                            let _ = graph_index.neighbors(e1).await;
-                        }
-                    }
-                });
-            }
-
-            Ok(fused_results)
+            Ok((fused_results, report))
         })
         .await
     }

@@ -6,6 +6,12 @@ use super::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, FilterExpr, Result};
 
+/// Named overfetch stage multipliers for adaptive candidate overfetching (Spec v17 §6.5).
+pub const OVERFETCH_STAGE_MULTIPLIERS: [usize; 3] = [3, 6, 12];
+
+/// Upper bound scan limit for adaptive candidate overfetching.
+pub const MAX_OVERFETCH_SCAN: usize = contextra_types::MAX_SEARCH_K;
+
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Estimates the selectivity (fraction of documents matching `filter`) over the collection metadata.
     ///

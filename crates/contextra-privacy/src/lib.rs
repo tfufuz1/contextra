@@ -4,6 +4,7 @@
 pub mod audit_trace;
 pub mod avv_generator;
 pub mod bulk_exfiltration_detector;
+pub mod context_edit_audit;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
@@ -15,6 +16,10 @@ pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrac
 pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
+};
+pub use context_edit_audit::{
+    build_context_edit_audit_record, compute_record_hash, render_audit_line, verify_audit_chain,
+    ContextEditAuditError, ContextEditAuditRecord, ContextEditKind,
 };
 pub use egress_gateway::{
     handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,

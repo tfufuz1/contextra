@@ -100,6 +100,8 @@ pub struct AgentContext {
     )>,
     /// Optionales CLM Scratchpad für temporären Arbeitskontext.
     pub clm_scratchpad: Option<crate::clm_scratchpad::ClmScratchpad>,
+    /// Neueste ScratchpadCheckpoint-Zusammenfassung nach einem Subgoal-Reset.
+    pub latest_scratchpad_checkpoint: Option<crate::clm_scratchpad::ScratchpadCheckpoint>,
 }
 
 impl AgentContext {
@@ -141,6 +143,7 @@ impl AgentContext {
             events: VecDeque::new(),
             pending_routing_decision: None,
             clm_scratchpad: None,
+            latest_scratchpad_checkpoint: None,
         })
     }
 
