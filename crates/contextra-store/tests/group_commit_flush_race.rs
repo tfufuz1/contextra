@@ -9,7 +9,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
-fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+fn copy_dir_all(
+    src: impl AsRef<std::path::Path>,
+    dst: impl AsRef<std::path::Path>,
+) -> std::io::Result<()> {
     std::fs::create_dir_all(&dst)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;

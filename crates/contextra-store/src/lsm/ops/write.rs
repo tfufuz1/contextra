@@ -556,12 +556,18 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             active: true,
         };
 
+        // Release commit_mutex during collection window so Followers can join queue
+        drop(commit_lock);
+
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_micros(storage.config.group_commit_window_micros)) => {},
             _ = notify_full.notified() => {},
         }
 
-        // Leader holds commit_mutex continuously from prepare_batch through apply_mem_updates and follower notification
+        // Re-acquire commit_mutex after collection window.
+        // Leader holds commit_mutex continuously from queue_guard.take() / prepare_batch through apply_mem_updates, advance_visibility, and follower notification.
+        let commit_lock = storage.commit_mutex.lock().await;
+
         let mut queue_guard = storage.pending_commit_queue.lock().await;
         let pending_queue = match queue_guard.take() {
             Some(q) => q,
