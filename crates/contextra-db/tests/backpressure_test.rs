@@ -17,6 +17,7 @@ async fn test_insert_backpressure_when_pressure_critical() {
     let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(SystemPressure {
         wal_queue_depth: 0,
         scheduler_queue_depth: 0.0,
+        blocking_util: 0.0,
         embedding_queue_depth: 0,
         pressure_level: PressureLevel::Normal,
     });
@@ -44,6 +45,7 @@ async fn test_insert_backpressure_when_pressure_critical() {
         .send(SystemPressure {
             wal_queue_depth: 600,
             scheduler_queue_depth: 0.9,
+            blocking_util: 0.0,
             embedding_queue_depth: 0,
             pressure_level: PressureLevel::Critical,
         })
@@ -65,6 +67,7 @@ async fn test_insert_backpressure_when_pressure_critical() {
         .send(SystemPressure {
             wal_queue_depth: 10,
             scheduler_queue_depth: 0.1,
+            blocking_util: 0.0,
             embedding_queue_depth: 5,
             pressure_level: PressureLevel::Normal,
         })
