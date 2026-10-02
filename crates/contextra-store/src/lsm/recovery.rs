@@ -285,6 +285,9 @@ impl LsmStorage {
                 match &entry.op {
                     WalOp::Put { .. } | WalOp::Delete { .. } => {
                         let tx_id = entry.tx_id().inner();
+                        if tx_id > max_tx && tx_id < TxId::INTERNAL_BASE {
+                            max_tx = tx_id;
+                        }
                         pending_tx_map.entry(tx_id).or_default().push(PendingTxOp {
                             lsn: *lsn,
                             op: entry.op.clone(),
@@ -292,10 +295,10 @@ impl LsmStorage {
                     }
                     WalOp::TxEnd { tx_id, committed } => {
                         let tx_raw = tx_id.inner();
+                        if tx_raw > max_tx && tx_raw < TxId::INTERNAL_BASE {
+                            max_tx = tx_raw;
+                        }
                         if *committed {
-                            if tx_raw > max_tx && tx_raw < TxId::INTERNAL_BASE {
-                                max_tx = tx_raw;
-                            }
                             if let Some(ops) = pending_tx_map.remove(&tx_raw) {
                                 for op in ops {
                                     match op.op {
@@ -327,6 +330,17 @@ impl LsmStorage {
                     }
                 }
             }
+
+            let orphan_ops: usize = pending_tx_map.values().map(|v| v.len()).sum();
+            if orphan_ops > 0 {
+                tracing::warn!(
+                    orphan_ops = orphan_ops,
+                    wal_path = ?wal_path,
+                    "Discarded uncommitted orphan transaction operations from WAL segment"
+                );
+                pending_tx_map.clear();
+            }
+
             drop(wal);
         }
 
@@ -577,6 +591,8 @@ impl LsmStorage {
             flush_notify,
             health,
             commit_mutex: tokio::sync::Mutex::new(()),
+            flush_mutex: tokio::sync::Mutex::new(()),
+            pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),
             cancel_token,
             task_tracker,
             flush_counter: AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0)),

@@ -13,6 +13,8 @@ use std::sync::Arc;
 /// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
 /// concurrent sequence allocation races during rotation.
 pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
+    let _flush_lock = storage.flush_mutex.lock().await;
+
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
     let has_active_memtable = {
         let state = storage.state.read().await;
@@ -36,7 +38,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     };
 
     // ── Phase 2: Atomarer Swap unter commit_mutex und state.write() ──────
-    let (to_flush, old_wal_opt, old_wal_hmac) = {
+    let (to_flush, old_wal_opt) = {
         let _commit_lock = storage.commit_mutex.lock().await;
 
         let mut state = storage.state.write().await;
@@ -44,7 +46,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             return Ok(());
         }
 
-        let (old_wal_opt, old_wal_hmac) = if !state.memtable.is_empty() {
+        let old_wal_opt = if !state.memtable.is_empty() {
             let new_wal = match new_wal_opt {
                 Some(w) => w,
                 None => {
@@ -64,14 +66,19 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             };
             old_wal.sealed.store(true, Ordering::SeqCst);
             let hmac = *old_wal.last_hmac.lock().await;
+            storage
+                .pending_sealed_wals
+                .lock()
+                .await
+                .push((old_wal.path().to_path_buf(), hmac));
             state.immutable_memtables.push(old_memtable);
-            (Some(old_wal), hmac)
+            Some(old_wal)
         } else {
-            (None, [0u8; 32])
+            None
         };
 
         let to_flush = state.immutable_memtables.clone();
-        (to_flush, old_wal_opt, old_wal_hmac)
+        (to_flush, old_wal_opt)
     }; // commit_mutex, state.write, and storage.wal released!
 
     let count = storage.segment_counter.fetch_add(1, Ordering::Relaxed);
@@ -119,16 +126,25 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         .map_err(|e| ContextraError::Storage(format!("SSTable open after flush failed: {}", e)))?;
 
         // === SSTABLE MANIFEST INTEGRATION START ===
-        storage
-            .manifest
-            .append_batch(&[
-                crate::manifest::ManifestEntry::Add {
-                    path: sst_path.clone(),
-                    max_tx: reader.metadata().max_tx_id,
-                },
-                crate::manifest::ManifestEntry::WalCheckpoint { hmac: old_wal_hmac },
-            ])
-            .await?;
+        let latest_hmac_opt = {
+            let pending = storage.pending_sealed_wals.lock().await;
+            pending
+                .iter()
+                .rev()
+                .find(|(_, hmac)| *hmac != [0u8; 32])
+                .map(|(_, hmac)| *hmac)
+        };
+
+        let mut manifest_entries = vec![crate::manifest::ManifestEntry::Add {
+            path: sst_path.clone(),
+            max_tx: reader.metadata().max_tx_id,
+        }];
+
+        if let Some(hmac) = latest_hmac_opt {
+            manifest_entries.push(crate::manifest::ManifestEntry::WalCheckpoint { hmac });
+        }
+
+        storage.manifest.append_batch(&manifest_entries).await?;
         // === SSTABLE MANIFEST INTEGRATION END ===
 
         // Atomic transition: remove successfully flushed memtables from immutable memtables and add to SSTables
@@ -157,12 +173,42 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         drop(sstables);
         drop(state);
 
-        // Delete old WAL only after SST and manifest entry are durable and truncate_lock acquired
-        if let Some(ref old_wal) = old_wal_opt {
-            let _trunc_guard = old_wal.truncate_lock.lock().await;
-            if let Err(e) = tokio::fs::remove_file(old_wal.path()).await {
-                tracing::debug!("Could not delete old WAL {:?}: {}", old_wal.path(), e);
+        // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b)
+        {
+            let mut pending_guard = storage.pending_sealed_wals.lock().await;
+            let active_wal_path = {
+                let wal_read = storage.wal.read().await;
+                wal_read.path().to_path_buf()
+            };
+
+            for (wal_path, _) in pending_guard.drain(..) {
+                if wal_path != active_wal_path {
+                    let mut trunc_guard_opt = None;
+                    if let Some(ref old_wal) = old_wal_opt {
+                        if old_wal.path() == wal_path.as_path() {
+                            trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);
+                        }
+                    }
+
+                    if let Err(e) = tokio::fs::remove_file(&wal_path).await {
+                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
+                    } else {
+                        let uuid_sidecar =
+                            std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
+                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+                            if e.kind() != std::io::ErrorKind::NotFound {
+                                tracing::debug!(
+                                    "Could not delete sidecar {:?}: {}",
+                                    uuid_sidecar,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    drop(trunc_guard_opt);
+                }
             }
+            let _ = crate::util::fsync_parent_dir(&storage.config.path).await;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
