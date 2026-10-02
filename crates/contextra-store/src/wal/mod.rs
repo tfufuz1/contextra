@@ -9,6 +9,9 @@ pub mod replay;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod open_heal_tests;
+
 pub use encode::*;
 pub use flusher::*;
 pub(crate) use hmac::*;
@@ -694,6 +697,7 @@ impl Wal {
                             "WAL backup fsync failed before rewrite: {e}"
                         ))
                     })?;
+                    crate::util::fsync_parent_dir(&bak_path).await?;
                 }
                 let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
@@ -716,9 +720,30 @@ impl Wal {
                         rewrite_res?;
                     }
                 }
-            } else if let Some((_, last_entry, _)) = entries.last() {
-                let mut guard = wal.last_hmac.lock().await;
-                *guard = last_entry.checksum;
+            } else {
+                let (verified_end, last_hmac) =
+                    if let Some((_, last_entry, end_pos)) = entries.last() {
+                        (*end_pos, last_entry.checksum)
+                    } else if metadata.len() >= 4 {
+                        (4u64, [0u8; 32])
+                    } else {
+                        (0u64, [0u8; 32])
+                    };
+
+                if verified_end < metadata.len() {
+                    let discarded_bytes = metadata.len() - verified_end;
+                    tracing::warn!(
+                        wal_path = %wal.path.display(),
+                        discarded_bytes,
+                        verified_end,
+                        file_len = metadata.len(),
+                        "Truncating torn WAL write tail on open"
+                    );
+                    wal.truncate(verified_end, last_hmac).await?;
+                } else {
+                    let mut guard = wal.last_hmac.lock().await;
+                    *guard = last_hmac;
+                }
             }
         }
 
@@ -764,6 +789,36 @@ impl Wal {
     /// orphan/partial bytes at the tail, and resets the `poisoned` flag to `false`.
     ///
     /// **This is the only supported mechanism to recover a poisoned `Wal` handle back into service.**
+    /// Truncates any uncommitted entries appearing after the last committed `TxEnd` marker in the WAL.
+    ///
+    /// Returns the number of bytes truncated.
+    ///
+    /// **Policy Note**: `truncate_uncommitted_tail` is NOT invoked during `Wal::open`.
+    /// Transaction commitment policy belongs in the higher LSM/Store layer; low-level
+    /// WAL unit tests and single-operation Put loggers write entries without explicit `TxEnd` markers.
+    /// In-flight transactions (Puts without `TxEnd`) left behind after a crash are pruned on demand by LSM recovery.
+    pub async fn truncate_uncommitted_tail(&self) -> Result<u64> {
+        let entries = self.replay().await?;
+        let current_len = self.size();
+
+        let mut last_tx_end: Option<(WalEntry, u64)> = None;
+        for (_, entry, pos) in &entries {
+            if matches!(entry.op, WalOp::TxEnd { .. }) {
+                last_tx_end = Some((entry.clone(), *pos));
+            }
+        }
+
+        if let Some((last_entry, last_pos)) = last_tx_end {
+            if last_pos < current_len {
+                let truncated_bytes = current_len - last_pos;
+                self.truncate(last_pos, last_entry.checksum).await?;
+                return Ok(truncated_bytes);
+            }
+        }
+
+        Ok(0)
+    }
+
     pub async fn recover_from_poison(&self) -> Result<()> {
         if !self.is_poisoned() {
             return Ok(());
@@ -772,10 +827,10 @@ impl Wal {
         // Replay all entries up to the last valid HMAC-verified entry
         let entries = self.replay().await?;
 
-        let file_len = self::fs::metadata(&self.path)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let metadata = self::fs::metadata(&self.path).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed to stat WAL for poison recovery: {e}"))
+        })?;
+        let file_len = metadata.len();
 
         let (verified_offset, verified_hmac) =
             if let Some((_, last_entry, end_pos)) = entries.last() {
@@ -789,6 +844,13 @@ impl Wal {
             } else {
                 (0u64, [0u8; 32])
             };
+
+        if verified_offset > file_len {
+            return Err(ContextraError::wal_corruption(
+                verified_offset,
+                "Verified end offset exceeds physical file length during poison recovery",
+            ));
+        }
 
         // Reset poisoned flag temporarily to allow truncation command to be executed by flusher
         self.poisoned
