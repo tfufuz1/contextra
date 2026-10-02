@@ -40,14 +40,13 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) reranker: Option<&'a (dyn Reranker + 'a)>,
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
-    pub(super) on_signal_failure: contextra_types::OnSignalFailure,
+    pub(super) on_signal_failure: SignalFailurePolicy,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub(super) pid_controller: Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>,
     pub(super) seq: Option<u64>,
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
     pub(super) current_tx: Option<contextra_types::TxId>,
-    pub(super) on_signal_failure: SignalFailurePolicy,
     pub(super) metrics: Option<Arc<dyn MetricsSink>>,
 }
 
@@ -73,14 +72,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             reranker: None,
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
-            on_signal_failure: contextra_types::OnSignalFailure::default(),
+            on_signal_failure: SignalFailurePolicy::Fail,
             #[cfg(feature = "adaptive-candidate-pool-sizing")]
             pid_controller: None,
             seq: None,
             as_of_timestamp: None,
             query_timestamp: None,
             current_tx: None,
-            on_signal_failure: SignalFailurePolicy::Fail,
             metrics: None,
         }
     }
@@ -218,12 +216,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Default: 200 (`DEFAULT_RERANK_POOL_MAX`), capping pre-retrieval pool size for large `k`.
     pub fn rerank_pool_max(mut self, max: usize) -> Self {
         self.rerank_pool_max = Some(max);
-        self
-    }
-
-    /// Sets the signal failure handling policy ([`OnSignalFailure`](contextra_types::OnSignalFailure)) (Spec Teil 6.5).
-    pub fn on_signal_failure(mut self, policy: contextra_types::OnSignalFailure) -> Self {
-        self.on_signal_failure = policy;
         self
     }
 

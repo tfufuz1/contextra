@@ -2,6 +2,10 @@
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.
+// VORVERDICHTETER EINGANG: Agentenunabhängige Schnittstelle (`PreCondensedInput`, `intake_pre_condensed_inputs`)
+//                          für vorverdichtete Eingabeknoten (z. B. ScratchpadCheckpoints aus Agenten-Pipelines).
+//                          Strikte Mandantentrennung (VETO-F10), Provenienzerhalt, Längenbeschränkung und
+//                          deterministische Sortierung nach tenant_id und text_digest.
 #![forbid(unsafe_code)]
 
 pub mod aggregation_phase;
@@ -41,9 +45,10 @@ pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;
 pub use memory_consolidation::{
     compact_segment_via_context_compactor, compute_community_hash, detect_near_duplicates,
-    group_turns_into_segments, run_consolidation_pass, CommunityStabilityTracker,
-    ConsolidationConfig, ConsolidationPhaseResult, MetaChunk, SynthesisConfig,
-    SynthesisPhaseResult, TurnSegment,
+    group_turns_into_segments, intake_pre_condensed_inputs, run_consolidation_pass,
+    CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, MetaChunk,
+    PreCondensedInput, SynthesisConfig, SynthesisPhaseResult, TurnSegment,
+    MAX_PRE_CONDENSED_DIGEST_LEN, MAX_PRE_CONDENSED_LABEL_LEN, MAX_PRE_CONDENSED_PROVENANCE_COUNT,
 };
 pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use synthesis_phase::run_synthesis_pass;

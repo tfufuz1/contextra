@@ -371,27 +371,37 @@ impl SstableReader {
         let index_offset = if is_mfsx {
             let base = if format_version >= 1 { 0 } else { 2 };
             min_tx_id = u64::from_le_bytes(
-                trailer_data[base..base + 8]
+                trailer_data
+                    .get(base..base + 8)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid min_tx_id".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid min_tx_id".into()))?,
             );
             max_tx_id = u64::from_le_bytes(
-                trailer_data[base + 8..base + 16]
+                trailer_data
+                    .get(base + 8..base + 16)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid max_tx_id".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid max_tx_id".into()))?,
             );
             min_seq = u64::from_le_bytes(
-                trailer_data[base + 16..base + 24]
+                trailer_data
+                    .get(base + 16..base + 24)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid min_seq".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid min_seq".into()))?,
             );
             max_seq = u64::from_le_bytes(
-                trailer_data[base + 24..base + 32]
+                trailer_data
+                    .get(base + 24..base + 32)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid max_seq".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid max_seq".into()))?,
             );
             bloom_offset = u64::from_le_bytes(
-                trailer_data[base + 32..base + 40]
+                trailer_data
+                    .get(base + 32..base + 40)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid bloom_offset".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid bloom_offset".into()))?,
             );
@@ -399,11 +409,13 @@ impl SstableReader {
                 has_bloom = true;
             }
             u64::from_le_bytes(
-                trailer_data[base + 40..base + 48]
+                trailer_data
+                    .get(base + 40..base + 48)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid index_offset".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid index_offset".into()))?,
             )
-        } else {
+        } else if trailer_len >= 54 {
             let magic_legacy =
                 u32::from_le_bytes(trailer_data[50..54].try_into().map_err(|_| {
                     ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
@@ -419,7 +431,29 @@ impl SstableReader {
                     "Invalid SSTable magic number".into(),
                 ));
             }
+        } else {
+            return Err(ContextraError::Storage(
+                "Invalid SSTable trailer length".into(),
+            ));
         };
+
+        let trailer_offset = file_size.saturating_sub(if is_mfsx {
+            if format_version >= 1 {
+                54
+            } else {
+                52
+            }
+        } else {
+            12
+        });
+
+        if index_offset > trailer_offset
+            || (has_bloom && (bloom_offset < index_offset || bloom_offset > trailer_offset))
+        {
+            return Err(ContextraError::Storage(
+                "corrupted SSTable: invalid section offsets".into(),
+            ));
+        }
 
         let bloom_filter = if has_bloom {
             let bloom_end = if is_mfsx {
@@ -556,7 +590,20 @@ impl SstableReader {
                     .map_err(|_| ContextraError::ParseError("corrupted index: offset".into()))?,
             );
             pos += 8;
+
+            if offset > index_offset {
+                return Err(ContextraError::Storage(
+                    "corrupted SSTable index: block offset exceeds index offset".into(),
+                ));
+            }
+
             index.push((key, offset));
+        }
+
+        if pos != index_len {
+            return Err(ContextraError::ParseError(
+                "corrupted index: trailing invalid bytes".into(),
+            ));
         }
 
         let first_key = if !index.is_empty() {
@@ -575,19 +622,24 @@ impl SstableReader {
                 &path_buf,
             )
             .await?;
-            if block.len() >= 2 {
-                let k_len =
-                    usize::from(u16::from_le_bytes(block[0..2].try_into().map_err(
-                        |_| ContextraError::ParseError("corrupted block: k_len".into()),
-                    )?));
-                if block.len() >= 2 + k_len {
-                    block.slice(2..2 + k_len)
-                } else {
-                    Bytes::new()
-                }
-            } else {
-                Bytes::new()
+            if block.len() < 2 {
+                return Err(ContextraError::ParseError(
+                    "corrupted block: header too short".into(),
+                ));
             }
+            let k_len =
+                usize::from(u16::from_le_bytes(block[0..2].try_into().map_err(
+                    |_| ContextraError::ParseError("corrupted block: k_len".into()),
+                )?));
+            let end_k = 2usize.checked_add(k_len).ok_or_else(|| {
+                ContextraError::ParseError("corrupted block: k_len overflow".into())
+            })?;
+            if block.len() < end_k {
+                return Err(ContextraError::ParseError(
+                    "corrupted block: key truncated".into(),
+                ));
+            }
+            block.slice(2..end_k)
         } else {
             Bytes::new()
         };
@@ -630,6 +682,13 @@ impl SstableReader {
         let len = usize::try_from(next_offset.saturating_sub(offset)).map_err(|_| {
             ContextraError::Storage("Block offset difference exceeds platform usize".into())
         })?;
+
+        if len > 16 * 1024 * 1024 {
+            return Err(ContextraError::Storage(
+                "SSTable block size exceeds maximum allowed size".into(),
+            ));
+        }
+
         let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
             let mut buf = vec![0u8; len];
             pread_exact(&file, &mut buf, offset)?;
@@ -750,38 +809,54 @@ impl SstableReader {
                     for entry_i in first_entry_idx..num_offsets {
                         let (entry_off, k_len) =
                             get_entry_at_index(&block_data, offsets_start, entry_i, is_v3)?;
-                        let mut ep = entry_off + 2;
+                        let ep = entry_off.checked_add(2).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating entry offset".into())
+                        })?;
+                        let end_k = ep.checked_add(k_len).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating entry key length".into())
+                        })?;
                         let entry_key = block_data
-                            .get(ep..ep + k_len)
+                            .get(ep..end_k)
                             .ok_or_else(|| ContextraError::Storage("malformed block".into()))?;
                         if entry_key != key {
                             break;
                         }
-                        ep += k_len;
 
+                        let ep_seq = end_k;
+                        let end_seq = ep_seq.checked_add(8).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating seq position".into())
+                        })?;
                         let seq_no = u64::from_le_bytes(
                             block_data
-                                .get(ep..ep + 8)
+                                .get(ep_seq..end_seq)
                                 .ok_or_else(|| {
                                     ContextraError::Storage("malformed block: seq_no".into())
                                 })?
                                 .try_into()
                                 .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                         );
-                        ep += 8;
+
+                        let ep_tx = end_seq;
+                        let end_tx = ep_tx.checked_add(8).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating tx position".into())
+                        })?;
                         let tx_id = u64::from_le_bytes(
                             block_data
-                                .get(ep..ep + 8)
+                                .get(ep_tx..end_tx)
                                 .ok_or_else(|| {
                                     ContextraError::Storage("malformed block: tx_id".into())
                                 })?
                                 .try_into()
                                 .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                         );
-                        ep += 8;
+
+                        let ep_vlen = end_tx;
+                        let end_vlen = ep_vlen.checked_add(4).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating v_len position".into())
+                        })?;
                         let v_len = usize::try_from(u32::from_le_bytes(
                             block_data
-                                .get(ep..ep + 4)
+                                .get(ep_vlen..end_vlen)
                                 .ok_or_else(|| {
                                     ContextraError::Storage("malformed block: v_len".into())
                                 })?
@@ -791,8 +866,12 @@ impl SstableReader {
                         .map_err(|_| {
                             ContextraError::Storage("value length exceeds platform usize".into())
                         })?;
-                        ep += 4;
-                        if ep + v_len > block_data.len() {
+
+                        let ep_val = end_vlen;
+                        let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating value position".into())
+                        })?;
+                        if end_val > block_data.len() {
                             return Err(ContextraError::Storage(
                                 "malformed block: value length out of bounds".into(),
                             ));
@@ -802,7 +881,7 @@ impl SstableReader {
                         if raw_seq <= max_seq_raw
                             && (tx_id <= max_tx || tx_id >= contextra_core::TxId::INTERNAL_BASE)
                         {
-                            let entry_val = block_data.slice(ep..ep + v_len);
+                            let entry_val = block_data.slice(ep_val..end_val);
                             return Ok(Some((entry_val, seq_no, tx_id)));
                         }
                     }
@@ -926,32 +1005,47 @@ impl SstableReader {
             for i in 0..num_offsets {
                 let (entry_off, k_len) = get_entry_at_index(&block_data, offsets_start, i, is_v3)?;
 
-                let mut ep = entry_off;
-                ep += 2;
+                let ep = entry_off.checked_add(2).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating entry offset".into())
+                })?;
+                let end_k = ep.checked_add(k_len).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating entry key length".into())
+                })?;
                 let _entry_key = block_data
-                    .get(ep..ep + k_len)
+                    .get(ep..end_k)
                     .ok_or_else(|| ContextraError::Storage("malformed block: entry_key".into()))?;
-                ep += k_len;
 
+                let ep_seq = end_k;
+                let end_seq = ep_seq.checked_add(8).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating seq position".into())
+                })?;
                 let seq_no = u64::from_le_bytes(
                     block_data
-                        .get(ep..ep + 8)
+                        .get(ep_seq..end_seq)
                         .ok_or_else(|| ContextraError::Storage("malformed block: seq_no".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 );
-                ep += 8;
+
+                let ep_tx = end_seq;
+                let end_tx = ep_tx.checked_add(8).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating tx position".into())
+                })?;
                 let _tx_id = u64::from_le_bytes(
                     block_data
-                        .get(ep..ep + 8)
+                        .get(ep_tx..end_tx)
                         .ok_or_else(|| ContextraError::Storage("malformed block: tx_id".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 );
-                ep += 8;
+
+                let ep_vlen = end_tx;
+                let end_vlen = ep_vlen.checked_add(4).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating v_len position".into())
+                })?;
                 let v_len = usize::try_from(u32::from_le_bytes(
                     block_data
-                        .get(ep..ep + 4)
+                        .get(ep_vlen..end_vlen)
                         .ok_or_else(|| ContextraError::Storage("malformed block: v_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
@@ -959,14 +1053,18 @@ impl SstableReader {
                 .map_err(|_| {
                     ContextraError::Storage("value length exceeds platform usize".into())
                 })?;
-                ep += 4;
-                if ep + v_len > block_data.len() {
+
+                let ep_val = end_vlen;
+                let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating value position".into())
+                })?;
+                if end_val > block_data.len() {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));
                 }
-                let key_bytes = block_data.slice(entry_off + 2..entry_off + 2 + k_len);
-                let val_bytes = block_data.slice(ep..ep + v_len);
+                let key_bytes = block_data.slice(ep..end_k);
+                let val_bytes = block_data.slice(ep_val..end_val);
 
                 results.push((key_bytes, val_bytes, seq_no));
             }

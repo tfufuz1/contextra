@@ -348,8 +348,8 @@ impl ClmScratchpad {
 
                 let mut chunk =
                     VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
-                if let Some(ref lbl) = label {
-                    chunk = chunk.with_label(lbl.as_str());
+                if let Some(lbl) = label {
+                    chunk = chunk.with_label(lbl);
                 }
 
                 // Ingest in den bestehenden Vault

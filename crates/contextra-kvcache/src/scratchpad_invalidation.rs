@@ -145,7 +145,9 @@ mod tests {
         let count = invalidator.invalidate_scope(&scope).unwrap();
         assert_eq!(count, 1);
 
-        assert!(store.lookup(tenant_a, &key_scratchpad, &scratchpad_tokens).is_none());
+        assert!(store
+            .lookup(tenant_a, &key_scratchpad, &scratchpad_tokens)
+            .is_none());
         let base_hit = store.lookup(tenant_a, &key_base, &base_tokens).unwrap();
         assert_eq!(base_hit.matched_tokens, 4);
     }
@@ -203,7 +205,8 @@ mod tests {
             .insert(tenant_b, &key, &scratchpad_tokens, vec![block_b])
             .unwrap();
 
-        let invalidator = PrefixStoreScratchpadInvalidator::new(&store).with_keys(vec![key.clone()]);
+        let invalidator =
+            PrefixStoreScratchpadInvalidator::new(&store).with_keys(vec![key.clone()]);
 
         let scope_a = ScratchpadCacheScope::new(tenant_a, scratchpad_tokens.clone());
         let count = invalidator.invalidate_scope(&scope_a).unwrap();

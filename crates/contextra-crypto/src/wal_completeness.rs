@@ -16,6 +16,15 @@ use subtle::ConstantTimeEq;
 /// letzte bekannte WAL-HMAC mit der im Checkpoint-Manifest persistierten
 /// High-Water-Mark verglichen wird.
 ///
+/// # Semantik & Bedrohungsmodell
+/// - Die Verifikation prüft die exakte Byteweise Gleichheit (`subtle::ConstantTimeEq`) zwischen dem
+///   Ende der WAL-HMAC-Kette (`wal_tail_hmac`) und der im Checkpoint-Manifest aufgezeichneten High-Water-Mark.
+/// - Ein fehlgeschlagener Vergleich zeigt an, dass nach dem letzten Checkpoint geschriebene WAL-Einträge
+///   durch Truncation, Dateisystem-Fehler oder bösartige Rollback-Versuche verloren gegangen oder verfälscht wurden.
+/// - **Grenzen:** Diese Funktion ist ein reiner Prädikatsvergleich (Tail == HighWaterMark). Ein Angreifer mit
+///   Schreibzugriff auf WAL *und* Checkpoint-Manifest kann beide konsistent zurücksetzen.
+///   Der Schutz gegen synchrone Manifest/WAL-Rollbacks wird durch den Audit-Chain-Anker (siehe ADR-042 / Spec §15.6) hergestellt.
+///
 /// # Fehler
 /// `CryptoError::WalTruncationDetected` wenn `wal_tail_hmac != manifest_high_water_mark`.
 ///

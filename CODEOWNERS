@@ -41,7 +41,13 @@
 /.jules/setup/                         @contextra/build-infra
 /.github/rulesets/                     @contextra/build-infra
 /CODEOWNERS                            @contextra/build-infra
+/CONSTITUTION.md                       @contextra/build-infra
+/VETOES.md                             @contextra/build-infra
+/.cargo/                               @contextra/build-infra
+/.githooks/                            @contextra/build-infra
+/supply-chain/                         @contextra/build-infra
+/rules/                                @contextra/build-infra
+/tests/                                @contextra/build-infra
 
 # Architektur-Dokumentation & Entscheidungen
-/DECISIONS.md                          @contextra/architecture-board
 /docs/decisions/                       @contextra/architecture-board

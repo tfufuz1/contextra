@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Contextra data structures.
-// INVARIANTEN: Nonce prefix (4 bytes) + OsRng random suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
+// INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
 // NICHT-OFFENSICHTLICH: AES-256-GCM-SIV provides nonce-misuse resistance (RFC 8452). Keys zeroized on drop. Lock-free & I/O-free.
 // HOTSPOTS: [50-150]
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
@@ -13,8 +13,8 @@
 //!
 //! The **only** public encryption entry-point is [`KeyManager::encrypt_auto_nonce`],
 //! which generates a collision-resistant 12-byte nonce composed of:
-//! - 4 bytes: random `nonce_prefix` generated once per `KeyManager` instance.
-//! - 8 bytes: cryptographically random suffix generated per encryption call via `OsRng`.
+//! - 4 bytes: random `nonce_prefix` generated once per `KeyManager` instance via `OsRng`.
+//! - 8 bytes: big-endian u64 sequence counter suffix incremented atomically per encryption call.
 //!
 //! Per-file key isolation via [`KeyManager::derive_file_key`] (HKDF-Expand) ensures
 //! that even if two instances share a nonce counter value, they operate on
@@ -344,7 +344,22 @@ impl KeyManager {
     /// Encrypts a block of data with a deterministically generated 12-byte nonce.
     /// Returns the ciphertext and the full 12-byte nonce used.
     pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
-        let counter_val = self.nonce_counter.fetch_add(1, Ordering::Relaxed);
+        let counter_val = self
+            .nonce_counter
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |val| {
+                if val == u64::MAX {
+                    None
+                } else {
+                    Some(val + 1)
+                }
+            })
+            .map_err(|_| {
+                CryptoError::Encryption(
+                    "Nonce counter exhausted: maximum encryptions reached for KeyManager instance"
+                        .to_string(),
+                )
+            })?;
+
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[0..4].copy_from_slice(&self.nonce_prefix);
         nonce_bytes[4..12].copy_from_slice(&counter_val.to_be_bytes());
@@ -536,6 +551,22 @@ mod tests {
         let debug_str = format!("{km:?}");
         assert!(!debug_str.contains("test-passphrase"));
         assert!(debug_str.contains("REDACTED"));
+    }
+
+    #[test]
+    fn test_nonce_counter_exhaustion() {
+        let km = KeyManager::try_new("secret-passphrase", b"salt1").expect("try_new");
+        km.nonce_counter.store(u64::MAX, Ordering::SeqCst);
+        let res = km.encrypt_auto_nonce(b"test");
+        assert!(
+            matches!(res, Err(CryptoError::Encryption(ref msg)) if msg.contains("Nonce counter exhausted")),
+            "Encryption MUST fail when nonce counter reaches u64::MAX"
+        );
+        let res2 = km.encrypt_auto_nonce(b"test");
+        assert!(
+            matches!(res2, Err(CryptoError::Encryption(ref msg)) if msg.contains("Nonce counter exhausted")),
+            "Subsequent encryptions MUST also fail without wrapping counter to 0"
+        );
     }
 
     #[test]

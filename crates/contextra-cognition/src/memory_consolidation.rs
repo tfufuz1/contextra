@@ -470,31 +470,41 @@ pub async fn run_structural_synthesis_pass(
 
         match llm.generate(&prompt_builder).await {
             Ok(generated_text) => {
-                if let (Some(threshold), Some(val)) = (config.min_grounding_score, validator) {
-                    let source_str_refs: Vec<&str> = valid_doc_ids
-                        .iter()
-                        .filter_map(|id| source_texts.get(id).map(|s| s.as_str()))
-                        .collect();
-                    match val.score_grounding(&generated_text, &source_str_refs) {
-                        Ok(score) => {
-                            if score < threshold {
+                if let Some(threshold) = config.min_grounding_score {
+                    if let Some(val) = validator {
+                        let source_str_refs: Vec<&str> = valid_doc_ids
+                            .iter()
+                            .filter_map(|id| source_texts.get(id).map(|s| s.as_str()))
+                            .collect();
+                        match val.score_grounding(&generated_text, &source_str_refs) {
+                            Ok(score) => {
+                                if score < threshold {
+                                    tracing::warn!(
+                                        community_hash = comm_hash,
+                                        score = score,
+                                        threshold = threshold,
+                                        "Generative Synthesis: Grounding-Score unter Schwelle — Chunk verworfen"
+                                    );
+                                    continue;
+                                }
+                            }
+                            Err(e) => {
                                 tracing::warn!(
                                     community_hash = comm_hash,
-                                    score = score,
-                                    threshold = threshold,
-                                    "Generative Synthesis: Grounding-Score unter Schwelle — Chunk verworfen"
+                                    error = %e,
+                                    "Generative Synthesis: Grounding-Score Berechnung fehlgeschlagen — Chunk verworfen"
                                 );
                                 continue;
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!(
-                                community_hash = comm_hash,
-                                error = %e,
-                                "Generative Synthesis: Grounding-Score Berechnung fehlgeschlagen — Chunk verworfen"
-                            );
-                            continue;
-                        }
+                    } else {
+                        tracing::warn!(
+                            community_hash = comm_hash,
+                            threshold = threshold,
+                            "Grounding validation required (min_grounding_score = {}), but no GroundingValidator provided; discarding ungrounded synthesis to protect episodic memory",
+                            threshold
+                        );
+                        continue;
                     }
                 }
 
@@ -523,6 +533,154 @@ pub async fn run_structural_synthesis_pass(
         synthesized,
         deferred_community_hashes,
     })
+}
+
+/// Maximum allowed length in bytes for text_digest in pre-condensed input.
+pub const MAX_PRE_CONDENSED_DIGEST_LEN: usize = 8192;
+
+/// Maximum allowed length in bytes for source_label in pre-condensed input.
+pub const MAX_PRE_CONDENSED_LABEL_LEN: usize = 512;
+
+/// Maximum allowed provenance count in pre-condensed input.
+pub const MAX_PRE_CONDENSED_PROVENANCE_COUNT: usize = 256;
+
+/// Agent-independent pre-condensed input structure (e.g. from agent scratchpad checkpoint or external pipeline).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PreCondensedInput {
+    pub tenant_id: contextra_types::TenantId,
+    pub source_label: String,
+    pub text_digest: String,
+    pub token_count: usize,
+    pub provenance: Vec<DocId>,
+}
+
+/// Ingests one or more pre-condensed inputs as nodes into the memory consolidation pipeline.
+///
+/// # Requirements & Invariants
+/// - **Strict Tenant Boundary (VETO-F10)**: Inputs with a `tenant_id` mismatching `target_tenant_id` are rejected.
+/// - **Provenance Preservation**: Input `provenance` `DocId`s flow directly into the created `TurnSegment.turn_ids`.
+/// - **Length & Bound Limits**: `text_digest`, `source_label`, and `provenance` count are checked against constants.
+/// - **Grounding Check**: When `min_grounding_score` is configured, inputs undergo grounding validation against `source_label`.
+/// - **Deterministic Ordering**: Inputs are sorted canonically by `tenant_id`, then `text_digest`, then `source_label`.
+pub fn intake_pre_condensed_inputs(
+    target_tenant_id: &contextra_types::TenantId,
+    inputs: &[PreCondensedInput],
+    validator: Option<&dyn ResponseGroundingValidator>,
+    min_grounding_score: Option<f32>,
+) -> contextra_types::Result<Vec<TurnSegment>> {
+    if inputs.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // 1. Strict Tenant Boundary Check (VETO-F10) & Bounds Validation
+    for input in inputs {
+        if &input.tenant_id != target_tenant_id {
+            return Err(contextra_types::ContextraError::PolicyViolation(format!(
+                "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
+                input.tenant_id,
+                target_tenant_id
+            )));
+        }
+
+        if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
+                "PreCondensedInput text_digest length {} exceeds limit {}",
+                input.text_digest.len(),
+                MAX_PRE_CONDENSED_DIGEST_LEN
+            )));
+        }
+
+        if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
+                "PreCondensedInput source_label length {} exceeds limit {}",
+                input.source_label.len(),
+                MAX_PRE_CONDENSED_LABEL_LEN
+            )));
+        }
+
+        if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
+                "PreCondensedInput provenance count {} exceeds limit {}",
+                input.provenance.len(),
+                MAX_PRE_CONDENSED_PROVENANCE_COUNT
+            )));
+        }
+    }
+
+    // 2. Deterministic Sorting: by tenant_id, then text_digest, then source_label
+    let mut sorted_inputs = inputs.to_vec();
+    sorted_inputs.sort_unstable_by(|a, b| {
+        a.tenant_id
+            .cmp(&b.tenant_id)
+            .then_with(|| a.text_digest.cmp(&b.text_digest))
+            .then_with(|| a.source_label.cmp(&b.source_label))
+    });
+
+    // 3. Grounding Check & Node Intake
+    let mut segments = Vec::new();
+
+    for input in sorted_inputs {
+        if let Some(threshold) = min_grounding_score {
+            if let Some(val) = validator {
+                let source_ref = [input.source_label.as_str()];
+                match val.score_grounding(&input.text_digest, &source_ref) {
+                    Ok(score) => {
+                        if score < threshold {
+                            tracing::warn!(
+                                tenant_id = %input.tenant_id,
+                                label = %input.source_label,
+                                score = score,
+                                threshold = threshold,
+                                "PreCondensedInput grounding score below threshold — input rejected"
+                            );
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            tenant_id = %input.tenant_id,
+                            error = %e,
+                            "PreCondensedInput grounding evaluation failed — input rejected"
+                        );
+                        continue;
+                    }
+                }
+            } else {
+                tracing::warn!(
+                    tenant_id = %input.tenant_id,
+                    threshold = threshold,
+                    "PreCondensedInput grounding check required (min_grounding_score = {}), but no validator provided — input rejected",
+                    threshold
+                );
+                continue;
+            }
+        }
+
+        // Calculate deterministic representative embedding from Blake3 hash of text_digest
+        let hash = blake3::hash(input.text_digest.as_bytes());
+        let hash_bytes = hash.as_bytes();
+        let mut representative_embedding = vec![0.0f32; 4];
+        for i in 0..4 {
+            let chunk_val = u64::from_le_bytes([
+                hash_bytes[i * 2],
+                hash_bytes[i * 2 + 1],
+                hash_bytes[i * 2 + 2],
+                hash_bytes[i * 2 + 3],
+                hash_bytes[i * 2 + 4],
+                hash_bytes[i * 2 + 5],
+                hash_bytes[i * 2 + 6],
+                hash_bytes[i * 2 + 7],
+            ]);
+            representative_embedding[i] = (chunk_val as f32) / (u64::MAX as f32);
+        }
+
+        segments.push(TurnSegment {
+            turn_ids: input.provenance.clone(),
+            representative_embedding,
+        });
+    }
+
+    Ok(segments)
 }
 
 /// Adapterfunktion zur Kompaktierung eines Segments via des bereits vorhandenen `ContextCompactor`.

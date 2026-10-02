@@ -1,15 +1,17 @@
 // Contextra — ADR Deprecation & Removal Deadline CI Gate
 //
-// Überprüft `DECISIONS.md` auf ADRs mit definierten Deprecation-/Removal-Fristen.
+// Überprüft `docs/decisions/` auf ADRs mit definierten Deprecation-/Removal-Fristen.
 //
 // Prüflogik:
-// 1. Parst `DECISIONS.md` nach ADR-Einträgen mit `Removal Deadline`, `Deprecation Deadline` oder `Review Deadline`.
-// 2. Prüft das Zieldatum gegen das aktuelle Systemdatum.
-// 3. Frist in der Zukunft (0 <= Resttage <= 14): Warnung zur rechtzeitigen Vorbereitung.
-// 4. Frist in der Vergangenheit (< 0 Tage):
+// 1. Liest alle Markdown-Dateien in `docs/decisions/`.
+// 2. Parst ADR-Einträge mit `Removal Deadline`, `Deprecation Deadline` oder `Review Deadline`.
+// 3. Prüft das Zieldatum gegen das angegebene/aktuelle Datum.
+// 4. Frist in der Zukunft (0 <= Resttage <= 14): Warnung zur rechtzeitigen Vorbereitung.
+// 5. Frist in der Vergangenheit (< 0 Tage):
 //    - Falls das Ziel-Crate / die Ziel-Datei (z. B. `crates/contextra-tauri`) weiterhin existiert:
 //      Harter CI-Fehler (Exit-Code != 0) mit klarer Handlungsaufforderung (physisch entfernen oder Frist per neuem ADR verlängern).
 //    - Falls der Zielpfad bereits entfernt wurde: Kein Fehler (Aufgabe bereits erledigt).
+// 6. Fail-closed: Falls `docs/decisions` nicht existiert oder keine gültigen ADRs enthält, schlägt das Gate fehl.
 
 use chrono::NaiveDate;
 use std::fs;
@@ -43,7 +45,7 @@ pub fn parse_adr_deadlines(content: &str) -> Result<Vec<AdrDeadlineEntry>, Strin
             block.to_string()
         };
 
-        if !block_str.contains("# ADR-") {
+        if !block_str.contains("# ADR-") && !block_str.starts_with("# ADR-") {
             continue;
         }
 
@@ -66,7 +68,7 @@ pub fn parse_adr_deadlines(content: &str) -> Result<Vec<AdrDeadlineEntry>, Strin
                 }
             } else if trimmed.starts_with("* **Status:**") || trimmed.starts_with("**Status:**") {
                 status = trimmed
-                    .trim_start_matches("*")
+                    .trim_start_matches('*')
                     .trim_start_matches("**Status:**")
                     .trim()
                     .to_string();
@@ -83,7 +85,7 @@ pub fn parse_adr_deadlines(content: &str) -> Result<Vec<AdrDeadlineEntry>, Strin
                     deadline = Some(raw_val);
                 }
             } else if trimmed.contains("Target Path:") || trimmed.contains("Target Crate:") {
-                let raw_val = if let Some((_, val)) = trimmed.split_once(":") {
+                let raw_val = if let Some((_, val)) = trimmed.split_once(':') {
                     val.trim()
                         .trim_matches('*')
                         .trim()
@@ -171,37 +173,45 @@ pub fn check_adr_deadlines_at(
     result
 }
 
-pub fn check_adr_deadlines_with_root(root: &Path) -> Result<(), String> {
+pub fn check_adr_deadlines_with_root_and_date(
+    root: &Path,
+    today_str: &str,
+) -> Result<(), String> {
     println!("=== Running xtask check-adr-deadlines ===");
     let decisions_dir = root.join("docs").join("decisions");
+
+    if !decisions_dir.exists() || !decisions_dir.is_dir() {
+        return Err(format!(
+            "❌ FAIL-CLOSED: ADR-Verzeichnis '{}' existiert nicht. Handlungsanweisung: Erstelle das Verzeichnis docs/decisions/ und lege ADR-Dateien dort ab.",
+            decisions_dir.display()
+        ));
+    }
+
+    let read_dir = fs::read_dir(&decisions_dir)
+        .map_err(|e| format!("Kann '{}' nicht lesen: {e}", decisions_dir.display()))?;
+
     let mut entries = Vec::new();
+    let mut file_count = 0;
 
-    if decisions_dir.exists() {
-        let read_dir = fs::read_dir(&decisions_dir)
-            .map_err(|e| format!("Kann {} nicht lesen: {e}", decisions_dir.display()))?;
-
-        for entry in read_dir.flatten() {
-            let path = entry.path();
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    let file_entries = parse_adr_deadlines(&content)?;
-                    entries.extend(file_entries);
-                }
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+            file_count += 1;
+            if let Ok(content) = fs::read_to_string(&path) {
+                let file_entries = parse_adr_deadlines(&content)?;
+                entries.extend(file_entries);
             }
         }
     }
 
-    let root_decisions = root.join("DECISIONS.md");
-    if root_decisions.exists() {
-        if let Ok(content) = fs::read_to_string(&root_decisions) {
-            let root_entries = parse_adr_deadlines(&content)?;
-            entries.extend(root_entries);
-        }
+    if file_count == 0 {
+        return Err(format!(
+            "❌ FAIL-CLOSED: Keine Markdown-Dateien in '{}' gefunden. Handlungsanweisung: Lege ADR-Dateien unter docs/decisions/*.md ab.",
+            decisions_dir.display()
+        ));
     }
 
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-
-    let deadline_res = check_adr_deadlines_at(&entries, &today, root);
+    let deadline_res = check_adr_deadlines_at(&entries, today_str, root);
 
     for w in &deadline_res.warnings {
         println!("{w}");
@@ -219,12 +229,18 @@ pub fn check_adr_deadlines_with_root(root: &Path) -> Result<(), String> {
 
     if deadline_res.warnings.is_empty() && deadline_res.errors.is_empty() {
         println!(
-            "✅ Alle ADR-Deprecation-Fristen innerhalb des zulässigen Zeitfensters (überprüft: {} ADR(s)).",
-            entries.len()
+            "✅ Alle ADR-Deprecation-Fristen innerhalb des zulässigen Zeitfensters (überprüft: {} ADR(s) in {} Datei(en)).",
+            entries.len(),
+            file_count
         );
     }
 
     Ok(())
+}
+
+pub fn check_adr_deadlines_with_root(root: &Path) -> Result<(), String> {
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    check_adr_deadlines_with_root_and_date(root, &today)
 }
 
 pub fn check_adr_deadlines() -> Result<(), String> {
@@ -239,8 +255,7 @@ mod tests {
 
     #[test]
     fn test_parse_adr_deadlines() {
-        let content = r#"
-# ADR-077: Produktvision PyPI-Library Fokus und Tauri Deprecation
+        let content = r#"# ADR-077: Produktvision PyPI-Library Fokus und Tauri Deprecation
 
 * **Status:** Akzeptiert
 * **Datum:** 2026-09-08
@@ -343,5 +358,24 @@ mod tests {
         let res = check_adr_deadlines_at(&entries, "2026-11-08", temp.path());
         assert!(res.warnings.is_empty());
         assert!(res.errors.is_empty());
+    }
+
+    #[test]
+    fn test_check_adr_deadlines_fail_closed_missing_directory() {
+        let temp = tempdir().unwrap();
+        let err = check_adr_deadlines_with_root_and_date(temp.path(), "2026-10-01").unwrap_err();
+        assert!(err.contains("FAIL-CLOSED"));
+        assert!(err.contains("existiert nicht"));
+    }
+
+    #[test]
+    fn test_check_adr_deadlines_fail_closed_empty_directory() {
+        let temp = tempdir().unwrap();
+        let decisions_dir = temp.path().join("docs").join("decisions");
+        fs::create_dir_all(&decisions_dir).unwrap();
+
+        let err = check_adr_deadlines_with_root_and_date(temp.path(), "2026-10-01").unwrap_err();
+        assert!(err.contains("FAIL-CLOSED"));
+        assert!(err.contains("Keine Markdown-Dateien"));
     }
 }

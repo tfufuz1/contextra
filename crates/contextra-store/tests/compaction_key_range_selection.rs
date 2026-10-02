@@ -80,7 +80,14 @@ async fn test_compaction_candidate_selection_prefers_overlapping_key_ranges() {
     // Window [0..6] = [r1..r6]: sorted: r1, r4, r5, r6 (3 overlaps: a5>=a2, a6>=a3, a7>=a4), then r2(m1), then r3(z1) (0 overlaps). Total overlaps = 3 out of 5.
     // Notice window [0..6] has 3 overlaps, window [2..6] has 2 overlaps.
     // But if we test candidate windows of size 4: window [r1, r4, r5, r6] (if contiguous) would have 3 overlaps out of 3.
-    let ssts = vec![r1.clone(), r4.clone(), r5.clone(), r6.clone(), r2.clone(), r3.clone()];
+    let ssts = vec![
+        r1.clone(),
+        r4.clone(),
+        r5.clone(),
+        r6.clone(),
+        r2.clone(),
+        r3.clone(),
+    ];
     // Window 0..4 = [r1, r4, r5, r6]: length 4, overlaps = 3.
     // Window 1..5 = [r4, r5, r6, r2]: length 4, overlaps = 2.
     // Window 2..6 = [r5, r6, r2, r3]: length 4, overlaps = 1.
@@ -92,7 +99,9 @@ async fn test_compaction_candidate_selection_prefers_overlapping_key_ranges() {
     // Window 0..6 has overlap 3, win_len 6. `overlap == best_overlap && win_len > best_tier_len` -> 0..6 wins because win_len 6 > 4!
     // If all 6 SSTables are in the tier, merging all 6 is better than 4 if they have the same overlap score!
 
-    let candidates = engine.select_compaction_candidates(&ssts).expect("candidates selected");
+    let candidates = engine
+        .select_compaction_candidates(&ssts)
+        .expect("candidates selected");
 
     // Let us verify that the candidate selection chooses the contiguous window with max overlap.
     assert!(!candidates.is_empty());

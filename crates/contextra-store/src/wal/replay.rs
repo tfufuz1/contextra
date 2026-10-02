@@ -4,8 +4,8 @@ use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
 use super::{
-    legacy_integrity_key, Wal, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
-    WAL_V3_HEADER,
+    legacy_integrity_key, Wal, WalEntry, WalOp, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE,
+    WAL_V2_HEADER, WAL_V3_HEADER,
 };
 
 pub type WalSeq = u64;
@@ -21,28 +21,36 @@ impl ReplayProgressSink for NoopReplayProgressSink {
 
 impl Wal {
     pub(crate) fn handle_wal_entry_parse_error(
-        e: ContextraError,
+        e: WalParseError,
         chunk_start_pos: u64,
         pos: u64,
         file_size: u64,
     ) -> Option<ContextraError> {
-        let err_msg = format!("{}", e);
-        let is_crc_error = err_msg.contains("CRC mismatch");
-
-        if pos >= file_size && !is_crc_error {
-            tracing::warn!(
-                "WAL truncation at tail (offset {}), partial entry: {}",
-                chunk_start_pos,
-                e
-            );
-            None
-        } else {
-            let reason = if is_crc_error {
-                format!("CRC validation failed: {}", e)
-            } else {
-                format!("Deserialization failed: {}", e)
-            };
-            Some(ContextraError::wal_corruption(chunk_start_pos, reason))
+        match e {
+            WalParseError::CrcMismatch { stored, computed } => {
+                Some(ContextraError::wal_corruption(
+                    chunk_start_pos,
+                    format!(
+                        "CRC validation failed: stored={:#010x}, computed={:#010x}",
+                        stored, computed
+                    ),
+                ))
+            }
+            _ => {
+                if pos >= file_size {
+                    tracing::warn!(
+                        "WAL truncation at tail (offset {}), partial entry: {}",
+                        chunk_start_pos,
+                        e
+                    );
+                    None
+                } else {
+                    Some(ContextraError::wal_corruption(
+                        chunk_start_pos,
+                        format!("Deserialization failed: {}", e),
+                    ))
+                }
+            }
         }
     }
 
@@ -461,8 +469,9 @@ impl Wal {
                         Ok(data) => data,
                         Err(e) => {
                             if pos >= file_size {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), decryption failed: {}",
+                                // Policy: An AEAD decryption failure at physical tail can be caused by zero-filled/truncated write.
+                                tracing::error!(
+                                    "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                     chunk_start_pos,
                                     e
                                 );
@@ -478,16 +487,9 @@ impl Wal {
                     let mut inner_slice = decrypted_data.as_slice();
                     while !inner_slice.is_empty() {
                         if inner_slice.len() < 4 {
-                            if pos >= file_size {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), incomplete inner framing",
-                                    chunk_start_pos
-                                );
-                                break;
-                            }
                             return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
-                                "Truncated inner WAL entry length in batch",
+                                "Incomplete inner framing in decrypted batch",
                             ));
                         }
                         let inner_len_bytes: [u8; 4] =
@@ -502,16 +504,9 @@ impl Wal {
                             };
                         let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                         if inner_slice.len() < 4 + inner_len {
-                            if pos >= file_size {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), incomplete inner payload",
-                                    chunk_start_pos
-                                );
-                                break;
-                            }
                             return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
-                                "Truncated inner WAL entry in batch",
+                                "Truncated inner WAL entry payload in decrypted batch",
                             ));
                         }
                         let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
@@ -519,36 +514,20 @@ impl Wal {
                             None => {
                                 return Err(ContextraError::wal_corruption(
                                     chunk_start_pos,
-                                    "Truncated inner WAL entry in batch",
+                                    "Truncated inner WAL entry payload in decrypted batch",
                                 ));
                             }
                         };
                         inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
 
-                        let entry = match WalEntry::from_bytes(inner_entry_bytes) {
+                        let entry = match WalEntry::from_bytes_classified(inner_entry_bytes) {
                             Ok(e) => e,
-                            Err(e) => {
-                                let err_msg = format!("{}", e);
-                                let is_crc_error = err_msg.contains("CRC mismatch");
-
-                                if pos >= file_size && !is_crc_error {
-                                    tracing::warn!(
-                                        "WAL truncation at tail (offset {}), partial entry: {}",
-                                        chunk_start_pos,
-                                        e
-                                    );
-                                    break;
-                                } else {
-                                    let reason = if is_crc_error {
-                                        format!("CRC validation failed: {e}")
-                                    } else {
-                                        format!("Deserialization failed: {e}")
-                                    };
-                                    return Err(ContextraError::wal_corruption(
-                                        chunk_start_pos,
-                                        reason,
-                                    ));
-                                }
+                            Err(parse_err) => {
+                                // Policy: Authenticated data is never a tail!
+                                return Err(ContextraError::wal_corruption(
+                                    chunk_start_pos,
+                                    format!("Deserialization failed in authenticated batch: {parse_err}"),
+                                ));
                             }
                         };
 
@@ -623,8 +602,8 @@ impl Wal {
                                     )));
                                 } else {
                                     if pos >= file_size {
-                                        tracing::warn!(
-                                            "WAL truncation at tail (offset {}), decryption failed: {}",
+                                        tracing::error!(
+                                            "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                             chunk_start_pos,
                                             e
                                         );
@@ -642,11 +621,17 @@ impl Wal {
                         entry_data_raw
                     };
 
-                    let entry = match WalEntry::from_bytes(entry_data) {
+                    let entry = match WalEntry::from_bytes_classified(entry_data) {
                         Ok(e) => e,
-                        Err(e) => {
+                        Err(parse_err) => {
+                            if self.key_manager.is_some() && version != WalVersion::V1 {
+                                return Err(ContextraError::wal_corruption(
+                                    chunk_start_pos,
+                                    format!("Deserialization failed in authenticated entry: {parse_err}"),
+                                ));
+                            }
                             if let Some(err) = Self::handle_wal_entry_parse_error(
-                                e,
+                                parse_err,
                                 chunk_start_pos,
                                 pos,
                                 file_size,
@@ -691,12 +676,15 @@ impl Wal {
 
             #[cfg(not(feature = "wal-integrity"))]
             {
-                let entry = match WalEntry::from_bytes(entry_data_raw) {
+                let entry = match WalEntry::from_bytes_classified(entry_data_raw) {
                     Ok(e) => e,
-                    Err(e) => {
-                        if let Some(err) =
-                            Self::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
-                        {
+                    Err(parse_err) => {
+                        if let Some(err) = Self::handle_wal_entry_parse_error(
+                            parse_err,
+                            chunk_start_pos,
+                            pos,
+                            file_size,
+                        ) {
                             return Err(err);
                         }
                         break;

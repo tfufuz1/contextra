@@ -203,6 +203,7 @@ pub struct SstableBuilder {
     index: Vec<(Bytes, u64)>, // (last_key, offset)
     first_key: Option<Bytes>,
     last_key: Option<Bytes>,
+    prev_key_last_seq: Option<u64>,
     offset: u64,
     key_manager: Option<Arc<KeyManager>>,
     /// Whole-SSTable bloom filter for cross-block pre-checks.
@@ -246,6 +247,7 @@ impl SstableBuilder {
             index: Vec::new(),
             first_key: None,
             last_key: None,
+            prev_key_last_seq: None,
             offset: 0,
             key_manager: derived_km,
             bloom_filter: BloomFilter::new(100_000, 0.01),
@@ -279,6 +281,27 @@ impl SstableBuilder {
             )));
         }
 
+        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
+
+        if let Some(prev_k) = &self.last_key {
+            if key < prev_k.as_ref() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "Keys added to SSTable out of order: previous '{:?}', current '{:?}'",
+                    prev_k.as_ref(),
+                    key
+                )));
+            } else if key == prev_k.as_ref() {
+                if let Some(prev_s) = self.prev_key_last_seq {
+                    if raw_seq >= prev_s {
+                        return Err(ContextraError::InvalidInput(format!(
+                            "Duplicate key versions must be added in strictly descending sequence order: previous seq {}, current seq {}",
+                            prev_s, raw_seq
+                        )));
+                    }
+                }
+            }
+        }
+
         if self.first_key.is_none() {
             self.first_key = Some(Bytes::copy_from_slice(key));
         }
@@ -298,10 +321,10 @@ impl SstableBuilder {
         self.key_count += 1;
         self.min_tx_id = self.min_tx_id.min(tx_id);
         self.max_tx_id = self.max_tx_id.max(tx_id);
-        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
         self.min_seq = self.min_seq.min(raw_seq);
         self.max_seq = self.max_seq.max(raw_seq);
         self.last_key = Some(Bytes::copy_from_slice(key));
+        self.prev_key_last_seq = Some(raw_seq);
         Ok(())
     }
 
@@ -454,6 +477,13 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?
             .len();
+
+        if self.key_count == 0 {
+            self.min_tx_id = 0;
+            self.max_tx_id = 0;
+            self.min_seq = 0;
+            self.max_seq = 0;
+        }
 
         Ok(SstableMetadata {
             first_key: self.first_key.clone().unwrap_or_default(),

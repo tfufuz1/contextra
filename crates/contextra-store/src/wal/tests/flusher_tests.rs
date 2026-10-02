@@ -250,3 +250,153 @@ async fn test_wal_try_append_backpressure() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_wal_rotate_and_seal_collision_avoidance() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("test_seal.wal");
+
+    let wal = Wal::open(&wal_path).await?;
+    let op1 = WalOp::Put {
+        tx_id: TxId::new(1),
+        key: b"k1".to_vec(),
+        value: b"v1".to_vec(),
+    };
+    let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+    wal.append_batch(batch1).await?;
+
+    // Manually create pre-existing candidate path test_seal.wal.sealed.1
+    let existing_sealed_1 = dir.path().join("test_seal.wal.sealed.1");
+    tokio::fs::write(&existing_sealed_1, b"PRE_EXISTING_SEALED_CONTENT").await?;
+
+    // Calling rotate_and_seal must skip .sealed.1 and write to .sealed.2
+    let sealed_path = wal.rotate_and_seal().await?;
+    assert_ne!(
+        sealed_path, existing_sealed_1,
+        "rotate_and_seal must NOT overwrite existing .sealed.1"
+    );
+    assert!(
+        sealed_path.exists(),
+        "New sealed path {:?} must exist",
+        sealed_path
+    );
+
+    // Content of existing_sealed_1 must be unchanged
+    let content = tokio::fs::read(&existing_sealed_1).await?;
+    assert_eq!(
+        content, b"PRE_EXISTING_SEALED_CONTENT",
+        "Pre-existing sealed file must not be modified or overwritten"
+    );
+
+    Ok(())
+}
+
+#[cfg(feature = "fault-injection")]
+#[tokio::test]
+async fn test_wal_fsync_failure_poisons_handle() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("fsync_fail.wal");
+
+    let wal = Wal::open(&wal_path).await?;
+    let op1 = WalOp::Put {
+        tx_id: TxId::new(1),
+        key: b"k1".to_vec(),
+        value: b"v1".to_vec(),
+    };
+    let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+    wal.append_batch(batch1).await?;
+
+    // Set FAIL_SYNC_ONCE
+    crate::wal::flusher::FAIL_SYNC_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
+
+    let op2 = WalOp::Put {
+        tx_id: TxId::new(2),
+        key: b"k2".to_vec(),
+        value: b"v2".to_vec(),
+    };
+    let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await?;
+    let res = wal.append_batch(batch2).await;
+
+    assert!(res.is_err(), "Append must fail when fsync fails");
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("WAL fsync failed, outcome unknown"),
+        "Error message must contain 'WAL fsync failed, outcome unknown', got: {err_msg}"
+    );
+
+    assert!(
+        wal.is_poisoned(),
+        "WAL handle must be permanently poisoned after fsync failure"
+    );
+
+    // Subsequent appends must fail because handle is poisoned
+    let op3 = WalOp::Put {
+        tx_id: TxId::new(3),
+        key: b"k3".to_vec(),
+        value: b"v3".to_vec(),
+    };
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
+    let res3 = wal.append_batch(batch3).await;
+    assert!(res3.is_err(), "Subsequent append must fail on poisoned WAL");
+
+    Ok(())
+}
+
+#[cfg(feature = "encryption-at-rest")]
+#[tokio::test]
+async fn test_wal_rewrite_multi_frame_chunking_encrypted() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("encrypted_rewrite.wal");
+
+    let km = Arc::new(KeyManager::try_new(
+        "passphrase123",
+        b"salt123456789012345678901234567890",
+    )?);
+    let wal = Wal::open_with_key_manager(&wal_path, Some(km.clone())).await?;
+
+    // 2 entries of 35 MiB each -> total 70 MiB > MAX_WAL_ENTRY_SIZE (64 MiB)
+    let payload_35mb = vec![0xAB; 35 * 1024 * 1024];
+    for i in 1..=2 {
+        let op = WalOp::Put {
+            tx_id: TxId::new(i),
+            key: format!("k{i}").into_bytes(),
+            value: payload_35mb.clone(),
+        };
+        let (batch, _) = wal.prepare_batch(vec![(op, i)]).await?;
+        wal.append_batch(batch).await?;
+    }
+
+    let replayed = wal.replay().await?;
+    assert_eq!(replayed.len(), 2);
+
+    let integrity_key = wal.get_integrity_key()?;
+
+    // Trigger Rewrite command
+    let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+    let flusher_tx = wal.flusher_tx.read().unwrap().clone().unwrap();
+    flusher_tx
+        .send(WalCommand::Rewrite {
+            replayed_entries: replayed,
+            integrity_key,
+            ack: ack_tx,
+        })
+        .await
+        .unwrap();
+
+    ack_rx.await.unwrap()?;
+
+    drop(wal);
+
+    // Reopen and replay: must successfully parse both 35 MiB entries split across multiple frames
+    let wal_reopened = Wal::open_with_key_manager(&wal_path, Some(km)).await?;
+    let replayed_after = wal_reopened.replay().await?;
+    assert_eq!(replayed_after.len(), 2);
+    for (i, (_seq, entry, _pos)) in replayed_after.iter().enumerate() {
+        assert_eq!(entry.seq_no, (i + 1) as u64);
+        if let WalOp::Put { value, .. } = &entry.op {
+            assert_eq!(value.len(), 35 * 1024 * 1024);
+        }
+    }
+
+    Ok(())
+}

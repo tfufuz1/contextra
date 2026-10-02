@@ -211,7 +211,8 @@ pub(crate) fn compute_ppr_with_context(
             cal.record(cost::PprCostSample {
                 algorithm: PprAlgorithm::DensePowerIteration,
                 estimated_cost: est.power_iteration,
-                measured_edge_accesses: (config.max_iterations as usize * (edge_count + node_count)) as u64,
+                measured_edge_accesses: (config.max_iterations as usize * (edge_count + node_count))
+                    as u64,
             });
 
             // Compare top results and log any substantial discrepancy

@@ -44,6 +44,10 @@ pub struct LsmStorage {
     pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
+    /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
+    pub(super) flush_mutex: tokio::sync::Mutex<()>,
+    /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
+    pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
     pub(super) task_tracker: tokio_util::task::TaskTracker,
     pub(super) flush_counter: AtomicU64,
@@ -251,6 +255,33 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    #[doc(hidden)]
+    pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
+        Arc::clone(&self.sstables)
+    }
+
+    #[doc(hidden)]
+    pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
+        Arc::clone(&self.block_cache)
+    }
+
+    #[doc(hidden)]
+    pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
+        Arc::clone(&self.budget)
+    }
+
+    #[doc(hidden)]
+    pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
+        Arc::clone(&self.manifest)
+    }
+
+    #[doc(hidden)]
+    pub async fn maybe_compact_for_test(&self) -> Result<bool> {
+        self.compaction_engine
+            .maybe_compact(&self.sstables, &self.config.path)
+            .await
+    }
+
     /// Checks if a database directory contains any legacy WAL files requiring explicit migration.
     ///
     /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
@@ -334,9 +365,7 @@ impl LsmStorage {
 
         let salt_path = config.path.join("SALT");
         if !salt_path.exists() {
-            let mut buf = [0u8; 32];
-            use rand::Rng;
-            rand::thread_rng().fill(&mut buf);
+            let buf = crate::lsm::recovery::generate_crypto_salt();
             crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
         }
 
