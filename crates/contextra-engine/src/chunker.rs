@@ -341,8 +341,11 @@ fn split_raw_section(
 
                     for line in body_lines {
                         let line_tokens = estimate_tokens(&line);
-                        if code_chunk_tokens + line_tokens > hard_limit && !code_chunk_lines.is_empty() {
-                            let content = format!("{}\n{}\n```", fence, code_chunk_lines.join("\n"));
+                        if code_chunk_tokens + line_tokens > hard_limit
+                            && !code_chunk_lines.is_empty()
+                        {
+                            let content =
+                                format!("{}\n{}\n```", fence, code_chunk_lines.join("\n"));
                             let tokens = estimate_tokens(&content);
                             result.push(RawSection {
                                 lines: vec![content],
@@ -356,7 +359,8 @@ fn split_raw_section(
                         }
 
                         if base_tokens + line_tokens > hard_limit {
-                            let windows = chunk_text_with_overlap(&line, window_chars, overlap_chars);
+                            let windows =
+                                chunk_text_with_overlap(&line, window_chars, overlap_chars);
                             for w in windows {
                                 let w_content = format!("{}\n{}\n```", fence, w);
                                 let w_tokens = estimate_tokens(&w_content);
@@ -397,7 +401,9 @@ fn split_raw_section(
 
                     for line in body_lines {
                         let line_tokens = estimate_tokens(&line);
-                        if table_chunk_tokens + line_tokens > hard_limit && !table_chunk_lines.is_empty() {
+                        if table_chunk_tokens + line_tokens > hard_limit
+                            && !table_chunk_lines.is_empty()
+                        {
                             let mut full_table_lines = header_lines.clone();
                             full_table_lines.append(&mut table_chunk_lines);
                             let content = full_table_lines.join("\n");
@@ -413,7 +419,8 @@ fn split_raw_section(
                         }
 
                         if header_tokens + line_tokens > hard_limit {
-                            let windows = chunk_text_with_overlap(&line, window_chars, overlap_chars);
+                            let windows =
+                                chunk_text_with_overlap(&line, window_chars, overlap_chars);
                             for w in windows {
                                 let content = if header_prefix.is_empty() {
                                     w.to_string()
@@ -873,7 +880,10 @@ mod tests {
         let chunker = MarkdownChunker::new(config);
         let chunks = chunker.chunk(DocId::new(20), &table_md);
 
-        assert!(chunks.len() > 1, "Oversized table should be split into multiple chunks");
+        assert!(
+            chunks.len() > 1,
+            "Oversized table should be split into multiple chunks"
+        );
 
         for chunk in &chunks {
             assert!(
@@ -898,7 +908,10 @@ mod tests {
         let chunker = MarkdownChunker::new(config);
         let chunks = chunker.chunk(DocId::new(30), &long_para);
 
-        assert!(chunks.len() > 1, "Oversized paragraph must be split into multiple chunks");
+        assert!(
+            chunks.len() > 1,
+            "Oversized paragraph must be split into multiple chunks"
+        );
 
         let limit = (20.0 * 1.2) as usize;
         for chunk in &chunks {

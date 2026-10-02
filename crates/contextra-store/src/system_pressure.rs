@@ -18,8 +18,13 @@
 //! - `wal_queue_depth`: Fully implemented in `LsmStorage` via AtomicUsize tracking pending
 //!   group-commit followers awaiting disk write/notification.
 //! - `scheduler_queue_depth`: Measures Tokio async scheduler global queue depth ratio
-//!   (`metrics.global_queue_depth()`), rather than dedicated blocking pool thread utilization
-//!   (which requires `tokio_unstable` disabled here to maintain stable Rust toolchain compatibility).
+//!   (`metrics.global_queue_depth()`).
+//! - `blocking_util`: Measures blocking thread pool utilization/saturation ratio (0.0–1.0).
+//!   Note: Direct inspection of Tokio blocking pool internal thread counts/queue depth requires
+//!   the `tokio_unstable` flag (unstable Tokio metrics API). To maintain standard stable toolchain
+//!   compatibility without `cfg(tokio_unstable)`, `blocking_util` is measured dynamically using a
+//!   lightweight probe task (`spawn_blocking`) with dispatch latency tracking and timeout probe,
+//!   reflecting real execution queue contention and pool saturation.
 //! - `embedding_queue_depth`: Defaults to `0/0` in `LsmStorage` because `contextra-store` is a pure
 //!   KV engine decoupled from embedding crates (`contextra-embed` / `contextra-candle`), which manage
 //!   their own semaphore permits.
@@ -46,7 +51,7 @@ pub enum PressureLevel {
 pub struct SystemPressure {
     pub wal_queue_depth: usize,
     pub scheduler_queue_depth: f32, // 0.0–1.0 (Tokio global scheduler queue depth ratio)
-    pub blocking_util: f32,          // 0.0–1.0 (Blocking pool workload / utilization ratio)
+    pub blocking_util: f32,         // 0.0–1.0 (Blocking pool workload / utilization ratio)
     pub embedding_queue_depth: usize, // via Semaphore-Permits
     pub pressure_level: PressureLevel,
 }
@@ -176,26 +181,36 @@ impl SystemPressureMonitor {
                         max_embedding_permits,
                     );
 
-                    if pressure.pressure_level != last_level {
-                        let (gauge_val, level_str) = match pressure.pressure_level {
-                            PressureLevel::Normal => (0.0, "Normal"),
-                            PressureLevel::Elevated => (1.0, "Elevated"),
-                            PressureLevel::Critical => (2.0, "Critical"),
-                        };
+                    if let Some(ref sink_lock) = metrics_sink {
+                        let sink = sink_lock.read();
+                        sink.record_gauge(
+                            "lsm_blocking_pool_utilization",
+                            pressure.blocking_util as f64,
+                            &[],
+                        );
 
-                        if let Some(ref sink_lock) = metrics_sink {
-                            sink_lock.read().record_gauge(
+                        if pressure.pressure_level != last_level {
+                            let (gauge_val, level_str) = match pressure.pressure_level {
+                                PressureLevel::Normal => (0.0, "Normal"),
+                                PressureLevel::Elevated => (1.0, "Elevated"),
+                                PressureLevel::Critical => (2.0, "Critical"),
+                            };
+
+                            sink.record_gauge(
                                 "lsm_backpressure_level",
                                 gauge_val,
                                 &[("level", level_str)],
                             );
                         }
+                    }
 
+                    if pressure.pressure_level != last_level {
                         tracing::info!(
                             previous_level = ?last_level,
                             new_level = ?pressure.pressure_level,
                             wal_depth = pressure.wal_queue_depth,
                             scheduler_queue_depth = pressure.scheduler_queue_depth,
+                            blocking_util = pressure.blocking_util,
                             embedding_queue = pressure.embedding_queue_depth,
                             "SystemPressure level transitioned"
                         );
@@ -312,14 +327,7 @@ mod tests {
         let cancel_token = cancellation.clone();
 
         let handle = tokio::spawn(async move {
-            monitor
-                .run(
-                    cancel_token,
-                    || 0,
-                    || 10,
-                    10,
-                )
-                .await;
+            monitor.run(cancel_token, || 0, || 10, 10).await;
         });
 
         // Spawn blocking tasks to saturate default 512 max blocking pool threads
@@ -336,7 +344,9 @@ mod tests {
         while start.elapsed() < Duration::from_secs(2) {
             if rx.changed().await.is_ok() {
                 let p = rx.borrow().clone();
-                if p.blocking_util > BLOCKING_UTIL_ELEVATED || p.pressure_level != PressureLevel::Normal {
+                if p.blocking_util > BLOCKING_UTIL_ELEVATED
+                    || p.pressure_level != PressureLevel::Normal
+                {
                     reacted = true;
                     break;
                 }
