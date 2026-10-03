@@ -308,8 +308,18 @@ impl Wal {
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
                                 if cut > 0 {
-                                    let _ = file.write_all(&batch_payload[..cut]).await;
-                                    let _ = file.flush().await;
+                                    if let Err(err) = file.write_all(&batch_payload[..cut]).await {
+                                        tracing::warn!(
+                                            "Failed write_all during simulated WAL append partial write: {}",
+                                            err
+                                        );
+                                    }
+                                    if let Err(err) = file.flush().await {
+                                        tracing::warn!(
+                                            "Failed flush during simulated WAL append partial write: {}",
+                                            err
+                                        );
+                                    }
                                 }
                                 crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
