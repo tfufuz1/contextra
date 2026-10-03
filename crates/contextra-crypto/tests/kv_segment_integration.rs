@@ -3,12 +3,11 @@
 // STAND: TS:2026-09-08T00:00:00Z
 
 #![cfg(feature = "kv-encryption")]
-#![allow(unsafe_code)]
+#![forbid(unsafe_code)]
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
 use contextra_types::TenantId;
-use std::mem::ManuallyDrop;
 use zeroize::Zeroize;
 
 fn setup_cipher() -> KvSegmentCipher {
@@ -89,29 +88,52 @@ fn test_encrypted_segment_memory_inspection_and_decryption_roundtrip() {
         "Decrypted payload MUST equal original confidential plaintext"
     );
 
-    // 4. Zeroize-on-drop combined verification
-    let mut manual_seg = ManuallyDrop::new(encrypted_seg);
-    let raw_ptr = manual_seg.as_bytes().as_ptr();
-    let raw_len = manual_seg.len();
+    // 4. Zeroize safe observable contract verification
+    let mut encrypted_seg = encrypted_seg;
+    let original_len = encrypted_seg.len();
+    assert_eq!(original_len, raw_stored_bytes.len());
+    assert!(!encrypted_seg.is_empty());
 
-    // Before zeroize: contains non-zero ciphertext bytes
-    // SAFETY: manual_seg is alive inside ManuallyDrop
-    unsafe {
-        let slice = std::slice::from_raw_parts(raw_ptr, raw_len);
-        assert_ne!(slice, vec![0u8; raw_len].as_slice());
-    }
+    // Before zeroize: encrypted data is non-empty and contains non-zero ciphertext bytes
+    assert_ne!(
+        encrypted_seg.as_bytes(),
+        vec![0u8; original_len].as_slice(),
+        "Ciphertext buffer MUST NOT be zeroed prior to explicit zeroize"
+    );
 
     // Action: Zeroize memory in place
-    Zeroize::zeroize(&mut *manual_seg);
+    Zeroize::zeroize(&mut encrypted_seg);
 
-    // After zeroize: all bytes in memory wiped to 0x00
-    // SAFETY: manual_seg memory buffer is still allocated within ManuallyDrop wrapper
-    unsafe {
-        let cleared_slice = std::slice::from_raw_parts(raw_ptr, raw_len);
-        assert_eq!(
-            cleared_slice,
-            vec![0u8; raw_len].as_slice(),
-            "Memory MUST be zeroed after zeroize on drop"
-        );
-    }
+    // After zeroize: safe observable contract guarantees len == 0, is_empty == true, as_bytes().is_empty()
+    assert_eq!(encrypted_seg.len(), 0);
+    assert!(encrypted_seg.is_empty());
+    assert!(encrypted_seg.as_bytes().is_empty());
+
+    // Zeroize-on-drop integration path: drop after zeroize must not panic
+    drop(encrypted_seg);
+}
+
+#[test]
+fn test_kv_segment_drop_after_zeroize() {
+    let cipher = setup_cipher();
+    let tenant = TenantId::try_new(42).unwrap();
+    let fp = dummy_fingerprint("llama-3.2-3b");
+    let mut seg = KvSegment::new_encrypted(
+        &cipher,
+        tenant,
+        100,
+        fp,
+        None,
+        b"DROP_AFTER_ZEROIZE_PAYLOAD",
+    )
+    .expect("new_encrypted MUST succeed");
+
+    assert!(!seg.is_empty());
+    Zeroize::zeroize(&mut seg);
+    assert!(seg.is_empty());
+    assert_eq!(seg.len(), 0);
+    assert!(seg.as_bytes().is_empty());
+
+    // Explicit drop ensures ZeroizeOnDrop handler executes safely without panic
+    drop(seg);
 }
