@@ -38,6 +38,7 @@
 /deny.toml                             @contextra/build-infra
 /capabilities.toml                     @contextra/build-infra
 /AGENTS.md                             @contextra/build-infra
+/.jules/                               @contextra/build-infra
 /.jules/setup/                         @contextra/build-infra
 /.github/rulesets/                     @contextra/build-infra
 /CODEOWNERS                            @contextra/build-infra
@@ -47,7 +48,9 @@
 /.githooks/                            @contextra/build-infra
 /supply-chain/                         @contextra/build-infra
 /rules/                                @contextra/build-infra
+/sgconfig.yml                          @contextra/build-infra
 /tests/                                @contextra/build-infra
+/docs/unwrap_baseline_history.jsonl    @contextra/build-infra
 
 # Architektur-Dokumentation & Entscheidungen
 /docs/decisions/                       @contextra/architecture-board
