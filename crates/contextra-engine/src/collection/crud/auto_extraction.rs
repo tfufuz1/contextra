@@ -66,6 +66,7 @@ impl LlmTextGenerator for NoopLlmGenerator {
 /// Die Entscheidung über eine globale Anpassung obliegt der Produktverantwortung und bleibt als offener
 /// Punkt im PR-Text dokumentiert.
 #[inline]
+#[allow(dead_code)]
 pub fn recommended_mode_for_regulated(is_regulated: bool) -> AutoExtractionMode {
     if is_regulated {
         AutoExtractionMode::Disabled

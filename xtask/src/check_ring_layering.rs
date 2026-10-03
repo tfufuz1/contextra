@@ -107,6 +107,38 @@ pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
         expires_on: "2026-12-31",
         reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
     },
+    AllowlistEntry {
+        from_crate: "contextra-store",
+        to_crate: "contextra-sandbox",
+        target_phase: "Phase 1c",
+        issue_ref: "#CTX-104",
+        expires_on: "2026-12-31",
+        reason: "Dev-dependency on WASM sandbox for WASM merge operator integration tests",
+    },
+    AllowlistEntry {
+        from_crate: "contextra-engine",
+        to_crate: "contextra-infer-candle",
+        target_phase: "Phase 1c",
+        issue_ref: "#CTX-105",
+        expires_on: "2026-12-31",
+        reason: "Engine dependency on candle inference provider for local embeddings",
+    },
+    AllowlistEntry {
+        from_crate: "contextra-engine",
+        to_crate: "contextra-sandbox",
+        target_phase: "Phase 1c",
+        issue_ref: "#CTX-106",
+        expires_on: "2026-12-31",
+        reason: "Engine dependency on WASM sandbox for custom merge functions",
+    },
+    AllowlistEntry {
+        from_crate: "contextra-cognition",
+        to_crate: "contextra-infer-candle",
+        target_phase: "Phase 1c",
+        issue_ref: "#CTX-107",
+        expires_on: "2026-12-31",
+        reason: "Cognition dev-dependency on candle for memory consolidation tests",
+    },
 ];
 
 pub fn find_allowlist_entry(from_crate: &str, to_crate: &str) -> Option<&'static AllowlistEntry> {

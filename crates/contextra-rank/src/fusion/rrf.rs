@@ -102,6 +102,7 @@ pub fn modulate_and_renormalize_weights(
 ) -> Vec<f32> {
     let raw_weights: Vec<f32> = result_sets.iter().map(|(_, _, w)| *w).collect();
     if beta == 0.0 || !beta.is_finite() {
+        // NAN-CHECK-OK
         return raw_weights;
     }
 
@@ -133,6 +134,7 @@ pub fn modulate_and_renormalize_weights(
                 let s1 = set[0].score;
                 let s2 = set[1].score;
                 if s1.is_finite() && s2.is_finite() {
+                    // NAN-CHECK-OK
                     (s1 - s2).max(0.0)
                 } else {
                     0.0
@@ -564,6 +566,7 @@ pub fn fuse_search_results_with_signal_strategies(
 
                 for doc in set.iter() {
                     if !doc.score.is_finite() {
+                        // NAN-CHECK-OK
                         non_finite = true;
                         break;
                     }

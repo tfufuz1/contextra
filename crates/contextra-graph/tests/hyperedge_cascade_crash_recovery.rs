@@ -63,10 +63,10 @@ async fn test_hyperedge_cascade_crash_recovery() {
         storage.commit(wal_tx_insert).await.unwrap();
 
         // Trigger cascade invalidation
-        let wal_seq = 100u64;
-        let wal_tx = TxId::new(wal_seq);
+        let cascade_tx_seq = (total_count + 1) as u64;
+        let wal_tx = TxId::new(cascade_tx_seq);
         let report =
-            cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_superseded, wal_seq)
+            cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_superseded, cascade_tx_seq)
                 .await
                 .unwrap();
 
@@ -157,7 +157,8 @@ async fn test_hyperedge_cascade_crash_recovery() {
         assert_eq!(recovered_graph.pending_cascade_queue_len(), overflow_count);
 
         // Drain and process cascade queue post-restart
-        let process_tx = TxId::new(200);
+        let process_tx_seq = (total_count + 2) as u64;
+        let process_tx = TxId::new(process_tx_seq);
         let processed = recovered_graph
             .process_cascade_queue(200, process_tx)
             .await
@@ -177,7 +178,8 @@ async fn test_hyperedge_cascade_crash_recovery() {
         assert!(remaining_entries.is_empty());
 
         // 2. Re-running process_cascade_queue is idempotent (returns 0)
-        let process_tx2 = TxId::new(201);
+        let process_tx2_seq = (total_count + 3) as u64;
+        let process_tx2 = TxId::new(process_tx2_seq);
         let processed_again = recovered_graph
             .process_cascade_queue(200, process_tx2)
             .await

@@ -1090,7 +1090,10 @@ async fn run_locomo_cmd(
     if !batch.is_empty() {
         col.insert_many(&batch).await?;
     }
-    println!("Indexed conversation turn corpus in {:.2?}", index_start.elapsed());
+    println!(
+        "Indexed conversation turn corpus in {:.2?}",
+        index_start.elapsed()
+    );
 
     let col_ref = &col;
     let embedder_ref = &embedder;

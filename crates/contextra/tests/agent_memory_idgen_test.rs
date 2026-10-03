@@ -61,7 +61,7 @@ async fn test_agent_memory_deterministic_id_generation(
 }
 
 #[tokio::test]
-async fn test_agent_memory_fallback_uuid_generation(
+async fn test_agent_memory_fallback_id_generation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
     let engine = builder(16)
@@ -77,11 +77,9 @@ async fn test_agent_memory_fallback_uuid_generation(
     // Verify non-identical IDs generated
     assert_ne!(id_a, id_b);
 
-    // Verify valid v4 UUID format
-    let parsed_a = uuid::Uuid::parse_str(id_a.as_str())?;
-    let parsed_b = uuid::Uuid::parse_str(id_b.as_str())?;
-    assert_eq!(parsed_a.get_version(), Some(uuid::Version::Random));
-    assert_eq!(parsed_b.get_version(), Some(uuid::Version::Random));
+    // Verify deterministic "fallback-" prefix
+    assert!(id_a.as_str().starts_with("fallback-"));
+    assert!(id_b.as_str().starts_with("fallback-"));
 
     // Verify recall functionality works with fallback IDs
     let recalled = memory.recall("Fallback memory", 2).await?;

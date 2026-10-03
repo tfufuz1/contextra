@@ -390,8 +390,9 @@ pub fn check_vetoes_with_root_and_opts(
             eprintln!("{err}");
         }
         return Err(format!(
-            "Veto conditional review check failed with {} error(s)",
-            errors.len()
+            "Veto conditional review check failed with {} error(s):\n{}",
+            errors.len(),
+            errors.join("\n")
         ));
     }
 

@@ -308,8 +308,8 @@ impl Wal {
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
                                 if cut > 0 {
-                                    let _ = file.write_all(&batch_payload[..cut]).await;
-                                    let _ = file.flush().await;
+                                    let _ = file.write_all(&batch_payload[..cut]).await; // INTENTIONAL-DROP
+                                    let _ = file.flush().await; // INTENTIONAL-DROP
                                 }
                                 crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
