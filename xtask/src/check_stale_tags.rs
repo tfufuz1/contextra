@@ -1,9 +1,21 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use regex::Regex;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use walkdir::WalkDir;
+
+/// Stichtag (Cutoff Date), ab dem Tags OHNE `until=YYYY-MM-DD` als Fehler (rot) behandelt werden.
+/// Bis zu diesem Stichtag werden sie als Warnung mit Zaehler gemeldet.
+pub const TAG_UNTIL_MANDATORY_CUTOFF_DATE: &str = "2026-12-31";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TagIssueType {
+    Expired { until_date: String },
+    InvalidUntilFormat { raw_until: String },
+    MissingUntilAfterCutoff,
+    StaleUntouched { threshold_days: i64 },
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StaleTagCandidate {
@@ -14,6 +26,8 @@ pub struct StaleTagCandidate {
     pub line_commit_ts: Option<String>,
     pub age_days: i64,
     pub raw: String,
+    pub until: Option<String>,
+    pub issue_type: TagIssueType,
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +36,7 @@ pub struct TagScanItem {
     pub line_num: usize,
     pub tag_id: Option<String>,
     pub tag_ts: String,
+    pub until_raw: Option<String>,
     pub raw: String,
 }
 
@@ -32,9 +47,22 @@ pub fn scan_audit_tags_in_root(root: &Path) -> Vec<TagScanItem> {
     }
 
     let mut items = Vec::new();
-    let re_audit_tag = Regex::new(r"AI-TAG\[.*?\]\s*TODO\(audit-[^)]+\)").unwrap();
-    let re_ts = Regex::new(r"\(TS:\s*([0-9T:-]+Z)\)").unwrap();
-    let re_id = Regex::new(r"\(ID:\s*([^\s\)]+)\)").unwrap();
+    let re_audit_tag = match Regex::new(r"AI-TAG\[.*?\]\s*TODO\(audit-[^)]+\)") {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let re_ts = match Regex::new(r"\(TS:\s*([0-9T:-]+Z)\)") {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let re_id = match Regex::new(r"\(ID:\s*([^\s\)]+)\)") {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let re_until = match Regex::new(r"until=([^\s\)\],]+)") {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
 
     for entry in WalkDir::new(&crates_dir)
         .sort_by_file_name()
@@ -69,12 +97,14 @@ pub fn scan_audit_tags_in_root(root: &Path) -> Vec<TagScanItem> {
                         };
 
                         let tag_id = re_id.captures(trimmed).map(|caps| caps[1].to_string());
+                        let until_raw = re_until.captures(trimmed).map(|caps| caps[1].to_string());
 
                         items.push(TagScanItem {
                             file_path: rel_path.clone(),
                             line_num: idx + 1,
                             tag_id,
                             tag_ts,
+                            until_raw,
                             raw: trimmed.to_string(),
                         });
                     }
@@ -128,6 +158,11 @@ pub fn parse_iso_datetime(ts_str: &str) -> Option<DateTime<Utc>> {
         })
 }
 
+pub fn parse_until_date(until_str: &str) -> Result<NaiveDate, String> {
+    NaiveDate::parse_from_str(until_str.trim(), "%Y-%m-%d")
+        .map_err(|e| format!("Invalid date format '{}': {}", until_str, e))
+}
+
 pub fn check_stale_tags_impl(
     root: &Path,
     threshold_days: i64,
@@ -145,65 +180,130 @@ pub fn check_stale_tags_impl(
         return Ok(Vec::new());
     }
 
-    let mut candidates = Vec::new();
+    let today_date = now.date_naive();
+    let cutoff_date = NaiveDate::parse_from_str(TAG_UNTIL_MANDATORY_CUTOFF_DATE, "%Y-%m-%d")
+        .ok()
+        .or_else(|| NaiveDate::from_ymd_opt(2026, 12, 31))
+        .unwrap_or(NaiveDate::MIN);
+
+    let mut hard_errors = Vec::new();
+    let mut warnings = Vec::new();
+    let mut missing_until_count = 0usize;
 
     for item in &tag_items {
-        let tag_dt = match parse_iso_datetime(&item.tag_ts) {
-            Some(dt) => dt,
-            None => continue,
-        };
+        let mut has_until_issue = false;
 
-        let age_days = (now - tag_dt).num_days();
-        if age_days < threshold_days {
-            continue;
-        }
-
-        let line_commit = get_line_last_commit_date(root, &item.file_path, item.line_num);
-
-        let is_untouched = if let Some(ref commit_iso) = line_commit {
-            if let Some(commit_dt) = parse_iso_datetime(commit_iso) {
-                // Line has not been modified after tag timestamp (allowing 60s clock skew)
-                commit_dt.timestamp() <= tag_dt.timestamp() + 60
-            } else {
-                true
+        if let Some(ref until_str) = item.until_raw {
+            match parse_until_date(until_str) {
+                Ok(until_date) => {
+                    if today_date > until_date {
+                        has_until_issue = true;
+                        hard_errors.push(StaleTagCandidate {
+                            file_path: item.file_path.clone(),
+                            line_num: item.line_num,
+                            tag_id: item.tag_id.clone(),
+                            tag_ts: item.tag_ts.clone(),
+                            line_commit_ts: None,
+                            age_days: (today_date - until_date).num_days(),
+                            raw: item.raw.clone(),
+                            until: Some(until_str.clone()),
+                            issue_type: TagIssueType::Expired {
+                                until_date: until_date.to_string(),
+                            },
+                        });
+                    }
+                }
+                Err(_) => {
+                    has_until_issue = true;
+                    hard_errors.push(StaleTagCandidate {
+                        file_path: item.file_path.clone(),
+                        line_num: item.line_num,
+                        tag_id: item.tag_id.clone(),
+                        tag_ts: item.tag_ts.clone(),
+                        line_commit_ts: None,
+                        age_days: 0,
+                        raw: item.raw.clone(),
+                        until: Some(until_str.clone()),
+                        issue_type: TagIssueType::InvalidUntilFormat {
+                            raw_until: until_str.clone(),
+                        },
+                    });
+                }
             }
         } else {
-            true
-        };
+            missing_until_count += 1;
+            if today_date >= cutoff_date {
+                has_until_issue = true;
+                hard_errors.push(StaleTagCandidate {
+                    file_path: item.file_path.clone(),
+                    line_num: item.line_num,
+                    tag_id: item.tag_id.clone(),
+                    tag_ts: item.tag_ts.clone(),
+                    line_commit_ts: None,
+                    age_days: 0,
+                    raw: item.raw.clone(),
+                    until: None,
+                    issue_type: TagIssueType::MissingUntilAfterCutoff,
+                });
+            }
+        }
 
-        if is_untouched {
-            candidates.push(StaleTagCandidate {
-                file_path: item.file_path.clone(),
-                line_num: item.line_num,
-                tag_id: item.tag_id.clone(),
-                tag_ts: item.tag_ts.clone(),
-                line_commit_ts: line_commit,
-                age_days,
-                raw: item.raw.clone(),
-            });
+        if !has_until_issue {
+            if let Some(tag_dt) = parse_iso_datetime(&item.tag_ts) {
+                let age_days = (now - tag_dt).num_days();
+                if age_days >= threshold_days {
+                    let line_commit =
+                        get_line_last_commit_date(root, &item.file_path, item.line_num);
+
+                    let is_untouched = if let Some(ref commit_iso) = line_commit {
+                        if let Some(commit_dt) = parse_iso_datetime(commit_iso) {
+                            commit_dt.timestamp() <= tag_dt.timestamp() + 60
+                        } else {
+                            true
+                        }
+                    } else {
+                        true
+                    };
+
+                    if is_untouched {
+                        if item.until_raw.is_none() {
+                            let cand = StaleTagCandidate {
+                                file_path: item.file_path.clone(),
+                                line_num: item.line_num,
+                                tag_id: item.tag_id.clone(),
+                                tag_ts: item.tag_ts.clone(),
+                                line_commit_ts: line_commit,
+                                age_days,
+                                raw: item.raw.clone(),
+                                until: None,
+                                issue_type: TagIssueType::StaleUntouched { threshold_days },
+                            };
+                            if strict {
+                                hard_errors.push(cand);
+                            } else {
+                                warnings.push(cand);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    if candidates.is_empty() {
+    if missing_until_count > 0 && today_date < cutoff_date {
         println!(
-            "✅ check-stale-tags: No stale audit tag candidates found (scanned {} tag(s)).",
-            tag_items.len()
+            "⚠️ Warning: Found {} tag(s) without `until=YYYY-MM-DD` expiration date (mandatory starting {}).",
+            missing_until_count, TAG_UNTIL_MANDATORY_CUTOFF_DATE
         );
-        Ok(candidates)
-    } else {
-        let warn_or_err = if strict {
-            "❌ Error"
-        } else {
-            "⚠️ Warning"
-        };
+    }
+
+    if !warnings.is_empty() {
         println!(
-            "{} check-stale-tags: Found {} stale audit tag candidate(s) older than {} days without line modification!",
-            warn_or_err,
-            candidates.len(),
+            "⚠️ Warning: Found {} stale audit tag candidate(s) older than {} days without line modification!",
+            warnings.len(),
             threshold_days
         );
-
-        for c in &candidates {
+        for c in &warnings {
             println!(
                 "  - File: {}:{}\n    Tag ID: {}\n    Tag TS: {}\n    Line Last Commit: {}\n    Tag Age: {} days\n    Raw: {}\n",
                 c.file_path,
@@ -215,15 +315,48 @@ pub fn check_stale_tags_impl(
                 c.raw
             );
         }
+    }
 
-        if strict {
-            Err(format!(
-                "{} stale audit tag candidate(s) detected.",
-                candidates.len()
-            ))
-        } else {
-            Ok(candidates)
+    if !hard_errors.is_empty() {
+        println!(
+            "❌ Error: Detected {} expired/invalid/stale audit tag candidate(s):",
+            hard_errors.len()
+        );
+        for c in &hard_errors {
+            let issue_desc = match &c.issue_type {
+                TagIssueType::Expired { until_date } => format!("Expired on {}", until_date),
+                TagIssueType::InvalidUntilFormat { raw_until } => {
+                    format!("Invalid until date format '{}'", raw_until)
+                }
+                TagIssueType::MissingUntilAfterCutoff => format!(
+                    "Missing until date (mandatory as of {})",
+                    TAG_UNTIL_MANDATORY_CUTOFF_DATE
+                ),
+                TagIssueType::StaleUntouched { threshold_days } => {
+                    format!("Stale (>{} days untouched)", threshold_days)
+                }
+            };
+            println!(
+                "  - File: {}:{}\n    Tag ID: {}\n    Tag TS: {}\n    Until: {}\n    Issue: {}\n    Raw: {}\n",
+                c.file_path,
+                c.line_num,
+                c.tag_id.as_deref().unwrap_or("N/A"),
+                c.tag_ts,
+                c.until.as_deref().unwrap_or("N/A"),
+                issue_desc,
+                c.raw
+            );
         }
+        Err(format!(
+            "{} stale/expired audit tag candidate(s) detected.",
+            hard_errors.len()
+        ))
+    } else {
+        println!(
+            "✅ check-stale-tags: All scanned tags ({}) passed expiration/format checks.",
+            tag_items.len()
+        );
+        Ok(warnings)
     }
 }
 
