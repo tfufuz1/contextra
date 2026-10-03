@@ -2626,7 +2626,13 @@ fn main() {
             }
         }
         "check-type-registry" => {
-            let type_name = args.get(2).map(|s| s.as_str()).unwrap_or("");
+            let type_name = match args.get(2) {
+                Some(s) if !s.trim().is_empty() => s.as_str(),
+                _ => {
+                    eprintln!("Verwendung: cargo xtask check-type-registry <TypName>");
+                    process::exit(2);
+                }
+            };
             let success = check_type_registry::run_check_type_registry(type_name);
             if !success {
                 process::exit(1);

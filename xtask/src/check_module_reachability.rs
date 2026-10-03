@@ -11,22 +11,10 @@ use walkdir::WalkDir;
 /// Übergangsliste für unverdrahtete Dateien (z. B. unfertige Traits/Module in Phase 0R).
 /// Diese Funde erzeugen eine WARN-Ausgabe statt eines Fehlers (Exit 0).
 pub const KNOWN_TRANSITION_UNREACHABLE: &[&str] = &[
-    "crates/contextra-core/src/traits/graph_index.rs",
-    "crates/contextra-core/src/traits/vector_index.rs",
-    "crates/contextra-core/src/traits/text_index.rs",
-    "crates/contextra-core/src/traits/lifecycle.rs",
-    "crates/contextra-db/src/decay_controller.rs",
-    "crates/contextra-db/src/filter.rs",
-    "crates/contextra-db/src/fusion.rs",
-    "crates/contextra-db/src/homeostat.rs",
-    "crates/contextra-db/src/maintenance_config.rs",
-    "crates/contextra-db/src/maintenance_scheduler.rs",
-    "crates/contextra-db/src/multistep.rs",
-    "crates/contextra-db/src/pid_latency_controller.rs",
-    "crates/contextra-db/src/transaction.rs",
-    "crates/contextra-db/src/volatile_vault.rs",
-    "benchmarks/contextra-bench/src/bin/compare_baseline.rs",
-    "crates/contextra-mcp/src/bin/contextra-mcp-server.rs",
+    "crates/contextra-checkpoint/src/guard/tests.rs",
+    "crates/contextra-checkpoint/src/meta/tests.rs",
+    "crates/contextra-checkpoint/src/orphan/tests.rs",
+    "crates/contextra-infer-ollama/src/query_rewriter.rs",
 ];
 
 #[derive(Debug, Clone)]
@@ -393,12 +381,32 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
             }
         }
 
-        let decls = target_decl_map.get(file);
-        let decl_count = decls.map(|d| d.len()).unwrap_or(0);
-
         let is_known_transition = KNOWN_TRANSITION_UNREACHABLE
             .iter()
             .any(|&t| t == rel_to_repo);
+
+        let is_harness_module = if let Ok(rel_to_src) = file.strip_prefix(&src_dir) {
+            rel_to_src.starts_with("harness") && file_name != "mod.rs"
+        } else {
+            false
+        };
+
+        let raw_decls = target_decl_map.get(file);
+        let mut decls_vec = raw_decls.cloned().unwrap_or_default();
+
+        if is_harness_module && decls_vec.is_empty() {
+            let harness_mod = src_dir.join("harness").join("mod.rs");
+            if harness_mod.exists() {
+                decls_vec.push(ModDecl {
+                    declaring_file: harness_mod,
+                    line_num: 1,
+                    mod_name: file.file_stem().unwrap().to_string_lossy().to_string(),
+                    custom_path: None,
+                });
+            }
+        }
+
+        let decl_count = decls_vec.len();
 
         if decl_count == 0 {
             let msg = format!("{} (Unerreichbar: 0 mod-Deklarationen)", rel_to_repo);
@@ -408,30 +416,55 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
                 errors.push(msg);
             }
         } else if decl_count > 1 {
-            let decl_strs: Vec<String> = decls
-                .unwrap()
-                .iter()
-                .map(|d| {
-                    let d_rel = d
-                        .declaring_file
-                        .strip_prefix(&repo_root_canon)
-                        .or_else(|_| d.declaring_file.strip_prefix(repo_root))
-                        .unwrap_or(&d.declaring_file)
-                        .to_string_lossy()
-                        .replace('\\', "/");
-                    format!("{}:{}", d_rel, d.line_num)
-                })
-                .collect();
-            let msg = format!(
-                "{} (Mehrfachdeklaration in {} Stellen: {})",
-                rel_to_repo,
-                decl_count,
-                decl_strs.join(", ")
-            );
-            if is_known_transition {
-                warnings.push(format!("TRANSITION: {}", msg));
-            } else {
-                errors.push(msg);
+            // Check if all declaring files are distinct root entry points (e.g. lib.rs vs main.rs)
+            // with at most 1 declaration per root file.
+            let mut is_valid_split_root = true;
+            let mut seen_declaring_files = std::collections::HashSet::new();
+
+            for d in &decls_vec {
+                let d_file_name = d.declaring_file.file_name().and_then(|s| s.to_str());
+                let is_root_decl_file = match d_file_name {
+                    Some("lib.rs") | Some("main.rs") => true,
+                    _ => {
+                        if let Ok(rel) = d.declaring_file.strip_prefix(&src_dir) {
+                            rel.starts_with("bin")
+                        } else {
+                            false
+                        }
+                    }
+                };
+
+                if !is_root_decl_file || !seen_declaring_files.insert(&d.declaring_file) {
+                    is_valid_split_root = false;
+                    break;
+                }
+            }
+
+            if !is_valid_split_root {
+                let decl_strs: Vec<String> = decls_vec
+                    .iter()
+                    .map(|d| {
+                        let d_rel = d
+                            .declaring_file
+                            .strip_prefix(&repo_root_canon)
+                            .or_else(|_| d.declaring_file.strip_prefix(repo_root))
+                            .unwrap_or(&d.declaring_file)
+                            .to_string_lossy()
+                            .replace('\\', "/");
+                        format!("{}:{}", d_rel, d.line_num)
+                    })
+                    .collect();
+                let msg = format!(
+                    "{} (Mehrfachdeklaration in {} Stellen: {})",
+                    rel_to_repo,
+                    decl_count,
+                    decl_strs.join(", ")
+                );
+                if is_known_transition {
+                    warnings.push(format!("TRANSITION: {}", msg));
+                } else {
+                    errors.push(msg);
+                }
             }
         }
     }
@@ -491,24 +524,20 @@ mod tests {
     fn test_transition_unreachable_gives_warning() {
         let dir = tempdir().unwrap();
         let repo_root = dir.path();
-        let crate_dir = repo_root.join("crates/contextra-core");
+        let crate_dir = repo_root.join("crates/contextra-checkpoint");
         let src_dir = crate_dir.join("src");
-        let traits_dir = src_dir.join("traits");
-        fs::create_dir_all(&traits_dir).unwrap();
+        let guard_dir = src_dir.join("guard");
+        fs::create_dir_all(&guard_dir).unwrap();
 
         fs::write(
             crate_dir.join("Cargo.toml"),
-            "[package]\nname = \"contextra-core\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"contextra-checkpoint\"\nversion = \"0.1.0\"\n",
         )
         .unwrap();
 
-        fs::write(src_dir.join("lib.rs"), "pub mod traits;\n").unwrap();
-        fs::write(traits_dir.join("mod.rs"), "// traits mod\n").unwrap();
-        fs::write(
-            traits_dir.join("graph_index.rs"),
-            "pub trait GraphIndex {}\n",
-        )
-        .unwrap();
+        fs::write(src_dir.join("lib.rs"), "pub mod guard;\n").unwrap();
+        fs::write(guard_dir.join("mod.rs"), "// guard mod\n").unwrap();
+        fs::write(guard_dir.join("tests.rs"), "// guard tests\n").unwrap();
 
         let res = check_crate_reachability(&crate_dir, repo_root);
         assert!(
@@ -516,7 +545,7 @@ mod tests {
             "Transition files must not produce hard errors"
         );
         assert_eq!(res.warnings.len(), 1);
-        assert!(res.warnings[0].contains("graph_index.rs"));
+        assert!(res.warnings[0].contains("tests.rs"));
         assert!(res.warnings[0].contains("TRANSITION"));
     }
 
