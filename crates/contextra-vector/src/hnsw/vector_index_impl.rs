@@ -378,8 +378,9 @@ impl VectorIndex for HnswIndex {
     /// ([`HnswIndexCore::rebuild`]) are guaranteed to yield 100% identical document results as pre-rebuild
     /// searches at the same pinned sequence number, regardless of rebuild progress or graph swaps.
     ///
-    /// Verified by integration test `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`
-    /// across multiple deterministic seeds and targeted timing execution inside the critical rebuild swap window.
+    /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
+    /// `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs` across multiple deterministic seeds and
+    /// targeted timing execution inside the critical rebuild swap window.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
         let log = self.inner.cold.seq_log.read().clone();
