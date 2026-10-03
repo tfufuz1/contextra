@@ -73,10 +73,11 @@ pub fn run_risk(args: &[String]) -> i32 {
                 max_tier = "crash";
             }
             touched_wal_crypto = true;
-        } else if f_lower.contains("simd") || f_lower.contains("vector") {
-            if max_tier != "sec" && max_tier != "crash" {
-                max_tier = "simd";
-            }
+        } else if (f_lower.contains("simd") || f_lower.contains("vector"))
+            && max_tier != "sec"
+            && max_tier != "crash"
+        {
+            max_tier = "simd";
         }
 
         if f_lower.contains("unsafe") || f_lower.contains("mmap") {
