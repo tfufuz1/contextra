@@ -31,6 +31,11 @@ pub struct TypeCheckResult {
 /// Gibt ein maschinenlesbares JSON-Ergebnis auf stdout aus.
 /// Exit-Semantik: `true` = keine Kollision, `false` = potenzielle Kollision.
 pub fn run_check_type_registry(type_name: &str) -> bool {
+    if type_name.trim().is_empty() {
+        eprintln!("Verwendung: cargo xtask check-type-registry <TypName>");
+        return false;
+    }
+
     let root = find_root_dir();
     let result = check_type_registry(&root, type_name);
 
@@ -65,6 +70,11 @@ pub fn check_type_registry(root: &Path, type_name: &str) -> TypeCheckResult {
         code_hits: Vec::new(),
         recommendation: String::new(),
     };
+
+    if type_name.trim().is_empty() {
+        result.recommendation = "Kein Typname angegeben.".to_string();
+        return result;
+    }
 
     // 1. TYPE_REGISTRY.md durchsuchen
     let registry_path = root.join("docs").join("TYPE_REGISTRY.md");
@@ -188,6 +198,16 @@ mod tests {
             "contextra-db"
         );
         assert_eq!(extract_crate_from_path("src/main.rs"), "");
+    }
+
+    #[test]
+    fn test_check_type_registry_empty_type_name() {
+        let root = crate::find_root_dir();
+        let result = check_type_registry(&root, "");
+        assert!(!result.registry_hit);
+        assert!(result.code_hits.is_empty());
+
+        assert!(!run_check_type_registry(""));
     }
 
     #[test]
