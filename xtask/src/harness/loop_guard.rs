@@ -105,10 +105,10 @@ pub fn loop_guard_save_state(root: &Path, state: &LoopGuardState) -> Result<(), 
     fs::write(&path, json).map_err(|e| format!("Failed to write state to {}: {e}", path.display()))
 }
 
-pub fn loop_guard_record(
+pub fn loop_guard_record_text(
     root: &Path,
-    _gate_name: Option<&str>,
-    log_file: Option<&Path>,
+    gate_name: Option<&str>,
+    content: &str,
     edited_path: Option<&str>,
 ) -> Result<(String, u32), String> {
     let mut state = loop_guard_load_state(root);
@@ -120,10 +120,12 @@ pub fn loop_guard_record(
         *current_edits += 1;
     }
 
-    if let Some(log_p) = log_file {
-        let content = fs::read_to_string(log_p)
-            .map_err(|e| format!("Failed to read log file {}: {e}", log_p.display()))?;
-        let norm = loop_guard_normalize_error(&content);
+    if !content.is_empty() {
+        let full_text = match gate_name {
+            Some(name) if !name.is_empty() => format!("[{}] {}", name, content),
+            _ => content.to_string(),
+        };
+        let norm = loop_guard_normalize_error(&full_text);
         let hash = loop_guard_hash_error(&norm);
 
         let entry = state.error_counts.entry(hash.clone()).or_insert(0);
@@ -144,6 +146,21 @@ pub fn loop_guard_record(
 
     loop_guard_save_state(root, &state)?;
     Ok((recorded_hash, count))
+}
+
+pub fn loop_guard_record(
+    root: &Path,
+    gate_name: Option<&str>,
+    log_file: Option<&Path>,
+    edited_path: Option<&str>,
+) -> Result<(String, u32), String> {
+    if let Some(log_p) = log_file {
+        let content = fs::read_to_string(log_p)
+            .map_err(|e| format!("Failed to read log file {}: {e}", log_p.display()))?;
+        loop_guard_record_text(root, gate_name, &content, edited_path)
+    } else {
+        loop_guard_record_text(root, gate_name, "", edited_path)
+    }
 }
 
 pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> {
