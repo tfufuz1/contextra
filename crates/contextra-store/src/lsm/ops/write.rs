@@ -267,11 +267,9 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
     let mut mem_updates = Vec::with_capacity(ops.len());
-    let mut last_seq = 0u64;
 
     for op in &ops {
         let seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
-        last_seq = seq_no;
         match op {
             IndexOp::Insert { doc_id: _, data } => {
                 let (key, value) = data;
@@ -306,12 +304,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
     }
 
+    // FIX B1: Allocate a separate, distinct monotonic sequence number for TxEnd to enforce entry.seq_no > last_seq in IntegrityVerifier.
+    let tx_end_seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
     wal_ops.push((
         WalOp::TxEnd {
             tx_id,
             committed: true,
         },
-        last_seq,
+        tx_end_seq_no,
     ));
 
     for (key, _, seq_no) in &mem_updates {

@@ -29,7 +29,7 @@ use contextra_types::{DistanceMetric, TenantId, TxId};
 use serde_json::json;
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -44,7 +44,10 @@ impl TestRng {
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.state
     }
 
@@ -84,11 +87,7 @@ fn cosine_similarity(a: &[f32; 4], b: &[f32; 4]) -> f32 {
     }
 }
 
-fn brute_force_top_k(
-    query: &[f32; 4],
-    dataset: &[(String, [f32; 4])],
-    k: usize,
-) -> Vec<String> {
+fn brute_force_top_k(query: &[f32; 4], dataset: &[(String, [f32; 4])], k: usize) -> Vec<String> {
     let mut scored: Vec<(String, f32)> = dataset
         .iter()
         .map(|(id, vec)| (id.clone(), cosine_similarity(query, vec)))
@@ -100,7 +99,6 @@ fn brute_force_top_k(
 }
 
 #[tokio::test]
-#[ignore = "BUG: WAL replay duplicate seq_no on restart after crash (crates/contextra-store/src/lsm/ops/write.rs:307)"]
 async fn test_e2e_compliance_scenario() {
     let start_time = std::time::Instant::now();
 
@@ -183,14 +181,24 @@ async fn test_e2e_compliance_scenario() {
             dataset_b.push((doc_id_b, vec_b));
         }
 
-        assert_eq!(col_a.len().await, 100, "Step 1: col_a must contain 100 documents");
-        assert_eq!(col_b.len().await, 100, "Step 1: col_b must contain 100 documents");
+        assert_eq!(
+            col_a.len().await,
+            100,
+            "Step 1: col_a must contain 100 documents"
+        );
+        assert_eq!(
+            col_b.len().await,
+            100,
+            "Step 1: col_b must contain 100 documents"
+        );
         println!("Step 1 SUCCESS: Tenant A (100 docs) and Tenant B (100 docs) populated.");
 
         // =========================================================================
         // STEP 2: SEARCH & INDEPENDENT TOP-K VERIFICATION & TENANT ISOLATION
         // =========================================================================
-        println!("\n--- Step 2: Top-K search verification against brute-force reference & isolation ---");
+        println!(
+            "\n--- Step 2: Top-K search verification against brute-force reference & isolation ---"
+        );
         let query_vec = [0.5, 0.5, 0.5, 0.5];
         let top_k = 5;
 
@@ -201,8 +209,14 @@ async fn test_e2e_compliance_scenario() {
             .expect("Step 2: Search col_a failed");
 
         let actual_top_k_a: Vec<String> = search_results_a.iter().map(|r| r.id.clone()).collect();
-        println!("  Expected Top-{} for Tenant A: {:?}", top_k, expected_top_k_a);
-        println!("  Actual   Top-{} for Tenant A: {:?}", top_k, actual_top_k_a);
+        println!(
+            "  Expected Top-{} for Tenant A: {:?}",
+            top_k, expected_top_k_a
+        );
+        println!(
+            "  Actual   Top-{} for Tenant A: {:?}",
+            top_k, actual_top_k_a
+        );
 
         assert_eq!(
             actual_top_k_a, expected_top_k_a,
@@ -244,10 +258,7 @@ async fn test_e2e_compliance_scenario() {
             "Step 3 ASSERTION FAILED: Deleted Tenant A returned search results after drop!"
         );
 
-        let get_doc_a = col_a
-            .get("doc_a_000")
-            .await
-            .expect("Step 3: Get doc_a_000");
+        let get_doc_a = col_a.get("doc_a_000").await.expect("Step 3: Get doc_a_000");
         assert!(
             get_doc_a.is_none(),
             "Step 3 ASSERTION FAILED: Deleted Tenant A document doc_a_000 was still retrievable!"
@@ -286,12 +297,17 @@ async fn test_e2e_compliance_scenario() {
         // =========================================================================
         // STEP 5: SIMULATE HARD PROCESS CRASH & RESTART VERIFICATION
         // =========================================================================
-        println!("\n--- Step 5: Simulating hard crash (dropping handle without explicit .close()) ---");
+        println!(
+            "\n--- Step 5: Simulating hard crash (dropping handle without explicit .close()) ---"
+        );
         // Dropping db handle without explicitly calling db.close().await
         drop(col_a);
         drop(col_b);
         drop(db);
     }
+
+    // Allow background tasks to release DirLock post-drop
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     println!("Reopening database from disk to verify recovery state...");
     {
@@ -355,7 +371,16 @@ async fn test_e2e_compliance_scenario() {
     // =========================================================================
     println!("\n--- Step 6: Verifying exported proof via python script ---");
     let proof_file_path = tmp_dir.path().join("tenant_a_deletion_proof.json");
-    let script_path = Path::new("docs/verification/verify_export.py");
+    let mut script_path = PathBuf::from("docs/verification/verify_export.py");
+    if !script_path.exists() {
+        if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+            let candidate =
+                PathBuf::from(manifest_dir).join("../../docs/verification/verify_export.py");
+            if candidate.exists() {
+                script_path = candidate;
+            }
+        }
+    }
 
     if !script_path.exists() {
         panic!(
@@ -369,7 +394,7 @@ async fn test_e2e_compliance_scenario() {
 
     // 6a. Verify valid proof file
     let py_output = Command::new("python3")
-        .arg(script_path)
+        .arg(&script_path)
         .arg(&proof_file_path)
         .arg(&proof_key_hex)
         .output();
@@ -453,7 +478,6 @@ async fn test_e2e_compliance_scenario() {
 /// attempts to verify sequence monotonicity in `IntegrityVerifier::verify_and_update_v3`, which fails
 /// with `CryptoError::WalCorruption { reason: "Duplicate or non-monotonic sequence number 1 (last: 1)" }`.
 #[tokio::test]
-#[ignore = "BUG: WAL replay duplicate seq_no on restart after crash (crates/contextra-store/src/lsm/ops/write.rs:307)"]
 async fn test_repro_wal_duplicate_seq_no_on_unflushed_restart() {
     let tmp = TempDir::new().expect("tempdir");
     let path = tmp.path().join("repro_db");
@@ -467,9 +491,13 @@ async fn test_repro_wal_duplicate_seq_no_on_unflushed_restart() {
         let db = Contextra::open_with_config(&path, config.clone())
             .await
             .expect("open db");
-        db.insert("repro_doc_1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"test": 1})))
-            .await
-            .expect("insert");
+        db.insert(
+            "repro_doc_1",
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(json!({"test": 1})),
+        )
+        .await
+        .expect("insert");
         // Abandon DB without close() -> WAL contains Put (seq=1) and TxEnd (seq=1)
         drop(db);
     }

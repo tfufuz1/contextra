@@ -12,7 +12,7 @@ use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -82,22 +82,13 @@ async fn repro_bug_tx_end_duplicate_seq_no_wal_replay() {
     }
 
     // 2. Reopen database from disk
-    // REPRO: LsmStorage::open fails during WAL replay because TxEnd shares seq_no=2 with key2,
-    // triggering WalCorruption error from IntegrityVerifier.
+    // FIX B1 VERIFICATION: LsmStorage::open succeeds during WAL replay after TxEnd allocates a distinct seq_no.
     let reopen_res = LsmStorage::open(config).await;
     assert!(
-        reopen_res.is_err(),
-        "Expected WAL corruption error on reopen due to duplicate TxEnd seq_no bug"
+        reopen_res.is_ok(),
+        "LsmStorage::open failed during WAL replay: {:?}",
+        reopen_res.err()
     );
-
-    if let Err(e) = reopen_res {
-        let err_str = format!("{e:?}");
-        assert!(
-            err_str.contains("Duplicate or non-monotonic sequence number")
-                || err_str.contains("WalCorruption"),
-            "Expected duplicate sequence number error, got: {err_str}"
-        );
-    }
 }
 
 /// Child process writer loop.
@@ -184,7 +175,6 @@ async fn child_writer() {
 /// Spawns the child writer via `std::env::current_exe()`, issues SIGKILL at randomized ACK counts,
 /// and validates durability, atomicity, phantom prevention, recovery writeability, and HMAC counter-probe.
 #[tokio::test]
-#[ignore = "BUG: TxEnd duplicate seq_no in crates/contextra-store/src/lsm/ops/write.rs:236 causes WalCorruption on replay"]
 async fn test_crash_kill_durability() {
     if std::env::var("CRASH_CHILD").is_ok() {
         return;
@@ -240,14 +230,10 @@ async fn test_crash_kill_durability() {
             .expect("spawn child writer process");
 
         let child_stdout = child.stdout.take().expect("capture child process stdout");
-        let reader = BufReader::new(child_stdout);
+        let mut reader = BufReader::new(child_stdout);
         let mut last_ack: u64 = 0;
 
-        for line_res in reader.lines() {
-            let line = match line_res {
-                Ok(l) => l,
-                Err(_) => break,
-            };
+        while let Some(Ok(line)) = reader.by_ref().lines().next() {
             let trimmed = line.trim();
             if let Some(num_str) = trimmed.strip_prefix("ACK ") {
                 if let Ok(ack_n) = num_str.parse::<u64>() {
@@ -258,6 +244,14 @@ async fn test_crash_kill_durability() {
                         }
                         let _ = child.kill();
                         let _ = child.wait();
+                        // Drain remaining buffered ACKs from pipe written before child process termination
+                        for rem_line in reader.lines().flatten() {
+                            if let Some(num_str) = rem_line.trim().strip_prefix("ACK ") {
+                                if let Ok(ack_n) = num_str.parse::<u64>() {
+                                    last_ack = ack_n;
+                                }
+                            }
+                        }
                         break;
                     }
                 }
@@ -456,7 +450,8 @@ async fn test_crash_kill_durability() {
         if let Ok(entries) = std::fs::read_dir(corrupt_tmp.path()) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() {
+                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if path.is_file() && file_name.ends_with(".log") {
                     if let Ok(meta) = std::fs::metadata(&path) {
                         if meta.len() > 16 {
                             if let Ok(mut data) = std::fs::read(&path) {
