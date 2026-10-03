@@ -5,11 +5,11 @@
 // Prüflogik:
 // 1. Permanent Rejected: Durchsucht die geänderten Dateien / Commits nach Schlüsselwörtern abgelehnter Features.
 // 2. Conditionally Accepted: Überwacht `conditional_review_due` Fristen.
-//    - Frist in der Vergangenheit (< 0 Tage) UND PR berührt das Feature:
+//    - Frist in der Vergangenheit (< 0 Tage) UND PR berührt das Feature (oder Zuordnung fehlt):
 //      Harter CI-Fehler (Exit-Code != 0) mit Referenz auf `adr_ref`.
 //    - Frist in der Vergangenheit (< 0 Tage) UND PR berührt das Feature NICHT:
 //      Warnung und Hinweis "Review-Ticket anlegen" (Exit-Code 0).
-//    - Datumsverlängerung in VETOES.md erfordert ein bereits auf dem Basis-Branch existierendes ADR.
+//    - Datumsverlängerung in VETOES.md erfordert ein bereits auf dem Basis-Branch existierendes accepted/final ADR.
 // 3. Fail-closed: Falls `VETOES.md` fehlt, schlägt das Gate fehl.
 
 use chrono::NaiveDate;
@@ -189,20 +189,27 @@ pub fn check_conditional_review_deadlines_scoped(
     };
 
     for entry in entries {
-        if entry.status == "conditionally_accepted" {
+        if entry.status.starts_with("conditionally_accepted") {
             if let Some(due_str) = &entry.conditional_review_due {
                 if let Ok(due_date) = NaiveDate::parse_from_str(due_str, "%Y-%m-%d") {
                     let days_until_due = (due_date - today).num_days();
                     let adr = entry.adr_ref.as_deref().unwrap_or("keine ADR angegeben");
+                    let has_assignment =
+                        !entry.affected_paths.is_empty() || !entry.keywords.is_empty();
 
                     if days_until_due < 0 {
                         let touches_feature = changed_files
                             .iter()
                             .any(|file| entry.is_file_affected(file));
 
-                        if touches_feature
-                            || (entry.affected_paths.is_empty() && changed_files.is_empty())
-                        {
+                        if !has_assignment {
+                            result.errors.push(format!(
+                                "❌ VETO-FRIST ÜBERSCHRITTEN (Zuordnung fehlt): Feature {} — Wiedervorlage war am {}, besitzt aber weder affected_paths noch keywords in VETOES.md. Fail-closed: PR blockiert (adr_ref: {}).",
+                                entry.feature_id,
+                                due_str,
+                                adr
+                            ));
+                        } else if touches_feature {
                             result.errors.push(format!(
                                 "❌ VETO-FRIST ÜBERSCHRITTEN: {} — Wiedervorlage war am {}, geänderte Dateien berühren das Feature. PR blockiert (adr_ref: {}). Bitte ADR mit Entscheidung erstellen oder Frist per neuem ADR auf Basis-Branch verlängern.",
                                 entry.feature_id,
@@ -219,7 +226,7 @@ pub fn check_conditional_review_deadlines_scoped(
                         }
                     } else if days_until_due <= CONDITIONAL_REVIEW_WARNING_THRESHOLD_DAYS {
                         result.warnings.push(format!(
-                            "⚠️ WARNUNG: VETO {} ('{}'): Review-Frist {} laeuft in {} Tag(en) ab — rechtzeitige Review erforderlich (adr_ref: {}).",
+                            "⚠️ WARNUNG: VETO {} ('{}'): Review-Frist {} laeuft in {} Tag(en) ab — rechtzeitige Review erforderlich (adr_ref: {}). Hinweis: Bitte Review-Ticket anlegen.",
                             entry.feature_id,
                             entry.reason_summary(),
                             due_str,
@@ -233,6 +240,86 @@ pub fn check_conditional_review_deadlines_scoped(
     }
 
     result
+}
+
+fn parse_adr_status(content: &str) -> Option<String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let stripped = if let Some(s) = trimmed.strip_prefix('*') {
+            s.trim()
+        } else if let Some(s) = trimmed.strip_prefix('-') {
+            s.trim()
+        } else {
+            trimmed
+        };
+        let lower = stripped.to_lowercase();
+        if lower.starts_with("status:")
+            || lower.starts_with("**status**:")
+            || lower.starts_with("**status:**")
+        {
+            if let Some((_, raw_val)) = stripped.split_once(':') {
+                let status_val = raw_val
+                    .trim()
+                    .trim_matches(|c| c == '*' || c == '_' || c == '`')
+                    .trim();
+                return Some(status_val.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn is_adr_status_accepted(status_val: &str) -> bool {
+    let lower = status_val.to_lowercase();
+    let cleaned = lower.replace(['✅', '✔'], "").trim().to_string();
+
+    cleaned == "accepted"
+        || cleaned.starts_with("accepted ")
+        || cleaned.starts_with("accepted(")
+        || cleaned == "final"
+        || cleaned.starts_with("final ")
+        || cleaned.starts_with("final(")
+}
+
+pub fn validate_adr_on_base_commit(
+    root: &Path,
+    base: &str,
+    adr_ref: &str,
+    changed_files: &[String],
+) -> Result<(), String> {
+    let clean_ref = adr_ref.split('#').next().unwrap_or(adr_ref).trim();
+
+    if changed_files.contains(&clean_ref.to_string()) {
+        return Err(format!(
+            "ADR '{clean_ref}' wurde im selben PR angelegt oder verändert (darf nicht im Diff basis...head enthalten sein)."
+        ));
+    }
+
+    let cat_out = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "-p", &format!("{base}:{clean_ref}")])
+        .output();
+
+    match cat_out {
+        Ok(out) if out.status.success() => {
+            let content = String::from_utf8_lossy(&out.stdout);
+            if let Some(status) = parse_adr_status(&content) {
+                if is_adr_status_accepted(&status) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "ADR '{clean_ref}' auf Basis-Branch hat Status '{status}', gefordert ist 'accepted' oder 'final'."
+                    ))
+                }
+            } else {
+                // If status line cannot be parsed, accept existence on base branch as fallback
+                Ok(())
+            }
+        }
+        _ => Err(format!(
+            "ADR '{clean_ref}' existiert NICHT auf dem Basis-Branch '{base}'."
+        )),
+    }
 }
 
 pub fn check_veto_date_extensions(
@@ -305,8 +392,18 @@ pub fn check_vetoes_with_root_and_opts(
     let changed_files = if let Some(override_files) = changed_files_override {
         override_files
     } else {
+        let base = Command::new("git")
+            .current_dir(root)
+            .args(["merge-base", "HEAD", "origin/main"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_else(|| "HEAD~1".to_string());
+
         let diff_output = Command::new("git")
-            .args(["diff", "--name-only", "HEAD~1...HEAD"])
+            .current_dir(root)
+            .args(["diff", "--name-only", &format!("{base}...HEAD")])
             .output();
 
         git_changed_files = match diff_output {
@@ -321,6 +418,7 @@ pub fn check_vetoes_with_root_and_opts(
     };
 
     let log_output = Command::new("git")
+        .current_dir(root)
         .args(["log", "--oneline", "-50"])
         .output()
         .map_err(|e| format!("git log fehlgeschlagen: {e}"))?;
@@ -346,6 +444,15 @@ pub fn check_vetoes_with_root_and_opts(
 
     let mut errors = deadline_res.errors;
 
+    let base_commit = Command::new("git")
+        .current_dir(root)
+        .args(["merge-base", "HEAD", "origin/main"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|| "HEAD~1".to_string());
+
     // Check date extension validity against base branch
     if let (Some(base_content), Some(check_adr_fn)) =
         (base_vetoes_override, adr_exists_on_base_override)
@@ -353,28 +460,32 @@ pub fn check_vetoes_with_root_and_opts(
         let ext_errors = check_veto_date_extensions(&entries, Some(base_content), check_adr_fn);
         errors.extend(ext_errors);
     } else if changed_files_override.is_none() {
-        // Attempt git show origin/main:VETOES.md or main:VETOES.md
         let base_vetoes_out = Command::new("git")
-            .args(["show", "HEAD~1:VETOES.md"])
+            .current_dir(root)
+            .args(["cat-file", "-p", &format!("{base_commit}:VETOES.md")])
             .output();
 
         if let Ok(out) = base_vetoes_out {
             if out.status.success() {
                 let base_content = String::from_utf8_lossy(&out.stdout);
                 let check_adr_fn = |adr_ref: &str| -> bool {
-                    let git_check = Command::new("git")
-                        .args(["cat-file", "-e", &format!("HEAD~1:{adr_ref}")])
-                        .output();
-                    match git_check {
-                        Ok(o) => o.status.success(),
-                        Err(_) => false,
-                    }
+                    validate_adr_on_base_commit(root, &base_commit, adr_ref, changed_files).is_ok()
                 };
                 let ext_errors =
                     check_veto_date_extensions(&entries, Some(&base_content), &check_adr_fn);
                 errors.extend(ext_errors);
             }
         }
+    }
+
+    let is_json = std::env::args().any(|a| a == "--json");
+    if is_json {
+        let json_out = serde_json::json!({
+            "gate": "check-vetoes",
+            "warnings": warnings,
+            "errors": errors
+        });
+        eprintln!("{}", json_out);
     }
 
     if !warnings.is_empty() {
@@ -389,10 +500,7 @@ pub fn check_vetoes_with_root_and_opts(
         for err in &errors {
             eprintln!("{err}");
         }
-        return Err(format!(
-            "Veto conditional review check failed with {} error(s)",
-            errors.len()
-        ));
+        return Err(errors.join("\n"));
     }
 
     Ok(())
@@ -516,7 +624,7 @@ conditional_review_due: 2026-10-07
 adr_ref: docs/decisions/ADR-077-old.md
 "#;
 
-        let check_adr_fn = |_path: &str| -> bool { false }; // ADR does NOT exist on base branch
+        let check_adr_fn = |_path: &str| -> bool { false };
 
         let errors =
             check_veto_date_extensions(&current_entries, Some(base_content), &check_adr_fn);
