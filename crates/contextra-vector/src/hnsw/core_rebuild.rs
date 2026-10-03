@@ -524,7 +524,8 @@ impl HnswIndexCore {
         // Invariant (v17 K-02 / SSI-Determinism): Setting this flag exposes RebuildStatus::Running.
         // Concurrent `search_at` readers continue executing against the active index structure
         // with SnapshotPinGuard snapshot filtering intact until Phase 2 swap completes.
-        // Verified by `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`.
+        // Verified by `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
+        // `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`.
         if self.hot.rebuilding.swap(true, Ordering::SeqCst) {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
@@ -786,7 +787,8 @@ impl HnswIndexCore {
     /// against `seq_log.is_visible(doc_id, seq_no)`, ensuring bit-identical results before, during,
     /// and after rebuild.
     ///
-    /// Verified by integration test `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`.
+    /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
+    /// `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`.
     fn rebuild_phase2_merge_and_swap(&self, new_index: HnswIndex, snapshot_tx: u64) -> Result<()> {
         let _write_lock = self.hot.write_mutex.lock();
 
