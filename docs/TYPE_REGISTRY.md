@@ -38,7 +38,7 @@
 | `PidLatencyController` | `contextra-adapt` | `crates/contextra-adapt/src/pid_latency_controller.rs` | `struct` |
 | `RandomizedLoggingPolicy` | `contextra-adapt` | `crates/contextra-adapt/src/offpolicy.rs` | `struct` |
 | `RerankDeadline` | `contextra-adapt` | `crates/contextra-adapt/src/homeostat.rs` | `struct` |
-| `RerankPidController` | `contextra-adapt` | `crates/contextra-adapt/src/homeostat.rs` | `struct` |
+| `RerankPidController` | `contextra-adapt` | `crates/contextra-adapt/src/homeostat.rs` | `struct` (deprecated; Nachfolger: `PidController`, Free Function `pid_regulated_candidate_pool` deprecated -> `PidController::update`) |
 | `RieGreedyError` | `contextra-adapt` | `crates/contextra-adapt/src/rie_greedy.rs` | `enum` |
 | `RieGreedyProfile` | `contextra-adapt` | `crates/contextra-adapt/src/rie_greedy.rs` | `struct` |
 | `Ring3Token` | `contextra-adapt` | `crates/contextra-adapt/src/flow_thompson.rs` | `struct` |

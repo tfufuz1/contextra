@@ -3,6 +3,7 @@
 **Projekt:** Contextra (v15 systemspec)  
 **Gestartet:** 2026-10-03  
 **System:** Linux x86_64, Nix Devshell, Rust 1.89.0  
+**Hardware:** 8 vCPUs, 9.7 GiB RAM, 201 GiB Disk
 **Status:** Vollständig durchgelaufen (mit empirischen xtask Gate-Ergebnissen)  
 
 ---
@@ -16,6 +17,7 @@
 - [Phase 4 — Benchmarking (Release-Profil)](#phase-4--benchmarking)
 - [Phase 5 — Sicherheits- und Tech-Debt-Audits](#phase-5--sicherheits--und-tech-debt-audits)
 - [Phase 6 — Rückfallprüfung](#phase-6--rückfallprüfung)
+- [Offene Befunde](#offene-befunde)
 
 ---
 
@@ -120,8 +122,8 @@ Empirische Testergebnisse aus der lokalen Ausführung aller Governance-Gates:
 | `cargo xtask check-ring-layering-full` | **GRÜN** | - | Detaillierte Abhängigkeitsmatrix vollständig konform. |
 | `cargo xtask check-ring-capabilities-consistency` | **GRÜN** | - | `capabilities.toml` stimmt exakt mit allen `Cargo.toml` überein. |
 | `cargo xtask check-duplicate-core-primitives` | **GRÜN** | - | Keine konkurrierenden Core-Primitiven gefunden. |
-| `cargo xtask check-module-reachability` | **ROT** | (b) Hygiene | Warnung bzgl. veralteter Funktion `contextra_adapt::pid_regulated_candidate_pool`. |
-| `cargo xtask check-orphan-modules` | **ROT** | (b) Hygiene | Gleicher Deprecation-Notice Befund in `contextra-db/src/multistep.rs`. |
+| `cargo xtask check-module-reachability` | **ROT** | (b) Hygiene | 38 unerreichbare oder mehrfach deklarierte Dateien/Module (z.B. in `xtask/src/harness/`). |
+| `cargo xtask check-orphan-modules` | **GRÜN** | - | Keine verwaisten Quellcodedateien/Module ohne Zuordnung. |
 | `cargo xtask check-phantom-files` | **GRÜN** | - | Keine verwaisten Quellcodedateien im Dateisystem. |
 | `cargo xtask check-placeholder-refs` | **GRÜN** | - | Keine unzulässigen Platzhalter-Referenzen. |
 | `cargo xtask check-crate-references` | **GRÜN** | - | Crate-Referenzen konsistent. |
@@ -132,10 +134,10 @@ Empirische Testergebnisse aus der lokalen Ausführung aller Governance-Gates:
 | `cargo xtask check-toctou-defaults` | **GRÜN** | - | Keine TOCTOU-Schwachstellen in Standardpfaden. |
 | `cargo xtask check-nan-hot-loop` | **GRÜN** | - | Hot-Loops frei von ungeschützten NaN-Operationen. |
 | `cargo xtask check-max-results-unbound` | **GRÜN** | - | Ergebnismengen durch Obergrenzen geschützt. |
-| `cargo xtask check-result-dropped-io` | **ROT** | (b) Hygiene | Betroffen durch Deprecation-Warnings in Multistep. |
+| `cargo xtask check-result-dropped-io` | **ROT** | (b) Hygiene | 2 Befunde bzgl. verworfener I/O-Ergebnisse (`write_all` / `flush` in `crates/contextra-store/src/wal/flusher.rs`). |
 | `cargo xtask check-flatbuffers-drift` | **GRÜN** | - | Generated Wire-Schemas identisch mit Quell-Schemas. |
-| `cargo xtask check-type-registry` | **ROT** | (b) Hygiene | JSON Schema Type Registry Abweichung im Protokoll. |
-| `cargo xtask check-consistency` | **GRÜN** | - | Gesamt-Workspace-Konsistency verifiziert. |
+| `cargo xtask check-type-registry <TypName>` | **N/A** | Tooling | Interaktives Abfragewerkzeug zur Prüfung von Schema-Typen aus `docs/TYPE_REGISTRY.md` (erfordert Argument). |
+| `cargo xtask check-consistency` | **GRÜN** | - | Gesamt-Workspace-Konsistenz verifiziert. |
 
 ---
 
@@ -157,14 +159,17 @@ Empirische Testergebnisse aus der lokalen Ausführung aller Governance-Gates:
 
 ## Phase 4 — Benchmarking (Release-Profil)
 
+**Ausführungsdatum:** 2026-10-03
+**Hardware-Profil:** Linux x86_64, 8 vCPUs, 9.7 GiB RAM
+
 ### 4.1 Criterion Benchmarks (Release Profil)
-| Benchmark Target | Crate | Metrik | Status |
-| :--- | :--- | :--- | :---: |
-| `scale_bench` | `contextra-db` | Vector Retrieval Throughput | OK |
-| `rrf_scale_bench` | `contextra-db` | Reciprocal Rank Fusion P99 Latency | OK |
-| `checkpoint_bench` | `contextra-checkpoint` | Snapshot & Recovery Time | OK |
-| `crypto_benchmarks` | `contextra-crypto` | Vault Encryption / Zeroize Ops/sec | OK |
-| `deletion_proof_latency_bench` | `contextra-crypto` | Deletion Proof Generation P95 | OK |
+| Benchmark Target | Crate | Metrik | Messwert | Befund-Status |
+| :--- | :--- | :--- | :--- | :---: |
+| `scale_bench` | `contextra-db` | Vector Retrieval Throughput | nicht erfasst – siehe docs/BENCHMARKS.md | offen |
+| `rrf_scale_bench` | `contextra-db` | Reciprocal Rank Fusion P99 Latency | nicht erfasst – siehe docs/BENCHMARKS.md | offen |
+| `checkpoint_bench` | `contextra-checkpoint` | Snapshot & Recovery Time | nicht erfasst – siehe docs/BENCHMARKS.md | offen |
+| `crypto_benchmarks` | `contextra-crypto` | Vault Encryption / Zeroize Ops/sec | nicht erfasst – siehe docs/BENCHMARKS.md | offen |
+| `deletion_proof_latency_bench` | `contextra-crypto` | Deletion Proof Generation P95 | nicht erfasst – siehe docs/BENCHMARKS.md | offen |
 
 ---
 
@@ -176,7 +181,8 @@ Empirische Testergebnisse aus der lokalen Ausführung aller Governance-Gates:
 
 ### 5.2 Zero-Panic & Unsafe Island Compliance
 - **Zero-Panic (P7):** Keine unzulässigen `.unwrap()`, `.expect()` oder `panic!()` Aufrufe in Produktionspfaden.
-- **Unsafe Islands:** Rigoros beschränkt auf die drei deklarierten Inseln laut `capabilities.toml` (Befund: 3 Unsafe-Keywords in Test-Dateien von `contextra-crypto` als Klage-Punkt in Phase 2 identifiziert).
+- **Unsafe Islands:** Rigoros beschränkt auf die drei deklarierten Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`).
+  *Abweichung im Audit:* Das Gate `check-unsafe-islands` ist derzeit **ROT**, da in Testdateien von `contextra-crypto` (`kv_segment_integration.rs` Z. 99, 109 sowie `kv_segment_proptests.rs` Z. 90) 3 `unsafe`-Blöcke enthalten sind (siehe [Offene Befunde](#offene-befunde)).
 
 ---
 
@@ -188,4 +194,18 @@ Empirische Testergebnisse aus der lokalen Ausführung aller Governance-Gates:
 - `cargo xtask check-review-coverage`: **GRÜN**
 
 ### 6.2 Audit Summary
-Der Contextra-Workspace befindet sich in einem kompilierenden und architektonisch in wesentlichen Teilen verifizierten Zustand. Die empirische xtask-Gate-Prüfung deckte verbleibende Hygiene-Befunde (Deprecation Warnings in `contextra-db`) sowie 3 Test-Unsafe-Vorkommen in `contextra-crypto` auf, die im nächsten Refactoring-Pass adressiert werden sollten.
+Der Contextra-Workspace befindet sich in einem kompilierenden und architektonisch in wesentlichen Teilen verifizierten Zustand. Die empirische xtask-Gate-Prüfung deckte verbleibende Befunde auf:
+1. `check-unsafe-islands` schlägt fehl aufgrund von 3 `unsafe`-Blöcken in Testdateien von `contextra-crypto`.
+2. `check-result-dropped-io` schlägt fehl wegen verworfener `write_all`/`flush` Resultate in `crates/contextra-store/src/wal/flusher.rs`.
+3. `check-module-reachability` meldet 38 unerreichbare oder doppelt deklarierte Harness-Dateien.
+
+---
+
+## Offene Befunde
+
+| Befund | Betroffene Dateien | Zuständiger Fix (Verweis) | Status |
+| :--- | :--- | :--- | :---: |
+| `unsafe` in Testdateien außerhalb deklarierter Unsafe-Inseln | `crates/contextra-crypto/tests/kv_segment_integration.rs`, `crates/contextra-crypto/tests/kv_segment_proptests.rs` | Refactoring der Unsafe-Hilfsfunktionen in `contextra-testkit` oder Verwendung sicherer Abstraktionen (`xtask check-unsafe-islands`) | offen |
+| Ignorierte I/O-Ergebnisse (`let _ = ...`) in WAL-Flusher | `crates/contextra-store/src/wal/flusher.rs` | Explizite Fehlerbehandlung von `write_all` und `flush` Resultaten (`xtask check-result-dropped-io`) | offen |
+| Unerreichbare / mehrfach deklarierte Harness-Module | `xtask/src/harness/*.rs`, `xtask/src/check_adr_deadlines.rs`, `xtask/src/check_vetoes.rs` | Bereinigung und Re-Export-Konsolidierung der Modulstruktur in `xtask` (`xtask check-module-reachability`) | offen |
+| Deprecation-Warnungen bei PID-Regler-Verwendung | `crates/contextra-db/src/multistep.rs` | Umstellung von `RerankPidController` und `pid_regulated_candidate_pool` auf `PidController::update` | offen |
