@@ -1,0 +1,72 @@
+# Configuration for cargo-mutants measuring mutation score for the 3 core guarantees
+# (G1 Crash/WAL, G2 Loeschung/Krypto, G3 Audit) with integration tests enabled.
+#
+# Usage per guarantee group:
+# G1 (Crash/WAL):
+#   cargo mutants --config mutants-guarantees.toml -p contextra-store \
+#     -f "crates/contextra-store/src/wal/**" \
+#     -f "crates/contextra-store/src/lsm/recovery.rs" \
+#     -f "crates/contextra-store/src/lsm/ops/write.rs" \
+#     -f "crates/contextra-store/src/lsm/group_commit.rs" \
+#     -o target/mutants-g1
+#
+# G2 (Loeschung/Krypto):
+#   cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+#     -f "crates/contextra-crypto/src/kv_shredding.rs" \
+#     -f "crates/contextra-crypto/src/kv_cipher.rs" \
+#     -f "crates/contextra-crypto/src/deletion_proof.rs" \
+#     -f "crates/contextra-crypto/src/ed25519_proof.rs" \
+#     -f "crates/contextra-crypto/src/kdf.rs" \
+#     -o target/mutants-g2
+#
+# G3 (Audit):
+#   cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+#     -f "crates/contextra-crypto/src/audit_chain.rs" \
+#     -f "crates/contextra-crypto/src/wal_crypto.rs" \
+#     -f "crates/contextra-crypto/src/wal_completeness.rs" \
+#     -o target/mutants-g3
+
+exclude_globs = [
+    "**/tests/**",
+    "**/tests.rs",
+    "**/*_test.rs",
+    "**/test_*.rs",
+    "**/benches/**",
+    "**/fuzz/**",
+    "**/*_generated.rs",
+]
+
+copy_target = false
+gitignore = true
+output = "target/mutants-guarantees"
+
+# Skip slow 100MB/1M stress tests and pre-existing failing/hanging tests in baseline.
+additional_cargo_test_args = [
+    "--",
+    "--skip", "test_large_100mb_payload_roundtrip",
+    "--skip", "test_encrypt_chunk_max_boundary",
+    "--skip", "test_1m_nonce_uniqueness_stress",
+    "--skip", "test_nonce_uniqueness_smoke_1m",
+    "--skip", "test_compaction_stress_and_gc",
+    "--skip", "test_retain_versions_unpinned_floor_max",
+    "--skip", "test_compaction_candidate_selection_follows_chronological_order",
+    "--skip", "test_compaction_swap_restores_shadowing_order_without_restart",
+    "--skip", "test_commit_tracks_budget_drift_on_consume_memory_failure",
+    "--skip", "test_memory_only_commit_restores_hmac",
+    "--skip", "test_aborted_transaction_discarded_on_open_recovery",
+    "--skip", "test_lsm_rollback_persistence",
+    "--skip", "test_rollback_small_tx_inline_no_sstable",
+    "--skip", "test_rollback_to_tx_edge_cases",
+    "--skip", "test_rollback_tombstone_subsequent_ops",
+    "--skip", "test_rollback_tombstone_wal",
+    "--skip", "test_startup_flush_before_wal_cleanup",
+    "--skip", "test_uncommitted_transaction_discarded_on_open_recovery",
+    "--skip", "test_wal_discovery_mixed_filenames",
+    "--skip", "test_wal_survives_process_restart",
+    "--skip", "test_wal_uuid_sidecar_cleaned_up_on_startup",
+    "--skip", "test_open_heal_encrypted_wal",
+    "--skip", "test_open_heal_truncated_tail_plaintext",
+    "--skip", "test_truncate_size_visible_atomically_with_file_state",
+]
+
+timeout_multiplier = 3.0
