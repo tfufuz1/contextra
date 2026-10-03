@@ -72,3 +72,31 @@ reason = "Ast-Grep / Static Analysis Regeln."
 [[protected]]
 glob = "xtask/registry.toml"
 reason = "Registry-Konfiguration der Xtask-Gates."
+
+[[protected]]
+glob = "tests/layering.rs"
+reason = "Validierung der Ring-Architektur & Import-Schichten-Grenzen."
+
+[[protected]]
+glob = "tests/unsafe_islands.rs"
+reason = "Überprüfung aller genehmigten Unsafe-Blöcke/Inseln im Workspace."
+
+[[protected]]
+glob = "rules/**"
+reason = "Architektur- und Sicherheitsregeln für Agenten und Entwicklung."
+
+[[protected]]
+glob = ".jules/harness-phases.toml"
+reason = "Phasen-Konfiguration des Harness Test-Runners."
+
+[[protected]]
+glob = ".jules/prompter-tiers.toml"
+reason = "Tier-Einteilungen der Prompter-Agenten."
+
+[[protected]]
+glob = "docs/decisions/**"
+reason = "Architektur-Entscheidungsrekorde (ADR) sichern Governance-Grundentscheidungen ab."
+
+[[protected]]
+glob = "docs/unwrap_baseline_history.jsonl"
+reason = "Historie der Zero-Panic/Unwrap-Baselines zur Verfolgung von Tech-Debt."
