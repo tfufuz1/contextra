@@ -1,149 +1,143 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Contextra — Jules Environment Setup Script
-# Repository: https://github.com/tfufuz1/contextra
-# Target: Jules VM (Ubuntu 24, Rust pre-installed)
+# Contextra — Jules Environment Setup (schwer, snapshot-fähig, idempotent)
+# Ziel: Jules-VM (Ubuntu 24.04, rustup/Node/Python/Go/Java/Docker vorinstalliert)
+# Läuft bei "Run and Snapshot". Danach wird nur der SNAPSHOT wiederverwendet —
+# alles Zeitabhängige (Commits, Tags, Claims, PRs) steckt deshalb in
+# refresh-context.sh, das bei JEDEM Task-Start läuft.
+# Diese Datei ändert KEINE getrackten Repo-Dateien (kein dirty tree).
 # =============================================================================
+set -uo pipefail                      # bewusst KEIN -e: ein optionales Tool darf den Snapshot nicht kippen
+export DEBIAN_FRONTEND=noninteractive
+LOG="${TMPDIR:-/tmp}/contextra-setup.log"; : > "$LOG"
+FAILS=0
 
-set -euo pipefail
+step() { echo; echo "=== $* ==="; }
+ok()   { echo "  ✅ $*"; }
+warn() { echo "  ⚠️  $*"; }
+try()  { "$@" >>"$LOG" 2>&1 || { warn "fehlgeschlagen (optional): $* — siehe $LOG"; return 1; }; }
+need() { "$@" >>"$LOG" 2>&1 || { echo "  ❌ PFLICHT fehlgeschlagen: $*"; tail -n 15 "$LOG"; FAILS=$((FAILS+1)); return 1; }; }
+
+# Repo-Wurzel ermitteln (Jules klont nach /app; nicht hart verdrahten)
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -z "$REPO" ] && for d in /app /home/jules/repo "$PWD"; do [ -f "$d/rust-toolchain.toml" ] && REPO="$d" && break; done
+[ -n "$REPO" ] || { echo "❌ Repo-Wurzel nicht gefunden"; exit 1; }
+cd "$REPO" || exit 1
+
+PIN="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml | head -1)"   # Single Source of Truth
+PIN="${PIN:-1.89.0}"
 
 echo "============================================================"
-echo "  Contextra Jules Environment Setup"
-echo "  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+echo "  Contextra Jules Environment Setup  $(date -u '+%F %T UTC')"
+echo "  Repo: $REPO   Rust-Pin: $PIN   Nutzer: $(id -un)"
 echo "============================================================"
 
-# ── 1. Rust Toolchain Check & Setup ──────────────────────────────────────────
-echo ""
-echo "[1/8] Verifying Rust toolchain..."
+# sudo nur nicht-interaktiv
+SUDO=""; if [ "$(id -u)" != 0 ]; then sudo -n true 2>/dev/null && SUDO="sudo -n" || SUDO="__none__"; fi
 
-if ! rustup toolchain install 1.89.0 --profile minimal; then
-    echo "❌ Failed to install Rust toolchain 1.89.0"
-    exit 1
-fi
-
-rustup default 1.89.0
-
-RUST_VERSION=$(rustc --version)
-echo "  ✅ $RUST_VERSION"
-
-PINNED_CHANNEL="1.89.0"
-if [[ "$RUST_VERSION" != *"$PINNED_CHANNEL"* ]]; then
-    echo "❌ Toolchain mismatch: Expected $PINNED_CHANNEL, got: $RUST_VERSION"
-    exit 1
-fi
-
-rustup component add clippy rustfmt 2>/dev/null || echo "  ⚠️ Warning: Could not add clippy/rustfmt components via rustup"
-echo "  ✅ clippy + rustfmt checked"
-
-# ── 2. System Libraries & FlatBuffers Compiler ──────────────────────────────
-echo ""
-echo "[2/8] Installing system libraries and FlatBuffers compiler..."
-
-if command -v apt-get &>/dev/null; then
-    sudo apt-get update -q 2>/dev/null || echo "  ⚠️ Warning: apt-get update failed"
-    sudo apt-get install -y -q \
-        libwebkit2gtk-4.1-dev \
-        libgtk-3-dev \
-        libayatana-appindicator3-dev \
-        librsvg2-dev \
-        libssl-dev \
-        flatbuffers-compiler \
-        pkg-config \
-        curl \
-        2>/dev/null || echo "  ⚠️ Warning: Some apt packages unavailable (acceptable fallback)"
-fi
-
-echo "  ✅ System libraries step finished"
-
-# ── 3. ONNX Runtime & C++ Toolchain Check ────────────────────────────────────
-echo ""
-echo "[3/8] Verifying C/C++ toolchain and glibc compatibility..."
-gcc --version | head -1
-ldd --version | head -1
-echo "  ✅ C/C++ toolchain and glibc verified"
-
-# ── 4. Code Search & AST Analysis Tools (ast-grep / sg) ──────────────────────
-echo ""
-echo "[4/8] Configuring ast-grep and git hooks..."
-
-if ! command -v ast-grep &>/dev/null && command -v sg &>/dev/null; then
-    SG_PATH=$(which sg)
-    SG_DIR=$(dirname "$SG_PATH")
-    if [ -w "$SG_DIR" ]; then
-        ln -sf "$SG_PATH" "$SG_DIR/ast-grep" 2>/dev/null || echo "  ⚠️ Warning: Could not symlink sg to ast-grep"
-    fi
-fi
-
-if command -v ast-grep &>/dev/null || command -v sg &>/dev/null; then
-    echo "  ✅ ast-grep / sg is available"
+# ── 1. Systempakete (nur, was Contextra wirklich braucht; kein Tauri/GTK) ─────
+step "[1/7] apt-Pakete"
+if [ "$SUDO" = "__none__" ]; then warn "kein sudo -n — apt übersprungen"
 else
-    cargo install ast-grep --locked --quiet 2>/dev/null || npm install -g @ast-grep/cli 2>/dev/null || echo "  ⚠️ Warning: ast-grep install skipped"
+  try $SUDO apt-get update -q
+  try $SUDO apt-get install -y -q --no-install-recommends \
+      build-essential pkg-config libssl-dev clang lld cmake \
+      flatbuffers-compiler strace valgrind gdb python3-venv python3-dev
+  ok "apt abgeschlossen"
 fi
+# flatc ist Pflicht für check-flatbuffers-drift – Fehlen offen melden
+command -v flatc >/dev/null && ok "flatc: $(flatc --version)" || warn "flatc fehlt (flatbuffers-drift-Gate nicht lauffähig)"
 
-git config core.hooksPath .githooks || echo "  ⚠️ Warning: Could not set core.hooksPath"
-echo "  ✅ git hooks configured to .githooks"
+# ── 2. Rust: Pin + stable (Cargo-Tools) + nightly (Fuzz/Sanitizer) ───────────
+step "[2/7] Rust-Toolchains"
+. "$HOME/.cargo/env" 2>/dev/null || true
+command -v rustup >/dev/null || { curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none >>"$LOG" 2>&1; . "$HOME/.cargo/env"; }
+need rustup toolchain install "$PIN" --profile minimal -c rustfmt -c clippy -c llvm-tools-preview
+try  rustup default "$PIN"
+try  rustup toolchain install stable --profile minimal
+try  rustup target add wasm32-wasip1 wasm32-unknown-unknown --toolchain "$PIN"
+if [ "${CONTEXTRA_SETUP_FULL:-0}" = 1 ]; then
+  try rustup toolchain install nightly --profile minimal -c rust-src -c llvm-tools-preview
+fi
+# Verifikation im Repo-Verzeichnis (rust-toolchain.toml greift dort)
+RV="$(rustc --version 2>/dev/null)"
+[[ "$RV" == *"$PIN"* ]] && ok "$RV" || { echo "  ❌ Toolchain-Mismatch: erwartet $PIN, ist: $RV"; FAILS=$((FAILS+1)); }
 
-# ── 5. Essential Cargo Tools (just, nextest, audit, deny, llvm-cov) ─────────
-echo ""
-echo "[5/8] Verifying Cargo helper tools..."
+# ── 3. Cargo-Werkzeuge: vorkompiliert (binstall), Fallback cargo install ──────
+step "[3/7] Cargo-Tools"
+if ! command -v cargo-binstall >/dev/null; then
+  try bash -c 'curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash'
+fi
+install_tool() {   # $1=binary-check  $2=crate
+  local chk="$1" crate="$2"
+  if eval "$chk" >/dev/null 2>&1; then ok "$crate vorhanden"; return; fi
+  if command -v cargo-binstall >/dev/null && try cargo binstall -y --locked "$crate"; then ok "$crate (binstall)"
+  else try cargo +stable install --locked "$crate" && ok "$crate (source)"; fi
+}
+install_tool "command -v just"            just
+install_tool "cargo nextest --version"    cargo-nextest
+install_tool "cargo deny --version"       cargo-deny
+install_tool "cargo audit --version"      cargo-audit
+if [ "${CONTEXTRA_SETUP_FULL:-0}" = 1 ]; then      # Audit-/Test-Kampagnen
+  install_tool "cargo llvm-cov --version" cargo-llvm-cov
+  install_tool "cargo mutants --version"  cargo-mutants
+  # NIE 'cargo install fuzz' (veralteter Crate) – nur cargo-fuzz, mit nightly
+  cargo fuzz --version >/dev/null 2>&1 || try cargo +nightly install --locked cargo-fuzz
+fi
+# ast-grep: npm ist schneller als Kompilieren; 'sg' → 'ast-grep' verlinken
+if ! command -v ast-grep >/dev/null; then
+  command -v sg >/dev/null && try ln -sf "$(command -v sg)" "$HOME/.cargo/bin/ast-grep" \
+    || try npm install -g @ast-grep/cli
+fi
+command -v ast-grep >/dev/null && ok "ast-grep" || warn "ast-grep fehlt (optional)"
 
-CARGO_TOOLS=("just" "cargo-nextest" "cargo-audit" "cargo-deny")
-for tool in "${CARGO_TOOLS[@]}"; do
-    if command -v "$tool" &>/dev/null; then
-        echo "  ✅ $tool is available"
-    else
-        echo "  ℹ️ Installing $tool..."
-        cargo install "$tool" --quiet 2>/dev/null || echo "  ⚠️ Warning: Could not install $tool (optional)"
-    fi
+# ── 4. Python-Umgebung (contextra-py / maturin) ──────────────────────────────
+step "[4/7] Python-venv"
+VENV="$HOME/.venv-contextra"
+[ -x "$VENV/bin/python" ] || try python3 -m venv "$VENV"
+try "$VENV/bin/pip" install -q --upgrade pip maturin numpy pytest && ok "venv: $VENV"
+
+# ── 5. Persistente Umgebung (idempotent, Marker-Block) ───────────────────────
+step "[5/7] Umgebungsvariablen"
+for RC in "$HOME/.bashrc" "$HOME/.profile"; do
+  touch "$RC"
+  sed -i '/# >>> contextra-env >>>/,/# <<< contextra-env <<</d' "$RC"
+  cat >> "$RC" <<ENVEOF
+# >>> contextra-env >>>
+export CARGO_TERM_COLOR=never
+export CARGO_INCREMENTAL=0
+export CARGO_NET_RETRY=5
+export RUST_BACKTRACE=1
+export CONTEXTRA_EMBEDDING_PROVIDER=mock   # kein Modell-Download in der VM
+export PATH="$VENV/bin:\$HOME/.cargo/bin:\$PATH"
+# <<< contextra-env <<<
+ENVEOF
 done
+ok ".bashrc/.profile aktualisiert"
+git config core.hooksPath .githooks && ok "git hooks → .githooks"
 
-# ── 6. Python & Node Environment Setup ───────────────────────────────────────
-echo ""
-echo "[6/8] Verifying multi-language runtimes..."
-
-echo "  ✅ Python: $(python3 --version 2>/dev/null || echo 'N/A')"
-echo "  ✅ Node: $(node --version 2>/dev/null || echo 'N/A')"
-echo "  ✅ Bun: $(bun --version 2>/dev/null || echo 'N/A')"
-
-# ── 7. Pre-warm Cargo Dependency Cache ──────────────────────────────────────
-echo ""
-echo "[7/8] Pre-compiling workspace dependencies..."
-
-cd /app 2>/dev/null || cd /home/jules/repo 2>/dev/null || cd .
-
-cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5
-echo "  ✅ Workspace dependency cache warmed"
-
-# ── 8. Validate Workspace Invariants ─────────────────────────────────────────
-echo ""
-echo "[8/8] Validating Contextra workspace invariants..."
-
-if [ -f "AGENTS.md" ]; then
-    echo "  ✅ AGENTS.md found ($(wc -l < AGENTS.md) lines)"
-else
-    echo "  ❌ AGENTS.md missing! Jules needs this file."
-    exit 1
+# ── 6. Abhängigkeits-Cache (Snapshot-Gewinn) ─────────────────────────────────
+step "[6/7] Cargo-Cache aufwärmen"
+timeout 600 cargo fetch --locked >>"$LOG" 2>&1 && ok "cargo fetch --locked" || warn "cargo fetch fehlgeschlagen/Timeout"
+if [ "${CONTEXTRA_SETUP_PREBUILD:-1}" = 1 ]; then
+  timeout 1200 cargo check --workspace --locked >>"$LOG" 2>&1 && ok "cargo check --workspace" \
+    || warn "cargo check Fehler/Timeout (Details: $LOG) — Snapshot trotzdem möglich"
 fi
 
-OPEN_TAGS=$(grep -rn 'AI-TAG\[SMELL\]\[CRITICAL\]' crates/ --include='*.rs' 2>/dev/null | grep -v RESOLVED | wc -l || echo "0")
-echo "  ✅ Open AI-TAG[SMELL][CRITICAL]: $OPEN_TAGS (target: 0)"
+# ── 7. Repo-Invarianten nur MELDEN (ein roter Repo-Zustand darf den Snapshot nicht blockieren)
+step "[7/7] Invarianten-Report"
+[ -f AGENTS.md ] && ok "AGENTS.md ($(wc -l < AGENTS.md) Zeilen)" || { echo "  ❌ AGENTS.md fehlt"; FAILS=$((FAILS+1)); }
+grep -q axum crates/contextra-mcp/Cargo.toml 2>/dev/null && warn "ADR-010 verletzt: axum in contextra-mcp" || ok "ADR-010: kein axum in contextra-mcp"
+OPEN=$(grep -rn 'AI-TAG\[[A-Z]*\]\[\(CRITICAL\|BLOCKER\)\]' crates/ --include='*.rs' 2>/dev/null | grep -vc RESOLVED)
+echo "  ℹ️  Offene CRITICAL/BLOCKER-Tags: ${OPEN:-0} (Ziel: 0)"
+if cargo run -q --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | grep -q env-attest; then
+  cargo run -q --manifest-path xtask/Cargo.toml -- env-attest 2>&1 | tail -n 15 || warn "env-attest meldet Abweichungen"
+else warn "xtask env-attest (noch) nicht registriert"; fi
 
-if grep -q "axum" crates/contextra-mcp/Cargo.toml 2>/dev/null; then
-    echo "  ❌ CRITICAL: axum found in contextra-mcp! Violates ADR-010"
-    exit 1
-else
-    echo "  ✅ ADR-010: axum not in contextra-mcp (stdio-only MCP)"
-fi
+# Kontext einmalig erzeugen (wird bei Task-Start erneut aktualisiert)
+[ -x .jules/setup/refresh-context.sh ] && bash .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
 
-if cargo run --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | grep -q "env-attest"; then
-    echo "  → Executing cargo xtask env-attest..."
-    cargo run --manifest-path xtask/Cargo.toml -- env-attest
-else
-    echo "  ⚠️ Warning: xtask env-attest command not available yet"
-fi
-
-# ── Summary ──────────────────────────────────────────────────────────────────
-echo ""
-echo "============================================================"
-echo "  ✅ Contextra Jules Environment Ready"
-echo "============================================================"
+echo; echo "============================================================"
+[ "$FAILS" = 0 ] && echo "  ✅ Contextra Jules Environment bereit" || echo "  ❌ $FAILS Pflichtschritt(e) fehlgeschlagen"
+echo "  Log: $LOG"; echo "============================================================"
+exit $(( FAILS > 0 ))
