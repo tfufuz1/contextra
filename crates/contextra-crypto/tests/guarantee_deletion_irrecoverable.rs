@@ -43,7 +43,7 @@ fn get_test_rng() -> (StdRng, u64) {
 
 /// Helper for constructing independent Ed25519 V3 payload according to specification:
 /// payload = scope_bytes || deleted_keys_hash (32) || tx_bytes (8) || timestamp_bytes (8)
-///           || covered_layers_bytes || excluded_scopes_bytes || receipt_part || audit_pos_part
+///           || covered_layers_bytes || excluded_scopes_bytes || graph_repair_bytes || receipt_part || audit_pos_part
 fn construct_independent_v3_payload(proof: &DeletionProof) -> Vec<u8> {
     let scope_bytes =
         bincode::serialize(&proof.scope).expect("Serialization of scope must succeed");
@@ -53,6 +53,8 @@ fn construct_independent_v3_payload(proof: &DeletionProof) -> Vec<u8> {
         .expect("Serialization of covered_layers must succeed");
     let excluded_scopes_bytes = bincode::serialize(&proof.excluded_scopes)
         .expect("Serialization of excluded_scopes must succeed");
+    let graph_repair_bytes = bincode::serialize(&proof.graph_repair)
+        .expect("Serialization of graph_repair must succeed");
 
     let receipt_bytes = proof.wal_chain_receipt.unwrap_or([0u8; 32]);
     let receipt_part = if proof.wal_chain_receipt.is_some() {
@@ -75,15 +77,17 @@ fn construct_independent_v3_payload(proof: &DeletionProof) -> Vec<u8> {
             + timestamp_bytes.len()
             + covered_layers_bytes.len()
             + excluded_scopes_bytes.len()
+            + graph_repair_bytes.len()
             + receipt_part.len()
             + audit_pos_part.len(),
     );
     payload.extend_from_slice(&scope_bytes);
     payload.extend_from_slice(&proof.deleted_keys_hash);
     payload.extend_from_slice(&tx_bytes);
-    payload.extend_from_slice(&timestamp_bytes);
+    payload.extend_from_slice(&proof.timestamp.to_le_bytes());
     payload.extend_from_slice(&covered_layers_bytes);
     payload.extend_from_slice(&excluded_scopes_bytes);
+    payload.extend_from_slice(&graph_repair_bytes);
     payload.extend_from_slice(receipt_part);
     payload.extend_from_slice(audit_pos_part);
 
@@ -329,7 +333,6 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
 }
 
 #[test]
-#[ignore = "BUG: graph_repair field is omitted from construct_v3_payload() in crates/contextra-crypto/src/deletion_proof.rs:512-555"]
 fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
     let keypair = DeletionProofKeyPair::generate();
     let tenant_id = TenantId::try_new(777).unwrap();
