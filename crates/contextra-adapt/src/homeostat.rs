@@ -5,7 +5,7 @@
 
 //! PID Controller and Deadline Management for Retrieval Latency Control.
 //!
-//! NOTE: `RerankPidController` and `pid_regulated_candidate_pool` have been consolidated into `crate::PidController`.
+//! NOTE: `RerankPidController` has been consolidated into `crate::PidController`.
 
 use std::time::{Duration, Instant};
 
@@ -89,19 +89,6 @@ impl RerankPidController {
         let dt = Duration::from_millis(100);
         self.inner.update(dt, observed_p95_latency_ms)
     }
-}
-
-/// Free function to update the PID controller with observed latency and return the regulated candidate pool size.
-#[deprecated(
-    since = "0.1.0",
-    note = "Consolidated into `crate::PidController`. Use `crate::PidController::update` directly."
-)]
-#[allow(deprecated)]
-pub fn pid_regulated_candidate_pool(
-    controller: &mut RerankPidController,
-    observed_p95_latency_ms: f32,
-) -> usize {
-    controller.update(observed_p95_latency_ms)
 }
 
 /// Hard deadline manager for candidate retrieval and Cross-Encoder reranking phases (P11 requirement).
@@ -217,14 +204,5 @@ mod tests {
         std::thread::sleep(Duration::from_millis(60));
 
         assert!(deadline.deadline_exceeded(start));
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_pid_regulated_candidate_pool_free_function() {
-        let mut controller = RerankPidController::new(150.0, 50, 200, 100);
-        let pool = pid_regulated_candidate_pool(&mut controller, 200.0);
-        assert!(pool < 100);
-        assert_eq!(pool, controller.k_pool());
     }
 }

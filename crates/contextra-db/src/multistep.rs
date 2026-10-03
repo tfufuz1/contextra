@@ -3,9 +3,9 @@
 // INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PID-reguliert in [50, 200].
 // STAND: TS:2026-09-12T00:00:00Z
 
-use crate::homeostat::{pid_regulated_candidate_pool, RerankPidController};
 use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
+use contextra_adapt::PidController;
 pub use contextra_ports::QueryRewriter;
 use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
 use contextra_types::{EntityId, Result, ScoredEntry};
@@ -65,13 +65,13 @@ pub struct MultiStepResult {
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
-    pid_controller: parking_lot::Mutex<RerankPidController>,
+    pid_controller: parking_lot::Mutex<PidController>,
     clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
-        let pid = RerankPidController::new(config.latency_budget_ms as f32, 50, 200, 100);
+        let pid = PidController::new(config.latency_budget_ms as f32, 50, 200, Some(100));
         Self {
             collection,
             config,
@@ -123,7 +123,11 @@ impl<S: StorageEngine> MultiStepEngine<S> {
 
         // Runde 1: Standard-Suche mit PID-reguliertem Kandidatenpool
         let start_nanos = self.clock.monotonic_nanos();
-        let current_pid_val = self.pid_controller.lock().k_pool();
+        let current_pid_val = self
+            .pid_controller
+            .lock()
+            .current_pool_size()
+            .unwrap_or_else(|| self.pid_controller.lock().min_pool_size);
         let candidate_k = (self.config.rerank_pool_multiplier * k)
             .clamp(50, current_pid_val)
             .clamp(50, 200);
@@ -137,9 +141,13 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .execute()
             .await?;
 
-        let round1_elapsed_ms =
-            (self.clock.monotonic_nanos().saturating_sub(start_nanos)) as f32 / 1_000_000.0;
-        let _ = pid_regulated_candidate_pool(&mut *self.pid_controller.lock(), round1_elapsed_ms);
+        let round1_elapsed_nanos = self.clock.monotonic_nanos().saturating_sub(start_nanos);
+        let round1_dt = std::time::Duration::from_nanos(round1_elapsed_nanos);
+        let round1_elapsed_ms = round1_dt.as_secs_f32() * 1000.0;
+        // Update PID controller state for subsequent rounds and queries; returned pool size is stored in current_pool_size.
+        self.pid_controller
+            .lock()
+            .update(round1_dt, round1_elapsed_ms);
 
         all_result_sets.push(round1);
         rounds_executed += 1;
@@ -181,7 +189,11 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             }
 
             let round_start_nanos = self.clock.monotonic_nanos();
-            let pid_val = self.pid_controller.lock().k_pool();
+            let pid_val = self
+                .pid_controller
+                .lock()
+                .current_pool_size()
+                .unwrap_or_else(|| self.pid_controller.lock().min_pool_size);
             let scaled_k = (self.config.rerank_pool_multiplier * k)
                 .clamp(50, pid_val)
                 .clamp(50, 200);
@@ -304,13 +316,16 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 }
             }
 
-            let round_elapsed_ms = (self
+            let round_elapsed_nanos = self
                 .clock
                 .monotonic_nanos()
-                .saturating_sub(round_start_nanos)) as f32
-                / 1_000_000.0;
-            let _ =
-                pid_regulated_candidate_pool(&mut *self.pid_controller.lock(), round_elapsed_ms);
+                .saturating_sub(round_start_nanos);
+            let round_dt = std::time::Duration::from_nanos(round_elapsed_nanos);
+            let round_elapsed_ms = round_dt.as_secs_f32() * 1000.0;
+            // Update PID controller state for subsequent rounds and queries; returned pool size is stored in current_pool_size.
+            self.pid_controller
+                .lock()
+                .update(round_dt, round_elapsed_ms);
 
             let deduped_round = deduplicate_search_results(round_results);
             all_result_sets.push(deduped_round);

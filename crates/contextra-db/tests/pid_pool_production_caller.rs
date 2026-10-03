@@ -1,14 +1,16 @@
 // FILE-CONTEXT
 // ZWECK: Prüft die PID-regulatorische Einbindung in den Multi-Step Candidate Pool und Grenzwerte [50, 200].
 
-use contextra_db::homeostat::{pid_regulated_candidate_pool, RerankPidController};
+use contextra_adapt::PidController;
 use contextra_db::multistep::{MultiStepConfig, MultiStepEngine};
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;
+use contextra_ports::Clock;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tempfile::tempdir;
 
 async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
@@ -40,28 +42,54 @@ async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
 }
 
 #[test]
-fn test_pid_regulated_candidate_pool_direct_call_and_bounds() {
-    let mut pid = RerankPidController::new(100.0, 50, 200, 100);
+fn test_pid_candidate_pool_update_and_bounds() {
+    let mut pid = PidController::new(100.0, 50, 200, Some(100));
+    let dt = Duration::from_millis(100);
 
     // Initial value is 100
-    assert_eq!(pid.k_pool(), 100);
+    assert_eq!(pid.current_pool_size(), Some(100));
 
     // Severe latency spike (500 ms vs 100 ms target) -> pool size contracts
-    let new_pool_high = pid_regulated_candidate_pool(&mut pid, 500.0);
+    let new_pool_high = pid.update(dt, 500.0);
     assert!(new_pool_high < 100);
     assert!(new_pool_high >= 50);
 
     // Continuous high latency -> settles at hard floor 50
     for _ in 0..20 {
-        pid_regulated_candidate_pool(&mut pid, 1000.0);
+        pid.update(dt, 1000.0);
     }
-    assert_eq!(pid.k_pool(), 50);
+    assert_eq!(pid.current_pool_size(), Some(50));
 
     // Continuous low latency (10 ms vs 100 ms target) -> pool size expands up to 200
     for _ in 0..30 {
-        pid_regulated_candidate_pool(&mut pid, 10.0);
+        pid.update(dt, 10.0);
     }
-    assert_eq!(pid.k_pool(), 200);
+    assert_eq!(pid.current_pool_size(), Some(200));
+}
+
+struct FastForwardClock {
+    nanos: AtomicU64,
+    advance_per_call: u64,
+}
+
+impl FastForwardClock {
+    fn new(advance_ms: u64) -> Self {
+        Self {
+            nanos: AtomicU64::new(0),
+            advance_per_call: advance_ms * 1_000_000,
+        }
+    }
+}
+
+impl Clock for FastForwardClock {
+    fn now_unix_nanos(&self) -> u64 {
+        0
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos
+            .fetch_add(self.advance_per_call, Ordering::SeqCst)
+    }
 }
 
 #[tokio::test]
@@ -83,7 +111,8 @@ async fn test_multistep_engine_uses_pid_candidate_pool() {
         ..Default::default()
     };
 
-    let engine = MultiStepEngine::new(col, config);
+    let clock = Arc::new(FastForwardClock::new(500)); // 500ms per clock call
+    let engine = MultiStepEngine::new(col, config).with_clock(clock);
 
     let res = engine
         .search("test", &[1.0, 0.0, 0.0, 0.0], 10, None)
