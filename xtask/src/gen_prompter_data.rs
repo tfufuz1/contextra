@@ -121,9 +121,10 @@ fn count_crate_tests(crate_path: &Path) -> usize {
     count
 }
 
-fn get_git_head_short() -> String {
+fn get_git_head_short(root: &Path) -> String {
+    let root_str = root.to_str().unwrap_or(".");
     Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
+        .args(["-C", root_str, "rev-parse", "--short", "HEAD"])
         .output()
         .ok()
         .filter(|o| o.status.success())
@@ -164,6 +165,7 @@ fn derive_status_from_working_state(crate_id: &str, ws_content: &str) -> String 
 pub fn run() -> bool {
     println!("=== Running xtask gen-prompter-data ===");
     let root = find_root_dir();
+    let root_str = root.to_str().unwrap_or(".");
 
     // 1. Load .jules/prompter-tiers.toml
     let tiers_path = root.join(".jules/prompter-tiers.toml");
@@ -296,7 +298,14 @@ pub fn run() -> bool {
     // Read and parse WORKING_STATE.md for working_state_snapshot
     let ws_path = root.join("WORKING_STATE.md");
     let mut ws_crates = Vec::new();
-    let mut last_merge = "unbekannt".to_string();
+    let mut last_merge = Command::new("git")
+        .args(["-C", root_str, "log", "--oneline", "-1", "--merges"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success() && !o.stdout.is_empty())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unbekannt".to_string());
 
     if let Ok(ws_content) = fs::read_to_string(&ws_path) {
         for line in ws_content.lines() {
@@ -326,7 +335,7 @@ pub fn run() -> bool {
 
     let output_data = PrompterDataOutput {
         generated_at: snapshot_now.clone(),
-        head: get_git_head_short(),
+        head: get_git_head_short(&root),
         context_preamble: tiers_cfg.defaults.context_preamble.clone(),
         target_architecture: tiers_cfg.target_architecture,
         crates: crates_json,
@@ -368,7 +377,7 @@ pub fn run() -> bool {
         if let Some(caps) = re_stand.captures(&agents_content) {
             if let Ok(agents_date) = NaiveDate::parse_from_str(&caps[1], "%Y-%m-%d") {
                 let last_code_change_str = Command::new("git")
-                    .args(["log", "-1", "--format=%cs", "--", "crates/"])
+                    .args(["-C", root_str, "log", "-1", "--format=%cs", "--", "crates/"])
                     .output()
                     .ok()
                     .filter(|o| o.status.success())

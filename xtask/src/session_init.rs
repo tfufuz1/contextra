@@ -11,6 +11,9 @@ pub struct SessionInitResult {
     pub active_claim_count: usize,
     pub claimed_crate: Option<String>,
     pub env_file_path: String,
+    pub last_commit: String,
+    pub last_merge: String,
+    pub prompter_distance: String,
 }
 
 pub fn generate_session_hash(now: &str) -> String {
@@ -42,6 +45,69 @@ fn count_open_blockers(root: &Path) -> usize {
         }
     }
     count
+}
+
+fn get_last_commit(root: &Path) -> String {
+    let root_str = root.to_str().unwrap_or(".");
+    std::process::Command::new("git")
+        .args(["-C", root_str, "log", "--oneline", "-1"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success() && !o.stdout.is_empty())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|| "unbekannt".to_string())
+}
+
+fn get_last_merge(root: &Path) -> String {
+    let root_str = root.to_str().unwrap_or(".");
+    std::process::Command::new("git")
+        .args(["-C", root_str, "log", "--oneline", "-1", "--merges"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success() && !o.stdout.is_empty())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "keine".to_string())
+}
+
+fn get_prompter_distance(root: &Path) -> String {
+    let root_str = root.to_str().unwrap_or(".");
+    let prompter_data_path = root.join(".jules/prompter-data.json");
+    let prompter_head_opt = if prompter_data_path.is_file() {
+        fs::read_to_string(&prompter_data_path)
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+            .and_then(|v| {
+                v.get("head")
+                    .and_then(|h| h.as_str())
+                    .map(|s| s.to_string())
+            })
+    } else {
+        None
+    };
+
+    if let Some(ref p_head) = prompter_head_opt {
+        let rev_list_opt = std::process::Command::new("git")
+            .args([
+                "-C",
+                root_str,
+                "rev-list",
+                "--count",
+                &format!("{}..HEAD", p_head),
+            ])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+        if let Some(count_str) = rev_list_opt {
+            format!("{} Commit(s)", count_str)
+        } else {
+            "unbekannt".to_string()
+        }
+    } else {
+        "unbekannt (kein prompter-data.json)".to_string()
+    }
 }
 
 pub fn run_session_init(
@@ -98,6 +164,18 @@ pub fn run_session_init(
     let db = crate::claim::ClaimsDatabase::load(&claims_path);
     let active_claim_count = db.count_active_claims();
 
+    let last_commit = get_last_commit(&root);
+    let last_merge = get_last_merge(&root);
+    let prompter_distance = get_prompter_distance(&root);
+
+    println!("Session-Kontinuität:");
+    println!("- SESSION_HASH: {}", session_hash);
+    println!("- Letzter Commit: {}", last_commit);
+    println!("- Letzter Merge: {}", last_merge);
+    println!("- Offene BLOCKER: {}", open_blockers);
+    println!("- Aktive Claims: {}", active_claim_count);
+    println!("- Prompter-Data-Abstand: {}", prompter_distance);
+
     let env_file = root.join(".jules/session.env");
     let env_file_path = env_file.display().to_string();
 
@@ -132,5 +210,8 @@ pub fn run_session_init(
         active_claim_count,
         claimed_crate: crate_name.map(|s| s.to_string()),
         env_file_path,
+        last_commit,
+        last_merge,
+        prompter_distance,
     })
 }
