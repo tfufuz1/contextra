@@ -1,0 +1,255 @@
+# governance/gates.toml
+# Gate-Katalog für Contextra Qualitäts-Gates.
+# Definiert name, phase, required_local, required_ci, risk_class, owner und fixture für alle Gates.
+
+[[gate]]
+name = "claim"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "context-pack"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "scope-guard"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "protected-paths"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "check-duplicate-symbols"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+
+[[gate]]
+name = "symbol-exists"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "architecture"
+fixture = "none"
+
+[[gate]]
+name = "check-dag"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+
+[[gate]]
+name = "check-ring-layering"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+
+[[gate]]
+name = "check-vetoes"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "ratchet"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "gate-weakening"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "test-integrity"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "quality"
+fixture = "none"
+
+[[gate]]
+name = "session-report"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "low"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "doc-truth"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "architecture"
+fixture = "none"
+
+[[gate]]
+name = "registry-check"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "diff-budget"
+phase = "submit"
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "claims-in-pr"
+phase = "submit"
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "task-card"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "agent-ops"
+fixture = "none"
+
+[[gate]]
+name = "ledger"
+phase = "submit"
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "can-merge"
+phase = "submit"
+required_local = false # Exklusiv in verdict-required.toml
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "gate-determinism-check"
+phase = "verify"
+required_local = false # In harness-phases.toml als determinism-check required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "high"
+owner = "core"
+fixture = "none"
+
+[[gate]]
+name = "gate-unsafe-audit"
+phase = "verify"
+required_local = false # In harness-phases.toml als unsafe-audit required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "critical"
+owner = "security"
+fixture = "none"
+
+[[gate]]
+name = "gate-lock-audit"
+phase = "verify"
+required_local = false # In harness-phases.toml als lock-audit required = false, in verdict-required.toml blocking = true
+required_ci = true
+risk_class = "high"
+owner = "core"
+fixture = "none"
+
+[[gate]]
+name = "gate-wal-replay-verify"
+phase = "verify"
+required_local = false # Exklusiv in verdict-required.toml
+required_ci = true
+risk_class = "critical"
+owner = "storage"
+fixture = "none"
+
+[[gate]]
+name = "fuzz-smoke"
+phase = "verify"
+required_local = false
+required_ci = false
+risk_class = "low"
+owner = "security"
+fixture = "none"
+
+[[gate]]
+name = "mutants-diff"
+phase = "verify"
+required_local = false
+required_ci = false
+risk_class = "low"
+owner = "quality"
+fixture = "none"
+
+[[gate]]
+name = "gates-catalog-sync"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+
+[[gate]]
+name = "codeowners-coverage"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"

@@ -24,11 +24,11 @@ required = true
 
 [[phase.check]]
 cmd = ["cargo", "xtask", "scope-guard"]
-required = false
+required = true
 
 [[phase.check]]
 cmd = ["cargo", "xtask", "protected-paths"]
-required = false
+required = true
 
 [[phase.check]]
 cmd = ["cargo", "xtask", "check-duplicate-symbols"]
@@ -36,7 +36,7 @@ required = true
 
 [[phase.check]]
 cmd = ["cargo", "xtask", "symbol-exists"]
-required = false
+required = true
 
 [[phase.verify]]
 cmd = ["cargo", "test"]
@@ -56,7 +56,7 @@ required = true
 
 [[phase.verify]]
 cmd = ["cargo", "xtask", "ratchet", "check"]
-required = false
+required = true
 
 [[phase.verify]]
 cmd = ["cargo", "xtask", "determinism-check"]
@@ -72,11 +72,11 @@ required = false
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "gate-weakening"]
-required = false
+required = true
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "test-integrity"]
-required = false
+required = true
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "diff-budget"]
@@ -84,7 +84,7 @@ required = false
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "session-report"]
-required = false
+required = true
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "claims-in-pr"]

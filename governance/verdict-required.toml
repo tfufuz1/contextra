@@ -28,6 +28,10 @@ name = "scope-guard"
 blocking = true
 
 [[gate]]
+name = "symbol-exists"
+blocking = true
+
+[[gate]]
 name = "diff-budget"
 blocking = true
 
@@ -41,6 +45,10 @@ blocking = true
 
 [[gate]]
 name = "task-card"
+blocking = true
+
+[[gate]]
+name = "session-report"
 blocking = true
 
 [[gate]]
