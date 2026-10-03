@@ -62,6 +62,44 @@ fn log_rss_measurement(stage: &str, num_chunks: usize, rss_kb: u64) {
     }
 }
 
+/// BEFUND B4:
+/// Handhabt das 16-MiB-Transaktionsstaging-Limit (`Transaction staging budget exceeded`) adaptiv.
+/// Falls ein Batch das Budget der MVCC-Transaktion überschreitet, wird er in kleinere Teil-Batches
+/// aufgeteilt und der gewünschte `batch_size`-Richtwert für künftige Batches verkleinert.
+/// Nicht-budgetbezogene Fehler lösen weiterhin einen harten Abbruch via `expect()` aus.
+fn insert_batch_adaptive<'a>(
+    db: &'a Contextra,
+    batch: &'a [(String, Vec<f32>, Option<serde_json::Value>)],
+    batch_size: &'a mut usize,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
+    Box::pin(async move {
+        if batch.is_empty() {
+            return;
+        }
+
+        match db.insert_many(batch).await {
+            Ok(_) => {}
+            Err(err) => {
+                let err_msg = err.to_string();
+                if err_msg.contains("staging budget exceeded") {
+                    if batch.len() == 1 {
+                        panic!(
+                            "Einzelnes Dokument überschreitet das Transaktionsbudget von 16 MiB: {}",
+                            err_msg
+                        );
+                    }
+                    let mid = batch.len() / 2;
+                    *batch_size = (*batch_size / 2).max(1);
+                    insert_batch_adaptive(db, &batch[..mid], batch_size).await;
+                    insert_batch_adaptive(db, &batch[mid..], batch_size).await;
+                } else {
+                    panic!("Unerwarteter Fehler bei insert_many: {}", err);
+                }
+            }
+        }
+    })
+}
+
 /// Deterministically generates synthetic 768-dim embeddings with realistic variation
 fn generate_embedding(doc_idx: usize) -> Vec<f32> {
     let mut vec = vec![0.0f32; EMBEDDING_DIM];
@@ -119,11 +157,11 @@ fn bench_scale_inserts_and_search(c: &mut Criterion) {
             log_rss_measurement("before_insert", num_chunks, rss_kb);
         }
 
-        // Measure batch population using insert_many in batches of 100 documents.
+        // B4: Measure batch population using insert_many in batches of 100 documents (dynamically resized).
         // Single-lock acquisition per batch eliminates lock contention and N-1 transaction commits,
-        // yielding an observed 10-50x throughput gain over document-by-document insert() calls while
-        // staying safely within max_ops_per_tx (10,000 staging ops).
-        let batch_size = 100;
+        // yielding an observed 10-50x throughput gain over document-by-document insert() calls.
+        // We handle 16-MiB transaction staging budget limits adaptively by splitting batches when needed.
+        let mut batch_size = 100;
         let start_time = std::time::Instant::now();
         rt.block_on(async {
             let mut current_batch = Vec::with_capacity(batch_size);
@@ -137,8 +175,8 @@ fn bench_scale_inserts_and_search(c: &mut Criterion) {
                     Some(serde_json::json!({ "text": text, "chunk_index": i })),
                 ));
 
-                if current_batch.len() == batch_size || i + 1 == num_chunks {
-                    db.insert_many(&current_batch).await.unwrap(); // unwrap allowed
+                if current_batch.len() >= batch_size || i + 1 == num_chunks {
+                    insert_batch_adaptive(&db, &current_batch, &mut batch_size).await;
                     current_batch.clear();
                 }
             }
