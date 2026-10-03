@@ -10,106 +10,91 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
+    outputs:
+      task_file: ${{ steps.task.outputs.task_file }}
+      task_date: ${{ steps.task.outputs.task_date }}
+      task_created: ${{ steps.task.outputs.task_created }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Sammle Commits der letzten 7 Tage
-        id: commits
-        run: |
-          echo "commits<<EOF" >> "$GITHUB_OUTPUT"
-          git log --since="7 days ago" --oneline --no-merges >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Prüfe und erstelle Audit-Task-Datei
         id: task
-        env:
-          COMMITS: ${{ steps.commits.outputs.commits }}
         run: |
-          TASK_FILE=".jules/pending-audit-task.md"
+          YEAR_WEEK=$(date -u +'%Y-W%V')
           DATE=$(date -u +'%Y-%m-%d')
-          echo "date=$DATE" >> "$GITHUB_OUTPUT"
-          COMMIT_LIST="${COMMITS:-"(keine Commits in den letzten 7 Tagen)"}"
+          TASK_FILE=".jules/tasks/AUDIT-${YEAR_WEEK}.toml"
 
-          if [ -f "$TASK_FILE" ] && ! head -n 5 "$TASK_FILE" | grep -q "STATUS: DONE"; then
-            echo "::warning::Es existiert bereits ein unbearbeiteter Audit-Auftrag in $TASK_FILE! Neuer Auftrag wird angehängt."
-            cat << EOF >> "$TASK_FILE"
+          echo "task_date=$YEAR_WEEK" >> "$GITHUB_OUTPUT"
+          echo "task_file=$TASK_FILE" >> "$GITHUB_OUTPUT"
 
----
-
-## Woechentlicher Proaktiv-Audit-Auftrag ($DATE)
-
-WICHTIG: Befolge .jules/AUDIT_INTAKE_PROTOCOL.md — verifiziere JEDEN Fund
-gegen den AKTUELLEN Code, bevor du etwas aenderst.
-
-### Auftrag
-Analysiere die folgenden Commits der letzten 7 Tage auf:
-1. Race Conditions / TOCTOU-Fehler (insbesondere in neu hinzugefuegten
-   Mutex/RwLock/Atomic-Nutzungen)
-2. Neue .unwrap()/.expect() in Produktionscode ausserhalb der Baseline
-   (.unwrap-baseline.json)
-3. Silent-Failure-Pattern (let _ = ... bei IO-Operationen)
-4. DAG-Grenzverletzungen in neuen Cargo.toml-Dependencies
-
-Fuer jeden gefundenen, verifizierten Fehler:
-- Schreibe zuerst einen Test, der den Fehler reproduzierbar beweist (roter Test)
-- Behebe den Fehler
-- Verifiziere: Test ist jetzt gruen, just check und just dag-check sind gruen
-- Oeffne einen PR mit Verweis auf diesen Audit-Auftrag
-
-Falls KEIN Fund verifiziert werden kann: Markiere den Status in dieser Datei
-als STATUS: DONE und erklaere das explizit.
-
-### Commits dieser Woche
-\`\`\`
-$COMMIT_LIST
-\`\`\`
-EOF
-          else
-            cat << EOF > "$TASK_FILE"
-STATUS: OPEN
-CREATED: $DATE
-
-## Woechentlicher Proaktiv-Audit-Auftrag ($DATE)
-
-WICHTIG: Befolge .jules/AUDIT_INTAKE_PROTOCOL.md — verifiziere JEDEN Fund
-gegen den AKTUELLEN Code, bevor du etwas aenderst.
-
-### Auftrag
-Analysiere die folgenden Commits der letzten 7 Tage auf:
-1. Race Conditions / TOCTOU-Fehler (insbesondere in neu hinzugefuegten
-   Mutex/RwLock/Atomic-Nutzungen)
-2. Neue .unwrap()/.expect() in Produktionscode ausserhalb der Baseline
-   (.unwrap-baseline.json)
-3. Silent-Failure-Pattern (let _ = ... bei IO-Operationen)
-4. DAG-Grenzverletzungen in neuen Cargo.toml-Dependencies
-
-Fuer jeden gefundenen, verifizierten Fehler:
-- Schreibe zuerst einen Test, der den Fehler reproduzierbar beweist (roter Test)
-- Behebe den Fehler
-- Verifiziere: Test ist jetzt gruen, just check und just dag-check sind gruen
-- Oeffne einen PR mit Verweis auf diesen Audit-Auftrag
-
-Falls KEIN Fund verifiziert werden kann: Markiere den Status in dieser Datei
-als STATUS: DONE und erklaere das explizit.
-
-### Commits dieser Woche
-\`\`\`
-$COMMIT_LIST
-\`\`\`
-EOF
+          if [ -f "$TASK_FILE" ]; then
+            echo "::notice::Audit-Task-Datei $TASK_FILE existiert bereits für ISO-Woche $YEAR_WEEK. Überspringe Erstellung."
+            echo "task_created=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          mkdir -p .jules/tasks
+
+          SHAS=$(git log --since="7 days ago" --format="%H" --no-merges)
+          if [ -z "$SHAS" ]; then
+            SHA_LIST='# Keine Commits in den letzten 7 Tagen'
+          else
+            SHA_LIST=$(echo "$SHAS" | sed 's/^/"/;s/$/",/')
+          fi
+
+          cat << EOF > "$TASK_FILE"
+# Audit-Task-Karte
+# ID Format: AUDIT-YYYY-Www
+id        = "AUDIT-${YEAR_WEEK}"
+title     = "Woechentlicher Proaktiv-Audit-Auftrag ${YEAR_WEEK}"
+crate     = "workspace"
+tier      = 1
+risk      = "sec"
+goal      = "Proaktive Analyse der Commits der letzten 7 Tage auf Race Conditions, unwrap-Regressions, Silent Failures und DAG-Grenzverletzungen."
+non_goals = ["Refactoring ausserhalb verifizierter Befunde", "Stilles Ignorieren nicht verifizierter Findings"]
+scope     = ["crates/**", "xtask/**"]
+forbidden = ["capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "P28 Determinismus", "Audit Intake Protocol"]
+acceptance = [
+  "cargo test --workspace --locked",
+  "cargo xtask check-ring-layering",
+  "cargo xtask panic-inventory"
+]
+evidence_required = ["Verifizierte Befunde mit Test oder Entkraeftungsbegruendung im PR-Text"]
+
+[audit_context]
+created_date = "${DATE}"
+instructions = "Lies .jules/AUDIT_INTAKE_PROTOCOL.md. Führe 'git show <sha>' für die aufgeführten commit_shas aus, um Diff/Änderungen zu analysieren. Jeder Fund muss gegen den AKTUELLEN Quellcode verifiziert werden."
+commit_shas = [
+${SHA_LIST}
+]
+
+[budget]
+files = 10
+lines = 300
+iterations = 10
+EOF
+
+          echo "task_created=true" >> "$GITHUB_OUTPUT"
+
       - name: Erstelle Pull Request mit Audit-Task
+        if: steps.task.outputs.task_created == 'true'
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
-          branch: automated/weekly-audit-task-${{ steps.task.outputs.date }}
-          title: "Wöchentlicher Audit-Auftrag ${{ steps.task.outputs.date }}"
-          commit-message: "chore(audit): add weekly proactive audit task ${{ steps.task.outputs.date }}"
+          branch: automated/weekly-audit-task-${{ steps.task.outputs.task_date }}
+          title: "Wöchentlicher Audit-Auftrag ${{ steps.task.outputs.task_date }}"
+          commit-message: "chore(audit): add weekly proactive audit task ${{ steps.task.outputs.task_date }}"
           body: |
-            Automatischer wöchentlicher Proaktiv-Audit-Auftrag in `.jules/pending-audit-task.md`.
+            Automatischer wöchentlicher Proaktiv-Audit-Auftrag in `${{ steps.task.outputs.task_file }}`.
 
-            Hinweis: Jules-Sessions sollten bei Bootstrap (`.jules/SESSION_BOOTSTRAP.md` Phase 1) prüfen, ob `.jules/pending-audit-task.md` mit `STATUS: OPEN` existiert.
+            WICHTIG:
+            - Befolge `.jules/AUDIT_INTAKE_PROTOCOL.md` — verifiziere JEDEN Fund gegen den AKTUELLEN Code, bevor du etwas änderst.
+            - Führe `git show <sha>` aus, um Commit-Änderungen zu untersuchen.
+            - Verwende `cargo xtask panic-inventory` zur unwrap/expect-Prüfung.
           delete-branch: true
 
   trigger-mutation-testing:
