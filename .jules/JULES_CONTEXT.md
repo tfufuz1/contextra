@@ -1,5 +1,5 @@
 # Contextra — Jules Agent Context
-> Version: 3.0 | Stand: 2026-09-28 | Permanent Ambient Context für Jules Sessions (Spezifikation v9)
+> Version: 3.0 | Stand: 2026-10-02 | Permanent Ambient Context für Jules Sessions (Spezifikation v9)
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
 > Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
