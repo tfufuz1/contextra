@@ -639,6 +639,8 @@ impl DeletionProof {
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let graph_repair_bytes = bincode::serialize(&self.graph_repair)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
         let receipt_part = if self.wal_chain_receipt.is_some() {
             receipt_bytes.as_slice()
@@ -660,6 +662,7 @@ impl DeletionProof {
                 + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
+                + graph_repair_bytes.len()
                 + receipt_part.len()
                 + audit_pos_part.len(),
         );
@@ -669,6 +672,7 @@ impl DeletionProof {
         payload.extend_from_slice(&timestamp_bytes);
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
+        payload.extend_from_slice(&graph_repair_bytes);
         payload.extend_from_slice(receipt_part);
         payload.extend_from_slice(audit_pos_part);
 
@@ -1738,6 +1742,47 @@ mod tests {
         .unwrap();
 
         assert!(proof.verify_external(&keypair.verifying_key).is_ok());
+    }
+
+    #[test]
+    fn test_v3_tampered_graph_repair_rejects() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let graph_repair = vec![GraphRepairAttestation {
+            doc_id: DocId(42),
+            verified_no_ghost_pointers: true,
+            attested_at: 1700000000,
+        }];
+        let proof = DeletionProof::create_v3(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+            ],
+            vec![ExcludedScope::LlmParameterMemory],
+            1700000000,
+            &graph_repair,
+            keypair.signing_key(),
+        )
+        .unwrap();
+
+        assert!(proof.verify(&keypair.verifying_key).unwrap());
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
+
+        // Tamper graph_repair field
+        let mut tampered = proof.clone();
+        tampered.graph_repair[0].verified_no_ghost_pointers = false;
+
+        assert!(!tampered.verify(&keypair.verifying_key).unwrap());
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
     }
 
     #[test]
