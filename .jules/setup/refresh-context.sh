@@ -8,6 +8,7 @@ set -uo pipefail
 . "$HOME/.cargo/env" 2>/dev/null || true
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 0
 CTX=.jules/context; mkdir -p "$CTX"
+export PATH="$HOME/.local/bin:$PATH"   # flatc-Shim (siehe environment_script.sh)
 XT=(cargo run -q --manifest-path xtask/Cargo.toml --)
 
 # A) Git-Historie sicherstellen (Jules-Checkouts können flach sein)
@@ -46,3 +47,7 @@ else rm -f "$CTX/RECENT_PRS.md"; fi
   [ -s "$CTX/PREFLIGHT.txt" ] && { echo; echo "## Preflight (Ende)"; tail -n 15 "$CTX/PREFLIGHT.txt"; }
 } > "$CTX/SESSION_START.md"
 echo "✅ Kontext geschrieben: $CTX/SESSION_START.md ($(wc -l < "$CTX/SESSION_START.md") Zeilen)"
+
+# Working Tree sauber halten (xtask/build.rs dürfen nichts Getracktes hinterlassen)
+git reset --hard HEAD -q 2>/dev/null && git clean -fdq 2>/dev/null
+git reset --hard HEAD 2>&1 | tail -1

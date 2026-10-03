@@ -42,11 +42,24 @@ else
   try $SUDO apt-get update -q
   try $SUDO apt-get install -y -q --no-install-recommends \
       build-essential pkg-config libssl-dev clang lld cmake \
-      flatbuffers-compiler strace valgrind gdb python3-venv python3-dev
+      strace valgrind gdb python3-venv python3-dev
   ok "apt abgeschlossen"
 fi
-# flatc ist Pflicht für check-flatbuffers-drift – Fehlen offen melden
-command -v flatc >/dev/null && ok "flatc: $(flatc --version)" || warn "flatc fehlt (flatbuffers-drift-Gate nicht lauffähig)"
+# flatc-SHIM: crates/contextra-wire/build.rs ruft bei vorhandenem `flatc` IMMER neu generieren auf und
+# überschreibt die getrackte src/contextra_generated.rs. Ubuntus flatc (2.0.8) passt nicht zum
+# flatbuffers-Crate (24.12.x) → 35 Compilerfehler (E0053) + dirty Working Tree.
+# Ohne nutzbares flatc nimmt build.rs den eingecheckten Code. Daher: apt-flatc entfernen/verdecken.
+mkdir -p "$HOME/.local/bin"
+[ "$SUDO" != "__none__" ] && try $SUDO apt-get remove -y -q flatbuffers-compiler
+cat > "$HOME/.local/bin/flatc" <<'SHIM'
+#!/usr/bin/env bash
+# Shim: nur mit CONTEXTRA_REAL_FLATC=/pfad/zu/passendem/flatc nutzbar (Version muss zum Crate passen).
+[ -n "${CONTEXTRA_REAL_FLATC:-}" ] && exec "$CONTEXTRA_REAL_FLATC" "$@"
+echo "flatc deaktiviert (Versions-Mismatch-Schutz)" >&2; exit 127
+SHIM
+chmod +x "$HOME/.local/bin/flatc"
+export PATH="$HOME/.local/bin:$PATH"
+flatc --version >/dev/null 2>&1 && warn "flatc ist noch aktiv!" || ok "flatc deaktiviert → build.rs nutzt eingechecktes contextra_generated.rs"
 
 # ── 2. Rust: Pin + stable (Cargo-Tools) + nightly (Fuzz/Sanitizer) ───────────
 step "[2/7] Rust-Toolchains"
@@ -54,9 +67,9 @@ step "[2/7] Rust-Toolchains"
 command -v rustup >/dev/null || { curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none >>"$LOG" 2>&1; . "$HOME/.cargo/env"; }
 need rustup toolchain install "$PIN" --profile minimal -c rustfmt -c clippy -c llvm-tools-preview
 try  rustup default "$PIN"
-try  rustup toolchain install stable --profile minimal
 try  rustup target add wasm32-wasip1 wasm32-unknown-unknown --toolchain "$PIN"
 if [ "${CONTEXTRA_SETUP_FULL:-0}" = 1 ]; then
+  try rustup toolchain install stable --profile minimal
   try rustup toolchain install nightly --profile minimal -c rust-src -c llvm-tools-preview
 fi
 # Verifikation im Repo-Verzeichnis (rust-toolchain.toml greift dort)
@@ -72,7 +85,7 @@ install_tool() {   # $1=binary-check  $2=crate
   local chk="$1" crate="$2"
   if eval "$chk" >/dev/null 2>&1; then ok "$crate vorhanden"; return; fi
   if command -v cargo-binstall >/dev/null && try cargo binstall -y --locked "$crate"; then ok "$crate (binstall)"
-  else try cargo +stable install --locked "$crate" && ok "$crate (source)"; fi
+  else try cargo install --locked "$crate" && ok "$crate (source)"; fi
 }
 install_tool "command -v just"            just
 install_tool "cargo nextest --version"    cargo-nextest
@@ -109,12 +122,12 @@ export CARGO_INCREMENTAL=0
 export CARGO_NET_RETRY=5
 export RUST_BACKTRACE=1
 export CONTEXTRA_EMBEDDING_PROVIDER=mock   # kein Modell-Download in der VM
-export PATH="$VENV/bin:\$HOME/.cargo/bin:\$PATH"
+export PATH="\$HOME/.local/bin:$VENV/bin:\$HOME/.cargo/bin:\$PATH"
 # <<< contextra-env <<<
 ENVEOF
 done
 ok ".bashrc/.profile aktualisiert"
-git config core.hooksPath .githooks && ok "git hooks → .githooks"
+ok "git hooks unverändert (Jules setzt global core.hooksPath=/dev/null)"
 
 # ── 6. Abhängigkeits-Cache (Snapshot-Gewinn) ─────────────────────────────────
 step "[6/7] Cargo-Cache aufwärmen"
@@ -135,7 +148,15 @@ if cargo run -q --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | g
 else warn "xtask env-attest (noch) nicht registriert"; fi
 
 # Kontext einmalig erzeugen (wird bei Task-Start erneut aktualisiert)
-[ -x .jules/setup/refresh-context.sh ] && bash .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
+[ -f .jules/setup/refresh-context.sh ] && bash .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
+
+# ── Working-Tree zurücksetzen (Jules verwirft sonst die Verifikation: "Working tree is dirty") ──
+if [ -n "$(git status --porcelain)" ]; then
+  warn "Working Tree nach Setup dirty:"; git status --short | head -10
+  git reset --hard HEAD -q && git clean -fdq        # ohne -x: target/ und Caches bleiben
+fi
+git reset --hard HEAD 2>&1 | tail -1                # gibt "HEAD is now at …" aus
+git status --porcelain | grep -q . && { echo "❌ Working Tree weiterhin dirty"; FAILS=$((FAILS+1)); } || ok "Working Tree sauber"
 
 echo; echo "============================================================"
 [ "$FAILS" = 0 ] && echo "  ✅ Contextra Jules Environment bereit" || echo "  ❌ $FAILS Pflichtschritt(e) fehlgeschlagen"
