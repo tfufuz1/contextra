@@ -24,6 +24,17 @@ Jeder Task folgt diesem iterativen Ablauf:
 - Es ist verboten, Gates, Lints oder den Toolchain-Pin abzuschwächen oder zu umgehen, um Testergebnisse zu erzwingen.
 - Geschützte Pfade: `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.jules/setup/**`.
 
+### Pflichttabellen der Qualitäts-Gates
+| Gate | Phase | Lokal Pflicht | CI Pflicht | Risiko-Klasse | Owner |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `scope-guard` | check | ja | ja | hoch | governance |
+| `protected-paths` | check | ja | ja | kritisch | governance |
+| `symbol-exists` | check | ja | ja | mittel | architecture |
+| `ratchet` | verify | ja | ja | hoch | governance |
+| `gate-weakening` | submit | ja | ja | kritisch | governance |
+| `test-integrity` | submit | ja | ja | hoch | quality |
+| `session-report` | submit | ja | ja | niedrig | agent-ops |
+
 ## 5. Scope
 - Ausschließlich Dateien im explizit freigegebenen Scope der Task-Karte bearbeiten.
 - Mängel außerhalb des Scopes nicht direkt beheben, sondern im PR-Text unter „Out-of-scope Findings" melden.
@@ -45,6 +56,6 @@ Das Abschwächen, Umgehen oder Deaktivieren von Qualitäts-Gates, Lints, Schwell
 ## 7. Nicht tun (Explizite Scope-Ausschlüsse v15 Teil 0.5)
 - Kein unkontrolliertes, globales Teilgraph-Rebuilding im HNSW-Index durchführen (Ausnahme: ADR-097).
 - Keine mandantenübergreifenden Datenflüsse oder Cross-Tenant-Aggregationen herstellen (`TenantId` isolation).
-- Keine Realtime-Audio- oder Voice-Funktionen integrieren.
+- Keine Realtime-Audio- or Voice-Funktionen integrieren.
 - Keine Veto-Sperren ohne explizites ADR in `docs/decisions/` umgehen.
 - Keine Framework-Adapter (LangChain/LlamaIndex), kein horizontales Sharding, Peer-to-Peer-Sync, EU-AI-Act-Risikomapper oder externe HTTP-Inferenz als Standardabhängigkeit einfügen.
