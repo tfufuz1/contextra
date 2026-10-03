@@ -5,6 +5,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[allow(clippy::duplicate_mod)]
+#[path = "loop_guard.rs"]
+mod loop_guard;
+
 #[derive(Debug, Deserialize)]
 pub struct JulesFacadeStep {
     pub cmd: Vec<String>,
@@ -177,15 +181,52 @@ pub fn jules_facade_execute_phase(
             if reasons.len() < 3 {
                 reasons.push(msg.clone());
             }
-            step_results.push(serde_json::json!({
+
+            let (hash, count, escalated, lg_err) =
+                match loop_guard::loop_guard_record_text(root, Some(sub_cmd), &combined, None) {
+                    Ok((h, c)) => {
+                        let esc = c >= 2;
+                        if esc {
+                            let reason = format!(
+                                "Wiederholter Fehler beim Gate '{}': Hash {} ({})",
+                                sub_cmd, h, c
+                            );
+                            let _ = loop_guard::loop_guard_stop(root, &reason);
+                        }
+                        (h, c, esc, None)
+                    }
+                    Err(e) => (String::new(), 0, false, Some(e)),
+                };
+
+            let mut step_json = serde_json::json!({
                 "command": cmd_str,
                 "required": step.required,
                 "status": "fail",
-                "message": msg
-            }));
+                "message": msg,
+                "gate": sub_cmd,
+                "hash": hash,
+                "count": count,
+                "escalated": escalated
+            });
 
-            if step.required {
+            if let Some(err) = lg_err {
+                let state_msg = format!("Loop-Guard Zustandsfehler: {}", err);
+                step_json["loop_guard_error"] = serde_json::json!(state_msg.clone());
+                reasons.push(state_msg);
+                overall_status = 2;
+            } else if step.required {
                 overall_status = 1;
+            }
+
+            step_results.push(step_json);
+
+            if escalated {
+                reasons.push(format!(
+                    "Loop-Guard Eskalation für Gate '{}': Hash {} (Count {})",
+                    sub_cmd, hash, count
+                ));
+                overall_status = 1;
+                break;
             }
         }
     }
