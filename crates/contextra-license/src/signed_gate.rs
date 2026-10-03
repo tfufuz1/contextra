@@ -343,7 +343,7 @@ impl LicenseGate for SignedLicenseGate {
         } else if let Some(ref payload) = self.license_payload {
             if let Some(ref expected_hash) = payload.installation_id_hash {
                 match self.local_installation_id {
-                    Some(local_hash) if constant_time_eq_32(&local_hash, &expected_hash) => {}
+                    Some(local_hash) if constant_time_eq_32(&local_hash, expected_hash) => {}
                     _ => return Err(LicenseError::NotActivated(ring)),
                 }
             } else {

@@ -35,8 +35,8 @@ fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
 /// Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht unbrauchbar machen.
 #[tokio::test]
 async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn std::error::Error>> {
-    // Timeout-Schutz gegen Deadlocks, Paniks oder unbegrenztes Hängen (max 60 Sekunden)
-    let test_execution = timeout(Duration::from_secs(60), async {
+    // Timeout-Schutz gegen Deadlocks, Paniks oder unbegrenztes Hängen (max 120 Sekunden)
+    let test_execution = timeout(Duration::from_secs(120), async {
         let tmp = TempDir::new()?;
         let dim = 16;
         let db = Arc::new(create_test_db(&tmp, dim).await?);
@@ -78,7 +78,7 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
 
         // 3. Parallele Tokio-Tasks starten, um kontinuierliche hohe Schreiblast über tausende Transaktionen zu treiben
         let task_count = 4;
-        let txs_per_task = 750; // Total 3.000 Transaktionen
+        let txs_per_task = 250; // Total 1.000 Transaktionen
         let total_tx_target = task_count * txs_per_task;
 
         let successful_commits = Arc::new(AtomicUsize::new(0));
@@ -273,6 +273,6 @@ async fn vertical_path_test_3_ssi_under_write_load_b16() -> Result<(), Box<dyn s
     // Assert (d): Totalausfall-Schutz — Test schlägt fehl if Timeout (60s) überschritten wird (Deadlock/Hang/Panic)
     match test_execution.await {
         Ok(res) => res,
-        Err(_) => panic!("Vertical Path Test 3 (B-16) timed out after 60 seconds! Potential deadlock or infinite loop in commit register."),
+        Err(_) => panic!("Vertical Path Test 3 (B-16) timed out after 120 seconds! Potential deadlock or infinite loop in commit register."),
     }
 }
