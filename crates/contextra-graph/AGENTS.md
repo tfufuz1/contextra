@@ -1,107 +1,66 @@
 # AGENTS.md — contextra-graph
-> Layer 1 | CSR-Graph, Entity-Relation Traversal, Session DAG | ~6100 LOC
+> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.11
 
-## 1. Zweck & Architekturrolle
-
-Wissensgraph-Engine (Signal 3 der 4-Signal-Fusion). Implementiert einen
-Compressed Sparse Row (CSR) Graphen im Speicher, gekoppelt an LSM-Speicher
-für Persistenz. Bietet bi-temporale Kanten, Personalized PageRank (PPR),
-Community Detection sowie einen separaten `SessionBranchTree` für Agenten-Status.
-Implementiert den `GraphIndex` Trait aus `contextra-core`.
+## 1. Zweck
+Wissensgraph-Engine des Contextra-Systems (Signal 3 der 4-Signal-Fusion). Implementiert Compressed Sparse Row (CSR) Graph-Speicherung (`CsrGraph`), bi-temporale Kanten-Gültigkeit, Personalized PageRank (PPR), PathRAG, N-äre Hyperkanten sowie Community Detection und Arbeitsablauf-Session-DAGs. Implementiert `GraphIndex` aus `contextra-ports`.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Verzeichnis / Datei | Verantwortung |
 |---|---|
-| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]`, Re-Exports |
-| `csr.rs` | `CsrGraph` — Hauptstruktur, persistiert Entitäten & Kanten, GraphIndex-Impl |
-| `hyperedge.rs` | N-äre Hyperkanten-Definition (`HyperEdge`, `HyperEdgeId`, `RoleId`, `RoleBinding`) |
-| `path_rag.rs` | `PathRAGEngine` — Bidirektionaler Path-Retrieval-Graph (Dijkstra) |
-| `ppr.rs` | `PprContext` — Personalized PageRank mit L1-Norm-Abbruch (ADR-026) |
-| `community.rs` | `detect_communities` — Leiden-Algorithmus inkl. StarExpansion für Hyperkanten |
-| `provenance.rs` | Herkunftsnachweis (`EdgeProvenance`, `DocEdgeIndex`) |
-| `cascade.rs` | Kaskadierende Kanten- und Hyperkanten-Invalidierung bei Dokument-Superseding |
-| `consistency_enforcement.rs` | Widerspruchserkennung und Edge-Suppression (`ConsistencyEnforcer`) |
-| `session_dag.rs` | `SessionBranchTree` — Agenten-Workflow-DAG, `AgentStateNode`, `DagEdge` |
+| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]` Crate-Boundary |
+| `csr/` | CSR-Kernstrukturen (`graph_index.rs`, `graph_read.rs`, `graph_write.rs`, `graph_persist.rs`, `inner.rs`, `path_graph.rs`, `types.rs`, `visibility.rs`) |
+| `apprh/` | APPRH Approximate Personalized PageRank & Heuristics (`diffusion.rs`, `gate_monitor.rs`, `params.rs`, `selector.rs`, `shadow.rs`, `error.rs`) |
+| `ppr/` | Personalized PageRank Engine (`ppr.rs`, `ppr_stream.rs`, `cost.rs`, `shadow_hook.rs`, `snapshot.rs`) |
+| `path_rag/` | PathRAG Engine für k-Path-Retrieval & Snapshot-Isolation (`snapshot.rs`, `k_path.rs`) |
+| `community/` | Community Detection Algorithmen & Leiden-Gruppierung (`community.rs`) |
+| `tl_hfd/` | TL-HFD Topological Heat Flow Diffusion (`diffusion.rs`, `lovasz.rs`, `params.rs`, `shadow.rs`, `error.rs`) |
+| `provenance.rs` | Herkunftsnachweis (`EdgeProvenance`, `DocEdgeIndex`, `INV-GRAPH-PROV-1`) |
+| `consistency_enforcement.rs` | L.9 Widerspruchserkennung und Edge-Suppression (`ConsistencyEnforcer`, `ExactPredicateConflictDetector`, `ConflictPattern`) |
+| `hyperedge.rs` | N-äre Hyperkanten-Definition (`HyperEdge`, `HyperEdgeId`, `RoleId`, `RoleBinding`) & `hyperedge_suggest.rs` |
+| `session_dag.rs` | Agenten-Workflow-DAG (`SessionBranchTree`, `AgentStateNode`, `DagEdge`) |
+| `edge_reinforcement.rs` | Kanten-Verstärkungslernen & Puffermanagement (`edge_reinforcement_buffer.rs`) |
+| `cascade.rs` | Kaskadierende Kanten-Invalidierung bei Dokument-Superseding |
+| `percolation.rs` | Graph-Perkolationsanalyse |
+| `entity_extraction.rs` | Extraktions-Schnittstelle für Entitäten |
+| `arc_slice.rs` | Zero-Copy Arc-Slice Hilfsstrukturen |
+| `error.rs` | Spezifische Fehler-Taxonomie für Graph-Operationen |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### CSR-Persistenz-Präfixe
-CSR-Entitäten und Kanten werden über den zugewiesenen `StorageEngine`
-unter spezifischen LSM-Präfixen persistiert: `__graph:entity:` und `__graph:edge:`.
-Bei LSM-Scans sind diese Präfixe system-intern und müssen vor normalen User-Daten verborgen werden.
+- **AGT-GRAPH-001:** `TxId` muss für alle Graph-Mutationen `TxId::is_valid_origin()` erfüllen (`tx != TxId::INVALID && tx.is_valid_origin()`). Direct Wall-Clock `SystemTime::now()` als TxId ist strikt verboten. (`cargo test -p contextra-graph`)
+- **INV-GRAPH-PROV-1:** Jede eingefügte Kante trägt nachvollziehbare Herkunftsmetadaten (`EdgeProvenance`). (`cargo test -p contextra-graph provenance`)
+- **Bi-temporale Achsen:** Bi-temporale Kanten filtern Sichtbarkeit strikt über `valid_from` und `valid_to` Kausal-TxIds. (`cargo test -p contextra-graph csr::tests::bitemporal_tests`)
+- **INV-GRAPH-SAFE:** 100% Safe Rust mit `#![forbid(unsafe_code)]` im Crate-Root. (`cargo xtask check-agents-integrity`)
 
-### Bi-temporale Kanten (ADR-033)
-Graph-Kanten unterstützen `valid_from` und `valid_to` basierend auf `TxId`.
-Bei `insert_edge_direct_with_bitemporal_validity` ist darauf zu achten,
-dass verfallene Kanten (wo `current_tx > valid_to`) bei Traversierungen ausgeblendet werden.
-
-### TxId-Origin-Invariante (AGT-GRAPH-001)
-`TxId` Argumente für Graphen-Updates MÜSSEN aus der Collection-eigenen `next_tx`-Sequenz 
-oder aus dem `TxId::INTERNAL_BASE` Bereich (z.B. Checkpoint Replay) stammen.
-Die Verwendung der aktuellen Wall-Clock (`SystemTime::as_nanos()`) korrumpiert die `rollback_to_tx()`-Kausalordnung!
-
-### GraphEdge-Relation Synchronisation
-In Layer 2 (Collection) **MUSS** bei `relate()`-Aufrufen synchron auch `graph_index.add_edge()`
-aufgerufen werden. LSM-Metadaten allein reichen nicht für Graph-Traversal.
-
-## 4. Public API Quick-Reference
+## 4. Verboten / Anti-Patterns
 
 ```rust
-// === CsrGraph (csr.rs) — Implementiert GraphIndex ===
-pub struct CsrGraph { ... }
-impl CsrGraph {
-    pub async fn load_from_storage<S: StorageEngine>(storage: &S) -> Result<Self>;
-    pub async fn persist_entity<S: StorageEngine>(&self, tx: TxId, entity: Entity, storage: &S) -> Result<()>;
-    pub async fn persist_edge<S: StorageEngine>(&self, tx: TxId, edge: Edge, storage: &S) -> Result<()>;
-    pub async fn personalized_page_rank_with_context_async(&self, seed_nodes: &[EntityId], config: &PprConfig, ctx: &mut PprContext) -> Vec<(EntityId, f32)>;
-}
+// ❌ FALSCH — SystemTime als TxId für Graph-Operationen verwenden:
+let tx = TxId::new(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64);
+// ✅ KORREKT — Gültige TxId aus der Collection / Transaction Engine verwenden.
 
-// === Session DAG (session_dag.rs) ===
-pub struct SessionBranchTree { ... }
-impl SessionBranchTree {
-    pub fn append_step(&self, parent: NodeIdx, node: AgentStateNode) -> Result<NodeIdx>;
-    pub fn path_to_head(&self) -> Vec<AgentStateNode>;
-}
+// ❌ FALSCH — tokio::spawn oder async runtime im Graph-Kern aufrufen:
+tokio::spawn(async move { ... });
+// ✅ KORREKT — Ring 0 ist synchron (P26); Graph-Traversierung läuft rein synchron.
 
-// === Community Detection (community.rs) ===
-pub async fn detect_communities(graph: &CsrGraph, config: CommunityDetectionConfig) -> Result<Vec<CommunityAssignment>>;
+// ❌ FALSCH — Unbegrenzte Graph-Traversierung ohne Hop-Limit oder Cutoff:
+// ✅ KORREKT — Immer max_hops, PPR-Minkowski-Norm-Abbruch oder Edge-Budgeting angeben.
 ```
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-```rust
-// ❌ FALSCH — SystemTime als TxId für Kanten:
-let tx = TxId(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64);
-graph.add_edge(tx, edge).await?;
-// ✅ KORREKT — TxId vom Caller (Collection) übernehmen:
-graph.add_edge(caller_provided_tx, edge).await?;
+- **Ring-0 Sync-Reinheit (P26):** `contextra-graph` ist ein Ring-0-Crate ohne `tokio`-Abhängigkeit. Algorithmen arbeiten synchron über In-Memory-Snapshots.
+- In-Memory CSR-Arrays und Indizes werden durch feingranulare `parking_lot::RwLock` geschützt.
+- Locks werden nur für minimal erforderliche Abschnitte gehalten.
 
-// ❌ FALSCH — Graph-Traversierung ohne Hop-Limit:
-// ✅ KORREKT — max_hops oder PPR-Algorithmus verwenden.
+## 6. Verifikation
 
-// ❌ FALSCH — CsrGraph mit SessionBranchTree verwechseln:
-// ✅ KORREKT — CsrGraph ist für Entitäten (Dokumente/Wissen), SessionBranchTree für Agenten-Status (Steps).
+```bash
+cargo test -p contextra-graph --locked
+cargo xtask check-agents-integrity
 ```
 
-## 6. Concurrency & Lock-Hierarchie
+## 7. Bekannte Lücken / SOLL
 
-`CsrGraph` nutzt intern `parking_lot::RwLock` für In-Memory CSR-Arrays.
-Die I/O-Persistierung erfolgt komplett asynchron über den bereitgestellten `StorageEngine`.
-Lese-Zugriffe (Traversierung, PPR) blockieren Writer nur extrem kurzfristig,
-da Algorithmen auf Snapshots des Graphen oder optimierten read-only Views arbeiten.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-store` (L1 Peer — wir importieren nur den `StorageEngine` Trait aus core), `contextra-db` (L2)
-- **Genutzt von**: `contextra-db`, `contextra-agent`
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-033 | Bi-temporaler Wissensgraph (TxId validity) |
-| ADR-026 | Personalized PageRank (PPR) |
-| ADR-027 | Community Detection Algorithmus |
-| `rules/llm_protocol.md` | State-Transition Validation |
+- Hyperkanten-Vorschläge (`hyperedge_suggest.rs`) und Perkolation (`percolation.rs`) bieten fortgeschrittene Graph-Analyse, werden jedoch selektiv je nach Feature-Konfiguration aktiviert.

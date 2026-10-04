@@ -1,123 +1,63 @@
 # AGENTS.md — contextra-vector
-> Layer 1 | HNSW Vektor-Index, SIMD Distanzen, SQ8-Quantisierung | ~10800 LOC
+> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.31
 
-## 1. Zweck & Architekturrolle
-
-Vektorsuch-Engine des Contextra-Systems (Signal 1 der 4-Signal-Fusion). Implementiert 
-Hierarchical Navigable Small World (HNSW) Graphen, 8-Bit Skalar-Quantisierung (SQ8) und
-Hardware-beschleunigte SIMD-Distanzmetriken (AVX-512, AVX2, NEON).
-Implementor des `VectorIndex` Traits aus `contextra-core`.
-
-**Invariante:** HNSW-Graphen liegen primär im RAM und werden asynchron via Checkpoints persistiert, 
-bzw. memory-mapped geladen (via `persistence::MmapIndex`).
+## 1. Zweck
+Vektorsuch-Engine des Contextra-Systems (Signal 1 der 4-Signal-Fusion). Implementiert Hierarchical Navigable Small World (HNSW) Graphen, 8-Bit Skalar-Quantisierung (SQ8) sowie DiskANN Out-of-Core-Suche (hinter `experimental-diskann`). Bietet SIMD-beschleunigte Distanzberechnungen durch Delegierung an `contextra-simd` und implementiert `VectorIndex` aus `contextra-ports`.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]` |
-| `hnsw.rs` | `HnswIndex`, Graph-Traversal, Layer-Verwaltung, Heuristic Node Selection |
-| `distance.rs` | SIMD-Distanz-Intrinsics (Cosine, Euclidean, DotProduct), Hardware-Dispatch |
-| `quantize.rs` | `ScalarQuantizer` (SQ8), Asymmetrische/Symmetrische Distanz-Approximation |
-| `persistence.rs` | `MmapIndex`, `HnswHeader`, Binärformat-Serialisierung & Memory-Mapping |
-| `diskann.rs` | DiskANN Out-of-Core-Suche (hinter `experimental-diskann` Feature-Gate) |
+| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]` Crate-Boundary |
+| `hnsw/` | `HnswIndexCore`, Graph-Traversal, Heuristic Node Selection (`vector_index_impl.rs`, `core_insert.rs`, `core_search.rs`, `core_rebuild.rs`) |
+| `diskann/` | Out-of-Core DiskANN Vektorindex (`filtered.rs`, `predicate_augmented.rs`, `persistence.rs`, `vector_index_impl.rs`) |
+| `acorn/` | ACORN Filtered Vector Search Extensions (`gamma_augmentation.rs`, `naive_reference.rs`) |
+| `persistence/` | Snapshots, Binärformat Header (`header.rs`), Memory-Mapping (`mmap.rs`), Knoten-Format (`node.rs`) |
+| `quantize/` | `ScalarQuantizer` (SQ8), Asymmetrische/Symmetrische Distanz-Approximation |
+| `distance.rs` | Safe Abstraktionsschicht für Distanzmetriken (Cosine, Euclidean, DotProduct) via `contextra-simd` |
+| `partial_rebuild.rs` | Inkrementelle HNSW-Graph-Härtung und Rebuild-Optionen (VETO-F02) |
+| `compute_pool.rs` | Dedizierter Synchroner Threadpool für rechenintensive Vektoroperationen |
+| `candidate_stream.rs` | Candidate Streaming Iteratoren für Vektor-Suche |
+| `quantize_rabitq.rs` | Experimental RaBitQ Quantisierungs-Prototyp |
 
-> `experimental-diskann` is opt-in. Enable with `features = ["experimental-diskann"]`.
-> Do NOT add it to `default` — it remains experimental by definition.
+## 3. Invarianten
 
-## 3. Kritische Invarianten
+- **VETO-F02 / ADR-097:** Kein partielles HNSW-Rewiring außer Tombstone-Pruning und kontrolliertem Rebuild. (`cargo test -p contextra-vector --test k02_snapshot_rebuild_determinism`)
+- **INV-DELETION-2:** Keinerlei Geisterzeiger auf gelöschte Knoten nach Tombstone-Pruning. (`cargo test -p contextra-vector hnsw::deletion`)
+- **P24:** Löschkosten sind lokal begrenzt; physisches Pruning erfolgt deferred im Background-Rebuild. (`cargo test -p contextra-vector`)
+- **INV-VECTOR-SAFE:** 100% Safe Rust mit `#![forbid(unsafe_code)]` im gesamten Crate-Root; SIMD-Intrinsics sind strikt nach `contextra-simd` ausgelagert. (`cargo xtask check-unsafe-islands`)
+- **NaN-Validierung:** Vektorkoordinaten und Queries müssen vor/während Distanzberechnungen auf NaN/Inf validiert werden. (`cargo test -p contextra-vector distance`)
 
-### SIMD-Hardware-Dispatch
-Distanzberechnung in `distance.rs` wählt zur Laufzeit die besten verfügbaren Intrinsics.
-Hierarchie: **AVX-512 > AVX2 > NEON > Skalar**.
-Fallback auf Skalar muss immer exakt die gleichen mathematischen Ergebnisse liefern.
-
-### Zero Unsafe Code & Invariants (ADR-017 / Spec §0.4)
-- `crates/contextra-vector` erzwingt strikt `#![forbid(unsafe_code)]` am Crate-Root (`src/lib.rs`).
-- Sämtliche `unsafe`-Operationen (SIMD, Mmap) sind in dedizierte Low-Level Crates (`contextra-simd`, `contextra-sys`) ausgelagert.
-- Jegliches `unsafe` oder `#![allow(unsafe_code)]` innerhalb von `contextra-vector` ist ausnahmslos verboten.
-
-### Atomic Rename Pattern (File Writes)
-Wie in `contextra-store` (aber hier für Index-Snapshots):
-1. Schreibe nach `.tmp`
-2. `fsync` die Datei
-3. `rename(tmp, final)`
-4. `fsync` das Parent-Directory
-
-### bounds-checked Neighbor Load
-Beim Laden von Graph-Knoten (`load_node`) MUSS `neighbor_count` gegen `max_degree` (`M` / `M_max0`) 
-geprüft werden. Ein Out-of-Bounds bedeutet Datei-Korruption -> `Err` zurückgeben, nie stumm abschneiden.
-
-### Quantisierungs-Drift
-`ScalarQuantizer` klemmt Werte außerhalb der trainierten Min/Max-Grenzen auf den erlaubten Bereich `[min, max]`.
-Codebook-Grenzen bleiben für bestehende Codebook-Versionen unveränderlich, um gespeicherte `u8`-Codes nicht zu korrumpieren.
-Ein kumulativer Drift oberhalb von `quantizer_drift_threshold` (Standard 10%) löst einen asynchronen Index-Rebuild mit neu kalibriertem Codebook aus.
-
-## 4. Public API Quick-Reference
+## 4. Verboten / Anti-Patterns
 
 ```rust
-// === HnswIndex (hnsw.rs) — Implementiert VectorIndex ===
-pub struct HnswIndex { ... }
-impl HnswIndex {
-    pub async fn open(config: HnswConfig) -> Result<Self>;
-    // Traits: insert, search, search_at, stats
-}
+// ❌ FALSCH — unsafe Block oder allow(unsafe_code) in contextra-vector verwenden:
+unsafe { ... }
+// ✅ KORREKT — Safe Rust nutzen; SIMD-Operationen an contextra-simd delegieren.
 
-pub struct HnswConfig {
-    pub dimension: usize,
-    pub m: usize,                  // Max edges per node (>0)
-    pub ef_construction: usize,    // Search depth during insertion
-    pub space: DistanceMetric,     // Cosine, Euclidean, DotProduct
-}
+// ❌ FALSCH — Direct tokio::spawn oder async runtime im Hotpath nutzen:
+tokio::spawn(async move { ... });
+// ✅ KORREKT — Ring 0 ist rein synchron (P26); Threadpool aus compute_pool.rs nutzen.
 
-// === Quantization (quantize.rs) ===
-pub struct ScalarQuantizer { ... }
-impl ScalarQuantizer {
-    pub fn try_train(batch: &[&[f32]], dimension: usize) -> Result<Self>;
-    pub fn quantize(&self, vector: &[f32]) -> Vec<u8>;
-    pub fn asymmetric_dist(&self, q_raw: &[f32], v_quant: &[u8]) -> f32;
-}
+// ❌ FALSCH — DiskANN im Standard-Build erzwingen:
+// DiskANN gehört isoliert hinter `experimental-diskann` Feature-Gate.
 ```
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-```rust
-// ❌ FALSCH — unsafe ohne SAFETY-Kommentar (Gate 4 schlägt an!):
-unsafe { std::arch::x86_64::_mm256_loadu_ps(ptr) }
-// ✅ KORREKT:
-// SAFETY: caller guarantees ptr points to 8 floats
-unsafe { std::arch::x86_64::_mm256_loadu_ps(ptr) }
+- **Ring-0 Sync-Reinheit (P26):** `contextra-vector` ist ein Ring-0-Crate ohne `tokio`-Abhängigkeit. All-In-Memory Traversal läuft synchron.
+- Feingranulares In-Memory Locking via `parking_lot::RwLock` / `parking_lot::Mutex`.
+- Locks dürfen nie über I/O-Grenzen gehalten werden; Sperrenhierarchie einhalten.
 
-// ❌ FALSCH — HNSW-Parameter hart codieren:
-let conf = HnswConfig { m: 16, ef_construction: 200, ... };
-// ✅ KORREKT — Aus DB-Config oder defaults laden.
+## 6. Verifikation
 
-// ❌ FALSCH — DiskANN in Produktion integrieren:
-let idx = DiskAnnIndex::open(...); // Nur experimentell!
-// ✅ KORREKT — DiskANN bleibt isoliert hinter feature-gate.
-
-// ❌ FALSCH — Snapshot-Isolation bei search_at ignorieren:
-// ✅ KORREKT — Visibility (SequenceLog) bei HNSW-Suche prüfen.
+```bash
+cargo test -p contextra-vector --locked
+cargo test -p contextra-vector --features experimental-diskann
+cargo xtask check-agents-integrity
 ```
 
-## 6. Concurrency & Lock-Hierarchie
+## 7. Bekannte Lücken / SOLL
 
-`HnswIndex` verwendet stark konkurrierendes Lock-Free- bzw. feingranulares Locking (via `parking_lot`).
-- `RwLock` auf dem Knoten-Array: Darf nur cực kurz gehalten werden.
-- NIEMALS `tokio::sync::RwLock` im HNSW-Hotpath verwenden (nur `parking_lot`).
-- Locks niemals über `.await`-Punkte halten. (Verletzung == Deadlock bei Vektorsuche).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-graph` (L1 Peer, via `#[cfg(feature="graph")]` für HNSW-Wissensgraph-Hybride)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-store` (L1 Peer — wir speichern Indexdateien direkt)
-- **Implementiert**: `VectorIndex` aus `contextra-core`.
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-017 | `unsafe`-Einschränkungen (nur SIMD/Mmap) |
-| ADR-013 | `experimental-diskann` Feature-Flag |
-| `rules/simd_safety.md` | Fallbacks und SIMD-Intrinsics |
-| `rules/async-io.md` | Datei-Operationen für Index-Speicherung |
+- `quantize_rabitq.rs` ist als RaBitQ-Prototyp vorhanden, aber noch nicht in den Produktions-Searchpath integriert.
+- `experimental-diskann` ist opt-in und verlangt explizite Feature-Aktivierung.
