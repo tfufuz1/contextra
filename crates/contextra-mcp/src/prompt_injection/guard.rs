@@ -412,6 +412,100 @@ impl PromptInjectionGuard {
         skeletonized.to_lowercase()
     }
 
+    /// Generische Leetspeak-Rückübersetzung (Ziffern und Sonderzeichen zu Buchstaben).
+    pub fn decode_leetspeak_view(text: &str) -> String {
+        text.chars()
+            .map(|c| match c {
+                '0' => 'o',
+                '1' | '!' => 'i',
+                '3' => 'e',
+                '4' | '@' => 'a',
+                '5' | '$' => 's',
+                '7' => 't',
+                '8' => 'b',
+                other => other,
+            })
+            .collect()
+    }
+
+    /// Minimale HTML-Entity-Dekodierung (`&#DEC;`, `&#xHEX;` und gängige benannte Entities).
+    pub fn decode_html_entities_view(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut chars = text.char_indices().peekable();
+
+        while let Some((i, c)) = chars.next() {
+            if c == '&' {
+                let remainder = &text[i..];
+                if let Some(semi_rel) = remainder.find(';') {
+                    if semi_rel <= 10 {
+                        let entity = &remainder[1..semi_rel];
+                        let mut decoded_char = None;
+
+                        if entity.starts_with("#x") || entity.starts_with("#X") {
+                            if let Ok(val) = u32::from_str_radix(&entity[2..], 16) {
+                                decoded_char = std::char::from_u32(val);
+                            }
+                        } else if entity.starts_with('#') {
+                            if let Ok(val) = entity[1..].parse::<u32>() {
+                                decoded_char = std::char::from_u32(val);
+                            }
+                        } else {
+                            decoded_char = match entity {
+                                "amp" => Some('&'),
+                                "lt" => Some('<'),
+                                "gt" => Some('>'),
+                                "quot" => Some('"'),
+                                "apos" => Some('\''),
+                                "nbsp" => Some(' '),
+                                _ => None,
+                            };
+                        }
+
+                        if let Some(ch) = decoded_char {
+                            result.push(ch);
+                            for _ in 0..semi_rel {
+                                chars.next();
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+            result.push(c);
+        }
+
+        result
+    }
+
+    /// Prüft ob ein Zeichen ein Markdown-Inline-Formatierungszeichen ist.
+    pub fn is_markdown_formatting_char(c: char) -> bool {
+        matches!(c, '*' | '_' | '`' | '~')
+    }
+
+    /// Entfernt Inline-Markdown-Formatierungszeichen (`*`, `_`, `` ` ``, `~`) innerhalb oder an Wörtern.
+    pub fn strip_markdown_inline_formatting_view(text: &str) -> String {
+        let chars: Vec<char> = text.chars().collect();
+        let len = chars.len();
+        let mut result = String::with_capacity(text.len());
+
+        for i in 0..len {
+            let c = chars[i];
+            if Self::is_markdown_formatting_char(c) {
+                let prev_is_ws = i == 0 || chars[i - 1].is_whitespace();
+                let next_is_ws = i + 1 == len || chars[i + 1].is_whitespace();
+
+                // Behalte das Zeichen NUR wenn es beidseitig von Whitespace umgeben ist (z. B. Bullet points "a * b")
+                if prev_is_ws && next_is_ws {
+                    result.push(c);
+                }
+            } else {
+                result.push(c);
+            }
+        }
+
+        result
+    }
+
     /// Collapsiert aufeinanderfolgende Whitespaces zu einem einzelnen Leerzeichen.
     pub fn collapse_whitespace(s: &str) -> String {
         let mut result = String::with_capacity(s.len());
@@ -540,11 +634,51 @@ impl PromptInjectionGuard {
     }
 
     /// Prüft den Eingabetext auf bekannte Prompt-Injection-Muster unter Verwendung
-    /// von Normalisierung, Whitespace-Analysen und rekursiver Base64-Dekodierung.
+    /// von Normalisierung, Leetspeak-Rückübersetzung, HTML-Entity-Dekodierung,
+    /// Markdown-Bereinigung, Whitespace-Analysen und rekursiver Base64-Dekodierung.
     ///
-    /// Gibt den erkannten Pattern-Namen zurück, falls ein Muster gefunden wurde.
+    /// Gibt den erkannten Pattern-Namen zurück, falls ein Muster in einer der Textansichten gefunden wurde.
     pub fn detect(&self, text: &str) -> Option<String> {
-        self.detect_recursive(text, 0)
+        // 1. Primäre Roh-Text-Prüfung
+        if let Some(matched) = self.detect_recursive(text, 0) {
+            return Some(matched);
+        }
+
+        // 2. Leetspeak-rückübersetzte Ansicht
+        let leet = Self::decode_leetspeak_view(text);
+        if leet != text {
+            if let Some(matched) = self.detect_recursive(&leet, 0) {
+                return Some(matched);
+            }
+        }
+
+        // 3. HTML-Entity-dekodierte Ansicht
+        let html = Self::decode_html_entities_view(text);
+        if html != text {
+            if let Some(matched) = self.detect_recursive(&html, 0) {
+                return Some(matched);
+            }
+        }
+
+        // 4. Markdown-Formatierungs-bereinigte Ansicht
+        let md = Self::strip_markdown_inline_formatting_view(text);
+        if md != text {
+            if let Some(matched) = self.detect_recursive(&md, 0) {
+                return Some(matched);
+            }
+        }
+
+        // 5. Kombinierte Dekodierungs-Ansicht (HTML -> Leetspeak -> Markdown)
+        let combined = Self::strip_markdown_inline_formatting_view(
+            &Self::decode_leetspeak_view(&Self::decode_html_entities_view(text)),
+        );
+        if combined != text && combined != leet && combined != html && combined != md {
+            if let Some(matched) = self.detect_recursive(&combined, 0) {
+                return Some(matched);
+            }
+        }
+
+        None
     }
 
     /// Prüft und verarbeitet das JSON-Ergebnisobjekt eines Such- oder Get-Aufrufs.
