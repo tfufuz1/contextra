@@ -1,115 +1,45 @@
-# AGENTS.md — contextra-crypto (Cargo-Package-Name: `contextra-privacy`)
-> Layer 1 | Encryption-at-Rest, HMAC-Chaining, Zeroize | ~2300 LOC
-<!-- Stand: 2026-09-27 -->
+# AGENTS.md — contextra-crypto
+> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.8, III.4, IX.4, L.1
 
-## 1. Zweck & Architekturrolle
+1. Zweck
+Encryption-at-Rest (AES-256-GCM-SIV), HKDF-Schlüsselableitung, WAL-HMAC-Integritätsketten, Zeroize-Speicherhygiene, Anti-Tamper Schutz und DSGVO-konforme kryptographische Löschbeweise (`DeletionProof`). Der Crate erzwingt `#![forbid(unsafe_code)]` im Produktionscode.
 
-Verantwortlich für Encryption-at-Rest (AES-256-GCM-SIV) und Datenintegrität 
-(HMAC-Chaining im WAL). Kapselt die Key-Derivation (HKDF), Zeroize-Speicherhygiene 
-und den Anti-Tamper-Schutz der WAL-Einträge.
-*(Hinweis zur Namensgebung: Verzeichnisname `crates/contextra-crypto`, Cargo-Package-Name `contextra-privacy`).*
-
-## 2. Modul-Karte
-
-| Datei / Modul | Verantwortung |
+2. Modul-Karte
+| Datei/Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]` im Produktionscode (Test-Only Unsafe für Zeroize-Verifikation) |
-| `crypto.rs` | `KeyManager` — HKDF Subkey Derivation, AES-256-GCM-SIV Ver-/Entschlüsselung |
-| `deletion_proof.rs` | Kryptographischer Löschnachweis (`DeletionProof`, `LayerCleanupProof`) |
-| `egress_vault.rs` | Egress Shield & Exfiltration Protection (`EgressVault`, `EgressClassifier`) |
-| `kv_cipher.rs` | KV-Segment-Verschlüsselung & Modell-Fingerprinting |
-| `kv_segment/` | Mandanten-isolierte KV-Cache-Security (`TenantIsolatedKvStore`, `KvSegment`, `EvictionWorker`) |
-| `wal_crypto.rs` | `WalHmac`, `IntegrityVerifier`, `EncryptedWal` — HMAC-Chaining Protokoll |
-| `anti_tamper.rs` | `VolatileEncryptionKey`, Speicherschutz (Zeroize) |
+| `src/lib.rs` | Modul-Deklarationen und Crate-Einstiegspunkt (`#![forbid(unsafe_code)]`) |
+| `src/crypto.rs` | `KeyManager` — HKDF Subkey Derivation, AES-256-GCM-SIV Ver-/Entschlüsselung |
+| `src/deletion_proof.rs` | `DeletionProof` — Kryptographische Löschnachweise und `hash_deleted_keys_length_prefixed` |
+| `src/deletion_proof_typestate.rs` | Typestate-Pattern zur compile-zeitlichen Abdeckungsprüfung aller 7 Deletion-Layer |
+| `src/ed25519_proof.rs` | Ed25519-Signierung und Verifikation von Version-3 Löschbeweisen |
+| `src/anti_tamper.rs` | `VolatileEncryptionKey` — Speichersicherer Schlüsselschutz mit Zeroize-on-Drop |
+| `src/audit_chain.rs` | Audit-Chain Verifikation und fälschungssichere Log-Verkettung |
+| `src/error.rs` | `CryptoError` — Crate-spezifische Fehler-Enum |
+| `src/kdf.rs` | HKDF-SHA256 Schlüsselableitungs-Mechanismen und Salt-Verwaltung |
+| `src/kv_cipher.rs` | KV-Segment Verschlüsselungs-Cipher und Modell-Fingerprinting |
+| `src/kv_segment/` | Mandanten-isolierte KV-Cache-Sicherheit (`store.rs`, `segment.rs`, `eviction_worker.rs`) |
+| `src/kv_shredding.rs` | Crypto-Shredding per-Group Subkey Derivation und O(1) Key-Revokation (Spec L.1) |
+| `src/revocation_log.rs` | Revokations-Log für entzogene Schlüssel und Zertifikate |
+| `src/wal_completeness.rs` | I/O-freie, konstanter-Zeit Verifikation der WAL-Kettenvollständigkeit |
+| `src/wal_crypto.rs` | `WalHmac`, `IntegrityVerifier`, `EncryptedWal` — HMAC-Chaining Protokoll |
 
-## 3. Kritische Invarianten
+3. Invarianten
+- `INV-DELETION-1`: `DeletionProof` darf erst erzeugt werden, wenn alle deklarierten Layer physisch bereinigt wurden.
+- `INV-CRYPTO-DUPLICATE-1`: Genau EINE Definition von `hash_deleted_keys_length_prefixed` in `deletion_proof.rs`.
+- `INV-WAL-TRUNCATION-1`: HMAC-Chaining verhindert WAL-Truncation und Replay-Attacken.
+- `INV-P28-CSPRNG`: Ausdrückliche P28-Ausnahme für `rand::thread_rng()` / `OsRng` bei der Schlüssel- und Salt-Generierung.
 
-### Key Derivation Kette
-Schlüssel MÜSSEN zwingend durch die `KeyManager` HKDF-Pipeline abgeleitet werden.
-**Pfad**: Passphrase + Salt → Master Key → `derive_file_key(file_id)` → Subkey.
-Hardcodierte Schlüssel sind absolut **VERBOTEN** (SECURITY BLOCKER).
+4. Verboten / Anti-Patterns
+- Plaintext-Vektoren für Schlüssel verwenden (Stets `zeroize::Zeroizing` oder `VolatileEncryptionKey` nutzen).
+- Hartcodierte kryptographische Schlüssel im Code ablegen.
+- HMAC-Fehler ignorieren statt als `ContextraError::WalCorruption` / `CryptoError` abzufangen.
 
-### HMAC Chaining (WAL Integrität)
-Jeder WAL-Eintrag (`WalEntrySnapshot`) muss kryptographisch mit dem vorherigen Eintrag 
-verkettet werden (HMAC-Chain). Ein Bruch in der Kette indiziert Manipulation oder 
-Korruption und muss mit `ContextraError::WalCorruption` hart abbrechen.
+5. Nebenläufigkeit, Async- und Lock-Regeln
+- Kryptographische Operationen sind rein synchron und CPU-bound.
+- Thread-safe `KeyManager` und `KeyRegistry` nutzen interne Leser/Schreiber-Sperren ohne Deadlock-Gefahren.
 
-### Zeroize-Garantie
-Kryptographisches Schlüsselmaterial (`VolatileEncryptionKey`) implementiert den 
-`ZeroizeOnDrop` Trait. Schlüsselmaterial darf den Scope nicht als Klartext (`String` 
-oder `Vec<u8>`) verlassen, sondern MUSS in `zeroize::Zeroizing` oder dem dedizierten
-Volatile-Wrapper gekapselt sein.
+6. Verifikation
+- `cargo test -p contextra-crypto`
 
-### Nonce-Uniqueness (AES-256-GCM-SIV)
-Verschlüsselungsoperationen (`encrypt_auto_nonce`) erzeugen zufällige Nonces.
-Auch wenn AES-GCM-SIV resistent gegen Nonce-Reuse ist, MUSS für jede Verschlüsselung
-eine neue, kryptographisch sichere Zufallszahl (`OsRng`) generiert werden.
-
-### Length-Prefixed Key Hash Single Source of Truth (INV-CRYPTO-DUPLICATE-1)
-`hash_deleted_keys_length_prefixed` ist kanonisch in `deletion_proof.rs` definiert.
-Andere Module wie `ed25519_proof.rs` MÜSSEN die Funktion direkt re-exportieren (`pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;`) statt eine Duplikat-Funktion anzulegen.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === Key Management (crypto.rs) ===
-pub struct KeyManager { ... }
-impl KeyManager {
-    pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self>;
-    pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self>;
-    pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])>;
-    pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>>;
-}
-
-// === WAL HMAC (wal_crypto.rs) ===
-pub struct IntegrityVerifier { ... }
-impl IntegrityVerifier {
-    pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()>;
-}
-
-// === Anti-Tamper (anti_tamper.rs) ===
-pub struct VolatileEncryptionKey { ... }
-impl VolatileEncryptionKey {
-    pub fn emergency_wipe(&mut self);
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Plaintext-Vektor für Keys nutzen:
-let key: Vec<u8> = vec![...];
-// ✅ KORREKT — Zeroize Wrapper nutzen:
-let key = zeroize::Zeroizing::new(vec![...]);
-
-// ❌ FALSCH — Keys hart kodieren:
-let key = b"hardcoded_key_32bytes___________"; 
-// ✅ KORREKT:
-let key = load_or_create_integrity_key(&path)?;
-
-// ❌ FALSCH — HMAC-Fehler ignorieren:
-let _ = verifier.verify_and_update(...);
-// ✅ KORREKT:
-verifier.verify_and_update(...)
-    .map_err(|e| ContextraError::WalCorruption { ... })?;
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-Verschlüsselung und HMAC-Operationen sind rein synchron und Thread-Safe (CPU-bound).
-Keys und Verifier halten keine Locks. Instanzen wie `IntegrityVerifier` müssen 
-pro WAL-Writer mutabel gehalten werden (was durch den `write_lock` im `LsmStorage`
-gewährleistet wird).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-store` (L1 Peer), `contextra-db` (L2)
-- **Genutzt von**: `contextra-store` (für WAL & SSTable Encryption), `contextra-mcp` (für Sandbox-Isolierung)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| `rules/wal_crypto.md` | HMAC Chaining & Derivation Regeln |
-| `AGENTS.md (Non-Obvious Decisions)` | `unsafe` Ausnahme für Memory-Wipe Verifikation |
+7. Bekannte Lücken / SOLL
+- Die Spezifikation nennt `contextra-crypto` historisch als Unsafe-Insel; der Code erzwingt jedoch strikt `#![forbid(unsafe_code)]` und `capabilities.toml` führt `unsafe_island = false`.
