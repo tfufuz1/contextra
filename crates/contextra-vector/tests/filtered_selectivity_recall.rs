@@ -87,7 +87,7 @@ async fn test_filtered_search_selectivity_recall() {
     let mut data_rng = SimpleRng::new(12345);
     let mut dataset = Vec::with_capacity(num_vecs);
     for i in 1..=num_vecs {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let vec = data_rng.next_unit_vector(dim);
         dataset.push((doc_id, vec));
     }
@@ -108,7 +108,7 @@ async fn test_filtered_search_selectivity_recall() {
     println!("(Hinweis: Messung beinhaltet nur Index-/Speicherlatenz, ohne Embedding-Inferenz)");
 
     for (label, modulus, target_rem) in selectivities {
-        let predicate = Arc::new(move |id: DocId| id.inner() % modulus == target_rem);
+        let predicate = Arc::new(move |id: DocId| (id.inner() as u64) % modulus == target_rem);
 
         let mut query_rng = SimpleRng::new(54321);
         let mut std_hits = 0;
