@@ -163,6 +163,7 @@ async fn run_benchmark() -> Result<(), Box<dyn std::error::Error>> {
 
     let db_cfg = ContextraConfig {
         dimension: dim,
+        max_ram_mb: 2048,
         ..Default::default()
     };
 

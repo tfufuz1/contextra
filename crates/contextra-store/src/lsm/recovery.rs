@@ -382,6 +382,12 @@ impl LsmStorage {
                     "Memory budget tracking nach WAL-Replay fehlgeschlagen: {e}. \
                      Budget-Accounting unpräzise bis zum nächsten Flush."
                 );
+            } else {
+                tracing::debug!(
+                    replayed_bytes = replayed_size,
+                    total_used_bytes = resource_tracker.memory_used(),
+                    "Memory budget consumed during WAL replay recovery"
+                );
             }
         }
 
@@ -722,7 +728,8 @@ impl LsmStorage {
         let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;
         wal.truncate(target_offset, target_hmac).await?;
 
-        fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) {
+        fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) -> usize {
+            let initial_size = memtable.size();
             let txs_to_rollback: std::collections::HashSet<u64> = memtable
                 .iter()
                 .into_iter()
@@ -732,11 +739,20 @@ impl LsmStorage {
             for tx_id in txs_to_rollback {
                 memtable.rollback(tx_id);
             }
+            initial_size.saturating_sub(memtable.size())
         }
 
-        prune_memtable_above_tx(&state.memtable, target_tx.inner());
+        let mut bytes_freed = prune_memtable_above_tx(&state.memtable, target_tx.inner()) as u64;
         for imm in &state.immutable_memtables {
-            prune_memtable_above_tx(imm, target_tx.inner());
+            bytes_freed += prune_memtable_above_tx(imm, target_tx.inner()) as u64;
+        }
+        if bytes_freed > 0 {
+            self.budget.release_memory(bytes_freed);
+            tracing::debug!(
+                freed_bytes = bytes_freed,
+                total_used_bytes = self.budget.memory_used(),
+                "Memory budget released during transaction rollback"
+            );
         }
 
         let mut sstables_lock = self.sstables.write().await;

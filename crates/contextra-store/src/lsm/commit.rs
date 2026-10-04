@@ -119,6 +119,12 @@ impl LsmStorage {
                         .load(std::sync::atomic::Ordering::Relaxed),
                     "Memory budget tracking warning during commit: {e}"
                 );
+            } else {
+                tracing::debug!(
+                    delta_bytes = entry_size as u64,
+                    total_used_bytes = self.budget.memory_used(),
+                    "Memory budget consumed during commit"
+                );
             }
             memtable.put(
                 Bytes::from(key.clone()),
