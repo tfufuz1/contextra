@@ -1,13 +1,9 @@
 //! Campaign J-23: Comprehensive Audit and Verification Test Suite for `contextra-vector`.
 //! Tests cover HNSW, DiskANN, ACORN, Adaptive ef, Rebuild/Swap, Arena Node Reuse, Partial Rebuild, Recall Suite, Limits & MVCC.
 
-use contextra_core::{
-    DistanceMetric, DocId, Result, ScoredDocument, TxId, VectorIndex,
-};
+use contextra_core::{DistanceMetric, DocId, Result, ScoredDocument, TxId, VectorIndex};
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};
-use contextra_vector::hnsw::{
-    AdaptiveEfPolicy, AdaptiveEfStateMachine, HnswConfig, HnswIndex,
-};
+use contextra_vector::hnsw::{AdaptiveEfPolicy, AdaptiveEfStateMachine, HnswConfig, HnswIndex};
 use std::collections::HashSet;
 
 // --- ORACLE / ANTI-MIRRORING (R4) ---
@@ -227,7 +223,10 @@ fn test_h3_adaptive_ef_max_ef_termination() -> Result<()> {
 
     assert!(sm.is_terminated());
     assert_eq!(sm.current_ef(), 32, "Should terminate at max_ef");
-    assert!(!sm.stats().converged, "Terminated due to max_ef, not stability");
+    assert!(
+        !sm.stats().converged,
+        "Terminated due to max_ef, not stability"
+    );
 
     Ok(())
 }
@@ -503,9 +502,7 @@ async fn test_h9_limits_dimension_mismatch_and_nan() -> Result<()> {
 
     // Dimension mismatch
     let bad_dim_vec = vec![1.0, 2.0];
-    let res_dim = index
-        .insert(TxId(1), make_doc_id(1), &bad_dim_vec)
-        .await;
+    let res_dim = index.insert(TxId(1), make_doc_id(1), &bad_dim_vec).await;
     assert!(
         res_dim.is_err(),
         "Dimension mismatch must return Err, not panic"

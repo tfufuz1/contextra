@@ -258,8 +258,7 @@ async fn test_h3_tenant_scoped_storage_isolation() {
 fn test_h4_kv_segment_deletion_proof_state_binding() {
     let registry = Arc::new(KeyRegistry::new());
     let master_key = Arc::new(
-        KeyManager::try_new("master-passphrase-shredding", b"master-salt-123")
-            .expect("KeyManager"),
+        KeyManager::try_new("master-passphrase-shredding", b"master-salt-123").expect("KeyManager"),
     );
 
     // 1. TombstoneOnly manager
@@ -401,7 +400,12 @@ async fn test_h6_observer_circuit_breaker_fail_open() {
     let start = std::time::Instant::now();
     for i in 1..=100u64 {
         let tx = TxId::new(i);
-        registry.notify(&[], i, tx, contextra_store::lsm::observer::WriteOrigin::UserWrite);
+        registry.notify(
+            &[],
+            i,
+            tx,
+            contextra_store::lsm::observer::WriteOrigin::UserWrite,
+        );
     }
     let elapsed = start.elapsed();
 
@@ -557,10 +561,6 @@ fn test_h8_system_pressure_monitor_escalation() {
     assert_eq!(p_critical_wal.pressure_level, PressureLevel::Critical);
 
     // Monotonicity check
-    assert!(
-        level_rank(p_normal.pressure_level) < level_rank(p_elevated_wal.pressure_level)
-    );
-    assert!(
-        level_rank(p_elevated_wal.pressure_level) < level_rank(p_critical_wal.pressure_level)
-    );
+    assert!(level_rank(p_normal.pressure_level) < level_rank(p_elevated_wal.pressure_level));
+    assert!(level_rank(p_elevated_wal.pressure_level) < level_rank(p_critical_wal.pressure_level));
 }

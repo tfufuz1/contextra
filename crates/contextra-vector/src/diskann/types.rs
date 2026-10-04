@@ -11,6 +11,7 @@ use ahash::AHashMap;
 use contextra_core::{ContextraError, DocId, Result};
 use memmap2::Mmap;
 use parking_lot::RwLock;
+use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
@@ -51,6 +52,97 @@ impl Clone for DiskAnnIndex {
         Self {
             inner: self.inner.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_try_new_non_existent_file_succeeds() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("non_existent.dann");
+        let config = DiskAnnConfig {
+            index_path: path,
+            dimension: 4,
+            max_degree: 8,
+            sector_size: 512,
+            ..Default::default()
+        };
+        let index_res = DiskAnnIndex::try_new(config);
+        assert!(index_res.is_ok());
+    }
+
+    #[test]
+    fn test_try_new_corrupt_magic_fails_immediately() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("corrupt_magic.dann");
+        std::fs::write(&path, b"BADM_corrupt_header_data_bytes_1234567890_padding_bytes").unwrap();
+
+        let config = DiskAnnConfig {
+            index_path: path,
+            dimension: 4,
+            max_degree: 8,
+            sector_size: 512,
+            ..Default::default()
+        };
+
+        let res = DiskAnnIndex::try_new(config);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        match err {
+            ContextraError::Storage(msg) => assert!(msg.contains("bad magic"), "Expected bad magic error, got: {msg}"),
+            other => panic!("Expected Storage error with bad magic, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_try_new_truncated_file_fails_immediately() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("truncated.dann");
+        // Only write 10 bytes (smaller than DiskAnnHeader::SIZE = 40)
+        std::fs::write(&path, b"DANN_small").unwrap();
+
+        let config = DiskAnnConfig {
+            index_path: path,
+            dimension: 4,
+            max_degree: 8,
+            sector_size: 512,
+            ..Default::default()
+        };
+
+        let res = DiskAnnIndex::try_new(config);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        match err {
+            ContextraError::Storage(msg) => assert!(msg.contains("Header too small") || msg.contains("too small for header"), "Expected Header too small error, got: {msg}"),
+            other => panic!("Expected Storage error with Header too small, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_try_new_valid_existing_file_succeeds() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("valid_index.dann");
+        let config = DiskAnnConfig {
+            index_path: path.clone(),
+            dimension: 4,
+            max_degree: 8,
+            sector_size: 512,
+            ..Default::default()
+        };
+
+        let index = DiskAnnIndex::try_new(config.clone()).unwrap();
+        index
+            .build_sync(&[vec![1.0, 0.0, 0.0, 0.0]], &[DocId::from(1u64)])
+            .unwrap();
+
+        // Re-open with try_new
+        let reloaded_res = DiskAnnIndex::try_new(config);
+        assert!(reloaded_res.is_ok());
     }
 }
 
@@ -96,6 +188,53 @@ impl DiskAnnIndex {
         let doc_id_size = 8;
         let raw_node_size = vector_size + neighbors_size + doc_id_size;
         let node_size_bytes = raw_node_size.div_ceil(config.sector_size) * config.sector_size;
+
+        if config.index_path.exists() {
+            let mut file = std::fs::File::open(&config.index_path).map_err(ContextraError::Io)?;
+            let metadata = file.metadata().map_err(ContextraError::Io)?;
+            let file_len = metadata.len() as usize;
+
+            if file_len < DiskAnnHeader::SIZE {
+                return Err(ContextraError::Storage("DiskANN file too small for header".into()));
+            }
+
+            let mut header_buf = [0u8; DiskAnnHeader::SIZE];
+            file.read_exact(&mut header_buf).map_err(ContextraError::Io)?;
+
+            let header = DiskAnnHeader::try_from_bytes(&header_buf)?;
+
+            if config.sector_size != header.sector_size as usize {
+                return Err(ContextraError::Index(format!(
+                    "DiskANN-Index inkompatibel: Config-sector_size={} stimmt nicht mit \
+                     Header-sector_size={} überein. Index muss neu aufgebaut werden.",
+                    config.sector_size, header.sector_size
+                )));
+            }
+
+            let header_sector_size = header.sector_size as usize;
+            if header_sector_size == 0 {
+                return Err(ContextraError::Storage("DiskANN header corrupt: sector_size is 0".into()));
+            }
+
+            let header_vector_size = if header.quantized != 0 {
+                header.dimension as usize
+            } else {
+                header.dimension as usize * 4
+            };
+            let header_neighbors_size = 4 + (header.max_degree as usize * 4);
+            let header_raw_node_size = header_vector_size + header_neighbors_size + doc_id_size;
+            let header_node_size_bytes =
+                header_raw_node_size.div_ceil(header_sector_size) * header_sector_size;
+            let start_offset = DiskAnnHeader::SIZE.div_ceil(header_sector_size) * header_sector_size;
+            let expected_min_size = start_offset
+                .saturating_add((header.node_count as usize).saturating_mul(header_node_size_bytes));
+            if file_len < expected_min_size {
+                return Err(ContextraError::Storage(format!(
+                    "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
+                    file_len, expected_min_size
+                )));
+            }
+        }
 
         Ok(Self {
             inner: Arc::new(DiskAnnIndexInner {

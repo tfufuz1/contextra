@@ -42,7 +42,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 ## 6. Invarianten (verbindlich, v15 Teil F)
 - **Zero-Panic (P7):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
 - **Prozessaufrufe:** Niemals über `sh -c`; Parameter via `shlex` parsen und als Argument-Array übergeben.
-- **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+- **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`). Alle anderen Crates (inkl. `contextra-vector` / `distance.rs`) erzwingen `#![forbid(unsafe_code)]` bzw. sind 100% Safe Rust.
 - **Single-Node & Ein-Prozess-Garantie:** Contextra ist ein `cargo add`, kein Server. Multi-Node Scaling, Sharding, Peer-to-Peer-Sync oder Cluster-Logik sind verboten.
 - **Pure Rust Inferenz:** GGUF/Candle Inferenz via `contextra-infer-candle` ist das Standard-Backend.
 - **Sync-Kern (P26):** Ring 0 (`contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-crypto`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-core`, `contextra-avv-generator`, `contextra-audit-export`) enthält keine Async-Runtime (`tokio`).

@@ -11,9 +11,7 @@ use contextra_vector::candidate_stream::VectorCandidateStream;
 use contextra_vector::compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-use contextra_vector::distance::{
-    cosine_distance, dot_product_distance, euclidean_distance,
-};
+use contextra_vector::distance::{cosine_distance, dot_product_distance, euclidean_distance};
 use contextra_vector::hnsw::sq8_bias::Sq8Bias;
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::{MmapIndex, NodeRecord};
@@ -208,8 +206,7 @@ fn test_h2_quantization_drift_and_sq8_bias() {
     );
 
     // Test Sq8Bias calibration
-    let raw_candidates: Vec<Vec<f32>> =
-        (0..10).map(|i| gen_vector(dim, i as u64 + 77)).collect();
+    let raw_candidates: Vec<Vec<f32>> = (0..10).map(|i| gen_vector(dim, i as u64 + 77)).collect();
 
     let cand_refs: Vec<&[f32]> = raw_candidates.iter().map(|v| v.as_slice()).collect();
     let bias_cal = Sq8Bias::calibrate(&cand_refs, &sq, DistanceMetric::Euclidean);
@@ -577,7 +574,10 @@ async fn test_h7_diskann_corruption_and_fallback_policy() {
     // Search on corrupted diskann index triggers fallback or error
     let query = gen_vector(dim, 999);
     let search_res = index.search(&query, 5).await;
-    println!("H7 DiskANN search on corrupted header result: is_ok={}", search_res.is_ok());
+    println!(
+        "H7 DiskANN search on corrupted header result: is_ok={}",
+        search_res.is_ok()
+    );
 }
 
 // ============================================================================
@@ -625,7 +625,10 @@ async fn test_h8_diskann_pending_wal_and_tombstone_wal_recovery() {
     index.delete(tx, del_doc).await.unwrap();
 
     let stats = index.stats().await.unwrap();
-    println!("H8 DiskANN stats after delete: num_vectors={}, deleted_ratio={}", stats.num_vectors, stats.deleted_ratio);
+    println!(
+        "H8 DiskANN stats after delete: num_vectors={}, deleted_ratio={}",
+        stats.num_vectors, stats.deleted_ratio
+    );
     assert!(stats.deleted_ratio > 0.0);
 }
 

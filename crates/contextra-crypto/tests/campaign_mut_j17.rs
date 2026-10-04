@@ -4,13 +4,12 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_crypto::{
-    KdfHeader, KdfParams, KeyManager,
-    KvCipher, KvSegmentCipher, KeyRegistry, SignatureVersion,
-    SubKey,
-};
 use contextra_crypto::kdf::{KDF_HEADER_MAGIC, KDF_HEADER_VERSION_1, KDF_ID_ARGON2ID};
 use contextra_crypto::kv_shredding::{GroupKek, RecordDek};
+use contextra_crypto::{
+    KdfHeader, KdfParams, KeyManager, KeyRegistry, KvCipher, KvSegmentCipher, SignatureVersion,
+    SubKey,
+};
 
 #[test]
 fn killer_test_signature_version_into_u8() {
@@ -45,8 +44,16 @@ fn killer_test_kdf_header_to_bytes_exact_length_and_magic() {
     let bytes = header.to_bytes();
 
     let expected_len = 4 + 1 + 1 + 4 + 4 + 4 + 4 + 16; // 38 bytes
-    assert_eq!(bytes.len(), expected_len, "Serialized KdfHeader length must match header layout");
-    assert_eq!(&bytes[0..4], KDF_HEADER_MAGIC, "Serialized header must start with magic MFKD");
+    assert_eq!(
+        bytes.len(),
+        expected_len,
+        "Serialized KdfHeader length must match header layout"
+    );
+    assert_eq!(
+        &bytes[0..4],
+        KDF_HEADER_MAGIC,
+        "Serialized header must start with magic MFKD"
+    );
     assert_eq!(bytes[4], KDF_HEADER_VERSION_1);
     assert_eq!(bytes[5], KDF_ID_ARGON2ID);
 }
@@ -61,21 +68,33 @@ fn killer_test_kdf_header_from_bytes_boundary_validations() {
 
     // 1. Truncated header (< 22 bytes)
     let truncated = &valid_bytes[..21];
-    assert!(KdfHeader::from_bytes(truncated).is_err(), "Header < 22 bytes must fail");
+    assert!(
+        KdfHeader::from_bytes(truncated).is_err(),
+        "Header < 22 bytes must fail"
+    );
 
     // 2. Exact 22 bytes header with salt_len = 16 (incomplete payload, 22 < 22 + 16)
     let incomplete_salt = &valid_bytes[..22];
-    assert!(KdfHeader::from_bytes(incomplete_salt).is_err(), "Incomplete salt payload must fail");
+    assert!(
+        KdfHeader::from_bytes(incomplete_salt).is_err(),
+        "Incomplete salt payload must fail"
+    );
 
     // 3. Header with salt_len below MIN_SALT_LEN (e.g. 15 bytes)
     let mut bad_salt_len_bytes = valid_bytes.clone();
     bad_salt_len_bytes[18..22].copy_from_slice(&15u32.to_be_bytes());
-    assert!(KdfHeader::from_bytes(&bad_salt_len_bytes).is_err(), "salt_len < 16 must fail");
+    assert!(
+        KdfHeader::from_bytes(&bad_salt_len_bytes).is_err(),
+        "salt_len < 16 must fail"
+    );
 
     // 4. Header with salt_len > 10,000 (e.g. 10,001 bytes)
     let mut huge_salt_len_bytes = valid_bytes.clone();
     huge_salt_len_bytes[18..22].copy_from_slice(&10_001u32.to_be_bytes());
-    assert!(KdfHeader::from_bytes(&huge_salt_len_bytes).is_err(), "salt_len > 10000 must fail");
+    assert!(
+        KdfHeader::from_bytes(&huge_salt_len_bytes).is_err(),
+        "salt_len > 10000 must fail"
+    );
 }
 
 #[test]
@@ -86,14 +105,23 @@ fn killer_test_key_manager_kv_cipher_seal_open_roundtrip() {
     let plaintext = b"exact plaintext payload for KeyManager KvCipher trait";
 
     let sealed = km.seal(plaintext).expect("KeyManager seal must succeed");
-    assert!(sealed.len() >= 12 + plaintext.len(), "Sealed payload must contain 12B nonce");
+    assert!(
+        sealed.len() >= 12 + plaintext.len(),
+        "Sealed payload must contain 12B nonce"
+    );
 
     let opened = km.open(&sealed).expect("KeyManager open must succeed");
-    assert_eq!(opened, plaintext, "Opened payload must equal original plaintext");
+    assert_eq!(
+        opened, plaintext,
+        "Opened payload must equal original plaintext"
+    );
 
     // Short ciphertext (< 12 bytes) must fail open
     let short_ct = vec![0u8; 11];
-    assert!(km.open(&short_ct).is_err(), "Ciphertext < 12 bytes must fail open");
+    assert!(
+        km.open(&short_ct).is_err(),
+        "Ciphertext < 12 bytes must fail open"
+    );
 }
 
 #[test]
@@ -104,8 +132,12 @@ fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
     let cipher = KvSegmentCipher::new(km);
     let plaintext = b"exact plaintext payload for KvSegmentCipher seal open";
 
-    let sealed = cipher.seal(plaintext).expect("KvSegmentCipher seal must succeed");
-    let opened = cipher.open(&sealed).expect("KvSegmentCipher open must succeed");
+    let sealed = cipher
+        .seal(plaintext)
+        .expect("KvSegmentCipher seal must succeed");
+    let opened = cipher
+        .open(&sealed)
+        .expect("KvSegmentCipher open must succeed");
     assert_eq!(opened, plaintext);
 }
 
@@ -122,7 +154,9 @@ fn killer_test_key_registry_get_wrapped_kek_and_dek() {
     assert!(registry.get_wrapped_dek(group_id, record_id).is_none());
 
     // Encrypt a record to populate registry
-    let payload = registry.encrypt_record(&km, group_id, record_id, b"sample record").unwrap();
+    let payload = registry
+        .encrypt_record(&km, group_id, record_id, b"sample record")
+        .unwrap();
 
     // Now get_wrapped_kek and get_wrapped_dek return Some((wrapped, nonce))
     let kek_opt = registry.get_wrapped_kek(group_id);
@@ -138,12 +172,21 @@ fn killer_test_key_registry_get_wrapped_kek_and_dek() {
 
     // After revoking record, get_wrapped_dek returns None, but get_wrapped_kek returns Some
     assert!(registry.revoke_record(group_id, record_id));
-    assert!(registry.get_wrapped_dek(group_id, record_id).is_none(), "Revoked record wrapped DEK must be None");
-    assert!(registry.get_wrapped_kek(group_id).is_some(), "Unrevoked group wrapped KEK must remain Some");
+    assert!(
+        registry.get_wrapped_dek(group_id, record_id).is_none(),
+        "Revoked record wrapped DEK must be None"
+    );
+    assert!(
+        registry.get_wrapped_kek(group_id).is_some(),
+        "Unrevoked group wrapped KEK must remain Some"
+    );
 
     // After revoking group, get_wrapped_kek returns None
     assert!(registry.revoke_group(group_id));
-    assert!(registry.get_wrapped_kek(group_id).is_none(), "Revoked group wrapped KEK must be None");
+    assert!(
+        registry.get_wrapped_kek(group_id).is_none(),
+        "Revoked group wrapped KEK must be None"
+    );
 }
 
 #[test]
@@ -154,15 +197,24 @@ fn killer_test_key_registry_is_group_active_logic() {
     let group_id = 999;
 
     // 1. Group not in registry and not revoked -> active must be FALSE
-    assert!(!registry.is_group_active(group_id), "Unregistered group must not be active");
+    assert!(
+        !registry.is_group_active(group_id),
+        "Unregistered group must not be active"
+    );
 
     // 2. Group registered and active -> active must be TRUE
     let _ = registry.get_or_derive(&km, group_id).unwrap();
-    assert!(registry.is_group_active(group_id), "Registered active group must be active");
+    assert!(
+        registry.is_group_active(group_id),
+        "Registered active group must be active"
+    );
 
     // 3. Group revoked -> active must be FALSE
     registry.revoke_group(group_id);
-    assert!(!registry.is_group_active(group_id), "Revoked group must not be active");
+    assert!(
+        !registry.is_group_active(group_id),
+        "Revoked group must not be active"
+    );
 }
 
 #[test]
@@ -176,7 +228,16 @@ fn killer_test_debug_redaction_for_subkeys() {
     let kek_debug = format!("{kek:?}");
     let dek_debug = format!("{dek:?}");
 
-    assert!(sk_debug.contains("***REDACTED***"), "SubKey Debug must contain ***REDACTED***");
-    assert!(kek_debug.contains("***REDACTED***"), "GroupKek Debug must contain ***REDACTED***");
-    assert!(dek_debug.contains("***REDACTED***"), "RecordDek Debug must contain ***REDACTED***");
+    assert!(
+        sk_debug.contains("***REDACTED***"),
+        "SubKey Debug must contain ***REDACTED***"
+    );
+    assert!(
+        kek_debug.contains("***REDACTED***"),
+        "GroupKek Debug must contain ***REDACTED***"
+    );
+    assert!(
+        dek_debug.contains("***REDACTED***"),
+        "RecordDek Debug must contain ***REDACTED***"
+    );
 }

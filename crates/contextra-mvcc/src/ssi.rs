@@ -651,7 +651,9 @@ impl SequenceLogSsiValidator {
             sink.record_gauge("mvcc_ssi_commit_register_utilization_ratio", ratio, &[]);
 
             if reached_threshold {
-                if let Some(ref blocker) = self.diagnose_pruning_blocker_internal(writes, Instant::now()) {
+                if let Some(ref blocker) =
+                    self.diagnose_pruning_blocker_internal(writes, Instant::now())
+                {
                     sink.record_gauge(
                         "mvcc_ssi_coarsened_buckets_total",
                         blocker.coarsened_seq_buckets as f64,

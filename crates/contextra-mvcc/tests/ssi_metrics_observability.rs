@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_mvcc::SequenceLogSsiValidator;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::metrics::{MetricEvent, TestMetricsSink};
 use contextra_ports::MetricsSink;
-use contextra_mvcc::SnapshotRegistry;
-use contextra_mvcc::SequenceLogSsiValidator;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -15,8 +15,8 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
     let max_keys = 20;
-    let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
-        .with_metrics_sink(sink_container);
+    let validator =
+        SequenceLogSsiValidator::new_with_bounds(max_keys).with_metrics_sink(sink_container);
 
     // Commit 17 distinct keys to exceed the 80% threshold (17 / 20 = 85%)
     for i in 1..=17 {
