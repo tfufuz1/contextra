@@ -160,7 +160,11 @@ impl KvSegmentManager {
                 "Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.",
             )),
             KvDeleteMode::CryptoShred => {
-                // Return true if key is revoked (no longer active)
+                if !self.registry.was_group_ever_registered(group_id) {
+                    return Err(ContextraError::KvDeleteModeConfig(
+                        "Löschbeweis unzulässig: Gruppe wurde nie registriert.",
+                    ));
+                }
                 let is_active = self.registry.is_key_active(group_id);
                 Ok(!is_active)
             }
