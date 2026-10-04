@@ -11,3 +11,4 @@ cargo run --manifest-path xtask/Cargo.toml -- blast-radius [--base <rev>] [--hea
 ## Funktionsweise
 - Liest `capabilities.toml` (`may_depend_on`) und berechnet alle transitiv betroffenen Crates und deren Tests.
 - Bricht mit Status `error` ab, falls Zyklen im Graph erkannt werden.
+- Stellt `blast_radius_get_affected_crates(root, base, head)` für den Phasen-Runner `jules` bereit, um den Platzhalter `{pkgs}` dynamisch zu expandieren.

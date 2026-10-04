@@ -183,35 +183,8 @@ pub fn run_blast_radius(args: &[String]) -> i32 {
         return 2;
     }
 
-    let changed_files = blast_radius_get_changed_files(&root_dir, &base_rev, &head_rev);
-    let mut directly_changed_crates = HashSet::new();
-
-    for file in &changed_files {
-        if file.starts_with("crates/") {
-            let parts: Vec<_> = file.split('/').collect();
-            if parts.len() >= 2 {
-                directly_changed_crates.insert(parts[1].to_string());
-            }
-        }
-    }
-
-    let mut affected_crates = HashSet::new();
-    let mut queue: Vec<_> = directly_changed_crates.into_iter().collect();
-
-    while let Some(c) = queue.pop() {
-        if affected_crates.insert(c.clone()) {
-            if let Some(dependents) = reverse_graph.get(&c) {
-                for dep in dependents {
-                    if !affected_crates.contains(dep) {
-                        queue.push(dep.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    let mut sorted_affected: Vec<_> = affected_crates.into_iter().collect();
-    sorted_affected.sort();
+    let (sorted_affected, _root_changed) =
+        blast_radius_get_affected_crates(&root_dir, Some(&base_rev), Some(&head_rev));
 
     let mut affected_tests = Vec::new();
     for c in &sorted_affected {
@@ -275,22 +248,161 @@ fn blast_radius_find_repo_root() -> PathBuf {
     PathBuf::from(".")
 }
 
-fn blast_radius_get_changed_files(root: &Path, base: &str, head: &str) -> Vec<String> {
-    let output = std::process::Command::new("git")
+pub fn blast_radius_get_changed_files_worktree(
+    root: &Path,
+    base: &str,
+    head: &str,
+) -> Option<Vec<String>> {
+    let mb = if base == "origin/main" {
+        let output = std::process::Command::new("git")
+            .current_dir(root)
+            .args(["merge-base", head, "origin/main"])
+            .output();
+        if let Ok(out) = &output {
+            if out.status.success() {
+                String::from_utf8_lossy(&out.stdout).trim().to_string()
+            } else {
+                let output2 = std::process::Command::new("git")
+                    .current_dir(root)
+                    .args(["merge-base", head, "main"])
+                    .output();
+                if let Ok(out2) = output2 {
+                    if out2.status.success() {
+                        String::from_utf8_lossy(&out2.stdout).trim().to_string()
+                    } else {
+                        base.to_string()
+                    }
+                } else {
+                    base.to_string()
+                }
+            }
+        } else {
+            base.to_string()
+        }
+    } else {
+        base.to_string()
+    };
+
+    let mut files = HashSet::new();
+
+    let diff_output = std::process::Command::new("git")
         .current_dir(root)
-        .args(["diff", "--name-only", base, head])
+        .args(["diff", "--name-only", &mb])
         .output();
 
-    if let Ok(out) = output {
+    match diff_output {
+        Ok(out) if out.status.success() => {
+            for line in String::from_utf8_lossy(&out.stdout).lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    files.insert(trimmed.to_string());
+                }
+            }
+        }
+        _ => return None,
+    }
+
+    let untracked_output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(["ls-files", "--others", "--exclude-standard"])
+        .output();
+
+    if let Ok(out) = untracked_output {
         if out.status.success() {
-            return String::from_utf8_lossy(&out.stdout)
-                .lines()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
+            for line in String::from_utf8_lossy(&out.stdout).lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    files.insert(trimmed.to_string());
+                }
+            }
         }
     }
-    Vec::new()
+
+    Some(files.into_iter().collect())
+}
+
+pub fn blast_radius_get_affected_crates(
+    root: &Path,
+    base: Option<&str>,
+    head: Option<&str>,
+) -> (Vec<String>, bool) {
+    let base_rev = base.unwrap_or("origin/main");
+    let head_rev = head.unwrap_or("HEAD");
+
+    let changed_files = match blast_radius_get_changed_files_worktree(root, base_rev, head_rev) {
+        Some(f) => f,
+        None => return (Vec::new(), true),
+    };
+
+    let mut root_changed = false;
+    let root_files = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "capabilities.toml"];
+    for file in &changed_files {
+        if root_files.contains(&file.as_str()) {
+            root_changed = true;
+            break;
+        }
+    }
+
+    let caps_path = root.join("capabilities.toml");
+    let caps_content = match fs::read_to_string(&caps_path) {
+        Ok(c) => c,
+        Err(_) => return (Vec::new(), true),
+    };
+
+    let parsed: Result<toml::Value, _> = toml::from_str(&caps_content);
+    let table = match parsed {
+        Ok(toml::Value::Table(t)) => t,
+        _ => return (Vec::new(), true),
+    };
+
+    let crates_table = match table.get("crates").and_then(|v| v.as_table()) {
+        Some(t) => t,
+        None => return (Vec::new(), true),
+    };
+
+    let mut reverse_graph: HashMap<String, Vec<String>> = HashMap::new();
+    for (crate_name, crate_val) in crates_table {
+        if let Some(arr) = crate_val.get("may_depend_on").and_then(|v| v.as_array()) {
+            for dep_val in arr {
+                if let Some(dep) = dep_val.as_str() {
+                    reverse_graph
+                        .entry(dep.to_string())
+                        .or_default()
+                        .push(crate_name.clone());
+                }
+            }
+        }
+    }
+
+    let mut directly_changed_crates = HashSet::new();
+    for file in &changed_files {
+        if file.starts_with("crates/") {
+            let parts: Vec<_> = file.split('/').collect();
+            if parts.len() >= 2 {
+                directly_changed_crates.insert(parts[1].to_string());
+            }
+        }
+    }
+
+    let mut affected_crates = HashSet::new();
+    let mut queue: Vec<_> = directly_changed_crates.into_iter().collect();
+
+    while let Some(c) = queue.pop() {
+        if affected_crates.insert(c.clone()) {
+            if let Some(dependents) = reverse_graph.get(&c) {
+                for dep in dependents {
+                    if !affected_crates.contains(dep) {
+                        queue.push(dep.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    let mut sorted_affected: Vec<_> = affected_crates.into_iter().collect();
+    sorted_affected.sort();
+
+    (sorted_affected, root_changed)
 }
 
 fn blast_radius_has_cycle(graph: &HashMap<String, Vec<String>>) -> bool {
