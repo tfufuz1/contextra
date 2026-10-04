@@ -31,7 +31,10 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -269,21 +272,50 @@ impl RevocationLog {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(path)
-                .map_err(|e| {
-                    CryptoError::Crypto(format!("Failed to write revocation log file: {e}"))
+            let parent = path.parent().unwrap_or_else(|| Path::new("."));
+            let file_name = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("revocation.log");
+            let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let tmp_path = parent.join(format!("{}.tmp-{}-{}", file_name, std::process::id(), count));
+
+            let write_tmp = || -> Result<()> {
+                let mut tmp_file = OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&tmp_path)
+                    .map_err(|e| {
+                        CryptoError::Crypto(format!("Failed to create temp revocation log file: {e}"))
+                    })?;
+
+                tmp_file.write_all(&serialized).map_err(|e| {
+                    CryptoError::Crypto(format!("Failed to write temp revocation log file: {e}"))
                 })?;
 
-            file.write_all(&serialized).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to flush revocation log file: {e}"))
-            })?;
-            file.flush().map_err(|e| {
-                CryptoError::Crypto(format!("Failed to sync revocation log file: {e}"))
-            })?;
+                tmp_file.sync_all().map_err(|e| {
+                    CryptoError::Crypto(format!("Failed to sync temp revocation log file: {e}"))
+                })?;
+
+                Ok(())
+            };
+
+            if let Err(err) = write_tmp() {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(err);
+            }
+
+            if let Err(e) = std::fs::rename(&tmp_path, path) {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(CryptoError::Crypto(format!(
+                    "Failed to rename temp revocation log file: {e}"
+                )));
+            }
+
+            // Optional parent directory sync on supporting POSIX platforms to persist directory entry modification
+            if let Ok(dir_file) = File::open(parent) {
+                let _ = dir_file.sync_all();
+            }
         }
 
         Ok(new_entry)
