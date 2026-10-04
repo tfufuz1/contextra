@@ -1,102 +1,41 @@
 # AGENTS.md — contextra-router
-> Layer 3 | SLM-Routing, Conformal Calibration, Context Windowing | ~5400 LOC
+> Ring 3 · stable · Quelle: capabilities.toml · Spec: III.17, K.23, Teil 8, Anhang C
 
-## 1. Zweck & Architekturrolle
+1. Zweck
+`contextra-router` ist die Routing-Engine für Small Language Models (SLM) in Ring 3. Die Crate entscheidet dynamisch basierend auf `SlmProfile` (Kapazität, Token-Budget, Domänen-Affinität) über das optimale Zielmodell, wendet Conformal Calibration (`ConformalCalibrator`) und Lyapunov Drift Control zur adaptiven Steuerung an und führt den Dispatch über Stdio-MCP JSON-RPC 2.0 aus.
 
-Entscheidet dynamisch, welches Small Language Model (SLM) für eine gegebene
-Agenten-Anfrage optimal ist (`RouterEngine`). Bewertet `SlmProfile` (Kapazität, 
-Max-Token-Budget, Domänen-Affinität) und wendet `ConformalCalibrator` an, um
-die Modellauswahl basierend auf empirischen Fehler-Raten adaptiv zu steuern.
-
-## 2. Modul-Karte
-
-| Datei | Verantwortung |
+2. Modul-Karte
+| Pfad | Verantwortung |
 |---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, Modul-Deklarationen & Re-Exports |
-| `router.rs` | `RouterEngine` — Die Haupt-Logik, `RoutingDecision`, `ConfidenceMetrics` |
-| `profile.rs` | `SlmProfile` — Konfiguration eines Modells, `ConformalCalibrator`, `ProfileCalibrationState` |
-| `dispatch.rs` | `dispatch_to_slm` — Execution-Layer für den ausgewählten Pfad |
-| `lyapunov.rs` | `LyapunovDriftWatcher` — Drift-Erkennung & Adaptions-Steuerung für Conformal Calibration (event-driven) |
-| `outcome.rs` | `DecisionId`, `RoutingOutcome` — Aufzeichnung und Feedback von Routing-Entscheidungen |
-| `bandit.rs` | Contextual Bandit Routing (LinUCB Sherman-Morrison Rang-1-Updates vs. Diagonal-Default) |
-| `routing_strategy.rs` | `RoutingStrategy` & `BanditPolicy` Traits und Strategie-Auswahl |
-| `guarded_payload.rs` | Typsichere Egress-Payload-Kapselung (`GuardedPayload<Sanitized/Unsanitized>`) |
-| `transport.rs` | Transport-Abstraktion für sichere Modell-Übertragung |
-| `serde_helpers.rs` | Serde-Hilfsfunktionen für Deserialisierung |
-| `tests.rs` | Integrations- und Einheitentests für Router- und Dispatch-Logik (kein Produktionscode) |
+| `src/lib.rs` | Public API & Re-Exports für Router-Engine, Profiles und Strategien |
+| `src/arm_registry.rs` | Verlustfreie, deterministische Abbildung zwischen Arm-Index und `RetrievalStrategy` |
+| `src/dispatch.rs` | Execution-Layer & JSON-RPC 2.0 Dispatching an SLM-MCP-Endpunkte (`dispatch_to_slm`) |
+| `src/fc_ts_dispatch.rs` | Flow-Corrected Thompson Sampling Profilauswahl (`select_profile_fc_ts`) |
+| `src/outcome.rs` | Monoton steigende `DecisionIdGenerator` (P29) & `RoutingOutcome` Feedback-Bewertung |
+| `src/ports_local.rs` | Lokale Re-Exports der Ring-0 Port-Traits (`Clock`, `Rng`, `IdGenerator`) |
+| `src/profile.rs` | `SlmProfile`, `ConformalCalibrator` & `ProfileCalibrationState` für SLM-Modellparameter |
+| `src/router/` | Haupt-Routing-Engine (`RouterEngine`), Dispatch-Core, Outcomes und Lifecycle-Steuerung |
+| `src/routing_strategy.rs` | `RoutingStrategy` Enum (`Cascade`, `ContextualBandit`, `FlowCorrectedThompson`) |
+| `src/serde_helpers.rs` | Serde-Hilfsfunktionen für sortierte `u64`-Sets |
+| `src/transport.rs` | Abstraktion für Transport-Kanäle (`StdioMcp`, `HttpCloud`) |
 
-## 3. Kritische Invarianten
+3. Invarianten
+- **Conformal Calibration Update**: Nach jeder Routing-Entscheidung MUSS das Feedback via `record_outcome` verarbeitet werden (`recalibrate_conformal`), um empirische Fehler-Raten zur Deckungsgarantie zu nutzen (`cargo test -p contextra-router`).
+- **P28 Determinismus über Ports**: Zeit-, ID- und RNG-Erzeugung erfolgt ausschließlich über injizierte Ports (`Clock`, `Rng`, `IdGenerator`) (`cargo test -p contextra-router`).
+- **Unabhängige Konformitäts-Rekalibrierung**: Die Conformal-Kalibrierung im Router (`router/src/profile.rs`) ist konzeptionell und instanziell getrennt vom `ConformalCalibrator` in `contextra-rank`.
 
-### Token-Budget Einhaltung
-Jedes `SlmProfile` definiert ein `max_context_tokens` Limit.
-Die `RouterEngine` **darf niemals** ein Modell auswählen, dessen Kapazität für das 
-aktuelle `ContextWindow` nicht ausreicht. Wenn kein SLM groß genug ist,
-muss der `ContextCompactor` (Layer 2) das Fenster vorab trimmen.
+4. Verboten / Anti-Patterns
+- **Direkte SLM-Aufrufe ohne Router Engine**: `dispatch_to_slm` darf nicht blind mit unvalidierten Profilen aufgerufen werden; die Entscheidung muss durch `RouterEngine::route` erfolgen.
+- **Entscheidung ohne Outcome-Feedback**: Das Erzeugen einer Routing-Entscheidung ohne anschließendes `record_outcome` verzerrt das Banditen- und Conformal-Modell.
+- **Profil-Erzeugung ohne Validierung**: `SlmProfile` darf nicht unvalidiert genutzt werden; vor der Verwendung muss `validate()` bzw. `try_new()` ausgeführt werden.
 
-### Conformal Calibration Update (AGT-RTR-001)
-Die `ProfileCalibrationState` muss nach jeder Interaktion anhand des LLM-Confidence-Scores 
-(bzw. Non-Conformity-Scores) geupdated werden. Die Router-Entscheidung kalibriert
-sich so dynamisch, wenn Modelle anfangen zu halluzinieren.
+5. Nebenläufigkeit, Async- und Lock-Regeln
+- `RouterEngine` schützt ihren inneren Zustand (`RouterState`) mittels `Arc<RwLock<RouterState>>` (`parking_lot`).
+- Schreib-Sperren während der Kalibrierungs-Updates (`recalibrate_conformal`) sind synchron und kurz zu halten.
+- Locks dürfen NIEMALS über `.await`-Punkte hinweg gehalten werden (P26).
 
-### Community-Score-Boost
-Modelle erhalten einen internen Score-Boost (z.B. `1.2x`), wenn die Anfrage
-Domänen berührt, für die das SLM laut Profil fine-tuned wurde (z.B. Rust-Code für DeepSeek-Coder).
+6. Verifikation
+- `cargo test -p contextra-router`
 
-## 4. Public API Quick-Reference
-
-```rust
-// === Profile & Calibration (profile.rs) ===
-pub struct SlmProfile {
-    pub name: String,
-    pub max_context_tokens: usize,
-    pub base_confidence: f32,
-    pub domain_tags: Vec<String>,
-}
-
-pub struct ProfileCalibrationState { ... }
-impl ProfileCalibrationState {
-    pub fn recalibrate_conformal(&mut self, non_conformity_score: f32) -> bool;
-}
-
-// === Router Engine (router.rs) ===
-pub struct RouterEngine { ... }
-impl RouterEngine {
-    pub fn new(collection: Arc<Collection<LsmStorage>>, profiles: Vec<SlmProfile>) -> Self;
-    pub async fn route(&self, ctx: &AgentContext, window: &ContextWindow) -> Result<RoutingDecision>;
-}
-
-// === Dispatching (dispatch.rs) ===
-pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String>;
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — SLM blind ohne Profil aufrufen:
-dispatch_to_slm(&RoutingDecision { target: "llama3".into(), ... }).await; // Profil fehlt!
-// ✅ KORREKT — RouterEngine entscheiden lassen:
-let decision = router.route(ctx, window).await?;
-dispatch_to_slm(&decision).await;
-
-// ❌ FALSCH — Kalibrierung nicht aktualisieren:
-// ✅ KORREKT — Nach erfolgreichem/fehlerhaftem Task das `ProfileCalibrationState` anpassen.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`RouterEngine` hält intern via `parking_lot::RwLock` die aktiven Profile und 
-deren Kalibrierungs-Statistiken (`calibration_stats`). Updates hierauf (`recalibrate_conformal`) 
-sind synchron und kurz.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-ports` (L0), `contextra-db` (L2, nur `dev-dependencies`)
-- **Verbotene Imports**: `contextra-mcp` (L4)
-- **Genutzt von**: `contextra-mcp`, ggf. `contextra-agent` als Tool
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-040 | SLM Routing Strategy & Calibration |
-| `rules/llm_protocol.md` | Context-Window Validation Limits |
+7. Bekannte Lücken / SOLL
+- **Kaltstart der Konformitäts-Kalibrierung**: `ConformalCalibrator` benötigt eine ausreichende Anzahl an aufgezeichneten `RoutingOutcome`s (`window_total`), um empirisch verlässliche Quantilsschwellen (`quantile_threshold`) zu liefern.
