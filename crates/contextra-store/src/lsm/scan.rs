@@ -121,6 +121,24 @@ impl LsmStorage {
                     sst.scan_prefix(prefix).await?
                 }
                 SstableScanMode::Range(start, end) => {
+                    use std::ops::Bound;
+                    let first = sst.first_key();
+                    let last = sst.last_key();
+                    if !first.is_empty() && !last.is_empty() {
+                        let past_end = match end {
+                            Bound::Included(e) => first.as_ref() > e,
+                            Bound::Excluded(e) => first.as_ref() >= e,
+                            Bound::Unbounded => false,
+                        };
+                        let before_start = match start {
+                            Bound::Included(s) => last.as_ref() < s,
+                            Bound::Excluded(s) => last.as_ref() <= s,
+                            Bound::Unbounded => false,
+                        };
+                        if past_end || before_start {
+                            continue;
+                        }
+                    }
                     sst.scan_range(start.map(|s| s), end.map(|e| e)).await?
                 }
             };

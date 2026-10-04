@@ -163,7 +163,47 @@ impl SstableReader {
             return Ok(results);
         }
 
-        for idx in 0..self.index.len() {
+        let mut start_idx = match start {
+            Bound::Included(s) | Bound::Excluded(s) => {
+                match self.index.binary_search_by(|(k, _)| k.as_ref().cmp(s)) {
+                    Ok(i) => i,
+                    Err(i) => i,
+                }
+            }
+            Bound::Unbounded => 0,
+        };
+
+        while start_idx > 0 {
+            let prev_last = self.index[start_idx - 1].0.as_ref();
+            let rewind = match start {
+                Bound::Included(s) => prev_last >= s,
+                Bound::Excluded(s) => prev_last >= s,
+                Bound::Unbounded => false,
+            };
+            if rewind {
+                start_idx -= 1;
+            } else {
+                break;
+            }
+        }
+
+        if start_idx >= self.index.len() {
+            return Ok(results);
+        }
+
+        for idx in start_idx..self.index.len() {
+            if idx > start_idx {
+                let prev_last = self.index[idx - 1].0.as_ref();
+                let past_end = match end {
+                    Bound::Included(e) => prev_last > e,
+                    Bound::Excluded(e) => prev_last >= e,
+                    Bound::Unbounded => false,
+                };
+                if past_end {
+                    break;
+                }
+            }
+
             let offset = self
                 .index
                 .get(idx)
