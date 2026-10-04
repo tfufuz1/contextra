@@ -12,6 +12,9 @@ pub const MAX_TRACKED_REQUESTS: usize = 256;
 /// Sums and exports attention weights across heads and layers of prefill steps.
 ///
 /// Maintains a bounded history (`MAX_TRACKED_REQUESTS = 256`) per active request.
+/// When the tracked request count reaches [`MAX_TRACKED_REQUESTS`] (256), the oldest request
+/// history is automatically evicted in FIFO order, ensuring the exporter state memory
+/// does not grow unbounded after generation completion or cancellation.
 #[derive(Debug)]
 pub struct CandleAttentionExporter {
     state: Mutex<ExporterState>,
@@ -77,6 +80,14 @@ impl CandleAttentionExporter {
         }
 
         self.record_attention_weights(request_id, combined);
+    }
+
+    /// Removes attention weights for a specific request ID from tracked history.
+    pub fn remove_request(&self, request_id: RequestId) {
+        let mut state = self.state.lock();
+        if state.weights.remove(&request_id).is_some() {
+            state.order.retain(|&id| id != request_id);
+        }
     }
 
     /// Returns the current number of tracked requests in memory.

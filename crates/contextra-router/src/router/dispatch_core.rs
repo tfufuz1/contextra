@@ -7,6 +7,7 @@ use super::*;
 impl RouterEngine {
     /// Routes a query with embedding and text to the best matching SLM profile.
     #[allow(deprecated)]
+    #[allow(clippy::cast_possible_truncation)]
     pub async fn route(
         &self,
         query_embedding: &[f32],
@@ -56,6 +57,8 @@ impl RouterEngine {
             chunks.push((chunk, comm_id));
         }
 
+        let decision_id = self.decision_ids.next();
+
         // 3. Perform profile selection, scoring, calibration tracking, and confidence metric generation
         // using an updated state snapshot swapped atomically via ArcSwap.
         let current_state = self.state.load_full();
@@ -79,19 +82,47 @@ impl RouterEngine {
                 })
                 .collect();
 
-            // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
-            #[cfg(feature = "bandit-routing")]
-            let bandit_selection =
-                if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
-                    self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
-                } else {
+            // 2. Profile Selection: FC-TS (opt-in), Bandit (opt-in), or Cascade (default)
+            #[cfg(feature = "flow-corrected-thompson")]
+            let fc_ts_selection = {
+                #[cfg(feature = "bandit-routing")]
+                {
+                    if matches!(
+                        self.routing_strategy,
+                        RoutingStrategy::FlowCorrectedThompson
+                    ) {
+                        self.select_profile_fc_ts_dispatch(
+                            &effective_profiles,
+                            query_embedding,
+                            decision_id,
+                        )
+                    } else {
+                        None
+                    }
+                }
+                #[cfg(not(feature = "bandit-routing"))]
+                {
                     None
-                };
+                }
+            };
+            #[cfg(not(feature = "flow-corrected-thompson"))]
+            let fc_ts_selection: Option<(usize, SlmProfile)> = None;
+
+            #[cfg(feature = "bandit-routing")]
+            let bandit_selection = if fc_ts_selection.is_none()
+                && matches!(self.routing_strategy, RoutingStrategy::ContextualBandit)
+            {
+                self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
+            } else {
+                None
+            };
             #[cfg(not(feature = "bandit-routing"))]
             let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
 
             let (selected_idx, selected_profile, is_bandit_decision) =
-                if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
+                if let Some((idx, profile)) = fc_ts_selection {
+                    (idx, profile, None)
+                } else if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
                     (idx, profile, Some((action_idx, propensity)))
                 } else {
                     let (idx, profile, _) =
@@ -156,7 +187,6 @@ impl RouterEngine {
             (selected_profile, metrics, is_bandit_decision)
         };
 
-        let decision_id = self.decision_ids.next();
         self.pending_decisions
             .write()
             .insert(decision_id, (selected_profile.name.clone(), Instant::now()));
@@ -547,5 +577,63 @@ impl RouterEngine {
             selected_action_idx,
             propensity,
         ))
+    }
+
+    #[cfg(feature = "flow-corrected-thompson")]
+    #[allow(dead_code)]
+    /// Flow-Corrected Thompson Sampling Profilauswahl (§21.3, AK-18).
+    pub(crate) fn select_profile_fc_ts_dispatch(
+        &self,
+        profiles: &[SlmProfile],
+        query_embedding: &[f32],
+        decision_id: DecisionId,
+    ) -> Option<(usize, SlmProfile)> {
+        if profiles.is_empty() {
+            tracing::warn!("FC-TS-Dispatch Fallback auf Cascade: keine Profile vorhanden");
+            return None;
+        }
+
+        let profile_names: Vec<String> = profiles.iter().map(|p| p.name.clone()).collect();
+        let arm_registry = crate::arm_registry::ArmRegistry::default();
+        let arm_set =
+            match arm_registry.create_fc_ts_arm_set(profile_names.len(), query_embedding.len()) {
+                Ok(set) => set,
+                Err(err) => {
+                    tracing::warn!(
+                        err = %err,
+                        "FC-TS-Dispatch Fallback auf Cascade: Arm-Set konnte nicht erstellt werden"
+                    );
+                    return None;
+                }
+            };
+
+        let mut rng = crate::fc_ts_dispatch::deterministic_fc_ts_rng(decision_id.inner());
+
+        match crate::fc_ts_dispatch::select_profile_fc_ts(
+            &profile_names,
+            &arm_set,
+            query_embedding,
+            &mut rng,
+        ) {
+            Ok((idx, _name)) => {
+                if let Some(profile) = profiles.get(idx) {
+                    Some((idx, profile.clone()))
+                } else {
+                    tracing::warn!(
+                        idx,
+                        profiles_len = profiles.len(),
+                        "FC-TS-Dispatch Fallback auf Cascade: Gewählter Profil-Index ungültig"
+                    );
+                    None
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    err = %err,
+                    "FC-TS-Dispatch Fallback auf Cascade: Fehler bei select_profile_fc_ts"
+                );
+                None
+            }
+        }
     }
 }

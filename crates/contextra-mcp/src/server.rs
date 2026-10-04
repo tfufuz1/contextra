@@ -1,4 +1,4 @@
-use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier};
+use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier, EgressGuardCheck};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
 use crate::protocol::JsonRpcResponse;
@@ -20,6 +20,7 @@ pub struct McpServer {
     pub sandbox: Arc<McpSandbox>,
     pub injection_guard: Arc<PromptInjectionGuard>,
     pub egress_classifier: Arc<dyn EgressClassifier>,
+    pub egress_guard: Option<Arc<dyn EgressGuardCheck>>,
     pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     #[cfg(feature = "kv-bridge")]
@@ -65,6 +66,7 @@ impl McpServer {
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
+            egress_guard: None,
             routing: None,
             plugin_registry: None,
             #[cfg(feature = "kv-bridge")]
@@ -88,6 +90,11 @@ impl McpServer {
 
     pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
         self.egress_classifier = classifier;
+        self
+    }
+
+    pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self {
+        self.egress_guard = Some(guard);
         self
     }
 

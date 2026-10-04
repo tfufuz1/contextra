@@ -8,7 +8,7 @@ use std::sync::Arc;
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) -> Result<()> {
-        if let Some(kv_store) = self.collection.kv_store() {
+        if let Some(kv_hooks) = self.collection.kv_hooks() {
             let chunk_ids: Vec<u64> = doc_ids
                 .iter()
                 .map(|d| {
@@ -21,7 +21,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 })
                 .collect::<Result<Vec<u64>>>()?;
             let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
-            kv_store.on_rollback(tenant, &chunk_ids);
+            kv_hooks.on_rollback(tenant, &chunk_ids);
         }
         Ok(())
     }

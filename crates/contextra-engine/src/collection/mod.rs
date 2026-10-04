@@ -32,8 +32,8 @@ mod tests;
 use contextra_graph::CsrGraph;
 #[cfg(not(loom))]
 use contextra_ports::{
-    Clock, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock, TextEmbeddingEngine,
-    VectorIndex,
+    Clock, KvLifecycleHooks, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock,
+    TextEmbeddingEngine, VectorIndex,
 };
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
@@ -261,6 +261,30 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
 /// Each collection provides its own vector index and inverted text index,
 /// while sharing the underlying LSM-Tree storage with other collections.
 #[cfg(not(loom))]
+/// Adapter struct wrapping `contextra_crypto::TenantIsolatedKvStore` to fulfill `KvLifecycleHooks`.
+#[cfg(feature = "encryption-at-rest")]
+struct CryptoKvStoreAdapter(Arc<contextra_crypto::TenantIsolatedKvStore>);
+
+#[cfg(feature = "encryption-at-rest")]
+impl KvLifecycleHooks for CryptoKvStoreAdapter {
+    fn on_rollback(&self, tenant: contextra_types::TenantId, chunk_ids: &[u64]) {
+        self.0.on_rollback(tenant, chunk_ids);
+    }
+
+    fn remove_doc_segments(&self, tenant: contextra_types::TenantId, doc: DocId) {
+        if let Ok(id) = u64::try_from(doc.inner()) {
+            self.0.remove_segment(tenant, id);
+        }
+    }
+
+    fn purge_tenant(&self, tenant: contextra_types::TenantId) {
+        let segs = self.0.get_segments(tenant);
+        if !segs.is_empty() {
+            self.0.remove_segments_for_rollback(tenant, &segs);
+        }
+    }
+}
+
 pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex> {
     pub(super) name: String,
     pub(super) prefix: Vec<u8>,
@@ -273,9 +297,11 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
     pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
-    /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks.
+    /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks (legacy field).
     #[cfg(feature = "encryption-at-rest")]
     pub(super) kv_store: Option<Arc<contextra_crypto::TenantIsolatedKvStore>>,
+    /// Feature-independent KV lifecycle hooks port.
+    pub(super) kv_hooks: Option<Arc<dyn KvLifecycleHooks>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
     pub(super) mutations_since_community_detection: Arc<AtomicU64>,
     /// Trigger-Schwelle: bei Überschreitung wird Community Detection geplant (Default: 100, 0 = deaktiviert).
@@ -310,6 +336,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             kv_locks: self.kv_locks.clone(),
             #[cfg(feature = "encryption-at-rest")]
             kv_store: self.kv_store.clone(),
+            kv_hooks: self.kv_hooks.clone(),
             mutations_since_community_detection: self.mutations_since_community_detection.clone(),
             community_detection_trigger_threshold: self
                 .community_detection_trigger_threshold
@@ -392,6 +419,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             kv_locks: Arc::new(kv_lock::KvKeyLocks::new()),
             #[cfg(feature = "encryption-at-rest")]
             kv_store: None,
+            kv_hooks: None,
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
@@ -477,9 +505,26 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.graph_index.clone()
     }
 
+    /// Attaches KV lifecycle hooks port implementation to the collection.
+    pub fn with_kv_hooks(mut self, hooks: Arc<dyn KvLifecycleHooks>) -> Self {
+        self.kv_hooks = Some(hooks);
+        self
+    }
+
+    /// Sets KV lifecycle hooks port implementation on the collection.
+    pub fn set_kv_hooks(&mut self, hooks: Arc<dyn KvLifecycleHooks>) {
+        self.kv_hooks = Some(hooks);
+    }
+
+    /// Returns a reference to the attached `KvLifecycleHooks`, if configured.
+    pub fn kv_hooks(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
+        self.kv_hooks.as_ref()
+    }
+
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
     #[cfg(feature = "encryption-at-rest")]
     pub fn with_kv_store(mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+        self.kv_hooks = Some(Arc::new(CryptoKvStoreAdapter(kv_store.clone())));
         self.kv_store = Some(kv_store);
         self
     }
@@ -487,6 +532,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
     #[cfg(feature = "encryption-at-rest")]
     pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
+        self.kv_hooks = Some(Arc::new(CryptoKvStoreAdapter(kv_store.clone())));
         self.kv_store = Some(kv_store);
     }
 

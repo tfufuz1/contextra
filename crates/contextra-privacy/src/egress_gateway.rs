@@ -113,9 +113,8 @@ impl CloudResponseRehydrator {
     pub fn rehydrate(&self, cloud_response_text: &str) -> String {
         let mut result = String::with_capacity(cloud_response_text.len());
         let mut cursor = 0;
-        let prefix = "[USER_ENTITY_";
 
-        while let Some(start_idx) = cloud_response_text[cursor..].find(prefix) {
+        while let Some(start_idx) = cloud_response_text[cursor..].find(SURROGATE_PREFIX) {
             let absolute_start = cursor + start_idx;
             result.push_str(&cloud_response_text[cursor..absolute_start]);
 
@@ -140,8 +139,8 @@ impl CloudResponseRehydrator {
                 continue;
             }
 
-            result.push_str(prefix);
-            cursor = absolute_start + prefix.len();
+            result.push_str(SURROGATE_PREFIX);
+            cursor = absolute_start + SURROGATE_PREFIX.len();
         }
 
         result.push_str(&cloud_response_text[cursor..]);
