@@ -1,115 +1,33 @@
 # AGENTS.md — contextra-db
-> Layer 2 | Collection, 4-Signal-Fusion, Context Compaction | ~15000 LOC
+> Ring 3 · stable · Quelle: capabilities.toml · Spec: K.9, III.19
 
-## 1. Zweck & Architekturrolle
+1. Zweck
+Dient als interne Re-Export-Fassade und Strangler Shell für Rückwärtskompatibilität über `contextra-engine` und `contextra-cognition`. Bietet zusätzlich den `AdaptiveDecayController`, `RerankPidController` (Homeostat), die `MultiStepEngine` für LLM-gestützte iterative Abfragen sowie den flüchtigen Arbeitsspeicher-Tresor (`VolatileContextVault`). Die primäre öffentliche Fassade für Anwendungsentwickler ist das Crate `contextra`.
 
-Orchestriert die vier Kern-Signale (LSM, Vector, Graph, BM25) zu einer unified
-`Collection`. Beinhaltet die komplexe Logik für Reciprocal Rank Fusion (RRF),
-Markdown-Chunking, Token-Budget-Management und LLM-gestützte Context Compaction.
-Ist die primäre High-Level-API für lokale Agenten.
-
-## 2. Modul-Karte
-
-| Datei | Verantwortung |
+2. Modul-Karte
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, Lock-Hierarchie-Definition |
-| `collection/` | `Collection`, Tx-Allokation (`next_tx`), Insert/Search-Routinen |
-| `fusion.rs` | 4-Signal RRF (`reciprocal_rank_fusion`), Priorisierung |
-| `context.rs` | `ContextManager`, `SpatialFence`, Relevanz-Thresholds, Token-Counting |
-| `context_compaction.rs` | `ContextCompactor`, `ConsolidationSession` (LLM-Zusammenfassung) |
-| `chunker.rs` | `MarkdownChunker` — Strukturiertes Aufteilen von Markdown-Dokumenten |
-| `multistep.rs` | `MultiStepEngine`, `QueryRewriter` — LLM-gestützte iterative Suche |
-| `transaction.rs` | `CommitIntent` — High-Level Transaktionssteuerung |
-| `background_workers.rs` | Background Tasks: Expiry Cleanup Worker, Orphan Cleanup Worker |
+| `src/lib.rs` | `#![forbid(unsafe_code)]`, Re-Exports von `engine`, `cognition` & Modul-Aliase |
+| `src/homeostat.rs` | `RerankDeadline` und `RerankPidController` für adaptive Rerank-Latenzsteuerung |
+| `src/multistep.rs` | `MultiStepEngine`, `QueryRewriter` und `MultiStepConfig` für iterative Suche |
+| `src/volatile_vault.rs` | `VolatileContextVault` für ephemeren In-Memory-Speicher [Feature: `volatile-vault`] |
 
-## 3. Kritische Invarianten
+3. Invarianten
+- **AGT-DB-001 / P28 TxId-Inkrement:** `TxId` **MUSS IMMER** über `collection.allocate_tx()` bezogen werden (deterministischer Zähler, keine direkte `SystemTime`).
+- **INV-REEXPORT-COMPAT:** `contextra-db` re-exportiert `contextra-engine` und `contextra-cognition` Typen ohne direkte eigene Storage-Mutationen.
+- **INV-VAULT-1/2/3:** `VolatileContextVault` speichert Daten ausschließlich im flüchtigen RAM mit Nullisierung/mlock über `contextra-sys`.
 
-### TxId Generierung (AGT-DB-001)
-`TxId` **MUSS IMMER** über `collection.allocate_tx().await` bezogen werden.
-Es inkrementiert deterministisch den atomaren Zähler `next_tx`.
-Niemals `SystemTime` verwenden (Kausalitätsbruch bei Graph & LSM)!
+4. Verboten / Anti-Patterns
+- **Keine direkte SystemTime für Transaktionen:** Kausalitätsbruch bei Graph & LSM.
+- **Kein Halten von Guards über `.await`:** `consolidate_via_llm` oder `MultiStepEngine::search` dürfen niemals unter aktiven Locks ausgeführt werden.
+- **Keine Verwechslung mit `contextra` Facade:** `contextra-db` ist eine interne L3-Fassade; externe Nutzer binden `contextra` ein.
 
-### 4-Signal Fusion Pipeline
-Bei `collection.search()` werden 4 Engines asynchron parallel abgefragt:
-Vector (HNSW), Text (BM25), Graph (PPR), Storage (LSM).
-Die Ergebnisse MÜSSEN zwingend durch `reciprocal_rank_fusion` (bzw. gewichtet)
-laufen, um Score-Verzerrungen aus unterschiedlichen Domänen auszugleichen.
+5. Nebenläufigkeit, Async- und Lock-Regeln
+Vererbt die Lock-Hierarchie von `contextra-engine`: `collections` (RwLock) -> `kv_locks` (KvKeyLocks) -> `embedder` (RwLock). MultiStep-LLM-Aufrufe erfolgen ohne aktive Locks, um Thread-Aushungerung zu verhindern.
 
-### MarkdownChunker Pflicht
-Agenten-Wissen besteht oft aus Markdown. Es **DARF NICHT** als einzelner gigantischer
-String an die Embedding-Engine gegeben werden. Der `MarkdownChunker` ist Pflicht,
-um Dokumente anhand von Headings (`#`, `##`) in sinnvolle semantische Chunks
-(ca. 512 Tokens) zu splitten, wobei Parent-Headings kaskadiert werden.
+6. Verifikation
+- `cargo test -p contextra-db`
+- `cargo test -p contextra-db --all-features`
 
-### Lock-Hierarchie (Deadlock Prevention)
-Wenn mehrere Komponenten gelockt werden müssen, gilt zwingend folgende Reihenfolge:
-1. **`collections` (RwLock)**: Die Registry aller aktiven Collections (äußerster Lock).
-2. **`kv_locks` (KvKeyLocks)**: Pro Collection, Key-granulares Sharded-Locking.
-3. **`embedder` (RwLock)**: Lazy-Initialization des TextEmbeddingEngines.
-*Jede Abweichung erzeugt Deadlocks unter Last.*
-
-## 4. Public API Quick-Reference
-
-```rust
-// === Collection (collection/mod.rs) ===
-pub struct Collection<S: StorageEngine> { ... }
-impl<S> Collection<S> {
-    pub async fn allocate_tx(&self) -> Result<TxId>;
-    pub async fn insert_document(&self, tx: TxId, doc_id: DocId, markdown: &str) -> Result<()>;
-    pub async fn search(&self, query: &HybridQuery) -> Result<ContextWindow>;
-}
-
-// === RRF & Context (fusion.rs, context_compaction.rs) ===
-pub fn reciprocal_rank_fusion(lists: Vec<Vec<ScoredEntry>>) -> Vec<ScoredEntry>;
-pub struct ContextCompactor { ... }
-impl ContextCompactor {
-    pub async fn consolidate_via_llm(&self, session: ConsolidationSession) -> Result<CompactedContext>;
-}
-
-// === Chunker (chunker.rs) ===
-pub struct MarkdownChunker { ... }
-impl MarkdownChunker {
-    pub fn chunk(&self, doc_id: DocId, markdown: &str) -> Vec<ContextChunk>;
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — SystemTime als TxId (verletzt Kausalität):
-let tx = TxId(std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos() as u64);
-// ✅ KORREKT:
-let tx = collection.allocate_tx().await?;
-
-// ❌ FALSCH — Ganze Dokumente einbetten:
-collection.insert_document(tx, doc_id, very_long_markdown).await?; // Chunking vergessen!
-// ✅ KORREKT:
-let chunks = chunker.chunk(doc_id, very_long_markdown);
-for chunk in chunks { collection.insert_chunk(...).await?; }
-
-// ❌ FALSCH — RRF Array-Out-Of-Bounds (bekannte Halluzination):
-// ✅ KORREKT: RRF-Algorithmus darf keine festen Indexe annehmen (z.B. lists[0]),
-// da manche Engines leere Ergebnisse liefern können.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-(Siehe Sektion 3)
-Zusätzlich: LLM-gestützte Operationen (`consolidate_via_llm`, `MultiStepEngine::search`)
-dauern Sekunden! Sie DÜRFEN NIEMALS unter einem aktiven Key-Lock oder `RwLockReadGuard`
-ausgeführt werden (Fehlerklasse 11).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-store`, `contextra-vector`, `contextra-graph`, `contextra-text` (alle L1), `contextra-checkpoint`
-- **Verbotene Imports**: `contextra-agent` (L3), `contextra-router` (L3), `contextra-mcp` (L4)
-- **Genutzt von**: Fast alle Layer 3/4 Crates
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-022 | RRF Algorithmus & Scoring-Normalisierung |
-| ADR-023 | LLM-gestützte Context Compaction (ConsolidationSession) |
-| `COMMON_LLM_ERRORS.md` | Fehler-Klasse 11: Lock-Guard über `.await` |
-| `COMMON_LLM_ERRORS.md` | Fehler-Klasse 5: RRF Panic Out-of-Bounds |
+7. Bekannte Lücken / SOLL
+- `contextra-db` ist eine Strangler-Shell im Übergang; neue High-Level-APIs werden in `contextra-engine` bzw. `contextra` entwickelt.
