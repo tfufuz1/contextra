@@ -1,102 +1,45 @@
 # AGENTS.md — contextra-infer-ollama
-> Layer 3 | Ollama API Client, Embeddings, Context Prefixing | ~2500 LOC
+> Ring 2 · stable · Quelle: capabilities.toml · Spec: K.13, L.10
 
-## 1. Zweck & Architekturrolle
-
-Bildet die Schnittstelle zu lokalen (oder remote) Ollama-Instanzen. Implementiert den
-`TextEmbeddingEngine` Trait aus `contextra-core` für Vektor-Einbettungen.
-Bietet Funktionen für Text-Generierung, RAG-Chat (Streaming), Importance-Scoring
-und Context-Prefix-Generierung (Erzeugung von kurzen Präfixen für Chunking).
+## 1. Zweck
+Schnittstelle zu lokalen oder externen Ollama-Instanzen. Stellt `OllamaClient` für HTTP-Textgenerierung und RAG-Streaming, `OllamaEmbedder` für Vektor-Embeddings, `ContextPrefixEngine` für kontextuelles Chunk-Präfixen und `OllamaQueryRewriter` für iterative Anfragenanpassung bereit.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, Re-Exports |
-| `client.rs` | `OllamaClient`, `OllamaConfig` — Basis-HTTP-Client (reqwest), Retry-Logik, RAG-Prompts |
-| `embedding.rs` | `OllamaEmbedder` — Implementiert `TextEmbeddingEngine` für Vektor-Indexierung |
-| `context_prefixer.rs` | `ContextPrefixEngine` — Erzeugt 50-100 Token Präfixe zur Context-Erhaltung beim Chunking |
-| `importance.rs` | `score_importance` — LLM-gestützte Bewertung der Wichtigkeit eines Memory-Chunks |
-| `model_info.rs` | `ModelInfo` — Abruf von Model-Dimensionen und Validierung der Verfügbarkeit |
+| `src/lib.rs` | Public API Re-Exports und Crate-Dokumentation |
+| `src/client/` | `OllamaClient`, `OllamaConfig`, Error-Klassifizierung (`is_transient_network_error`) und XML-Escaping (`build_rag_prompt`) |
+| `src/context_prefixer.rs` | `ContextPrefixEngine` (Alias `ContextPrefixer`) und Wortgrenzen-Truncation (`truncate_prefix`) |
+| `src/embedding.rs` | `OllamaEmbedder` mit `TextEmbeddingEngine`-Implementierung |
+| `src/importance.rs` | LLM-gestützte Chunk-Wichtigkeitsbewertung (`score_importance`, `score_importance_batch`) mit `IsotonicCalibrator` |
+| `src/model_info.rs` | `ModelInfo` und statische Dimensionsermittlung (`known_dimension`) |
+| `src/query_rewriter.rs` | `OllamaQueryRewriter` und `OllamaQueryRewriterConfig` zur Abfrage-Umformulierung |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### HTTP Retry & Timeout Patterns
-Aufrufe an Ollama können aufgrund lokaler Hardware (OOM, Cold Start) fehlschlagen.
-Methoden wie `try_embed_batch` oder `try_generate_text` implementieren einen
-eingebauten Retry-Mechanismus mit Exponential Backoff bei transienten Netz-Fehlern.
-`embed` und `generate` wrappen diese mit endgültigem Error-Mapping.
+- **Keine Root-Abhängigkeit:** Externe HTTP-Inferenz ist opt-in in Ring 2 und darf nie als Root-Standardabhängigkeit verwendet werden (`cargo test -p contextra-infer-ollama`).
+- **Input- & Batch-Limits:** Validierung erzwingt `MAX_TEXT_BYTES = 10_000_000` (10 MB) und `MAX_BATCH_SIZE = 512` zur Vermeidung von OOM/DoS (`client/validation.rs`).
+- **Prompt-Injection-Schutz:** RAG-Prompts nutzen XML-Escaping (`xml_escape`) und Tag-Isolation (`<rag_context>`, `<user_query>`).
+- **Präfix-Grenzen:** `truncate_prefix` wahrt Wort- und Codepoint-Grenzen bis `max_tokens` / `max_chars` (`context_prefixer.rs`).
 
-### ContextPrefixEngine Protokoll
-Beim Chunking (siehe `contextra-db/chunker.rs`) kann optional die `ContextPrefixEngine`
-genutzt werden, um jedem Chunk ein 50-100 Token langes Präfix voranzustellen, das
-den globalen Dokument-Kontext beschreibt. Dieses Präfix muss strikt an die Token-Grenzen
-gehalten werden (via `truncate_prefix`).
+## 4. Verboten / Anti-Patterns
 
-### Dimension-Discovery
-Der HNSW-Index benötigt eine feste Dimension. Wenn Ollama-Modelle verwendet werden,
-MUSS die Dimension idealerweise über `known_dimension()` statisch abgefragt oder
-einmalig via Dummy-Embedding dynamisch ermittelt werden.
+- **Verboten:** Direkte HTTP-Aufrufe an Ollama ohne `OllamaClient` vorbeizuführen (umgeht Retry-Logik und Timeout-Handling).
+- **Verboten:** Modelling- oder Batch-Aufrufe ohne Längen- und Modellsicherheitsprüfungen auszuführen.
 
-## 4. Public API Quick-Reference
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-```rust
-// === HTTP Client (client.rs) ===
-pub struct OllamaClient { ... }
-impl OllamaClient {
-    pub fn new(base_url: impl Into<String>) -> Self;
-    pub async fn embed_batch(&self, model: &str, texts: &[&str]) -> Result<Vec<Vec<f32>>>;
-    pub async fn generate_text(&self, model: &str, prompt: &str) -> Result<String>;
-    pub async fn is_model_available(&self, model: &str) -> bool;
-    pub async fn chat_with_rag_streaming(...) -> Result<...>; // Streaming response
-}
+- `OllamaClient` verarbeitet Requests thread-safe über einen gekapselten `reqwest::Client` mit Connection-Pool.
+- Batch-Processing in `score_importance_batch` nutzt `tokio::spawn` mit expliziter Concurrency-Begrenzung (`max_concurrent`).
+- `generate_prefix_batch` in `ContextPrefixEngine` arbeitet sequenziell, um GPU-Exhaustion bei lokalen Modellen zu verhindern.
 
-// === TextEmbeddingEngine (embedding.rs) ===
-pub struct OllamaEmbedder { ... }
-impl OllamaEmbedder {
-    pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self;
-    pub fn with_expected_dimension(self, dim: usize) -> Self;
-    // Implementiert TextEmbeddingEngine::embed und embed_batch
-}
+## 6. Verifikation
 
-// === Context Prefixer (context_prefixer.rs) ===
-pub struct ContextPrefixEngine { ... }
-impl ContextPrefixEngine {
-    pub async fn generate_prefix(&self, text: &str) -> Result<String>;
-}
-```
+- `cargo test -p contextra-infer-ollama --locked`
+- `cargo test -p contextra-infer-ollama --test campaign_stub_ollama`
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 7. Bekannte Lücken / SOLL
 
-```rust
-// ❌ FALSCH — Ungeprüfte Model-Verwendung:
-client.generate_text("llama3", prompt).await?; // Model vielleicht nicht gepullt!
-// ✅ KORREKT — Vorher prüfen:
-client.ensure_model_available("llama3").await?;
-
-// ❌ FALSCH — reqwest direkt verwenden:
-let res = reqwest::get("http://localhost:11434/api/generate").await?;
-// ✅ KORREKT — IMMER OllamaClient verwenden (enthält Retry-Logik und Error-Handling).
-
-// ❌ FALSCH — Eigene Prompt-Formatierung für RAG:
-// ✅ KORREKT — `build_rag_prompt()` verwenden.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`OllamaClient` hält intern einen thread-safen `reqwest::Client`. Erfordert keine
-eigenen Locks. Bei parallelen `embed_batch` Aufrufen sorgt der Client-interne Connection-Pool
-für die Steuerung. (Achtung: Zu hohe Concurrency bringt die lokale GPU zum OOM).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-store` (L1)
-- **Genutzt von**: `contextra-db` (MultiStep, ContextCompaction), `contextra-agent`
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-039 | `reqwest` Workspace-Dependency Regel (Kein reqwest-blocker, aber Error-Mapping) |
-| `rules/llm_protocol.md` | OOM Prevention bei Batch-Embeddings |
+- `ContextPrefixEngine` setzt eine erreichbare Ollama-Instanz voraus; bei Nichterreichbarkeit schlägt der Aufruf mit `ContextraError::Io` / `Storage` fehl.
+- `known_dimension` liefert für unbesetzte Modelle `None`; in diesem Fall muss die Dimension dynamisch über ein Test-Embedding ermittelt werden.

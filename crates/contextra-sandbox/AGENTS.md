@@ -1,61 +1,47 @@
 # AGENTS.md — contextra-sandbox
-> Layer 6.5 | WASM Execution Boundary for MCP CodeExecution Permission | ~500 LOC
+> Ring 2 · stable · Quelle: capabilities.toml · Spec: K.24, L.6
 
-## 1. Zweck & Architekturrolle
-
-Stellt eine eng begrenzte WASM-Ausführungsgrenze für die `CodeExecution`-Permission des MCP-Servers bereit (§4.18).
-Kein WASM-Compiler im Guest — nur Ausführung vorab kompilierter `.wasm`-Binaries.
+## 1. Zweck
+Stellt eine isolierte WASM-Ausführungsgrenze für die `CodeExecution`-Berechtigung des MCP-Servers (§4.18) sowie für benutzerdefinierte WASM-Merge-Operatoren bereit. Führt vorkompilierte WASM-Module in einer gesicherten Sandbox mit striktem CPU-Fuel-Budget und Wall-Clock-Timeout aus.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, Modul-Exporte und Crate-Dokumentation |
-| `capabilities.rs` | `WasmCapabilities` Whitelist für WASM-Guest-Capabilities |
-| `executor.rs` | `WasmExecutor` Execution Engine mit Store, Fuel, Limiter und Timeout |
-| `output.rs` | `WasmOutput` mit `ZeroizeOnDrop` für stdout (P9 Invariante) |
-| `error.rs` | `SandboxError` Fehlertypen für Sandbox-Verletzungen |
+| `src/lib.rs` | `#![forbid(unsafe_code)]`, Crate-Dokumentation und Modul-Exporte |
+| `src/approval.rs` | `ApprovalRequest`, `ApprovalRisk` und `ApprovalStatus` zur Risikobewertung und Freigabe |
+| `src/capabilities.rs` | `WasmCapabilities` (Guest-Whitelist) und `MergeOperatorCapabilities::pure()` für pure Operatoren |
+| `src/error.rs` | `SandboxError` Fehlertypen (§4.18: `Timeout`, `FuelExhausted`, `CapabilityViolation` etc.) |
+| `src/executor.rs` | `WasmExecutor` Ausführungs-Engine und `CapabilityViolationError` |
+| `src/merge.rs` | `WasmMergeFunction` Brücke für WASM Merge-Operatoren |
+| `src/output.rs` | `WasmOutput` mit `ZeroizeOnDrop` für stdout (P9 Security Invariante) |
+| `src/wasi.rs` | Handgeschriebener WASI-preview1 Host auf Wasmtime-Linker (`ProcessExitError`, `OutputLimitExceededError`) |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### Strict Safe Rust
-Strict `#![forbid(unsafe_code)]` — alle WASM-Interaktionen nutzen ausschließlich safe APIs von Wasmtime.
+- **Strict Safe Rust:** `#![forbid(unsafe_code)]` erzwingt 100 % Safe Rust; Interaktion mit Wasmtime nutzt ausschließlich safe APIs.
+- **Doppelte Isolierung (§4.18):** Jede WASM-Ausführung MUSS durch ein CPU-Fuel-Budget (`max_fuel`) UND ein Wall-Clock-Timeout (`tokio::time::timeout_at`) begrenzt sein (`cargo test -p contextra-sandbox --test wasm_boundary_tests`).
+- **Zeroize on Drop (P9):** `WasmOutput.stdout` wird über `ZeroizeOnDrop` beim Verlassen des Scopes sicher aus dem RAM gelöscht (`output.rs`).
+- **Fail-Closed Capabilities:** In `WasiHost` / `WasmCapabilities` sind Netzwerk, Filesystem und Cloud-Egress standardmäßig deaktiviert (`capabilities.rs`).
 
-### Fuel & Timeout Isolation (§4.18)
-Jede Execution MUSS durch ein Fuel-Budget (CPU, deterministisch) UND ein Wall-Clock-Timeout (tokio::time::timeout) beschränkt sein.
+## 4. Verboten / Anti-Patterns
 
-### Zeroize on Drop (P9)
-`WasmOutput.stdout` ist als `ZeroizeOnDrop` / `Zeroizing<Vec<u8>>` abgesichert. Sensitiver Host/Guest-Output verbleibt nach Drop nicht im RAM.
+- **Verboten:** `unsafe`-Code in `contextra-sandbox` verwenden.
+- **Verboten:** WASM-Ausführungen ohne Fuel-Begrenzung oder ohne Wall-Clock-Timeout zu starten.
+- **Verboten:** Wasmtime `Store`- oder `Instance`-Zustände über mehrere Execution-Aufrufe hinweg wiederzuverwenden (erfordert State Isolation).
 
-### State Isolation per Execution
-Jeder `execute()`-Aufruf erzeugt eine frische `Store` + `Instance`. Keinerlei Zustandsübertrag oder Memory-Leakage zwischen Execution-Aufrufen.
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-## 4. Public API Quick-Reference
+- Jeder `execute()`-Aufruf erzeugt eine frische Wasmtime `Store`- und `Instance`-Instanz zur vollkommenen Zustandstrennung.
+- Timeouts werden asynchron über `tokio::time::timeout_at` durchgesetzt, ohne den Thread zu blockieren.
 
-```rust
-pub struct WasmCapabilities { ... }
-pub struct WasmExecutor { ... }
-impl WasmExecutor {
-    pub fn new() -> Result<Self, SandboxError>;
-    pub async fn execute(
-        &self,
-        wasm_bytes: &[u8],
-        input: &[u8],
-        capabilities: &WasmCapabilities,
-        timeout: Duration,
-    ) -> Result<WasmOutput, SandboxError>;
-}
-```
+## 6. Verifikation
 
-## 5. Anti-Patterns & LLM-Fallstricke
+- `cargo test -p contextra-sandbox --locked`
+- `cargo test -p contextra-sandbox --test wasm_boundary_tests`
+- `cargo test -p contextra-sandbox --test pure_merge_operator_capabilities_test`
+- `cargo test -p contextra-sandbox --test wasm_wasi_io`
 
-- **Niemals unsafe code in contextra-sandbox verwenden**.
-- **Niemals Fuel-Setups oder Wall-Clock-Timeouts weglassen**.
-- **Niemals Stores über execute()-Aufrufe hinweg wiederverwenden**.
+## 7. Bekannte Lücken / SOLL
 
-## 6. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| §4.18 Spec | WASM Execution Boundary & Fuel Budgeting |
-| P9 Security Invariant | Zeroize-On-Drop für Exec Output |
+- Handgeschriebener WASI-preview1 Host (`wasi.rs`) implementiert eine gezielte Minimalauswahl an System-Calls (`fd_read`, `fd_write`, `proc_exit`, `clock_time_get`, `random_get`); ununterstützte Host-Calls liefern `ERRNO_NOSYS` / `ERRNO_NOTSUP`.

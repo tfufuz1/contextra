@@ -1,58 +1,48 @@
 # AGENTS.md — contextra-infer-candle
-> Layer 3 | Native Candle GGUF ML Inferenz & Embedding Provider | ~800 LOC
+> Ring 2 · stable · Quelle: capabilities.toml · Spec: K.12
 
-## 1. Zweck & Architekturrolle
-
-Inferenz-Backend auf Basis von Candle (`candle-core`, `candle-transformers`) für native GGUF-Modellausführung (Datenhoheit ohne externe Services).
-In `contextra-db` als `EmbeddingBackend::Candle` in die Haupt-Serving-Pipeline eingebunden.
+## 1. Zweck
+Native GGUF-Modellausführung und Vektor-Einbettungen auf Basis von Candle (`candle-core`, `candle-transformers`) für Datenhoheit ohne externe Dienstanbieter. Bietet `CandleLlmClient` für Textgenerierung, `CandleEmbedClient` für Vektor-Embeddings und `KvBridgeAdapter` zur Anbindung an den verschlüsselten KV-Cache. Integriert `GaspValidator` zur Post-Hoc-Halluzinationsprüfung.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | Crate-Exports und Initialisierung |
-| `inference.rs` | Candle GGUF LlmTextGenerator Implementierung (Inkrementelle Inferenz-Semaphore & Backpressure-Härtung H-5 geschlossen) |
-| `embedding.rs` | Candle GGUF EmbeddingProvider Implementierung |
+| `src/lib.rs` | Public API Re-Exports und Feature-Wiring |
+| `src/attention_exporter.rs` | `CandleAttentionExporter` zur Erfassung und Aggregation von Attention-Gewichten |
+| `src/embedding.rs` | `CandleEmbedClient`, `BertEmbedModel` und `DefaultCandleEmbedModel` für Vektor-Einbettungen |
+| `src/embedding_provider.rs` | `MAX_CANDLE_EMBED_BATCH_SIZE` Konstante für Batching |
+| `src/gasp.rs` | `GaspValidator` und `GaspConfig` für Post-Hoc Grounding-Validierung (GASP) |
+| `src/gguf_loader.rs` | `parse_gguf_metadata` und `GgufMetadata` zum Auslesen von GGUF-Headern |
+| `src/inference/` | `CandleLlmClient`, `CandleModelInner`, `QuantizedLlamaModel` und Prefix-Reuse (`PrefixSeed`, `KvPrefixContext`) |
+| `src/kv_bridge.rs` | `KvBridgeAdapter` und `KvCacheKey` für verschlüsselten KV-Cache-Zugriff |
+| `src/kv_state.rs` | `KvState` und `LayerKv` zur expliziten Verwaltung von KV-Cache-Tensoren |
+| `src/model/` | `ModelWeights`, `LayerWeights` und `QuantizedMatMul` für Llama-GGUF-Forward-Passes |
+| `src/model_registry.rs` | `CandleQuantization` Enum und `compute_fingerprint` für Modell-Fingerprints |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### Zero-Panic-Doctrine
-Keinesfalls `.unwrap()` oder `.expect()` im Produktionscode verwenden.
+- **Zero-Panic (P7):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren (`cargo test -p contextra-infer-candle`).
+- **Async Backpressure:** Semaphore-Begrenzung für Inferenz (`DEFAULT_MAX_CONCURRENT_INFERENCES = 4`) und Embeddings (`DEFAULT_MAX_CONCURRENT_EMBEDDINGS = 8`) (`cargo test -p contextra-infer-candle --test real_inference_test`).
+- **Fallback bei Fehlen von Gewicht-Dateien:** Client-Initialisierung nutzt `DefaultCandleLlmModel` bzw. `DefaultCandleEmbedModel` als Safe Mock (`cargo test -p contextra-infer-candle --test gguf_loader_test`).
 
-### Async Thread Safety
-Candle-Tensor-Operationen sind CPU-blockierend. Alle Inferenz- und Embed-Aufrufe MÜSSEN via `tokio::task::spawn_blocking` ausgeführt werden.
+## 4. Verboten / Anti-Patterns
 
-### Error Handling
-Alle Fehler sind als `ContextraError` zu strukturieren.
+- **Verboten:** Blockierende Candle-Tensor-Aktionen direkt im tokio-Executor ausführen; CPU/GPU-Pfade müssen in `tokio::task::spawn_blocking` gekapselt werden.
+- **Verboten:** Aufwärts-Imports auf Ring-3-Crates (z.B. `contextra-engine` oder `contextra-mcp`).
 
-## 4. Public API Quick-Reference
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-```rust
-pub struct CandleLlmGenerator { ... }
-pub struct CandleEmbedClient { ... }
-```
+- Semaphore-Steuerung (`tokio::sync::Semaphore`) für gleichzeitige Modellauswertungen verhindert Memory-Exhaustion / OOM.
+- Inferenz- und Tensor-Operationen laufen in `spawn_blocking`-Threads ohne Sperren über `.await`-Punkte zu halten.
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 6. Verifikation
 
-```rust
-// ❌ FALSCH — Direct blocking Candle tensor ops inside async:
-let output = model.forward(&input)?;
+- `cargo test -p contextra-infer-candle --locked`
+- `cargo test -p contextra-infer-candle --test real_inference_test`
+- `cargo test -p contextra-infer-candle --test kv_bridge_and_stress_test`
 
-// ✅ KORREKT — Wrapped in spawn_blocking:
-tokio::task::spawn_blocking(move || model.forward(&input)).await??;
-```
+## 7. Bekannte Lücken / SOLL
 
-## 6. Concurrency & Lock-Hierarchie
-
-Inferenz-Sessions verwalten Thread-sichere Gewichte und Caches. Blocking Thread Pools trennen Heavy ML-Tensors vom Tokio Async Reactor.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-mcp` (L4 Upper)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| Strategy B | Native Candle GGUF Inferenz |
+- `GaspValidator` ist vollständig implementiert (`gasp.rs`), verlässt sich jedoch auf externe Grounding-Feedback-Quellen.
+- `KvBridgeAdapter` erfordert ein aktives Encrypted KV Storage Gateway für verschlüsselte Segment-Persistenz.

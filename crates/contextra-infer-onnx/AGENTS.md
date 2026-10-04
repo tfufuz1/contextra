@@ -1,104 +1,40 @@
 # AGENTS.md — contextra-infer-onnx
-> Layer 3 | Lokale ONNX-Modelle, Embeddings, Cross-Encoder | ~1200 LOC
+> Ring 2 · experimental · Quelle: capabilities.toml · Spec: K.14
 
-## 1. Zweck & Architekturrolle
-
-Ermöglicht vollständig lokale, offline-fähige Vektor-Einbettungen und Reranking
-(ohne Ollama-Abhängigkeit) mittels ONNX-Runtime (`ort`).
-Implementiert den `TextEmbeddingEngine` Trait aus `contextra-core`.
+## 1. Zweck
+Stellt lokale, offline-fähige Vektor-Einbettungen und Cross-Encoder-Reranking bereit. Bietet `TextEmbedder` (`OnnxEmbedder`) für ONNX-Runtime-basierte Einbettungen, einen Candle-Backend-Adapter (`create_candle_embedder`) sowie `CrossEncoderReranker` zur Präzisionsverbesserung von Retrieval-Ergebnissen.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, `TextEmbedder`, `TextEmbedderConfig` |
-| `pool.rs` | `SessionPool` — Thread-sicheres Pooling von ONNX-Sessions (pub(crate)) |
-| `reranker.rs` | `CrossEncoderReranker` — Präzises Re-Scoring der RRF-Ergebnisse |
+| `src/lib.rs` | `TextEmbedder`, `TextEmbedderConfig`, `create_candle_embedder` Adapter und Modell-Download (`ensure_onnx_model_download`) |
+| `src/reranker/config.rs` | `RerankConfig` mit `MAX_CANDIDATES = 10_000` Allokationsbegrenzung |
+| `src/reranker/cross_encoder.rs` | `CrossEncoderReranker` und Kalibrierungs-/Feedback-Methoden (`record_implicit_feedback`) |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### Feature-Gate-Protokoll (`onnx`)
-Die gesamte Crate erfordert umfangreiche C++-Abhängigkeiten (`ort`).
-Um Pure-Rust-Builds nicht zu brechen, MUSS jeder Code, der `contextra-infer-onnx` nutzt,
-dies strikt hinter dem `#[cfg(feature = "onnx")]` Gate verstecken.
-Default ist dieses Feature **deaktiviert**.
+- **Feature-Gating (`onnx` / `candle-backend`):** Die ONNX-Runtime-Abhängigkeit ist hinter `cfg(feature = "onnx")` gekapselt, um Pure-Rust-Builds standardmäßig nicht zu brechen.
+- **Kein C++-FFI Cross-Encoder als Standard:** `CrossEncoderReranker` ist backend-abstrahiert; eine C++-FFI-Lösung darf niemals als unüberspringbare Standardabhängigkeit durchgreifen.
+- **Kandidatenbegrenzung:** `RerankConfig` deckelt Reranking auf maximal `MAX_CANDIDATES = 10_000` Dokumente pro Aufruf zur Vermeidung von Speichererschöpfung.
 
-### spawn_blocking-Pattern für Inferenz
-ONNX-Runtime-Aufrufe (`session.run()`) sind blockierend und CPU-intensiv.
-Sie DÜRFEN NIEMALS direkt im tokio-Threadpool aufgerufen werden.
-Jeder Embedding-Aufruf muss in `tokio::task::spawn_blocking` gekapselt werden,
-um den async-Executor nicht zu blockieren (`embed_async` Methode).
+## 4. Verboten / Anti-Patterns
 
-### SessionPool Architektur
-Das Laden von ONNX-Modellen in den Speicher dauert lange. `SessionPool` (intern)
-hält N Modell-Instanzen vor. Aufrufer dürfen nicht für jeden Aufruf ein
-`TextEmbedder::new()` machen, sondern müssen den `TextEmbedder` via `Arc` teilen.
+- **Verboten:** ONNX- oder Candle-Forward-Ausführungen direkt im async-Executor auszuführen; CPU-intensives Tokenisieren/Inferieren gehört in `tokio::task::spawn_blocking`.
+- **Verboten:** Modelle pro Suchanfrage neu zu laden (`TextEmbedder::load`); Instanzen müssen thread-safe wiederverwendet werden.
 
-## 4. Public API Quick-Reference
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-```rust
-// === TextEmbedder (lib.rs) ===
-pub struct TextEmbedder { ... }
-impl TextEmbedder {
-    pub fn load(model_dir: impl AsRef<Path>) -> Result<Self>;
-    pub fn load_with_config(model_dir: impl AsRef<Path>, config: TextEmbedderConfig) -> Result<Self>;
-    pub async fn embed_async(&self, text: &str) -> Result<Vec<f32>>;
-}
+- `TextEmbedder` und `CrossEncoderReranker` verwalten Modell- und Session-Zustände thread-safe und sind ohne explizite Mutexes parallel nutzbar.
+- Schwerlast-Inferenz wird über `embed_async` bzw. `spawn_blocking` an dedizierte Worker-Threads delegiert.
 
-pub struct TextEmbedderConfig {
-    pub intra_op_threads: usize,
-    pub inter_op_threads: usize,
-    pub pooling_strategy: PoolingStrategy, // Mean, CLS
-}
+## 6. Verifikation
 
-// === Cross-Encoder Reranking (reranker.rs) ===
-pub struct CrossEncoderReranker { ... }
-impl CrossEncoderReranker {
-    pub fn new(config: RerankConfig) -> Result<Self>;
-    pub async fn rerank(&self, query: &str, documents: &[&str]) -> Result<Vec<RerankResult>>;
-}
-pub struct RerankResult {
-    pub index: usize,
-    pub score: f32,
-}
-```
+- `cargo test -p contextra-infer-onnx --locked`
+- `cargo test -p contextra-infer-onnx --test onnx_embedder_test`
+- `cargo test -p contextra-infer-onnx --test reranker_adversarial_test`
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 7. Bekannte Lücken / SOLL
 
-```rust
-// ❌ FALSCH — Code ohne Feature-Gate nutzen:
-let embedder = contextra_embed::TextEmbedder::load("..."); // Bricht CI ohne --features onnx!
-// ✅ KORREKT:
-#[cfg(feature = "onnx")]
-let embedder = contextra_embed::TextEmbedder::load("...");
-
-// ❌ FALSCH — Modelle pro Request neu laden:
-async fn handle_search(query: &str) {
-    let embedder = TextEmbedder::load("models/all-MiniLM").unwrap();
-    // ...
-}
-// ✅ KORREKT — Einmal beim Start laden und `Arc<TextEmbedder>` teilen.
-
-// ❌ FALSCH — embed() blockierend aufrufen (Fehlt in API-Ref oben absichtlich):
-// ✅ KORREKT — Immer embed_async() nutzen!
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`TextEmbedder` und `CrossEncoderReranker` sind intern zustandslos bzw. verwalten
-ihre ONNX-Sessions thread-safe. Keine Locks nach außen sichtbar. Der C-FFI
-der ONNX-Runtime verwaltet seine eigenen internen Threadpools.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-infer-ollama` (L3 Peer)
-- **Genutzt von**: Optional in `contextra-db` (falls konfiguriert).
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-005 | Sovereign Core Doctrine (Erklärt, warum `onnx` default=off ist) |
-| `COMMON_LLM_ERRORS.md` | Fehler-Klasse 12: Feature-Gate-Vergessen (`onnx`) |
-| `rules/async_drop.md` | spawn_blocking für CPU-bound Workloads |
+- Automatische Modelldownloads (`ensure_onnx_model_download`) setzen Netzwerzzugriff oder ein vorausgefülltes Cache-Verzeichnis (`~/.contextra/models`) voraus.
+- Das Crate besitzt laut `capabilities.toml` den Reifestatus `experimental`.
