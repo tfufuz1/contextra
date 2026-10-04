@@ -93,6 +93,8 @@ impl KvCipher for KeyManager {
 }
 
 use crate::kv_shredding::KeyRegistry;
+use crate::revocation_log::RevocationLog;
+use std::sync::Arc;
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
@@ -108,6 +110,12 @@ impl KvSegmentCipher {
             key_manager,
             registry: KeyRegistry::new(),
         }
+    }
+
+    /// Attaches a `RevocationLog` to the underlying `KeyRegistry`.
+    pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
+        self.registry = self.registry.with_revocation_log(log);
+        self
     }
 
     /// Returns a reference to the consolidated `KeyRegistry` for crypto-shredding key management.

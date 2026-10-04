@@ -113,6 +113,7 @@ pub fn derive_subkey(
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
+    ever_registered_groups: RwLock<HashSet<u64>>,
     pub revocation_log: Option<std::sync::Arc<RevocationLog>>,
 }
 
@@ -122,6 +123,7 @@ impl KeyRegistry {
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
         }
     }
@@ -167,6 +169,15 @@ impl KeyRegistry {
             guard.contains(&group_id)
         } else {
             true
+        }
+    }
+
+    /// Checks if a group was ever registered in this registry.
+    pub fn was_group_ever_registered(&self, group_id: u64) -> bool {
+        if let Ok(guard) = self.ever_registered_groups.read() {
+            guard.contains(&group_id)
+        } else {
+            false
         }
     }
 
@@ -219,6 +230,9 @@ impl KeyRegistry {
         };
 
         write_guard.insert(group_id, entry);
+        if let Ok(mut ever_guard) = self.ever_registered_groups.write() {
+            ever_guard.insert(group_id);
+        }
         Ok(SubKey(kek_bytes))
     }
 
