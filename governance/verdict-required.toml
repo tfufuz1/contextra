@@ -59,6 +59,19 @@ blocking = true
 name = "can-merge"
 blocking = true
 
+# Aggregate gates (additive non-blocking entries)
+[[gate]]
+name = "gate-guard"
+blocking = false
+
+[[gate]]
+name = "gate-arch"
+blocking = false
+
+[[gate]]
+name = "gate-integrity"
+blocking = false
+
 # Reusable deep-gates artifacts (Session 8)
 [[gate]]
 name = "gate-determinism-check"
