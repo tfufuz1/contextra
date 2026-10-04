@@ -320,7 +320,7 @@ pub fn check_unsafe_code(root: &Path) -> Vec<DebtViolation> {
             let is_allowed_crate = allowed_crates
                 .iter()
                 .any(|c| rel_path.contains(&format!("crates/{}/", c)));
-            if is_allowed_crate || rel_path == "crates/contextra-vector/src/distance.rs" {
+            if is_allowed_crate {
                 continue;
             }
 
@@ -472,7 +472,7 @@ pub fn run_debt_audit() -> Result<(), String> {
         println!("✅ Kein .unwrap() in Produktionscode");
     }
 
-    println!("--- [2/4] unsafe außerhalb distance.rs ---");
+    println!("--- [2/4] unsafe in unzulässigen Crates ---");
     let unsafe_violations = check_unsafe_code(&root);
     if !unsafe_violations.is_empty() {
         println!("❌ UNSAFE VIOLATIONS:");
@@ -481,7 +481,7 @@ pub fn run_debt_audit() -> Result<(), String> {
         }
         fail = true;
     } else {
-        println!("✅ Kein unsafe außerhalb distance.rs");
+        println!("✅ Kein unzulässiges unsafe gefunden");
     }
 
     println!("--- [3/4] std::fs in Produktionscode (Soft-Warning) ---");
