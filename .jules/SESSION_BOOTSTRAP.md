@@ -1,56 +1,44 @@
 # Contextra — Jules Session Bootstrap
-> Mascinenausführbare Checkliste. Jede Session MUSS mit dieser
+> Maschinenausführbare Checkliste. Jede Session MUSS mit dieser
 > Sequenz beginnen, bevor Code geschrieben oder Dateien geändert werden.
 
-- **VETOES.md** (Root): Permanent abgelehnte oder eingeschränkt akzeptierte Features.
-  Vor jeder neuen Feature-Implementierung mit "F-NN"-Bezeichnung prüfen ob ein
-  Eintrag existiert. `just check-vetoes` läuft automatisch, ist aber kein Ersatz
-  für manuelles Lesen vor Arbeitsbeginn an physio-*/Nucleation-artigen Features.
+- **VETOES.md** (Root): Permanent abgelehnte oder eingeschränkt akzeptierte Features. Vor Arbeitsbeginn prüfen.
 
-## Phase 0 — Session-Identität etablieren, Task-Claiming & Context Pack erzeugen (30 Sekunden)
+## Phasentabelle (Jules Fassade)
 
-```bash
-cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env <!-- harness:planned --> <!-- doc-ref-ignore -->
-source .jules/session.env
-cargo xtask context-pack --crate <CRATE_NAME> <!-- harness:planned --> <!-- doc-ref-ignore -->
-```
+Die Phasen-Runner-Konfiguration (`.jules/harness-phases.toml`) ist die kanonische Quelle aller Gate-Ausführungen.
 
-Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->. Dies ist die einzige Datei, die ein Agent zu Sessionbeginn lesen muss.
-
-## Phase 1 — Offene Kritische Issues prüfen (30 Sekunden)
+| Phase | Agent-Gate | Befehl | Zweck |
+|---|---|---|---|
+| `start` | `guard` / `integrity` | `cargo xtask jules start --card <karte>` | Initialisiert Session, lintet Karte, setzt Claim, erzeugt Kontext |
+| `check` | `guard` / `symbols` | `cargo xtask jules check` | Prüft Syntax, Lints, Scope, geschützte Pfade & Symbol-Existenz |
+| `verify` | `arch` | `cargo xtask jules verify` | Führt Akzeptanz-Tests, DAG-Checks & Architektur-Gates aus |
+| `submit` | `integrity` / `report` | `cargo xtask jules submit` | Verifiziert PR-Integrität, Diff-Budget & Session-Report |
+| `stop` | `guard` | `cargo xtask jules stop --reason <grund>` | Stoppt die Session und den Loop Guard bei Eskalation |
 
 ```bash
-# BLOCKER und CRITICAL Tags — bei Fund: STOP, zuerst beheben
-grep -rn "AI-TAG\[.*\]\[BLOCKER\]\|AI-TAG\[.*\]\[CRITICAL\]" crates/ \
-  --include="*.rs" | grep -v "RESOLVED" || echo "  ✅ Keine"
-
-# Offene ANCHORS mit IN-PROGRESS Status
-grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ \
-  --include="*.rs" || echo "  (keine)"
-
-# WORKING_STATE.md lesen (autogeneriert, immer aktuell)
-head -50 WORKING_STATE.md
+cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env <!-- doc-ref-ignore -->
+source .jules/session.env <!-- doc-ref-ignore -->
+cargo xtask context-pack --crate <CRATE_NAME> <!-- doc-ref-ignore -->
 ```
 
-## Phase 2 — Toolchain verifizieren (30 Sekunden)
+Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->.
+
+## Werkzeug-Prüfung für Einzel-Crate
+
+Für Einzel-Crate-Aufgaben benutze gezielte Checks statt Workspace-weiter Builds:
 
 ```bash
-# Verifiziere Build-Grundlage
-cargo check --workspace
-
-# Falls cargo nicht im PATH: Rust-Toolchain aktivieren
-# source "$HOME/.cargo/env" && cargo check --workspace
+cargo check -p <CRATE_NAME>
 ```
 
-## Phase 3 — Aufgaben-spezifischen Kontext laden
-
-Lade basierend auf der Aufgabe:
+## Aufgabenspezifischer Kontext
 
 | Aufgabe-Typ | Zu lesende Dateien |
 |-------------|-------------------|
 | Code in `contextra-store/*` <!-- doc-ref-ignore --> | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
 | Code in `contextra-vector/*` <!-- doc-ref-ignore --> | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
-| Code in `contextra-db/*` <!-- doc-ref-ignore --> | `crates/contextra-db/AGENTS.md` |
+| Code in `contextra-engine/*` <!-- doc-ref-ignore --> | `crates/contextra-engine/AGENTS.md` |
 | Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
 | Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |
 | ADR schreiben | `docs/decisions/` (letzte 5 ADRs lesen), `CONSTITUTION.md §Governance` |
@@ -58,57 +46,9 @@ Lade basierend auf der Aufgabe:
 | unsafe Code | `rules/simd_safety.md` — NUR in approved files (AGENTS.md §4) |
 | Crypto/WAL | `rules/wal_crypto.md` → WAL-First-Regel verifizieren |
 
-## Phase 4 — Pre-Write-Check (vor JEDER Code-Änderung)
-
-```bash
-# API-Halluzinations-Schutz: Signatur vor Nutzung verifizieren
-grep -n "pub fn <METHODE>" crates/contextra-db/src/collection.rs
-
-# Typ-Dopplungs-Schutz: Typ-Register prüfen
-grep "<TYPNAME>" docs/TYPE_REGISTRY.md
-
-# DAG-Prüfung: Keine Layer-Verletzung
-```
-
-## Phase 5 — Session-Ende (VOR letztem Commit)
-
-```bash
-# 1. Format & Lint (Formatierung erzwingen + Clippy/Check)
-cargo fmt --all
-just check
-
-# 2. DAG-Integrität & Tech-Debt Audit
-just dag-check
-just debt-audit
-
-# 3. Tests
-just test
-
-# 4. Sync-Docs (generiert WORKING_STATE.md, CHANGELOG, etc.)
-just sync-docs
-
-# 5. Finaler Check
-just sync-docs-check
-```
-
-## Phase 6 — Pre-Submit Gate (BLOCKIEREND — kein Submit ohne ✅)
-
-> **Invariante:** Führe zwingend `cargo xtask jules-submit-gate --crate <DEIN-CRATE>` aus. <!-- harness:planned --> <!-- doc-ref-ignore -->
-> Kein submit() vor ✅ SUBMIT GATE BESTANDEN. Bei Fehlschlag: STOP, Fix, Phase 6 erneut durchlaufen.
-
-```bash
-# Pre-Submit Gate ausführen (Schritte 6.1–6.5 automatisiert)
-cargo xtask jules-submit-gate --crate <DEIN-CRATE> <!-- harness:planned --> <!-- doc-ref-ignore -->
-```
-
-> **Regel für Commit-Messages:** Jede in der PR-Beschreibung unter
-> "Hinzugefügt" oder "Getestet" genannte Datei MUSS in `git diff --name-only
-> origin/main...HEAD` erscheinen. Ausnahmen begründen, nie stillschweigend weglassen.
-
 ## Notfall-Eskalation (Prompt-Thrashing)
 
-Wenn derselbe Compiler-Fehler nach 2 Iterationen nicht behoben ist:
-1. **STOPP** — keinen weiteren Code schreiben
-2. Fehler auf minimales Beispiel reduzieren
-3. Fehlermeldung + Diff in Session-Log dokumentieren
-4. Entwickler um explizite Instruktion bitten
+Wenn derselbe Compiler- oder Gate-Fehler nach 2 Iterationen nicht behoben ist:
+1. **STOPP** — keinen weiteren Code schreiben.
+2. Fehler auf minimales Beispiel reduzieren und in Session-Log dokumentieren.
+3. Session abbrechen mit `cargo xtask jules stop --reason thrash`.
