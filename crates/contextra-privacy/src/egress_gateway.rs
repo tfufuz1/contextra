@@ -3,7 +3,7 @@
 // INVARIANTEN: APM-EGRESS-BYPASS: Jede Anfrage MUSS EgressClassifier::classify() durchlaufen.
 //              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -31,20 +31,83 @@ pub trait InjectionDetector: Send + Sync {
     fn detect(&self, text: &str) -> Option<String>;
 }
 
+/// Matches a surrogate token `[USER_ENTITY_[0-9a-fA-F]{4}]` at the beginning of `remainder`.
+///
+/// Returns `Some(token_str)` if `remainder` starts with a valid surrogate token, `None` otherwise.
+/// Guarantees zero panics on arbitrary UTF-8 byte boundaries.
+fn match_surrogate_token(remainder: &str) -> Option<&str> {
+    let prefix = "[USER_ENTITY_";
+    if !remainder.starts_with(prefix) {
+        return None;
+    }
+
+    let mut char_indices = remainder.char_indices();
+    let indices: Vec<(usize, char)> = char_indices.by_ref().take(19).collect();
+    if indices.len() >= 18 && (indices.len() == 18 || indices[18].0 >= 18) {
+        let hex_chars_valid = indices[13..17].iter().all(|(_, c)| c.is_ascii_hexdigit());
+        let closing_bracket_valid = indices[17].1 == ']';
+
+        if hex_chars_valid && closing_bracket_valid {
+            let end_bound = if indices.len() > 18 {
+                indices[18].0
+            } else {
+                remainder.len()
+            };
+            if remainder.is_char_boundary(end_bound) {
+                return Some(&remainder[..end_bound]);
+            }
+        }
+    }
+    None
+}
+
+/// Extracts all surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` from the given text.
+/// Guarantees UTF-8 safety and zero panics.
+pub fn extract_surrogate_tokens(sanitized_request: &str) -> HashSet<String> {
+    let mut tokens = HashSet::new();
+    let mut cursor = 0;
+    let prefix = "[USER_ENTITY_";
+
+    while let Some(start_idx) = sanitized_request[cursor..].find(prefix) {
+        let absolute_start = cursor + start_idx;
+        let remainder = &sanitized_request[absolute_start..];
+
+        if let Some(token) = match_surrogate_token(remainder) {
+            tokens.insert(token.to_string());
+            cursor = absolute_start + token.len();
+        } else {
+            cursor = absolute_start + prefix.len();
+        }
+    }
+
+    tokens
+}
+
 /// Inbound Layer 5 Re-Hydrator replacing surrogate tokens with original vault entities.
 #[derive(Debug, Clone, Default)]
 pub struct CloudResponseRehydrator {
     vault_map: HashMap<String, String>,
+    allowed_tokens: Option<HashSet<String>>,
 }
 
 impl CloudResponseRehydrator {
     /// Creates a new `CloudResponseRehydrator` with the provided surrogate-to-entity map.
     pub fn new(vault_map: HashMap<String, String>) -> Self {
-        Self { vault_map }
+        Self {
+            vault_map,
+            allowed_tokens: None,
+        }
+    }
+
+    /// Restricts rehydration to only tokens present in `allowed_tokens`.
+    pub fn scoped_to_request(mut self, allowed_tokens: impl IntoIterator<Item = String>) -> Self {
+        self.allowed_tokens = Some(allowed_tokens.into_iter().collect());
+        self
     }
 
     /// Rehydrates surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` back to original entity values.
     /// Unknown or missing surrogate tokens remain unchanged without panicking.
+    /// If an `allowed_tokens` scope is set, only tokens present in that scope will be rehydrated.
     ///
     /// Guarantees zero panics on arbitrary UTF-8 byte boundaries by using character slice bounds.
     pub fn rehydrate(&self, cloud_response_text: &str) -> String {
@@ -58,44 +121,23 @@ impl CloudResponseRehydrator {
 
             let remainder = &cloud_response_text[absolute_start..];
 
-            // Safely inspect character indices to prevent slicing across multi-byte UTF-8 boundaries
-            let mut char_indices = remainder.char_indices();
-            let mut token_len = None;
-            let mut is_valid_surrogate = false;
+            if let Some(surrogate) = match_surrogate_token(remainder) {
+                let token_allowed = match &self.allowed_tokens {
+                    Some(allowed) => allowed.contains(surrogate),
+                    None => true,
+                };
 
-            // Check if remainder starts with prefix "[USER_ENTITY_" (13 chars) followed by 4 hex chars and "]" (18 chars total)
-            if remainder.starts_with(prefix) {
-                // Collect character boundary offsets up to 18 characters
-                let indices: Vec<(usize, char)> = char_indices.by_ref().take(19).collect();
-                if indices.len() >= 18 && (indices.len() == 18 || indices[18].0 >= 18) {
-                    let hex_chars_valid =
-                        indices[13..17].iter().all(|(_, c)| c.is_ascii_hexdigit());
-                    let closing_bracket_valid = indices[17].1 == ']';
-
-                    if hex_chars_valid && closing_bracket_valid {
-                        token_len = if indices.len() > 18 {
-                            Some(indices[18].0)
-                        } else {
-                            Some(remainder.len())
-                        };
-                        is_valid_surrogate = true;
+                if token_allowed {
+                    if let Some(original) = self.vault_map.get(surrogate) {
+                        result.push_str(original);
+                    } else {
+                        result.push_str(surrogate);
                     }
+                } else {
+                    result.push_str(surrogate);
                 }
-            }
-
-            if is_valid_surrogate {
-                if let Some(end_bound) = token_len {
-                    if remainder.is_char_boundary(end_bound) {
-                        let surrogate = &remainder[..end_bound];
-                        if let Some(original) = self.vault_map.get(surrogate) {
-                            result.push_str(original);
-                        } else {
-                            result.push_str(surrogate);
-                        }
-                        cursor = absolute_start + end_bound;
-                        continue;
-                    }
-                }
+                cursor = absolute_start + surrogate.len();
+                continue;
             }
 
             result.push_str(prefix);
