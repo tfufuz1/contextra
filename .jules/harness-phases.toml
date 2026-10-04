@@ -17,70 +17,38 @@ required = true
 [[phase.check]]
 cmd = ["cargo", "fmt", "--check"]
 required = true
+parallel_group = "static"
 
 [[phase.check]]
 cmd = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
 required = true
+parallel_group = "static"
 
 [[phase.check]]
-cmd = ["cargo", "xtask", "scope-guard"]
+cmd = ["cargo", "xtask", "gate-guard"]
 required = true
-
-[[phase.check]]
-cmd = ["cargo", "xtask", "protected-paths"]
-required = true
-
-[[phase.check]]
-cmd = ["cargo", "xtask", "check-duplicate-symbols"]
-required = true
+parallel_group = "static"
 
 [[phase.check]]
 cmd = ["cargo", "xtask", "symbol-exists"]
 required = true
+parallel_group = "static"
 
 [[phase.verify]]
 cmd = ["cargo", "test"]
 required = true
 
 [[phase.verify]]
-cmd = ["cargo", "xtask", "check-dag"]
-required = true
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "check-ring-layering"]
-required = true
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "check-vetoes"]
-required = true
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "ratchet", "check"]
-required = true
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "determinism-check"]
-required = false
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "unsafe-audit"]
-required = false
-
-[[phase.verify]]
-cmd = ["cargo", "xtask", "lock-audit"]
-required = false
-
-[[phase.submit]]
-cmd = ["cargo", "xtask", "gate-weakening"]
+cmd = ["cargo", "xtask", "gate-arch"]
 required = true
 
 [[phase.submit]]
-cmd = ["cargo", "xtask", "test-integrity"]
+cmd = ["cargo", "xtask", "gate-guard"]
 required = true
 
 [[phase.submit]]
-cmd = ["cargo", "xtask", "diff-budget"]
-required = false
+cmd = ["cargo", "xtask", "gate-integrity"]
+required = true
 
 [[phase.submit]]
 cmd = ["cargo", "xtask", "session-report"]

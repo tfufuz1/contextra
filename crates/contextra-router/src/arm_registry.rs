@@ -1,3 +1,5 @@
+#[cfg(feature = "flow-corrected-thompson")]
+use contextra_adapt::{FcTsArmSet, FcTsConfig, FcTsError, FlowCorrectedThompsonBandit};
 use contextra_types::RetrievalStrategy;
 
 /// Verlustfreie, deterministische Abbildung Arm-Index <-> RetrievalStrategy.
@@ -57,6 +59,24 @@ impl ArmRegistry {
             _ => 0,
         }
     }
+
+    /// Erzeugt ein `FcTsArmSet` mit `count` Armen der Dimension `dim`.
+    #[cfg(feature = "flow-corrected-thompson")]
+    pub fn create_fc_ts_arm_set(&self, count: usize, dim: usize) -> Result<FcTsArmSet, FcTsError> {
+        if count == 0 {
+            return Err(FcTsError::InvalidConfig("FcTsArmSet is empty".to_string()));
+        }
+        let mut arms = Vec::with_capacity(count);
+        let cfg = FcTsConfig {
+            dim,
+            ..Default::default()
+        };
+        for _ in 0..count {
+            let arm = FlowCorrectedThompsonBandit::new(cfg.clone())?;
+            arms.push(arm);
+        }
+        Ok(FcTsArmSet { arms })
+    }
 }
 
 #[cfg(test)]
@@ -109,6 +129,24 @@ mod tests {
 
         for arm in 0..5 {
             assert_eq!(reg1.strategy_for(arm).ok(), reg2.strategy_for(arm).ok());
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "flow-corrected-thompson")]
+    fn test_arm_registry_create_fc_ts_arm_set() {
+        let registry = ArmRegistry::default();
+        let set = registry
+            .create_fc_ts_arm_set(3, 4)
+            .expect("valid arm set creation");
+        assert_eq!(set.arms.len(), 3);
+
+        let err = registry
+            .create_fc_ts_arm_set(0, 4)
+            .expect_err("should fail for empty count");
+        match err {
+            FcTsError::InvalidConfig(msg) => assert!(msg.contains("empty")),
+            _ => panic!("unexpected error variant"),
         }
     }
 }

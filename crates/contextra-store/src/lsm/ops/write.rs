@@ -33,6 +33,34 @@ pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
     Ok(())
 }
 
+struct PutIfAbsentLockGuard<'a> {
+    storage: &'a LsmStorage,
+    key: &'a [u8],
+    tx_id: TxId,
+    armed: bool,
+}
+
+impl<'a> PutIfAbsentLockGuard<'a> {
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl<'a> Drop for PutIfAbsentLockGuard<'a> {
+    fn drop(&mut self) {
+        if self.armed {
+            let mut locks = self
+                .storage
+                .intent_locks
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if locks.get(self.key) == Some(&self.tx_id) {
+                locks.remove(self.key);
+            }
+        }
+    }
+}
+
 pub(super) async fn put_if_absent(
     storage: &LsmStorage,
     tx_id: TxId,
@@ -70,53 +98,33 @@ pub(super) async fn put_if_absent(
         }
     }
 
-    // 3. Query committed state
-    let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);
-    let is_present = match storage.get_at_seq(key, current_max_seq).await {
-        Ok(opt) => opt.is_some(),
-        Err(e) => {
-            let mut locks = storage
-                .intent_locks
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            if locks.get(key) == Some(&tx_id) {
-                locks.remove(key);
-            }
-            return Err(e);
-        }
+    let mut lock_guard = PutIfAbsentLockGuard {
+        storage,
+        key,
+        tx_id,
+        armed: true,
     };
 
+    // 3. Query committed state
+    let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);
+    let is_present = storage.get_at_seq(key, current_max_seq).await?.is_some();
+
     if is_present {
-        let mut locks = storage
-            .intent_locks
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        if locks.get(key) == Some(&tx_id) {
-            locks.remove(key);
-        }
         return Ok(false);
     }
 
     // 4. Stage operation in tx_buffer
     let doc_id = derive_doc_id(key);
 
-    if let Err(e) = storage.tx_buffer.stage_kv(
+    storage.tx_buffer.stage_kv(
         tx_id,
         IndexOp::Insert {
             doc_id,
             data: (key.to_vec(), value.to_vec()),
         },
-    ) {
-        let mut locks = storage
-            .intent_locks
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        if locks.get(key) == Some(&tx_id) {
-            locks.remove(key);
-        }
-        return Err(e);
-    }
+    )?;
 
+    lock_guard.disarm();
     Ok(true)
 }
 

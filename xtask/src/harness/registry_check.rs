@@ -73,6 +73,35 @@ pub fn run_registry_check(args: &[String]) -> i32 {
         }
     };
 
+    let allowed_owner_tiers: HashSet<&str> = [
+        "agent-gate",
+        "gate-constituent",
+        "ci-gate",
+        "generator",
+        "report",
+        "bench",
+        "tool",
+        "legacy",
+    ]
+    .into_iter()
+    .collect();
+
+    for reg_entry in &registry_entries {
+        if !allowed_owner_tiers.contains(reg_entry.owner_tier.as_str()) {
+            findings.push(RegistryCheckFinding {
+                id: "INVALID_OWNER_TIER".to_string(),
+                severity: "error".to_string(),
+                file: "xtask/registry.toml".to_string(),
+                line: 1,
+                message: format!(
+                    "Eintrag '{}' in registry.toml hat ungültigen owner_tier '{}'",
+                    reg_entry.name, reg_entry.owner_tier
+                ),
+                fix: "Setze owner_tier auf einen der erlaubten Werte: agent-gate, gate-constituent, ci-gate, generator, report, bench, tool, legacy".to_string(),
+            });
+        }
+    }
+
     let registered_names: HashSet<String> =
         registry_entries.iter().map(|e| e.name.clone()).collect();
 
@@ -220,7 +249,7 @@ fn registry_check_parse_args(args: &[String]) -> Result<RegistryCheckArgs, Strin
 
 fn registry_check_detect_root() -> Result<PathBuf, String> {
     let output = Command::new("git")
-        .args(&["rev-parse", "--show-toplevel"])
+        .args(["rev-parse", "--show-toplevel"])
         .output();
     match output {
         Ok(out) if out.status.success() => {
@@ -364,7 +393,7 @@ fn registry_check_extract_harness_commands(harness_dir: &Path) -> HashSet<String
         if let Ok(entries) = fs::read_dir(harness_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.extension().map_or(false, |e| e == "rs") {
+                if path.is_file() && path.extension().is_some_and(|e| e == "rs") {
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         if stem != "mod" {
                             cmds.insert(stem.replace('_', "-"));
@@ -405,24 +434,22 @@ fn registry_check_finish(
             "findings": json_findings
         });
         println!("{}", output);
+    } else if exit_code == 0 {
+        println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/registry.toml registriert.");
     } else {
-        if exit_code == 0 {
-            println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/registry.toml registriert.");
-        } else {
+        println!(
+            "❌ [REGISTRY-CHECK]: Konsistencyprüfungen für xtask-Kommandos fehlgeschlagen."
+        );
+        for f in findings {
             println!(
-                "❌ [REGISTRY-CHECK]: Konsistenzprüfungen für xtask-Kommandos fehlgeschlagen."
+                "  - [{}] {} (Datei: {}:{})",
+                f.severity.to_uppercase(),
+                f.message,
+                f.file,
+                f.line
             );
-            for f in findings {
-                println!(
-                    "  - [{}] {} (Datei: {}:{})",
-                    f.severity.to_uppercase(),
-                    f.message,
-                    f.file,
-                    f.line
-                );
-                println!("    Invariante/ADR: Registrierungspflicht in xtask/registry.toml");
-                println!("    FIX: {}", f.fix);
-            }
+            println!("    Invariante/ADR: Registrierungspflicht in xtask/registry.toml");
+            println!("    FIX: {}", f.fix);
         }
     }
     exit_code
