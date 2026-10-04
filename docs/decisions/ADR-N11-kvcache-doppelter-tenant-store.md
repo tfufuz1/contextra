@@ -49,10 +49,23 @@ Im Repository existieren derzeit **zwei getrennte Implementierungen** der Datens
   - *Layering:* Reines Flattening.
   - *Risiko:* Verlust der Prefix-Radix-Optimierung, falls diese in `contextra-crypto` nicht nachgezogen wird.
 
+### Option 4: Policy-Injection via generischen `EvictionPolicy`-Trait
+* **Beschreibung:** Ein `EvictionPolicy`-Trait wird in `contextra-ports` (Ring 0, abhängigkeitsfrei) definiert. Der konsolidierte `TenantIsolatedKvStore<P: EvictionPolicy = LruEvictionPolicy>` in `contextra-crypto` wird generisch über die Eviction-Strategie, mittels statischer Monomorphisierung (kein `dyn Trait`, kein vtable-Overhead im Hot-Path). `contextra-kvcache` implementiert `AttentionEvictionPolicy: EvictionPolicy` und wird vom Konsumenten (z. B. `contextra-engine`) als Typ-Parameter eingesetzt; der Default bleibt reines LRU für Konsumenten ohne Attention-Awareness.
+* **Erforderliche Änderungen:**
+  - Neuer Trait in `contextra-ports`.
+  - `TenantIsolatedKvStore` in `contextra-crypto` erhält Generic-Parameter.
+  - Konsumenten müssen den konkreten Policy-Typ durch ihren jeweiligen Aufrufgraphen bis zur Store-Instanziierung durchreichen (offene Frage: ob dies via Typparameter auf `Contextra`/`CollectionConfig` oder via Type-Erasure am äußersten Rand gelöst wird — noch zu klären).
+* **Bewertung:**
+  - *Layering:* Beste Trennung aller 4 Optionen — Ring 0 bleibt frei von ML-/Attention-spezifischen Typen, nur das abstrakte Trait wandert dorthin.
+  - *Sicherheit:* Gleichwertig zu Option 2 (AEAD bleibt vollständig in Ring 0).
+  - *Performance:* Keine dyn-Dispatch-Kosten im Eviction-Hot-Path dank Monomorphisierung.
+  - *Aufwand & Risiko:* Mittel — die Typ-Parameter-Durchreichung durch den Aufrufgraphen ist nicht trivial und muss vor Umsetzung konkretisiert werden.
+* **Referenz:** Entspricht dem Policy/Mechanism-Separation-Muster aus SGLang RadixCache (`EvictionStrategy`) und vLLM PagedAttention (`BlockPool` Eviction Hook).
+
 ---
 
 ## 3. Empfehlung & Entscheidungsvorbehalt
 
 **Empfehlung der System-Architektur:** Option 2 (Portierung des `AttentionScoreSource`-Ports in `contextra-ports` und Integration in `contextra-crypto::kv_segment::TenantIsolatedKvStore`) bietet die sauberste Integration bei minimalem Risiko für bestehende produktive Pipeline-Pfade.
 
-> **HINWEIS:** Die finale Entscheidung über die Option und die Freigabe der dafür erforderlichen `capabilities.toml`- und `Cargo.toml`-Änderungen **muss von einem menschlichen Architekten / Tech Lead getroffen werden**. In Auftrag K-01 wurde der Attention-Eviction-Pfad innerhalb von `contextra-kvcache` vollständig und regressionsfrei verdrahtet.
+> **HINWEIS:** Die finale Entscheidung über die Option und die Freigabe der dafür erforderlichen `capabilities.toml`- und `Cargo.toml`-Änderungen **muss von einem menschlichen Architekten / Tech Lead getroffen werden**. In Auftrag K-01 wurde der Attention-Eviction-Pfad innerhalb von `contextra-kvcache` vollständig und regressionsfrei verdrahtet. Zudem sollte Option 4 vom entscheidenden Architekten parallel zu Option 2 in Betracht gezogen werden, bevor eine finale Entscheidung getroffen wird.
