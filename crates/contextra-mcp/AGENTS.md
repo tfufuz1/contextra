@@ -1,107 +1,53 @@
 # AGENTS.md — contextra-mcp
-> Layer 4 | Model Context Protocol (MCP) Server, Sandbox, Security | ~1600 LOC
+> Ring 4 · stable · Quelle: capabilities.toml · Spec: III.23 / K.17 / K.34 / L.7
 
-## 1. Zweck & Architekturrolle
-
-Implementiert den Model Context Protocol (MCP) Server für Contextra, wodurch externe Agenten
-(wie Claude oder Jules) die Codebasis über standardisierte JSON-RPC 2.0 Schnittstellen
-steuern können. Enthält eine harte Security-Sandbox (`McpSandbox`), Prompt-Injection-Guards
-und Volatile-Result-Speicherung.
+## 1. Zweck
+Model Context Protocol Server & Cloud Egress Gateway für Contextra.
+Exponiert Datenbank- und Agentenfunktionen über Stdio JSON-RPC 2.0 für KI-Assistenten (Claude, Cursor, Jules).
+Erzwingt strikte Sandbox-Richtlinien, Egress-Gateway-Grenzen und Quarantäne durch den PromptInjectionGuard.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`contextra_consolidate`, `contextra_cloud_query`, `uvx`-Distribution) |
-| `config.rs` | CLI- und Server-Konfiguration (`McpConfig`) |
-| `protocol.rs` | `McpError`, JSON-RPC 2.0 Message-Parser und Typen |
-| `sandbox.rs` | `McpSandbox`, `SandboxPolicy`, `VolatileToolResult` (verschlüsselter RAM) |
-| `egress_gateway.rs` | Egress Shield Gateway für Cloud Queries (`CloudQueryRequest`, `DefaultEgressClassifier`) |
-| `egress_guard.rs` | Schutz und Validierung ausgehender Anfragen gegen Exfiltration |
-| `prompt_injection.rs` | `PromptInjectionGuard`, `SecurityAuditLogger`, Pattern-Matching |
+| `lib.rs` | `McpServer` Initialisierung und öffentliche Re-Exports |
+| `server.rs`, `server_dispatch.rs`, `server_tools.rs` | JSON-RPC 2.0 Handler, Dispatcher und Tool-Registrierung (`TOOL_REGISTRY`) |
+| `sandbox.rs` | `SandboxPolicy`, Timeouts und RAM-verschlüsselte `VolatileToolResult`-Verwaltung |
+| `prompt_injection/` | `PromptInjectionGuard`, `SecurityAuditLogger`, Richtlinien und Quarantäne |
+| `egress_gateway.rs`, `egress_guard.rs` | Validierung und Schutz ausgehender Netzwerk- und Cloud-Egress-Anfragen |
+| `bulk_exfiltration_detector.rs` | Erkennung und Blockade von unbefugter Massendaten-Exfiltration |
+| `io.rs`, `protocol.rs`, `routing.rs` | Stdio-Framing, JSON-RPC Nachrichtenprotokoll und Aufrufer-Routing |
+| `config.rs`, `validation.rs`, `tools_crud.rs` | Server-Konfiguration, Parameter-Schema-Validierung und CRUD-Tool-Logik |
+| `bin/contextra-mcp-server.rs` | Executable Entrypoint für Stdio-MCP-Server |
 
-## 3. Kritische Invarianten
+## 3. Invarianten
 
-### Nur Stdio-Transport (ADR-010)
-Der MCP-Server kommuniziert **ausschließlich** über Stdio (Standard I/O) mittels JSON-RPC 2.0.
-Die HTTP-Schnittstelle wurde laut ADR-010 aus Sicherheitsgründen restlos entfernt.
-Ein Einbau von `axum` oder `hyper` ist ein Security-Blocker!
+- **INV-MCP-STDIO-ONLY**: Kommuniziert ausschließlich über Stdio JSON-RPC 2.0; HTTP-Server sind aus Sicherheitsgründen verboten (ADR-010).
+  *Prüfung*: `cargo test -p contextra-mcp --lib`
+- **INV-MCP-CLASSIFY-1**: Jedes Werkzeug in `TOOL_REGISTRY` ist kategorisiert und validiert (`check_mcp_tool_classification`).
+  *Prüfung*: `cargo test -p contextra-mcp --lib`
+- **INV-MCP-SANDBOX-DEFAULT**: Schreibzugriffe (`allow_db_writes`) und Cloud-Egress (`allow_cloud_egress`) sind standardmäßig verboten.
+  *Prüfung*: `cargo test -p contextra-mcp --lib`
+- **INV-MCP-VOLATILE-CONTAINMENT**: Tool-Ausgaben über `MAX_VOLATILE_OUTPUT_BYTES` (16 MB) werden RAM-verschlüsselt in `VolatileToolResult` gehalten.
+  *Prüfung*: `cargo test -p contextra-mcp --lib`
 
-### Sandbox-Defaults
-Die `SandboxPolicy` definiert harte Grenzen:
-- `allow_db_reads`: true
-- `allow_db_writes`: false (muss explizit opt-in via Env-Var `CONTEXTRA_MCP_WRITE_ALLOW`)
-- `allow_code_execution`: false (strikt verboten by default)
-- `allow_cloud_egress`: false (Cloud-Egress strikt verboten by default; erfordert explizites Opt-in)
-Schreibende Operationen (Write-Authorization, ADR-044) sowie Cloud-Egress-Aufrufe werden vor Ausführung blockiert, wenn deaktiviert.
+## 4. Verboten / Anti-Patterns
 
-### Prompt-Injection Guard (Quarantäne)
-Eingehende Texte (für Embeddings/Graph) passieren den `PromptInjectionGuard`.
-Treffer auf Patterns (wie `ignore all previous instructions`) lösen sofortige Quarantäne aus.
-Diese Events werden im `SecurityAuditLogger` unwiderruflich erfasst.
+- **Keine HTTP-Endpunkte**: Der Einbau von HTTP-Servern (`axum`, `hyper`) ist im MCP-Server ein Security-Blocker.
+- **Keine unbehandelte Executortimeouts**: Tool-Ausführungen müssen zwingend über `sandbox.execute_with_timeout(...)` geleitet werden.
+- **Kein Bypass des InjectionGuards**: Ungefilterter Import von Prompt-Inhalten ohne `PromptInjectionGuard` ist untersagt.
 
-### Volatile Results (Anthropic Containment)
-Sehr große Tool-Ergebnisse (MAX_VOLATILE_OUTPUT_BYTES = 16 MB) oder sensitive Daten 
-werden nicht als JSON im Klartext zurückgeschickt, sondern im `VolatileToolResult` 
-RAM-verschlüsselt (via `contextra-crypto::VolatileEncryptionKey`, Cargo-Package-Name: `contextra-privacy`). Der Agent erhält
-nur einen Reference-Key, den andere Tools einlösen können.
-Die Anzahl ist begrenzt (`MAX_VOLATILE_RESULTS` = 1000).
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-## 4. Public API Quick-Reference
+- Multi-Threaded Tokio-Runtime steuert Stdio-I/O und Hintergrundaufgaben.
+- `McpSandbox` schützt `VolatileToolResult` über ein einzelnes, ungeschachteltes `parking_lot::Mutex`.
+- Geschachtelte Sperren über Crate-Grenzen hinweg sind strikt verboten.
 
-```rust
-// === McpServer (lib.rs) ===
-pub struct McpServer { ... }
-impl McpServer {
-    pub fn new(collection: Arc<Collection<LsmStorage>>) -> Self;
-    pub fn with_sandbox(self, sandbox: Arc<McpSandbox>) -> Self;
-    pub fn with_injection_guard(self, guard: Arc<PromptInjectionGuard>) -> Self;
-    pub async fn run_stdio(self: Arc<Self>) -> Result<(), Box<dyn Error>>;
-}
+## 6. Verifikation
 
-// === Sandbox & Security (sandbox.rs, prompt_injection.rs) ===
-pub struct SandboxPolicy {
-    pub allow_db_reads: bool,
-    pub allow_db_writes: bool,
-    pub allow_code_execution: bool,
-    pub allow_cloud_egress: bool,
-    pub max_execution_ms: u64,
-}
-pub struct McpSandbox { ... }
-impl McpSandbox {
-    pub async fn execute_with_timeout<F, T, E>(&self, category: ToolCategory, future: F) -> Result<T, McpError>;
-}
-pub struct PromptInjectionGuard { ... }
-```
+- `cargo test -p contextra-mcp`
+- `cargo check -p contextra-mcp`
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 7. Bekannte Lücken / SOLL
 
-```rust
-// ❌ FALSCH — Timeout im Tool ignorieren:
-let result = tool_call().await;
-// ✅ KORREKT — Alle Tool-Ausführungen MÜSSEN durch die Sandbox:
-let result = sandbox.execute_with_timeout(ToolCategory::DatabaseRead, tool_call()).await?;
-
-// ❌ FALSCH — HTTP Server hinzufügen:
-// ✅ KORREKT — MCP läuft exklusiv über `run_stdio`.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`McpSandbox` verwaltet die `VolatileToolResult` in einer `HashMap`, die durch 
-ein **einziges**, nicht geschachteltes `parking_lot::Mutex` geschützt ist.
-Regel `detect_nested_locks.yml` verbietet geschachtelte Locks innerhalb von Layer 4 strikt.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: Alle L0-L3 Crates (`contextra-core`, `contextra-db`, `contextra-agent`, `contextra-crypto` / `contextra-privacy`)
-- **Verbotene Imports**: Keine (Layer 4 Top Crate)
-- **Genutzt von**: CLI (`contextra`) und externen MCP-Clients (Cursor, Jules, Claude)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-010 | Entfernung der HTTP-Schicht (Nur Stdio) |
-| ADR-044 | MCP Write-Authorization (Opt-In Security) |
-| `rules/detect_nested_locks.yml` | Verbietet Deadlock-anfällige Lock-Schachtelungen |
+- Dynamisches Hinzufügen externer WASM-MCP-Plugins erfordert Neustart der Stdio-Session.
