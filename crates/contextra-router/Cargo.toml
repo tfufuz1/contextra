@@ -12,9 +12,8 @@ ring = "3"
 
 [features]
 default = []
-bandit-routing = ["egress-sherman-morrison"]
+bandit-routing = ["contextra-adapt/bandit-routing"]
 cloud-egress-guard = []
-egress-sherman-morrison = []
 flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
 
 [dependencies]

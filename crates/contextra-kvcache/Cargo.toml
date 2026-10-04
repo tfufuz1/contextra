@@ -31,7 +31,6 @@ bytes = { workspace = true }
 default = []
 content-addressed-kv-cache = []
 kv-encryption = ["contextra-crypto/kv-encryption"]
-kvcache-attention-eviction = []
 kvcache-kivi-quant = []
 kivi-quantization = []
 

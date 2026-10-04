@@ -28,7 +28,6 @@ deletion-proof = ["wal-integrity"]
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
-sieve-cache = []
 docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
 
