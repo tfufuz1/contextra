@@ -1,6 +1,6 @@
 # Contextra
 
-Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25 / BM25F), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
+Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25; BM25F-Spezifikation), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
 > **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v15 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
@@ -11,7 +11,7 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 1. **Beweisbarkeit statt Zusage:** Löschung (`DeletionProof`), Datenzugriff und Agentenhandlungen sind kryptographisch nachprüfbar und ohne Contextra-Zugriff extern verifizierbar.
 2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`).
 3. **Pure Rust Inferenz (Candle):** Lokale GGUF-Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen.
-4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), Zero-Panic-Garantie im Produktionspfad (P7) und injizierter Determinismus (P28).
+4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, schrittweise Reduzierung verbleibender Panic-Stellen über CI-Ratchet-Mechanismus) und injizierter Determinismus (P28).
 5. **Drei abgestufte Feature-Ringe:**
    - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Candle-Inferenz, Bandit-Routing.
    - **Ring `sovereign`:** Quelloffener Krypto-Code (Löschbeweis, Privacy-Gateway, Zero-Net-Traffic).
@@ -24,12 +24,12 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 | Feature | Ring | Subsystem / Crate | Status | Anmerkung |
 |---|---|---|---|---|
 | **Vector Search (HNSW / DiskANN)** | `fast` | `contextra-vector` | 🟢 Produktiv | HNSW, DiskANN, SQ8 / RaBitQ Quantisierung. |
-| **Full-Text Search (BM25 / BM25F)** | `fast` | `contextra-text` | 🟢 Produktiv | BM25/BM25F mit Block-Max WAND & deutscher Morphologie. |
+| **Full-Text Search (BM25 / BM25F)** | `fast` | `contextra-text` | 🟢 Produktiv / 🟡 Geplant | BM25 produktiv (Block-Max WAND & deutsche Morphologie); BM25F spezifiziert, Implementierung ausstehend. |
 | **Knowledge Graph & PPR** | `fast` | `contextra-graph` | 🟢 Produktiv | CSR-Graph, Forward-Push PPR, Leiden-Community-Detection, Hyperkanten. |
 | **4-Signal-Fusion & Kalibrierung** | `fast` | `contextra-rank` | 🟢 Produktiv | Multi-Signal-Fusion (RRF), Isotonic- / Platt-Kalibrierung & Drift. |
-| **Contextual-Bandit-Routing** | `fast` | `contextra-adapt` | 🟢 Produktiv | LinUCB, Sherman-Morrison, FC-TS, Lyapunov-Drift-Regler & PID. |
+| **Contextual-Bandit-Routing** | `fast` | `contextra-adapt` | 🟡 In Arbeit | Kernmechanismen (LinUCB, Sherman-Morrison, FC-TS) implementiert, Produktionsverdrahtung in Arbeit. |
 | **LSM Storage Engine & WAL** | `fast` | `contextra-store` | 🟢 Produktiv | LSM-Tree, WAL (Group-Commit, HMAC-Kette), MVCC-Pinning. |
-| **KV-Cache v2 & Zero-Copy IPC** | `fast` | `contextra-kvcache` | 🟢 Produktiv | Prefix-Radix-Baum, Tiering, AEAD, Segmentdateien. |
+| **KV-Cache v2 & Zero-Copy IPC** | `fast` | `contextra-kvcache` | 🟡 In Arbeit | Kernmechanismen (Prefix-Radix-Baum, Tiering, AEAD) implementiert, Produktionsverdrahtung in Arbeit. |
 | **Local Inference Backend (Candle)** | `fast` | `contextra-infer-candle` | 🟢 Produktiv | Pure Rust GGUF/Candle als Standard-Inferenzbackend. |
 | **Opt-in Inference Backends** | `fast` | `contextra-infer-ollama`, `contextra-infer-onnx` | 🟢 Produktiv | Ollama HTTP & ONNX/ort Reranker (explizites Opt-in). |
 | **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten (`contextra` ohne Ollama). |
