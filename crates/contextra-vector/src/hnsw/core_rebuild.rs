@@ -3,6 +3,7 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::SaturatingU8;
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
@@ -633,7 +634,7 @@ impl HnswIndexCore {
                                     kept.push(neighbor_u32);
                                 }
                             }
-                            counts[count_start + layer] = kept.len() as u8;
+                            counts[count_start + layer] = SaturatingU8::from(kept.len()).get();
                             arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
                         }
                     }

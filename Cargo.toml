@@ -185,6 +185,8 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
 
 [profile.release]
 panic = "unwind"
