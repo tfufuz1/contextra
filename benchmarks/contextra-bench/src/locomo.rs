@@ -469,7 +469,10 @@ mod tests {
         assert_eq!(dataset.cases.len(), 4);
 
         let conv_map = dataset.conversation_index.get("conv_1").unwrap();
-        assert_eq!(conv_map.get("D1:1").unwrap(), "I visited Berlin in May 2023.");
+        assert_eq!(
+            conv_map.get("D1:1").unwrap(),
+            "I visited Berlin in May 2023."
+        );
 
         assert_eq!(dataset[0].expected_answer, "Paris");
         assert_eq!(dataset[0].category, LocomoQuestionCategory::MultiHop);

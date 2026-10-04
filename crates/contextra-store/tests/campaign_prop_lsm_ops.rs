@@ -42,7 +42,12 @@ impl ReferenceModel {
         }
     }
 
-    fn delete_prefix_uncommitted(&mut self, tx_id: u64, _prefix: &[u8], matching_committed_keys: &[Vec<u8>]) {
+    fn delete_prefix_uncommitted(
+        &mut self,
+        tx_id: u64,
+        _prefix: &[u8],
+        matching_committed_keys: &[Vec<u8>],
+    ) {
         let entry = self.active_txs.entry(tx_id).or_default();
         for k in matching_committed_keys {
             if let Some(pos) = entry.iter().position(|(staged_k, _)| staged_k == k) {
@@ -117,16 +122,43 @@ impl ReferenceModel {
 
 #[derive(Debug, Clone)]
 enum CampaignOp {
-    Put { tx: u64, key: Vec<u8>, val: Vec<u8> },
-    Delete { tx: u64, key: Vec<u8> },
-    PutBatch { tx: u64, items: Vec<(Vec<u8>, Vec<u8>)> },
-    DeletePrefix { tx: u64, prefix: Vec<u8> },
-    Commit { tx: u64 },
-    Rollback { tx: u64 },
-    Get { key: Vec<u8> },
-    GetAtSeq { key: Vec<u8>, target_seq: u64 },
-    ScanPrefix { prefix: Vec<u8> },
-    ScanRange { start: Vec<u8>, end: Vec<u8> },
+    Put {
+        tx: u64,
+        key: Vec<u8>,
+        val: Vec<u8>,
+    },
+    Delete {
+        tx: u64,
+        key: Vec<u8>,
+    },
+    PutBatch {
+        tx: u64,
+        items: Vec<(Vec<u8>, Vec<u8>)>,
+    },
+    DeletePrefix {
+        tx: u64,
+        prefix: Vec<u8>,
+    },
+    Commit {
+        tx: u64,
+    },
+    Rollback {
+        tx: u64,
+    },
+    Get {
+        key: Vec<u8>,
+    },
+    GetAtSeq {
+        key: Vec<u8>,
+        target_seq: u64,
+    },
+    ScanPrefix {
+        prefix: Vec<u8>,
+    },
+    ScanRange {
+        start: Vec<u8>,
+        end: Vec<u8>,
+    },
     CloseAndReopen,
 }
 
@@ -141,10 +173,7 @@ fn valid_key_strategy() -> impl Strategy<Value = Vec<u8>> {
 }
 
 fn key_strategy() -> impl Strategy<Value = Vec<u8>> {
-    prop_oneof![
-        Just(vec![]),
-        valid_key_strategy(),
-    ]
+    prop_oneof![Just(vec![]), valid_key_strategy(),]
 }
 
 fn value_strategy() -> impl Strategy<Value = Vec<u8>> {
@@ -159,24 +188,35 @@ fn value_strategy() -> impl Strategy<Value = Vec<u8>> {
 fn campaign_op_strategy() -> impl Strategy<Value = CampaignOp> {
     let tx_strat = 1u64..10u64;
     prop_oneof![
-        (tx_strat.clone(), valid_key_strategy(), value_strategy()).prop_map(|(tx, key, val)| CampaignOp::Put { tx, key, val }),
-        (tx_strat.clone(), valid_key_strategy()).prop_map(|(tx, key)| CampaignOp::Delete { tx, key }),
-        (tx_strat.clone(), prop::collection::vec((valid_key_strategy(), value_strategy()), 1..5)).prop_map(|(tx, items)| {
-            let mut seen = BTreeSet::new();
-            let mut rev_items = Vec::new();
-            for (k, v) in items.into_iter().rev() {
-                if seen.insert(k.clone()) {
-                    rev_items.push((k, v));
+        (tx_strat.clone(), valid_key_strategy(), value_strategy())
+            .prop_map(|(tx, key, val)| CampaignOp::Put { tx, key, val }),
+        (tx_strat.clone(), valid_key_strategy())
+            .prop_map(|(tx, key)| CampaignOp::Delete { tx, key }),
+        (
+            tx_strat.clone(),
+            prop::collection::vec((valid_key_strategy(), value_strategy()), 1..5)
+        )
+            .prop_map(|(tx, items)| {
+                let mut seen = BTreeSet::new();
+                let mut rev_items = Vec::new();
+                for (k, v) in items.into_iter().rev() {
+                    if seen.insert(k.clone()) {
+                        rev_items.push((k, v));
+                    }
                 }
-            }
-            rev_items.reverse();
-            CampaignOp::PutBatch { tx, items: rev_items }
-        }),
-        (tx_strat.clone(), valid_key_strategy()).prop_map(|(tx, prefix)| CampaignOp::DeletePrefix { tx, prefix }),
+                rev_items.reverse();
+                CampaignOp::PutBatch {
+                    tx,
+                    items: rev_items,
+                }
+            }),
+        (tx_strat.clone(), valid_key_strategy())
+            .prop_map(|(tx, prefix)| CampaignOp::DeletePrefix { tx, prefix }),
         tx_strat.clone().prop_map(|tx| CampaignOp::Commit { tx }),
         tx_strat.clone().prop_map(|tx| CampaignOp::Rollback { tx }),
         key_strategy().prop_map(|key| CampaignOp::Get { key }),
-        (key_strategy(), 0u64..100u64).prop_map(|(key, target_seq)| CampaignOp::GetAtSeq { key, target_seq }),
+        (key_strategy(), 0u64..100u64)
+            .prop_map(|(key, target_seq)| CampaignOp::GetAtSeq { key, target_seq }),
         key_strategy().prop_map(|prefix| CampaignOp::ScanPrefix { prefix }),
         (key_strategy(), key_strategy()).prop_map(|(k1, k2)| {
             let (start, end) = if k1 <= k2 { (k1, k2) } else { (k2, k1) };
@@ -339,7 +379,10 @@ async fn prop_counter_probe_scan_ordering_inversion() {
     scan.reverse();
 
     let is_ordered = scan.windows(2).all(|w| w[0].0 <= w[1].0);
-    assert!(!is_ordered, "R10 Counter-probe successfully detected ordering mutation!");
+    assert!(
+        !is_ordered,
+        "R10 Counter-probe successfully detected ordering mutation!"
+    );
 }
 
 #[tokio::test]
@@ -356,7 +399,10 @@ async fn prop_counter_probe_uncommitted_rollback_leakage() {
     storage.rollback(tx).await.unwrap();
 
     let val = storage.get(b"leak_key").await.unwrap();
-    assert_eq!(val, None, "R10 Counter-probe verified rolled back transaction is not visible");
+    assert_eq!(
+        val, None,
+        "R10 Counter-probe verified rolled back transaction is not visible"
+    );
 }
 
 #[tokio::test]
@@ -375,5 +421,8 @@ async fn prop_counter_probe_prefix_bound_overflow() {
 
     let scan_pfx = storage.scan_prefix(b"pfx_").await.unwrap();
     let contains_pfy = scan_pfx.iter().any(|(k, _)| k.starts_with(b"pfy_"));
-    assert!(!contains_pfy, "R10 Counter-probe verified prefix scan bounds constraint!");
+    assert!(
+        !contains_pfy,
+        "R10 Counter-probe verified prefix scan bounds constraint!"
+    );
 }

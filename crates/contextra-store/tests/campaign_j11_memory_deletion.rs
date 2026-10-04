@@ -2,9 +2,9 @@
 // Oracle: StorageEngine transaction lifecycle (put + commit) vs uncommitted isolation.
 
 use contextra_ports::storage::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -28,7 +28,10 @@ async fn test_campaign_j11_memory_only_storage_contract() {
 
     let fetched = engine.get(key).await;
     assert!(fetched.is_ok());
-    assert_eq!(fetched.expect("Failed to get key"), Some(val.to_vec().into()));
+    assert_eq!(
+        fetched.expect("Failed to get key"),
+        Some(val.to_vec().into())
+    );
 }
 
 #[tokio::test]
@@ -38,7 +41,9 @@ async fn test_campaign_j11_counter_probing_failure() {
     let mut config = LsmConfig::default();
     config.path = dir.path().join("dummy_db");
 
-    let engine = LsmStorage::open(config).await.expect("Failed to open storage");
+    let engine = LsmStorage::open(config)
+        .await
+        .expect("Failed to open storage");
     let tx_id = TxId::new(200);
     let key = b"uncommitted_key";
     let val = b"uncommitted_val";
@@ -47,5 +52,8 @@ async fn test_campaign_j11_counter_probing_failure() {
     let res = engine.get(key).await.expect("Get failed");
 
     // Counter probe assertion check: uncommitted key MUST NOT be visible
-    assert!(res.is_none(), "Uncommitted key should not be visible before commit");
+    assert!(
+        res.is_none(),
+        "Uncommitted key should not be visible before commit"
+    );
 }
