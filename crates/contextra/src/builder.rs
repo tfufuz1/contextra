@@ -166,6 +166,26 @@ impl ContextraBuilder {
         self
     }
 
+    /// Returns the configured storage path.
+    pub fn storage_path(&self) -> &std::path::Path {
+        &self.storage_path
+    }
+
+    /// Returns a reference to the inner [`ContextraConfig`].
+    pub fn config(&self) -> &ContextraConfig {
+        &self.config
+    }
+
+    /// Returns a reference to the configured license gate.
+    pub fn license_gate(&self) -> &Arc<dyn LicenseGate> {
+        &self.license_gate
+    }
+
+    /// Returns the configured performance profile preset, if any.
+    pub fn performance_profile(&self) -> Option<crate::performance_profile::PerformanceProfile> {
+        self.performance_profile
+    }
+
     /// Builds and initializes the `Contextra` engine instance.
     pub async fn build(mut self) -> Result<Contextra, ContextraError> {
         if let Some(ref err_msg) = self.signed_license_error {
