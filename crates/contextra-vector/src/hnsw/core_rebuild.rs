@@ -633,7 +633,10 @@ impl HnswIndexCore {
                                     kept.push(neighbor_u32);
                                 }
                             }
-                            counts[count_start + layer] = kept.len() as u8;
+                            counts[count_start + layer] = u8::try_from(
+                                contextra_types::SaturatingU16::from(kept.len()).get(),
+                            )
+                            .unwrap_or(u8::MAX);
                             arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
                         }
                     }
