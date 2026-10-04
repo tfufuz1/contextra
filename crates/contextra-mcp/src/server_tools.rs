@@ -5,7 +5,7 @@ use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::chunker::{ChunkerConfig, MarkdownChunker};
 use contextra_ports::StorageEngine;
-use contextra_types::{DocId, MAX_SEARCH_K};
+use contextra_types::{DocId, TenantId, TenantScoped, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
 /// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
@@ -613,15 +613,21 @@ impl McpServer {
                     Some(10)
                 };
 
+                let tenant = TenantId::try_new(1)?;
                 let request = CloudQueryRequest {
                     query,
                     collection,
                     max_results,
                 };
+                let scoped = TenantScoped::new(tenant, request);
 
-                let response =
-                    egress_gateway::handle_cloud_query(request, self.egress_classifier.as_ref())
-                        .await?;
+                let response = egress_gateway::handle_cloud_query_scoped_with_guard(
+                    scoped,
+                    &tenant,
+                    self.egress_classifier.as_ref(),
+                    self.egress_guard.as_deref(),
+                )
+                .await?;
 
                 serde_json::to_value(&response).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))
