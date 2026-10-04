@@ -11,10 +11,7 @@ const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
-/// Default Expected Calibration Error (ECE) threshold for maintenance-driven model rebuilds.
-///
-/// An ECE of 0.10 (10%) represents a significant deviation between predicted probabilities
-/// and actual outcomes across confidence bins, signaling that recalibration is necessary.
+/// Default Expected Calibration Error (ECE) threshold for triggering a rebuild.
 pub const DEFAULT_ECE_REBUILD_THRESHOLD: f32 = 0.10;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
@@ -131,22 +128,22 @@ impl IsotonicCalibrator {
         }
     }
 
-    /// Evaluates Expected Calibration Error (ECE) and triggers a model rebuild if ECE exceeds `threshold`.
+    /// Checks the Expected Calibration Error (ECE) against `threshold`.
     ///
-    /// Returns `true` if a rebuild was triggered, or `false` if ECE is within bounds,
-    /// cannot be calculated (e.g., insufficient observations during warmup), or if `threshold` is non-finite (NaN/Inf).
+    /// Calls `expected_calibration_error()`. If the result is `Some(ece)` with `ece > threshold`
+    /// (and `threshold` is finite), calls `force_rebuild()` and returns `true`.
+    /// Returns `false` otherwise (including when ECE is `None` due to insufficient data or when `threshold` is NaN).
     pub fn maybe_rebuild_on_ece(&mut self, threshold: f32) -> bool {
         if !threshold.is_finite() {
             return false;
         }
-
-        match self.expected_calibration_error() {
-            Some(ece) if ece > threshold => {
+        if let Some(ece) = self.expected_calibration_error() {
+            if ece > threshold {
                 self.force_rebuild();
-                true
+                return true;
             }
-            _ => false,
         }
+        false
     }
 
     /// Resets observations if ConfigFingerprint changes (P8 Compliance).
