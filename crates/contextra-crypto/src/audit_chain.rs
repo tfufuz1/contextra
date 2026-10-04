@@ -100,6 +100,15 @@ impl AuditChainEntry {
     }
 }
 
+/// Anker für die Verifizierung einer Audit-Kette gegen extern gespeicherte Zustände.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditChainAnchor {
+    /// Index des geankerten Eintrags.
+    pub index: u64,
+    /// Blake3-Hash des geankerten Eintrags.
+    pub entry_hash: [u8; 32],
+}
+
 /// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditChainHeadSignature {
@@ -325,5 +334,36 @@ impl AuditChain {
         }
 
         Ok(true)
+    }
+
+    /// Liefert den Anker des letzten Eintrags der Kette, oder `None` bei leerer Kette.
+    pub fn anchor(&self) -> Option<AuditChainAnchor> {
+        self.entries.last().map(|entry| AuditChainAnchor {
+            index: entry.index,
+            entry_hash: entry.entry_hash,
+        })
+    }
+
+    /// Verifiziert die Kette gegen einen externen Anker.
+    ///
+    /// Ruft zuerst [`Self::verify_chain`] zur Prüfung der internen Integrität auf.
+    /// Anschließend wird geprüft, ob an `anchor.index` ein Eintrag mit identischem `entry_hash` existiert.
+    /// Eine seit dem Anker gewachsene Kette ist gültig; eine kürzer gewordene Kette (Backup-Rollback)
+    /// oder eine abweichende Alternativhistorie (Fork) liefert `Ok(false)`.
+    pub fn verify_chain_against_anchor(&self, anchor: &AuditChainAnchor) -> Result<bool> {
+        if !self.verify_chain()? {
+            return Ok(false);
+        }
+
+        let idx = match usize::try_from(anchor.index) {
+            Ok(i) => i,
+            Err(_) => return Ok(false),
+        };
+
+        if let Some(entry) = self.entries.get(idx) {
+            Ok(entry.entry_hash == anchor.entry_hash)
+        } else {
+            Ok(false)
+        }
     }
 }
