@@ -8,11 +8,11 @@ risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | ca
 goal      = "Präzise Beschreibung des angestrebten Zielzustands"
 non_goals = ["Was explizit nicht getan werden soll", "Kein Refactoring fremder Module"]
 scope     = ["crates/contextra-core/src/**"]
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "Single Error Root"]
 acceptance = [
   "cargo test -p contextra-core",
-  "just check"
+  "cargo xtask jules check"
 ]
 evidence_required = ["Neuer Test, der die Funktionalität absichert"]
 
