@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(decrypted, plaintext);
 
         // Revoke key in single consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment.segment_id);
+        let revoked = cipher.registry().revoke_subkey(segment.segment_id).unwrap();
         assert!(revoked, "Subkey revocation must succeed");
 
         let res = segment.decrypt_data(&cipher);

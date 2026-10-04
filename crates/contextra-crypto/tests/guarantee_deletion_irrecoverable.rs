@@ -136,7 +136,7 @@ fn test_scenario_1_tenant_shredding_and_isolation() {
     assert!(registry.is_group_active(tenant_b_group));
 
     // "Delete" Tenant A (Schlüsselvernichtung über die öffentliche API)
-    let revoked = registry.revoke_group(tenant_a_group);
+    let revoked = registry.revoke_group(tenant_a_group).unwrap();
     assert!(
         revoked,
         "Public API revoke_group(tenant_a) must return true for active group"
@@ -215,7 +215,7 @@ fn test_scenario_2_key_derivation_boundary_and_reconstruction_check() {
         .expect("Initial get_or_derive must succeed");
 
     // Löschung / Revocation
-    let revoked = registry.revoke_group(tenant_id);
+    let revoked = registry.revoke_group(tenant_id).unwrap();
     assert!(revoked, "Revocation of tenant_id 999 must succeed");
 
     // Versuche Schlüssel nach Löschung neu abzuleiten

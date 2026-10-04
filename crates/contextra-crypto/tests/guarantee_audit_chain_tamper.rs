@@ -479,7 +479,7 @@ fn test_encrypted_commitment_salt_security_and_tamper() {
     assert!(wrong_group.decrypt(&registry).is_err());
 
     // 5. Decryption after subkey revocation (shredding) fails
-    assert!(registry.revoke_subkey(group_id));
+    assert!(registry.revoke_subkey(group_id).unwrap());
     assert!(enc_salt.decrypt(&registry).is_err());
 }
 
