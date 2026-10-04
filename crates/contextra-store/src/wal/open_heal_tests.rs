@@ -36,13 +36,13 @@ async fn test_open_heal_truncated_tail_plaintext() -> Result<()> {
         "WAL size after open-heal should be truncated to verified end, got {size_after_heal}"
     );
 
-    // 4. Append 1 new entry (entry 4)
+    // 4. Append 1 new entry (entry 3)
     let op4 = WalOp::Put {
         tx_id: TxId::new(4),
         key: b"key_4".to_vec(),
         value: b"val_4".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
+    let (batch4, _) = wal.prepare_batch(vec![(op4, 3)]).await?;
     wal.append_batch(batch4).await?;
     drop(wal);
 
@@ -56,7 +56,7 @@ async fn test_open_heal_truncated_tail_plaintext() -> Result<()> {
     );
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 4);
+    assert_eq!(replayed[2].1.seq_no, 3);
 
     Ok(())
 }
@@ -143,14 +143,14 @@ async fn test_open_heal_encrypted_wal() -> Result<()> {
     let truncated_len = original_bytes.len() - 15;
     fs::write(&path, &original_bytes[..truncated_len]).await?;
 
-    // 3. Open WAL with Open-Heal and append entry 4
+    // 3. Open WAL with Open-Heal and append entry 3
     let wal = Wal::open_with_config(&path, config.clone()).await?;
     let op4 = WalOp::Put {
         tx_id: TxId::new(4),
         key: b"enc_k4".to_vec(),
         value: b"enc_v4".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
+    let (batch4, _) = wal.prepare_batch(vec![(op4, 3)]).await?;
     wal.append_batch(batch4).await?;
     drop(wal);
 
@@ -164,7 +164,7 @@ async fn test_open_heal_encrypted_wal() -> Result<()> {
     );
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 4);
+    assert_eq!(replayed[2].1.seq_no, 3);
 
     Ok(())
 }
@@ -343,7 +343,7 @@ async fn test_fault_injection_recover_from_poison() -> Result<()> {
         key: b"k3".to_vec(),
         value: b"v3".to_vec(),
     };
-    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 2)]).await?;
     wal.append_batch(batch3).await?;
     drop(wal);
 
@@ -351,7 +351,7 @@ async fn test_fault_injection_recover_from_poison() -> Result<()> {
     let replayed = wal_reopened.replay().await?;
     assert_eq!(replayed.len(), 2);
     assert_eq!(replayed[0].1.seq_no, 1);
-    assert_eq!(replayed[1].1.seq_no, 3);
+    assert_eq!(replayed[1].1.seq_no, 2);
 
     Ok(())
 }

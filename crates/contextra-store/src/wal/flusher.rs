@@ -350,46 +350,7 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            let rollback_res: Result<()> = async {
-                                file.set_len(size_before).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL rollback set_len({}) failed for {}: {}",
-                                        size_before,
-                                        path.display(),
-                                        e
-                                    ))
-                                })?;
-                                if write_header {
-                                    header_written
-                                        .store(false, std::sync::atomic::Ordering::Release);
-                                }
-                                file.sync_all().await.map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL rollback sync_all failed for {}: {}",
-                                        path.display(),
-                                        e
-                                    ))
-                                })?;
-                                file.seek(std::io::SeekFrom::Start(size_before))
-                                    .await
-                                    .map_err(|e| {
-                                        ContextraError::Storage(format!(
-                                            "WAL rollback seek({}) failed for {}: {}",
-                                            size_before,
-                                            path.display(),
-                                            e
-                                        ))
-                                    })?;
-                                Ok(())
-                            }
-                            .await;
-
-                            if rollback_res.is_err() {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                            } else {
-                                let mut last_hmac_guard = last_hmac.lock().await;
-                                *last_hmac_guard = flusher_last_hmac;
-                            }
+                            poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
 
                             for ack in acks {
                                 let _ =
@@ -480,6 +441,8 @@ impl Wal {
                                 ));
                             }
 
+                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
+
                             if let Err(e) = file.set_len(offset).await {
                                 return Err(ContextraError::Storage(format!(
                                     "WAL truncate failed for {}: {}",
@@ -505,8 +468,6 @@ impl Wal {
                                     e
                                 )));
                             }
-
-                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
                             if offset < 4 {
                                 header_written.store(false, std::sync::atomic::Ordering::Release);
                             } else {

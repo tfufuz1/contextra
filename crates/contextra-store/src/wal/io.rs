@@ -673,6 +673,11 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
+        if self.is_poisoned() {
+            return Err(ContextraError::Storage(
+                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+            ));
+        }
         let entries = &batch.0;
         if entries.is_empty() {
             let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
@@ -733,6 +738,11 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
+        if self.is_poisoned() {
+            return Err(ContextraError::Storage(
+                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+            ));
+        }
         let entries = &batch.0;
         if entries.is_empty() {
             let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
