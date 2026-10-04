@@ -88,7 +88,11 @@ async fn test_campaign_group_commit_stress_200_tasks() {
             ..Default::default()
         };
 
-        let storage = Arc::new(LsmStorage::new(config.clone()).await.expect("LsmStorage::new"));
+        let storage = Arc::new(
+            LsmStorage::new(config.clone())
+                .await
+                .expect("LsmStorage::new"),
+        );
         let oracle = GroundTruthOracle::new();
 
         let num_tasks = 200;
@@ -136,7 +140,10 @@ async fn test_campaign_group_commit_stress_200_tasks() {
     })
     .await;
 
-    assert!(res.is_ok(), "Test timed out due to possible deadlock or starvation!");
+    assert!(
+        res.is_ok(),
+        "Test timed out due to possible deadlock or starvation!"
+    );
 }
 
 /// b) Commit / Rollback / Flush Interleaving against Ground Truth Oracle
@@ -269,7 +276,11 @@ async fn test_campaign_cancel_safety_intent_locks() {
             let val = format!("fresh_v_{}", i).into_bytes();
 
             let res = storage.put_if_absent(tx, &key, &val).await;
-            assert!(res.is_ok(), "Key cancel_k_{} remained locked after task abort!", i);
+            assert!(
+                res.is_ok(),
+                "Key cancel_k_{} remained locked after task abort!",
+                i
+            );
             storage.commit(tx).await.expect("commit fresh key");
         }
     })
