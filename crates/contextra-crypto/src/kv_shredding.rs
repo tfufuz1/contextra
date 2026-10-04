@@ -224,14 +224,19 @@ impl KeyRegistry {
 
     /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
     /// Returns `true` if the group was active and is now revoked.
-    pub fn revoke_group(&self, group_id: u64) -> bool {
+    pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
+        if let Some(ref log) = self.revocation_log {
+            log.append(RevocationTarget::Group(group_id))
+                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        }
+
         let mut revoked_guard = match self.revoked_groups.write() {
             Ok(g) => g,
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         };
 
         if revoked_guard.contains(&group_id) {
-            return false;
+            return Ok(false);
         }
 
         revoked_guard.insert(group_id);
@@ -243,23 +248,28 @@ impl KeyRegistry {
                 for (_, mut rec) in entry.record_deks.drain() {
                     rec.wrapped_dek.zeroize();
                 }
-                return true;
+                return Ok(true);
             }
         }
 
-        true
+        Ok(true)
     }
 
     /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
-    pub fn revoke_subkey(&self, group_id: u64) -> bool {
+    pub fn revoke_subkey(&self, group_id: u64) -> Result<bool> {
         self.revoke_group(group_id)
     }
 
     /// Revokes (destroys) the DEK wrap for a single record within `group_id` (Single Record Deletion).
     /// Leaves neighbor records in the same group intact and decryptable.
-    pub fn revoke_record(&self, group_id: u64, record_id: u64) -> bool {
+    pub fn revoke_record(&self, group_id: u64, record_id: u64) -> Result<bool> {
         if self.is_group_revoked(group_id) {
-            return false;
+            return Ok(false);
+        }
+
+        if let Some(ref log) = self.revocation_log {
+            log.append(RevocationTarget::Record(format!("{group_id}:{record_id}")))
+                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         }
 
         if let Ok(mut groups_guard) = self.groups.write() {
@@ -268,12 +278,12 @@ impl KeyRegistry {
                     if !rec.revoked {
                         rec.revoked = true;
                         rec.wrapped_dek.zeroize();
-                        return true;
+                        return Ok(true);
                     }
                 }
             }
         }
-        false
+        Ok(false)
     }
 
     /// Returns `true` if `group_id` has an active KEK and is not revoked.
@@ -503,7 +513,7 @@ mod tests {
         }
 
         // Perform single record deletion (revoke record 10)
-        let revoked = registry.revoke_record(group_id, 10);
+        let revoked = registry.revoke_record(group_id, 10)?;
         assert!(revoked, "Record 10 must be successfully revoked");
 
         // Record 10 MUST fail decryption
@@ -537,7 +547,7 @@ mod tests {
         assert!(registry.is_group_active(group_id));
 
         // Revoke entire group (Group Deletion)
-        let revoked = registry.revoke_group(group_id);
+        let revoked = registry.revoke_group(group_id)?;
         assert!(revoked, "Group 100 revocation must succeed");
         assert!(!registry.is_group_active(group_id));
 
