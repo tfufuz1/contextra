@@ -91,6 +91,32 @@ impl RerankPidController {
     }
 }
 
+/// Dynamic PID regulation for candidate pool size based on observed p95 latency.
+///
+/// # Time Measurement & P28 Determinism
+/// P95 latency measurement must be performed by the caller using an injected `Clock` port.
+/// This function does not perform any time measurements internally. It uses a fixed time
+/// step (`dt = Duration::from_millis(100)`) to update the controller state deterministically
+/// without relying on system wallclock calls (P28 requirement).
+///
+/// # Specification Sync Note
+/// The specification document (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`) references `RerankPidController`
+/// in the function signature signature. However, `RerankPidController` is deprecated in favor of
+/// [`crate::PidController`]. This function accepts `&mut crate::PidController` directly.
+///
+/// # Guarantees
+/// - The returned candidate pool size is strictly bounded in `[controller.min_pool_size, controller.max_pool_size]`.
+/// - The hard floor `k_min >= 50` is strictly preserved.
+/// - Non-finite (`NaN`, `INFINITY`, `NEG_INFINITY`) or negative latency inputs do not panic and do not produce
+///   out-of-bounds candidate pool sizes.
+pub fn pid_regulated_candidate_pool(
+    controller: &mut crate::PidController,
+    observed_p95_latency_ms: f32,
+) -> usize {
+    let dt = Duration::from_millis(100);
+    controller.update(dt, observed_p95_latency_ms)
+}
+
 /// Hard deadline manager for candidate retrieval and Cross-Encoder reranking phases (P11 requirement).
 ///
 /// # Intended Integration Point
