@@ -22,6 +22,7 @@ pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
 pub mod deletion_proof;
+pub mod deletion_proof_typestate;
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
