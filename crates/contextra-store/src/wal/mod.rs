@@ -335,7 +335,14 @@ pub struct Wal {
 
 impl Drop for Wal {
     fn drop(&mut self) {
-        // No-op: Flusher task loop terminates naturally when all flusher_tx senders are dropped (rx.recv() returns None).
+        if let Ok(mut tx_guard) = self.flusher_tx.write() {
+            tx_guard.take();
+        }
+        if let Ok(mut task_guard) = self.flusher_task.lock() {
+            if let Some(task) = task_guard.take() {
+                task.abort();
+            }
+        }
     }
 }
 
@@ -748,6 +755,33 @@ impl Wal {
         }
 
         Ok(wal)
+    }
+
+    /// Gracefully closes the WAL, stopping the background flusher task and waiting for it to exit.
+    pub async fn close(&self) -> Result<()> {
+        self.sealed.store(true, std::sync::atomic::Ordering::SeqCst);
+        let flusher_tx = {
+            let mut guard = self
+                .flusher_tx
+                .write()
+                .map_err(|_| ContextraError::Storage("flusher_tx RwLock poisoned".into()))?;
+            guard.take()
+        };
+        drop(flusher_tx);
+
+        let flusher_task = {
+            let mut guard = self
+                .flusher_task
+                .lock()
+                .map_err(|_| ContextraError::Storage("flusher_task Mutex poisoned".into()))?;
+            guard.take()
+        };
+
+        if let Some(task) = flusher_task {
+            let _ = task.await;
+        }
+
+        Ok(())
     }
 
     /// Helper to expose integrity key for tests

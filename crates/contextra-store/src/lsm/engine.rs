@@ -104,6 +104,11 @@ impl LsmStorage {
     pub async fn close(&self) -> Result<()> {
         self.wait_shutdown().await;
         self.flush().await?;
+        let active_wal = {
+            let wal_guard = self.wal.read().await;
+            Arc::clone(&*wal_guard)
+        };
+        active_wal.close().await?;
         Ok(())
     }
 
