@@ -64,7 +64,27 @@ impl ComputePool {
                     match job_opt {
                         Some(job) => {
                             state_clone.active_jobs.fetch_add(1, Ordering::SeqCst);
-                            job();
+
+                            // SAFETY: `AssertUnwindSafe` is safe here because each job closure
+                            // submitted to `ComputePool` is self-contained and isolated. No shared
+                            // locks or mutable state are held across the job execution boundary
+                            // within the worker thread. Catching panics prevents worker threads
+                            // from terminating unexpectedly and guards against thread pool exhaustion.
+                            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
+                            if let Err(err) = result {
+                                let panic_msg = if let Some(s) = err.downcast_ref::<&str>() {
+                                    (*s).to_string()
+                                } else if let Some(s) = err.downcast_ref::<String>() {
+                                    s.clone()
+                                } else {
+                                    "Unknown panic payload".to_string()
+                                };
+                                tracing::error!(
+                                    panic_payload = %panic_msg,
+                                    "ComputePool worker caught panic during job execution; thread remains active"
+                                );
+                            }
+
                             state_clone.active_jobs.fetch_sub(1, Ordering::SeqCst);
                         }
                         None => break, // Channel closed when PoolState is dropped
@@ -161,5 +181,27 @@ mod tests {
             results.push(rx.recv().unwrap());
         }
         assert_eq!(results.len(), 5);
+    }
+
+    #[test]
+    fn test_compute_pool_panic_resilience() {
+        let pool = ComputePool::new(1);
+        assert_eq!(pool.max_workers(), 1);
+
+        // 1. Submit a task that panics explicitly.
+        let handle_panic = pool.spawn(|| {
+            panic!("intentional task panic for resilience testing");
+        });
+
+        // Joining the panicking task handle must return RecvError (sender dropped on panic).
+        assert!(handle_panic.join().is_err());
+
+        // 2. Verify pool is still functional by submitting a second normal task.
+        let handle_normal = pool.spawn(|| 100 + 42);
+        assert_eq!(handle_normal.join().unwrap(), 142);
+
+        // 3. Verify active_jobs returns to 0 and max_workers capacity is unchanged.
+        assert_eq!(pool.active_jobs(), 0);
+        assert_eq!(pool.max_workers(), 1);
     }
 }

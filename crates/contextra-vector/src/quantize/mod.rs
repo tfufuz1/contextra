@@ -94,6 +94,13 @@ impl ScalarQuantizer {
                     vec.len()
                 )));
             }
+            for &val in *vec {
+                if !val.is_finite() {
+                    return Err(contextra_core::ContextraError::invalid_input(
+                        "training data contains NaN or infinite values",
+                    ));
+                }
+            }
         }
 
         if batch.is_empty() {
@@ -221,8 +228,14 @@ impl ScalarQuantizer {
         self.dimension
     }
 
-    /// Calculates quantization drift as the fraction of dimensions falling outside \[mins\[i\], maxes\[i\]\].
-    pub fn check_drift(&self, vector: &[f32]) -> f32 {
+    /// Calculates quantization drift for a single vector as the fraction of dimensions
+    /// falling outside `[mins[i], maxes[i]]`.
+    ///
+    /// This is a **pure calculation** with no side-effects. It does NOT update
+    /// cumulative query metrics (`total_queries`, `out_of_range_queries`).
+    /// For stateful metric tracking across query history, see [`quantize`](Self::quantize)
+    /// and [`drift_ratio`](Self::drift_ratio).
+    pub fn calculate_vector_drift(&self, vector: &[f32]) -> f32 {
         if self.dimension == 0 || vector.is_empty() {
             return 0.0;
         }
@@ -235,7 +248,21 @@ impl ScalarQuantizer {
         out_count as f32 / self.dimension as f32
     }
 
+    /// Legacy pure drift calculation wrapper for [`calculate_vector_drift`](Self::calculate_vector_drift).
+    ///
+    /// # Deprecated
+    /// Renamed to [`calculate_vector_drift`](Self::calculate_vector_drift) to explicitly distinguish
+    /// pure stateless drift calculations from stateful query metric tracking in [`drift_ratio`](Self::drift_ratio).
+    #[deprecated(since = "0.1.0", note = "Use `calculate_vector_drift` instead")]
+    pub fn check_drift(&self, vector: &[f32]) -> f32 {
+        self.calculate_vector_drift(vector)
+    }
+
     /// Returns the fraction of quantized queries that contained values outside the trained min/max range.
+    ///
+    /// This is a **stateful metric** reflecting cumulative historical queries processed via
+    /// [`quantize`](Self::quantize). Pure drift checks via [`calculate_vector_drift`](Self::calculate_vector_drift)
+    /// do not update query counters or affect this ratio.
     pub fn drift_ratio(&self) -> f32 {
         let total = self.total_queries.load(Ordering::Relaxed);
         if total == 0 {
@@ -468,3 +495,62 @@ impl ScalarQuantizer {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod quantize_validation_tests {
+    use super::*;
+
+    #[test]
+    fn test_try_train_with_nan_returns_invalid_input() {
+        let vec1 = vec![1.0, 2.0, 3.0];
+        let vec2 = vec![1.0, f32::NAN, 3.0];
+        let batch = vec![vec1.as_slice(), vec2.as_slice()];
+        let res = ScalarQuantizer::try_train(&batch, 3);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(
+            err.to_string().contains("NaN or infinite values"),
+            "Expected error to mention NaN or infinite values, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_try_train_with_infinity_returns_invalid_input() {
+        let vec1 = vec![1.0, 2.0, 3.0];
+        let vec2 = vec![1.0, f32::INFINITY, 3.0];
+        let batch = vec![vec1.as_slice(), vec2.as_slice()];
+        let res = ScalarQuantizer::try_train(&batch, 3);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(
+            err.to_string().contains("NaN or infinite values"),
+            "Expected error to mention NaN or infinite values, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()> {
+        let vec1 = vec![0.0, 5.0, 10.0];
+        let vec2 = vec![10.0, 5.0, 0.0];
+        let batch = vec![vec1.as_slice(), vec2.as_slice()];
+        let sq = ScalarQuantizer::try_train(&batch, 3)?;
+
+        assert_eq!(sq.drift_ratio(), 0.0);
+
+        // Pure drift calculation does NOT modify drift ratio
+        let out_of_bounds = vec![-5.0, 5.0, 15.0]; // 2 dimensions out of range
+        let calc_drift = sq.calculate_vector_drift(&out_of_bounds);
+        assert!((calc_drift - (2.0 / 3.0)).abs() < f32::EPSILON);
+        assert_eq!(sq.drift_ratio(), 0.0, "Pure drift calculation must not update drift ratio");
+
+        // Quantizing in-range vector -> 1 query, 0 out-of-range -> ratio = 0.0
+        let _ = sq.quantize(&[5.0, 5.0, 5.0])?;
+        assert_eq!(sq.drift_ratio(), 0.0);
+
+        // Quantizing out-of-range vector -> 2 queries total, 1 out-of-range -> ratio = 0.5
+        let _ = sq.quantize(&out_of_bounds)?;
+        assert!((sq.drift_ratio() - 0.5).abs() < f32::EPSILON);
+
+        Ok(())
+    }
+}

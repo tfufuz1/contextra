@@ -7,16 +7,29 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
-    pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) {
+    pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) -> Result<()> {
         if let Some(kv_store) = self.collection.kv_store() {
-            let chunk_ids: Vec<u64> = doc_ids.iter().map(|d| d.inner()).collect();
+            let chunk_ids: Vec<u64> = doc_ids
+                .iter()
+                .map(|d| {
+                    u64::try_from(d.inner()).map_err(|_| {
+                        ContextraError::InvalidInput(format!(
+                            "DocId {} exceeds u64::MAX for chunk_id conversion",
+                            d.inner()
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<u64>>>()?;
             let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
             kv_store.on_rollback(tenant, &chunk_ids);
         }
+        Ok(())
     }
 
     pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {
-        self.trigger_kv_store_rollback(doc_ids);
+        if let Err(e) = self.trigger_kv_store_rollback(doc_ids) {
+            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
+        }
         let comp_tx = TxId::new(
             self.collection
                 .next_tx
@@ -183,7 +196,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             };
             Arc::clone(&guard)
         };
-        self.trigger_kv_store_rollback(&doc_ids);
+        if let Err(e) = self.trigger_kv_store_rollback(&doc_ids) {
+            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
+        }
 
         if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
@@ -209,7 +224,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             };
             Arc::clone(&guard)
         };
-        self.trigger_kv_store_rollback(&doc_ids);
+        let kv_res = self.trigger_kv_store_rollback(&doc_ids);
+        if let Err(ref e) = kv_res {
+            tracing::error!("[INV-DB-3] KV store rollback failed: {}", e);
+        }
 
         let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
@@ -230,6 +248,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         let mut errors = Vec::new();
+        if let Err(e) = kv_res {
+            errors.push(format!("KV Store: {}", e));
+        }
         if let Err(e) = graph_res {
             errors.push(format!("Graph: {}", e));
         }
@@ -251,5 +272,20 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rollback_docid_overflow_handling() {
+        let valid_doc = DocId::new(42 as _);
+        let res_valid = u64::try_from(valid_doc.inner());
+        assert_eq!(res_valid, Ok(42));
+
+        let overflow_raw: u128 = (u64::MAX as u128) + 100;
+        assert!(u64::try_from(overflow_raw).is_err());
     }
 }

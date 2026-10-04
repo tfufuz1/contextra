@@ -14,9 +14,10 @@
 //! Given an input vector $x \in \mathbb{R}^D$ and a random orthogonal rotation matrix $R \in \mathbb{R}^{D \times D}$ ($R R^T = I$):
 //! 1. Rotated vector: $x' = R x$, with norm $\|x'\| = \|x\|$.
 //! 2. Sign binarization: $b_i = \mathbb{I}(x'_i \ge 0) \in \{0, 1\}$.
-//! 3. Reconstructed rotated vector estimate: $\hat{x}'_i = \bar{s} \cdot (2 b_i - 1)$, where $\bar{s} = \frac{1}{D} \sum_{i=0}^{D-1} |x'_i|$.
+//! 3. Reconstructed rotated vector estimate: $\hat{x}'_i = c_s \cdot \bar{s} \cdot (2 b_i - 1)$, where $\bar{s} = \frac{1}{D} \sum_{i=0}^{D-1} |x'_i|$ and $c_s = \frac{\pi}{2} \approx 1.5707963$.
+//!    The factor $c_s = \frac{\pi}{2}$ compensates for sign binarization attenuation under random orthogonal rotation (Gao & Long, 2024), where $\mathbb{E}\left[\bar{s} \sum q'_i \text{sgn}(x'_i)\right] = \frac{2}{\pi} \langle q, x \rangle$, ensuring $\mathbb{E}[\langle q', \hat{x}' \rangle] = \langle q, x \rangle$.
 //! 4. Asymmetric inner product estimation for query $q$ (rotated $q' = R q$):
-//!    $$\langle q, x \rangle = \langle q', x' \rangle \approx \bar{s} \sum_{i=0}^{D-1} q'_i (2 b_i - 1)$$
+//!    $$\langle q, x \rangle = \langle q', x' \rangle \approx c_s \bar{s} \sum_{i=0}^{D-1} q'_i (2 b_i - 1)$$
 //! 5. Asymmetric Euclidean distance estimation:
 //!    $$d(q, x) = \sqrt{\max\left(0, \|q\|^2 + \|x\|^2 - 2 \langle q', \hat{x}' \rangle\right)}$$
 
@@ -141,6 +142,18 @@ impl RaBitQQuantizer {
     }
 
     /// Computes the asymmetric Euclidean distance between an unquantized query vector and a quantized bitcode.
+    ///
+    /// # Mathematical Derivation & Bias Correction
+    /// Following RaBitQ (Gao & Long, 2024), sign binarization $(2b_i - 1) = \text{sgn}(x'_i)$ replaces component magnitudes.
+    /// Under random orthogonal rotation, rotated vector components follow joint Gaussian distributions.
+    /// By Bussgang's theorem / price's theorem, $\mathbb{E}[q'_i \text{sgn}(x'_i)] = \sqrt{\frac{2}{\pi}} \frac{\langle q, x \rangle}{D \sigma_x}$,
+    /// and $\mathbb{E}[\bar{s}] = \sqrt{\frac{2}{\pi}} \sigma_x$, yielding:
+    /// $$\mathbb{E}\left[\bar{s} \sum_{i=0}^{D-1} q'_i \text{sgn}(x'_i)\right] = \frac{2}{\pi} \langle q, x \rangle$$
+    /// To ensure unbiased inner product estimation $\mathbb{E}[\hat{\langle q, x \rangle}] = \langle q, x \rangle$,
+    /// the raw sign dot product estimate $\bar{s} \sum q'_i \text{sgn}(x'_i)$ must be scaled by the expectation correction factor:
+    /// $$c_s = \frac{\pi}{2} \approx 1.5707963268$$
+    /// Without $c_s$, raw sign dot products underestimate inner products by $\frac{2}{\pi} \approx 0.6366$,
+    /// causing a systematic positive bias in Euclidean distance estimations.
     pub fn asymmetric_distance(&self, query: &[f32], code: &[u8]) -> Result<f32> {
         if query.len() != self.dimension {
             return Err(ContextraError::invalid_input(format!(
@@ -203,7 +216,9 @@ impl RaBitQQuantizer {
             sum_q_rot_sign += q_rot_i * sign;
         }
 
-        let estimated_dot = bar_s * sum_q_rot_sign;
+        // RaBitQ expectation correction factor c_s = pi / 2 for random orthogonal rotation
+        let c_s = std::f32::consts::PI / 2.0;
+        let estimated_dot = c_s * bar_s * sum_q_rot_sign;
 
         let dist_sq = norm_q_sq + norm_x_sq - 2.0 * estimated_dot;
         Ok(dist_sq.max(0.0).sqrt())
@@ -407,6 +422,57 @@ mod tests {
         // NaN during asymmetric distance computation
         let res_asym = quantizer.asymmetric_distance(&nan_vec, &valid_code);
         assert!(matches!(res_asym, Err(ContextraError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_asymmetric_distance_mean_error_bias() -> Result<()> {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
+
+        let dim = 128;
+        let num_pairs = 10_000;
+        let mut rng = StdRng::seed_from_u64(0x42_CA_FE_BA_BE);
+
+        // Train quantizer on 100 sample vectors to establish rotation matrix
+        let train_vecs: Vec<Vec<f32>> = (0..100)
+            .map(|_| (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect())
+            .collect();
+        let quantizer = RaBitQQuantizer::try_train(&train_vecs, dim)?;
+
+        let mut total_error = 0.0f64;
+
+        for i in 0..num_pairs {
+            let q: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let x: Vec<f32> = if i % 2 == 0 {
+                // Independent random vector
+                (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+            } else {
+                // Correlated / near vector
+                let noise_scale = rng.gen_range(0.01..0.5);
+                q.iter().map(|&val| val + rng.gen_range(-noise_scale..noise_scale)).collect()
+            };
+
+            let exact_dist: f32 = q
+                .iter()
+                .zip(x.iter())
+                .map(|(&a, &b)| (a - b) * (a - b))
+                .sum::<f32>()
+                .sqrt();
+
+            let code = quantizer.quantize(&x)?;
+            let estimated_dist = quantizer.asymmetric_distance(&q, &code)?;
+
+            let error = (estimated_dist - exact_dist) as f64;
+            total_error += error;
+        }
+
+        let mean_error = total_error / (num_pairs as f64);
+        assert!(
+            mean_error.abs() < 0.05,
+            "Mean error bias across 10,000 vector pairs must be < 0.05, got: {mean_error:.6}"
+        );
+
+        Ok(())
     }
 
     #[test]
