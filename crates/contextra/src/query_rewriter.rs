@@ -48,6 +48,21 @@ impl LlmQueryRewriter {
         self.max_snippet_chars = n;
         self
     }
+
+    /// Returns the maximum number of alternative sub-queries to generate.
+    pub fn max_subqueries(&self) -> usize {
+        self.max_subqueries
+    }
+
+    /// Returns the maximum number of previous context search results to include in the prompt.
+    pub fn max_context_results(&self) -> usize {
+        self.max_context_results
+    }
+
+    /// Returns the maximum number of characters per result snippet in the prompt.
+    pub fn max_snippet_chars(&self) -> usize {
+        self.max_snippet_chars
+    }
 }
 
 impl QueryRewriter for LlmQueryRewriter {
