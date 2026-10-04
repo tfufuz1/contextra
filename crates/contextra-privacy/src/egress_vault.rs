@@ -12,6 +12,122 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zeroize::{Zeroize, Zeroizing};
 
+/// Common prefix for session-bound surrogate tokens.
+pub const SURROGATE_PREFIX: &str = "[USER_ENTITY_";
+
+/// Validates a credit card number candidate using the Luhn algorithm (ISO/IEC 7812-1 MOD 10).
+pub fn is_luhn_valid(number_str: &str) -> bool {
+    let digits: Vec<u32> = number_str.chars().filter_map(|c| c.to_digit(10)).collect();
+    if digits.len() < 13 || digits.len() > 19 {
+        return false;
+    }
+
+    let mut sum = 0;
+    let mut double = false;
+
+    for &digit in digits.iter().rev() {
+        if double {
+            let mut val = digit * 2;
+            if val > 9 {
+                val -= 9;
+            }
+            sum += val;
+        } else {
+            sum += digit;
+        }
+        double = !double;
+    }
+
+    sum % 10 == 0
+}
+
+/// Validates an IBAN candidate using the ISO 7064 MOD 97-10 algorithm.
+pub fn is_iban_valid(iban_str: &str) -> bool {
+    let cleaned: String = iban_str
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+
+    if cleaned.len() < 15 || cleaned.len() > 34 {
+        return false;
+    }
+
+    let country = &cleaned[..2];
+    if !country.chars().all(|c| c.is_ascii_alphabetic()) {
+        return false;
+    }
+
+    let check_digits = &cleaned[2..4];
+    if !check_digits.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+
+    let rearranged = format!("{}{}", &cleaned[4..], &cleaned[..4]);
+
+    let mut remainder = 0u64;
+    for ch in rearranged.chars() {
+        if ch.is_ascii_digit() {
+            let val = (ch as u8 - b'0') as u64;
+            remainder = (remainder * 10 + val) % 97;
+        } else if ch.is_ascii_uppercase() {
+            let val = (ch as u8 - b'A' + 10) as u64;
+            remainder = (remainder * 10 + (val / 10)) % 97;
+            remainder = (remainder * 10 + (val % 10)) % 97;
+        } else {
+            return false;
+        }
+    }
+
+    remainder == 1
+}
+
+/// Normalizes a payload string prior to Layer-1 classification by stripping whitespace
+/// and hyphen delimiters bridging alphanumeric characters (e.g., in credit cards or IBANs).
+///
+/// Returns a new string for evaluation without mutating the original text.
+pub fn normalize_payload(text: &str) -> String {
+    if !text.contains(' ') && !text.contains('-') {
+        return text.to_string();
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut result = String::with_capacity(len);
+    let mut i = 0;
+
+    while i < len {
+        let ch = chars[i];
+        if (ch == ' ' || ch == '-') && i > 0 {
+            let prev = chars[i - 1];
+            if prev.is_ascii_alphanumeric() {
+                let mut j = i;
+                while j < len && (chars[j] == ' ' || chars[j] == '-') {
+                    j += 1;
+                }
+                if j < len && chars[j].is_ascii_alphanumeric() {
+                    i = j;
+                    continue;
+                }
+            }
+        }
+        result.push(ch);
+        i += 1;
+    }
+
+    result
+}
+
+fn is_credit_card_pattern(regex: &regex::Regex) -> bool {
+    let s = regex.as_str();
+    s.contains(r"\d{13,19}") || s.contains(r"\d{16}")
+}
+
+fn is_iban_pattern(regex: &regex::Regex) -> bool {
+    let s = regex.as_str();
+    s.contains(r"[A-Z]{2}\d{2}") || s.contains(r"[a-zA-Z]{2}\d{2}")
+}
+
 /// Trait for recognizing entities (NER) in text without creating a direct dependency
 /// on heavy embedding or ML crates (DAG-neutral interface).
 pub trait EntityRecognizer: Send + Sync {
@@ -414,6 +530,14 @@ pub async fn classify_layer1_arc(
                 }
             }
         }
+
+        let normalized = normalize_payload(text);
+        if normalized != text {
+            if let Some(classification) = eval_text(&normalized) {
+                return classification;
+            }
+        }
+
         EgressClassification::Allow
     });
 
@@ -813,6 +937,33 @@ mod tests {
         assert_eq!(
             res,
             EgressClassification::Block(BlockReason::SensitivePattern("R-005".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_luhn_and_iban_validation_functions() {
+        assert!(is_luhn_valid("4532015112830366"));
+        assert!(!is_luhn_valid("1111111111111111"));
+        assert!(!is_luhn_valid("1234"));
+
+        assert!(is_iban_valid("DE89370400440532013000"));
+        assert!(!is_iban_valid("DE00370400440532013000"));
+        assert!(!is_iban_valid("INVALID_IBAN"));
+    }
+
+    #[test]
+    fn test_normalize_payload_delimiters() {
+        assert_eq!(
+            normalize_payload("4532-0151-1283-0366"),
+            "4532015112830366"
+        );
+        assert_eq!(
+            normalize_payload("DE89 3704 0044 0532 0130 00"),
+            "DE89370400440532013000"
+        );
+        assert_eq!(
+            normalize_payload("plain text without delimiters"),
+            "plain text without delimiters"
         );
     }
 
