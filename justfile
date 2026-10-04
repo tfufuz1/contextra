@@ -4,6 +4,16 @@ set shell := ["bash", "-uc"]
 default:
     @just --list
 
+[private]
+nix-run *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
+        nix develop -c {{ARGS}}
+    else
+        {{ARGS}}
+    fi
+
 # Sets up local development environment (git hooks, tooling)
 bootstrap:
     #!/usr/bin/env bash
@@ -19,29 +29,38 @@ test *ARGS:
 check:
     #!/usr/bin/env bash
     set -euo pipefail
-    if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
-        RUNNER="nix develop -c"
-    else
-        RUNNER=""
-    fi
-    $RUNNER cargo fmt --all -- --check
-    $RUNNER cargo clippy --all-targets -- -D warnings
-    $RUNNER cargo check --all-targets --workspace
-    $RUNNER cargo xtask check-max-results-unbound
-    $RUNNER cargo xtask check-toctou-defaults
-    $RUNNER cargo xtask check-nan-hot-loop
-    $RUNNER cargo xtask check-result-dropped-io
+    just nix-run cargo fmt --all -- --check
+    just nix-run cargo clippy --all-targets -- -D warnings
+    just nix-run cargo check --all-targets --workspace
+    just nix-run cargo xtask check-max-results-unbound
+    just nix-run cargo xtask check-toctou-defaults
+    just nix-run cargo xtask check-nan-hot-loop
+    just nix-run cargo xtask check-result-dropped-io
     if [ -f coverage.json ]; then
-        $RUNNER cargo xtask check-coverage-gate
+        just nix-run cargo xtask check-coverage-gate
     fi
+
+# Agent entry points (Phase runner / xtask jules is the source of truth)
+agent-check *ARGS:
+    cargo xtask jules check {{ARGS}}
+
+agent-verify *ARGS:
+    cargo xtask jules verify {{ARGS}}
+
+agent-submit *ARGS:
+    cargo xtask jules submit {{ARGS}}
+
+# Modular check for any crate
+check-crate CRATE *ARGS:
+    just nix-run cargo check -p {{CRATE}} {{ARGS}}
 
 # Modular check for contextra-core
-check-core:
-    nix develop -c cargo check -p contextra-core || cargo check -p contextra-core
+check-core *ARGS:
+    just check-crate contextra-core {{ARGS}}
 
 # Modular check for contextra-store
-check-store:
-    nix develop -c cargo check -p contextra-store || cargo check -p contextra-store
+check-store *ARGS:
+    just check-crate contextra-store {{ARGS}}
 
 # Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)
 loom-store:
@@ -49,36 +68,35 @@ loom-store:
 
 # Runs the chaos matrix fault-injection integration test suite
 chaos-test:
-    nix develop -c cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1 || \
-    cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1
+    just nix-run cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1
 
 # Modular check for contextra-vector
-check-vector:
-    nix develop -c cargo check -p contextra-vector || cargo check -p contextra-vector
+check-vector *ARGS:
+    just check-crate contextra-vector {{ARGS}}
 
 # Modular check for contextra-db
-check-db:
-    nix develop -c cargo check -p contextra-db || cargo check -p contextra-db
+check-db *ARGS:
+    just check-crate contextra-db {{ARGS}}
 
 # Modular check for contextra-text
-check-text:
-    nix develop -c cargo check -p contextra-text || cargo check -p contextra-text
+check-text *ARGS:
+    just check-crate contextra-text {{ARGS}}
 
 # Sync documentation from inline tags and cargo topology
 sync-docs:
-    nix develop -c cargo xtask sync-docs || cargo xtask sync-docs
+    just nix-run cargo xtask sync-docs
 
 # Verifies if documentation is in sync with code without making changes
 sync-docs-check:
-    nix develop -c cargo xtask sync-docs --check || cargo xtask sync-docs --check
+    just nix-run cargo xtask sync-docs --check
 
 # Verifies multi-session review coverage for completed anchors
 check-review-coverage:
-    nix develop -c cargo xtask check-review-coverage || cargo xtask check-review-coverage
+    just nix-run cargo xtask check-review-coverage
 
 # Verifies internal documentation consistency (e.g. crate counts)
 check-consistency:
-    nix develop -c cargo xtask check-consistency || cargo xtask check-consistency
+    just nix-run cargo xtask check-consistency
 
 # Zeigt alle Context-Tags als NDJSON (filterbar nach Crate, Severity, Status)
 context-tags *ARGS:
@@ -119,41 +137,36 @@ coverage-gate:
 
 # Modular check for contextra-py
 check-py:
-    nix develop -c cargo check --manifest-path crates/contextra-py/Cargo.toml || cargo check --manifest-path crates/contextra-py/Cargo.toml
+    just nix-run cargo check --manifest-path crates/contextra-py/Cargo.toml
 
 # Modular check for contextra-infer <!-- crate-ref-ignore -->
 check-infer:
-    nix develop -c cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx || cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx
+    just nix-run cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx
 
 # Generiert prompter-data.json aus dem Live-Repo-Stand
 gen-prompter-data:
-    nix develop -c cargo xtask gen-prompter-data || cargo xtask gen-prompter-data
+    just nix-run cargo xtask gen-prompter-data
 
 # Verifies the Directed Acyclic Graph (DAG) integrity of the workspace
 dag-check:
-    nix develop -c cargo xtask check-dag || cargo xtask check-dag
+    just nix-run cargo xtask check-dag
 
 # Checks for permanent feature veto keywords in recent commits
 check-vetoes:
-    nix develop -c cargo xtask check-vetoes || cargo xtask check-vetoes
+    just nix-run cargo xtask check-vetoes
 
 # Checks ADR deprecation and removal deadlines
 check-adr-deadlines:
-    nix develop -c cargo xtask check-adr-deadlines || cargo xtask check-adr-deadlines
+    just nix-run cargo xtask check-adr-deadlines
 
 # Triple-Test-Gate: Tests müssen 3x hintereinander grün sein (DONE-Definition)
 triple-test: check
     #!/usr/bin/env bash
     set -euo pipefail
-    if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
-        RUNNER="nix develop -c"
-    else
-        RUNNER=""
-    fi
     echo "=== Triple-Test-Gate ==="
     for RUN in 1 2 3; do
         echo "--- Run $RUN/3 ---"
-        if ! $RUNNER cargo test --workspace; then
+        if ! just nix-run cargo test --workspace; then
             echo "❌ FAILED on run $RUN/3. Fix all failures before this WP is DONE."
             exit 1
         fi
@@ -239,12 +252,7 @@ debt-audit:
 
 # Runs the LongMemEval regression benchmark suite and compares against baseline
 bench-regression:
-    #!/usr/bin/env bash
-    if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
-        nix develop -c cargo run -p contextra-bench --release
-    else
-        cargo run -p contextra-bench --release
-    fi
+    just nix-run cargo run -p contextra-bench --release
 
 # Bootstrap a new feature using the Micro-Spec Template
 spec NAME:
@@ -274,7 +282,6 @@ check-agents-integrity:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo run --manifest-path xtask/Cargo.toml -- check-agents-integrity
-
 
 # Führt alle 8 Bug-Proof-Tests aus (L1 Unit-Tests, rote→grüne Beweise)
 prove-bugs:

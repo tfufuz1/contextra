@@ -11,39 +11,21 @@ cargo fmt --all -- --check || {
     exit 1
 }
 
-# 2. Clippy (schnell bei warmem Cache, < 10s)
-cargo clippy --workspace --all-targets --locked -- -D warnings || {
-    echo "❌ Clippy-Fehler. Behebe alle Warnungen."
-    exit 1
-}
-
-# 3. Statische Audit-Lints (< 3s)
-cargo xtask check-max-results-unbound || {
+# 2. Statische Audit-Lints (< 3s)
+cargo xtask check-max-results-unbound --quiet || {
     echo "❌ Unbegrenzter max_results-Parameter gefunden. Füge 'UNBOUNDED-OK'-Kommentar oder begrenze."
     exit 1
 }
 
-cargo xtask check-toctou-defaults || {
+cargo xtask check-toctou-defaults --quiet || {
     echo "❌ TOCTOU-Default in Trait gefunden. Default-Impl entfernen oder atomic implementieren."
     exit 1
 }
 
-cargo xtask check-result-dropped-io || {
+cargo xtask check-result-dropped-io --quiet || {
     echo "❌ let _ = <IO-Operation> gefunden. Fehler propagieren oder explizit als INTENTIONAL-DROP markieren."
     exit 1
 }
-
-# 4. Compilation Check (für geänderte Crates, < 20s)
-CHANGED_CRATES=$( (git diff --cached --name-only || true) | (grep "^crates/" || true) | cut -d/ -f1-2 | sort -u)
-for crate_path in $CHANGED_CRATES; do
-    if [ -n "$crate_path" ]; then
-        crate_name=$(basename "$crate_path")
-        cargo check -p "$crate_name" || {
-            echo "❌ Kompilierungsfehler in $crate_name."
-            exit 1
-        }
-    fi
-done
 
 echo "✅ Pre-Commit Gate bestanden"
 exit 0

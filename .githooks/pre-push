@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 # .githooks/pre-push — Pre-push Hard Gate Hook Wrapper
-set -e
+set -euo pipefail
 
-exec cargo run --manifest-path xtask/Cargo.toml -- pre-push "$@"
+exec just agent-check "$@"
