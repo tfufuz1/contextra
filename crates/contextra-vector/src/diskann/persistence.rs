@@ -625,3 +625,65 @@ impl DiskAnnIndex {
         Ok(node)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diskann::config::DiskAnnConfig;
+    use contextra_core::{DistanceMetric, DocId};
+
+    #[cfg(feature = "docid-128")]
+    #[tokio::test]
+    async fn test_docid_128_mmap_persistence_roundtrip() -> Result<()> {
+        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let index_path = temp_dir.path().join("docid128_mmap_roundtrip.idx");
+
+        let config = DiskAnnConfig {
+            index_path: index_path.clone(),
+            dimension: 4,
+            max_degree: 4,
+            beam_width: 4,
+            distance_metric: DistanceMetric::Euclidean,
+            quantize: false,
+            ..DiskAnnConfig::default()
+        };
+
+        let index = DiskAnnIndex::try_new(config.clone())?;
+
+        // 128-bit DocId values that exceed u64::MAX
+        let large_id1 = (u64::MAX as u128) + 123_456_789u128;
+        let large_id2 = (1u128 << 80) + 987_654_321u128;
+
+        let doc1 = DocId::from(large_id1);
+        let doc2 = DocId::from(large_id2);
+
+        let vectors = vec![
+            vec![1.0, 0.0, 0.0, 0.0],
+            vec![2.0, 0.0, 0.0, 0.0],
+        ];
+        let ids = vec![doc1, doc2];
+
+        index.build(&vectors, &ids).await?;
+
+        // Reload index from disk
+        let reloaded = DiskAnnIndex::try_new(config)?;
+        reloaded.load().await?;
+
+        // Verify doc_ids in memory match 128-bit values without truncation
+        let loaded_ids = reloaded.inner.doc_ids.read().clone();
+        assert_eq!(loaded_ids, ids);
+        assert_eq!(loaded_ids[0].inner(), large_id1);
+        assert_eq!(loaded_ids[1].inner(), large_id2);
+
+        // Verify load_node loads exact 128-bit doc_id
+        let node0 = reloaded.load_node(0)?;
+        assert_eq!(node0.doc_id, doc1);
+        assert_eq!(node0.doc_id.inner(), large_id1);
+
+        let node1 = reloaded.load_node(1)?;
+        assert_eq!(node1.doc_id, doc2);
+        assert_eq!(node1.doc_id.inner(), large_id2);
+
+        Ok(())
+    }
+}

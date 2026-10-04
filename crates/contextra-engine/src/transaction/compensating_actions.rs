@@ -175,6 +175,20 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmActio
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_docid_u64_overflow_handling() {
+        let max_u64_doc = DocId::new(u64::MAX as _);
+        assert_eq!(u64::try_from(max_u64_doc.inner()), Ok(u64::MAX));
+
+        let overflow_raw: u128 = (u64::MAX as u128) + 1;
+        assert!(u64::try_from(overflow_raw).is_err());
+    }
+}
+
 pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) doc_ids: Arc<Vec<DocId>>,
@@ -199,7 +213,13 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid = EntityId::new(doc_id.inner());
+                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
+                    ContextraError::InvalidInput(format!(
+                        "DocId {} exceeds u64::MAX for EntityId conversion",
+                        doc_id.inner()
+                    ))
+                })?;
+                let eid = EntityId::new(eid_val);
                 let _ = self
                     .collection
                     .graph_index
@@ -239,7 +259,18 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if let Some(kv_store) = self.collection.kv_store() {
-                let chunk_ids: Vec<u64> = self.doc_ids.iter().map(|d| d.inner()).collect();
+                let chunk_ids: Vec<u64> = self
+                    .doc_ids
+                    .iter()
+                    .map(|d| {
+                        u64::try_from(d.inner()).map_err(|_| {
+                            ContextraError::InvalidInput(format!(
+                                "DocId {} exceeds u64::MAX for chunk_id conversion",
+                                d.inner()
+                            ))
+                        })
+                    })
+                    .collect::<Result<Vec<u64>>>()?;
                 kv_store.on_rollback(self.tenant_id, &chunk_ids);
             }
             let comp_tx = TxId::new(

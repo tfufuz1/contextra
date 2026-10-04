@@ -383,6 +383,7 @@ maturity = 'stable'
 description = 'Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)'
 capabilities = ['hnsw-index', 'diskann-index', 'scalar-quantization']
 path = "crates/contextra-vector"
+# Hinweis: contextra-vector (inkl. distance.rs) ist KEINE Unsafe-Insel (0% unsafe, Delegierung an contextra-simd)
 unsafe_island = false
 may_depend_on = ['contextra-core', 'contextra-crypto', 'contextra-simd', 'contextra-sys']
 ci_class = 'pr'

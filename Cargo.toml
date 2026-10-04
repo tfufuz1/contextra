@@ -150,6 +150,7 @@ contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
+contextra-audit-export = { path = "crates/contextra-audit-export" }
 contextra-avv-generator = { path = "crates/contextra-avv-generator" }
 contextra-license = { path = "crates/contextra-license" }
 
