@@ -313,6 +313,17 @@ impl<T: Clone> TxBuffer<T> {
             .record_read(key, snapshot_seq);
     }
 
+    /// Registers a range prefix read operation and its snapshot sequence number for transaction `tx`.
+    pub fn register_prefix_read(&self, tx: TxId, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let shard_idx = self.shard_idx(tx);
+        let mut shard = self.shards[shard_idx].write();
+        shard
+            .read_sets
+            .entry(tx)
+            .or_default()
+            .record_prefix(prefix, snapshot_seq);
+    }
+
     /// Registers a read key and its snapshot sequence number for transaction `tx`,
     /// enforcing a maximum key count limit `max_keys` on new key insertions.
     ///
@@ -796,6 +807,21 @@ mod tests {
         // Drain cleans up read_set
         buffer.drain(tx);
         assert!(buffer.get_read_set(tx).is_none());
+    }
+
+    #[test]
+    fn test_tx_buffer_prefix_read_set_tracking() {
+        let buffer = TxBuffer::<String>::new();
+        let tx = TxId::new(10);
+        buffer.begin(tx);
+
+        buffer.register_prefix_read(tx, b"user:".to_vec(), 100);
+
+        let rs = buffer.read_set(tx).expect("read set present"); // #[cfg(test)]
+        assert_eq!(rs.len(), 1);
+        let prefixes: Vec<_> = rs.prefixes_iter().collect();
+        assert_eq!(prefixes.len(), 1);
+        assert_eq!(prefixes[0], (&b"user:".to_vec(), &100));
     }
 
     #[test]

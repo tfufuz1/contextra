@@ -50,6 +50,9 @@ pub(crate) async fn scan_prefix_tracked(
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    storage
+        .tx_buffer
+        .register_prefix_read(tx_id, prefix.to_vec(), snapshot_seq);
     let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
     for (k, _) in &results {
         storage
