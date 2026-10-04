@@ -1,68 +1,71 @@
-use std::collections::HashMap;
 use contextra_privacy::egress_gateway::{extract_surrogate_tokens, CloudResponseRehydrator};
+use std::collections::HashMap;
 
 #[test]
-fn test_scoped_rehydration_allowed_vs_unallowed_tokens() {
+fn test_rehydrator_scoped_token_isolation() {
+    let mut vault_map = HashMap::new();
+    vault_map.insert("[USER_ENTITY_00a1]".to_string(), "Alice".to_string());
+    vault_map.insert("[USER_ENTITY_00b2]".to_string(), "Bob".to_string());
+
+    // Only allow token 00a1 in scope
+    let allowed = vec!["[USER_ENTITY_00a1]".to_string()];
+
+    let rehydrator = CloudResponseRehydrator::new(vault_map).scoped_to_request(allowed);
+
+    let cloud_response =
+        "Hallo [USER_ENTITY_00a1], hier ist [USER_ENTITY_00b2] und [USER_ENTITY_00c3].";
+    let result = rehydrator.rehydrate(cloud_response);
+
+    // [USER_ENTITY_00a1] is in scope -> replaced with Alice
+    // [USER_ENTITY_00b2] is in vault but NOT in scope -> left unchanged
+    // [USER_ENTITY_00c3] is NOT in vault and NOT in scope -> left unchanged
+    assert_eq!(
+        result,
+        "Hallo Alice, hier ist [USER_ENTITY_00b2] und [USER_ENTITY_00c3]."
+    );
+}
+
+#[test]
+fn test_extract_surrogate_tokens_multibyte_and_invalid_patterns() {
+    let text = "Text mit Umlauten äöü! 🌍 Token: [USER_ENTITY_1234], Emoji 🔥 [USER_ENTITY_abcd]. \
+                Ungültig: [USER_ENTITY_zzzz], [USER_ENTITY_12], [USER_ENTITY_12345] und [USER_ENTITY_";
+
+    let extracted = extract_surrogate_tokens(text);
+
+    assert_eq!(extracted.len(), 2);
+    assert!(extracted.contains("[USER_ENTITY_1234]"));
+    assert!(extracted.contains("[USER_ENTITY_abcd]"));
+    assert!(!extracted.contains("[USER_ENTITY_zzzz]"));
+    assert!(!extracted.contains("[USER_ENTITY_12]"));
+}
+
+#[test]
+fn test_rehydrator_mixed_valid_and_injected_surrogate_tokens() {
     let mut vault_map = HashMap::new();
     vault_map.insert(
         "[USER_ENTITY_00a1]".to_string(),
-        "Confidential Alice".to_string(),
+        "Geheime ProjektA".to_string(),
     );
     vault_map.insert(
         "[USER_ENTITY_00b2]".to_string(),
-        "Confidential Bob".to_string(),
+        "StrengGeheim ProjektB".to_string(),
     );
 
-    // Rehydrator with vault containing entries for both Alice (00a1) and Bob (00b2),
-    // but scoped ONLY to Alice (00a1) which was actually sent in the request.
-    let rehydrator = CloudResponseRehydrator::new(vault_map)
-        .scoped_to_request(vec!["[USER_ENTITY_00a1]".to_string()]);
+    // Request sent to cloud only contained [USER_ENTITY_00a1]
+    let outgoing_request = "Anfrage bzgl. [USER_ENTITY_00a1] in der Cloud.";
+    let allowed_tokens = extract_surrogate_tokens(outgoing_request);
 
-    let cloud_resp = "Response contains [USER_ENTITY_00a1] and injected [USER_ENTITY_00b2].";
-    let rehydrated = rehydrator.rehydrate(cloud_resp);
-
-    assert_eq!(
-        rehydrated,
-        "Response contains Confidential Alice and injected [USER_ENTITY_00b2]."
-    );
-}
-
-#[test]
-fn test_extract_surrogate_tokens_multibyte_utf8_and_invalid_patterns() {
-    let sanitized_request =
-        "Hallo 🌍! [USER_ENTITY_00a1] test [USER_ENTITY_äöü1] 🚀 [USER_ENTITY_00B2] [USER_ENTITY_zzzz] [USER_ENTITY_123] end";
-
-    let tokens = extract_surrogate_tokens(sanitized_request);
-
-    assert_eq!(tokens.len(), 2);
-    assert!(tokens.contains("[USER_ENTITY_00a1]"));
-    assert!(tokens.contains("[USER_ENTITY_00B2]"));
-    assert!(!tokens.contains("[USER_ENTITY_äöü1]"));
-    assert!(!tokens.contains("[USER_ENTITY_zzzz]"));
-    assert!(!tokens.contains("[USER_ENTITY_123]"));
-}
-
-#[test]
-fn test_mixed_text_with_legitimate_and_injected_surrogates() {
-    let request_text = "Analysis for [USER_ENTITY_1234] regarding project [USER_ENTITY_abcd].";
-    let allowed_tokens = extract_surrogate_tokens(request_text);
-
-    assert_eq!(allowed_tokens.len(), 2);
-
-    let mut vault_map = HashMap::new();
-    vault_map.insert("[USER_ENTITY_1234]".to_string(), "Project Alpha".to_string());
-    vault_map.insert("[USER_ENTITY_abcd]".to_string(), "Top Secret".to_string());
-    vault_map.insert("[USER_ENTITY_ffff]".to_string(), "Unrelated Vault Data".to_string());
+    assert_eq!(allowed_tokens.len(), 1);
+    assert!(allowed_tokens.contains("[USER_ENTITY_00a1]"));
 
     let rehydrator = CloudResponseRehydrator::new(vault_map).scoped_to_request(allowed_tokens);
 
-    let response_text =
-        "Result for [USER_ENTITY_1234] ([USER_ENTITY_abcd]). Injected: [USER_ENTITY_ffff] and [USER_ENTITY_9999].";
-
-    let rehydrated = rehydrator.rehydrate(response_text);
+    // Cloud response includes both legitimate token 00a1 and injected token 00b2
+    let cloud_response = "Antwort: [USER_ENTITY_00a1] verarbeitet. Injected: [USER_ENTITY_00b2].";
+    let rehydrated = rehydrator.rehydrate(cloud_response);
 
     assert_eq!(
         rehydrated,
-        "Result for Project Alpha (Top Secret). Injected: [USER_ENTITY_ffff] and [USER_ENTITY_9999]."
+        "Antwort: Geheime ProjektA verarbeitet. Injected: [USER_ENTITY_00b2]."
     );
 }

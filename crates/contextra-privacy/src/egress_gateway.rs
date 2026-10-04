@@ -31,60 +31,52 @@ pub trait InjectionDetector: Send + Sync {
     fn detect(&self, text: &str) -> Option<String>;
 }
 
-const SURROGATE_PREFIX: &str = "[USER_ENTITY_";
-const SURROGATE_CHAR_COUNT: usize = 18; // 13 chars prefix + 4 hex chars + 1 closing bracket
-
-/// Parses a surrogate token from the beginning of `remainder` if it matches `[USER_ENTITY_[0-9a-fA-F]{4}]`.
-/// Returns `Some(token_str_slice)` if valid, or `None` otherwise.
-/// Guaranteed safe against non-ASCII/multi-byte UTF-8 boundaries.
-fn parse_surrogate_token(remainder: &str) -> Option<&str> {
-    if !remainder.starts_with(SURROGATE_PREFIX) {
+/// Matches a surrogate token `[USER_ENTITY_[0-9a-fA-F]{4}]` at the beginning of `remainder`.
+///
+/// Returns `Some(token_str)` if `remainder` starts with a valid surrogate token, `None` otherwise.
+/// Guarantees zero panics on arbitrary UTF-8 byte boundaries.
+fn match_surrogate_token(remainder: &str) -> Option<&str> {
+    let prefix = "[USER_ENTITY_";
+    if !remainder.starts_with(prefix) {
         return None;
     }
 
     let mut char_indices = remainder.char_indices();
-    let indices: Vec<(usize, char)> = char_indices
-        .by_ref()
-        .take(SURROGATE_CHAR_COUNT + 1)
-        .collect();
+    let indices: Vec<(usize, char)> = char_indices.by_ref().take(19).collect();
+    if indices.len() >= 18 && (indices.len() == 18 || indices[18].0 >= 18) {
+        let hex_chars_valid = indices[13..17].iter().all(|(_, c)| c.is_ascii_hexdigit());
+        let closing_bracket_valid = indices[17].1 == ']';
 
-    if indices.len() < SURROGATE_CHAR_COUNT {
-        return None;
-    }
-
-    let hex_chars_valid = indices[13..17].iter().all(|(_, c)| c.is_ascii_hexdigit());
-    let closing_bracket_valid = indices[17].1 == ']';
-
-    if hex_chars_valid && closing_bracket_valid {
-        let end_byte_idx = if indices.len() > SURROGATE_CHAR_COUNT {
-            indices[SURROGATE_CHAR_COUNT].0
-        } else {
-            remainder.len()
-        };
-        if remainder.is_char_boundary(end_byte_idx) {
-            return Some(&remainder[..end_byte_idx]);
+        if hex_chars_valid && closing_bracket_valid {
+            let end_bound = if indices.len() > 18 {
+                indices[18].0
+            } else {
+                remainder.len()
+            };
+            if remainder.is_char_boundary(end_bound) {
+                return Some(&remainder[..end_bound]);
+            }
         }
     }
-
     None
 }
 
-/// Extracts all surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` from sanitized request text.
-///
-/// Guaranteed safe on arbitrary UTF-8 byte boundaries and will not panic.
+/// Extracts all surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` from the given text.
+/// Guarantees UTF-8 safety and zero panics.
 pub fn extract_surrogate_tokens(sanitized_request: &str) -> HashSet<String> {
     let mut tokens = HashSet::new();
     let mut cursor = 0;
+    let prefix = "[USER_ENTITY_";
 
-    while let Some(start_idx) = sanitized_request[cursor..].find(SURROGATE_PREFIX) {
+    while let Some(start_idx) = sanitized_request[cursor..].find(prefix) {
         let absolute_start = cursor + start_idx;
         let remainder = &sanitized_request[absolute_start..];
 
-        if let Some(token) = parse_surrogate_token(remainder) {
+        if let Some(token) = match_surrogate_token(remainder) {
             tokens.insert(token.to_string());
             cursor = absolute_start + token.len();
         } else {
-            cursor = absolute_start + SURROGATE_PREFIX.len();
+            cursor = absolute_start + prefix.len();
         }
     }
 
@@ -107,17 +99,15 @@ impl CloudResponseRehydrator {
         }
     }
 
-    /// Restricts rehydration strictly to the provided set of surrogate tokens.
-    ///
-    /// Tokens not present in `allowed_tokens` will remain in the response text untouched,
-    /// preventing cloud response prompt injection from rehydrating unrequested vault entries.
+    /// Restricts rehydration to only tokens present in `allowed_tokens`.
     pub fn scoped_to_request(mut self, allowed_tokens: impl IntoIterator<Item = String>) -> Self {
         self.allowed_tokens = Some(allowed_tokens.into_iter().collect());
         self
     }
 
     /// Rehydrates surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` back to original entity values.
-    /// Unknown, missing, or out-of-scope surrogate tokens remain unchanged without panicking.
+    /// Unknown or missing surrogate tokens remain unchanged without panicking.
+    /// If an `allowed_tokens` scope is set, only tokens present in that scope will be rehydrated.
     ///
     /// Guarantees zero panics on arbitrary UTF-8 byte boundaries by using character slice bounds.
     pub fn rehydrate(&self, cloud_response_text: &str) -> String {
@@ -130,7 +120,7 @@ impl CloudResponseRehydrator {
 
             let remainder = &cloud_response_text[absolute_start..];
 
-            if let Some(surrogate) = parse_surrogate_token(remainder) {
+            if let Some(surrogate) = match_surrogate_token(remainder) {
                 let token_allowed = match &self.allowed_tokens {
                     Some(allowed) => allowed.contains(surrogate),
                     None => true,
@@ -145,7 +135,6 @@ impl CloudResponseRehydrator {
                 } else {
                     result.push_str(surrogate);
                 }
-
                 cursor = absolute_start + surrogate.len();
                 continue;
             }
