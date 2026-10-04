@@ -97,6 +97,7 @@ mod dyn_safety {
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
     fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
     fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
+    fn _assert_dyn_kv_lifecycle_hooks(_: Option<&dyn KvLifecycleHooks>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
@@ -115,6 +116,7 @@ mod dyn_safety {
         _assert_dyn_metrics_sink(None);
         _assert_dyn_kv_bridge_storage(None);
         _assert_dyn_kv_prefix_store(None);
+        _assert_dyn_kv_lifecycle_hooks(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);

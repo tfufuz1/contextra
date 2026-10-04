@@ -258,7 +258,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            if let Some(kv_store) = self.collection.kv_store() {
+            if let Some(kv_hooks) = self.collection.kv_hooks() {
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()
@@ -271,7 +271,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                         })
                     })
                     .collect::<Result<Vec<u64>>>()?;
-                kv_store.on_rollback(self.tenant_id, &chunk_ids);
+                kv_hooks.on_rollback(self.tenant_id, &chunk_ids);
             }
             let comp_tx = TxId::new(
                 self.collection

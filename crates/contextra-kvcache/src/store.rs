@@ -498,6 +498,34 @@ impl TenantIsolatedKvStore {
         self.remove_segments_for_rollback(tenant, &[segment_id]);
     }
 
+    /// Removes KV cache segments associated with a document ID.
+    #[allow(irrefutable_let_patterns)]
+    pub fn remove_doc_segments(&self, tenant: TenantId, doc: contextra_types::DocId) {
+        if let Ok(segment_id) = u64::try_from(doc.inner()) {
+            self.remove_segment(tenant, segment_id);
+        }
+    }
+
+    /// Purges all cached KV segments and radix state for the given tenant.
+    pub fn purge_tenant(&self, tenant: TenantId) {
+        let idx = self.shard_idx(tenant);
+        let scores = self.attention_source();
+        let _deferred: Option<TenantState> = {
+            let mut shard = self.shards[idx].lock.write();
+            let mut state = shard.remove(&tenant);
+            if let Some(ref mut st) = state {
+                for id in st.segment_ids().collect::<Vec<_>>() {
+                    scores.unregister_segment(tenant, id);
+                }
+            }
+            state
+        };
+        tracing::debug!(
+            tenant_id = ?tenant,
+            "KvStore purge_tenant: removed all segments for tenant"
+        );
+    }
+
     /// Liefert unverschlüsselte Segment-Bytes für einen Tenant.
     pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> {
         let idx = self.shard_idx(tenant);
@@ -725,6 +753,20 @@ impl TenantIsolatedKvStore {
         }
         drop(all_segments);
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");
+    }
+}
+
+impl contextra_ports::KvLifecycleHooks for TenantIsolatedKvStore {
+    fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) {
+        self.on_rollback(tenant, chunk_ids);
+    }
+
+    fn remove_doc_segments(&self, tenant: TenantId, doc: contextra_types::DocId) {
+        self.remove_doc_segments(tenant, doc);
+    }
+
+    fn purge_tenant(&self, tenant: TenantId) {
+        self.purge_tenant(tenant);
     }
 }
 
