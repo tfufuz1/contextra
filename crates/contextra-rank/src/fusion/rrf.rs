@@ -213,9 +213,9 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
     let mut id_table: Vec<&str> = Vec::new();
     let mut scores: Vec<f32> = Vec::new();
-    let mut entries: Vec<FusedEntry<'_>> = Vec::new();
     let mut valid_signal_count = 0usize;
 
+    // --- Phase 1: Lightweight scoring across all candidates ---
     for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
         let weight = modulated_weights[idx];
         if !weight.is_finite() || weight <= 0.0 {
@@ -227,11 +227,6 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
             continue;
         }
         valid_signal_count += 1;
-        let sig_key = SignalKey::from_name(signal_name);
-        let signal_kind = sig_key.and_then(|k| match k {
-            SignalKey::Known(kind) => Some(kind),
-            _ => None,
-        });
 
         let rrf_k = k as f32;
         debug_assert!(
@@ -255,19 +250,74 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
             let score = if score.is_finite() { score } else { 0.0 };
 
             let doc_id_str: &str = doc.id.as_str();
-            let idx = match id_to_idx.get(doc_id_str) {
+            let candidate_idx = match id_to_idx.get(doc_id_str) {
                 Some(&i) => i as usize,
                 None => {
                     let new_idx = id_table.len();
                     id_to_idx.insert(doc_id_str, new_idx as u32);
                     id_table.push(doc_id_str);
                     scores.push(0.0_f32);
-                    entries.push(FusedEntry::default());
                     new_idx
                 }
             };
-            scores[idx] += score;
-            let entry = &mut entries[idx];
+            scores[candidate_idx] += score;
+        }
+    }
+
+    // --- Selection: Top-K candidates determination ---
+    let mut top_k = BoundedTopK::new(max_results);
+    for idx in 0..scores.len() as u32 {
+        let i = idx as usize;
+        top_k.push(TopKCandidate {
+            idx,
+            score: scores[i],
+            id: id_table[i],
+        });
+    }
+
+    let ranked_candidates = top_k.into_sorted_vec();
+    if ranked_candidates.is_empty() {
+        return Vec::new();
+    }
+
+    let num_topk = ranked_candidates.len();
+    let mut topk_slots: Vec<Option<usize>> = vec![None; id_table.len()];
+    for (topk_pos, cand) in ranked_candidates.iter().enumerate() {
+        topk_slots[cand.idx as usize] = Some(topk_pos);
+    }
+
+    let mut entries: Vec<FusedEntry<'_>> = (0..num_topk).map(|_| FusedEntry::default()).collect();
+
+    // --- Phase 2: Materialize FusedEntry strictly for Top-K candidates ---
+    for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
+        let weight = modulated_weights[idx];
+        if !weight.is_finite() || weight <= 0.0 {
+            continue;
+        }
+        let sig_key = SignalKey::from_name(signal_name);
+        let signal_kind = sig_key.and_then(|k| match k {
+            SignalKey::Known(kind) => Some(kind),
+            _ => None,
+        });
+
+        let rrf_k = k as f32;
+
+        for (rank_idx, doc) in result_set.iter().enumerate() {
+            let doc_id_str: &str = doc.id.as_str();
+            let candidate_idx = match id_to_idx.get(doc_id_str) {
+                Some(&i) => i as usize,
+                None => continue,
+            };
+            let topk_pos = match topk_slots[candidate_idx] {
+                Some(pos) => pos,
+                None => continue,
+            };
+
+            let entry = &mut entries[topk_pos];
+            let rrf_rank = (rank_idx + 1) as u32;
+            let denom = rrf_k + rrf_rank as f32;
+            let score = weight / denom;
+            let score = if score.is_finite() { score } else { 0.0 };
 
             if doc.metadata.is_some() {
                 entry.deferred_metadata.push(&doc.metadata);
@@ -372,23 +422,12 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
         }
     }
 
-    let mut top_k = BoundedTopK::new(max_results);
-    for idx in 0..scores.len() as u32 {
-        let i = idx as usize;
-        top_k.push(TopKCandidate {
-            idx,
-            score: scores[i],
-            id: id_table[i],
-        });
-    }
-
-    let ranked_candidates = top_k.into_sorted_vec();
     let mut results: Vec<SearchResult> = Vec::with_capacity(ranked_candidates.len());
-    for cand in ranked_candidates {
+    for (topk_pos, cand) in ranked_candidates.into_iter().enumerate() {
         let i = cand.idx as usize;
         let id = id_table[i].to_string();
-        let score = scores[i];
-        let entry = &mut entries[i];
+        let score = cand.score;
+        let entry = &mut entries[topk_pos];
 
         let mut merged_meta: Option<serde_json::Value> = None;
         for meta in entry.deferred_metadata.drain(..) {
@@ -603,37 +642,50 @@ pub fn fuse_search_results_with_signal_strategies(
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
     let mut id_table: Vec<&str> = Vec::new();
     let mut scores: Vec<f32> = Vec::new();
-    let mut entries: Vec<FusedEntry<'_>> = Vec::new();
     let mut valid_signal_count = 0usize;
+
+    // Precalculate normalization ranges per signal
+    let mut norm_ranges: Vec<Option<(f32, f32)>> = Vec::with_capacity(result_sets.len());
 
     for (signal_name, result_set, weight) in &result_sets {
         let weight = *weight;
         if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
+            norm_ranges.push(None);
             continue;
         }
-        valid_signal_count += 1;
-        let sig_key = SignalKey::from_name(signal_name);
-        let signal_kind = sig_key.and_then(|k| match k {
-            SignalKey::Known(kind) => Some(kind),
-            _ => None,
-        });
 
         let eff_strat = effective_strategies
             .get(signal_name)
             .copied()
             .unwrap_or_else(|| strategies.strategy_for_signal(signal_name));
 
-        let norm_range = if eff_strat == FusionStrategy::ScoreNormalized {
+        if eff_strat == FusionStrategy::ScoreNormalized {
             let mut min_s = f32::INFINITY;
             let mut max_s = f32::NEG_INFINITY;
             for doc in result_set {
                 min_s = min_s.min(doc.score);
                 max_s = max_s.max(doc.score);
             }
-            Some((min_s, max_s - min_s))
+            norm_ranges.push(Some((min_s, max_s - min_s)));
         } else {
-            None
-        };
+            norm_ranges.push(None);
+        }
+    }
+
+    // --- Phase 1: Lightweight scoring ---
+    for (sig_idx, (signal_name, result_set, weight)) in result_sets.iter().enumerate() {
+        let weight = *weight;
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
+            continue;
+        }
+        valid_signal_count += 1;
+
+        let eff_strat = effective_strategies
+            .get(signal_name)
+            .copied()
+            .unwrap_or_else(|| strategies.strategy_for_signal(signal_name));
+
+        let norm_range = norm_ranges[sig_idx];
 
         for (rank_idx, doc) in result_set.iter().enumerate() {
             let rank = (rank_idx + 1) as u32;
@@ -659,19 +711,96 @@ pub fn fuse_search_results_with_signal_strategies(
             };
 
             let doc_id_str: &str = doc.id.as_str();
-            let idx = match id_to_idx.get(doc_id_str) {
+            let candidate_idx = match id_to_idx.get(doc_id_str) {
                 Some(&i) => i as usize,
                 None => {
                     let new_idx = id_table.len();
                     id_to_idx.insert(doc_id_str, new_idx as u32);
                     id_table.push(doc_id_str);
                     scores.push(0.0_f32);
-                    entries.push(FusedEntry::default());
                     new_idx
                 }
             };
-            scores[idx] += weighted_score;
-            let entry = &mut entries[idx];
+            scores[candidate_idx] += weighted_score;
+        }
+    }
+
+    // --- Selection: Top-K candidates ---
+    let mut top_k = BoundedTopK::new(max_results);
+    for idx in 0..scores.len() as u32 {
+        let i = idx as usize;
+        top_k.push(TopKCandidate {
+            idx,
+            score: scores[i],
+            id: id_table[i],
+        });
+    }
+
+    let ranked_candidates = top_k.into_sorted_vec();
+    if ranked_candidates.is_empty() {
+        return Vec::new();
+    }
+
+    let num_topk = ranked_candidates.len();
+    let mut topk_slots: Vec<Option<usize>> = vec![None; id_table.len()];
+    for (topk_pos, cand) in ranked_candidates.iter().enumerate() {
+        topk_slots[cand.idx as usize] = Some(topk_pos);
+    }
+
+    let mut entries: Vec<FusedEntry<'_>> = (0..num_topk).map(|_| FusedEntry::default()).collect();
+
+    // --- Phase 2: Materialize FusedEntry strictly for Top-K candidates ---
+    for (sig_idx, (signal_name, result_set, weight)) in result_sets.iter().enumerate() {
+        let weight = *weight;
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
+            continue;
+        }
+        let sig_key = SignalKey::from_name(signal_name);
+        let signal_kind = sig_key.and_then(|k| match k {
+            SignalKey::Known(kind) => Some(kind),
+            _ => None,
+        });
+
+        let eff_strat = effective_strategies
+            .get(signal_name)
+            .copied()
+            .unwrap_or_else(|| strategies.strategy_for_signal(signal_name));
+
+        let norm_range = norm_ranges[sig_idx];
+
+        for (rank_idx, doc) in result_set.iter().enumerate() {
+            let doc_id_str: &str = doc.id.as_str();
+            let candidate_idx = match id_to_idx.get(doc_id_str) {
+                Some(&i) => i as usize,
+                None => continue,
+            };
+            let topk_pos = match topk_slots[candidate_idx] {
+                Some(pos) => pos,
+                None => continue,
+            };
+
+            let entry = &mut entries[topk_pos];
+            let rank = (rank_idx + 1) as u32;
+
+            let weighted_score = match eff_strat {
+                FusionStrategy::Rrf => {
+                    let score = weight / (k_rrf + rank as f32);
+                    if score.is_finite() {
+                        score
+                    } else {
+                        0.0
+                    }
+                }
+                FusionStrategy::ScoreNormalized => {
+                    let (min_s, range) = norm_range.unwrap_or((0.0, 0.0));
+                    let norm_score = if range > 0.0 && doc.score.is_finite() {
+                        ((doc.score - min_s) / range).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    weight * norm_score
+                }
+            };
 
             if doc.metadata.is_some() {
                 entry.deferred_metadata.push(&doc.metadata);
@@ -751,23 +880,12 @@ pub fn fuse_search_results_with_signal_strategies(
         }
     }
 
-    let mut top_k = BoundedTopK::new(max_results);
-    for idx in 0..scores.len() as u32 {
-        let i = idx as usize;
-        top_k.push(TopKCandidate {
-            idx,
-            score: scores[i],
-            id: id_table[i],
-        });
-    }
-
-    let ranked_candidates = top_k.into_sorted_vec();
     let mut results: Vec<SearchResult> = Vec::with_capacity(ranked_candidates.len());
-    for cand in ranked_candidates {
+    for (topk_pos, cand) in ranked_candidates.into_iter().enumerate() {
         let i = cand.idx as usize;
         let id = id_table[i].to_string();
-        let score = scores[i];
-        let entry = &mut entries[i];
+        let score = cand.score;
+        let entry = &mut entries[topk_pos];
 
         let mut merged_meta: Option<serde_json::Value> = None;
         for meta in entry.deferred_metadata.drain(..) {
