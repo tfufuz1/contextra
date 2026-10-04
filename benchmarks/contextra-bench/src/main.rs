@@ -58,6 +58,7 @@ pub struct ScenarioComparison {
     pub recall_at_1_delta_pct: f64,
     pub recall_at_5_delta_pct: f64,
     pub error_rate_reduction_pct: f64,
+    pub mechanism_active: bool,
 }
 
 /// Complete benchmark report.
@@ -681,6 +682,10 @@ async fn run_scenario_a(
         0.0
     };
 
+    // Sanity check: Verify whether applying context prefix / has_context_prefix produces any observable
+    // difference in retrieval results compared to baseline.
+    let mechanism_active = baseline_retrieved != prefix_retrieved;
+
     Ok(ScenarioComparison {
         scenario_name: "Baseline vs. Kontext-Präfix".into(),
         baseline_metrics: base_metrics,
@@ -688,6 +693,7 @@ async fn run_scenario_a(
         recall_at_1_delta_pct: recall_1_delta,
         recall_at_5_delta_pct: recall_5_delta,
         error_rate_reduction_pct: err_reduction,
+        mechanism_active,
     })
 }
 
@@ -728,11 +734,11 @@ async fn run_scenario_b(
 
     // 2. With Cross-Encoder Reranking
     let reranker_config = RerankConfig::default();
-    let reranker = match CrossEncoderReranker::new(reranker_config) {
-        Ok(r) => r,
+    let (reranker, is_passthrough) = match CrossEncoderReranker::new(reranker_config) {
+        Ok(r) => (r, false),
         Err(_) => {
             println!("[INFO] ONNX model weights not found at models/bge-reranker-base.onnx. Using Passthrough CrossEncoder for benchmark.");
-            CrossEncoderReranker::passthrough()
+            (CrossEncoderReranker::passthrough(), true)
         }
     };
 
@@ -776,6 +782,9 @@ async fn run_scenario_b(
         0.0
     };
 
+    // Sanity check: If passthrough reranker was used or retrieved results are identical, mechanism is not active.
+    let mechanism_active = !is_passthrough && no_rerank_retrieved != with_rerank_retrieved;
+
     Ok(ScenarioComparison {
         scenario_name: "Ohne vs. mit Cross-Encoder-Reranking".into(),
         baseline_metrics: base_metrics,
@@ -783,6 +792,7 @@ async fn run_scenario_b(
         recall_at_1_delta_pct: recall_1_delta,
         recall_at_5_delta_pct: recall_5_delta,
         error_rate_reduction_pct: err_reduction,
+        mechanism_active,
     })
 }
 
@@ -827,16 +837,27 @@ fn generate_markdown_summary(report: &BenchmarkReport) -> String {
         sc_a.baseline_metrics.mrr,
         sc_a.baseline_metrics.error_rate_at_1 * 100.0,
     ));
-    out.push_str(&format!(
-        "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
-        sc_a.feature_metrics.recall_at_1 * 100.0,
-        sc_a.feature_metrics.recall_at_3 * 100.0,
-        sc_a.feature_metrics.recall_at_5 * 100.0,
-        sc_a.feature_metrics.mrr,
-        sc_a.feature_metrics.error_rate_at_1 * 100.0,
-        sc_a.recall_at_1_delta_pct,
-        sc_a.error_rate_reduction_pct,
-    ));
+    if sc_a.mechanism_active {
+        out.push_str(&format!(
+            "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
+            sc_a.feature_metrics.recall_at_1 * 100.0,
+            sc_a.feature_metrics.recall_at_3 * 100.0,
+            sc_a.feature_metrics.recall_at_5 * 100.0,
+            sc_a.feature_metrics.mrr,
+            sc_a.feature_metrics.error_rate_at_1 * 100.0,
+            sc_a.recall_at_1_delta_pct,
+            sc_a.error_rate_reduction_pct,
+        ));
+    } else {
+        out.push_str(&format!(
+            "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** |\n",
+            sc_a.feature_metrics.recall_at_1 * 100.0,
+            sc_a.feature_metrics.recall_at_3 * 100.0,
+            sc_a.feature_metrics.recall_at_5 * 100.0,
+            sc_a.feature_metrics.mrr,
+            sc_a.feature_metrics.error_rate_at_1 * 100.0,
+        ));
+    }
 
     let sc_b = &report.scenario_b_reranking;
     out.push_str(&format!(
@@ -847,16 +868,27 @@ fn generate_markdown_summary(report: &BenchmarkReport) -> String {
         sc_b.baseline_metrics.mrr,
         sc_b.baseline_metrics.error_rate_at_1 * 100.0,
     ));
-    out.push_str(&format!(
-        "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
-        sc_b.feature_metrics.recall_at_1 * 100.0,
-        sc_b.feature_metrics.recall_at_3 * 100.0,
-        sc_b.feature_metrics.recall_at_5 * 100.0,
-        sc_b.feature_metrics.mrr,
-        sc_b.feature_metrics.error_rate_at_1 * 100.0,
-        sc_b.recall_at_1_delta_pct,
-        sc_b.error_rate_reduction_pct,
-    ));
+    if sc_b.mechanism_active {
+        out.push_str(&format!(
+            "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
+            sc_b.feature_metrics.recall_at_1 * 100.0,
+            sc_b.feature_metrics.recall_at_3 * 100.0,
+            sc_b.feature_metrics.recall_at_5 * 100.0,
+            sc_b.feature_metrics.mrr,
+            sc_b.feature_metrics.error_rate_at_1 * 100.0,
+            sc_b.recall_at_1_delta_pct,
+            sc_b.error_rate_reduction_pct,
+        ));
+    } else {
+        out.push_str(&format!(
+            "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** |\n",
+            sc_b.feature_metrics.recall_at_1 * 100.0,
+            sc_b.feature_metrics.recall_at_3 * 100.0,
+            sc_b.feature_metrics.recall_at_5 * 100.0,
+            sc_b.feature_metrics.mrr,
+            sc_b.feature_metrics.error_rate_at_1 * 100.0,
+        ));
+    }
 
     out
 }
@@ -1395,6 +1427,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 recall_at_1_delta_pct: 0.0,
                 recall_at_5_delta_pct: 0.0,
                 error_rate_reduction_pct: 0.0,
+                mechanism_active: false,
             }
         }
     };
@@ -1494,11 +1527,82 @@ mod tests {
         let (docs, q_a, _q_b) = create_synthetic_corpus();
         let sc_a = run_scenario_a(&docs, &q_a).await.unwrap();
         assert_eq!(sc_a.baseline_metrics.total_queries, q_a.len());
+        // Prepending context prefix changes BM25 indexing in Scenario A, making the mechanism active
+        assert!(sc_a.mechanism_active);
 
         #[cfg(feature = "onnx-bench")]
         {
             let sc_b = run_scenario_b(&docs, &_q_b).await.unwrap();
             assert_eq!(sc_b.baseline_metrics.total_queries, _q_b.len());
+            // Scenario B using passthrough cross-encoder produces identical ordering, so mechanism is inactive (false)
+            assert!(!sc_b.mechanism_active);
         }
+    }
+
+    #[test]
+    fn test_markdown_summary_reporting_na_vs_active() {
+        let sc_inactive = ScenarioComparison {
+            scenario_name: "Test Inactive".into(),
+            baseline_metrics: BenchmarkMetrics {
+                recall_at_1: 0.5,
+                recall_at_3: 0.5,
+                recall_at_5: 0.5,
+                mrr: 0.5,
+                error_rate_at_1: 0.5,
+                error_rate_at_5: 0.5,
+                total_queries: 10,
+            },
+            feature_metrics: BenchmarkMetrics {
+                recall_at_1: 0.5,
+                recall_at_3: 0.5,
+                recall_at_5: 0.5,
+                mrr: 0.5,
+                error_rate_at_1: 0.5,
+                error_rate_at_5: 0.5,
+                total_queries: 10,
+            },
+            recall_at_1_delta_pct: 0.0,
+            recall_at_5_delta_pct: 0.0,
+            error_rate_reduction_pct: 0.0,
+            mechanism_active: false,
+        };
+
+        let sc_active = ScenarioComparison {
+            scenario_name: "Test Active".into(),
+            baseline_metrics: BenchmarkMetrics {
+                recall_at_1: 0.5,
+                recall_at_3: 0.5,
+                recall_at_5: 0.5,
+                mrr: 0.5,
+                error_rate_at_1: 0.5,
+                error_rate_at_5: 0.5,
+                total_queries: 10,
+            },
+            feature_metrics: BenchmarkMetrics {
+                recall_at_1: 0.75,
+                recall_at_3: 0.75,
+                recall_at_5: 0.75,
+                mrr: 0.75,
+                error_rate_at_1: 0.25,
+                error_rate_at_5: 0.25,
+                total_queries: 10,
+            },
+            recall_at_1_delta_pct: 50.0,
+            recall_at_5_delta_pct: 50.0,
+            error_rate_reduction_pct: 50.0,
+            mechanism_active: true,
+        };
+
+        let report = BenchmarkReport {
+            timestamp: "2026-10-04T00:00:00Z".into(),
+            corpus_size_docs: 50,
+            total_test_queries: 10,
+            scenario_a_context_prefix: sc_inactive,
+            scenario_b_reranking: sc_active,
+        };
+
+        let summary = generate_markdown_summary(&report);
+        assert!(summary.contains("n/a — Mechanismus nicht aktiv/nicht verdrahtet"));
+        assert!(summary.contains("+50.0%"));
     }
 }
