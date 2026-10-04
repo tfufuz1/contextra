@@ -144,7 +144,7 @@ impl KvSegmentManager {
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
     pub fn delete_segment(&self, group_id: u64) -> bool {
         match self.config.delete_mode {
-            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id),
+            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id).unwrap_or(false),
             KvDeleteMode::TombstoneOnly => false,
         }
     }
