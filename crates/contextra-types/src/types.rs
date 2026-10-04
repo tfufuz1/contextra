@@ -21,3 +21,7 @@ pub use importance::*;
 pub use math::*;
 #[allow(ambiguous_glob_reexports)]
 pub use saos::*;
+
+/// Branchless saturating narrowing integer conversions.
+pub mod saturating;
+pub use saturating::*;
