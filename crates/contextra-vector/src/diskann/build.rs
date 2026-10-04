@@ -40,6 +40,7 @@ impl TombstoneSet {
         self.set.len()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.set.is_empty()
     }
@@ -264,7 +265,8 @@ impl DiskAnnIndex {
         let id_bytes = id.inner().to_le_bytes();
         let dim_bytes = dim.to_le_bytes();
 
-        let mut entry_bytes = Vec::with_capacity(8 + 4 + (embedding.len() * 4));
+        let mut entry_bytes =
+            Vec::with_capacity(std::mem::size_of::<DocId>() + 4 + (embedding.len() * 4));
         entry_bytes.extend_from_slice(&id_bytes);
         entry_bytes.extend_from_slice(&dim_bytes);
         for &val in embedding {
@@ -742,6 +744,52 @@ impl DiskAnnIndex {
                 );
             }
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "docid-128")]
+    #[tokio::test]
+    async fn test_docid_128_wal_roundtrip() -> Result<()> {
+        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let pending_wal_path = temp_dir.path().join("test_128.pending.wal");
+        let tombstone_wal_path = temp_dir.path().join("test_128.tombstone.wal");
+
+        let large_id1 = (u64::MAX as u128) + 987_654_321u128;
+        let large_id2 = (1u128 << 85) + 123_456_789u128;
+
+        let doc1 = DocId::from(large_id1);
+        let doc2 = DocId::from(large_id2);
+
+        let embedding1 = vec![1.5f32, 2.5, 3.5, 4.5];
+        let embedding2 = vec![10.0f32, 20.0, 30.0, 40.0];
+
+        // 1. Pending WAL roundtrip
+        DiskAnnIndex::append_to_pending_wal(&pending_wal_path, doc1, &embedding1).await?;
+        DiskAnnIndex::append_to_pending_wal(&pending_wal_path, doc2, &embedding2).await?;
+
+        let recovered_pending = DiskAnnIndex::read_pending_wal(&pending_wal_path)?;
+        assert_eq!(recovered_pending.len(), 2);
+        assert_eq!(recovered_pending[0].0, doc1);
+        assert_eq!(recovered_pending[0].0.inner(), large_id1);
+        assert_eq!(recovered_pending[0].1, embedding1);
+        assert_eq!(recovered_pending[1].0, doc2);
+        assert_eq!(recovered_pending[1].0.inner(), large_id2);
+        assert_eq!(recovered_pending[1].1, embedding2);
+
+        // 2. Tombstone WAL roundtrip
+        DiskAnnIndex::append_to_tombstone_wal(&tombstone_wal_path, doc1).await?;
+        DiskAnnIndex::append_to_tombstone_wal(&tombstone_wal_path, doc2).await?;
+
+        let recovered_tombstones = DiskAnnIndex::read_tombstone_wal(&tombstone_wal_path)?;
+        assert_eq!(recovered_tombstones.len(), 2);
+        assert!(recovered_tombstones.contains(large_id1));
+        assert!(recovered_tombstones.contains(large_id2));
+
         Ok(())
     }
 }
