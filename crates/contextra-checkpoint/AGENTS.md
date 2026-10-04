@@ -1,105 +1,52 @@
 # AGENTS.md — contextra-checkpoint
-> Layer 1 | Snapshot-Pinning, RAII-Transaktions-Guards, Time-Travel | ~1000 LOC
+> Ring 1 · stable · Quelle: capabilities.toml · Spec: K.5 / III.11
 
-## 1. Zweck & Architekturrolle
-
-Koordiniert konsistente Snapshots über alle Storage-Komponenten hinweg (LSM, Vector, Graph).
-Bietet `PersistentCheckpointStore` zur Ablage von benannten Checkpoints.
-Herzstück ist der `CheckpointGuard`: Er erzwingt per RAII-Semantik, dass Transaktionen
-entweder explizit committet werden oder andernfalls (bei Panic/Drop) ein Rollback auslösen.
-Implementiert den `CheckpointCoordinator` Trait (bzw. greift auf diesen zu).
+## 1. Zweck
+Verwaltet transaktionale Checkpoints, Point-in-Time State Snapshots und Time-Travel Rollbacks über Storage-Komponenten hinweg.
+Bietet den RAII-Guard `CheckpointGuard` für automatischen Rollback bei Fehlern/Drop sowie den `PersistentCheckpointStore` zur persistenten Ablage von Checkpoints mit BLAKE3-Manifest-Verifikation.
+Implementiert den Trait `contextra_ports::CheckpointCoordinator` und entkoppelt synchrone Drop-Aktionen über eine verwaiste Registerverwaltung (`InstanceOrphanRegistry`).
 
 ## 2. Modul-Karte
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, `CheckpointGuard`, `PersistentCheckpointStore`, `StateCheckpoint` |
+| `lib.rs` | Einstiegspunkt mit `#![deny(dead_code)]`, Modul-Deklarationen und Re-Exports von Guards, Store und Metadata |
+| `guard.rs` | `CheckpointGuard` und `PinGuard` (RAII-Lebenszyklus, Rollback/Commit, Zeitstempel-Ermittlung via Clock-Port) |
+| `hardlink_cloner.rs` | `CheckpointHardlinkCloner` Trait und `DefaultHardlinkCloner` für physikalisches Hardlink-Klonen von SSTables |
+| `manifest.rs` | `CheckpointManifest` (Metadaten-Komponenten und BLAKE3-Prüfsummenvalidierung) |
+| `meta.rs` | `CheckpointMeta` und `StateCheckpoint` (Ablagestruktur und Identifikation von Checkpoints) |
+| `orphan.rs` | `InstanceOrphanRegistry` und `OrphanRegistry` (Erfassung und Recovery verwaister Pins/Checkpoints) |
+| `store.rs` | `PersistentCheckpointStore` (Thread-sicheres Registrieren, Wiederherstellen und Löschen von Checkpoints) |
 
-*(Hinweis: Diese Crate ist klein und vollständig in `lib.rs` zusammengefasst, um die Kopplung zwischen Guard-Lifecycle und Persistenz eng zu halten).*
+## 3. Invarianten
 
-## 3. Kritische Invarianten
+- **RAII CheckpointGuard Semantik**: Ein `CheckpointGuard` muss explizit per `commit()` oder `rollback()` finalisiert werden. Verworfene Guards werden synchron als "orphaned" registriert.
+  *Test*: `cargo test -p contextra-checkpoint --lib`
+- **Determinismus via Clock-Port (INV-CHECKPOINT-DETERMINISM-1)**: Zeitstempel (`timestamp_ms`) werden ausschließlich über die injizierte `contextra_ports::Clock`-Schnittstelle bezogen (kein `SystemTime::now()` im Nicht-Test-Produktivcode).
+  *Test*: `cargo test -p contextra-checkpoint --lib`
+- **BLAKE3-Manifest-Integrität**: `CheckpointManifest` berechnet und verifiziert Prüfsummen vor dem Laden oder Wiederherstellen von Komponenten.
+  *Test*: `cargo test -p contextra-checkpoint --lib`
+- **Snapshot Pinning Integration**: Persistent store pinnt Sequenznummern in der Unter-StorageEngine, um Compaction-Verwurf während Time-Travel-Optionen zu verhindern.
+  *Test*: `cargo test -p contextra-checkpoint --lib`
 
-### RAII-Semantik des CheckpointGuard
-Ein `CheckpointGuard` **MUSS** immer konsumiert werden.
-- `guard.commit()` überführt die Transaktion in einen dauerhaften Checkpoint.
-- `guard.rollback()` (oder `drop(guard)`) verwirft uncommittete Änderungen der `TxId`.
-- **Wichtig:** Da `Drop` in async-Rust nicht asynchron sein kann, registriert
-der synchrone Drop-Handler des Guards die Transaktion als "orphaned".
-Ein asynchroner Reaper (`recover_orphaned_checkpoints`) muss diese später aufräumen.
+## 4. Verboten / Anti-Patterns
 
-### TxId-Zuweisung für System-Checkpoints
-Manuell erstellte named Checkpoints (nicht reguläre Agent-Steps) nutzen TxIds 
-aus dem internen Bereich `TxId::INTERNAL_BASE` aufwärts.
-Dies verhindert Konflikte mit regulären Dokument/Kanten-Einfügungen.
+- **Direkter `SystemTime::now()`-Aufruf im Nicht-Test-Code**: Bricht P28 (Determinismus). Uhr muss stets per `with_clock` oder `Clock`-Port injiziert werden.
+- **Blockierendes Disk-I/O in synchronous `Drop`**: `CheckpointGuard::drop()` schreibt nicht synchron auf Disk, sondern trägt Einträge in die `InstanceOrphanRegistry` ein.
+- **Verwechslung mit Store-internem Pinning**: `contextra-checkpoint` ist der einzige öffentliche Einstiegspunkt für Checkpoints; `contextra_store::lsm::guard` ist ein reines Store-Detail.
 
-### Snapshot Pinning
-`PersistentCheckpointStore` ruft `storage.pin_checkpoint(seq_no)` auf.
-Gepinnte Checkpoints verhindern, dass der LSM-Compactor (Layer 1) Versionen 
-löscht, die für `rollback_to_tx` noch benötigt werden.
-Wenn ein Checkpoint gelöscht wird, MUSS er unpinned werden.
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 
-## 4. Public API Quick-Reference
+- In-Memory-Zustand (Checkpoints, Orphan-Register) wird durch `parking_lot::RwLock` oder `parking_lot::Mutex` geschützt.
+- `parking_lot`-Guards werden nie über `.await`-Grenzen gehalten.
+- Längere E/A-Operationen (Hardlink-Klonen, File-Flushes) nutzen `tokio::fs` bzw. `tokio::task::spawn_blocking`.
 
-```rust
-// === Checkpoint Lifecycle ===
-pub struct CheckpointGuard<S: StorageEngine> { ... }
-impl<S> CheckpointGuard<S> {
-    pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self;
-    pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self>;
-    pub fn commit(self) -> Result<StateCheckpoint>;
-    pub async fn rollback(self) -> Result<()>;
-}
+## 6. Verifikation
 
-// === Persistent Checkpoint Store ===
-pub struct PersistentCheckpointStore<S: StorageEngine> { ... }
-impl<S> PersistentCheckpointStore<S> {
-    pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self>;
-    pub async fn create_checkpoint(&self, name: &str, ...) -> Result<CheckpointMeta>;
-    pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta>;
-    pub async fn drop_checkpoint(&self, name: &str) -> Result<()>;
-}
-
-// === Orphan Management ===
-pub async fn await_pending_rollbacks();
-pub fn orphaned_checkpoint_count() -> usize;
+```bash
+cargo test -p contextra-checkpoint --locked
 ```
 
-## 5. Anti-Patterns & LLM-Fallstricke
+## 7. Bekannte Lücken / SOLL
 
-```rust
-// ❌ FALSCH — Guard unabsichtlich droppen vor Await (Blockiert LSM-Locks!):
-let guard = store.create_guard(tx)?;
-let result = some_long_async_task().await; // Guard lebt hier noch, Drop passiert danach!
-// ✅ KORREKT — Guard explizit handhaben:
-let result = some_long_async_task().await;
-if result.is_ok() { guard.commit()?; } else { guard.rollback().await?; }
-
-// ❌ FALSCH — System-Checkpoints mit aktueller Systemzeit als TxId:
-let tx = TxId(SystemTime::now()...);
-// ✅ KORREKT — `allocate_tx` des Stores nutzen:
-let tx = store.allocate_tx().await?;
-
-// ❌ FALSCH — public struct Felder modifizieren:
-// ✅ KORREKT — `StateCheckpoint` Felder sind privat oder read-only nach Erstellung.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`CheckpointGuard` hält keine blockierenden OS-Locks (Mutex/RwLock) über asynchrone Grenzen,
-aber er repräsentiert eine offene, uncommittete Transaktion im `TxBuffer` der `StorageEngine`.
-Lange offene Guards verbrauchen Memory (weil Writes nicht in den LSM fließen) und können
-andere Lese-Transaktionen behindern (weil das MVCC-Watermark nicht voranschreitet).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-store` (L1 Peer), `contextra-db` (L2)
-- **Genutzt von**: `contextra-db` (MultiStepEngine), `contextra-agent` (für Agenten-Steps)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-011 | RAII-basierte Checkpoint Guards (Orphan-Reaping bei Panic) |
-| `rules/async_drop.md` | Hintergrund-Reaping von synchronen Drops (Orphaned Checkpoints) |
-| `COMMON_LLM_ERRORS.md` | Fehler-Klasse 11: Lock-Guard über `.await` halten |
+- **Rückwärtskompatible Hilfsfunktionen in `orphan.rs`**: Funktionen wie `await_pending_rollbacks()` und `pending_rollback_count()` dienen der Abwärtskompatibilität und verweisen auf den globalen Orphan-Registry-Fallback.
