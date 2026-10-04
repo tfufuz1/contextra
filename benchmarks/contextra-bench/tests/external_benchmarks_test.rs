@@ -282,9 +282,13 @@ async fn test_empty_and_erroring_eval_runs() {
                 contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
-    let locomo_report = run_locomo_eval(&empty_locomo, &std::collections::HashMap::new(), mock_search_ok)
-        .await
-        .unwrap();
+    let locomo_report = run_locomo_eval(
+        &empty_locomo,
+        &std::collections::HashMap::new(),
+        mock_search_ok,
+    )
+    .await
+    .unwrap();
     assert_eq!(locomo_report.total_eval_cases, 0);
     assert_eq!(locomo_report.overall_recall_at_5, 0.0);
     assert_eq!(locomo_report.overall_mrr, 0.0);

@@ -1,4 +1,6 @@
-use pyo3::exceptions::{PyKeyError, PyPermissionError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{
+    PyIOError, PyIndexError, PyKeyError, PyPermissionError, PyRuntimeError, PyValueError,
+};
 use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,11 +11,11 @@ use crate::bindings::search_result::PySearchResult;
 // ─── Custom Exceptions ──────────────────────────────────────────────────────
 
 pyo3::create_exception!(_contextra, ContextraError, pyo3::exceptions::PyException);
-pyo3::create_exception!(_contextra, ContextraIOError, ContextraError);
-pyo3::create_exception!(_contextra, ContextraIndexError, ContextraError);
-pyo3::create_exception!(_contextra, ContextraValueError, ContextraError);
+pyo3::create_exception!(_contextra, ContextraIOError, PyIOError);
+pyo3::create_exception!(_contextra, ContextraIndexError, PyIndexError);
+pyo3::create_exception!(_contextra, ContextraValueError, PyValueError);
 pyo3::create_exception!(_contextra, ContextraCryptoError, ContextraError);
-pyo3::create_exception!(_contextra, ContextraInternalError, ContextraError);
+pyo3::create_exception!(_contextra, ContextraInternalError, PyRuntimeError);
 
 // ─── Shared Constants ───────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ pub const MAX_WORKER_THREADS: usize = 256;
 
 /// Maximum allowed length for document string IDs (1024 characters).
 pub const MAX_ID_LENGTH: usize = 1024;
+/// Maximum allowed length for collection names (64 characters).
+pub const MAX_COLLECTION_NAME_LENGTH: usize = 64;
 /// Maximum allowed length for relationship labels (256 characters).
 pub const MAX_LABEL_LENGTH: usize = 256;
 /// Maximum batch size for batch insertion/upsertion (10,000 items).
@@ -102,10 +106,10 @@ pub fn validate_collection_name(name: &str) -> PyResult<()> {
             "Collection name cannot contain null bytes",
         ));
     }
-    if name.len() > MAX_ID_LENGTH {
+    if name.len() > MAX_COLLECTION_NAME_LENGTH {
         return Err(ContextraValueError::new_err(format!(
             "Collection name exceeds maximum length of {} bytes. Got: {}",
-            MAX_ID_LENGTH,
+            MAX_COLLECTION_NAME_LENGTH,
             name.len()
         )));
     }

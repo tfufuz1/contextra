@@ -121,7 +121,7 @@ impl PyContextra {
         validate_collection_name(name)?;
         let rt = &self.runtime;
         let name_owned = name.to_string();
-        let tenant_id = contextra_core::TenantId::try_new(1).map_err(contextra_err)?;
+        let tenant_id = contextra_types::TenantId::SYSTEM;
         run_blocking_ffi(py, &self.poisoned, || {
             rt.block_on(
                 self.inner

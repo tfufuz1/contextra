@@ -56,7 +56,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
     let tx1 = TxId::new(1);
     for (i, vec) in vectors.iter().enumerate() {
         index
-            .insert(tx1, DocId::new((i + 1) as u64), vec)
+            .insert(tx1, DocId::from((i + 1) as u64), vec)
             .await
             .expect("insert baseline vector");
     }
@@ -66,7 +66,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
     let tx2 = TxId::new(2);
     for i in 1..=160 {
         index
-            .delete(tx2, DocId::new(i as u64))
+            .delete(tx2, DocId::from(i as u64))
             .await
             .expect("delete doc");
     }

@@ -50,3 +50,11 @@ path = "tests/visibility_proptest.rs"
 [[test]]
 name = "loom_snapshot_registry"
 path = "tests/loom_snapshot_registry.rs"
+
+[[test]]
+name = "campaign_cov_ssi_coarsening"
+path = "tests/campaign_cov_ssi_coarsening.rs"
+
+[[test]]
+name = "campaign_cov_tx_buffer_reap"
+path = "tests/campaign_cov_tx_buffer_reap.rs"
