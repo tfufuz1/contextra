@@ -36,6 +36,7 @@ members = [
     "crates/contextra-avv-generator",
     "crates/contextra-license",
     "xtask",
+    "xtask-heavy",
 ]
 # Excluded from default-members per Spezifikation Section 0.5 / A.3 ("Pure Rust, kein Server"):
 # - contextra-sandbox: WASM boundary (opt-in sandbox)
