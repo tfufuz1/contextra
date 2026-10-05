@@ -89,7 +89,6 @@ impl SlmProfile {
         self
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Builder method to attach an explicit resource cost estimate to this profile.
     pub fn with_resource_cost_estimate(mut self, resource_cost_estimate: f32) -> Self {
         self.resource_cost_estimate = resource_cost_estimate;
@@ -146,6 +145,27 @@ impl SlmProfile {
             token_budget,
             min_relevance_score,
         );
+        profile.validate()?;
+        Ok(profile)
+    }
+
+    /// Creates and validates a new `SlmProfile` with an explicit resource cost estimate.
+    pub fn try_new_with_cost(
+        name: impl Into<String>,
+        mcp_endpoint: impl Into<String>,
+        domain_communities: impl IntoIterator<Item = u64>,
+        token_budget: TokenBudget,
+        min_relevance_score: f32,
+        resource_cost_estimate: f32,
+    ) -> Result<Self> {
+        let profile = Self::new(
+            name,
+            mcp_endpoint,
+            domain_communities,
+            token_budget,
+            min_relevance_score,
+        )
+        .with_resource_cost_estimate(resource_cost_estimate);
         profile.validate()?;
         Ok(profile)
     }
@@ -230,7 +250,6 @@ impl ConformalCalibrator {
         (self.quantile_threshold - old_threshold).abs() > f32::EPSILON
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Returns the current empirical error rate.
     pub fn empirical_error_rate(&self) -> f32 {
         if self.window_total == 0 {
@@ -239,7 +258,6 @@ impl ConformalCalibrator {
         self.window_errors as f32 / self.window_total as f32
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Resets statistics while preserving the current calibrated threshold.
     pub fn reset_window(&mut self) {
         self.window_errors = 0;
@@ -327,13 +345,28 @@ impl ProfileCalibrationState {
         self.last_calibrated_fingerprint.as_ref() == Some(active_fp)
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Durchschnittliche Konfidenz über alle bisherigen Entscheidungen.
     pub fn average_confidence(&self) -> f64 {
         if self.times_selected == 0 {
             return 1.0;
         }
         self.cumulative_confidence / self.times_selected as f64
+    }
+
+    /// Liefert die empirische Fehlerrate des untergeordneten ConformalCalibrators.
+    pub fn empirical_error_rate(&self) -> f32 {
+        self.conformal.empirical_error_rate()
+    }
+
+    /// Setzt das Beobachtungsfenster des ConformalCalibrators zurück,
+    /// behält aber den kalibrierten Schwellenwert bei.
+    pub fn reset_window(&mut self) {
+        self.conformal.reset_window();
+    }
+
+    /// Prüft, ob der Kalibrierungszustand gesunde Metriken aufweist.
+    pub fn is_healthy(&self) -> bool {
+        self.average_confidence() >= 0.5 && self.empirical_error_rate() <= self.conformal.alpha * 2.0
     }
 
     /// Recalibrates using the conformal calibrator.

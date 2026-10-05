@@ -53,7 +53,6 @@ fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
     Ok((program, args))
 }
 
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Dispatches the prepared context from a [`RoutingDecision`] to the target SLM's MCP endpoint
 /// over stdio JSON-RPC 2.0 (ADR-010 compliant).
 ///
@@ -164,6 +163,18 @@ pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String> {
             "MCP-Antwort enthielt weder result noch error".to_string(),
         ))
     }
+}
+
+/// Convenience-Hilfsfunktion, die über die [`crate::router::RouterEngine`] eine Routing-Entscheidung
+/// für die Query ermittelt und den maßgeschneiderten Kontext direkt mittels [`dispatch_to_slm`]
+/// an den MCP-Endpunkt des ausgewählten SLMs übermittelt.
+pub async fn route_and_dispatch_to_slm(
+    router: &crate::router::RouterEngine,
+    query_embedding: &[f32],
+    query_text: &str,
+) -> Result<String> {
+    let decision = router.route(query_embedding, query_text).await?;
+    dispatch_to_slm(&decision).await
 }
 
 #[cfg(test)]
