@@ -358,6 +358,68 @@ mod tests {
     }
 
     #[test]
+    fn test_kv_cipher_revocation_survives_registry_reconstruction() {
+        use contextra_ports::SystemClock;
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let log_path = temp_dir.path().join("kv_revocation.log");
+
+        let sk = SigningKey::generate(&mut OsRng);
+        let vk = sk.verifying_key();
+        let clock = Arc::new(SystemClock::new());
+
+        let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)
+            .expect("Failed to create persistent revocation log");
+        let log_arc = Arc::new(log);
+
+        let master_km1 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
+        let cipher1 = KvSegmentCipher::new(master_km1).with_revocation_log(log_arc.clone());
+
+        let tenant_id = TenantId::try_new(101).unwrap();
+        let fp = dummy_fingerprint("model-v1");
+        let group_id = 888;
+        let plaintext = b"Sensitive persistent group payload";
+
+        let encrypted = cipher1
+            .encrypt_with_version(tenant_id, group_id, 1, fp.clone(), plaintext)
+            .unwrap();
+
+        // Revoke group_id on cipher1
+        let revoked = cipher1
+            .registry()
+            .revoke_group(group_id)
+            .expect("revoke_group failed");
+        assert!(revoked, "Group 888 must be revoked on cipher1");
+        assert!(cipher1.registry().is_group_revoked(group_id));
+
+        // Drop cipher1 and log_arc simulating process shutdown / registry destruction
+        drop(cipher1);
+        drop(log_arc);
+
+        // Re-open persistent revocation log and construct a new KvSegmentCipher with new KeyRegistry
+        let reopened_log = RevocationLog::open_or_create(&log_path, clock, None, vk)
+            .expect("Failed to reopen persistent revocation log");
+        let master_km2 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
+        let cipher2 = KvSegmentCipher::new(master_km2).with_revocation_log(Arc::new(reopened_log));
+
+        // Assert group 888 is still revoked in the reconstructed cipher's registry
+        assert!(
+            cipher2.registry().is_group_revoked(group_id),
+            "Revocation MUST survive registry reconstruction on persisted log"
+        );
+
+        // Decryption of encrypted layer on new reconstructed cipher MUST fail due to key revocation
+        let decrypt_res = cipher2.decrypt_with_version(&encrypted, group_id, 1);
+        assert!(
+            decrypt_res.is_err(),
+            "Decryption on reconstructed cipher MUST fail for revoked group"
+        );
+    }
+
+    #[test]
     fn test_single_shredding_path_consolidation_and_revocation() {
         // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
         // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
