@@ -13,11 +13,9 @@ pub fn extract_valid_subcommands(main_rs_content: &str) -> HashSet<String> {
     let str_regex = Regex::new(r#""([a-z0-9_-]+)""#).expect("Valid regex");
 
     for line in main_rs_content.lines() {
-        if let Some((patterns, _)) = line.split_once("=>") {
-            for caps in str_regex.captures_iter(patterns) {
-                if let Some(cmd) = caps.get(1) {
-                    valid_commands.insert(cmd.as_str().to_string());
-                }
+        for caps in str_regex.captures_iter(line) {
+            if let Some(cmd) = caps.get(1) {
+                valid_commands.insert(cmd.as_str().to_string());
             }
         }
     }
@@ -96,6 +94,12 @@ pub fn run_check_workflow_commands(root: &Path) -> bool {
     };
 
     let mut valid_subcommands = extract_valid_subcommands(&main_rs_content);
+
+    let cli_mod_path = root.join("xtask/src/cli/mod.rs");
+    if let Ok(cli_mod_content) = fs::read_to_string(&cli_mod_path) {
+        valid_subcommands.extend(extract_valid_subcommands(&cli_mod_content));
+    }
+
     let harness_subcommands = extract_harness_subcommands(&root.join("xtask/src/harness"));
     valid_subcommands.extend(harness_subcommands);
 
