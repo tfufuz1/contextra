@@ -29,6 +29,11 @@ pub struct CsrGraph {
     pub doc_edge_index: crate::provenance::DocEdgeIndex,
     /// In-memory FIFO cascade queue for hyperedges deferred during high fan-out invalidation (§6.6 / §6.8).
     pub cascade_queue: Arc<Mutex<VecDeque<(DocId, crate::hyperedge::HyperEdgeId)>>>,
+    /// Optionaler Edge-Reinforcement-Buffer für co-occurrence & traversal feedback signals (F-03).
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub reinforcement_buffer: Arc<crate::edge_reinforcement_buffer::EdgeReinforcementBuffer>,
+    /// Thread-safe string interner for hyperedge participant roles.
+    pub role_interner: Arc<crate::hyperedge::RoleInterner>,
 }
 
 impl CsrGraph {
@@ -49,7 +54,64 @@ impl CsrGraph {
             consistency_enforcer: None,
             doc_edge_index: crate::provenance::DocEdgeIndex::new(),
             cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
+            #[cfg(feature = "edge-reinforcement-learning")]
+            reinforcement_buffer: Arc::new(
+                crate::edge_reinforcement_buffer::EdgeReinforcementBuffer::new(),
+            ),
+            role_interner: Arc::new(crate::hyperedge::RoleInterner::new()),
         }
+    }
+
+    /// Interns a role name and returns its assigned RoleId.
+    pub fn intern_role(&self, name: &str) -> crate::hyperedge::RoleId {
+        self.role_interner.get_or_intern(name)
+    }
+
+    /// Resolves a RoleId to an owned String.
+    pub fn resolve_role_string(&self, id: crate::hyperedge::RoleId) -> Option<String> {
+        self.role_interner.resolve_string(id)
+    }
+
+    /// Checks if a role name exists in the role interner.
+    pub fn contains_role(&self, name: &str) -> bool {
+        self.role_interner.contains_role(name)
+    }
+
+    /// Checks if a RoleId exists in the role interner.
+    pub fn contains_role_id(&self, id: crate::hyperedge::RoleId) -> bool {
+        self.role_interner.contains_id(id)
+    }
+
+    /// Appends a co-occurrence signal to the internal edge reinforcement buffer (F-03).
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub fn push_cooccurrence_signal(&self, from: EntityId, to: EntityId, co_activation: f32) {
+        self.reinforcement_buffer
+            .push_cooccurrence(from, to, co_activation);
+    }
+
+    /// Appends a traversal signal to the internal edge reinforcement buffer (F-03).
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub fn push_traversal_signal(&self, from: EntityId, to: EntityId, path_length: usize) {
+        self.reinforcement_buffer
+            .push_traversal(from, to, path_length);
+    }
+
+    /// Returns the counts of pending co-occurrence and traversal signals (F-03).
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub fn reinforcement_signal_counts(&self) -> (usize, usize) {
+        (
+            self.reinforcement_buffer.cooccurrence_count(),
+            self.reinforcement_buffer.traversal_count(),
+        )
+    }
+
+    /// Flushes buffered reinforcement signals to the CSR graph (F-03).
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub fn flush_reinforcement_buffer(
+        &self,
+        config: &crate::edge_reinforcement::EdgeReinforcementConfig,
+    ) {
+        self.reinforcement_buffer.flush_to_graph(self, config);
     }
 
     /// Creates a new CSR graph with persistent storage and default config.
@@ -62,33 +124,75 @@ impl CsrGraph {
         config: CsrGraphConfig,
         storage: Arc<dyn StorageEngine>,
     ) -> Self {
-        let initial = Arc::new(GraphInner::new());
-        Self {
-            config,
-            inner: Arc::new(ArcSwap::from(initial.clone())),
-            write_state: Arc::new(Mutex::new((*initial).clone())),
-            storage: Some(storage),
-            last_tx_id: AtomicU64::new(0),
-            consistency_enforcer: None,
-            doc_edge_index: crate::provenance::DocEdgeIndex::new(),
-            cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
-        }
+        let mut graph = Self::with_config(config);
+        graph.storage = Some(storage);
+        graph
     }
 
     /// Erstellt CsrGraph mit aktiviertem ConsistencyEnforcer für Widerspruchsprävention (F-04/ADR-073).
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
-        let initial = Arc::new(GraphInner::new());
-        Self {
-            config: CsrGraphConfig::default(),
-            inner: Arc::new(ArcSwap::from(initial.clone())),
-            write_state: Arc::new(Mutex::new((*initial).clone())),
-            storage: None,
-            last_tx_id: AtomicU64::new(0),
-            consistency_enforcer: Some(RwLock::new(ConsistencyEnforcer::new(
-                suppression_threshold,
-            ))),
-            doc_edge_index: crate::provenance::DocEdgeIndex::new(),
-            cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
+        let mut graph = Self::new();
+        graph.consistency_enforcer = Some(RwLock::new(ConsistencyEnforcer::new(
+            suppression_threshold,
+        )));
+        graph
+    }
+
+    /// Exposes active conflict patterns from the optional ConsistencyEnforcer.
+    pub fn active_conflict_patterns(&self) -> Vec<crate::consistency_enforcement::ConflictPattern> {
+        if let Some(ref enforcer_lock) = self.consistency_enforcer {
+            let enforcer = enforcer_lock.read();
+            enforcer.active_patterns().cloned().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Detects whether two edge assertions conflict using the provided ContradictionDetector.
+    pub fn detect_contradiction<D: crate::consistency_enforcement::ContradictionDetector>(
+        &self,
+        detector: &D,
+        a: &EdgeAssertion,
+        b: &EdgeAssertion,
+    ) -> bool {
+        if let Some(ref enforcer_lock) = self.consistency_enforcer {
+            let enforcer = enforcer_lock.read();
+            enforcer.detect_contradiction(detector, a, b)
+        } else {
+            detector.conflicts(a, b)
+        }
+    }
+
+    /// Retrieves a conflict pattern by hash if tracked by ConsistencyEnforcer.
+    pub fn get_conflict_pattern(
+        &self,
+        pattern_hash: &[u8; 32],
+    ) -> Option<crate::consistency_enforcement::ConflictPattern> {
+        let enforcer_lock = self.consistency_enforcer.as_ref()?;
+        let enforcer = enforcer_lock.read();
+        enforcer.get_pattern(pattern_hash).cloned()
+    }
+
+    /// Checks if a pattern hash is suppressed by ConsistencyEnforcer.
+    pub fn is_conflict_suppressed(&self, pattern_hash: [u8; 32]) -> bool {
+        if let Some(ref enforcer_lock) = self.consistency_enforcer {
+            let enforcer = enforcer_lock.read();
+            enforcer.is_suppressed(pattern_hash)
+        } else {
+            false
+        }
+    }
+
+    /// Suggests tombstone candidate edges for a conflict pattern using ConsistencyEnforcer.
+    pub fn suggest_tombstone_candidates_for_pattern(
+        &self,
+        matching_edges: &[crate::consistency_enforcement::EdgeId],
+    ) -> Vec<crate::consistency_enforcement::EdgeId> {
+        if let Some(ref enforcer_lock) = self.consistency_enforcer {
+            let enforcer = enforcer_lock.read();
+            enforcer.suggest_tombstone_candidates(matching_edges)
+        } else {
+            matching_edges.to_vec()
         }
     }
 
@@ -123,6 +227,10 @@ impl CsrGraph {
         {
             let mut inner = self.inner_write();
             inner.doc_to_edges.remove(&doc_id);
+        }
+
+        if self.pending_cascade_queue_len() > 0 {
+            let _ = self.process_cascade_queue(100, wal_tx).await;
         }
 
         if tombstone_candidates.is_empty() {
@@ -404,6 +512,23 @@ impl CsrGraph {
             self.insert_hyperedge_direct(hyperedge.clone());
         });
 
+        Ok(hyperedge)
+    }
+
+    /// Creates and persists an n-ary hyperedge with storage persistence.
+    pub async fn relate_n_ary_and_persist(
+        &self,
+        tx: TxId,
+        id: crate::hyperedge::HyperEdgeId,
+        predicate: crate::csr::EdgeType,
+        participants: Vec<crate::hyperedge::RoleBinding>,
+        weight: f32,
+        doc_id: Option<DocId>,
+    ) -> std::result::Result<crate::hyperedge::HyperEdge, GraphMutationError> {
+        let hyperedge = self.relate_n_ary(id, predicate, participants, weight, doc_id)?;
+        if let Err(err) = self.persist_hyperedge(tx, &hyperedge).await {
+            tracing::warn!(error = %err, "Failed to persist hyperedge");
+        }
         Ok(hyperedge)
     }
 
@@ -714,6 +839,21 @@ impl CsrGraph {
         Ok(())
     }
 
+    /// Batched, atomic commit of hyperedges with async storage persistence.
+    pub async fn commit_super_edge_batch_async(
+        &self,
+        tombstone_ids: &[crate::hyperedge::HyperEdgeId],
+        new_edges: Vec<crate::hyperedge::HyperEdge>,
+        wal_tx: TxId,
+    ) -> std::result::Result<(), GraphMutationError> {
+        for edge in &new_edges {
+            if let Err(err) = self.persist_hyperedge(wal_tx, edge).await {
+                tracing::warn!(error = %err, "Failed to persist hyperedge during batch commit");
+            }
+        }
+        self.commit_super_edge_batch(tombstone_ids, new_edges, wal_tx)
+    }
+
     /// Returns all edge IDs derived from the given source `DocId`.
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<(EntityId, EntityId)> {
         let inner = self.inner_read();
@@ -837,6 +977,39 @@ impl CsrGraph {
         }
 
         Ok(())
+    }
+
+    /// Auto-routes direct edge insertion to the appropriate validity-specialized helper.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_edge_auto(
+        self: &Arc<Self>,
+        from: EntityId,
+        to: EntityId,
+        weight: f32,
+        tx_valid_from: Option<TxId>,
+        tx_valid_to: Option<TxId>,
+        business_valid_from: Option<i64>,
+        business_valid_to: Option<i64>,
+        source_doc_id: Option<DocId>,
+    ) -> Result<()> {
+        if business_valid_from.is_some() || business_valid_to.is_some() || source_doc_id.is_some() {
+            self.insert_edge_direct_with_bitemporal_validity(
+                from,
+                to,
+                weight,
+                tx_valid_from,
+                tx_valid_to,
+                business_valid_from,
+                business_valid_to,
+                source_doc_id,
+            )
+            .await
+        } else if tx_valid_from.is_some() || tx_valid_to.is_some() {
+            self.insert_edge_direct_with_validity(from, to, weight, tx_valid_from, tx_valid_to)
+                .await
+        } else {
+            self.insert_edge_direct(from, to, weight).await
+        }
     }
 
     /// Directly inserts an edge into the CSR graph without staging.
