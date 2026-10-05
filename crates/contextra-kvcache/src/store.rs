@@ -118,8 +118,8 @@ impl TenantState {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
 
-    /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
-    #[cfg(feature = "kv-encryption")]
+    /// O(1) get für Entschlüsselung / Dequantisierung — benötigt &mut wegen LRU-Update.
+    #[cfg(any(feature = "kv-encryption", feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
         self.cache.get(&id)
     }
