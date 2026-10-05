@@ -93,6 +93,11 @@ impl PprCostCalibrator {
     /// Returns `None` if no samples have been recorded.
     /// DOES NOT automatically apply the recommended factor.
     pub fn recommended_multiplier(&self) -> Option<f64> {
+        self.evaluate_recommended_multiplier()
+    }
+
+    /// Evaluates the recommended cost multiplier across recorded samples.
+    pub fn evaluate_recommended_multiplier(&self) -> Option<f64> {
         let guard = self.samples.lock();
         if guard.is_empty() {
             return None;
