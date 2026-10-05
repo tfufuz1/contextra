@@ -106,7 +106,7 @@ impl Wal {
     #[allow(clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
-        file_size: u64,
+        _file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         match self.replay_mmap().await {
             Ok(res) => Ok(res),
@@ -116,14 +116,8 @@ impl Wal {
                     self.path,
                     e
                 );
-                let mut entries = Vec::new();
-                let version = self
-                    .scan_entries_with_callback(file_size, |seq, entry, pos| {
-                        entries.push((seq, entry, pos));
-                        true
-                    })
-                    .await?;
-                Ok((entries, version))
+                let entries = self.replay_stream().await?;
+                Ok((entries, WalVersion::V3))
             }
         }
     }
