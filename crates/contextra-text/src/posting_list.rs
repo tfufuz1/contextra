@@ -332,11 +332,18 @@ impl ResidentPostingIndex {
         }
     }
 
-    /// Removes specified terms from the in-memory cache (e.g., on transaction rollback).
-    pub fn remove_terms(&self, terms: &[String]) {
+    /// Removes postings for a given doc_id across specified terms from the in-memory cache (e.g., on transaction rollback).
+    pub fn remove_terms(&self, doc_id: DocId, terms: &[String]) {
         let mut guard = self.index.write();
         for term in terms {
-            guard.remove(term);
+            if let Some(list) = guard.get(term).cloned() {
+                let updated = list.remove(doc_id);
+                if updated.is_empty() {
+                    guard.remove(term);
+                } else {
+                    guard.insert(term.clone(), Arc::new(updated));
+                }
+            }
         }
     }
 
@@ -501,5 +508,26 @@ mod tests {
         let invalid_bytes = b"PL\x02\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
         let res = PostingList::decode_compact(invalid_bytes);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_remove_terms_per_document() {
+        let index = ResidentPostingIndex::new();
+        let term = "alpha".to_string();
+
+        let doc1 = DocId::new(1);
+        let doc2 = DocId::new(2);
+
+        index.upsert_posting(&term, Posting::new(doc1, 1, 10));
+        index.upsert_posting(&term, Posting::new(doc2, 2, 20));
+
+        let list_before = index.get(&term).expect("term alpha should exist");
+        assert_eq!(list_before.len(), 2);
+
+        index.remove_terms(doc1, &[term.clone()]);
+
+        let list_after = index.get(&term).expect("term alpha should still exist for doc2");
+        assert_eq!(list_after.len(), 1);
+        assert_eq!(list_after.as_slice()[0].doc_id(), doc2);
     }
 }
