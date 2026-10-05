@@ -680,7 +680,7 @@ impl OrchestratorEngine {
                 event_res = source.next_event() => {
                     match event_res? {
                         Some(event) => {
-                            ctx.attach_event(event);
+                            ctx.try_attach_event(event)?;
                             self.run(ctx, graph).await?;
                             self.checkpoint(ctx).await?;
                         }
