@@ -214,6 +214,13 @@ impl VolatileContextVault {
         let chunks_purged = self.chunks.len();
         let bytes_zeroed = self.current_bytes;
 
+        let metadata = self.preview_metadata();
+        tracing::trace!(
+            metadata_count = metadata.len(),
+            "VolatileContextVault: Purging vault chunks: {:?}",
+            metadata
+        );
+
         // munlock vor dem Zeroize — damit OS den Speicher wieder verwalten darf,
         // NACHDEM wir ihn überschrieben haben (Reihenfolge bewusst: zeroize zuerst,
         // dann munlock — OS soll keine Gelegenheit haben, unzeroisierten Content zu lesen).
@@ -260,6 +267,7 @@ impl VolatileContextVault {
         self.is_memory_locked
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Lesezugriff auf Chunks (für User-Preview vor Commit/Purge-Entscheidung).
     /// Gibt nur Metadaten zurück, keine Inhalte — verhindert versehentliches Logging.
     pub fn preview_metadata(&self) -> Vec<VaultChunkMetadata> {
