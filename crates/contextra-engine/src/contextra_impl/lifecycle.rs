@@ -114,7 +114,7 @@ impl Contextra {
         ));
 
         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
-        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store);
+        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store.clone());
 
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
@@ -140,6 +140,9 @@ impl Contextra {
             pid_controller: parking_lot::RwLock::new(None),
             kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
+            kv_hooks: parking_lot::RwLock::new(Some(
+                kv_store as Arc<dyn contextra_ports::KvLifecycleHooks>,
+            )),
         };
 
         db.initialize_collections().await?;

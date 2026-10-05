@@ -76,6 +76,10 @@ impl Contextra {
             col = col.with_embedder(Arc::clone(emb));
         }
 
+        if let Some(hooks) = self.kv_hooks() {
+            col.set_kv_hooks(hooks);
+        }
+
         if name != "default" {
             let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
             let tx = self.allocate_tx()?;
@@ -184,6 +188,10 @@ impl Contextra {
 
         if let Some(emb) = self.embedder.read().as_ref() {
             col = col.with_embedder(Arc::clone(emb));
+        }
+
+        if let Some(hooks) = self.kv_hooks() {
+            col.set_kv_hooks(hooks);
         }
 
         if name != "default" {
@@ -387,5 +395,45 @@ impl Contextra {
             .remove(&(tenant_id, name.to_string()));
 
         Ok(proof)
+    }
+
+    /// Purges all cached KV segments and stored collection data for the given tenant across the engine.
+    ///
+    /// # Limitations / Non-Guarantees (SCHRITT 4)
+    /// - Does NOT purge unmanaged hardware RAM or OS memory pages outside zeroized buffers.
+    /// - Does NOT purge raw LLM internal model activations or external prompt residues outside Contextra.
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
+    /// - Does NOT clear external unmanaged block caches.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn purge_tenant(&self, tenant_id: TenantId) -> Result<()> {
+        // 1. Notify KV lifecycle hooks on Contextra and across active collections
+        if let Some(hooks) = self.kv_hooks() {
+            hooks.purge_tenant(tenant_id);
+        }
+
+        let read_guard = self.tenant_collections.read().await;
+        for ((t, _), col) in read_guard.iter() {
+            if *t == tenant_id {
+                if let Some(hooks) = col.kv_hooks() {
+                    hooks.purge_tenant(tenant_id);
+                }
+            }
+        }
+        drop(read_guard);
+
+        // 2. Delete all LSM storage entries for tenant
+        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+            self.storage.clone(),
+            tenant_id,
+        );
+        let tx = self.allocate_tx()?;
+        tenant_storage.delete_prefix(tx, b"").await?;
+        tenant_storage.commit(tx).await?;
+
+        // 3. Remove cached collection handles for this tenant
+        let mut write_guard = self.tenant_collections.write().await;
+        write_guard.retain(|(t, _), _| *t != tenant_id);
+
+        Ok(())
     }
 }
