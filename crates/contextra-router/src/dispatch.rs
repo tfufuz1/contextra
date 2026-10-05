@@ -53,6 +53,7 @@ fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
     Ok((program, args))
 }
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Dispatches the prepared context from a [`RoutingDecision`] to the target SLM's MCP endpoint
 /// over stdio JSON-RPC 2.0 (ADR-010 compliant).
 ///

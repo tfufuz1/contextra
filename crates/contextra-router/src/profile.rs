@@ -89,6 +89,7 @@ impl SlmProfile {
         self
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Builder method to attach an explicit resource cost estimate to this profile.
     pub fn with_resource_cost_estimate(mut self, resource_cost_estimate: f32) -> Self {
         self.resource_cost_estimate = resource_cost_estimate;
@@ -229,6 +230,7 @@ impl ConformalCalibrator {
         (self.quantile_threshold - old_threshold).abs() > f32::EPSILON
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Returns the current empirical error rate.
     pub fn empirical_error_rate(&self) -> f32 {
         if self.window_total == 0 {
@@ -237,6 +239,7 @@ impl ConformalCalibrator {
         self.window_errors as f32 / self.window_total as f32
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Resets statistics while preserving the current calibrated threshold.
     pub fn reset_window(&mut self) {
         self.window_errors = 0;
@@ -324,6 +327,7 @@ impl ProfileCalibrationState {
         self.last_calibrated_fingerprint.as_ref() == Some(active_fp)
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Durchschnittliche Konfidenz über alle bisherigen Entscheidungen.
     pub fn average_confidence(&self) -> f64 {
         if self.times_selected == 0 {
