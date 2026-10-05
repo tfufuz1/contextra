@@ -267,7 +267,6 @@ impl VolatileContextVault {
         self.is_memory_locked
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Lesezugriff auf Chunks (für User-Preview vor Commit/Purge-Entscheidung).
     /// Gibt nur Metadaten zurück, keine Inhalte — verhindert versehentliches Logging.
     pub fn preview_metadata(&self) -> Vec<VaultChunkMetadata> {
@@ -280,6 +279,23 @@ impl VolatileContextVault {
                 label: c.label.clone(),
             })
             .collect()
+    }
+
+    /// Entnimmt alle Chunks aus dem Vault für die Speicherung im Storage Engine.
+    ///
+    /// # INVARIANTE INV-VAULT-2
+    /// Dies ist der einzige Schreibpfad auf dauerhafte Ablage.
+    /// Gibt ein Tupel aus `(Vec<VaultChunkMetadata>, Vec<VaultChunk>)` zurück,
+    /// setzt den Byte-Zähler zurück und löst bestehende mlock-Fixierungen.
+    pub fn drain_for_commit(&mut self) -> (Vec<VaultChunkMetadata>, Vec<VaultChunk>) {
+        if self.consumed {
+            return (Vec::new(), Vec::new());
+        }
+        let metadata = self.preview_metadata();
+        self.mlock_regions.unlock_all();
+        self.current_bytes = 0;
+        let chunks = std::mem::take(&mut self.chunks);
+        (metadata, chunks)
     }
 }
 
@@ -455,5 +471,27 @@ mod tests {
         assert!(vault.is_memory_locked());
         vault.ingest(make_chunk(1, b"")).unwrap();
         assert!(vault.is_memory_locked());
+    }
+
+    /// INV-VAULT-2: drain_for_commit entnimmt Chunks und liefert Metadaten-Preview.
+    #[test]
+    fn test_drain_for_commit_extracts_chunks_and_metadata() {
+        let config = VaultConfig {
+            attempt_mlock: false,
+            ..Default::default()
+        };
+        let mut vault = VolatileContextVault::open(config);
+        vault
+            .ingest(make_chunk(100, b"data payload").with_label("lbl"))
+            .unwrap();
+
+        let (meta, chunks) = vault.drain_for_commit();
+        assert_eq!(meta.len(), 1);
+        assert_eq!(meta[0].id, DocId::new(100));
+        assert_eq!(meta[0].label.as_deref(), Some("lbl"));
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].content, b"data payload");
+        assert_eq!(vault.len(), 0);
+        assert_eq!(vault.current_size_bytes(), 0);
     }
 }
