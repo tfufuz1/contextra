@@ -137,6 +137,8 @@ impl PidController {
         let u = self.kp * error + self.ki * candidate_integral + self.kd * derivative;
         self.prev_error = error;
 
+        // FIX(2026-10-05): new_size is clamped to [min_s, max_s] where min_s >= 50, so conversion to usize is non-negative and bounded.
+        #[allow(clippy::cast_possible_truncation)]
         let new_size = (current_pool as f32 + u).round() as isize;
         let min_s = self.min_pool_size as isize;
         let max_s = self.max_pool_size as isize;
@@ -145,6 +147,7 @@ impl PidController {
             self.integral = candidate_integral;
         }
 
+        #[allow(clippy::cast_sign_loss)]
         let clamped = new_size.clamp(min_s, max_s) as usize;
         self.current_pool_size = Some(clamped);
         clamped
@@ -187,10 +190,13 @@ impl AntiWindupController for PidController {
         let u = self.kp * error + self.ki * self.integral + self.kd * derivative;
         self.prev_error = error;
 
+        // FIX(2026-10-05): new_size is clamped to [min_s, max_s] where min_s >= 50, so conversion to usize is non-negative and bounded.
+        #[allow(clippy::cast_possible_truncation)]
         let new_size = (current_pool as f32 + u).round() as isize;
         let min_s = self.min_pool_size as isize;
         let max_s = self.max_pool_size as isize;
 
+        #[allow(clippy::cast_sign_loss)]
         let clamped = new_size.clamp(min_s, max_s) as usize;
         self.current_pool_size = Some(clamped);
         clamped

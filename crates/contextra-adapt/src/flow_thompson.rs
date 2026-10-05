@@ -766,7 +766,10 @@ impl FcTsArmSet {
             }
         }
 
-        let candidate_idx = best_idx as u32;
+        // FIX(2026-10-05): Safe conversion from usize to u32 for arm index to fix clippy::cast_possible_truncation
+        let candidate_idx = u32::try_from(best_idx).map_err(|_| {
+            FcTsError::InvalidConfig("best_idx exceeds u32::MAX".to_string())
+        })?;
 
         if let Some(sink) = self.arms.iter().find_map(|a| a.shadow_sink.clone()) {
             let mut baseline_best_idx = 0;
@@ -780,8 +783,13 @@ impl FcTsArmSet {
                 }
             }
 
+            // FIX(2026-10-05): Safe conversion from usize to u32 for baseline best index to fix clippy::cast_possible_truncation
+            let baseline_idx = u32::try_from(baseline_best_idx).map_err(|_| {
+                FcTsError::InvalidConfig("baseline_best_idx exceeds u32::MAX".to_string())
+            })?;
+
             sink.record(crate::shadow_mode::ShadowDiscrepancy {
-                baseline: baseline_best_idx as u32,
+                baseline: baseline_idx,
                 candidate: candidate_idx,
                 context_id: 0,
             });
