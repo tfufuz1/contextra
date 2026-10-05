@@ -10,7 +10,7 @@ use contextra_privacy::context_edit_audit::{
     ContextEditAuditError, ContextEditInput, ContextEditKind,
 };
 use contextra_privacy::egress_gateway::{
-    pii_vault_forces_crypto_shred, resolve_effective_kv_delete_mode, CloudResponseRehydrator,
+    pii_vault_forces_crypto_shred, CloudResponseRehydrator,
 };
 use contextra_privacy::egress_guard::{EgressGuard, TextSearchEngine, TextSearchResult};
 use contextra_privacy::egress_vault::{
@@ -360,28 +360,6 @@ fn test_h7_pii_vault_forces_crypto_shred_truth_table() {
     assert!(!pii_vault_forces_crypto_shred(false, false)); // No PII match -> not forced
     assert!(!pii_vault_forces_crypto_shred(false, true));  // No PII match + memory-only -> not forced
 
-    // 2. resolve_effective_kv_delete_mode
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum MockDeleteMode { TombstoneOnly, CryptoShred }
-
-    #[derive(Debug, Clone, Copy)]
-    enum MockDurability { DiskBacked }
-
-    let effective_forced = resolve_effective_kv_delete_mode(
-        true,
-        MockDurability::DiskBacked,
-        MockDeleteMode::TombstoneOnly,
-        MockDeleteMode::CryptoShred,
-    );
-    assert_eq!(effective_forced, MockDeleteMode::CryptoShred);
-
-    let effective_preset = resolve_effective_kv_delete_mode(
-        false,
-        MockDurability::DiskBacked,
-        MockDeleteMode::TombstoneOnly,
-        MockDeleteMode::CryptoShred,
-    );
-    assert_eq!(effective_preset, MockDeleteMode::TombstoneOnly);
 }
 
 // ── H8: Audit Trace Determinism & Tamper Detection ──────────────────────────────

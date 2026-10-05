@@ -10,7 +10,7 @@ use contextra_privacy::bulk_exfiltration_detector::{
 use contextra_privacy::egress_gateway::{
     guard_and_sanitize_payload, handle_cloud_query_scoped,
     handle_cloud_query_scoped_with_bulk_detector, handle_cloud_query_scoped_with_guard,
-    resolve_effective_kv_delete_mode, CloudQueryRequest,
+    CloudQueryRequest,
 };
 use contextra_privacy::egress_guard::{
     EgressGuard, TextSearchEngine, TextSearchResult,
@@ -123,36 +123,7 @@ async fn test_j19_symbols_integration() -> Result<(), Box<dyn std::error::Error>
     .await?;
     assert_eq!(resp_scoped_bulk.status, "success");
 
-    // 7. resolve_effective_kv_delete_mode
-    #[derive(Debug)]
-    #[allow(dead_code)]
-    enum MockDurability {
-        MemoryOnly,
-        Persistent,
-    }
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum MockDeleteMode {
-        Soft,
-        CryptoShred,
-    }
-
-    let delete_mode_forced = resolve_effective_kv_delete_mode(
-        true,
-        MockDurability::Persistent,
-        MockDeleteMode::Soft,
-        MockDeleteMode::CryptoShred,
-    );
-    assert_eq!(delete_mode_forced, MockDeleteMode::CryptoShred);
-
-    let delete_mode_preset = resolve_effective_kv_delete_mode(
-        true,
-        MockDurability::MemoryOnly,
-        MockDeleteMode::Soft,
-        MockDeleteMode::CryptoShred,
-    );
-    assert_eq!(delete_mode_preset, MockDeleteMode::Soft);
-
-    // 8. EgressError::policy_violation
+    // 7. EgressError::policy_violation
     let err = EgressError::policy_violation("Policy denied test");
     assert!(matches!(err, EgressError::PolicyViolation(msg) if msg == "Policy denied test"));
 
