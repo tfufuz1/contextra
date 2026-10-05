@@ -58,7 +58,7 @@ impl WorkflowEdge {
             || self
                 .condition
                 .as_ref()
-                .map_or(false, |c| !c.trim().is_empty())
+                .is_some_and(|c| !c.trim().is_empty())
     }
 
     /// Evaluates whether this edge's condition/goal is satisfied against a [`StepResult`].

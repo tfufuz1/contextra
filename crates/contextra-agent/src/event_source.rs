@@ -125,6 +125,15 @@ impl<S: StorageEngine> PollingDocumentEventSource<S> {
         Self::with_capacity(collection, poll_interval, MAX_PENDING_EVENTS_CAPACITY)
     }
 
+    /// Creates a new `PollingDocumentEventSource` initialized from a specific sequence number checkpoint.
+    pub fn new_from_seq(
+        collection: Arc<Collection<S>>,
+        poll_interval: Duration,
+        last_seen_seq: u64,
+    ) -> Self {
+        Self::new(collection, poll_interval).with_last_seen_seq(last_seen_seq)
+    }
+
     /// Creates a new `PollingDocumentEventSource` with specified maximum queue capacity bound.
     // AI-TAG[HARDENING][CRITICAL] RESOLVED: Enforces bounded event queue capacity to guard against unbounded memory growth. (TS:2026-08-30T15:00:19Z) (SESSION: 283abf0f)
     pub fn with_capacity(

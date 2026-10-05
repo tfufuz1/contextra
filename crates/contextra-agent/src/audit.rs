@@ -108,6 +108,11 @@ impl<S: StorageEngine> AuditLog<S> {
         Self::append_to(&self.collection, entry).await
     }
 
+    /// Migrates legacy zero-vector audit entries from the HNSW vector index into direct LSM KV store format.
+    pub async fn migrate_legacy_entries(&self) -> Result<MigrationStats> {
+        migrate_legacy_audit_entries(&self.collection).await
+    }
+
     /// Replays all audit entries for a given task via scan_prefix.
     pub async fn replay_task(&self, task_id: &str) -> Result<Vec<AuditEntry>> {
         validate_task_id(task_id)?;
