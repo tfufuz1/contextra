@@ -190,7 +190,6 @@ impl Default for SignedLicenseGate {
 }
 
 impl SignedLicenseGate {
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Constructs a [`SignedLicenseGate`] without any active activation record.
     pub fn no_activation() -> Self {
         Self {
@@ -202,19 +201,16 @@ impl SignedLicenseGate {
         }
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Constructs an unactivated [`SignedLicenseGate`] bound to the auto-derived local installation ID.
     pub fn unactivated_local(storage_path: Option<&std::path::Path>) -> Self {
         Self::no_activation().with_auto_installation_id(storage_path)
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Constructs a [`SignedLicenseGate`] from a [`SignedActivation`].
     pub fn from_activation(activation: SignedActivation, verifying_key: VerifyingKey) -> Self {
         Self::from_activation_with_clock(activation, verifying_key, Arc::new(SystemClock::new()))
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Constructs a [`SignedLicenseGate`] directly from activation parameters by creating a [`SignedActivation`].
     pub fn from_activation_params(
         ring: FeatureRing,
@@ -307,14 +303,12 @@ impl SignedLicenseGate {
         Err(LicenseError::InvalidSignature)
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Binds a local installation ID hash (e.g. BLAKE3 hash of machine ID or MAC address) to this gate instance.
     pub fn with_local_installation_id(mut self, id_hash: [u8; 32]) -> Self {
         self.local_installation_id = Some(id_hash);
         self
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Binds the auto-derived local installation ID hash (using optional persistent storage path) to this gate instance.
     pub fn with_auto_installation_id(self, storage_path: Option<&std::path::Path>) -> Self {
         let id_hash = derive_local_installation_id_hash(storage_path);
@@ -336,7 +330,6 @@ impl SignedLicenseGate {
         self.verifying_key.as_ref()
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Generates a valid signed payload, signature, and verifying key bytes for testing purposes.
     pub fn create_test_signed_payload(
         rings: Vec<FeatureRing>,
@@ -360,7 +353,6 @@ impl SignedLicenseGate {
         (payload_bytes, signature, verifying_key_bytes)
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Constructs a [`SignedLicenseGate`] configured with a test signed payload for development or testing.
     pub fn for_testing(rings: Vec<FeatureRing>, expires_at: Option<i64>) -> Self {
         let (payload_bytes, signature, verifying_key_bytes) =
