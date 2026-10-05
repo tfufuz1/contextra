@@ -441,8 +441,6 @@ impl Wal {
                                 ));
                             }
 
-                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
-
                             if let Err(e) = file.set_len(offset).await {
                                 return Err(ContextraError::Storage(format!(
                                     "WAL truncate failed for {}: {}",
@@ -477,6 +475,8 @@ impl Wal {
                             flusher_last_hmac = new_last_hmac;
                             let mut last_hmac_guard = last_hmac.lock().await;
                             *last_hmac_guard = new_last_hmac;
+
+                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
 
                             Ok(())
                         }
