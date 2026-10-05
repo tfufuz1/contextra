@@ -24,6 +24,7 @@ pub struct ContextraBuilder {
     license_gate: Arc<dyn LicenseGate>,
     signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
+    collection_profile: Option<crate::collection_profile::CollectionProfile>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -39,6 +40,7 @@ impl std::fmt::Debug for ContextraBuilder {
             .field("license_gate", &"<dyn LicenseGate>")
             .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
+            .field("collection_profile", &self.collection_profile)
             .finish()
     }
 }
@@ -53,6 +55,7 @@ impl Clone for ContextraBuilder {
             license_gate: Arc::clone(&self.license_gate),
             signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
+            collection_profile: self.collection_profile,
         }
     }
 }
@@ -71,7 +74,45 @@ impl ContextraBuilder {
             license_gate: Arc::new(OpenFastGate),
             signed_license_error: None,
             performance_profile: None,
+            collection_profile: None,
         }
+    }
+
+    /// Creates a `ContextraBuilder` pre-populated from a `ContextraConfig`.
+    pub fn from_config(config: ContextraConfig) -> Self {
+        let mut builder = Self::new(config.dimension);
+        builder = builder.with_max_elements(config.max_elements);
+        builder = builder.with_distance_metric(config.distance_metric);
+        if let Some(passphrase) = config.encryption_passphrase.clone() {
+            builder = builder.with_encryption_passphrase(passphrase);
+        }
+        builder = builder.with_embedding_backend(config.embedding_backend);
+        builder = builder.with_consolidation(
+            config.consolidation_enabled,
+            config.consolidation_interval,
+        );
+        builder.explicit_user_config = true;
+        builder
+    }
+
+    /// Creates a `ContextraBuilder` configured from a `CollectionProfile`.
+    pub fn from_profile(profile: crate::collection_profile::CollectionProfile) -> Self {
+        Self::new(768).with_collection_profile(profile)
+    }
+
+    /// Creates a `ContextraBuilder` configured for a specific `DeploymentTier`.
+    pub fn from_tier(tier: crate::collection_profile::DeploymentTier) -> Self {
+        Self::from_profile(tier.resolve())
+    }
+
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    /// Creates a `ContextraBuilder` initialized with a cryptographic signed license gate (§14.6, §15).
+    pub fn from_signed_license(
+        payload_bytes: &[u8],
+        signature: &[u8; 64],
+        verifying_key_bytes: &[u8; 32],
+    ) -> Self {
+        Self::new(768).with_signed_license(payload_bytes, signature, verifying_key_bytes)
     }
 
     /// Sets the storage directory path for the database engine.
@@ -124,6 +165,7 @@ impl ContextraBuilder {
         self
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Attaches a cryptographic signed license gate (§14.6, §15).
     pub fn with_signed_license(
         mut self,
@@ -134,20 +176,18 @@ impl ContextraBuilder {
         match contextra_license::signed_gate::VerifyingKey::from_bytes(verifying_key_bytes) {
             Ok(key) => {
                 match SignedLicenseGate::from_signed_payload(payload_bytes, signature, key) {
-                    Ok(gate) => {
-                        self.license_gate = Arc::new(gate);
-                        self.signed_license_error = None;
-                    }
+                    Ok(gate) => self.with_license_gate(Arc::new(gate)),
                     Err(e) => {
                         self.signed_license_error = Some(e.to_string());
+                        self
                     }
                 }
             }
             Err(_) => {
                 self.signed_license_error = Some(LicenseError::InvalidSignature.to_string());
+                self
             }
         }
-        self
     }
 
     /// Sets the performance profile preset for the contextra instance.
@@ -159,11 +199,33 @@ impl ContextraBuilder {
         self
     }
 
+    /// Attaches a `CollectionProfile` and pre-configures performance profile settings.
+    pub fn with_collection_profile(
+        self,
+        profile: crate::collection_profile::CollectionProfile,
+    ) -> Self {
+        let mut b = self.with_performance_profile(profile.performance);
+        b.collection_profile = Some(profile);
+        b
+    }
+
     /// Sets the complete `ContextraConfig` directly.
-    pub fn with_config(mut self, config: ContextraConfig) -> Self {
-        self.config = config;
-        self.explicit_user_config = true;
-        self
+    pub fn with_config(self, config: ContextraConfig) -> Self {
+        let storage_path = self.storage_path;
+        let embedder = self.embedder;
+        let license_gate = self.license_gate;
+        let signed_license_error = self.signed_license_error;
+        let performance_profile = self.performance_profile;
+        let collection_profile = self.collection_profile;
+
+        let mut b = Self::from_config(config);
+        b.storage_path = storage_path;
+        b.embedder = embedder;
+        b.license_gate = license_gate;
+        b.signed_license_error = signed_license_error;
+        b.performance_profile = performance_profile;
+        b.collection_profile = collection_profile;
+        b
     }
 
     /// Returns the configured storage path.
@@ -190,6 +252,12 @@ impl ContextraBuilder {
     pub async fn build(mut self) -> Result<Contextra, ContextraError> {
         if let Some(ref err_msg) = self.signed_license_error {
             return Err(ContextraError::PolicyViolation(err_msg.clone()));
+        }
+
+        if let Some(ref collection_profile) = self.collection_profile {
+            collection_profile
+                .validate_with_license(self.license_gate.as_ref())
+                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
         }
 
         let requested_ring = if let Some(profile) = self.performance_profile {
