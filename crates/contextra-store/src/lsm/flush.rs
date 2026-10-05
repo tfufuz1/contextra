@@ -2,6 +2,7 @@ use super::*;
 use contextra_core::Result;
 
 impl LsmStorage {
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn force_flush(&self) -> Result<()> {
         self.flush().await
     }

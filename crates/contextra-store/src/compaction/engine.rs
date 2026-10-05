@@ -86,6 +86,7 @@ impl CompactionEngine {
     }
 
     /// Attaches a custom adaptive compaction planner.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_adaptive_planner(mut self, planner: Arc<dyn AdaptiveCompactionPlanner>) -> Self {
         self.adaptive_planner = Some(planner);
         self
