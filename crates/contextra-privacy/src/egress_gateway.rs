@@ -108,6 +108,7 @@ impl CloudResponseRehydrator {
     /// Rehydrates surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` back to original entity values.
     /// Unknown or missing surrogate tokens remain unchanged without panicking.
     /// If an `allowed_tokens` scope is set, only tokens present in that scope will be rehydrated.
+    /// If `allowed_tokens` was never set (unscoped instance), no tokens are substituted (fail-closed).
     ///
     /// Guarantees zero panics on arbitrary UTF-8 byte boundaries by using character slice bounds.
     pub fn rehydrate(&self, cloud_response_text: &str) -> String {
@@ -123,7 +124,7 @@ impl CloudResponseRehydrator {
             if let Some(surrogate) = match_surrogate_token(remainder) {
                 let token_allowed = match &self.allowed_tokens {
                     Some(allowed) => allowed.contains(surrogate),
-                    None => true,
+                    None => false,
                 };
 
                 if token_allowed {
@@ -432,10 +433,17 @@ mod tests {
             "Confidential Company Corp".to_string(),
         );
 
-        let rehydrator = CloudResponseRehydrator::new(vault_map);
-
         let cloud_resp =
             "According to the analysis, [USER_ENTITY_00a1] showed a 25% revenue growth.";
+
+        // Unscoped instance must leave tokens unchanged (fail-closed)
+        let unscoped_rehydrator = CloudResponseRehydrator::new(vault_map.clone());
+        assert_eq!(unscoped_rehydrator.rehydrate(cloud_resp), cloud_resp);
+
+        // Scoped instance substitutes allowed tokens
+        let rehydrator = CloudResponseRehydrator::new(vault_map)
+            .scoped_to_request(vec!["[USER_ENTITY_00a1]".to_string()]);
+
         let rehydrated = rehydrator.rehydrate(cloud_resp);
 
         assert_eq!(
@@ -449,7 +457,8 @@ mod tests {
         let mut vault_map = HashMap::new();
         vault_map.insert("[USER_ENTITY_0011]".to_string(), "Known Entity".to_string());
 
-        let rehydrator = CloudResponseRehydrator::new(vault_map);
+        let rehydrator = CloudResponseRehydrator::new(vault_map)
+            .scoped_to_request(vec!["[USER_ENTITY_0011]".to_string()]);
 
         let cloud_resp = "Reference to [USER_ENTITY_ffff] and [USER_ENTITY_0011].";
         let rehydrated = rehydrator.rehydrate(cloud_resp);
@@ -468,7 +477,8 @@ mod tests {
             "Secret Entity".to_string(),
         );
 
-        let rehydrator = CloudResponseRehydrator::new(vault_map);
+        let rehydrator = CloudResponseRehydrator::new(vault_map)
+            .scoped_to_request(vec!["[USER_ENTITY_1234]".to_string()]);
 
         let cloud_resp = "Hallo 🌍! [USER_ENTITY_äöü1] test [USER_ENTITY_1234] 🚀 und 漢字.";
         let rehydrated = rehydrator.rehydrate(cloud_resp);
