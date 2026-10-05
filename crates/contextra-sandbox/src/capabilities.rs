@@ -81,7 +81,6 @@ impl WasmCapabilities {
     /// - `max_memory_pages`: `16` (1 MB)
     /// - `max_fuel`: `10_000_000`
     /// - `max_wall_clock_ms`: `5_000`
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn pure_merge_operator() -> Self {
         Self {
             allow_stdout: false,
