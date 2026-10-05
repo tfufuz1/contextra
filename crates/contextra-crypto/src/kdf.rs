@@ -153,7 +153,8 @@ impl KdfHeader {
         buf.extend_from_slice(&self.params.m_cost_kib.to_be_bytes());
         buf.extend_from_slice(&self.params.t_cost.to_be_bytes());
         buf.extend_from_slice(&self.params.p_cost.to_be_bytes());
-        buf.extend_from_slice(&(self.salt.len() as u32).to_be_bytes());
+        let salt_len = u32::try_from(self.salt.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&salt_len.to_be_bytes());
         buf.extend_from_slice(&self.salt);
         buf
     }

@@ -65,7 +65,7 @@ fn test_encrypted_segment_memory_inspection_and_decryption_roundtrip() {
     assert!(encrypted_seg.encrypted);
     assert_eq!(encrypted_seg.rope_offset, Some(256));
 
-    let raw_stored_bytes = encrypted_seg.as_bytes();
+    let raw_stored_bytes = encrypted_seg.as_bytes().to_vec();
 
     // Verify raw stored memory bytes DO NOT contain any plaintext substring (P9 requirement)
     let contains_plaintext = raw_stored_bytes
