@@ -10,7 +10,8 @@ use contextra_ports::{GraphCollectionMutation, GraphIndex, StorageEngine};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
-use super::types::{CsrGraphConfig, EdgePayload};
+use super::types::CsrGraphConfig;
+pub type EdgePayload = super::types::EdgePayload;
 
 /// Compressed Sparse Row graph for entity-relation traversal.
 ///
@@ -223,10 +224,20 @@ impl CsrGraph {
         wal_tx: TxId,
     ) -> Result<Vec<crate::consistency_enforcement::EdgeId>> {
         let tombstone_candidates = self.doc_edge_index.remove_doc(doc_id);
+        let tombstone_candidates = self.suggest_tombstone_candidates_for_pattern(&tombstone_candidates);
 
         {
             let mut inner = self.inner_write();
             inner.doc_to_edges.remove(&doc_id);
+        }
+
+        #[cfg(feature = "edge-reinforcement-learning")]
+        {
+            let (co_count, tr_count) = self.reinforcement_signal_counts();
+            if co_count > 0 || tr_count > 0 {
+                let default_config = crate::edge_reinforcement::EdgeReinforcementConfig::default();
+                self.flush_reinforcement_buffer(&default_config);
+            }
         }
 
         if self.pending_cascade_queue_len() > 0 {
@@ -428,7 +439,7 @@ impl CsrGraph {
             let end = inner.offsets[from_idx + 1];
             for j in start..end {
                 if inner.targets.get(j) == Some(&to_idx) {
-                    return inner.source_doc_id_at(j);
+                    return self.get_source_doc_id(j);
                 }
             }
         }
@@ -968,6 +979,12 @@ impl CsrGraph {
                 tx_valid_from.unwrap_or_else(|| TxId::new(0)),
             );
             self.doc_edge_index.record_provenance(&prov);
+        }
+
+        #[cfg(feature = "edge-reinforcement-learning")]
+        {
+            self.push_cooccurrence_signal(from, to, weight);
+            self.push_traversal_signal(from, to, 1);
         }
 
         // Phase 2: Compact außerhalb des Write-Locks (falls nötig)
