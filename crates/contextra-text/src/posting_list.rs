@@ -319,17 +319,7 @@ impl ResidentPostingIndex {
 
     /// Removes a posting for a doc_id across a list of terms using RCU.
     pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId) {
-        let mut guard = self.index.write();
-        for term in terms {
-            if let Some(list) = guard.get(term).cloned() {
-                let updated = list.remove(doc_id);
-                if updated.is_empty() {
-                    guard.remove(term);
-                } else {
-                    guard.insert(term.clone(), Arc::new(updated));
-                }
-            }
-        }
+        self.remove_terms(doc_id, terms);
     }
 
     /// Removes postings for a given doc_id across specified terms from the in-memory cache (e.g., on transaction rollback).
