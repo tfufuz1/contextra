@@ -45,7 +45,11 @@ impl AccessCounterAttentionExporter {
 
 impl AttentionExporter for AccessCounterAttentionExporter {
     fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>> {
-        let count = self.access_counts.read().get(&request_id).copied()?;
+        let mut count = self.get_access_count(request_id);
+        if count == 0 {
+            self.record_access(request_id);
+            count = 1;
+        }
         Some(vec![count as f32])
     }
 }

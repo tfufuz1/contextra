@@ -48,7 +48,7 @@ impl Default for EntityExtractionConfig {
 
 /// Fallback / Dummy LLM Generator fuer reine RuleBased Extraktion ohne externes LLM.
 #[derive(Debug, Clone)]
-struct NoopLlmGenerator;
+pub(crate) struct NoopLlmGenerator;
 
 impl LlmTextGenerator for NoopLlmGenerator {
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
@@ -289,6 +289,15 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
                         "Failed to relate auto-extracted triple"
                     );
                 }
+            }
+        }
+
+        if created_edges > 0 {
+            if let Err(e) = collection
+                .update_document_importance(doc_id, 1.0, "auto_extractor")
+                .await
+            {
+                tracing::warn!(doc_id = %doc_id, error = %e, "Failed to update document importance after auto extraction");
             }
         }
 
