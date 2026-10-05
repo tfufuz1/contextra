@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-09-10T00:00:00Z (SESSION: 61b93a6f)
+// STAND: 2026-10-05 (SESSION: provenance_delete_cascade)
 // ZWECK: Herkunftsnachweis für Graph-Kanten (DocEdgeIndex & EdgeProvenance)
 // INVARIANTEN: INV-GRAPH-PROV-1: Jede CSR-Kante ordnet sich ihren Quelldokumenten zu.
 // SIEHE AUCH: crates/contextra-graph/src/cascade.rs
@@ -33,47 +33,96 @@ impl EdgeProvenance {
     }
 }
 
-/// Rückverfolgung DocId -> betroffene Kanten, für Cascading-Invalidation.
-/// Wird bei jedem neuen EdgeProvenance-Eintrag aktualisiert.
+/// Rückverfolgung DocId -> betroffene Kanten, für Cascading-Invalidation (INV-GRAPH-PROV-1).
+/// Speichert sowohl die Zuordnung DocId -> Kanten als auch EdgeId -> EdgeProvenance.
 #[derive(Debug, Default)]
 pub struct DocEdgeIndex {
-    index: RwLock<AHashMap<DocId, AHashSet<EdgeId>>>,
+    doc_to_edges: RwLock<AHashMap<DocId, AHashSet<EdgeId>>>,
+    edge_provenance: RwLock<AHashMap<EdgeId, EdgeProvenance>>,
 }
 
 impl DocEdgeIndex {
     pub fn new() -> Self {
         Self {
-            index: RwLock::new(AHashMap::new()),
+            doc_to_edges: RwLock::new(AHashMap::new()),
+            edge_provenance: RwLock::new(AHashMap::new()),
         }
     }
 
     /// Registriert die Abhängigkeit einer Kante von einem Dokument.
     pub fn record(&self, doc_id: DocId, edge_id: EdgeId) {
-        let mut guard = self.index.write();
-        guard.entry(doc_id).or_default().insert(edge_id);
+        let prov = EdgeProvenance::new(edge_id, vec![doc_id], TxId::new(0));
+        self.record_provenance(&prov);
     }
 
     /// Registriert einen EdgeProvenance-Eintrag und indiziert alle darin enthaltenen source_doc_ids.
     pub fn record_provenance(&self, provenance: &EdgeProvenance) {
-        let mut guard = self.index.write();
+        let mut doc_guard = self.doc_to_edges.write();
+        let mut prov_guard = self.edge_provenance.write();
+
         for &doc_id in &provenance.source_doc_ids {
-            guard.entry(doc_id).or_default().insert(provenance.edge_id);
+            doc_guard.entry(doc_id).or_default().insert(provenance.edge_id);
+        }
+
+        if let Some(existing) = prov_guard.get_mut(&provenance.edge_id) {
+            for &doc_id in &provenance.source_doc_ids {
+                if !existing.source_doc_ids.contains(&doc_id) {
+                    existing.source_doc_ids.push(doc_id);
+                }
+            }
+        } else {
+            prov_guard.insert(provenance.edge_id, provenance.clone());
         }
     }
 
     /// Gibt alle Kanten zurück, die von diesem Dokument abhängen.
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<EdgeId> {
-        let guard = self.index.read();
+        let guard = self.doc_to_edges.read();
         guard
             .get(&doc_id)
             .map(|set| set.iter().copied().collect())
             .unwrap_or_default()
     }
 
-    /// Entfernt alle Kanten-Registrierungen für ein Dokument.
-    pub fn remove_doc(&self, doc_id: DocId) {
-        let mut guard = self.index.write();
-        guard.remove(&doc_id);
+    /// Gibt das `EdgeProvenance` einer Kante zurück, falls vorhanden.
+    pub fn provenance_for_edge(&self, edge_id: EdgeId) -> Option<EdgeProvenance> {
+        let guard = self.edge_provenance.read();
+        guard.get(&edge_id).cloned()
+    }
+
+    /// Entfernt ein Dokument aus dem Herkunftsindex (DSGVO-Kaskaden-Löschung).
+    ///
+    /// # Semantik (INV-GRAPH-PROV-1)
+    /// Beim Löschen von Dokument D:
+    /// (a) D wird aus allen `source_doc_ids` der betroffenen Kanten entfernt.
+    /// (b) Kanten, deren `source_doc_ids` danach LEER sind, werden in einer `Vec<EdgeId>` zurückgegeben,
+    ///     damit der Aufrufer sie im Graph tombstonieren/löschen kann.
+    /// (c) Kanten mit weiteren Quell-Dokumenten bleiben im Graph und Index bestehen.
+    ///
+    /// Ein mehrfacher Aufruf mit derselben `DocId` oder eine unbekannte `DocId` ist ein idempotent safe No-Op
+    /// und liefert einen leeren Vektor zurück.
+    pub fn remove_doc(&self, doc_id: DocId) -> Vec<EdgeId> {
+        let mut doc_guard = self.doc_to_edges.write();
+        let mut prov_guard = self.edge_provenance.write();
+
+        let mut tombstone_candidates = Vec::new();
+
+        if let Some(edges) = doc_guard.remove(&doc_id) {
+            for edge_id in edges {
+                if let Some(prov) = prov_guard.get_mut(&edge_id) {
+                    prov.source_doc_ids.retain(|&d| d != doc_id);
+                    if prov.source_doc_ids.is_empty() {
+                        tombstone_candidates.push(edge_id);
+                        prov_guard.remove(&edge_id);
+                    }
+                } else {
+                    // Fallback: Kante war in doc_to_edges registriert, hatte aber sonst keine Dokumente
+                    tombstone_candidates.push(edge_id);
+                }
+            }
+        }
+
+        tombstone_candidates
     }
 }
 
@@ -103,7 +152,10 @@ mod tests {
         assert_eq!(edges_doc2.len(), 1);
         assert!(edges_doc2.contains(&edge2));
 
-        index.remove_doc(doc1);
+        let tombstoned_doc1 = index.remove_doc(doc1);
+        // edge1 had only doc1 -> tombstoned
+        // edge2 had doc1 and doc2 -> remaining doc2, not tombstoned
+        assert_eq!(tombstoned_doc1, vec![edge1]);
         assert!(index.edges_for_doc(doc1).is_empty());
         assert_eq!(index.edges_for_doc(doc2).len(), 1);
     }
@@ -120,6 +172,9 @@ mod tests {
 
         assert_eq!(index.edges_for_doc(doc1), vec![edge]);
         assert_eq!(index.edges_for_doc(doc2), vec![edge]);
+
+        let stored_prov = index.provenance_for_edge(edge).expect("provenance exists");
+        assert_eq!(stored_prov.source_doc_ids, vec![doc1, doc2]);
     }
 
     #[test]
@@ -137,7 +192,8 @@ mod tests {
         let index = DocEdgeIndex::new();
         assert!(index.edges_for_doc(DocId::new(404)).is_empty());
 
-        index.remove_doc(DocId::new(404)); // must not panic
+        let res = index.remove_doc(DocId::new(404)); // must not panic and return empty
+        assert!(res.is_empty());
         assert!(index.edges_for_doc(DocId::new(404)).is_empty());
     }
 
@@ -171,5 +227,43 @@ mod tests {
         assert_eq!(deserialized.edge_id, prov.edge_id);
         assert_eq!(deserialized.source_doc_ids, prov.source_doc_ids);
         assert_eq!(deserialized.created_at_tx, prov.created_at_tx);
+    }
+
+    #[test]
+    fn test_remove_doc_multi_sources_cascade_rules() {
+        let index = DocEdgeIndex::new();
+        let doc1 = DocId::new(1);
+        let doc2 = DocId::new(2);
+        let doc3 = DocId::new(3);
+
+        let edge_a = (EntityId::new(10), EntityId::new(20)); // Doc1 only
+        let edge_b = (EntityId::new(20), EntityId::new(30)); // Doc1 + Doc2
+        let edge_c = (EntityId::new(30), EntityId::new(40)); // Doc2 only
+
+        index.record_provenance(&EdgeProvenance::new(edge_a, vec![doc1], TxId::new(1)));
+        index.record_provenance(&EdgeProvenance::new(edge_b, vec![doc1, doc2], TxId::new(1)));
+        index.record_provenance(&EdgeProvenance::new(edge_c, vec![doc2], TxId::new(1)));
+
+        // Remove doc1: Edge A is tombstoned, Edge B remains (doc2)
+        let removed_doc1 = index.remove_doc(doc1);
+        assert_eq!(removed_doc1, vec![edge_a]);
+
+        let prov_b = index.provenance_for_edge(edge_b).expect("edge_b exists");
+        assert_eq!(prov_b.source_doc_ids, vec![doc2]);
+
+        // Remove unknown doc3: No-op
+        let removed_doc3 = index.remove_doc(doc3);
+        assert!(removed_doc3.is_empty());
+
+        // Repeat remove doc1: Idempotent
+        let removed_doc1_again = index.remove_doc(doc1);
+        assert!(removed_doc1_again.is_empty());
+
+        // Remove doc2: Edge B and Edge C are tombstoned
+        let mut removed_doc2 = index.remove_doc(doc2);
+        removed_doc2.sort();
+        let mut expected = vec![edge_b, edge_c];
+        expected.sort();
+        assert_eq!(removed_doc2, expected);
     }
 }
