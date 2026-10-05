@@ -32,6 +32,9 @@ impl NaiveReferenceIndex {
     }
 
     /// Creates a `NaiveReferenceIndex` pre-populated with vectors using Euclidean distance.
+    ///
+    /// **Test & Benchmark Only**: Used to construct baseline ground-truth reference indices
+    /// for recall verification in tests and benchmarks.
     pub fn from_vectors(vectors: Vec<(DocId, Vec<f32>)>) -> Self {
         Self {
             vectors,

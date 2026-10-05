@@ -3,7 +3,6 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DocId, Result};
-use contextra_types::SaturatingU8;
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
@@ -350,6 +349,18 @@ impl HnswIndexCore {
         if let Some(idx) = node_idx {
             self.cold.deleted_nodes.write().insert(idx as u64);
             self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
+
+            let mmap_node_count = self
+                .cold
+                .mmap_index
+                .read()
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            if idx >= mmap_node_count {
+                let ram_idx = idx - mmap_node_count;
+                self.hot.arena.free_node(ram_idx);
+            }
 
             let ep_val = self.hot.get_entry_point();
             let ram_ep_val = self.hot.get_ram_entry_point();

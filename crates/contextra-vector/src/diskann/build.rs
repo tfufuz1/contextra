@@ -408,12 +408,6 @@ impl DiskAnnIndex {
     }
 
     /// Liest uncommittete Pending-Vektoren aus `pending.wal` und fügt sie in den Index ein.
-    pub fn recover_pending_delta(
-        &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize>> + Send + '_>> {
-        Box::pin(async move { self.recover_pending_delta_sync() })
-    }
-
     pub fn recover_pending_delta_sync(&self) -> Result<usize> {
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if !pending_wal.exists() {
