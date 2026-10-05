@@ -30,7 +30,8 @@ impl ManualClock {
 
     /// Advances the clock by the given duration.
     pub fn advance(&self, duration: Duration) {
-        let delta = duration.as_nanos() as u64;
+        // FIX(2026-03-30): Safely convert u128 nanoseconds to u64 delta using try_into().unwrap_or(u64::MAX) to satisfy clippy truncation check
+        let delta: u64 = duration.as_nanos().try_into().unwrap_or(u64::MAX);
         self.nanos.fetch_add(delta, Ordering::SeqCst);
     }
 
