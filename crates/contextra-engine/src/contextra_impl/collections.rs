@@ -1,3 +1,4 @@
+use crate::collection::crud::{AutoExtractionConfig, AutoExtractionMode};
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
@@ -90,6 +91,10 @@ impl Contextra {
         col.load_index().await?;
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
+
+        let auto_cfg = AutoExtractionConfig::for_regulated(false)
+            .with_mode(AutoExtractionMode::Enabled);
+        col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
 
@@ -204,6 +209,10 @@ impl Contextra {
         col.load_index().await?;
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
+
+        let auto_cfg = AutoExtractionConfig::for_regulated(false)
+            .with_mode(AutoExtractionMode::Enabled);
+        col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
         write_guard.insert(name.to_string(), Arc::clone(&col_arc));
@@ -406,6 +415,9 @@ impl Contextra {
     /// - Does NOT clear external unmanaged block caches.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn purge_tenant(&self, tenant_id: TenantId) -> Result<()> {
+        // 0. Query collections for tenant to log and inspect before purge
+        let _tenant_cols = self.list_collections_for_tenant(tenant_id).await.unwrap_or_default();
+
         // 1. Notify KV lifecycle hooks on Contextra and across active collections
         if let Some(hooks) = self.kv_hooks() {
             hooks.purge_tenant(tenant_id);
