@@ -636,7 +636,7 @@ impl SequenceLogSsiValidator {
 
     /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
     pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
-        self.snapshot_registry = Some(registry);
+        self.set_snapshot_registry(registry);
         self
     }
 
