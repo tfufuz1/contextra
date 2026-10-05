@@ -132,9 +132,26 @@ impl Tier2EncryptedSegment {
         })
     }
 
+    /// Erstellt ein neues Tier-2 Segment mit einem zufälligen Schlüssel aus der angegebenen Passphrase.
+    pub fn new_with_random_key(
+        tenant_id: TenantId,
+        segment_id: u64,
+        plaintext: &[u8],
+        passphrase: &str,
+    ) -> Result<Self, ContextraError> {
+        let key = ShreddableSegmentKey::try_new_random(passphrase)?;
+        Self::new(tenant_id, segment_id, plaintext, key)
+    }
+
     /// Liest und entschlüsselt das Segment. Scheitert sofort, wenn der Key ge-shredded wurde.
     pub fn read_and_decrypt(&self) -> Result<Vec<u8>, ContextraError> {
         self.key.decrypt(&self.ciphertext, &self.nonce)
+    }
+
+    /// Entschlüsselt das Tier-2 Segment und stellt ein In-Memory `KvSegment` wieder her.
+    pub fn to_kv_segment(&self) -> Result<KvSegment, ContextraError> {
+        let plaintext = self.read_and_decrypt()?;
+        Ok(KvSegment::new(self.tenant_id, self.segment_id, plaintext))
     }
 }
 
@@ -144,6 +161,8 @@ impl Tier2EncryptedSegment {
 pub struct EncryptedSegmentPayload {
     /// Encrypted KV layer container from contextra-crypto. Zeroized on drop.
     pub layer: EncryptedKvLayer,
+    #[zeroize(skip)]
+    pub key_derivation_version: u8,
 }
 
 /// Ein KV-Cache-Segment. P9-Pflicht: Zeroize-on-Drop, nie unverschlüsselt
@@ -217,6 +236,20 @@ impl KvSegment {
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
         }
+    }
+
+    /// Erstellt ein neues quantisiertes KV-Cache-Segment.
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    pub fn new_quantized(
+        tenant_id: TenantId,
+        segment_id: u64,
+        raw_kv: &KvTensorView,
+        config: KiviQuantizeConfig,
+        cipher: &dyn contextra_crypto::KvCipher,
+    ) -> Result<Self, ContextraError> {
+        let mut seg = Self::new(tenant_id, segment_id, vec![]);
+        seg.write_quantized(raw_kv, config, cipher)?;
+        Ok(seg)
     }
 
     /// Writes quantized raw KV tensor into segment, enforcing `INV-KIVI-AEAD-ORDER`:
@@ -297,6 +330,7 @@ impl KvSegment {
             content: KvSegmentContent::Raw(content_bytes),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
+                key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
             }),
         })
     }
@@ -331,6 +365,12 @@ impl KvSegment {
         }
 
         if let Some(payload) = &self.encrypted_payload {
+            if payload.key_derivation_version != self.key_derivation_version {
+                return Err(CryptoError::Crypto(format!(
+                    "Key derivation version mismatch: segment key_derivation_version is {}, payload key_derivation_version is {}",
+                    self.key_derivation_version, payload.key_derivation_version
+                )));
+            }
             cipher.decrypt_with_version(
                 &payload.layer,
                 self.segment_id,
@@ -494,6 +534,7 @@ mod tests {
             content: KvSegmentContent::Raw(bytes::Bytes::from(ciphertext_copy)),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
+                key_derivation_version: 0,
             }),
         };
 

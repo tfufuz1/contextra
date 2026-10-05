@@ -343,6 +343,34 @@ impl TenantIsolatedKvStore {
         self.attention_source.read().clone()
     }
 
+    /// Registriert eine Zuordnung von `(tenant_id, segment_id)` zu einer `request_id` für Attention-Score-basierte Eviction.
+    pub fn register_segment_request(
+        &self,
+        tenant_id: TenantId,
+        segment_id: u64,
+        request_id: contextra_ports::RequestId,
+    ) {
+        self.attention_source()
+            .register_segment(tenant_id, segment_id, request_id);
+    }
+
+    /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
+    pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {
+        self.attention_source()
+            .unregister_segment(tenant_id, segment_id);
+    }
+
+    /// Fügt ein Segment zusammen mit einer `RequestId` ein und registriert die Request-Zuordnung.
+    pub fn insert_segment_for_request(
+        &self,
+        tenant: TenantId,
+        segment: KvSegment,
+        request_id: contextra_ports::RequestId,
+    ) {
+        self.register_segment_request(tenant, segment.segment_id, request_id);
+        self.insert_segment(tenant, segment);
+    }
+
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
         let mut store = Self::new();
@@ -357,6 +385,7 @@ impl TenantIsolatedKvStore {
     }
 
     #[inline]
+    #[allow(clippy::cast_possible_truncation)]
     fn shard_idx(&self, tenant: TenantId) -> usize {
         (tenant.inner() as usize) & (self.shard_count - 1)
     }
@@ -453,6 +482,11 @@ impl TenantIsolatedKvStore {
         state.acquire_guard(block_id, worker)
     }
 
+    /// Pinned einen Block im Store mittels Guard gegen vorzeitige LRU-Eviction.
+    pub fn pin_block(&self, tenant: TenantId, block_id: u64) -> Option<KvBlockGuard> {
+        self.acquire_block_guard(tenant, block_id, None)
+    }
+
     /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
     pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) {
         self.remove_segments_for_rollback(tenant, chunk_ids);
@@ -499,11 +533,9 @@ impl TenantIsolatedKvStore {
     }
 
     /// Removes KV cache segments associated with a document ID.
-    #[allow(irrefutable_let_patterns)]
     pub fn remove_doc_segments(&self, tenant: TenantId, doc: contextra_types::DocId) {
-        if let Ok(segment_id) = u64::try_from(doc.inner()) {
-            self.remove_segment(tenant, segment_id);
-        }
+        let segment_id = doc.inner();
+        self.remove_segment(tenant, segment_id);
     }
 
     /// Purges all cached KV segments and radix state for the given tenant.
@@ -584,6 +616,40 @@ impl TenantIsolatedKvStore {
             if let Some(seg) = state.get_segment_ref_mut(segment_id) {
                 let decrypted = seg.decrypt_data(cipher)?;
                 return Ok(Some(decrypted));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Fügt ein quantisiertes Segment in den Store ein.
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    pub fn insert_quantized_segment(
+        &self,
+        tenant: TenantId,
+        segment_id: u64,
+        raw_kv: &super::quantize_kivi::KvTensorView,
+        config: super::quantize_kivi::KiviQuantizeConfig,
+        cipher: &dyn contextra_crypto::KvCipher,
+    ) -> Result<(), ContextraError> {
+        let segment = KvSegment::new_quantized(tenant, segment_id, raw_kv, config, cipher)?;
+        self.insert_segment(tenant, segment);
+        Ok(())
+    }
+
+    /// Liest und dequantisiert ein gespeichertes Segment.
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    pub fn get_dequantized_segment(
+        &self,
+        tenant: TenantId,
+        segment_id: u64,
+        cipher: &dyn contextra_crypto::KvCipher,
+    ) -> Result<Option<super::quantize_kivi::KvTensorView>, ContextraError> {
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
+        if let Some(state) = shard.get_mut(&tenant) {
+            if let Some(seg) = state.get_segment_ref_mut(segment_id) {
+                let view = seg.read_dequantized(cipher)?;
+                return Ok(Some(view));
             }
         }
         Ok(None)
