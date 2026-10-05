@@ -58,7 +58,7 @@ pub enum LegacyKeyStatus {
 impl LegacyKeyStatus {
     /// Returns `true` if the status is [`LegacyKeyStatus::LegacyActive`].
     pub const fn is_legacy(self) -> bool {
-        matches!(self, Self::LegacyActive)
+        !self.is_standard()
     }
 
     /// Returns `true` if the status is [`LegacyKeyStatus::Standard`].

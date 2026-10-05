@@ -240,7 +240,7 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to create SSTable: {}", e)))?;
 
-        Ok(Self {
+        let mut builder = Self {
             path: path_ref.to_path_buf(),
             file,
             block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 4),
@@ -257,7 +257,9 @@ impl SstableBuilder {
             min_seq: u64::MAX,
             max_seq: 0,
             format_version: 4,
-        })
+        };
+        builder.set_format_version(4);
+        Ok(builder)
     }
 
     /// Explicitly configures the SSTable format version to write (default: 4).
@@ -337,6 +339,13 @@ impl SstableBuilder {
             .last_key
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
+        let current_block_bytes = self.block_builder.current_size();
+        tracing::trace!(
+            path = %self.path.display(),
+            current_block_bytes,
+            format_version = self.format_version,
+            "Flushing SSTable block"
+        );
         let block_data = std::mem::replace(
             &mut self.block_builder,
             BlockBuilder::new_with_version(BLOCK_SIZE, self.format_version),
