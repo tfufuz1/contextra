@@ -84,6 +84,15 @@ impl CsrGraph {
         apprh_local(self, seeds, params)
     }
 
+    /// Evaluates APPRH diffusion over CsrGraph.
+    pub fn evaluate_apprh_diffusion(
+        &self,
+        seeds: &[EntityId],
+        params: &ApprhParams,
+    ) -> Result<AHashMap<EntityId, f32>, ApprhError> {
+        self.apprh_diffusion(seeds, params)
+    }
+
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
     pub fn apprh_shadow_compare(
         &self,
@@ -93,5 +102,16 @@ impl CsrGraph {
         top_k: usize,
     ) -> Result<ApprhShadowComparison, ApprhError> {
         shadow_compare_forward_push_vs_apprh(self, seeds, ppr, apprh_params, top_k)
+    }
+
+    /// Evaluates APPRH shadow comparison on CsrGraph.
+    pub fn evaluate_apprh_shadow(
+        &self,
+        seeds: &[EntityId],
+        ppr: &PprParams,
+        apprh_params: &ApprhParams,
+        top_k: usize,
+    ) -> Result<ApprhShadowComparison, ApprhError> {
+        self.apprh_shadow_compare(seeds, ppr, apprh_params, top_k)
     }
 }

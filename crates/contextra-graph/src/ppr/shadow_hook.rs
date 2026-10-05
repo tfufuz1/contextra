@@ -45,6 +45,16 @@ pub fn log_tl_hfd_vs_baseline_discrepancy(
     });
 }
 
+/// Helper to log TL-HFD vs baseline discrepancy using tracing shadow sink.
+pub fn log_tl_hfd_discrepancy_tracing(
+    baseline: &AHashMap<EntityId, f32>,
+    candidate: &AHashMap<EntityId, f32>,
+    context_id: u64,
+) {
+    let sink = contextra_adapt::TracingShadowSink;
+    log_tl_hfd_vs_baseline_discrepancy(baseline, candidate, context_id, &sink);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
