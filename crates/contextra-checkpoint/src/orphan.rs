@@ -90,12 +90,7 @@ impl OrphanRegistry {
 
     /// Synchronously registers an orphaned sequence pin and persists to disk.
     pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        let wall_ms = clock_timestamp_ms(self.inner.clock().as_ref());
-        self.inner.register_orphan_sync(PinnedSeqNoOrphan {
-            seq_no: pin_id,
-            timestamp_ms: wall_ms,
-        });
-        Ok(())
+        self.inner.register_orphan(pin_id)
     }
 
     /// Retrieves all currently registered orphaned pin sequence numbers.
@@ -117,19 +112,7 @@ impl OrphanRegistry {
         &self,
         storage: &S,
     ) -> Result<Vec<PinId>> {
-        let orphans = self.get_orphans();
-        let mut recovered = Vec::new();
-
-        for pin_id in orphans {
-            if let Err(e) = storage.unpin_checkpoint(pin_id).await {
-                tracing::warn!(pin_id = pin_id, error = %e, "Failed to unpin orphaned pin during recovery");
-            } else {
-                recovered.push(pin_id);
-                self.inner.clear_orphan_pin(pin_id);
-            }
-        }
-
-        Ok(recovered)
+        self.inner.recover_and_clean(storage).await
     }
 }
 
@@ -283,6 +266,25 @@ impl InstanceOrphanRegistry {
     /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
     /// An orphan registered between drops and the next flush is retained in memory and would only be lost
     /// across an ungraceful process panic/crash before the next flush, matching pre-existing crash window semantics.
+    /// Synchronously registers an orphaned sequence pin by pin ID using the configured clock.
+    pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
+        let wall_ms = clock_timestamp_ms(self.clock().as_ref());
+        self.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: pin_id,
+            timestamp_ms: wall_ms,
+        });
+        Ok(())
+    }
+
+    /// Registers a pinned sequence number orphan in-memory without blocking disk I/O.
+    ///
+    /// # Crash-Safety & RAII Drop Semantics
+    /// This method is called synchronously from [`PinGuard::drop`]. It strictly performs
+    /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
+    /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
+    /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
+    /// An orphan registered between drops and the next flush is retained in memory and would only be lost
+    /// across an ungraceful process panic/crash before the next flush, matching pre-existing crash window semantics.
     pub fn register_orphan_sync(&self, orphan: PinnedSeqNoOrphan) {
         let mut lock = self.pins.lock();
         if !lock.iter().any(|o| o.seq_no == orphan.seq_no) {
@@ -295,6 +297,26 @@ impl InstanceOrphanRegistry {
                 "Registered orphan pin in memory (dirty); awaiting next flush"
             );
         }
+    }
+
+    /// Recovers all registered orphaned pins in this instance registry by unpinning them in storage and cleaning the registry.
+    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
+        &self,
+        storage: &S,
+    ) -> Result<Vec<PinId>> {
+        let orphans = self.get_orphan_pins();
+        let mut recovered = Vec::new();
+
+        for orphan in orphans {
+            if let Err(e) = storage.unpin_checkpoint(orphan.seq_no).await {
+                tracing::warn!(pin_id = orphan.seq_no, error = %e, "Failed to unpin orphaned pin during recovery");
+            } else {
+                recovered.push(orphan.seq_no);
+                self.clear_orphan_pin(orphan.seq_no);
+            }
+        }
+
+        Ok(recovered)
     }
 
     /// Registers an orphaned checkpoint in-memory without blocking disk I/O.
