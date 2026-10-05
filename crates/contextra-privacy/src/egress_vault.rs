@@ -631,6 +631,7 @@ impl EgressVault {
     }
 
     /// Setzt einen benutzerdefinierten `SurrogateVault`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self {
         self.surrogate_vault = surrogate_vault;
         self
@@ -642,6 +643,7 @@ impl EgressVault {
     }
 
     /// Gibt die Policy-Kategorie dieser Vault-Instanz für Cloud-Egress-Klassifizierungen zurück.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn policy_category(&self) -> PolicyCategory {
         PolicyCategory::CloudEgress
     }
@@ -656,8 +658,15 @@ impl EgressVault {
         &self.surrogate_vault
     }
 
+    /// Retrieves the original entity text for a given surrogate key if present in the vault.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    pub fn get_entity(&self, surrogate: &str) -> Option<String> {
+        self.surrogate_vault.get_entity(surrogate)
+    }
+
     /// Classifies a `TenantScoped` payload for egress export only if the bound `TenantId`
     /// matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn classify_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,
@@ -671,6 +680,7 @@ impl EgressVault {
 
     /// Tokenizes and replaces recognized entities in a `TenantScoped` payload only if the bound
     /// `TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn sanitize_and_vault_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,

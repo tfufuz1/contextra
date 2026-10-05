@@ -12,6 +12,7 @@ use crate::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault, SURROGATE_PREFIX,
 };
 use crate::error::EgressError;
+use crate::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -157,6 +158,7 @@ pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -
 /// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
 /// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
 /// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 pub fn resolve_effective_kv_delete_mode<D, K>(
     is_pii_match: bool,
     durability_mode: D,
@@ -204,10 +206,7 @@ pub async fn handle_cloud_query_scoped(
     expected_tenant_id: &contextra_types::TenantId,
     classifier: &dyn EgressClassifier,
 ) -> Result<CloudQueryResponse, EgressError> {
-    let req = request
-        .into_inner_checked(expected_tenant_id)
-        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
-    handle_cloud_query(req, classifier).await
+    handle_cloud_query_scoped_with_guard(request, expected_tenant_id, classifier, None).await
 }
 
 /// Extended cloud query handler enforcing tenant scope matching alongside DLP classifier and Layer 4 guard.
@@ -217,10 +216,14 @@ pub async fn handle_cloud_query_scoped_with_guard(
     classifier: &dyn EgressClassifier,
     egress_guard: Option<&dyn EgressGuardCheck>,
 ) -> Result<CloudQueryResponse, EgressError> {
-    let req = request
-        .into_inner_checked(expected_tenant_id)
-        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
-    handle_cloud_query_with_guard(req, classifier, egress_guard).await
+    handle_cloud_query_scoped_with_bulk_detector(
+        request,
+        expected_tenant_id,
+        classifier,
+        egress_guard,
+        None,
+    )
+    .await
 }
 
 /// Extended cloud query handler enforcing tenant scope matching, DLP classifier, Layer 4 guard, and bulk volume detector.
@@ -323,6 +326,27 @@ pub async fn process_cloud_response(
     Ok(rehydrator.rehydrate(raw_response))
 }
 
+/// Evaluates an unsanitized payload against egress security classifiers and returns a `GuardedPayload<Sanitized>`
+/// upon successful validation across all layers.
+pub async fn guard_and_sanitize_payload(
+    payload: GuardedPayload<Unsanitized>,
+    classifier: &dyn EgressClassifier,
+    egress_guard: Option<&dyn EgressGuardCheck>,
+) -> Result<GuardedPayload<Sanitized>, EgressError> {
+    let req = CloudQueryRequest {
+        query: payload.inner.clone(),
+        collection: None,
+        max_results: None,
+    };
+    let session_id = payload.session_id().to_string();
+
+    let response = handle_cloud_query_with_guard(req, classifier, egress_guard).await?;
+    Ok(GuardedPayload::<Sanitized>::from_sanitized(
+        response.query,
+        session_id,
+    ))
+}
+
 fn evaluate_classification_result(classification: EgressClassification) -> Result<(), EgressError> {
     match classification {
         EgressClassification::Allow => Ok(()),
@@ -331,20 +355,20 @@ fn evaluate_classification_result(classification: EgressClassification) -> Resul
                 "Egress policy violation: query blocked by rule {rule_id}"
             )))
         }
-        EgressClassification::Block(BlockReason::PolicyDenied(reason)) => Err(
-            EgressError::invalid_params(format!("Egress policy violation: {reason}")),
-        ),
+        EgressClassification::Block(BlockReason::PolicyDenied(reason)) => {
+            Err(EgressError::policy_violation(reason))
+        }
+        EgressClassification::Block(BlockReason::EgressPolicyDenied(reason)) => {
+            Err(EgressError::policy_violation(reason))
+        }
         EgressClassification::Block(BlockReason::ClassificationTimeout) => {
             Err(EgressError::invalid_params(
                 "Egress policy violation: classification evaluation timeout",
             ))
         }
-        EgressClassification::Block(BlockReason::InternalError(err)) => Err(
-            EgressError::invalid_params(format!("Egress policy violation: {err}")),
-        ),
-        _ => Err(EgressError::invalid_params(
-            "Egress policy violation: query blocked due to unknown classification",
-        )),
+        EgressClassification::Block(BlockReason::InternalError(err)) => {
+            Err(EgressError::internal_error(err))
+        }
     }
 }
 

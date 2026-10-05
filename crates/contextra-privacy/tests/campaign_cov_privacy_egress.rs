@@ -23,7 +23,8 @@ fn test_cloud_response_rehydrator_and_pii_vault_shred_rules() {
     vault_map.insert(surrogate_1.clone(), "Alice Smith".to_string());
     vault_map.insert(surrogate_2.clone(), "alice@example.com".to_string());
 
-    let rehydrator = CloudResponseRehydrator::new(vault_map);
+    let rehydrator = CloudResponseRehydrator::new(vault_map)
+        .scoped_to_request(vec![surrogate_1.clone(), surrogate_2.clone()]);
 
     // 1. Rehydrate cloud response text containing surrogates
     let cloud_response = format!("User {surrogate_1} with email {surrogate_2} confirmed.");
