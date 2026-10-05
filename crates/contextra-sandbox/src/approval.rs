@@ -232,7 +232,6 @@ impl ApprovalRequest {
     /// Low-risk executions (default sandboxed capabilities without network, cloud egress,
     /// or filesystem privileges) are allowed to run automatically (`false`) to ensure low-latency
     /// operation. Higher risk levels (`Elevated` or `High`) require explicit human approval (`true`).
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn requires_approval(&self) -> bool {
         matches!(self.risk, ApprovalRisk::Elevated | ApprovalRisk::High)
     }
