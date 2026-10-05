@@ -70,9 +70,31 @@ impl ManifestSchemaVersion {
         }
     }
 
+    /// Returns the size in bytes of a single `DocId` value under this schema version's DocId width.
+    pub fn doc_id_bytes_len(self) -> usize {
+        self.doc_id_width().bytes_len()
+    }
+
     /// Returns `true` if this schema version is compatible with the compile-time DocId feature flags.
     pub fn is_compatible_with_current_build(self) -> bool {
         self.doc_id_width() == DocIdWidth::current()
+    }
+
+    /// Validates that this schema version is compatible with the current compile-time build flags.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::Serialization` if schema version's DocId width does not match the active build.
+    pub fn validate_build_compatibility(self) -> Result<Self> {
+        if self.is_compatible_with_current_build() {
+            Ok(self)
+        } else {
+            Err(ContextraError::Serialization(format!(
+                "Manifest schema version {:?} (DocId width {:?}) is incompatible with current build configuration (DocId width {:?})",
+                self,
+                self.doc_id_width(),
+                DocIdWidth::current()
+            )))
+        }
     }
 }
 
