@@ -191,6 +191,7 @@ pub async fn ensure_onnx_model_download(
 pub use contextra_infer_candle::CandleEmbedClient;
 
 #[cfg(feature = "candle-backend")]
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Creates a trait object `Box<dyn EmbeddingProvider>` wrapping a `CandleEmbedClient`.
 pub fn create_candle_embedder(
     client: CandleEmbedClient,
