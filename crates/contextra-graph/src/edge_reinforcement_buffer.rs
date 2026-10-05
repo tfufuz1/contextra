@@ -129,9 +129,14 @@ impl EdgeReinforcementBuffer {
 
         inner.sync_edge_reinforcement_weights(config);
 
+        let remaining_cooccurrence = self.cooccurrence_count();
+        let remaining_traversal = self.traversal_count();
+
         tracing::debug!(
             cooccurrence_applied = cooccurrence_signals.len(),
             traversal_applied = traversal_signals.len(),
+            remaining_cooccurrence = remaining_cooccurrence,
+            remaining_traversal = remaining_traversal,
             "F-03 EdgeReinforcementBuffer: flush_to_graph abgeschlossen"
         );
     }

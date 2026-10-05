@@ -314,6 +314,12 @@ impl<'a> HyperEdgeView<'a> {
     ) -> ArcSlice<RoleBinding> {
         self.participants.slice(range)
     }
+
+    /// Returns a zero-copy sub-view containing the primary participants (first `count` bindings).
+    pub fn primary_participants(&self, count: usize) -> ArcSlice<RoleBinding> {
+        let max_idx = count.min(self.participants.len());
+        self.slice_participants(0..max_idx)
+    }
 }
 
 impl<'a> Deref for HyperEdgeView<'a> {
