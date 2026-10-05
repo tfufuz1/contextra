@@ -66,7 +66,6 @@ impl RouterEngine {
         }
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Konfiguriert den Startwert des instanzgebundenen DecisionIdGenerators.
     pub fn with_initial_decision_id(mut self, start: u64) -> Self {
         self.decision_ids = DecisionIdGenerator::new(start);
@@ -74,7 +73,6 @@ impl RouterEngine {
     }
 
     #[cfg(feature = "bandit-routing")]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Builder-Methode zur Konfiguration der Routing-Strategie und Bandit-Exploration.
     pub fn with_routing_strategy(
         mut self,
@@ -98,17 +96,42 @@ impl RouterEngine {
         for p in &profiles {
             p.validate()?;
         }
-        Ok(Self::new(
+        let engine = Self::new(
             search_provider,
             community_resolver,
             context_preparer,
             profiles,
             calibration_store_path,
-        ))
+        )
+        .with_initial_decision_id(0);
+
+        #[cfg(feature = "bandit-routing")]
+        let engine = engine.with_routing_strategy(
+            RoutingStrategy::Cascade,
+            0.1,
+            0x1234_5678_9abc_def0,
+        );
+
+        Ok(engine)
     }
 
     /// Dynamically updates configured SLM profiles at runtime (Hot-Reload).
     pub fn update_profiles(&self, new_profiles: Vec<SlmProfile>) {
+        if let Err(err) = self.try_update_profiles(new_profiles) {
+            tracing::warn!(?err, "Hot-reload update_profiles validation failed");
+        }
+    }
+
+    /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
+    pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
+        for p in &new_profiles {
+            p.validate()?;
+        }
+        self.apply_profile_update(new_profiles);
+        Ok(())
+    }
+
+    fn apply_profile_update(&self, new_profiles: Vec<SlmProfile>) {
         let current = self.state.load_full();
         let mut old_cal = current.calibration.clone();
         let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
@@ -138,16 +161,6 @@ impl RouterEngine {
         };
 
         self.state.store(Arc::new(new_state));
-    }
-
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
-    /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
-    pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
-        for p in &new_profiles {
-            p.validate()?;
-        }
-        self.update_profiles(new_profiles);
-        Ok(())
     }
 
     /// Returns a copy of the active SLM profiles.
