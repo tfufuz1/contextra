@@ -212,6 +212,27 @@ fn clone_chunk(chunk: &VaultChunk) -> VaultChunk {
 }
 
 impl ClmScratchpad {
+    /// Erzeugt einen neuen `ClmScratchpad` für eine Task mit voll spezifizierten Mandanten- und Auditeigenschaften.
+    pub fn new_scoped(
+        task_id: String,
+        config: VaultConfig,
+        tenant_id: TenantId,
+        created_at_tx: TxId,
+        audit_sink: Arc<dyn ContextEditAuditSink>,
+        cache_invalidator: Arc<dyn ScratchpadCacheInvalidator>,
+        pinned_regions: Vec<PinnedRegionId>,
+    ) -> Self {
+        let mut pad = Self::new(task_id, config)
+            .with_tenant_id(tenant_id)
+            .with_created_at_tx(created_at_tx)
+            .with_audit_sink(audit_sink)
+            .with_cache_invalidator(cache_invalidator);
+        for region in pinned_regions {
+            pad = pad.with_pinned_region(region);
+        }
+        pad
+    }
+
     /// Erzeugt einen neuen `ClmScratchpad` für eine Task mit gegebener Vault-Konfiguration.
     pub fn new(task_id: String, config: VaultConfig) -> Self {
         let vault = VolatileContextVault::open(config.clone());
