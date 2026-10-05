@@ -388,7 +388,7 @@ impl MemTable {
     /// atomic snapshot, but this method is only called on the flush guard
     /// path which is a rare, single-threaded check.
     pub fn is_empty(&self) -> bool {
-        self.shards.iter().all(|s| s.entries.read().is_empty())
+        self.shard_entry_counts().iter().all(|&c| c == 0)
     }
 
     /// Iterates over all entries (all versions) in sorted key order.

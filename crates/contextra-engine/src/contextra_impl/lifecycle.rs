@@ -70,7 +70,18 @@ impl Contextra {
             ..Default::default()
         };
 
-        let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        if LsmStorage::has_pending_legacy_wal_migration_path(&lsm_config.path).await? {
+            LsmStorage::migrate_legacy_wal_keys(&lsm_config, clock).await?;
+        }
+
+        let storage = if let Some(passphrase) = lsm_config.encryption_passphrase.clone() {
+            let _ = passphrase;
+            Arc::new(LsmStorage::open(lsm_config).await?)
+        } else {
+            Arc::new(LsmStorage::open(lsm_config).await?)
+        };
+        let _ = storage.has_pending_legacy_wal_migration().await;
         if !storage.supports_ssi_tracking() {
             tracing::warn!(
                 "Storage engine does not support SSI tracking; serializable isolation may be degraded"

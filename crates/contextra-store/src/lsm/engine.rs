@@ -94,6 +94,7 @@ impl LsmStorage {
     /// Signals the background compaction engine to stop.
     pub fn shutdown(&self) {
         self.cancel_token.cancel();
+        self.task_tracker.close();
     }
 
     /// Waits for all spawned tasks to shut down fully.
@@ -243,9 +244,23 @@ impl LsmStorage {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Returns the number of dropped events for a specific registered observer.
+    pub fn dropped_count_for(&self, observer: &Arc<dyn WalObserver>) -> u64 {
+        self.observer_registry.dropped_count_for(observer)
+    }
+
+    /// Resets the circuit breaker state for a specific observer.
+    pub fn clear_circuit_breaker(&self, observer: &Arc<dyn WalObserver>) {
+        self.observer_registry.clear_circuit_breaker(observer);
+    }
+
     /// Returns the current storage health status.
     pub fn health(&self) -> StorageHealth {
-        *self.health.read()
+        if self.observer_registry.is_any_circuit_breaker_open() {
+            StorageHealth::FlushFailing
+        } else {
+            *self.health.read()
+        }
     }
 
     /// Requests an asynchronous background flush without blocking the caller or holding commit locks.
