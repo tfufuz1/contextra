@@ -231,7 +231,7 @@ fn test_concurrency_parallel_serialization() {
     let threads: Vec<_> = (0..8)
         .map(|t_id| {
             thread::spawn(move || {
-                for i in 0..100 {
+                for i in 0..100u32 {
                     let mut builder = FlatBufferBuilder::new();
                     let doc_id = format!("thread-{}-doc-{}", t_id, i);
                     let id_offset = builder.create_string(&doc_id);
@@ -245,11 +245,12 @@ fn test_concurrency_parallel_serialization() {
                         },
                     );
                     let results = builder.create_vector(&[doc]);
+                    // FIX(2026-03-30): Use u32 loop variable to avoid clippy::cast_sign_loss
                     let resp = SearchResponse::create(
                         &mut builder,
                         &SearchResponseArgs {
                             results: Some(results),
-                            total_hits: (i + 1) as u32,
+                            total_hits: i + 1,
                             processing_time_ms: 0.5,
                         },
                     );
@@ -258,7 +259,8 @@ fn test_concurrency_parallel_serialization() {
                     let buf = builder.finished_data();
                     let parsed =
                         root_as_search_response(buf).expect("Parallel verification failed");
-                    assert_eq!(parsed.total_hits(), (i + 1) as u32);
+                    // FIX(2026-03-30): Use u32 loop variable to avoid clippy::cast_sign_loss
+                    assert_eq!(parsed.total_hits(), i + 1);
                     let res = parsed.results().unwrap();
                     assert_eq!(res.get(0).id(), Some(doc_id.as_str()));
                 }
