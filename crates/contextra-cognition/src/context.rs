@@ -51,6 +51,7 @@ impl ContextManager {
     }
 
     /// Sets the minimum relevance score for context inclusion.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn set_relevance_threshold(&mut self, threshold: f32) {
         self.relevance_threshold = threshold;
     }
@@ -205,6 +206,7 @@ impl ContextManager {
         }
 
         // Mindestens 1, maximal sinnvoll deckeln
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         (tokens.ceil() as usize).max(1)
     }
 }
