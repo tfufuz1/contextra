@@ -114,7 +114,7 @@ impl Contextra {
         ));
 
         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
-        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store);
+        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store.clone());
 
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
