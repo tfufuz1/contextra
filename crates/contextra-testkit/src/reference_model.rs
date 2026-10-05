@@ -57,6 +57,12 @@ impl ReferenceModel {
     ///
     /// Returns the sequence number assigned to this commit batch.
     pub fn commit(&mut self) -> u64 {
+        self.commit_batch(Vec::new())
+    }
+
+    /// Appends `ops` to pending buffer and commits them under a new sequence number.
+    pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64 {
+        self.pending_writes.extend(ops);
         if self.pending_writes.is_empty() {
             return self.current_seq;
         }
@@ -82,12 +88,6 @@ impl ReferenceModel {
         }
 
         commit_seq
-    }
-
-    /// Appends `ops` to pending buffer and commits them under a new sequence number.
-    pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64 {
-        self.pending_writes.extend(ops);
-        self.commit()
     }
 
     /// Returns the current high water mark sequence number.
@@ -155,12 +155,12 @@ impl ReferenceModel {
 
     /// Gets the latest committed value for `key`.
     pub fn get_latest(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.get_at(key, self.current_seq)
+        self.get_at(key, self.snapshot_seq())
     }
 
     /// Scans all entries starting with `prefix` at latest sequence number.
     pub fn scan_prefix_latest(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
-        self.scan_prefix_at(prefix, self.current_seq)
+        self.scan_prefix_at(prefix, self.snapshot_seq())
     }
 
     /// Returns a full snapshot map of latest visible key-values at `seq`.
