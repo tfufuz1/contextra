@@ -83,7 +83,7 @@ async fn test_hnsw_seed_determinism_identical_indices() {
     let mut data_rng = SimpleRng::new(1001);
     let mut dataset = Vec::with_capacity(num_vecs);
     for i in 1..=num_vecs {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let vec = data_rng.next_vector(dim);
         dataset.push((doc_id, vec));
     }
@@ -158,7 +158,7 @@ async fn test_hnsw_seed_determinism_different_seeds_different_layouts() {
     let mut data_rng = SimpleRng::new(2002);
     let mut dataset = Vec::with_capacity(num_vecs);
     for i in 1..=num_vecs {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let vec = data_rng.next_vector(dim);
         dataset.push((doc_id, vec));
     }
@@ -248,7 +248,7 @@ async fn test_hnsw_seed_determinism_rebuild_reproducibility() {
     let mut data_rng = SimpleRng::new(3003);
     let mut dataset = Vec::with_capacity(num_vecs);
     for i in 1..=num_vecs {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let vec = data_rng.next_vector(dim);
         dataset.push((doc_id, vec));
     }
