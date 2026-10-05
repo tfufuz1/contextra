@@ -168,7 +168,7 @@ macro_rules! contextra_crud_methods {
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
                         results: Some(results_vec_off),
-                        total_hits: res_offsets.len() as u32,
+                        total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),
                         processing_time_ms: 0.0,
                     },
                 );
@@ -291,7 +291,7 @@ macro_rules! contextra_crud_methods {
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
                         results: Some(results_vec_off),
-                        total_hits: res_offsets.len() as u32,
+                        total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),
                         processing_time_ms: 0.0,
                     },
                 );
