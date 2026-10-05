@@ -178,11 +178,30 @@ impl CandleLlmClient {
             .load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Returns the current number of tracked requests in memory if an attention exporter is attached.
+    pub fn tracked_request_count(&self) -> usize {
+        self.attention_exporter
+            .as_ref()
+            .map_or(0, |e| e.tracked_request_count())
+    }
+
     /// Configures optional `KvPrefixStore` context for stage B prefix reuse.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     #[cfg(feature = "kv-stage-b")]
     pub fn with_prefix_store(mut self, store: Arc<dyn contextra_ports::kv::KvPrefixStore>) -> Self {
         self.prefix_store = Some(crate::inference::KvPrefixContext { store });
         self
+    }
+
+    /// Loads a `CandleLlmClient` from a model directory and attaches a `KvPrefixStore`.
+    #[cfg(feature = "kv-stage-b")]
+    pub fn from_dir_with_prefix_store(
+        model_dir: &std::path::Path,
+        quantization: crate::model_registry::CandleQuantization,
+        store: Arc<dyn contextra_ports::kv::KvPrefixStore>,
+    ) -> Result<Self> {
+        let client = Self::from_dir(model_dir, quantization)?;
+        Ok(client.with_prefix_store(store))
     }
 
     /// Configures optional `CandleAttentionExporter` for exporting attention weights during inference.
@@ -368,6 +387,7 @@ impl CandleLlmClient {
                 0.0,
             )
             .with_threshold(new_config.threshold);
+            val.set_threshold(new_config.threshold);
             val.refresh_config(new_config);
         }
 
@@ -413,6 +433,12 @@ impl CandleLlmClient {
 
         let gguf_path = model_dir.join("model.gguf");
         let fingerprint = if gguf_path.exists() {
+            let meta = crate::gguf_loader::parse_gguf_metadata(&gguf_path)?;
+            tracing::debug!(
+                "Parsed GGUF metadata for LLM model: arch={}, tensors={}",
+                meta.architecture,
+                meta.tensor_count
+            );
             crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
         // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
@@ -425,6 +451,12 @@ impl CandleLlmClient {
                 }
             }
             if let Some(path) = gguf_found {
+                let meta = crate::gguf_loader::parse_gguf_metadata(&path)?;
+                tracing::debug!(
+                    "Parsed GGUF metadata for LLM model: arch={}, tensors={}",
+                    meta.architecture,
+                    meta.tensor_count
+                );
                 crate::model_registry::compute_fingerprint(&path, &quantization)?
             } else {
                 crate::model_registry::ModelFingerprint {
@@ -524,9 +556,9 @@ impl CandleModelInner for QuantizedLlamaModel {
     )> {
         if let Some(layer) = self.weights.layers.first() {
             let layout = contextra_ports::kv::KvLayout {
-                n_layer: self.weights.layers.len() as u32,
-                n_kv_head: layer.n_kv_head as u32,
-                head_dim: layer.head_dim as u32,
+                n_layer: u32::try_from(self.weights.layers.len()).unwrap_or(u32::MAX),
+                n_kv_head: u32::try_from(layer.n_kv_head).unwrap_or(u32::MAX),
+                head_dim: u32::try_from(layer.head_dim).unwrap_or(u32::MAX),
                 dtype: "f16".to_string(),
             };
             // RoPE base frequency used in precomput_freqs_cis in quantized_llama.rs

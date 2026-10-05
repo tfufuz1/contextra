@@ -215,7 +215,7 @@ impl KvState {
         }
 
         let len = range.end - range.start;
-        let mut layer_payloads = Vec::with_capacity(self.layers.len());
+        let mut layer_payloads = Vec::with_capacity(self.layer_count());
 
         for layer in &self.layers {
             let dim_k = Self::tensor_seq_dim(&layer.k, self.pos);
@@ -252,8 +252,7 @@ impl KvState {
         })
     }
 
-    /// Imports a `KvBlock` and concatenates its layer tensors onto the current state.
-    pub fn import_block(&mut self, block: &KvBlock) -> Result<(), ContextraError> {
+    fn import_block_internal(&mut self, block: &KvBlock) -> Result<(), ContextraError> {
         let payload: KvStateBlockPayload = bincode::deserialize(&block.data).map_err(|e| {
             ContextraError::InvalidInput(format!("Failed to deserialize KvBlock payload: {e}"))
         })?;
@@ -272,10 +271,10 @@ impl KvState {
             }
             self.pos = payload.seq_len;
         } else {
-            if self.layers.len() != payload.layers.len() {
+            if self.layer_count() != payload.layers.len() {
                 return Err(ContextraError::InvalidInput(format!(
                     "Layer count mismatch: state has {} layers, block has {}",
-                    self.layers.len(),
+                    self.layer_count(),
                     payload.layers.len()
                 )));
             }
@@ -301,13 +300,18 @@ impl KvState {
         Ok(())
     }
 
+    /// Imports a `KvBlock` and concatenates its layer tensors onto the current state.
+    pub fn import_block(&mut self, block: &KvBlock) -> Result<(), ContextraError> {
+        self.import_block_at(block, self.pos)
+    }
+
     /// Imports a `KvBlock` at a specific position or appends it if `at == self.pos`.
     pub fn import_block_at(&mut self, block: &KvBlock, at: usize) -> Result<(), ContextraError> {
         if at == self.pos {
-            self.import_block(block)
+            self.import_block_internal(block)
         } else if at < self.pos {
             self.truncate(at)?;
-            self.import_block(block)
+            self.import_block_internal(block)
         } else {
             Err(ContextraError::InvalidInput(format!(
                 "Cannot import block at position {at} past current pos {}",
