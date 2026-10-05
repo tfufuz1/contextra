@@ -137,7 +137,6 @@ impl<S> AuditRegisterExporter<S> {
 
 impl AuditRegisterExporter<testkit::InMemoryProcessingRegisterSource> {
     /// Creates an exporter pre-populated with synthetic sample processing register entries for `tenant_id`.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_sample_data_for(tenant_id: TenantId) -> Self {
         Self::new(testkit::InMemoryProcessingRegisterSource::with_sample_data_for(tenant_id))
     }
