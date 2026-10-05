@@ -157,6 +157,20 @@ impl EgressGuard {
     }
 }
 
+impl crate::egress_gateway::EgressGuardCheck for EgressGuard {
+    fn check<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
+        Box::pin(self.check(payload))
+    }
+
+    fn check_scoped<'a>(
+        &'a self,
+        payload: contextra_types::TenantScoped<&'a str>,
+        expected_tenant_id: &'a contextra_types::TenantId,
+    ) -> BoxFuture<'a, EgressClassification> {
+        Box::pin(self.check_scoped(payload, expected_tenant_id))
+    }
+}
+
 impl EgressClassifier for EgressGuard {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
         Box::pin(self.check(payload))

@@ -25,6 +25,20 @@ pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024;
 pub trait EgressGuardCheck: Send + Sync {
     /// Evaluates the outbound payload against vector index / similarity models.
     fn check<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
+
+    /// Evaluates a `TenantScoped` outbound payload for bulk exfiltration.
+    fn check_scoped<'a>(
+        &'a self,
+        payload: contextra_types::TenantScoped<&'a str>,
+        expected_tenant_id: &'a contextra_types::TenantId,
+    ) -> BoxFuture<'a, EgressClassification> {
+        Box::pin(async move {
+            match payload.into_inner_checked(expected_tenant_id) {
+                Ok(unpacked) => self.check(unpacked).await,
+                Err(err) => EgressClassification::Block(BlockReason::PolicyDenied(err.to_string())),
+            }
+        })
+    }
 }
 
 /// Trait contract for checking prompt injection in cloud responses without depending on Ring 4 crates.
@@ -100,6 +114,18 @@ impl CloudResponseRehydrator {
         }
     }
 
+    /// Creates a new `CloudResponseRehydrator` by fetching surrogate mappings from an `EgressVault`.
+    pub fn from_vault(vault: &EgressVault, surrogates: impl IntoIterator<Item = String>) -> Self {
+        let surrogate_set: HashSet<String> = surrogates.into_iter().collect();
+        let mut vault_map = HashMap::new();
+        for surrogate in &surrogate_set {
+            if let Some(entity) = vault.get_entity(surrogate) {
+                vault_map.insert(surrogate.clone(), entity);
+            }
+        }
+        Self::new(vault_map).scoped_to_request(surrogate_set)
+    }
+
     /// Restricts rehydration to only tokens present in `allowed_tokens`.
     pub fn scoped_to_request(mut self, allowed_tokens: impl IntoIterator<Item = String>) -> Self {
         self.allowed_tokens = Some(allowed_tokens.into_iter().collect());
@@ -155,28 +181,6 @@ pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -
     is_pii_match && !is_memory_only
 }
 
-/// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
-/// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
-/// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
-pub fn resolve_effective_kv_delete_mode<D, K>(
-    is_pii_match: bool,
-    durability_mode: D,
-    preset_kv_delete_mode: K,
-    crypto_shred_mode: K,
-) -> K
-where
-    D: std::fmt::Debug,
-    K: Copy,
-{
-    let is_memory_only = format!("{:?}", durability_mode).contains("MemoryOnly");
-    if pii_vault_forces_crypto_shred(is_pii_match, is_memory_only) {
-        crypto_shred_mode
-    } else {
-        preset_kv_delete_mode
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudQueryRequest {
     pub query: String,
@@ -206,7 +210,14 @@ pub async fn handle_cloud_query_scoped(
     expected_tenant_id: &contextra_types::TenantId,
     classifier: &dyn EgressClassifier,
 ) -> Result<CloudQueryResponse, EgressError> {
-    handle_cloud_query_scoped_with_guard(request, expected_tenant_id, classifier, None).await
+    handle_cloud_query_scoped_with_bulk_detector(
+        request,
+        expected_tenant_id,
+        classifier,
+        None,
+        None,
+    )
+    .await
 }
 
 /// Extended cloud query handler enforcing tenant scope matching alongside DLP classifier and Layer 4 guard.
@@ -216,14 +227,18 @@ pub async fn handle_cloud_query_scoped_with_guard(
     classifier: &dyn EgressClassifier,
     egress_guard: Option<&dyn EgressGuardCheck>,
 ) -> Result<CloudQueryResponse, EgressError> {
-    handle_cloud_query_scoped_with_bulk_detector(
-        request,
-        expected_tenant_id,
-        classifier,
-        egress_guard,
-        None,
-    )
-    .await
+    if egress_guard.is_none() {
+        handle_cloud_query_scoped(request, expected_tenant_id, classifier).await
+    } else {
+        handle_cloud_query_scoped_with_bulk_detector(
+            request,
+            expected_tenant_id,
+            classifier,
+            egress_guard,
+            None,
+        )
+        .await
+    }
 }
 
 /// Extended cloud query handler enforcing tenant scope matching, DLP classifier, Layer 4 guard, and bulk volume detector.
@@ -237,7 +252,43 @@ pub async fn handle_cloud_query_scoped_with_bulk_detector(
     let req = request
         .into_inner_checked(expected_tenant_id)
         .map_err(|e| EgressError::invalid_params(e.to_string()))?;
-    handle_cloud_query_with_bulk_detector(req, classifier, egress_guard, bulk_detector).await
+
+    if req.query.trim().is_empty() {
+        return Err(EgressError::invalid_params("query cannot be empty"));
+    }
+    if req.query.len() > MAX_SEARCH_QUERY_BYTES {
+        return Err(EgressError::invalid_params(format!(
+            "query size exceeds limit: {} bytes > {} limit",
+            req.query.len(),
+            MAX_SEARCH_QUERY_BYTES
+        )));
+    }
+
+    if let Some((detector, session)) = bulk_detector {
+        check_bulk_exfiltration(detector, session, &req.query)?;
+    }
+
+    let scoped_payload = contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
+    let l1_classification = classifier
+        .classify_scoped(scoped_payload, expected_tenant_id)
+        .await;
+    evaluate_classification_result(l1_classification)?;
+
+    if let Some(guard) = egress_guard {
+        let scoped_guard_payload = contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
+        let l4_classification = guard
+            .check_scoped(scoped_guard_payload, expected_tenant_id)
+            .await;
+        evaluate_classification_result(l4_classification)?;
+    }
+
+    Ok(CloudQueryResponse {
+        status: "success".to_string(),
+        query: req.query,
+        abstracted: false,
+        results: vec![],
+        abstraction_notice: None,
+    })
 }
 
 pub async fn handle_cloud_query_with_guard(
@@ -345,6 +396,30 @@ pub async fn guard_and_sanitize_payload(
         response.query,
         session_id,
     ))
+}
+
+/// Evaluates an unsanitized tenant-scoped payload against egress security classifiers and returns a `TenantScoped<GuardedPayload<Sanitized>>`
+/// upon successful validation.
+pub async fn guard_and_sanitize_payload_scoped(
+    payload: contextra_types::TenantScoped<GuardedPayload<Unsanitized>>,
+    expected_tenant_id: &contextra_types::TenantId,
+    vault: &EgressVault,
+    recognizer: &dyn crate::egress_vault::EntityRecognizer,
+) -> Result<contextra_types::TenantScoped<GuardedPayload<Sanitized>>, EgressError> {
+    let unpacked = payload
+        .into_inner_checked(expected_tenant_id)
+        .map_err(|e| EgressError::policy_violation(e.to_string()))?;
+    let session_id = unpacked.session_id().to_string();
+
+    let scoped_text = contextra_types::TenantScoped::new(*expected_tenant_id, unpacked.inner.as_str());
+    let (sanitized_scoped, _count) = vault.sanitize_and_vault_scoped(scoped_text, expected_tenant_id, recognizer)?;
+
+    let sanitized_str = sanitized_scoped
+        .into_inner_checked(expected_tenant_id)
+        .map_err(|e| EgressError::policy_violation(e.to_string()))?;
+
+    let guarded = GuardedPayload::<Sanitized>::from_sanitized(sanitized_str, session_id);
+    Ok(contextra_types::TenantScoped::new(*expected_tenant_id, guarded))
 }
 
 fn evaluate_classification_result(classification: EgressClassification) -> Result<(), EgressError> {
