@@ -3,7 +3,6 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DocId, Result};
-use contextra_types::SaturatingU8;
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
