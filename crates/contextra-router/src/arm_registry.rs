@@ -36,7 +36,6 @@ impl Default for ArmRegistry {
 }
 
 impl ArmRegistry {
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert die `RetrievalStrategy` für den gegebenen Arm-Index (0..=4).
     pub fn strategy_for(&self, arm: u32) -> Result<RetrievalStrategy, ArmRegistryError> {
         self.arms
@@ -45,7 +44,6 @@ impl ArmRegistry {
             .ok_or(ArmRegistryError::OutOfRange(arm))
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert den Arm-Index (0..=4) für die gegebene `RetrievalStrategy`.
     ///
     /// Die Implementierung verwendet ein `match` über alle bekannten Varianten mit einem
@@ -60,6 +58,27 @@ impl ArmRegistry {
             RetrievalStrategy::Global { .. } => 4,
             _ => 0,
         }
+    }
+
+    /// Löse eine `RetrievalStrategy` deterministisch in ihr Arm-Index/Strategie-Paar auf.
+    /// Nutzt intern `arm_for` und `strategy_for` zur Verifizierung der bijektiven Zuordnung.
+    pub fn resolve_strategy(&self, strategy: RetrievalStrategy) -> Option<(u32, RetrievalStrategy)> {
+        let arm_idx = self.arm_for(strategy);
+        self.strategy_for(arm_idx)
+            .ok()
+            .map(|strat| (arm_idx, strat))
+    }
+
+    /// Prüft, ob eine `RetrievalStrategy` im Registry registriert und gültig auflösbar ist.
+    pub fn contains_strategy(&self, strategy: RetrievalStrategy) -> bool {
+        self.resolve_strategy(strategy).is_some()
+    }
+
+    /// Liefert alle im Registry registrierten Arm-Indizes samt zugehörigen Retrieval-Strategien.
+    pub fn active_strategies(&self) -> Vec<(u32, RetrievalStrategy)> {
+        (0..self.arms.len() as u32)
+            .filter_map(|arm| self.strategy_for(arm).ok().map(|strat| (arm, strat)))
+            .collect()
     }
 
     /// Erzeugt ein `FcTsArmSet` mit `count` Armen der Dimension `dim`.
