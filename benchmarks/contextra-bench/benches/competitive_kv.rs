@@ -3,11 +3,11 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use contextra_core::{StorageEngine, TxId};
-use contextra_store::{LsmConfig, LsmStorage};
+use contextra_store::lsm::{DurabilityMode, LsmConfig, LsmStorage};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use redb::{Database as RedbDb, TableDefinition as RedbTableDefinition};
+use redb::{Database as RedbDb, Durability as RedbDurability, TableDefinition as RedbTableDefinition};
 use sled::Db as SledDb;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
@@ -20,6 +20,21 @@ const READ_KEY_COUNT: usize = 100_000;
 const MIXED_OP_COUNT: usize = 100_000;
 const SCAN_RANGE_LIMIT: usize = 10_000;
 const CONTEXTRA_TX_BATCH_SIZE: usize = 5_000;
+
+fn print_parity_inventory() {
+    static INVENTORY_PRINTED: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    if !INVENTORY_PRINTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        println!("===============================================================================");
+        println!("COMPETITIVE KV BENCHMARK PARITY CONFIGURATION INVENTORY");
+        println!("-------------------------------------------------------------------------------");
+        println!("1. Contextra-LSM (Full): DurabilityMode::Full (WAL + HMAC-SHA256, fsync per commit)");
+        println!("2. Contextra-LSM (WalNoHmac): DurabilityMode::WalNoHmac (WAL + CRC32, fsync per commit)");
+        println!("3. redb: Durability::Immediate (fsync per write transaction commit)");
+        println!("4. sled: Standard DB with explicit db.flush() per commit / write unit");
+        println!("===============================================================================");
+    }
+}
 
 #[derive(Clone)]
 enum KvOp {
@@ -76,9 +91,10 @@ fn generate_mixed_ops(dataset: &[(Vec<u8>, Vec<u8>)], count: usize, seed: u64) -
     ops
 }
 
-async fn create_contextra_db(dir: &Path) -> LsmStorage {
+async fn create_contextra_db(dir: &Path, mode: DurabilityMode) -> LsmStorage {
     let config = LsmConfig {
         path: dir.to_path_buf(),
+        durability_mode: mode,
         ..Default::default()
     };
     LsmStorage::new(config)
@@ -107,7 +123,8 @@ fn create_redb(dir: &Path) -> RedbDb {
 }
 
 fn populate_redb(db: &RedbDb, dataset: &[(Vec<u8>, Vec<u8>)]) {
-    let write_txn = db.begin_write().expect("redb begin_write failed");
+    let mut write_txn = db.begin_write().expect("redb begin_write failed");
+    write_txn.set_durability(RedbDurability::Immediate);
     {
         let mut table = write_txn
             .open_table(REDB_TABLE)
@@ -137,6 +154,7 @@ fn populate_sled(db: &SledDb, dataset: &[(Vec<u8>, Vec<u8>)]) {
 // 3.a) Sequential Write 1M keys: put(tx, k, v) / insert(k, v) / insert(k, v)
 // ---------------------------------------------------------------------------
 fn bench_sequential_write_1m(c: &mut Criterion) {
+    print_parity_inventory();
     let rt = Runtime::new().expect("Tokio runtime creation failed");
     let mut group = c.benchmark_group("a_sequential_write_1m");
     group.sample_size(10);
@@ -145,15 +163,15 @@ fn bench_sequential_write_1m(c: &mut Criterion) {
 
     let dataset = generate_kv_pairs(WRITE_KEY_COUNT, 42);
 
-    // Contextra-LSM
-    group.bench_function(BenchmarkId::new("Contextra-LSM", WRITE_KEY_COUNT), |b| {
+    // Contextra-LSM (Full)
+    group.bench_function(BenchmarkId::new("Contextra-LSM (Full)", WRITE_KEY_COUNT), |b| {
         b.to_async(&rt).iter_custom(|iters| {
             let dataset = &dataset;
             async move {
                 let mut total_duration = Duration::ZERO;
                 for i in 0..iters {
                     let tmp = TempDir::new().expect("TempDir failed");
-                    let db = create_contextra_db(tmp.path()).await;
+                    let db = create_contextra_db(tmp.path(), DurabilityMode::Full).await;
                     let start = Instant::now();
                     let mut tx_counter = i * 1_000_000 + 1;
                     for chunk in dataset.chunks(CONTEXTRA_TX_BATCH_SIZE) {
@@ -172,6 +190,36 @@ fn bench_sequential_write_1m(c: &mut Criterion) {
         });
     });
 
+    // Contextra-LSM (WalNoHmac)
+    group.bench_function(
+        BenchmarkId::new("Contextra-LSM (WalNoHmac)", WRITE_KEY_COUNT),
+        |b| {
+            b.to_async(&rt).iter_custom(|iters| {
+                let dataset = &dataset;
+                async move {
+                    let mut total_duration = Duration::ZERO;
+                    for i in 0..iters {
+                        let tmp = TempDir::new().expect("TempDir failed");
+                        let db = create_contextra_db(tmp.path(), DurabilityMode::WalNoHmac).await;
+                        let start = Instant::now();
+                        let mut tx_counter = i * 1_000_000 + 1;
+                        for chunk in dataset.chunks(CONTEXTRA_TX_BATCH_SIZE) {
+                            let tx = TxId(tx_counter);
+                            tx_counter += 1;
+                            for (k, v) in chunk {
+                                db.put(tx, k, v).await.expect("Contextra put failed");
+                            }
+                            db.commit(tx).await.expect("Contextra commit failed");
+                        }
+                        total_duration += start.elapsed();
+                        black_box(db);
+                    }
+                    total_duration
+                }
+            });
+        },
+    );
+
     // redb
     group.bench_function(BenchmarkId::new("redb", WRITE_KEY_COUNT), |b| {
         b.iter_custom(|iters| {
@@ -180,7 +228,8 @@ fn bench_sequential_write_1m(c: &mut Criterion) {
                 let tmp = TempDir::new().expect("TempDir failed");
                 let db = create_redb(tmp.path());
                 let start = Instant::now();
-                let write_txn = db.begin_write().expect("redb begin_write failed");
+                let mut write_txn = db.begin_write().expect("redb begin_write failed");
+                write_txn.set_durability(RedbDurability::Immediate);
                 {
                     let mut table = write_txn
                         .open_table(REDB_TABLE)
@@ -226,6 +275,7 @@ fn bench_sequential_write_1m(c: &mut Criterion) {
 // 3.b) Random Read 100k keys: get(&k) / get(&k) / get(&k)
 // ---------------------------------------------------------------------------
 fn bench_random_read_100k(c: &mut Criterion) {
+    print_parity_inventory();
     let rt = Runtime::new().expect("Tokio runtime creation failed");
     let mut group = c.benchmark_group("b_random_read_100k");
     group.sample_size(10);
@@ -236,9 +286,16 @@ fn bench_random_read_100k(c: &mut Criterion) {
     let read_keys = generate_random_read_keys(&dataset, READ_KEY_COUNT, 99);
 
     // Setup pre-populated stores
-    let tmp_ctx = TempDir::new().expect("TempDir failed");
-    let db_ctx = rt.block_on(async {
-        let db = create_contextra_db(tmp_ctx.path()).await;
+    let tmp_ctx_full = TempDir::new().expect("TempDir failed");
+    let db_ctx_full = rt.block_on(async {
+        let db = create_contextra_db(tmp_ctx_full.path(), DurabilityMode::Full).await;
+        populate_contextra(&db, &dataset).await;
+        db
+    });
+
+    let tmp_ctx_nohmac = TempDir::new().expect("TempDir failed");
+    let db_ctx_nohmac = rt.block_on(async {
+        let db = create_contextra_db(tmp_ctx_nohmac.path(), DurabilityMode::WalNoHmac).await;
         populate_contextra(&db, &dataset).await;
         db
     });
@@ -251,15 +308,28 @@ fn bench_random_read_100k(c: &mut Criterion) {
     let db_sled = create_sled(tmp_sled.path());
     populate_sled(&db_sled, &dataset);
 
-    // Contextra-LSM
-    group.bench_function(BenchmarkId::new("Contextra-LSM", READ_KEY_COUNT), |b| {
+    // Contextra-LSM (Full)
+    group.bench_function(BenchmarkId::new("Contextra-LSM (Full)", READ_KEY_COUNT), |b| {
         b.to_async(&rt).iter(|| async {
             for k in &read_keys {
-                let res = db_ctx.get(k).await.expect("Contextra get failed");
+                let res = db_ctx_full.get(k).await.expect("Contextra get failed");
                 black_box(res);
             }
         });
     });
+
+    // Contextra-LSM (WalNoHmac)
+    group.bench_function(
+        BenchmarkId::new("Contextra-LSM (WalNoHmac)", READ_KEY_COUNT),
+        |b| {
+            b.to_async(&rt).iter(|| async {
+                for k in &read_keys {
+                    let res = db_ctx_nohmac.get(k).await.expect("Contextra get failed");
+                    black_box(res);
+                }
+            });
+        },
+    );
 
     // redb
     group.bench_function(BenchmarkId::new("redb", READ_KEY_COUNT), |b| {
@@ -289,9 +359,10 @@ fn bench_random_read_100k(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
-// 3.c) Mixed 50/50 Read/Write, interleaved
+// 3.c) Mixed 50/50 Workload, interleaved
 // ---------------------------------------------------------------------------
 fn bench_mixed_50_50(c: &mut Criterion) {
+    print_parity_inventory();
     let rt = Runtime::new().expect("Tokio runtime creation failed");
     let mut group = c.benchmark_group("c_mixed_50_50_100k");
     group.sample_size(10);
@@ -301,8 +372,8 @@ fn bench_mixed_50_50(c: &mut Criterion) {
     let base_dataset = generate_kv_pairs(100_000, 42);
     let ops = generate_mixed_ops(&base_dataset, MIXED_OP_COUNT, 123);
 
-    // Contextra-LSM
-    group.bench_function(BenchmarkId::new("Contextra-LSM", MIXED_OP_COUNT), |b| {
+    // Contextra-LSM (Full)
+    group.bench_function(BenchmarkId::new("Contextra-LSM (Full)", MIXED_OP_COUNT), |b| {
         b.to_async(&rt).iter_custom(|iters| {
             let base_dataset = &base_dataset;
             let ops = &ops;
@@ -310,7 +381,7 @@ fn bench_mixed_50_50(c: &mut Criterion) {
                 let mut total_duration = Duration::ZERO;
                 for iter in 0..iters {
                     let tmp = TempDir::new().expect("TempDir failed");
-                    let db = create_contextra_db(tmp.path()).await;
+                    let db = create_contextra_db(tmp.path(), DurabilityMode::Full).await;
                     populate_contextra(&db, base_dataset).await;
 
                     let start = Instant::now();
@@ -335,6 +406,44 @@ fn bench_mixed_50_50(c: &mut Criterion) {
         });
     });
 
+    // Contextra-LSM (WalNoHmac)
+    group.bench_function(
+        BenchmarkId::new("Contextra-LSM (WalNoHmac)", MIXED_OP_COUNT),
+        |b| {
+            b.to_async(&rt).iter_custom(|iters| {
+                let base_dataset = &base_dataset;
+                let ops = &ops;
+                async move {
+                    let mut total_duration = Duration::ZERO;
+                    for iter in 0..iters {
+                        let tmp = TempDir::new().expect("TempDir failed");
+                        let db = create_contextra_db(tmp.path(), DurabilityMode::WalNoHmac).await;
+                        populate_contextra(&db, base_dataset).await;
+
+                        let start = Instant::now();
+                        for (op_idx, op) in ops.iter().enumerate() {
+                            match op {
+                                KvOp::Read(k) => {
+                                    let res = db.get(k).await.expect("Contextra get failed");
+                                    black_box(res);
+                                }
+                                KvOp::Write(k, v) => {
+                                    let tx =
+                                        TxId(iter * (ops.len() as u64) + (op_idx as u64) + 10_000);
+                                    db.put(tx, k, v).await.expect("Contextra put failed");
+                                    db.commit(tx).await.expect("Contextra commit failed");
+                                }
+                            }
+                        }
+                        total_duration += start.elapsed();
+                        black_box(db);
+                    }
+                    total_duration
+                }
+            });
+        },
+    );
+
     // redb
     group.bench_function(BenchmarkId::new("redb", MIXED_OP_COUNT), |b| {
         b.iter_custom(|iters| {
@@ -356,7 +465,8 @@ fn bench_mixed_50_50(c: &mut Criterion) {
                             black_box(res);
                         }
                         KvOp::Write(k, v) => {
-                            let write_txn = db.begin_write().expect("redb begin_write failed");
+                            let mut write_txn = db.begin_write().expect("redb begin_write failed");
+                            write_txn.set_durability(RedbDurability::Immediate);
                             {
                                 let mut table = write_txn
                                     .open_table(REDB_TABLE)
@@ -395,6 +505,7 @@ fn bench_mixed_50_50(c: &mut Criterion) {
                         KvOp::Write(k, v) => {
                             db.insert(k.as_slice(), v.as_slice())
                                 .expect("sled insert failed");
+                            db.flush().expect("sled flush failed");
                         }
                     }
                 }
@@ -412,6 +523,7 @@ fn bench_mixed_50_50(c: &mut Criterion) {
 // 3.d) Scan 10k-Range
 // ---------------------------------------------------------------------------
 fn bench_scan_10k_range(c: &mut Criterion) {
+    print_parity_inventory();
     let rt = Runtime::new().expect("Tokio runtime creation failed");
     let mut group = c.benchmark_group("d_scan_10k_range");
     group.sample_size(10);
@@ -423,9 +535,16 @@ fn bench_scan_10k_range(c: &mut Criterion) {
     let end_key = format!("key_{:08}", 20_000).into_bytes();
 
     // Setup pre-populated stores
-    let tmp_ctx = TempDir::new().expect("TempDir failed");
-    let db_ctx = rt.block_on(async {
-        let db = create_contextra_db(tmp_ctx.path()).await;
+    let tmp_ctx_full = TempDir::new().expect("TempDir failed");
+    let db_ctx_full = rt.block_on(async {
+        let db = create_contextra_db(tmp_ctx_full.path(), DurabilityMode::Full).await;
+        populate_contextra(&db, &dataset).await;
+        db
+    });
+
+    let tmp_ctx_nohmac = TempDir::new().expect("TempDir failed");
+    let db_ctx_nohmac = rt.block_on(async {
+        let db = create_contextra_db(tmp_ctx_nohmac.path(), DurabilityMode::WalNoHmac).await;
         populate_contextra(&db, &dataset).await;
         db
     });
@@ -438,10 +557,10 @@ fn bench_scan_10k_range(c: &mut Criterion) {
     let db_sled = create_sled(tmp_sled.path());
     populate_sled(&db_sled, &dataset);
 
-    // Contextra-LSM
-    group.bench_function(BenchmarkId::new("Contextra-LSM", SCAN_RANGE_LIMIT), |b| {
+    // Contextra-LSM (Full)
+    group.bench_function(BenchmarkId::new("Contextra-LSM (Full)", SCAN_RANGE_LIMIT), |b| {
         b.to_async(&rt).iter(|| async {
-            let res = db_ctx
+            let res = db_ctx_full
                 .scan(
                     Bound::Included(start_key.as_slice()),
                     Bound::Excluded(end_key.as_slice()),
@@ -452,6 +571,24 @@ fn bench_scan_10k_range(c: &mut Criterion) {
             black_box(res);
         });
     });
+
+    // Contextra-LSM (WalNoHmac)
+    group.bench_function(
+        BenchmarkId::new("Contextra-LSM (WalNoHmac)", SCAN_RANGE_LIMIT),
+        |b| {
+            b.to_async(&rt).iter(|| async {
+                let res = db_ctx_nohmac
+                    .scan(
+                        Bound::Included(start_key.as_slice()),
+                        Bound::Excluded(end_key.as_slice()),
+                        Some(SCAN_RANGE_LIMIT),
+                    )
+                    .await
+                    .expect("Contextra scan failed");
+                black_box(res);
+            });
+        },
+    );
 
     // redb
     group.bench_function(BenchmarkId::new("redb", SCAN_RANGE_LIMIT), |b| {
@@ -535,6 +672,7 @@ fn ensure_fd_limit(min_fds: u64) -> bool {
 // 3.e) Recovery-Zeit nach 1M Writes: Drop/Close und neu öffnen
 // ---------------------------------------------------------------------------
 fn bench_recovery_time_1m(c: &mut Criterion) {
+    print_parity_inventory();
     if !ensure_fd_limit(TARGET_FD_LIMIT) {
         eprintln!(
             "[WARN] Skipping bench_recovery_time_1m benchmark group due to insufficient FD limits."
@@ -550,11 +688,21 @@ fn bench_recovery_time_1m(c: &mut Criterion) {
 
     let dataset = generate_kv_pairs(WRITE_KEY_COUNT, 42);
 
-    // Pre-create and populate persisted data directories
-    let tmp_ctx = TempDir::new().expect("TempDir failed");
-    let ctx_path = tmp_ctx.path().to_path_buf();
+    // Pre-create and populate persisted data directories for Contextra Full & WalNoHmac
+    let tmp_ctx_full = TempDir::new().expect("TempDir failed");
+    let ctx_full_path = tmp_ctx_full.path().to_path_buf();
     rt.block_on(async {
-        let db = create_contextra_db(&ctx_path).await;
+        let db = create_contextra_db(&ctx_full_path, DurabilityMode::Full).await;
+        populate_contextra(&db, &dataset).await;
+        if let Err(e) = db.close().await {
+            eprintln!("[WARN] Contextra close failed during recovery prep: {e}");
+        }
+    });
+
+    let tmp_ctx_nohmac = TempDir::new().expect("TempDir failed");
+    let ctx_nohmac_path = tmp_ctx_nohmac.path().to_path_buf();
+    rt.block_on(async {
+        let db = create_contextra_db(&ctx_nohmac_path, DurabilityMode::WalNoHmac).await;
         populate_contextra(&db, &dataset).await;
         if let Err(e) = db.close().await {
             eprintln!("[WARN] Contextra close failed during recovery prep: {e}");
@@ -575,11 +723,12 @@ fn bench_recovery_time_1m(c: &mut Criterion) {
         populate_sled(&db, &dataset);
     }
 
-    // Contextra-LSM Recovery
-    group.bench_function(BenchmarkId::new("Contextra-LSM", WRITE_KEY_COUNT), |b| {
+    // Contextra-LSM (Full) Recovery
+    group.bench_function(BenchmarkId::new("Contextra-LSM (Full)", WRITE_KEY_COUNT), |b| {
         b.to_async(&rt).iter(|| async {
             let config = LsmConfig {
-                path: ctx_path.clone(),
+                path: ctx_full_path.clone(),
+                durability_mode: DurabilityMode::Full,
                 ..Default::default()
             };
             let start = Instant::now();
@@ -595,6 +744,31 @@ fn bench_recovery_time_1m(c: &mut Criterion) {
             }
         });
     });
+
+    // Contextra-LSM (WalNoHmac) Recovery
+    group.bench_function(
+        BenchmarkId::new("Contextra-LSM (WalNoHmac)", WRITE_KEY_COUNT),
+        |b| {
+            b.to_async(&rt).iter(|| async {
+                let config = LsmConfig {
+                    path: ctx_nohmac_path.clone(),
+                    durability_mode: DurabilityMode::WalNoHmac,
+                    ..Default::default()
+                };
+                let start = Instant::now();
+                match LsmStorage::new(config).await {
+                    Ok(db) => {
+                        let elapsed = start.elapsed();
+                        black_box(db);
+                        black_box(elapsed);
+                    }
+                    Err(err) => {
+                        eprintln!("[WARN] Contextra recovery benchmark iteration failed: {err}");
+                    }
+                }
+            });
+        },
+    );
 
     // redb Recovery
     group.bench_function(BenchmarkId::new("redb", WRITE_KEY_COUNT), |b| {
