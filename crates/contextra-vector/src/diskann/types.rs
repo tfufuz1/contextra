@@ -265,7 +265,7 @@ impl DiskAnnIndex {
     pub(crate) fn check_quantizer_drift(&self, vector: &[f32]) {
         let q_guard = self.inner.quantizer.read();
         if let Some(ref q) = *q_guard {
-            let drift = q.check_drift(vector);
+            let drift = q.calculate_vector_drift(vector);
             if drift > 0.10 {
                 use std::sync::atomic::Ordering;
                 let count = self.inner.drift_warn_count.fetch_add(1, Ordering::Relaxed) + 1;
