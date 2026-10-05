@@ -378,6 +378,18 @@ impl QueryRewriteOutput {
                 .is_none_or(|s| s.trim().is_empty())
             && self.anchor_entities.is_empty()
     }
+
+    /// Converts this query rewrite output into a [`HybridQueryBuilder`].
+    pub fn into_query_builder(self) -> HybridQueryBuilder {
+        let mut builder = HybridQueryBuilder::new();
+        if let Some(text) = self.text_query {
+            builder = builder.with_text_query(text);
+        }
+        if let Some(anchor) = self.anchor_entities.first() {
+            builder = builder.with_graph_start_node(anchor.clone());
+        }
+        builder
+    }
 }
 
 /// Evaluated result for hybrid/4-signal search.
@@ -450,9 +462,85 @@ impl HybridQuery {
     pub fn builder() -> HybridQueryBuilder {
         HybridQueryBuilder::default()
     }
+
+    /// Creates a `HybridQuery` with a text search query string.
+    pub fn text_search(text: impl Into<String>) -> Result<Self> {
+        HybridQueryBuilder::new().with_text_query(text).build()
+    }
+
+    /// Creates a `HybridQuery` with a vector query embedding.
+    pub fn vector_search(vector: Vec<f32>) -> Result<Self> {
+        HybridQueryBuilder::new().with_vector_query(vector).build()
+    }
+
+    /// Creates a `HybridQuery` configured for graph traversal search.
+    pub fn graph_search(
+        start_node: impl Into<String>,
+        strategy: GraphTraversalStrategy,
+    ) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_graph_start_node(start_node)
+            .with_graph_strategy(strategy)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` with custom fusion weights and signal fusion strategy.
+    pub fn with_fusion(
+        weights: FusionWeights,
+        strategy: impl Into<SignalFusionStrategies>,
+    ) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_fusion_weights(weights)
+            .with_fusion_strategy(strategy)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` with a metadata filter expression.
+    pub fn filtered(filter: FilterExpr) -> Result<Self> {
+        HybridQueryBuilder::new().with_filter(filter).build()
+    }
+
+    /// Creates a `HybridQuery` with community context boosting.
+    pub fn community_boosted(entity_id: EntityId) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_same_community_as(entity_id)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` filtered by cognitive memory types.
+    pub fn memory_filtered(types: Vec<MemoryType>) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_memory_type_filter(types)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` with options for superseded items and provenance.
+    pub fn with_provenance_and_superseded(
+        include_provenance: bool,
+        include_superseded: bool,
+    ) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_include_provenance(include_provenance)
+            .with_include_superseded(include_superseded)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` with pre-reranking pool expansion settings.
+    pub fn rerank_pool_config(multiplier: usize, max: usize) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_rerank_pool_multiplier(multiplier)
+            .with_rerank_pool_max(max)
+            .build()
+    }
+
+    /// Creates a `HybridQuery` with a specified signal failure policy.
+    pub fn with_failure_policy(policy: OnSignalFailure) -> Result<Self> {
+        HybridQueryBuilder::new()
+            .with_on_signal_failure(policy)
+            .build()
+    }
 }
 
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Builder for HybridQuery to improve DX.
 #[derive(Default)]
 pub struct HybridQueryBuilder {
