@@ -105,7 +105,6 @@ impl ContextraBuilder {
         Self::from_profile(tier.resolve())
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Creates a `ContextraBuilder` initialized with a cryptographic signed license gate (§14.6, §15).
     pub fn from_signed_license(
         payload_bytes: &[u8],
@@ -165,7 +164,6 @@ impl ContextraBuilder {
         self
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Attaches a cryptographic signed license gate (§14.6, §15).
     pub fn with_signed_license(
         mut self,
