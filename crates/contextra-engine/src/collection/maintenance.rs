@@ -134,17 +134,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(count)
     }
 
-    /// Veraltete Alias-Methode für `evict_decayed_chunks`.
-    #[deprecated(note = "use evict_decayed_chunks instead")]
-    pub async fn reap_by_thermostat(
-        &self,
-        decay_controller: &AdaptiveDecayController,
-        max_per_tick: usize,
-    ) -> Result<usize> {
-        self.evict_decayed_chunks(decay_controller, max_per_tick)
-            .await
-    }
-
     /// Repairs the index by re-syncing with the storage.
     ///
     /// Scans the storage for any documents that are missing from the index
@@ -648,12 +637,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok(count)
-    }
-
-    /// Deprecated legacy alias for `trigger_expiry_cleanup`.
-    #[deprecated(note = "use trigger_expiry_cleanup instead")]
-    pub async fn trigger_reaper(&self) -> Result<usize> {
-        self.trigger_expiry_cleanup().await
     }
 
     /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
