@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use contextra_ports::Clock;
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// A thread-safe, manually advanceable clock for deterministic tests.
 #[derive(Debug)]
 pub struct ManualClock {
