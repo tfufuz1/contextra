@@ -123,6 +123,12 @@ impl CandleEmbedClient {
 
         let gguf_path = model_dir.join("model.gguf");
         let fingerprint = if gguf_path.exists() {
+            let meta = crate::gguf_loader::parse_gguf_metadata(&gguf_path)?;
+            tracing::debug!(
+                "Parsed GGUF metadata for embedding model: arch={}, tensors={}",
+                meta.architecture,
+                meta.tensor_count
+            );
             crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
         // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
@@ -135,6 +141,12 @@ impl CandleEmbedClient {
                 }
             }
             if let Some(path) = gguf_found {
+                let meta = crate::gguf_loader::parse_gguf_metadata(&path)?;
+                tracing::debug!(
+                    "Parsed GGUF metadata for embedding model: arch={}, tensors={}",
+                    meta.architecture,
+                    meta.tensor_count
+                );
                 crate::model_registry::compute_fingerprint(&path, &quantization)?
             } else {
                 crate::model_registry::ModelFingerprint {
@@ -170,6 +182,16 @@ impl CandleEmbedClient {
         };
 
         Ok(Self::new(device, model, fingerprint, tokenizer))
+    }
+
+    /// Loads a `CandleEmbedClient` from a model directory with custom maximum concurrent operations limit.
+    pub fn from_dir_with_concurrency(
+        model_dir: &std::path::Path,
+        quantization: crate::model_registry::CandleQuantization,
+        max_concurrent: usize,
+    ) -> Result<Self> {
+        let client = Self::from_dir(model_dir, quantization)?;
+        Ok(client.with_max_concurrent_embeddings(max_concurrent))
     }
 }
 
