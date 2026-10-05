@@ -201,6 +201,14 @@ impl SequenceLog {
     ///
     /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
     pub fn min_retention_seq(&self) -> Option<u64> {
+        let expired = self.expired_pins();
+        if !expired.is_empty() {
+            tracing::warn!(
+                expired_count = expired.len(),
+                max_pin_duration = ?self.max_pin_duration,
+                "SequenceLog has active snapshot pins exceeding max pin duration"
+            );
+        }
         self.min_retention_seq_at(Instant::now())
     }
 
