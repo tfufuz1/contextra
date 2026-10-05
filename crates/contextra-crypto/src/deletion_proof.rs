@@ -52,7 +52,8 @@ pub struct GraphRepairAttestation {
 pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {
-        hasher.update(&(key.len() as u32).to_le_bytes());
+        let len_u32 = u32::try_from(key.len()).unwrap_or(u32::MAX);
+        hasher.update(&len_u32.to_le_bytes());
         hasher.update(key);
     }
     *hasher.finalize().as_bytes()
@@ -403,7 +404,7 @@ impl DeletionProof {
         graph_repair: &[GraphRepairAttestation],
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
-        Self::create_with_wal_receipt_v3(
+        Self::create_v3_with_audit_position(
             scope,
             deleted_keys,
             deleted_after_tx,
@@ -499,7 +500,10 @@ impl DeletionProof {
         }
 
         let timestamp = if attested_at >= 0 {
-            attested_at as u64
+            #[allow(clippy::cast_sign_loss)]
+            {
+                attested_at as u64
+            }
         } else {
             0u64
         };
@@ -762,6 +766,20 @@ impl DeletionProof {
             DeletionScope::Document { tenant_id, .. } => *tenant_id,
             DeletionScope::Collection { tenant_id, .. } => *tenant_id,
             DeletionScope::Tenant { tenant_id } => *tenant_id,
+        }
+    }
+
+    /// Verifiziert die in diesem Beweis enthaltene WAL-Löschquittung (falls vorhanden) gegen das WAL-Event.
+    pub fn verify_wal_receipt(
+        &self,
+        prev_hmac: &[u8; 32],
+        delete_event_payload: &[u8],
+        integrity_key: &[u8],
+    ) -> Result<bool> {
+        if let Some(ref receipt) = self.wal_chain_receipt {
+            verify_wal_delete_receipt(receipt, prev_hmac, delete_event_payload, integrity_key)
+        } else {
+            Ok(false)
         }
     }
 }

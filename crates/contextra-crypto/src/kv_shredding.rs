@@ -147,6 +147,19 @@ impl KeyRegistry {
         }
     }
 
+    /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog`.
+    pub fn new_in_memory(
+        clock: Arc<dyn contextra_ports::Clock>,
+        signing_key: Option<ed25519_dalek::SigningKey>,
+        verifying_key: ed25519_dalek::VerifyingKey,
+    ) -> Self {
+        Self::new().with_revocation_log(Arc::new(RevocationLog::new_in_memory(
+            clock,
+            signing_key,
+            verifying_key,
+        )))
+    }
+
     /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         self.revocation_log = Some(log);
@@ -428,20 +441,20 @@ impl KeyRegistry {
             )));
         }
 
-        if let Ok(groups_guard) = self.groups.read() {
-            if let Some(entry) = groups_guard.get(&payload.group_id) {
-                if let Some(rec) = entry.record_deks.get(&payload.record_id) {
-                    if rec.revoked {
-                        return Err(CryptoError::Crypto(format!(
-                            "Record {} in group {} has been revoked/shredded",
-                            payload.record_id, payload.group_id
-                        )));
-                    }
-                }
-            } else {
+        if !self.is_record_active(payload.group_id, payload.record_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Record {} in group {} is not active or has been revoked/shredded",
+                payload.record_id, payload.group_id
+            )));
+        }
+
+        if let Some((expected_wrapped_dek, expected_dek_nonce)) =
+            self.get_wrapped_dek(payload.group_id, payload.record_id)
+        {
+            if payload.wrapped_dek != expected_wrapped_dek || payload.dek_nonce != expected_dek_nonce {
                 return Err(CryptoError::Crypto(format!(
-                    "Group {} missing or revoked in KeyRegistry",
-                    payload.group_id
+                    "Wrapped DEK mismatch for record {} in group {}",
+                    payload.record_id, payload.group_id
                 )));
             }
         }
@@ -505,7 +518,7 @@ impl KeyRegistry {
         ciphertext: &[u8],
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
-        if self.is_group_revoked(group_id) {
+        if self.is_group_revoked(group_id) || self.get_wrapped_kek(group_id).is_none() {
             return Err(CryptoError::KeyRevoked(format!(
                 "Sub-key for group {group_id} has been revoked or is missing"
             )));

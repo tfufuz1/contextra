@@ -318,6 +318,11 @@ impl RevocationLog {
             }
         }
 
+        drop(entries_guard);
+        drop(revoked_guard);
+
+        self.verify_integrity()?;
+
         Ok(new_entry)
     }
 
