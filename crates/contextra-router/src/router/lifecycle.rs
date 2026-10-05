@@ -66,6 +66,7 @@ impl RouterEngine {
         }
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Konfiguriert den Startwert des instanzgebundenen DecisionIdGenerators.
     pub fn with_initial_decision_id(mut self, start: u64) -> Self {
         self.decision_ids = DecisionIdGenerator::new(start);
@@ -73,6 +74,7 @@ impl RouterEngine {
     }
 
     #[cfg(feature = "bandit-routing")]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Builder-Methode zur Konfiguration der Routing-Strategie und Bandit-Exploration.
     pub fn with_routing_strategy(
         mut self,
@@ -138,6 +140,7 @@ impl RouterEngine {
         self.state.store(Arc::new(new_state));
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
     pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
         for p in &new_profiles {

@@ -6,6 +6,7 @@ use super::*;
 
 impl RouterEngine {
     #[cfg(feature = "bandit-routing")]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert die aufgezeichnete Logging-Propensity für eine ausstehende Bandit-Entscheidung.
     pub fn bandit_decision_propensity(&self, id: DecisionId) -> Option<f32> {
         self.pending_bandit.read().get(&id).map(|d| d.propensity)
@@ -63,6 +64,7 @@ impl RouterEngine {
         }
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Setzt die Baseline für den Lyapunov-Drift-Wächter eines bestimmten Profils.
     pub fn set_lyapunov_baseline(&self, profile_name: &str, baseline: &[f32]) -> bool {
         let current = self.state.load_full();
@@ -184,12 +186,14 @@ impl RouterEngine {
         true
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Anzahl offener (noch nicht mit record_outcome() abgeschlossener) Decisions.
     /// Sollte in normaler Laufzeit nahe 0 bleiben.
     pub fn pending_decision_count(&self) -> usize {
         self.pending_decisions.read().len()
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Setzt Kalibrierungsstatistik für alle Profile zurück.
     pub fn reset_all_calibration(&self) {
         let current = self.state.load_full();
