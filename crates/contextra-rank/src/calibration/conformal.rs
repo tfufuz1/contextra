@@ -109,7 +109,7 @@ impl AdaptiveConformalCalibrator {
             return Err(ConformalError::InvalidLearningRate(learning_rate));
         }
 
-        Ok(Self {
+        let calibrator = Self {
             alpha,
             threshold: initial_threshold,
             learning_rate,
@@ -117,7 +117,8 @@ impl AdaptiveConformalCalibrator {
             max_threshold: Self::DEFAULT_MAX_THRESHOLD,
             observation_count: 0,
             fingerprint: None,
-        })
+        };
+        calibrator.with_bounds(Self::DEFAULT_MIN_THRESHOLD, Self::DEFAULT_MAX_THRESHOLD)
     }
 
     /// Sets bounding constraints `[min_threshold, max_threshold]` for the estimated threshold.

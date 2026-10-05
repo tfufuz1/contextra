@@ -74,6 +74,11 @@ impl DiBudFusionState {
         self.provenance.get(doc_id)
     }
 
+    /// Generates a structured retrieval explanation for a given document if present in provenance.
+    pub fn explain_doc(&self, doc_id: &DocId) -> Option<crate::explain::RetrievalExplanation> {
+        self.provenance_of(doc_id).map(crate::explain::explain)
+    }
+
     /// Feeds the result of reading a channel into the state machine.
     ///
     /// Raw scores are unknown in pure `DocId` streams and are set to 0.0 in `ProvenanceRecord`.
@@ -87,7 +92,7 @@ impl DiBudFusionState {
         self.accesses += 1;
         let ch_idx = ch.index();
         self.channel_depths[ch_idx] += 1;
-        let rank_1based = self.channel_depths[ch_idx] as u32;
+        let rank_1based = u32::try_from(self.channel_depths[ch_idx]).unwrap_or(u32::MAX);
 
         if let Some(doc_id) = item {
             let doc_state = self.observed_docs.entry(doc_id).or_default();
@@ -135,18 +140,15 @@ impl DiBudFusionState {
         let mut best_channel = None;
         let mut best_score = -1.0_f32;
 
-        for ch in [
-            BudgetedChannel::Graph,
-            BudgetedChannel::Text,
-            BudgetedChannel::Vector,
-        ] {
-            let idx = ch.index();
-            if !self.exhausted[idx] {
-                let score =
-                    budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
-                if score > best_score {
-                    best_score = score;
-                    best_channel = Some(ch);
+        for idx in [2, 1, 0] {
+            if let Some(ch) = BudgetedChannel::from_index(idx) {
+                if !self.exhausted[idx] {
+                    let score =
+                        budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
+                    if score > best_score {
+                        best_score = score;
+                        best_channel = Some(ch);
+                    }
                 }
             }
         }
