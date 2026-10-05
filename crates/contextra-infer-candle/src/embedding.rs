@@ -60,7 +60,7 @@ impl CandleEmbedClient {
     ) -> Self {
         let dim = model.dim();
         let max_concurrent_embeddings = DEFAULT_MAX_CONCURRENT_EMBEDDINGS;
-        Self {
+        let client = Self {
             device,
             model: Arc::new(tokio::sync::Mutex::new(model)),
             fingerprint,
@@ -68,7 +68,8 @@ impl CandleEmbedClient {
             dim,
             max_concurrent_embeddings,
             semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent_embeddings)),
-        }
+        };
+        client.with_max_concurrent_embeddings(DEFAULT_MAX_CONCURRENT_EMBEDDINGS)
     }
 
     /// Configures maximum concurrent embedding operations for backpressure control.

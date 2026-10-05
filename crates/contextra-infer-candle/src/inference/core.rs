@@ -19,7 +19,8 @@ use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
 #[cfg(not(feature = "kv-stage-b"))]
 use candle_transformers::models::quantized_llama::ModelWeights;
-use contextra_ports::{BoxFuture, BoxStream, ContextSegment};
+use contextra_ports::{BoxFuture, BoxStream};
+pub(crate) use contextra_ports::ContextSegment;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
 use futures_util::stream;
@@ -140,7 +141,7 @@ impl CandleLlmClient {
         tokenizer: tokenizers::Tokenizer,
     ) -> Self {
         let max_concurrent_inferences = DEFAULT_MAX_CONCURRENT_INFERENCES;
-        Self {
+        let client = Self {
             device,
             model: Arc::new(tokio::sync::Mutex::new(model)),
             fingerprint,
@@ -157,7 +158,8 @@ impl CandleLlmClient {
             prefill_skipped_tokens: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             attention_exporter: None,
             id_gen: Arc::new(contextra_ports::SequentialIdGen::new(1)),
-        }
+        };
+        client.with_max_concurrent_inferences(DEFAULT_MAX_CONCURRENT_INFERENCES)
     }
 
     /// Returns the total count of segment full prefill calculations performed.
@@ -313,6 +315,11 @@ impl CandleLlmClient {
                 if let Some(exporter) = attention_exporter {
                     if let Some(scores) = guard.last_attention_scores() {
                         exporter.record_layer_head_scores(request_id, &scores);
+                        tracing::debug!(
+                            "Recorded attention scores for request {:?}, total tracked: {}",
+                            request_id,
+                            exporter.tracked_request_count()
+                        );
                     }
                 }
 
@@ -916,6 +923,11 @@ impl LlmTextGenerator for CandleLlmClient {
                     if let Some(exporter) = attention_exporter {
                         if let Some(scores) = guard.last_attention_scores() {
                             exporter.record_layer_head_scores(request_id, &scores);
+                            tracing::debug!(
+                                "Recorded attention scores for request {:?}, total tracked: {}",
+                                request_id,
+                                exporter.tracked_request_count()
+                            );
                         }
                     }
                 }
@@ -1047,6 +1059,11 @@ impl LlmTextGeneratorStreaming for CandleLlmClient {
                     if let Some(exporter) = attention_exporter {
                         if let Some(scores) = guard.last_attention_scores() {
                             exporter.record_layer_head_scores(request_id, &scores);
+                            tracing::debug!(
+                                "Recorded streaming attention scores for request {:?}, total tracked: {}",
+                                request_id,
+                                exporter.tracked_request_count()
+                            );
                         }
                     }
                 } else if let Err(err) = res {

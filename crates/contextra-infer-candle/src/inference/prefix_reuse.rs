@@ -83,7 +83,7 @@ pub fn seed_from_hit(hit: &KvPrefixHit, tokens_len: usize) -> Result<PrefixSeed>
     let matched_len = hit.matched_tokens.min(tokens_len.saturating_sub(1));
     let mut state = KvState::new(Vec::new(), 0);
     for block in &hit.blocks {
-        state.import_block(block)?;
+        state.import_block_at(block, state.pos())?;
     }
     state.truncate(matched_len)?;
     Ok(PrefixSeed { matched_len, state })

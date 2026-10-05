@@ -106,12 +106,15 @@ impl GaspValidator {
 
     /// Erstellt einen `GaspValidator` mit angegebener Konfiguration.
     pub fn with_config(config: GaspConfig) -> Self {
+        let threshold = config.threshold;
         let mut cal = IsotonicCalibrator::new(config.warmup_required, config.max_observations);
         cal.invalidate_on_config_change(config.fingerprint.clone());
-        Self {
+        let mut validator = Self {
             config,
             calibrator: Mutex::new(cal),
-        }
+        };
+        validator.set_threshold(threshold);
+        validator
     }
 
     /// Setzt den Schwellenwert für Abstention und aktualisiert den Fingerabdruck (INV-CAL-2).
