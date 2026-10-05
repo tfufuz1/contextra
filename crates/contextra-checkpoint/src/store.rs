@@ -27,6 +27,29 @@ pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
         None
     }
 
+    fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
+        if let Some(registry) = self.orphan_registry() {
+            registry.register_orphan(pin_id)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn create_hardlink_clone<'a>(
+        &'a self,
+        seq_no: u64,
+        source_dir: &'a Path,
+        target_dir: &'a Path,
+        snapshot_registry: &'a Arc<SnapshotRegistry>,
+    ) -> BoxFuture<'a, Result<HardlinkCloneResult>> {
+        Box::pin(async move {
+            let _ = (seq_no, source_dir, target_dir, snapshot_registry);
+            Err(ContextraError::Internal(
+                "Hardlink clone not supported for this registry".into(),
+            ))
+        })
+    }
+
     fn recover_orphaned_pins<'a>(&'a self) -> BoxFuture<'a, Result<Vec<PinId>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
@@ -718,16 +741,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
     // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
-        let orphans = self.orphan_registry.get_orphan_pins();
-        let mut recovered = Vec::new();
-        for orphan in orphans {
-            if let Err(e) = self.storage.unpin_checkpoint(orphan.seq_no).await {
-                tracing::warn!(pin_id = orphan.seq_no, error = %e, "Failed to unpin orphaned pin during recovery");
-            } else {
-                recovered.push(orphan.seq_no);
-                self.orphan_registry.clear_orphan_pin(orphan.seq_no);
-            }
-        }
+        let mut recovered = self.orphan_registry.recover_and_clean(&*self.storage).await?;
         #[allow(deprecated)]
         if let Ok(global_recovered) =
             global_orphan_registry().recover_and_clean(&*self.storage).await
@@ -810,6 +824,23 @@ impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpo
 
     fn orphan_registry(&self) -> Option<&Arc<InstanceOrphanRegistry>> {
         Some(&self.orphan_registry)
+    }
+
+    fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
+        self.orphan_registry.register_orphan(pin_id)
+    }
+
+    fn create_hardlink_clone<'a>(
+        &'a self,
+        seq_no: u64,
+        source_dir: &'a Path,
+        target_dir: &'a Path,
+        snapshot_registry: &'a Arc<SnapshotRegistry>,
+    ) -> BoxFuture<'a, Result<HardlinkCloneResult>> {
+        Box::pin(async move {
+            self.create_hardlink_clone(seq_no, source_dir, target_dir, snapshot_registry)
+                .await
+        })
     }
 
     fn recover_orphaned_pins<'a>(&'a self) -> BoxFuture<'a, Result<Vec<PinId>>> {
