@@ -6,7 +6,6 @@ use super::*;
 
 impl RouterEngine {
     #[cfg(feature = "bandit-routing")]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert die aufgezeichnete Logging-Propensity für eine ausstehende Bandit-Entscheidung.
     pub fn bandit_decision_propensity(&self, id: DecisionId) -> Option<f32> {
         self.pending_bandit.read().get(&id).map(|d| d.propensity)
@@ -19,6 +18,10 @@ impl RouterEngine {
 
     /// Setzt Kalibrierungsstatistik für ein bestimmtes Profil zurück.
     pub fn reset_calibration(&self, profile_name: &str) {
+        if profile_name == "*" {
+            self.reset_all_calibration();
+            return;
+        }
         let current = self.state.load_full();
         if current.calibration.contains_key(profile_name) {
             let mut new_state = (*current).clone();
@@ -26,6 +29,7 @@ impl RouterEngine {
                 state.reset();
             }
             self.state.store(Arc::new(new_state));
+            self.set_lyapunov_baseline(profile_name, &[]);
         }
     }
 
@@ -64,7 +68,6 @@ impl RouterEngine {
         }
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Setzt die Baseline für den Lyapunov-Drift-Wächter eines bestimmten Profils.
     pub fn set_lyapunov_baseline(&self, profile_name: &str, baseline: &[f32]) -> bool {
         let current = self.state.load_full();
@@ -83,8 +86,8 @@ impl RouterEngine {
     pub(super) fn evict_stale_decisions(&self) {
         let now = Instant::now();
         let cutoff = now.checked_sub(PENDING_DECISION_TTL);
-        let mut map = self.pending_decisions.write();
-        if map.len() >= MAX_PENDING_DECISIONS {
+        if self.pending_decision_count() >= MAX_PENDING_DECISIONS {
+            let mut map = self.pending_decisions.write();
             if let Some(cutoff) = cutoff {
                 map.retain(|_, (_, ts)| *ts > cutoff);
             }
@@ -144,6 +147,13 @@ impl RouterEngine {
 
         #[cfg(feature = "bandit-routing")]
         {
+            if let Some(propensity) = self.bandit_decision_propensity(decision_id) {
+                tracing::debug!(
+                    ?decision_id,
+                    propensity,
+                    "Recording outcome for decision with propensity"
+                );
+            }
             if let Some(pending_bandit_entry) = self.pending_bandit.write().remove(&decision_id) {
                 let reward = 1.0 - non_conformity;
                 if let Some(profile) = new_state
@@ -186,14 +196,12 @@ impl RouterEngine {
         true
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Anzahl offener (noch nicht mit record_outcome() abgeschlossener) Decisions.
     /// Sollte in normaler Laufzeit nahe 0 bleiben.
     pub fn pending_decision_count(&self) -> usize {
         self.pending_decisions.read().len()
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Setzt Kalibrierungsstatistik für alle Profile zurück.
     pub fn reset_all_calibration(&self) {
         let current = self.state.load_full();
