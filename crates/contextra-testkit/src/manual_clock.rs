@@ -17,7 +17,9 @@ pub struct ManualClock {
 
 impl Default for ManualClock {
     fn default() -> Self {
-        Self::new(1_000_000_000) // Start at 1s past epoch by default
+        let clock = Self::new(0);
+        clock.set_nanos(1_000_000_000); // Start at 1s past epoch by default
+        clock
     }
 }
 
@@ -53,7 +55,7 @@ impl ManualClock {
 
     /// Returns the current timestamp as a `SystemTime`.
     pub fn now_system_time(&self) -> SystemTime {
-        UNIX_EPOCH + Duration::from_nanos(self.now_nanos())
+        UNIX_EPOCH + Duration::from_nanos((self.now_secs_f64() * 1_000_000_000.0) as u64)
     }
 }
 

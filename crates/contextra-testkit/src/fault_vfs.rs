@@ -41,9 +41,10 @@ impl FaultVfs {
         Self::default()
     }
 
-    /// Sets the active fault configuration.
+    /// Sets the active fault configuration and resets operation counters.
     pub fn set_config(&self, config: FaultConfig) {
         *self.config.write() = config;
+        self.reset_counters();
     }
 
     /// Simulates a system crash (disables further operations until reset).
