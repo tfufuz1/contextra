@@ -104,6 +104,45 @@ impl CsrGraph {
         Ok(())
     }
 
+    /// Entfernt ein Dokument aus dem Graph und tombstoniert alle Kanten, die ausschließlich
+    /// von diesem Dokument belegt wurden (DSGVO-Kaskaden-Löschung).
+    ///
+    /// # Semantik (INV-GRAPH-PROV-1)
+    /// (a) Das Dokument wird aus allen `source_doc_ids` der betroffenen Kanten im Herkunftsindex entfernt.
+    /// (b) Kanten, deren `source_doc_ids` danach LEER sind, werden atomar tombstoniert (und persistent gelöscht).
+    /// (c) Kanten mit weiteren Quell-Dokumenten bleiben bestehen.
+    ///
+    /// Gibt die Liste der tombstonierten Kanten `Vec<EdgeId>` zurück.
+    pub async fn remove_doc(
+        &self,
+        doc_id: DocId,
+        wal_tx: TxId,
+    ) -> Result<Vec<crate::consistency_enforcement::EdgeId>> {
+        let tombstone_candidates = self.doc_edge_index.remove_doc(doc_id);
+
+        {
+            let mut inner = self.inner_write();
+            inner.doc_to_edges.remove(&doc_id);
+        }
+
+        if tombstone_candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let (_count, newly_tombstoned_edges, _affected_nodes) =
+            self.tombstone_edges_direct(&tombstone_candidates, wal_tx)?;
+
+        if let Some(ref storage) = self.storage {
+            for (from_id, to_id) in &newly_tombstoned_edges {
+                let _ = self
+                    .delete_edge_persistence(storage.as_ref(), wal_tx, from_id, to_id)
+                    .await;
+            }
+        }
+
+        Ok(newly_tombstoned_edges)
+    }
+
     /// Read path contract for RCU snapshot isolation (IP-08):
     /// Returns a lock-free reference `arc_swap::Guard<Arc<GraphInner>>` to the current `GraphInner` snapshot.
     /// Readers never block on compaction or writer locks.
@@ -783,7 +822,12 @@ impl CsrGraph {
         }; // Write-Lock freigegeben
 
         if let Some(doc_id) = source_doc_id {
-            self.doc_edge_index.record(doc_id, (from, to));
+            let prov = crate::provenance::EdgeProvenance::new(
+                (from, to),
+                vec![doc_id],
+                tx_valid_from.unwrap_or_else(|| TxId::new(0)),
+            );
+            self.doc_edge_index.record_provenance(&prov);
         }
 
         // Phase 2: Compact außerhalb des Write-Locks (falls nötig)
@@ -902,6 +946,12 @@ impl CsrGraph {
                 .entry(doc_id)
                 .or_default()
                 .insert((from, to));
+            let prov = crate::provenance::EdgeProvenance::new(
+                (from, to),
+                vec![doc_id],
+                tx_valid_from.unwrap_or_else(|| TxId::new(0)),
+            );
+            self.doc_edge_index.record_provenance(&prov);
         }
         inner
             .pending_edges

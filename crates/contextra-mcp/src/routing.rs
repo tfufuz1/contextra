@@ -158,12 +158,67 @@ pub async fn setup_routing(
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
 pub fn setup_kv_bridge(
-    _db: &Arc<Contextra>,
+    db: &Arc<Contextra>,
 ) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
-    tracing::info!(
-        "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
-    );
-    None
+    let passphrase = db
+        .config()
+        .encryption_passphrase
+        .clone()
+        .or_else(|| std::env::var("CONTEXTRA_ENCRYPTION_PASSPHRASE").ok())
+        .or_else(|| std::env::var("CONTEXTRA_PASSPHRASE").ok());
+
+    let passphrase = match passphrase {
+        Some(p) if !p.trim().is_empty() => p,
+        _ => {
+            tracing::warn!(
+                "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
+            );
+            return None;
+        }
+    };
+
+    let master_km = match contextra_crypto::CryptoKey::try_new(&passphrase, b"contextra-kv-salt") {
+        Ok(km) => km,
+        Err(e) => {
+            tracing::warn!("KvBridgeAdapter: CryptoKey initialization failed: {e}");
+            return None;
+        }
+    };
+
+    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
+
+    let col_res = match tokio::runtime::Handle::try_current() {
+        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),
+        Err(_) => {
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread().build() {
+                rt.block_on(db.collection("default"))
+            } else {
+                return None;
+            }
+        }
+    };
+
+    let store = match col_res {
+        Ok(mut col) => {
+            if let Some(existing) = col.kv_store() {
+                Arc::clone(existing)
+            } else {
+                let new_store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
+                if let Some(col_mut) = Arc::get_mut(&mut col) {
+                    col_mut.set_kv_store(Arc::clone(&new_store));
+                }
+                new_store
+            }
+        }
+        Err(e) => {
+            tracing::warn!("KvBridgeAdapter: Failed to acquire default collection: {e}");
+            Arc::new(contextra_crypto::TenantIsolatedKvStore::new())
+        }
+    };
+
+    Some(Arc::new(contextra_infer_candle::KvBridgeAdapter::new(
+        store, cipher,
+    )))
 }
 
 #[cfg(test)]

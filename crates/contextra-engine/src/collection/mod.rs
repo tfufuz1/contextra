@@ -552,10 +552,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn set_kv_store(&mut self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {}
+    pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
+        let _ = kv_store;
+    }
 
     #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn with_kv_store(self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+    pub fn with_kv_store(self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+        let _ = kv_store;
         self
     }
 

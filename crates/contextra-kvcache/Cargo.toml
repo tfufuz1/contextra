@@ -35,5 +35,6 @@ kvcache-kivi-quant = []
 kivi-quantization = []
 
 [dev-dependencies]
+contextra-kvcache = { path = ".", features = ["kivi-quantization", "kv-encryption"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"

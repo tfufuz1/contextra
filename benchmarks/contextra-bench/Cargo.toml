@@ -38,6 +38,11 @@ contextra-graph = { workspace = true }
 contextra-db = { workspace = true }
 contextra-infer-onnx = { workspace = true }
 contextra-infer-candle = { workspace = true }
+contextra-kvcache = { workspace = true, features = ["kivi-quantization"] }
+contextra-crypto = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
+bytes = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -58,6 +63,10 @@ harness = false
 
 [[bench]]
 name = "long_mem_eval"
+harness = false
+
+[[bench]]
+name = "kv_cache_effect"
 harness = false
 
 [dev-dependencies]
