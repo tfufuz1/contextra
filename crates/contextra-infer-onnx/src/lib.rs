@@ -187,17 +187,6 @@ pub async fn ensure_onnx_model_download(
     })
 }
 
-#[cfg(feature = "candle-backend")]
-pub use contextra_infer_candle::CandleEmbedClient;
-
-#[cfg(feature = "candle-backend")]
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
-/// Creates a trait object `Box<dyn EmbeddingProvider>` wrapping a `CandleEmbedClient`.
-pub fn create_candle_embedder(
-    client: CandleEmbedClient,
-) -> Box<dyn contextra_ports::EmbeddingProvider> {
-    Box::new(client)
-}
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
