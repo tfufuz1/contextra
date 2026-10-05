@@ -427,12 +427,16 @@ impl RoleInterner {
         let name_str = name.to_string();
         let new_id = RoleId(self.next_id.fetch_add(1, Ordering::Relaxed));
 
-        match self.forward.insert(name_str.clone(), new_id) {
-            Ok(()) => {
-                let _ = self.backward.insert(new_id, name_str);
-                new_id
+        // Insert into backward FIRST so resolve/resolve_string callers finding new_id in forward
+        // are guaranteed to also find name_str in backward.
+        let _ = self.backward.insert(new_id, name_str.clone());
+
+        match self.forward.insert(name_str, new_id) {
+            Ok(()) => new_id,
+            Err((_, existing_id)) => {
+                let _ = self.backward.remove(&new_id);
+                existing_id
             }
-            Err((_, existing_id)) => existing_id,
         }
     }
 

@@ -115,6 +115,7 @@ async fn test_wiring_cascade_queue_processing() {
     assert_eq!(graph.pending_cascade_queue_len(), 0);
 }
 
+#[cfg(feature = "edge-reinforcement-learning")]
 #[tokio::test]
 async fn test_wiring_edge_reinforcement_buffer() {
     let graph = CsrGraph::new();
