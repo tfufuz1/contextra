@@ -259,6 +259,7 @@ impl LlmConfig {
         }
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Instantiates the configured `LlmTextGenerator` as an `Arc<dyn LlmTextGenerator>`.
     pub fn build_generator(&self) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
         create_llm_text_generator(
@@ -434,6 +435,15 @@ mod tests {
         assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.llm_model, "llama3.2:3b");
         assert!(config.candle_model_dir.is_none());
+    }
+
+    #[test]
+    fn test_llm_config_build_generator() {
+        let config = LlmConfig::default();
+        let generator = config.build_generator().unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let response = rt.block_on(generator.generate("test prompt")).unwrap();
+        assert!(response.contains("[Mock LLM response for: test prompt]"));
     }
 
     #[test]
