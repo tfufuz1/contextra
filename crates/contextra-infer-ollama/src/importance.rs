@@ -202,14 +202,18 @@ pub async fn score_importance_with_calibrator(
     let model_id = client.config().model.clone();
     let raw_response = client.generate_text(&model_id, &prompt).await?;
 
-    let mut assessment = parse_importance_score_response(&raw_response);
-    assessment.model_id = model_id.clone();
+    let parsed = parse_importance_score_response(&raw_response);
+    let calibrated_confidence =
+        calibrator.and_then(|cal| cal.lock().calibrated_probability(parsed.value()));
 
-    if let Some(cal) = calibrator {
-        assessment.calibrated_confidence = cal.lock().calibrated_probability(assessment.value());
-    }
+    let assessment = ImportanceAssessment::with_provenance(
+        parsed.score,
+        parsed.confidence,
+        &model_id,
+        calibrated_confidence,
+    );
 
-    if assessment.confidence == Confidence::Unparseable {
+    if !assessment.is_parsed() {
         tracing::warn!(
             model = %model_id,
             "score_importance completed with Confidence::Unparseable fallback"
