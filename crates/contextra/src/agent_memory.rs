@@ -119,13 +119,22 @@ pub struct AgentMemory {
     id_gen: Option<Arc<dyn IdGen>>,
 }
 
+impl From<Arc<Contextra>> for AgentMemory {
+    fn from(engine: Arc<Contextra>) -> Self {
+        Self::new_arc(engine)
+    }
+}
+
+impl From<Contextra> for AgentMemory {
+    fn from(engine: Contextra) -> Self {
+        Self::new(engine)
+    }
+}
+
 impl AgentMemory {
     /// Constructs a new `AgentMemory` wrapper around a `Contextra` engine instance.
     pub fn new(engine: Contextra) -> Self {
-        Self {
-            engine: Arc::new(engine),
-            id_gen: None,
-        }
+        Self::new_arc(Arc::new(engine))
     }
 
     /// Constructs a new `AgentMemory` wrapper around an `Arc<Contextra>` engine instance.

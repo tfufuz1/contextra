@@ -18,17 +18,30 @@ pub struct LlmQueryRewriter {
 }
 
 impl LlmQueryRewriter {
-    /// Creates a new `LlmQueryRewriter` with default limits:
-    /// - `max_subqueries`: 3
-    /// - `max_context_results`: 3
-    /// - `max_snippet_chars`: 300
-    pub fn new(generator: Arc<dyn LlmTextGenerator>) -> Self {
+    /// Creates a new `LlmQueryRewriter` with explicit limits.
+    pub fn new_with_limits(
+        generator: Arc<dyn LlmTextGenerator>,
+        max_subqueries: usize,
+        max_context_results: usize,
+        max_snippet_chars: usize,
+    ) -> Self {
         Self {
             generator,
             max_subqueries: 3,
             max_context_results: 3,
             max_snippet_chars: 300,
         }
+        .with_max_subqueries(max_subqueries)
+        .with_max_context_results(max_context_results)
+        .with_max_snippet_chars(max_snippet_chars)
+    }
+
+    /// Creates a new `LlmQueryRewriter` with default limits:
+    /// - `max_subqueries`: 3
+    /// - `max_context_results`: 3
+    /// - `max_snippet_chars`: 300
+    pub fn new(generator: Arc<dyn LlmTextGenerator>) -> Self {
+        Self::new_with_limits(generator, 3, 3, 300)
     }
 
     /// Sets the maximum number of alternative sub-queries to generate.
