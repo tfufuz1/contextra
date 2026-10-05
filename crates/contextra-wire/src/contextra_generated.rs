@@ -363,6 +363,33 @@ impl<'a> SearchResponse<'a> {
     // which contains a valid value in this slot
     unsafe { self._tab.get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0)).unwrap()}
   }
+
+  /// Finalizes building a standard `SearchResponse` FlatBuffer.
+  #[inline]
+  pub fn finish_buffer<'b>(
+    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    root: flatbuffers::WIPOffset<SearchResponse<'a>>,
+  ) {
+    finish_search_response_buffer(fbb, root);
+  }
+
+  /// Finalizes building a size-prefixed `SearchResponse` FlatBuffer for framed IPC streams.
+  #[inline]
+  pub fn finish_size_prefixed_buffer<'b>(
+    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    root: flatbuffers::WIPOffset<SearchResponse<'a>>,
+  ) {
+    finish_size_prefixed_search_response_buffer(fbb, root);
+  }
+
+  /// Verifies and decodes a size-prefixed `SearchResponse` FlatBuffer with custom options.
+  #[inline]
+  pub fn size_prefixed_root_with_opts<'b, 'o>(
+    opts: &'o flatbuffers::VerifierOptions,
+    buf: &'b [u8],
+  ) -> Result<SearchResponse<'b>, flatbuffers::InvalidFlatbuffer> {
+    size_prefixed_root_as_search_response_with_opts(opts, buf)
+  }
 }
 
 impl flatbuffers::Verifiable for SearchResponse<'_> {
