@@ -545,6 +545,7 @@ pub struct Contextra {
     >,
     kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
+    kv_hooks: parking_lot::RwLock<Option<Arc<dyn contextra_ports::KvLifecycleHooks>>>,
 }
 
 #[cfg(not(loom))]
@@ -578,6 +579,16 @@ impl Contextra {
             .read()
             .as_ref()
             .map(|w| w.attention_source())
+    }
+
+    /// Sets or overrides the KV lifecycle hooks implementation on Contextra.
+    pub fn set_kv_hooks(&self, hooks: Arc<dyn contextra_ports::KvLifecycleHooks>) {
+        *self.kv_hooks.write() = Some(hooks);
+    }
+
+    /// Returns a cloned reference to the active KV lifecycle hooks, if configured.
+    pub fn kv_hooks(&self) -> Option<Arc<dyn contextra_ports::KvLifecycleHooks>> {
+        self.kv_hooks.read().as_ref().map(Arc::clone)
     }
 }
 

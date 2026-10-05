@@ -57,6 +57,10 @@ loom = "0.7"
 wat = "1"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
+[[test]]
+name = "kv_delete_cascade_e2e"
+path = "tests/kv_delete_cascade_e2e.rs"
+
 [features]
 default = []
 onnx = []

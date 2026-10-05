@@ -140,6 +140,9 @@ impl Contextra {
             pid_controller: parking_lot::RwLock::new(None),
             kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
+            kv_hooks: parking_lot::RwLock::new(Some(
+                kv_store as Arc<dyn contextra_ports::KvLifecycleHooks>,
+            )),
         };
 
         db.initialize_collections().await?;

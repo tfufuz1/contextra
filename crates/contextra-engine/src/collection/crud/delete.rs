@@ -10,10 +10,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         drop(_guard);
         let mut db_tx = self.begin_transaction()?;
 
+        let doc_id = DocId::from_key(id)?;
+
         match self.delete_op(&mut db_tx, id).await {
             Ok(_) => {
                 db_tx.commit().await?;
                 self.check_and_trigger_community_detection(1);
+                if let Some(kv_hooks) = self.kv_hooks() {
+                    let tenant = self.tenant_id();
+                    kv_hooks.remove_doc_segments(tenant, doc_id);
+                }
                 Ok(())
             }
             Err(e) => {
