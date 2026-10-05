@@ -61,7 +61,10 @@ impl OrchestratorEngine {
     /// Attaches a [`MetricsSink`] to the internal dead-letter queue, if configured.
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         if let Some(dlq) = self.dead_letter_queue.take() {
-            self.dead_letter_queue = Some(dlq.with_metrics_sink(sink));
+            self.dead_letter_queue = Some(DeadLetterQueue::new_with_metrics(
+                dlq.storage().clone(),
+                sink,
+            ));
         }
         self
     }
@@ -77,6 +80,14 @@ impl OrchestratorEngine {
     /// Attempts to construct an [`OrchestratorEngine`] directly from a Contextra DB handle.
     pub fn try_from_db(db: &contextra_db::Contextra) -> Result<Self> {
         Self::try_new(db.inner_storage())
+    }
+
+    #[deprecated(note = "Use try_from_db instead to handle initialization errors without panicking")]
+    pub fn from_db(db: &contextra_db::Contextra) -> Self {
+        Self::try_from_db(db).unwrap_or_else(|e| {
+            tracing::error!("Failed to initialize OrchestratorEngine from_db: {}", e);
+            Self::new(db.inner_storage())
+        })
     }
 
     #[deprecated(note = "Use try_new instead to handle initialization errors without panicking")]
@@ -178,9 +189,7 @@ impl OrchestratorEngine {
         self.recover_orphans().await?;
 
         // Perform legacy audit entry migration if needed before starting step processing
-        crate::audit::AuditLog::new(ctx.state_collection.clone())
-            .migrate_legacy_entries()
-            .await?;
+        crate::audit::migrate_legacy_audit_entries(&ctx.state_collection).await?;
 
         loop {
             tokio::task::yield_now().await;

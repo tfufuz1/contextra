@@ -56,6 +56,10 @@ impl DeadLetterQueue {
         }
     }
 
+    pub fn storage(&self) -> &Arc<dyn StorageEngine> {
+        &self.storage
+    }
+
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
@@ -116,38 +120,11 @@ impl DeadLetterQueue {
     }
 
     pub async fn drain(&self) -> Result<Vec<StepDeadLetter>> {
-        let entries = self.storage.scan_prefix(Self::PREFIX).await?;
-        let mut letters = Vec::with_capacity(entries.len());
-        let mut keys_to_delete = Vec::with_capacity(entries.len());
-
-        for (key, val) in entries {
-            let letter: StepDeadLetter = serde_json::from_slice(&val)
-                .map_err(|e| ContextraError::Serialization(e.to_string()))?;
-            letters.push(letter);
-            keys_to_delete.push(key);
-        }
-
-        if !keys_to_delete.is_empty() {
-            let tx = self.allocate_tx().await?;
-            if let Err(e) = self.storage.delete_many(tx, keys_to_delete).await {
-                if let Err(rollback_err) = self.storage.rollback(tx).await {
-                    tracing::error!(error = %rollback_err, "Failed to rollback transaction after delete_many failure in DLQ");
-                }
-                return Err(e);
-            }
-            if let Err(e) = self.storage.commit(tx).await {
-                if let Err(rollback_err) = self.storage.rollback(tx).await {
-                    tracing::error!(error = %rollback_err, "Failed to rollback transaction after commit failure in DLQ");
-                }
-                return Err(e);
-            }
-        }
-
+        let uncommitted = self.drain_uncommitted().await?;
         if let Some(ref sink) = self.metrics_sink {
             sink.record_gauge("dlq_depth", 0.0, &[]);
         }
-
-        Ok(letters)
+        Ok(uncommitted)
     }
 
     pub async fn list(&self) -> Result<Vec<StepDeadLetter>> {

@@ -213,14 +213,22 @@ impl StateGraph {
             }
         }
 
-        self.edges.push(WorkflowEdge {
-            from: from.to_string(),
-            to: to.to_string(),
-            condition: condition.map(|s| s.to_string()),
-            priority,
-            goal: parsed_goal,
-        });
-        Ok(())
+        if let Some(goal) = parsed_goal {
+            self.try_add_edge_with_goal(from, to, goal, priority)?;
+            if let Some(edge) = self.edges.last_mut() {
+                edge.condition = condition.map(|s| s.to_string());
+            }
+            Ok(())
+        } else {
+            self.edges.push(WorkflowEdge {
+                from: from.to_string(),
+                to: to.to_string(),
+                condition: condition.map(|s| s.to_string()),
+                priority,
+                goal: None,
+            });
+            Ok(())
+        }
     }
 
     /// Tries to insert a new edge with an explicit [`GoalCondition`].
