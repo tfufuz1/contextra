@@ -437,6 +437,29 @@ pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + '
     )
 }
 
+/// Starts a fully-configured background task for periodic consolidation with LLM, rich validator, and LeanRAG stage 3.
+pub fn start_consolidation_worker_full<S: StorageEngine + 'static, V: VectorIndex + 'static>(
+    collection: Arc<Collection<S, V>>,
+    consolidation_config: ConsolidationConfig,
+    synthesis_config: SynthesisConfig,
+    interval: std::time::Duration,
+    cancel_token: tokio_util::sync::CancellationToken,
+    llm: Option<Arc<dyn LlmTextGenerator>>,
+    rich_validator: Option<Arc<dyn GroundingValidator>>,
+    leanrag_config: Option<AggregationConfig>,
+) -> tokio::task::JoinHandle<()> {
+    ConsolidationEngine::start_worker_full(
+        collection,
+        consolidation_config,
+        synthesis_config,
+        interval,
+        cancel_token,
+        llm,
+        rich_validator,
+        leanrag_config,
+    )
+}
+
 /// Deprecated legacy alias for `start_consolidation_worker`.
 #[deprecated(note = "use start_consolidation_worker instead")]
 #[allow(deprecated)]
@@ -494,14 +517,12 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
     }
 
     /// Fügt ein optionales LLM für die generative Wissenssynthese hinzu.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_llm(mut self, llm: Arc<dyn LlmTextGenerator>) -> Self {
         self.llm = Some(llm);
         self
     }
 
     /// Fügt eine optionale AggregationConfig für LeanRAG Stage 3 (Opt-in) hinzu.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_leanrag(mut self, cfg: AggregationConfig) -> Self {
         self.leanrag = Some(cfg);
         self
@@ -514,7 +535,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
     }
 
     /// Fügt einen optionalen reichhaltigen Grounding-Validator (`GroundingValidator`) mit Kalibrierung & Policy-Violation-Semantik hinzu.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_rich_validator(mut self, validator: Arc<dyn GroundingValidator>) -> Self {
         self.rich_validator = Some(validator);
         self
@@ -543,6 +563,36 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             cancel_token,
         ));
         engine.start()
+    }
+
+    /// Starts a fully-configured background task for periodic consolidation.
+    pub fn start_worker_full(
+        collection: Arc<Collection<S, V>>,
+        consolidation_config: ConsolidationConfig,
+        synthesis_config: SynthesisConfig,
+        interval: std::time::Duration,
+        cancel_token: tokio_util::sync::CancellationToken,
+        llm: Option<Arc<dyn LlmTextGenerator>>,
+        rich_validator: Option<Arc<dyn GroundingValidator>>,
+        leanrag_config: Option<AggregationConfig>,
+    ) -> tokio::task::JoinHandle<()> {
+        let mut engine = ConsolidationEngine::new(
+            collection,
+            consolidation_config,
+            synthesis_config,
+            interval,
+            cancel_token,
+        );
+        if let Some(llm) = llm {
+            engine = engine.with_llm(llm);
+        }
+        if let Some(validator) = rich_validator {
+            engine = engine.with_rich_validator(validator);
+        }
+        if let Some(leanrag) = leanrag_config {
+            engine = engine.with_leanrag(leanrag);
+        }
+        Arc::new(engine).start()
     }
 
     /// Hauptschleife der `ConsolidationEngine`.
