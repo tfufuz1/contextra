@@ -93,6 +93,16 @@ impl AdaptiveConformalCalibrator {
         )
     }
 
+    /// Creates a bounded `AdaptiveConformalCalibrator` with custom miscoverage level `alpha` and explicit threshold bounds.
+    pub fn bounded(
+        alpha: f32,
+        min_threshold: f32,
+        max_threshold: f32,
+    ) -> Result<Self, ConformalError> {
+        let calibrator = Self::new(alpha)?;
+        calibrator.with_bounds(min_threshold, max_threshold)
+    }
+
     /// Creates an `AdaptiveConformalCalibrator` with custom parameters.
     pub fn with_params(
         alpha: f32,
