@@ -77,6 +77,13 @@ impl TenantPrefixKvStore {
         }
     }
 
+    /// Erstellt einen `TenantPrefixKvStore` mit spezifischem Byte-Budget und Reuse-Policy.
+    pub fn with_capacity_and_policy(budget: usize, policy: KvReusePolicy) -> Self {
+        Self::new()
+            .with_byte_budget_per_tenant(budget)
+            .with_reuse_policy(policy)
+    }
+
     /// Konfiguriert das maximale Byte-Budget pro Mandant über alle seine Präfix-Partitionen.
     pub fn with_byte_budget_per_tenant(mut self, budget: usize) -> Self {
         self.byte_budget_per_tenant = budget;
@@ -302,6 +309,8 @@ impl TenantPrefixKvStore {
 impl Default for TenantPrefixKvStore {
     fn default() -> Self {
         Self::new()
+            .with_byte_budget_per_tenant(DEFAULT_BYTE_BUDGET_PER_TENANT)
+            .with_reuse_policy(KvReusePolicy::default())
     }
 }
 

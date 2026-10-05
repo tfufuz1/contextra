@@ -151,16 +151,12 @@ impl EvictionWorker {
         segment_id: u64,
         request_id: RequestId,
     ) {
-        self.attention_source
-            .read()
-            .register_segment(tenant_id, segment_id, request_id);
+        self.store.register_segment_request(tenant_id, segment_id, request_id);
     }
 
     /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
     pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {
-        self.attention_source
-            .read()
-            .unregister_segment(tenant_id, segment_id);
+        self.store.unregister_segment_request(tenant_id, segment_id);
     }
 
     /// Liefert die aktuell konfigurierte AttentionScoreSource.
