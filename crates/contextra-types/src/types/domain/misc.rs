@@ -220,17 +220,7 @@ impl Edge {
                 "Edge weight must be finite and non-negative".to_string(),
             ));
         }
-        Ok(Self {
-            from,
-            to,
-            label: label_str.into(),
-            weight,
-            tx_valid_from: None,
-            tx_valid_to: None,
-            business_valid_from: None,
-            business_valid_to: None,
-            source_doc_id: None,
-        })
+        Ok(Self::new(from, to, label_str).with_weight(weight))
     }
 
     /// Sets a custom weight on the edge.
@@ -240,10 +230,8 @@ impl Edge {
     }
 
     /// Sets transaction validity window (system time / MVCC) on the edge.
-    pub fn with_tx_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.tx_valid_from = from;
-        self.tx_valid_to = to;
-        self
+    pub fn with_tx_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.with_validity(from, to)
     }
 
     /// Sets business validity window (business time in Unix ms) on the edge.
@@ -254,8 +242,10 @@ impl Edge {
     }
 
     /// Sets transaction validity window on the edge (alias for `with_tx_validity` for backward compatibility).
-    pub fn with_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.with_tx_validity(from, to)
+    pub fn with_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.tx_valid_from = from;
+        self.tx_valid_to = to;
+        self
     }
 }
 
@@ -324,6 +314,11 @@ impl MemoryType {
             MemoryType::Working => Some(50_000), // ~50.000 TX ≈ 30 Minuten bei normalem Tempo
             _ => None,
         }
+    }
+
+    /// Returns the canonical metadata key string.
+    pub fn as_str(&self) -> &'static str {
+        self.as_metadata_key()
     }
 
     /// Gibt den kanonischen Metadaten-Key zurück (für JSON-Serialisierung).

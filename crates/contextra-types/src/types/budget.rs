@@ -209,38 +209,12 @@ impl TokenBudget {
     /// Reserviert `amount` Tokens atomar. Schlägt fehl, wenn das verfügbare Budget
     /// (limit - reserved - consumed) unterschritten würde.
     pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>> {
-        loop {
-            let current_consumed = self.consumed.load(Ordering::Acquire);
-            let effective = self.effective_limit();
-            let avail = effective
-                .saturating_sub(self.reserved)
-                .saturating_sub(current_consumed);
-
-            if avail == 0 || avail < amount {
-                return Err(ContextraError::Internal(format!(
-                    "Token budget exhausted before step execution (available: {}, required: {})",
-                    avail, amount
-                )));
-            }
-
-            let next_consumed = current_consumed.saturating_add(amount);
-            if self
-                .consumed
-                .compare_exchange_weak(
-                    current_consumed,
-                    next_consumed,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                )
-                .is_ok()
-            {
-                return Ok(Reservation {
-                    budget: self,
-                    amount,
-                    settled: AtomicBool::new(false),
-                });
-            }
-        }
+        self.try_reserve(amount)?;
+        Ok(Reservation {
+            budget: self,
+            amount,
+            settled: AtomicBool::new(false),
+        })
     }
 
     /// Tries to reserve `tokens` from the available budget before step execution.
@@ -313,12 +287,7 @@ impl<'a> Drop for Reservation<'a> {
 
 impl Default for TokenBudget {
     fn default() -> Self {
-        Self {
-            limit: 8192,
-            strategy: BudgetStrategy::Conservative,
-            reserved: 512,
-            consumed: AtomicUsize::new(0),
-        }
+        Self::for_model("default").with_reserved(512, 0)
     }
 }
 
