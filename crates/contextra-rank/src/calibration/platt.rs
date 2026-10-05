@@ -65,6 +65,10 @@ impl PlattScaler {
         if logit.is_nan() {
             return 0.5;
         }
+        if !self.is_fitted() {
+            let z = logit;
+            return 1.0 / (1.0 + (-z).exp());
+        }
         let z = self.a * logit + self.b;
         1.0 / (1.0 + (-z).exp())
     }
