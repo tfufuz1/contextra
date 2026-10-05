@@ -768,6 +768,67 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Delegates KV segment payload writing to `contextra_store::kv::KvSegmentManager`.
+    pub fn write_kv_segment(
+        &self,
+        manager: &contextra_store::kv::KvSegmentManager,
+        group_id: u64,
+        plaintext: &[u8],
+    ) -> std::result::Result<contextra_store::kv::KvSegmentPayload, contextra_types::ContextraError> {
+        manager.write_segment(group_id, plaintext)
+    }
+
+    /// Delegates KV segment reading/decryption to `contextra_store::kv::KvSegmentManager`.
+    pub fn read_kv_segment(
+        &self,
+        manager: &contextra_store::kv::KvSegmentManager,
+        segment: &contextra_store::kv::KvSegmentPayload,
+    ) -> std::result::Result<Vec<u8>, contextra_types::ContextraError> {
+        manager.read_segment(segment)
+    }
+
+    /// Delegates KV segment key revocation/deletion to `contextra_store::kv::KvSegmentManager`.
+    pub fn delete_kv_segment(
+        &self,
+        manager: &contextra_store::kv::KvSegmentManager,
+        group_id: u64,
+    ) -> bool {
+        manager.delete_segment(group_id)
+    }
+
+    /// Delegates KV deletion proof generation to `contextra_store::kv::KvSegmentManager`.
+    pub fn generate_kv_deletion_proof(
+        &self,
+        manager: &contextra_store::kv::KvSegmentManager,
+        group_id: u64,
+    ) -> std::result::Result<bool, contextra_types::ContextraError> {
+        manager.generate_deletion_proof(group_id)
+    }
+
+    /// Generates a collection prefix using TenantKeyCodec.
+    pub fn tenant_collection_prefix(
+        &self,
+        codec: &contextra_store::tenant_codec::TenantKeyCodec,
+        collection: &contextra_types::CollectionId,
+    ) -> Vec<u8> {
+        codec.collection_prefix(collection)
+    }
+
+    /// Encodes a graph key using TenantKeyCodec.
+    pub fn tenant_encode_graph_key(
+        &self,
+        codec: &contextra_store::tenant_codec::TenantKeyCodec,
+        collection: &contextra_types::CollectionId,
+        entity_id: u64,
+    ) -> Vec<u8> {
+        codec.encode_graph_key(collection, entity_id)
+    }
+
+    /// Evaluates point lookup traversal metrics on the underlying LSM storage engine.
+    pub async fn point_lookup_metrics(&self, storage: &contextra_store::LsmStorage, key: &[u8]) -> (usize, usize, usize, usize, bool) {
+        storage.point_lookup_metrics(key).await
+    }
+
     /// Increments mutation counter and triggers background community detection if threshold is reached.
     pub(super) fn check_and_trigger_community_detection(&self, count: usize) {
         let threshold = self

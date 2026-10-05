@@ -676,13 +676,18 @@ name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "contextra-core",
+ "contextra-crypto",
  "contextra-db",
  "contextra-graph",
  "contextra-infer-candle",
  "contextra-infer-onnx",
+ "contextra-kvcache",
+ "contextra-ports",
  "contextra-store",
  "contextra-text",
+ "contextra-types",
  "contextra-vector",
  "criterion",
  "hdrhistogram",

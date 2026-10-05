@@ -553,23 +553,22 @@ impl LsmStorage {
         )
         .with_pressure_rx(pressure_rx.clone());
 
+        if config.compaction.enable_adaptive_compaction {
+            let planner = Arc::new(
+                crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
+                    config.compaction.adaptive_read_ratio_threshold,
+                    config.compaction.min_sstables_per_tier,
+                    config.compaction.size_ratio,
+                ),
+            );
+            compaction_engine_builder = compaction_engine_builder.with_adaptive_planner(planner);
+        }
+
         if let Some(mo) = merge_operator {
             compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);
         }
 
         let compaction_engine = Arc::new(compaction_engine_builder);
-
-        let compaction_engine_for_loop = Arc::clone(&compaction_engine);
-        let compaction_sstables = Arc::clone(&sstables);
-        let compaction_path = config.path.clone();
-
-        let ct_clone = cancel_token.clone();
-        task_tracker.spawn(async move {
-            compaction_engine_for_loop
-                .run_loop(compaction_sstables, compaction_path, ct_clone)
-                .await;
-        });
-        task_tracker.close();
 
         let flush_notify = Arc::new(tokio::sync::Notify::new());
         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
@@ -615,6 +614,17 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
         };
+
+        let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
+        let compaction_sstables = Arc::clone(&storage.sstables);
+        let compaction_path = storage.config.path.clone();
+        let ct_clone = storage.cancel_token.clone();
+
+        storage.spawn_tracked(async move {
+            compaction_engine_for_loop
+                .run_loop(compaction_sstables, compaction_path, ct_clone)
+                .await;
+        });
 
         if replayed_size > 0 && !wal_files.is_empty() {
             tracing::info!(
