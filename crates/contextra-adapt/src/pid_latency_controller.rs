@@ -96,6 +96,24 @@ impl PidLatencyController {
         }
     }
 
+    /// Observes elapsed latency from a `LatencyBudgetGuard` and calculates scaling adjustment.
+    pub fn observe_and_adjust(&mut self, guard: &LatencyBudgetGuard) -> f64 {
+        self.compute_adjustment(guard.elapsed_ms())
+    }
+
+    /// Scales a base candidate pool size using the computed PID scaling adjustment factor.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    pub fn scale_pool_size(&mut self, observed_latency_ms: f64, base_pool_size: usize) -> usize {
+        let factor = self.compute_adjustment(observed_latency_ms);
+        let scaled = (base_pool_size as f64 * factor).round();
+        if scaled.is_finite() && scaled >= 1.0 {
+            // Safety: scaled is verified finite and >= 1.0, bounded by base_pool_size * MAX_SCALING_FACTOR.
+            scaled as usize
+        } else {
+            1
+        }
+    }
+
     /// Calculates scaling adjustment factor in range `[0.3, 1.0]` based on observed latency.
     ///
     /// - Observed latency > target_latency => scaling factor decreases towards 0.3.

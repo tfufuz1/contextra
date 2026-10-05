@@ -128,6 +128,24 @@ impl EnsembleDriftWatcher {
         l.is_drift_detected() && matches!(c, DriftSignal::Detected)
     }
 
+    /// Observes a new reward / score, evaluates ensemble drift detection, and applies a penalty to the target policy when drift occurs.
+    #[cfg(feature = "bandit-routing")]
+    pub fn observe_and_react_policy<P: crate::bandit::BanditPolicy + ?Sized>(
+        &mut self,
+        reward: f32,
+        policy: &mut P,
+        k_drift: f32,
+        alpha_max: f32,
+        gamma: f32,
+    ) -> bool {
+        if self.observe_and_decide(reward) {
+            policy.apply_drift_penalty(k_drift, alpha_max, gamma);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Sets the baseline distribution for the Lyapunov watcher and baseline mean for the Catoni detector.
     pub fn set_baseline(&mut self, baseline_scores: &[f32]) {
         self.lyapunov.set_baseline(baseline_scores);

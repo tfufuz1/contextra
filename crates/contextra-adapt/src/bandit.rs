@@ -137,6 +137,17 @@ pub struct SketchMatrix {
 }
 
 impl SketchMatrix {
+    /// Erstellt eine `SketchMatrix` mit mandantenisoliertem Seed aus `TenantId` und `base_seed`.
+    pub fn from_tenant_seed(
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        original_dim: usize,
+        projected_dim: usize,
+    ) -> Result<Self, BanditError> {
+        let seed = Self::derive_seed(tenant_id, base_seed);
+        Self::from_seed(seed, original_dim, projected_dim)
+    }
+
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
     pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
@@ -455,6 +466,17 @@ impl BanditProfileState {
         Ok(())
     }
 
+    /// Initialisiert die Sketched Projection mit einem mandantenisolierten PRNG-Seed.
+    pub fn init_tenant_sketch(
+        &mut self,
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        projected_dim: usize,
+    ) -> Result<(), BanditError> {
+        self.seed = SketchMatrix::derive_seed(tenant_id, base_seed);
+        self.ensure_sketched_state(projected_dim)
+    }
+
     fn ensure_inv_a(&mut self) {
         let d = self.theta.len();
         if self.inv_a.len() != d * d {
@@ -763,6 +785,15 @@ impl BanditProfileState {
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
         self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
+    }
+
+    /// Observes current non-conformity scores via a `DriftPolicyBridge` and applies drift adaptation if detected.
+    pub fn observe_and_adapt_drift(
+        &mut self,
+        bridge: &mut crate::drift::DriftPolicyBridge,
+        current_scores: &[f32],
+    ) -> crate::lyapunov::LyapunovResult {
+        bridge.observe_and_react(current_scores, self)
     }
 }
 
