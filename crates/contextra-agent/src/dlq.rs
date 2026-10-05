@@ -65,11 +65,24 @@ impl DeadLetterQueue {
         storage: Arc<dyn StorageEngine>,
         sink: Arc<dyn contextra_ports::MetricsSink>,
     ) -> Self {
-        Self {
-            storage,
-            next_tx: OnceCell::new(),
-            metrics_sink: Some(sink),
+        Self::new(storage).with_metrics_sink(sink)
+    }
+
+    /// Drains uncommitted dead letter entries from the queue, discarding entries whose transaction
+    /// was already committed in WAL/storage according to [`is_already_committed`].
+    pub async fn drain_uncommitted(&self) -> Result<Vec<StepDeadLetter>> {
+        let letters = self.list().await?;
+        let mut uncommitted = Vec::new();
+
+        for letter in letters {
+            if self.is_already_committed(&letter).await? {
+                self.remove(&letter).await?;
+            } else {
+                uncommitted.push(letter);
+            }
         }
+
+        Ok(uncommitted)
     }
 
     async fn report_depth(&self) -> Result<usize> {
