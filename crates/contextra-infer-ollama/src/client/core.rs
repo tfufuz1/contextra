@@ -639,13 +639,7 @@ impl OllamaClient {
 
     /// Ensures that the specified model exists; returns `ContextraError::NotFound` with helpful instruction if missing.
     pub async fn ensure_model_available(&self, model: &str) -> Result<()> {
-        validate_model_name(model)?;
-        if !self.is_model_available(model).await {
-            return Err(ContextraError::NotFound(format!(
-                "Ollama model '{model}' not found. Run: ollama pull {model}"
-            )));
-        }
-        Ok(())
+        self.validate_model_available(model).await
     }
 
     /// Generates vector embedding with retry logic for transient failures.
