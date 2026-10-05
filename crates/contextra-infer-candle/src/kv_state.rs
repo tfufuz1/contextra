@@ -151,7 +151,7 @@ impl KvState {
 
     /// Returns `true` if there are no layer KV tensors or position is zero.
     pub fn is_empty(&self) -> bool {
-        self.layers.is_empty() || self.pos == 0
+        self.layer_count() == 0 || self.pos == 0
     }
 
     /// Returns the active sequence length / position.
