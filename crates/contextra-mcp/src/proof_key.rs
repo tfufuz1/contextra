@@ -80,6 +80,7 @@ pub(crate) fn resolve_deletion_proof_key(
     }
 }
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Liest den DeletionProof-Schlüssel aus den Prozess-Umgebungsvariablen
 /// (`CONTEXTRA_DELETION_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`), ruft die reine Auflösungsfunktion auf
 /// und gibt bei Warnzuständen einmalige `tracing::warn!`-Meldungen aus.
@@ -147,5 +148,19 @@ mod tests {
 
         let res2 = resolve_deletion_proof_key(Some("  "), Some("   "));
         assert_eq!(res2, Err(ProofKeyError::MissingKey));
+    }
+
+    #[test]
+    fn test_deletion_proof_key_from_env() {
+        // Without env var set
+        std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+        std::env::remove_var("CONTEXTRA_PROOF_KEY");
+        assert!(deletion_proof_key_from_env().is_err());
+
+        // With env var set
+        std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", "unit_test_proof_key_12345");
+        let res = deletion_proof_key_from_env().unwrap();
+        assert_eq!(res.as_str(), "unit_test_proof_key_12345");
+        std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
     }
 }
