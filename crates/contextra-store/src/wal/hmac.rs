@@ -183,6 +183,15 @@ impl Wal {
         }
     }
 
+    /// Returns the [`LegacyKeyStatus`] of the active WAL instance.
+    pub fn legacy_key_status(&self) -> LegacyKeyStatus {
+        if self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
+            LegacyKeyStatus::LegacyActive
+        } else {
+            LegacyKeyStatus::Standard
+        }
+    }
+
     /// Exposes the HMAC integrity key for testing.
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
