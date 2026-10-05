@@ -1,20 +1,21 @@
-import contextra
-import numpy as np
-import pytest
+import gc
 import os
 import shutil
+import numpy as np
+import pytest
+import contextra
 
 @pytest.fixture
 def db_path(tmp_path):
-    path = str(tmp_path / "test_j33_fb_db")
+    path = str(tmp_path / "test_j33closure_fb_db")
     yield path
     if os.path.exists(path):
         shutil.rmtree(path)
 
-def test_j33_collection_and_db_flatbuffer_search(db_path):
-    """Test search_fb and hybrid_search_fb methods on PyCollection and PyContextra (Db)."""
+def test_j33closure_collection_and_db_flatbuffer_search(db_path):
+    """Test search_fb and hybrid_search_fb Python calling capability on PyCollection and PyContextra (Db)."""
     db = contextra.open(db_path, dimension=4)
-    col = db.collection("fb_test_col")
+    col = db.collection("fb_closure_col")
 
     v1 = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
     v2 = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
@@ -42,9 +43,14 @@ def test_j33_collection_and_db_flatbuffer_search(db_path):
     assert isinstance(db_hybrid_fb_bytes, bytes)
     assert len(db_hybrid_fb_bytes) > 0
 
+    # Verify memory GC safety on PyBytes
+    gc.collect()
+    assert len(col_fb_bytes) > 0
+    assert len(db_hybrid_fb_bytes) > 0
 
-def test_j33_flatbuffer_search_bounds_validation(db_path):
-    """Test parameter validation for search_fb and hybrid_search_fb."""
+
+def test_j33closure_flatbuffer_search_bounds_validation(db_path):
+    """Test parameter validation for search_fb and hybrid_search_fb from Python."""
     db = contextra.open(db_path, dimension=4)
     col = db.collection("bounds_col")
     v = np.array([0.5, 0.5, 0.0, 0.0], dtype=np.float32)
