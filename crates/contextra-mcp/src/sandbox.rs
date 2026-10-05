@@ -499,7 +499,6 @@ impl McpSandbox {
         Ok(())
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Ruft einen verschlüsselten Tool-Output ab und entschlüsselt ihn.
     pub fn get_volatile(&self, key: &str) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>> {
         let results = self.volatile_results.lock();
