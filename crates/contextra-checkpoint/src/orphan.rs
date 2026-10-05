@@ -155,8 +155,9 @@ pub struct PinnedSeqNoOrphan {
 pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
     tracing::warn!(
         seq_no = orphan.seq_no,
-        "register_pinned_seq_no_orphan is deprecated and no-op; use InstanceOrphanRegistry instead"
+        "register_pinned_seq_no_orphan is deprecated; forwarding to global_orphan_registry (ADR-053)"
     );
+    let _ = global_orphan_registry().register_orphan(orphan.seq_no);
 }
 
 /// Instance-scoped orphan state for checkpoints and pinned sequence numbers.
@@ -498,12 +499,14 @@ mod tests {
     fn test_deprecated_global_orphan_path_warns() {
         #[allow(deprecated)]
         {
+            global_orphan_registry().clear_all();
             clear_all_orphaned_checkpoints();
             register_pinned_seq_no_orphan(PinnedSeqNoOrphan {
                 seq_no: 99999,
                 timestamp_ms: 1000,
             });
             let _orphans = get_orphaned_checkpoints();
+            global_orphan_registry().clear_all();
             clear_all_orphaned_checkpoints();
         }
     }
