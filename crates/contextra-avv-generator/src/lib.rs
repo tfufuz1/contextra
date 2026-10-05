@@ -47,6 +47,11 @@ impl AvvContext {
         }
     }
 
+    /// Associated helper returning Contextra's default list of technical measures.
+    pub fn default_technical_measures() -> Vec<TechnicalMeasure> {
+        default_technical_measures()
+    }
+
     /// Builder pattern entry point for constructing an [`AvvContext`].
     // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn builder(
@@ -87,6 +92,12 @@ impl AvvContextBuilder {
         self
     }
 
+    /// Resets technical measures to Contextra's default set.
+    pub fn with_default_technical_measures(mut self) -> Self {
+        self.ctx.technical_measures = default_technical_measures();
+        self
+    }
+
     /// Appends a technical measure to the list.
     pub fn add_technical_measure(mut self, measure: TechnicalMeasure) -> Self {
         self.ctx.technical_measures.push(measure);
@@ -116,9 +127,9 @@ impl AvvContextBuilder {
         self.ctx
     }
 
-    /// Directly renders the built [`AvvContext`] into a Markdown document.
+    /// Directly renders the built [`AvvContext`] into a Markdown document using [`render_avv_markdown`].
     pub fn render(self) -> Result<String, AvvGeneratorError> {
-        self.ctx.render()
+        render_avv_markdown(&self.ctx)
     }
 }
 
