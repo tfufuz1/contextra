@@ -130,26 +130,45 @@ impl Wal {
     }
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`) with progress callback.
+    /// Falls back to stream replay if mmap or parsing fails.
     #[allow(clippy::type_complexity)]
     pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let std_file = std::fs::File::open(&self.path)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
-        let metadata = std_file
-            .metadata()
-            .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
-        let file_size = metadata.len();
+        let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+            let std_file = std::fs::File::open(&self.path)
+                .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
+            let metadata = std_file
+                .metadata()
+                .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
+            let file_size = metadata.len();
 
-        if file_size == 0 {
-            return Ok((Vec::new(), WalVersion::V1));
+            if file_size == 0 {
+                return Ok((Vec::new(), WalVersion::V1));
+            }
+
+            let mmap = contextra_sys::mmap_readonly(&std_file)
+                .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
+
+            self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
+        })();
+
+        match mmap_res {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                tracing::warn!(
+                    path = %self.path.display(),
+                    error = %e,
+                    "WAL mmap replay failed, falling back to stream reader"
+                );
+                let entries = self.replay_stream().await?;
+                for (seq, _, _) in &entries {
+                    sink.on_entry_replayed(*seq, None);
+                }
+                Ok((entries, WalVersion::V3))
+            }
         }
-
-        let mmap = contextra_sys::mmap_readonly(&std_file)
-            .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
-
-        self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
     #[allow(dead_code, clippy::type_complexity)]
