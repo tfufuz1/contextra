@@ -62,6 +62,7 @@ impl KvSegmentManager {
     ///
     /// Under `KvDeleteMode::CryptoShred`, encrypts `plaintext` using a subkey derived for `group_id` via `KeyRegistry`.
     /// Under `KvDeleteMode::TombstoneOnly`, stores `plaintext` unencrypted without subkey derivation.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn write_segment(
         &self,
         group_id: u64,
@@ -103,6 +104,7 @@ impl KvSegmentManager {
     /// Under `CryptoShred`, decrypts using the subkey in `KeyRegistry`. If the subkey was revoked (deleted),
     /// decryption fails and returns an error.
     /// Under `TombstoneOnly`, returns the raw payload bytes.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn read_segment(&self, segment: &KvSegmentPayload) -> Result<Vec<u8>, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::CryptoShred => {
@@ -142,6 +144,7 @@ impl KvSegmentManager {
     /// Under `CryptoShred`, revokes (destroys) the subkey for `group_id` in `KeyRegistry` in O(1) time.
     /// The physical ciphertext remains intact on disk, but becomes information-theoretically unrecoverable.
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn delete_segment(&self, group_id: u64) -> bool {
         match self.config.delete_mode {
             KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id).unwrap_or(false),
@@ -154,6 +157,7 @@ impl KvSegmentManager {
     /// INVARIANTE `INV-KV-DELETE-1`: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente
     /// möglich, niemals für `TombstoneOnly`. Falls ein Aufrufer versucht, für ein `TombstoneOnly`-Segment einen
     /// Löschbeweis auszustellen, schlägt dies mit `ContextraError::KvDeleteModeConfig` fehl.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn generate_deletion_proof(&self, group_id: u64) -> Result<bool, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::TombstoneOnly => Err(ContextraError::KvDeleteModeConfig(
