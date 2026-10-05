@@ -130,6 +130,16 @@ impl KeyManager {
         })
     }
 
+    /// Creates a new [`KeyManager`] using Argon2id password-based key derivation with default OWASP parameters.
+    ///
+    /// Generates a default [`KdfHeader`] with a fresh 32-byte salt and derives the master key via Argon2id.
+    /// Returns both the initialized `KeyManager` instance and the generated header for serialization/persistence.
+    pub fn try_new_argon2id(passphrase: &str) -> Result<(Self, KdfHeader)> {
+        let header = KdfHeader::generate_default()?;
+        let km = Self::try_new_with_kdf(passphrase, &header)?;
+        Ok((km, header))
+    }
+
     /// Creates a new KeyManager with a cryptographically secure random salt.
     pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8; 32])> {
         let mut salt = [0u8; 32];
@@ -163,7 +173,8 @@ impl KeyManager {
         // Erweiterungen (z.B. zweites Feld) ohne diese Falle zu schreiben.
         let mut info = Vec::with_capacity(b"contextra-file-key-v1:".len() + 4 + file_id.len());
         info.extend_from_slice(b"contextra-file-key-v1:");
-        info.extend_from_slice(&(file_id.len() as u32).to_le_bytes());
+        let file_id_len = u32::try_from(file_id.len()).unwrap_or(u32::MAX);
+        info.extend_from_slice(&file_id_len.to_le_bytes());
         info.extend_from_slice(file_id);
 
         hk.expand(&info, &mut sub_key)
@@ -183,6 +194,22 @@ impl KeyManager {
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
         })
+    }
+
+    /// Derives a sub-key specifically for a KV-cache segment identified by tenant ID and segment ID.
+    ///
+    /// Formats the versioned segment descriptor string and delegates to [`Self::derive_segment_key`].
+    pub fn derive_segment_key_for_id(
+        &self,
+        tenant_id: contextra_types::TenantId,
+        segment_id: u64,
+    ) -> Result<Self> {
+        let info = format!(
+            "contextra-kv-v1-segment-{}-{}",
+            tenant_id.inner(),
+            segment_id
+        );
+        self.derive_segment_key(&info)
     }
 
     /// Derives a sub-key specifically for a KV-cache segment based on a versioned info string.
@@ -245,9 +272,11 @@ impl KeyManager {
         info.extend_from_slice(&tenant_id.inner().to_le_bytes());
         info.extend_from_slice(&model_fingerprint.hash);
         // Length-prefixed fields (S-2 fix): u32 LE prefix prevents concatenation ambiguity
-        info.extend_from_slice(&(model_id_bytes.len() as u32).to_le_bytes());
+        let model_id_len = u32::try_from(model_id_bytes.len()).unwrap_or(u32::MAX);
+        let quantization_len = u32::try_from(quantization_bytes.len()).unwrap_or(u32::MAX);
+        info.extend_from_slice(&model_id_len.to_le_bytes());
         info.extend_from_slice(model_id_bytes);
-        info.extend_from_slice(&(quantization_bytes.len() as u32).to_le_bytes());
+        info.extend_from_slice(&quantization_len.to_le_bytes());
         info.extend_from_slice(quantization_bytes);
 
         hk.expand(&info, &mut sub_key)
@@ -326,6 +355,28 @@ impl KeyManager {
             CryptoError::Crypto(format!("HKDF deletion proof key expansion failed: {}", e))
         })?;
         Ok(key)
+    }
+
+    /// Creates and signs a v2 [`DeletionProof`][crate::deletion_proof::DeletionProof] using a sub-key
+    /// derived specifically for cryptographic deletion proofs via [`Self::derive_deletion_proof_key`].
+    pub fn create_deletion_proof(
+        &self,
+        scope: crate::deletion_proof::DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: contextra_types::TxId,
+        covered_layers: Vec<crate::deletion_proof::LayerCleanupProof>,
+        excluded_scopes: Vec<crate::deletion_proof::ExcludedScope>,
+    ) -> Result<crate::deletion_proof::DeletionProof> {
+        let proof_key = self.derive_deletion_proof_key()?;
+        crate::deletion_proof::DeletionProof::create(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            &proof_key,
+        )
+        .map_err(|e| CryptoError::Crypto(e.to_string()))
     }
 
     /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.

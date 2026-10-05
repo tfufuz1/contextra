@@ -228,6 +228,13 @@ impl IntegrityVerifier {
         self.last_seq_no
     }
 
+    /// Transferiert sowohl `last_hmac` als auch `last_seq_no` von einer `source`-Instanz
+    /// für einen vollständigen Verifier-Handoff.
+    pub fn handoff_from(&mut self, source: &Self) {
+        self.set_last_hmac(source.last_hmac_snapshot());
+        self.set_last_seq_no(source.last_seq_no_snapshot());
+    }
+
     /// Verifies a V3 entry (with tx_id and length prefixes) and updates the chain state.
     pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
