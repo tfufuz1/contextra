@@ -55,6 +55,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
 
     /// Setzt den optionalen `EdgeReinforcementBuffer` für F-03.
     #[cfg(feature = "edge-reinforcement-learning")]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_edge_reinforcement_buffer(
         mut self,
         buffer: Arc<contextra_graph::EdgeReinforcementBuffer>,
@@ -69,11 +70,13 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 
     /// Erhöht die Anzahl aktiver Agenten-Sessions.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn increment_active_sessions(&self) -> usize {
         self.active_sessions.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     /// Verringert die Anzahl aktiver Agenten-Sessions.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn decrement_active_sessions(&self) -> usize {
         self.active_sessions
             .fetch_sub(1, Ordering::SeqCst)
