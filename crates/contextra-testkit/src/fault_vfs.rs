@@ -23,6 +23,7 @@ pub struct FaultConfig {
     pub fail_all: bool,
 }
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Simulated in-memory file system with deterministic fault injection capabilities.
 #[derive(Debug, Clone, Default)]
 pub struct FaultVfs {

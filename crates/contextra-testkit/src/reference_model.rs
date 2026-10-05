@@ -14,6 +14,7 @@ pub enum RefOp {
     Delete { key: Vec<u8> },
 }
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceModel {
@@ -164,17 +165,9 @@ impl ReferenceModel {
 
     /// Returns a full snapshot map of latest visible key-values at `seq`.
     pub fn snapshot_map_at(&self, seq: u64) -> BTreeMap<Vec<u8>, Vec<u8>> {
-        let mut map = BTreeMap::new();
-        for (key, versions) in &self.history {
-            if let Some((_, Some(val))) = versions
-                .iter()
-                .rev()
-                .find(|(version_seq, _)| *version_seq <= seq)
-            {
-                map.insert(key.clone(), val.clone());
-            }
-        }
-        map
+        self.scan_range_at(Bound::Unbounded, Bound::Unbounded, seq)
+            .into_iter()
+            .collect()
     }
 }
 
