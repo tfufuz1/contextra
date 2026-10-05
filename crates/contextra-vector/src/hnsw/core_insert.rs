@@ -372,10 +372,18 @@ impl HnswIndexCore {
         };
 
         let m = self.cold.config.m;
-        self.hot
+        let mmap_count = self
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+
+        let ram_idx = self.hot
             .arena
             .allocate_node(prepared.new_layer, m, &prepared.final_connections)
-            .ok();
+            .unwrap_or_else(|_| prepared.new_idx.saturating_sub(mmap_count));
 
         for backlink in prepared.neighbor_backlinks {
             self.hot
@@ -389,11 +397,20 @@ impl HnswIndexCore {
                 .ok();
         }
 
-        self.hot.nodes.write().push(node);
+        let mut nodes = self.hot.nodes.write();
+        let global_idx = mmap_count + ram_idx;
+        if ram_idx < nodes.len() {
+            nodes[ram_idx] = node;
+            if self.cold.deleted_nodes.write().remove(global_idx as u64) {
+                self.hot.deleted_count.fetch_sub(1, Ordering::SeqCst);
+            }
+        } else {
+            nodes.push(node);
+        }
         self.hot
             .doc_to_node
             .write()
-            .insert(prepared.doc_id.inner(), prepared.new_idx);
+            .insert(prepared.doc_id.inner(), global_idx);
 
         let current_ep = self.hot.get_entry_point();
         if prepared.should_update_entry_point || current_ep.is_none() {
