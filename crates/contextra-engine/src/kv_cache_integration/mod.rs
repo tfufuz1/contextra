@@ -53,10 +53,9 @@ impl AttentionExporter for AccessCounterAttentionExporter {
 /// Primary composition root function for building an [`EvictionWorker`].
 ///
 /// Spawns the [`EvictionWorker`] for the provided [`TenantIsolatedKvStore`]
-/// and wires it with a production [`CandleAttentionExporter`].
+/// and wires it with a production [`CandleAttentionExporter`] via [`start_kv_cache_eviction`].
 pub fn build_eviction_worker(store: Arc<TenantIsolatedKvStore>) -> EvictionWorker {
-    let exporter: Arc<dyn AttentionExporter> = Arc::new(CandleAttentionExporter::new());
-    build_eviction_worker_with_exporter(store, exporter)
+    start_kv_cache_eviction(store)
 }
 
 /// Composition root function allowing injection of a custom [`AttentionExporter`].
@@ -71,8 +70,9 @@ pub fn build_eviction_worker_with_exporter(
 
 /// Engine lifecycle integration entry point for KV cache background eviction.
 ///
-/// Delegates to [`build_eviction_worker`] to instantiate and attach the active
+/// Delegates to [`build_eviction_worker_with_exporter`] to instantiate and attach the active
 /// attention exporter to the background eviction thread.
 pub fn start_kv_cache_eviction(store: Arc<TenantIsolatedKvStore>) -> EvictionWorker {
-    build_eviction_worker(store)
+    let exporter: Arc<dyn AttentionExporter> = Arc::new(CandleAttentionExporter::new());
+    build_eviction_worker_with_exporter(store, exporter)
 }

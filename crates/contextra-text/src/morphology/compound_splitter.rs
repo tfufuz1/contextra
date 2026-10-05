@@ -109,23 +109,14 @@ impl GermanCompoundSplitter {
     pub fn with_domains(min_len: usize, domains: &[&dyn DomainVocabulary]) -> Self {
         let mut splitter = Self::with_min_length(min_len);
         for domain in domains {
-            for stem in domain.compound_stems() {
-                let norm = normalize_umlauts(stem);
-                if norm.len() >= 2 {
-                    splitter.trie.insert(&norm);
-                }
-            }
-            for term in domain.protected_terms() {
-                let norm = normalize_umlauts(term);
-                if norm.len() >= 2 {
-                    splitter.trie.insert(&norm);
-                }
-            }
+            splitter.extend_vocabulary(domain.compound_stems());
+            splitter.extend_vocabulary(domain.protected_terms());
         }
         splitter
     }
 
     /// Creates a splitter loaded with default German vocabulary and all built-in domain vocabularies (Legal & Medical).
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn new_with_all_domains() -> Self {
         let legal = LegalDomainVocabulary;
         let medical = MedicalDomainVocabulary;

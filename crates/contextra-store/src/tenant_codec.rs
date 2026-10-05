@@ -39,6 +39,7 @@ impl TenantKeyCodec {
 
     /// Encodes a document chunk key: `t:{tenant}:{collection}:chunk:{doc}`.
     #[inline]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn encode_chunk_key(&self, collection: &CollectionId, doc_id: DocId) -> Vec<u8> {
         format!(
             "t:{}:{}:chunk:{}",
@@ -51,6 +52,7 @@ impl TenantKeyCodec {
 
     /// Encodes a graph entity key: `t:{tenant}:{collection}:graph:{entity}`.
     #[inline]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn encode_graph_key(&self, collection: &CollectionId, entity_id: u64) -> Vec<u8> {
         format!(
             "t:{}:{}:graph:{}",
@@ -69,12 +71,14 @@ impl TenantKeyCodec {
     }
 
     /// Collection-spezifisches Scan-Präfix: `t:{tenant}:{col}:`
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn collection_prefix(&self, collection: &CollectionId) -> Vec<u8> {
         format!("t:{}:{}:", self.tenant_id.inner(), collection.0).into_bytes()
     }
 
     /// Dekodiert TenantId aus encoded Key. None bei ungültigem Format.
     /// Kein Unwrap — robuste Nutzung im Recovery-Pfad.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn decode_tenant_id(key: &[u8]) -> Option<TenantId> {
         let s = std::str::from_utf8(key).ok()?;
         let rest = s.strip_prefix("t:")?;

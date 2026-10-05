@@ -722,15 +722,8 @@ impl Wal {
     /// Non-blocking attempt to append a prepared batch. Returns `Err(ContextraError::Storage("WAL queue full (backpressure)"))`
     /// if the flusher channel buffer is full.
     pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let ack_rx = {
-            let truncate_guard = self.truncate_lock.lock().await;
-            self.try_enqueue_append_batch_locked(batch, &truncate_guard)
-                .await?
-        };
-        ack_rx
-            .await
-            .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
-        Ok(())
+        let truncate_guard = self.truncate_lock.lock().await;
+        self.try_append_batch_locked(batch, &truncate_guard).await
     }
 
     pub async fn try_enqueue_append_batch_locked(

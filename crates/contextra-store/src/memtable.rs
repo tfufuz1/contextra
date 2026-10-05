@@ -263,6 +263,7 @@ impl MemTable {
     }
 
     /// Returns the transaction ID range covered by this MemTable.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn tx_range(&self) -> (u64, u64) {
         (
             self.min_tx.load(Ordering::Acquire),
@@ -484,6 +485,7 @@ impl MemTable {
     ///
     /// Iterates over each shard's range defined by `(start, end)` bounds and merges matching visible entries directly
     /// into `target`. Higher `seq_no` versions shadow lower `seq_no` versions.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn scan_range_into(
         &self,
         start: Bound<&[u8]>,
@@ -568,6 +570,7 @@ impl MemTable {
 
     /// Returns entry count for each shard (used for testing shard distribution).
     #[doc(hidden)]
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn shard_entry_counts(&self) -> [usize; SHARD_COUNT] {
         std::array::from_fn(|i| self.shards[i].entries.read().len())
     }

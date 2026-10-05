@@ -621,6 +621,12 @@ impl FlowCorrectedThompsonBandit {
 
         self.drift_rate = delta;
     }
+
+    /// Recomputes the drift rate from the window in a background task by creating a `Ring3Token` internally.
+    pub fn recompute_drift_rate_in_background(&mut self) {
+        let token = ring3_background_task_token();
+        self.recompute_drift_rate_from_window(&token);
+    }
 }
 
 /// Referenzpolitik basierend auf Diagonal-Approximation für Off-Policy-Evaluation (§B.3.2).
@@ -766,7 +772,10 @@ impl FcTsArmSet {
             }
         }
 
-        let candidate_idx = best_idx as u32;
+        // FIX(2026-10-05): Safe conversion from usize to u32 for arm index to fix clippy::cast_possible_truncation
+        let candidate_idx = u32::try_from(best_idx).map_err(|_| {
+            FcTsError::InvalidConfig("best_idx exceeds u32::MAX".to_string())
+        })?;
 
         if let Some(sink) = self.arms.iter().find_map(|a| a.shadow_sink.clone()) {
             let mut baseline_best_idx = 0;
@@ -780,14 +789,45 @@ impl FcTsArmSet {
                 }
             }
 
+            // FIX(2026-10-05): Safe conversion from usize to u32 for baseline best index to fix clippy::cast_possible_truncation
+            let baseline_idx = u32::try_from(baseline_best_idx).map_err(|_| {
+                FcTsError::InvalidConfig("baseline_best_idx exceeds u32::MAX".to_string())
+            })?;
+
             sink.record(crate::shadow_mode::ShadowDiscrepancy {
-                baseline: baseline_best_idx as u32,
+                baseline: baseline_idx,
                 candidate: candidate_idx,
                 context_id: 0,
             });
         }
 
         Ok(candidate_idx)
+    }
+
+    /// Updates an arm in the set with a new observation flow.
+    pub fn update_arm(
+        &mut self,
+        arm_idx: usize,
+        context: &[f32],
+        reward: f32,
+        observation_time: u64,
+        confidence_weight: f32,
+    ) -> Result<(), FcTsError> {
+        let total_arms = self.arms.len();
+        let arm = self.arms.get_mut(arm_idx).ok_or_else(|| {
+            FcTsError::InvalidConfig(format!(
+                "Arm index {arm_idx} out of bounds (total arms: {total_arms})"
+            ))
+        })?;
+        arm.update_with_flow(context, reward, observation_time, confidence_weight)
+    }
+
+    /// Triggers background drift rate recomputation for all arms in the set.
+    pub fn recompute_drift_rates_in_background(&mut self) {
+        let token = ring3_background_task_token();
+        for arm in &mut self.arms {
+            arm.recompute_drift_rate_from_window(&token);
+        }
     }
 }
 

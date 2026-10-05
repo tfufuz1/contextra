@@ -36,6 +36,7 @@ impl Default for ArmRegistry {
 }
 
 impl ArmRegistry {
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert die `RetrievalStrategy` für den gegebenen Arm-Index (0..=4).
     pub fn strategy_for(&self, arm: u32) -> Result<RetrievalStrategy, ArmRegistryError> {
         self.arms
@@ -44,6 +45,7 @@ impl ArmRegistry {
             .ok_or(ArmRegistryError::OutOfRange(arm))
     }
 
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Liefert den Arm-Index (0..=4) für die gegebene `RetrievalStrategy`.
     ///
     /// Die Implementierung verwendet ein `match` über alle bekannten Varianten mit einem

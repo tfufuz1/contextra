@@ -76,13 +76,17 @@ impl AuditChainEntry {
     ) -> Result<[u8; 32]> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&index.to_le_bytes());
-        hasher.update(&(schema_id.len() as u32).to_le_bytes());
+        let schema_len = u32::try_from(schema_id.len())
+            .map_err(|e| CryptoError::Crypto(format!("schema_id length overflow: {e}")))?;
+        hasher.update(&schema_len.to_le_bytes());
         hasher.update(schema_id.as_bytes());
         hasher.update(rules_hash);
 
         let class_bytes = bincode::serialize(&data_class)
             .map_err(|e| CryptoError::Crypto(format!("DataClass serialization failed: {e}")))?;
-        hasher.update(&(class_bytes.len() as u32).to_le_bytes());
+        let class_len = u32::try_from(class_bytes.len())
+            .map_err(|e| CryptoError::Crypto(format!("class_bytes length overflow: {e}")))?;
+        hasher.update(&class_len.to_le_bytes());
         hasher.update(&class_bytes);
 
         hasher.update(&doc_id.0.to_le_bytes());
@@ -365,5 +369,30 @@ impl AuditChain {
         } else {
             Ok(false)
         }
+    }
+
+    /// Erzeugt einen Anker des aktuellen Kettenkopfs zusammen mit einer Ed25519-Kettenkopf-Signatur.
+    pub fn create_signed_anchor(
+        &self,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<(AuditChainAnchor, AuditChainHeadSignature)> {
+        let anchor = self.anchor().ok_or_else(|| {
+            CryptoError::Crypto("Cannot create anchor for an empty AuditChain".to_string())
+        })?;
+        let head_sig = self.sign_head(signing_key)?;
+        Ok((anchor, head_sig))
+    }
+
+    /// Verifiziert die Kette gegen einen Anker und prüft zusätzlich die Kettenkopf-Signatur.
+    pub fn verify_signed_anchor(
+        &self,
+        anchor: &AuditChainAnchor,
+        head_sig: &AuditChainHeadSignature,
+        verifying_key: &ed25519_dalek::VerifyingKey,
+    ) -> Result<bool> {
+        if !self.verify_chain_against_anchor(anchor)? {
+            return Ok(false);
+        }
+        Self::verify_head_signature(head_sig, verifying_key)
     }
 }

@@ -220,6 +220,25 @@ impl RieGreedyProfile {
         }
         trace
     }
+
+    /// Liefert die mittlere Parameter-Unsicherheit des Profils ($\text{Tr}(\Lambda^{-1}) / d$).
+    pub fn uncertainty(&self) -> f32 {
+        if self.dim == 0 {
+            0.0
+        } else {
+            self.trace_precision_inv() / self.dim as f32
+        }
+    }
+
+    /// Berechnet den Konfidenz-Score im Intervall (0, 1] basierend auf der Spur der inversen Präzisionsmatrix.
+    pub fn confidence_score(&self) -> f32 {
+        let trace = self.trace_precision_inv();
+        if trace <= 0.0 || !trace.is_finite() {
+            0.0
+        } else {
+            1.0 / (1.0 + trace)
+        }
+    }
 }
 
 #[cfg(test)]

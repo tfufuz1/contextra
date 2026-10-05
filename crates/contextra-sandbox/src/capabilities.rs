@@ -69,17 +69,6 @@ impl Default for WasmCapabilities {
 
 impl WasmCapabilities {
     /// Returns a strict `WasmCapabilities` preset for pure merge operators.
-    pub fn pure_merge_operator() -> Self {
-        MergeOperatorCapabilities::pure()
-    }
-}
-
-/// Dedicated pure capabilities preset for I/O-free WASM Merge Operators (§4.18).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MergeOperatorCapabilities;
-
-impl MergeOperatorCapabilities {
-    /// Returns a strict `WasmCapabilities` preset for pure merge operators.
     ///
     /// # Security Profile
     /// - `allow_stdout`: `false`
@@ -92,8 +81,9 @@ impl MergeOperatorCapabilities {
     /// - `max_memory_pages`: `16` (1 MB)
     /// - `max_fuel`: `10_000_000`
     /// - `max_wall_clock_ms`: `5_000`
-    pub fn pure() -> WasmCapabilities {
-        WasmCapabilities {
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    pub fn pure_merge_operator() -> Self {
+        Self {
             allow_stdout: false,
             allow_stderr: false,
             max_memory_pages: 16, // 1 MB
@@ -109,6 +99,17 @@ impl MergeOperatorCapabilities {
             max_stdin_bytes: 1024 * 1024,
             random_seed: None,
         }
+    }
+}
+
+/// Dedicated pure capabilities preset for I/O-free WASM Merge Operators (§4.18).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MergeOperatorCapabilities;
+
+impl MergeOperatorCapabilities {
+    /// Returns a strict `WasmCapabilities` preset for pure merge operators.
+    pub fn pure() -> WasmCapabilities {
+        WasmCapabilities::pure_merge_operator()
     }
 
     /// Returns a strict `WasmCapabilities` preset for merge operators with stdout enabled for returning output bytes.

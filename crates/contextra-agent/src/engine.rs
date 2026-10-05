@@ -58,6 +58,14 @@ impl OrchestratorEngine {
         self
     }
 
+    /// Attaches a [`MetricsSink`] to the internal dead-letter queue, if configured.
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        if let Some(dlq) = self.dead_letter_queue.take() {
+            self.dead_letter_queue = Some(dlq.with_metrics_sink(sink));
+        }
+        self
+    }
+
     fn now_secs(&self) -> u64 {
         self.clock.now_unix_nanos() / 1_000_000_000
     }
@@ -125,15 +133,6 @@ impl OrchestratorEngine {
         })
     }
 
-    /// Helper constructor creating OrchestratorEngine directly from Contextra DB handle.
-    #[allow(deprecated)]
-    #[deprecated(
-        note = "Use try_from_db instead to handle initialization errors without panicking"
-    )]
-    pub fn from_db(db: &contextra_db::Contextra) -> Self {
-        Self::new(db.inner_storage())
-    }
-
     /// Attempts to register an agent tool with boundary validation on the tool name.
     pub fn try_register_tool(&mut self, tool: Box<dyn AgentTool>) -> Result<()> {
         let name = tool.name();
@@ -177,6 +176,11 @@ impl OrchestratorEngine {
     async fn run_internal(&self, ctx: &mut AgentContext, graph: &StateGraph) -> Result<()> {
         // Startup orphan recovery MUST execute before first agent step (Befund A.3)
         self.recover_orphans().await?;
+
+        // Perform legacy audit entry migration if needed before starting step processing
+        crate::audit::AuditLog::new(ctx.state_collection.clone())
+            .migrate_legacy_entries()
+            .await?;
 
         loop {
             tokio::task::yield_now().await;
@@ -601,7 +605,9 @@ impl OrchestratorEngine {
             let restored_budget =
                 contextra_types::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
-            restored_budget.consume(consumed as usize);
+            if let Ok(consumed_usize) = usize::try_from(consumed) {
+                restored_budget.consume(consumed_usize);
+            }
             ctx.budget = restored_budget;
         } else if let Some(available) = checkpoint
             .metadata
@@ -612,7 +618,8 @@ impl OrchestratorEngine {
                 .budget
                 .effective_limit()
                 .saturating_sub(ctx.budget.reserved);
-            let consumed = total_usable.saturating_sub(available as usize);
+            let available_usize = usize::try_from(available).unwrap_or(usize::MAX);
+            let consumed = total_usable.saturating_sub(available_usize);
             let restored_budget =
                 contextra_types::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
@@ -680,7 +687,7 @@ impl OrchestratorEngine {
                 event_res = source.next_event() => {
                     match event_res? {
                         Some(event) => {
-                            ctx.attach_event(event);
+                            ctx.try_attach_event(event)?;
                             self.run(ctx, graph).await?;
                             self.checkpoint(ctx).await?;
                         }

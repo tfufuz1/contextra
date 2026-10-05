@@ -180,51 +180,6 @@ impl WalEntry {
         }
     }
 
-    /// Legacy V2 checksum calculation (without tx_id and length-prefixes in HMAC).
-    pub fn compute_checksum_v2(
-        op: &WalOp,
-        seq_no: u64,
-        integrity_key: &[u8],
-        prev_hmac: [u8; 32],
-    ) -> Result<[u8; 32]> {
-        #[cfg(feature = "wal-integrity")]
-        {
-            let mut mac = WalHmac::new(integrity_key)?;
-
-            mac.update(&prev_hmac);
-            mac.update(&seq_no.to_le_bytes());
-            match op {
-                WalOp::Put { key, value, .. } => {
-                    mac.update(&[0u8]);
-                    mac.update(key);
-                    mac.update(value);
-                }
-                WalOp::Delete { key, .. } => {
-                    mac.update(&[1u8]);
-                    mac.update(key);
-                }
-                WalOp::TxEnd { committed, .. } => {
-                    mac.update(&[2u8]);
-                    mac.update(&[*committed as u8]);
-                }
-            }
-            Ok(mac.finalize())
-        }
-        #[cfg(not(feature = "wal-integrity"))]
-        {
-            let _ = (op, seq_no, integrity_key, prev_hmac);
-            Ok([0u8; 32])
-        }
-    }
-
-    pub fn compute_checksum(
-        op: &WalOp,
-        seq_no: u64,
-        integrity_key: &[u8],
-        prev_hmac: [u8; 32],
-    ) -> Result<[u8; 32]> {
-        Self::compute_checksum_v3(op, seq_no, integrity_key, prev_hmac)
-    }
 
     /// Serializes the entry to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {

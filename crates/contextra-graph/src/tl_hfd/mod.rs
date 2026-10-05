@@ -50,4 +50,13 @@ impl CsrGraph {
     ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
         tl_hfd_local(self, seeds, params)
     }
+
+    /// Evaluates TL-HFD over CsrGraph.
+    pub fn evaluate_thresholded_local_hfd(
+        &self,
+        seeds: &[EntityId],
+        params: &TlHfdParams,
+    ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
+        self.thresholded_local_hfd(seeds, params)
+    }
 }

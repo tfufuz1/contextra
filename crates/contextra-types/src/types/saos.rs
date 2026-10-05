@@ -452,6 +452,7 @@ impl HybridQuery {
     }
 }
 
+// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Builder for HybridQuery to improve DX.
 #[derive(Default)]
 pub struct HybridQueryBuilder {

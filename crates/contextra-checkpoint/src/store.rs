@@ -4,6 +4,8 @@ use crate::hardlink_cloner::{
 };
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
+#[allow(deprecated)]
+use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
 use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
@@ -714,6 +716,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
         let orphans = self.orphan_registry.get_orphan_pins();
         let mut recovered = Vec::new();
@@ -724,6 +727,12 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                 recovered.push(orphan.seq_no);
                 self.orphan_registry.clear_orphan_pin(orphan.seq_no);
             }
+        }
+        #[allow(deprecated)]
+        if let Ok(global_recovered) =
+            global_orphan_registry().recover_and_clean(&*self.storage).await
+        {
+            recovered.extend(global_recovered);
         }
         Ok(recovered)
     }
@@ -761,6 +770,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Creates a physical hardlink clone of all SSTable files visible for `seq_no` into `target_dir`.
     ///
     /// Delegates to [`DefaultHardlinkCloner`] while holding a snapshot pin in `snapshot_registry`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn create_hardlink_clone(
         &self,
         seq_no: u64,

@@ -165,12 +165,16 @@ impl AgentContext {
 
     /// Records a cache directive for a specific step ID.
     pub fn set_step_cache_directive(&mut self, step_id: StepId, directive: CacheDirective) {
-        self.current_cache_directive = directive.clone();
+        self.set_cache_directive(directive.clone());
         self.step_directives.insert(step_id.inner(), directive);
     }
 
     /// Returns the appropriate `CacheDirective` for a workflow node / prompt role.
     pub fn directive_for_node(&self, node_id: &str, step_id: StepId) -> CacheDirective {
+        Self::eval_directive_for_node(node_id, step_id)
+    }
+
+    pub(crate) fn eval_directive_for_node(node_id: &str, step_id: StepId) -> CacheDirective {
         let lower = node_id.to_lowercase();
         if lower.contains("system") || lower.contains("prompt") {
             CacheDirective::Pin { ttl: None }
@@ -235,14 +239,7 @@ impl AgentEngine {
     /// - Transient reasoning steps -> `CacheDirective::ReleaseAfterStep { step_id }`
     /// - Default -> `CacheDirective::Auto`
     pub fn directive_for_step(&self, node_id: &str, step_id: StepId) -> CacheDirective {
-        let lower = node_id.to_lowercase();
-        if lower.contains("system") || lower.contains("prompt") {
-            CacheDirective::Pin { ttl: None }
-        } else if lower.contains("reasoning") || lower.contains("transient") {
-            CacheDirective::ReleaseAfterStep { step_id }
-        } else {
-            CacheDirective::Auto
-        }
+        AgentContext::eval_directive_for_node(node_id, step_id)
     }
 
     /// Executes step configuration, updating context with per-step cache directives.
@@ -252,10 +249,10 @@ impl AgentEngine {
         step_id: StepId,
         node_id: &str,
     ) -> CacheDirective {
-        let directive = self.directive_for_step(node_id, step_id);
+        let directive = ctx.directive_for_node(node_id, step_id);
         self.current_directive = directive.clone();
-        ctx.set_step_cache_directive(step_id, directive.clone());
-        directive
+        ctx.set_step_cache_directive(step_id, directive);
+        ctx.get_cache_directive().clone()
     }
 }
 

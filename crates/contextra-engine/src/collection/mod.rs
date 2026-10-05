@@ -299,7 +299,7 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
     /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks (legacy field).
     #[cfg(feature = "encryption-at-rest")]
-    pub(super) kv_store: Option<Arc<contextra_crypto::TenantIsolatedKvStore>>,
+    pub(super) kv_store: Option<Arc<dyn KvLifecycleHooks>>,
     /// Feature-independent KV lifecycle hooks port.
     pub(super) kv_hooks: parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
@@ -539,16 +539,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
     #[cfg(feature = "encryption-at-rest")]
     pub fn with_kv_store(mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
-        *self.kv_hooks.write() = Some(Arc::new(CryptoKvStoreAdapter(kv_store.clone())));
-        self.kv_store = Some(kv_store);
+        let adapter: Arc<dyn KvLifecycleHooks> = Arc::new(CryptoKvStoreAdapter(kv_store));
+        *self.kv_hooks.write() = Some(adapter.clone());
+        self.kv_store = Some(adapter);
         self
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
     #[cfg(feature = "encryption-at-rest")]
     pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
-        *self.kv_hooks.write() = Some(Arc::new(CryptoKvStoreAdapter(kv_store.clone())));
-        self.kv_store = Some(kv_store);
+        let adapter: Arc<dyn KvLifecycleHooks> = Arc::new(CryptoKvStoreAdapter(kv_store));
+        *self.kv_hooks.write() = Some(adapter.clone());
+        self.kv_store = Some(adapter);
     }
 
     #[cfg(all(not(feature = "encryption-at-rest"), test))]
@@ -564,13 +566,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(feature = "encryption-at-rest")]
-    pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
+    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
         self.kv_store.as_ref()
     }
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<crate::TenantIsolatedKvStore>> {
+    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
         None
     }
 

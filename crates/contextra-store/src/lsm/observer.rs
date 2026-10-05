@@ -292,6 +292,7 @@ impl ObserverRegistry {
     }
 
     /// Returns the number of dropped events for a specific registered observer.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn dropped_count_for(&self, observer: &Arc<dyn WalObserver>) -> u64 {
         let guard = self.observers.read();
         guard
@@ -314,6 +315,7 @@ impl ObserverRegistry {
     }
 
     /// Returns whether any registered observer currently has an open circuit breaker.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn is_any_circuit_breaker_open(&self) -> bool {
         let clock = self.clock.read().clone();
         let now_nanos = clock.monotonic_nanos();
@@ -322,6 +324,7 @@ impl ObserverRegistry {
     }
 
     /// Resets the circuit breaker state for a specific observer.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn clear_circuit_breaker(&self, observer: &Arc<dyn WalObserver>) {
         let guard = self.observers.read();
         if let Some(worker) = guard.iter().find(|w| Arc::ptr_eq(&w.inner, observer)) {

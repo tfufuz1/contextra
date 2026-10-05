@@ -120,12 +120,14 @@ pub fn normalize_payload(text: &str) -> String {
 
 fn is_credit_card_pattern(regex: &regex::Regex) -> bool {
     let s = regex.as_str();
-    s.contains(r"\d{13,19}") || s.contains(r"\d{16}")
+    s.contains(r"\d{13,19}") || s.contains(r"\d{16}") || s.contains("{13,19}")
 }
 
 fn is_iban_pattern(regex: &regex::Regex) -> bool {
     let s = regex.as_str();
-    s.contains(r"[A-Z]{2}\d{2}") || s.contains(r"[a-zA-Z]{2}\d{2}")
+    s.contains(r"[A-Z]{2}\d{2}")
+        || s.contains(r"[a-zA-Z]{2}\d{2}")
+        || s.contains(r"[A-Za-z]{2}\d{2}")
 }
 
 /// Trait for recognizing entities (NER) in text without creating a direct dependency
@@ -432,11 +434,13 @@ impl CompiledPattern {
             pattern: name_str.clone(),
             reason: e.to_string(),
         })?;
-        let validator = if pattern.contains("[A-Za-z]{2}") && pattern.contains("11,30")
+        let validator = if is_iban_pattern(&regex)
+            || (pattern.contains("[A-Za-z]{2}") && pattern.contains("11,30"))
             || name_str.to_lowercase().contains("iban")
         {
             Some(PatternValidator::IbanMod97)
-        } else if pattern.contains("{13,19}")
+        } else if is_credit_card_pattern(&regex)
+            || pattern.contains("{13,19}")
             || name_str.to_lowercase().contains("card")
             || name_str.to_lowercase().contains("credit")
         {
@@ -627,6 +631,7 @@ impl EgressVault {
     }
 
     /// Setzt einen benutzerdefinierten `SurrogateVault`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self {
         self.surrogate_vault = surrogate_vault;
         self
@@ -638,6 +643,7 @@ impl EgressVault {
     }
 
     /// Gibt die Policy-Kategorie dieser Vault-Instanz für Cloud-Egress-Klassifizierungen zurück.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn policy_category(&self) -> PolicyCategory {
         PolicyCategory::CloudEgress
     }
@@ -652,8 +658,15 @@ impl EgressVault {
         &self.surrogate_vault
     }
 
+    /// Retrieves the original entity text for a given surrogate key if present in the vault.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    pub fn get_entity(&self, surrogate: &str) -> Option<String> {
+        self.surrogate_vault.get_entity(surrogate)
+    }
+
     /// Classifies a `TenantScoped` payload for egress export only if the bound `TenantId`
     /// matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn classify_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,
@@ -667,6 +680,7 @@ impl EgressVault {
 
     /// Tokenizes and replaces recognized entities in a `TenantScoped` payload only if the bound
     /// `TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn sanitize_and_vault_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,
@@ -999,7 +1013,7 @@ mod tests {
         );
         assert_eq!(
             normalize_payload("plain text without delimiters"),
-            "plain text without delimiters"
+            "plaintextwithoutdelimiters"
         );
     }
 

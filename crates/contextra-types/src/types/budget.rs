@@ -174,6 +174,8 @@ impl TokenBudget {
     }
 
     /// Calculates the effective token limit based on strategy.
+    // FIX(2026-10-05): Safe non-negative float multiplication scaled from positive usize token budget.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn effective_limit(&self) -> usize {
         match self.strategy {
             BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
@@ -427,6 +429,8 @@ impl ResourceTracker {
     }
 
     /// Returns true if memory usage is below 95% of the limit.
+    // FIX(2026-10-05): Safe non-negative float multiplication for 95% memory threshold calculation.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn has_memory_capacity(&self) -> bool {
         self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
     }

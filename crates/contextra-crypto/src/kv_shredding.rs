@@ -18,7 +18,7 @@ use aes_gcm_siv::{
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Default size of a shred key group (number of records sharing one KEK).
@@ -108,13 +108,31 @@ pub fn derive_subkey(
     registry.get_or_derive(master_key, group_id)
 }
 
+/// Listener trait for group revocation events.
+pub trait GroupRevocationListener: Send + Sync {
+    fn on_group_revoked(&self, group_id: u64);
+}
+
 /// In-memory thread-safe registry for envelope KV crypto-shredding keys.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
     ever_registered_groups: RwLock<HashSet<u64>>,
-    pub revocation_log: Option<std::sync::Arc<RevocationLog>>,
+    pub revocation_log: Option<Arc<RevocationLog>>,
+    listeners: Vec<Arc<dyn GroupRevocationListener>>,
+}
+
+impl std::fmt::Debug for KeyRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyRegistry")
+            .field("groups", &self.groups)
+            .field("revoked_groups", &self.revoked_groups)
+            .field("ever_registered_groups", &self.ever_registered_groups)
+            .field("revocation_log", &self.revocation_log)
+            .field("listeners_count", &self.listeners.len())
+            .finish()
+    }
 }
 
 impl KeyRegistry {
@@ -125,12 +143,32 @@ impl KeyRegistry {
             revoked_groups: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
+            listeners: Vec::new(),
         }
     }
 
+    /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog`.
+    pub fn new_in_memory(
+        clock: Arc<dyn contextra_ports::Clock>,
+        signing_key: Option<ed25519_dalek::SigningKey>,
+        verifying_key: ed25519_dalek::VerifyingKey,
+    ) -> Self {
+        Self::new().with_revocation_log(Arc::new(RevocationLog::new_in_memory(
+            clock,
+            signing_key,
+            verifying_key,
+        )))
+    }
+
     /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
-    pub fn with_revocation_log(mut self, log: std::sync::Arc<RevocationLog>) -> Self {
+    pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         self.revocation_log = Some(log);
+        self
+    }
+
+    /// Attaches a `GroupRevocationListener` to be notified on group revocation.
+    pub fn with_revocation_listener(mut self, listener: Arc<dyn GroupRevocationListener>) -> Self {
+        self.listeners.push(listener);
         self
     }
 
@@ -262,8 +300,13 @@ impl KeyRegistry {
                 for (_, mut rec) in entry.record_deks.drain() {
                     rec.wrapped_dek.zeroize();
                 }
-                return Ok(true);
             }
+        }
+
+        drop(revoked_guard);
+
+        for listener in &self.listeners {
+            listener.on_group_revoked(group_id);
         }
 
         Ok(true)
@@ -398,20 +441,20 @@ impl KeyRegistry {
             )));
         }
 
-        if let Ok(groups_guard) = self.groups.read() {
-            if let Some(entry) = groups_guard.get(&payload.group_id) {
-                if let Some(rec) = entry.record_deks.get(&payload.record_id) {
-                    if rec.revoked {
-                        return Err(CryptoError::Crypto(format!(
-                            "Record {} in group {} has been revoked/shredded",
-                            payload.record_id, payload.group_id
-                        )));
-                    }
-                }
-            } else {
+        if !self.is_record_active(payload.group_id, payload.record_id) {
+            return Err(CryptoError::Crypto(format!(
+                "Record {} in group {} is not active or has been revoked/shredded",
+                payload.record_id, payload.group_id
+            )));
+        }
+
+        if let Some((expected_wrapped_dek, expected_dek_nonce)) =
+            self.get_wrapped_dek(payload.group_id, payload.record_id)
+        {
+            if payload.wrapped_dek != expected_wrapped_dek || payload.dek_nonce != expected_dek_nonce {
                 return Err(CryptoError::Crypto(format!(
-                    "Group {} missing or revoked in KeyRegistry",
-                    payload.group_id
+                    "Wrapped DEK mismatch for record {} in group {}",
+                    payload.record_id, payload.group_id
                 )));
             }
         }
@@ -475,7 +518,7 @@ impl KeyRegistry {
         ciphertext: &[u8],
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
-        if self.is_group_revoked(group_id) {
+        if self.is_group_revoked(group_id) || self.get_wrapped_kek(group_id).is_none() {
             return Err(CryptoError::KeyRevoked(format!(
                 "Sub-key for group {group_id} has been revoked or is missing"
             )));
@@ -584,6 +627,99 @@ mod tests {
         assert!(
             res_encrypt.is_err(),
             "encrypt_with_group MUST consistently reject revoked group"
+        );
+
+        Ok(())
+    }
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct TestListener {
+        call_count: AtomicUsize,
+        last_revoked_group: std::sync::Mutex<Option<u64>>,
+    }
+
+    impl TestListener {
+        fn new() -> Self {
+            Self {
+                call_count: AtomicUsize::new(0),
+                last_revoked_group: std::sync::Mutex::new(None),
+            }
+        }
+    }
+
+    impl GroupRevocationListener for TestListener {
+        fn on_group_revoked(&self, group_id: u64) {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            if let Ok(mut guard) = self.last_revoked_group.lock() {
+                *guard = Some(group_id);
+            }
+        }
+    }
+
+    #[test]
+    fn test_group_revocation_listener_first_and_second_revocation() -> Result<()> {
+        let km = KeyManager::try_new("test-passphrase-listener", b"salt1")?;
+        let listener = Arc::new(TestListener::new());
+        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
+
+        let group_id = 200;
+        let _subkey = registry.get_or_derive(&km, group_id)?;
+
+        // (a) First revocation calls listener exactly once
+        let res1 = registry.revoke_group(group_id)?;
+        assert!(res1, "First revocation must return Ok(true)");
+        assert_eq!(
+            listener.call_count.load(Ordering::SeqCst),
+            1,
+            "Listener must be called exactly once on first revocation"
+        );
+        assert_eq!(
+            *listener.last_revoked_group.lock().unwrap(),
+            Some(group_id),
+            "Listener must receive the revoked group_id"
+        );
+
+        // (b) Second revocation does NOT call listener again
+        let res2 = registry.revoke_group(group_id)?;
+        assert!(!res2, "Second revocation must return Ok(false)");
+        assert_eq!(
+            listener.call_count.load(Ordering::SeqCst),
+            1,
+            "Listener must not be called again on second revocation"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_group_revocation_listener_unknown_group_id() -> Result<()> {
+        let listener = Arc::new(TestListener::new());
+        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
+
+        let unknown_group_id = 999;
+        assert!(!registry.was_group_ever_registered(unknown_group_id));
+
+        // (c) Revoking an unknown group_id reports Ok(true) and calls listener once on first attempt
+        let res1 = registry.revoke_group(unknown_group_id)?;
+        assert!(res1, "Revoking unknown group_id returns Ok(true)");
+        assert_eq!(
+            listener.call_count.load(Ordering::SeqCst),
+            1,
+            "Listener is called once when revoking an unknown group_id for the first time"
+        );
+        assert_eq!(
+            *listener.last_revoked_group.lock().unwrap(),
+            Some(unknown_group_id)
+        );
+
+        // Second revocation attempt for same unknown group_id returns Ok(false) and does not call listener
+        let res2 = registry.revoke_group(unknown_group_id)?;
+        assert!(!res2, "Second revocation of unknown group_id returns Ok(false)");
+        assert_eq!(
+            listener.call_count.load(Ordering::SeqCst),
+            1,
+            "Listener is not called again on second revocation of unknown group_id"
         );
 
         Ok(())
