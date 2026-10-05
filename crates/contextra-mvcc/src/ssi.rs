@@ -114,12 +114,12 @@ impl ReadSet {
 
     /// Returns `true` if no read keys or range prefixes are tracked in this set.
     pub fn is_empty(&self) -> bool {
-        self.keys.is_empty() && self.prefixes.is_empty()
+        self.keys_map().is_empty() && self.prefixes_map().is_empty()
     }
 
     /// Returns the total number of read keys and range prefixes tracked in this set.
     pub fn len(&self) -> usize {
-        self.keys.len() + self.prefixes.len()
+        self.keys_map().len() + self.prefixes_map().len()
     }
 
     /// Clears all tracked read keys, range prefixes, and resets the cached minimum snapshot sequence.
@@ -137,12 +137,12 @@ impl ReadSet {
 
     /// Returns an iterator over tracked read keys and their snapshot sequence numbers.
     pub fn iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)> {
-        self.keys.iter()
+        self.keys_map().iter()
     }
 
     /// Returns an iterator over tracked range prefixes and their snapshot sequence numbers.
     pub fn prefixes_iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)> {
-        self.prefixes.iter()
+        self.prefixes_map().iter()
     }
 
     /// Returns the inner map of read keys to snapshot sequence numbers.
@@ -512,7 +512,97 @@ impl Default for SequenceLogSsiValidator {
     }
 }
 
+/// Builder for constructing a [`SequenceLogSsiValidator`].
+///
+/// // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+#[derive(Default)]
+pub struct SequenceLogSsiValidatorBuilder {
+    max_tracked_keys: Option<usize>,
+    sequence_log: Option<Arc<RwLock<SequenceLog>>>,
+    snapshot_registry: Option<Arc<SnapshotRegistry>>,
+    max_pin_duration: Option<Duration>,
+    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+}
+
+impl std::fmt::Debug for SequenceLogSsiValidatorBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SequenceLogSsiValidatorBuilder")
+            .field("max_tracked_keys", &self.max_tracked_keys)
+            .field("sequence_log", &self.sequence_log)
+            .field("snapshot_registry", &self.snapshot_registry)
+            .field("max_pin_duration", &self.max_pin_duration)
+            .field("has_metrics_sink", &self.metrics_sink.is_some())
+            .finish()
+    }
+}
+
+impl SequenceLogSsiValidatorBuilder {
+    /// Creates a new builder instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Configures the maximum tracked keys bound.
+    pub fn with_max_tracked_keys(mut self, limit: usize) -> Self {
+        self.max_tracked_keys = Some(limit);
+        self
+    }
+
+    /// Attaches an existing [`SequenceLog`].
+    pub fn with_sequence_log(mut self, seq_log: Arc<RwLock<SequenceLog>>) -> Self {
+        self.sequence_log = Some(seq_log);
+        self
+    }
+
+    /// Attaches an active [`SnapshotRegistry`].
+    pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
+        self.snapshot_registry = Some(registry);
+        self
+    }
+
+    /// Sets a custom maximum pin duration.
+    pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
+        self.max_pin_duration = Some(duration);
+        self
+    }
+
+    /// Attaches a metrics sink container.
+    pub fn with_metrics_sink(
+        mut self,
+        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    ) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+
+    /// Builds the configured [`SequenceLogSsiValidator`].
+    pub fn build(self) -> SequenceLogSsiValidator {
+        let max_keys = self.max_tracked_keys.unwrap_or(DEFAULT_MAX_TRACKED_COMMIT_KEYS);
+        let mut validator = if let Some(seq_log) = self.sequence_log {
+            SequenceLogSsiValidator::with_sequence_log(seq_log)
+        } else {
+            SequenceLogSsiValidator::new_with_bounds(max_keys)
+        };
+        validator.max_tracked_keys = max_keys;
+        if let Some(registry) = self.snapshot_registry {
+            validator = validator.with_snapshot_registry(registry);
+        }
+        if let Some(duration) = self.max_pin_duration {
+            validator = validator.with_max_pin_duration(duration);
+        }
+        if let Some(sink) = self.metrics_sink {
+            validator = validator.with_metrics_sink(sink);
+        }
+        validator
+    }
+}
+
 impl SequenceLogSsiValidator {
+    /// Creates a builder to configure and instantiate a [`SequenceLogSsiValidator`].
+    pub fn builder() -> SequenceLogSsiValidatorBuilder {
+        SequenceLogSsiValidatorBuilder::new()
+    }
+
     /// Creates a new [`SequenceLogSsiValidator`] with default maximum commit key capacity (1,000,000 keys).
     pub fn new() -> Self {
         Self::new_with_bounds(DEFAULT_MAX_TRACKED_COMMIT_KEYS)
@@ -581,6 +671,9 @@ impl SequenceLogSsiValidator {
     /// Sets a custom maximum pin duration before diagnostic alarms are triggered for unreleased snapshots.
     pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
         self.max_pin_duration = duration;
+        if let Some(ref seq_log) = self.sequence_log {
+            seq_log.write().set_max_pin_duration(duration);
+        }
         self
     }
 
@@ -715,7 +808,13 @@ impl SequenceLogSsiValidator {
         let longest_pin = self
             .snapshot_registry
             .as_ref()
-            .and_then(|reg| reg.longest_active_pin_at(now));
+            .and_then(|reg| {
+                if now == Instant::now() {
+                    reg.longest_active_pin()
+                } else {
+                    reg.longest_active_pin_at(now)
+                }
+            });
 
         let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
         let longest_pin_duration = longest_pin.map(|(_, dur)| dur);
@@ -740,10 +839,7 @@ impl SequenceLogSsiValidator {
     /// `contextra-store` assumes strict monotonic `commit_seq` assignment serialized by `commit_mutex`.
     /// Registering keys must reflect durably committed WAL/engine sequence numbers.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
-        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
-        let mut writes = self.committed_writes.write();
-        writes.insert(key.to_vec(), commit_seq);
-        self.check_and_coarsen_if_needed(&mut writes);
+        self.record_commit_keys(Some(key), commit_seq);
     }
 
     /// Records committed writes for multiple keys at sequence number `commit_seq`.
@@ -773,11 +869,22 @@ impl SequenceLogSsiValidator {
 
         // Fail-closed check if commit key capacity limit is reached or exceeded
         if committed_writes.len() >= self.max_tracked_keys {
+            let blocker_msg = if let Some(blocker) = self.diagnose_pruning_blocker() {
+                format!(
+                    "; pruning blocker details: min_unpruned_seq={}, longest_pin_duration={:?}, is_pin_expired={}",
+                    blocker.min_unpruned_seq,
+                    blocker.longest_pin_duration,
+                    blocker.is_pin_expired
+                )
+            } else {
+                String::new()
+            };
             return Err(ContextraError::Conflict(format!(
-                "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {})",
+                "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {}){}",
                 tx_id.inner(),
                 committed_writes.len(),
-                self.max_tracked_keys
+                self.max_tracked_keys,
+                blocker_msg
             )));
         }
 
@@ -916,10 +1023,10 @@ impl SequenceLogSsiValidator {
         let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         self.validate_internal(&writes, tx_id, read_set)?;
-
         for key in write_keys {
             writes.insert(key.to_vec(), commit_seq);
         }
+        self.check_and_coarsen_if_needed(&mut writes);
 
         Ok(())
     }
@@ -927,8 +1034,7 @@ impl SequenceLogSsiValidator {
 
 impl SsiValidator for SequenceLogSsiValidator {
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()> {
-        let committed_writes = self.committed_writes.read();
-        self.validate_internal(&committed_writes, tx_id, read_set)
+        self.validate_and_record(tx_id, read_set, std::iter::empty::<&[u8]>(), 0)
     }
 }
 

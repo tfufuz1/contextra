@@ -516,11 +516,21 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
+    /// Validates that `tx` has pending operations before draining and returning them.
+    ///
+    /// # Errors
+    /// Returns `Err(ContextraError::Transaction(...))` if the transaction has no pending operations.
+    pub fn try_drain(&self, tx: TxId) -> Result<Vec<IndexOp<T>>> {
+        self.validate_pending_ops(tx)?;
+        Ok(self.drain(tx))
+    }
+
     /// Drains and returns all buffered operations for a transaction.
     ///
     /// Returns an empty vector if the transaction does not exist or has no operations.
     /// This operation is atomic per shard and cleans up tracked [`ReadSet`] and byte budgets.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
+        let _ = self.validate_pending_ops(tx);
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
@@ -635,6 +645,7 @@ impl<T: Clone> TxBuffer<T> {
 
     /// Returns a clone of the pending operations for a transaction.
     pub fn get_ops(&self, tx: TxId) -> Option<Vec<IndexOp<T>>> {
+        let _ = self.validate_pending_ops(tx);
         let shard_idx = self.shard_idx(tx);
         let shard = self.shards[shard_idx].read();
         shard.ops.get(&tx).map(|(ops, _)| ops.clone())
@@ -677,6 +688,28 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         }
     }
 
+    /// Stages a key-value insert operation for transaction `tx` if the key is not already staged
+    /// for insert within the same transaction scope (`INV-TOCTOU-PUT-IF-ABSENT`).
+    ///
+    /// # Errors
+    /// Returns `Err(ContextraError::Transaction(...))` if the key is already staged for insert.
+    pub fn stage_kv_if_absent(
+        &self,
+        tx: TxId,
+        doc_id: DocId,
+        key: Vec<u8>,
+        val: Vec<u8>,
+    ) -> Result<()> {
+        if self.is_key_staged_for_tx(tx, &key) {
+            return Err(ContextraError::Transaction(format!(
+                "Key '{:?}' is already staged in transaction {}",
+                String::from_utf8_lossy(&key),
+                tx
+            )));
+        }
+        self.stage_kv(tx, IndexOp::Insert { doc_id, data: (key, val) })
+    }
+
     /// Stages a key-value operation and updates atomic key staging map.
     pub fn stage_kv(&self, tx: TxId, op: IndexOp<(Vec<u8>, Vec<u8>)>) -> Result<()> {
         let (key, is_insert) = match &op {
@@ -704,6 +737,13 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
             return Err(e);
         }
         Ok(())
+    }
+
+    /// Validates that `tx` has pending operations before draining key-value operations.
+    #[allow(clippy::type_complexity)]
+    pub fn try_drain_kv(&self, tx: TxId) -> Result<Vec<IndexOp<(Vec<u8>, Vec<u8>)>>> {
+        self.validate_pending_ops(tx)?;
+        Ok(self.drain_kv(tx))
     }
 
     /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
@@ -756,6 +796,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
             let mut max_tx: Option<TxId> = None;
             let mut status: Option<bool> = None;
             for (&tx_id, &is_insert) in map {
+                if is_insert && !self.is_key_staged_for_tx(tx_id, key) {
+                    continue;
+                }
                 match max_tx {
                     None => {
                         max_tx = Some(tx_id);
