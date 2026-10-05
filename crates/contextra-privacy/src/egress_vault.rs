@@ -373,6 +373,37 @@ pub fn normalize_payload_for_dlp(payload: &str) -> String {
     normalized
 }
 
+// FIX(2026-03-29): Extracted evaluation logic against compiled patterns with DLP normalization matching.
+fn eval_text(text: &str, patterns: &[CompiledPattern]) -> Option<EgressClassification> {
+    let normalized = normalize_payload_for_dlp(text);
+
+    for cp in patterns.iter() {
+        let mut raw_matches = cp.regex.find_iter(text);
+        if raw_matches.any(|m| cp.is_valid_match(m.as_str())) {
+            tracing::warn!(
+                rule_id = %cp.name,
+                pattern = %cp.regex.as_str(),
+                "Egress DLP sensitive pattern match detected"
+            );
+            return Some(EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone())));
+        }
+
+        if normalized != text {
+            let mut norm_matches = cp.regex.find_iter(&normalized);
+            if norm_matches.any(|m| cp.is_valid_match(m.as_str())) {
+                tracing::warn!(
+                    rule_id = %cp.name,
+                    pattern = %cp.regex.as_str(),
+                    "Egress DLP sensitive pattern match detected via normalized payload"
+                );
+                return Some(EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone())));
+            }
+        }
+    }
+
+    None
+}
+
 /// Optional validator applied post-regex match to confirm checksum-backed patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatternValidator {
@@ -505,35 +536,15 @@ pub async fn classify_layer1_arc(
                 ));
             }
         };
-        let normalized = normalize_payload_for_dlp(text);
 
-        for cp in patterns_cloned.iter() {
-            let mut raw_matches = cp.regex.find_iter(text);
-            if raw_matches.any(|m| cp.is_valid_match(m.as_str())) {
-                tracing::warn!(
-                    rule_id = %cp.name,
-                    pattern = %cp.regex.as_str(),
-                    "Egress DLP sensitive pattern match detected"
-                );
-                return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
-            }
-
-            if normalized != text {
-                let mut norm_matches = cp.regex.find_iter(&normalized);
-                if norm_matches.any(|m| cp.is_valid_match(m.as_str())) {
-                    tracing::warn!(
-                        rule_id = %cp.name,
-                        pattern = %cp.regex.as_str(),
-                        "Egress DLP sensitive pattern match detected via normalized payload"
-                    );
-                    return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
-                }
-            }
+        if let Some(classification) = eval_text(text, &patterns_cloned) {
+            return classification;
         }
 
+        // FIX(2026-03-29): Second normalization pass via normalize_payload, reusing eval_text
         let normalized = normalize_payload(text);
         if normalized != text {
-            if let Some(classification) = eval_text(&normalized) {
+            if let Some(classification) = eval_text(&normalized, &patterns_cloned) {
                 return classification;
             }
         }
@@ -782,6 +793,31 @@ impl EgressClassifier for EgressVault {
 mod tests {
     use super::*;
     use std::time::Instant;
+
+    #[tokio::test]
+    async fn test_second_normalization_path_blocks_sensitive_pattern() {
+        let cp = CompiledPattern::new("R-001", r"secretkey\d+").expect("valid pattern");
+        let patterns = vec![cp];
+
+        let raw_payload = "secret key 12345";
+        let normalized = normalize_payload(raw_payload);
+        assert_eq!(normalized, "secretkey12345");
+
+        // Direct proof that eval_text evaluates the payload produced by normalize_payload and blocks it
+        let eval_res = eval_text(&normalized, &patterns);
+        assert_eq!(
+            eval_res,
+            Some(EgressClassification::Block(BlockReason::SensitivePattern("R-001".to_string())))
+        );
+
+        // Verification through EgressVault classification pipeline
+        let vault = EgressVault::new(vec![r"secretkey\d+".to_string()]).expect("valid vault");
+        let class_res = vault.classify(raw_payload).await;
+        assert_eq!(
+            class_res,
+            EgressClassification::Block(BlockReason::SensitivePattern("R-001".to_string()))
+        );
+    }
 
     #[tokio::test]
     async fn test_allow_happy_path() {
