@@ -1,7 +1,10 @@
 //! Types for DiBud (Dynamic Budgeted RRF) fusion.
 
+use ahash::AHashMap;
 use contextra_types::{ContextraError, DocId};
 use serde::{Deserialize, Serialize};
+
+use crate::fusion::ProvenanceRecord;
 
 /// Identifies the channels managed by DiBud fusion budget.
 ///
@@ -33,6 +36,11 @@ impl BudgetedChannel {
             2 => Some(Self::Graph),
             _ => None,
         }
+    }
+
+    /// Iterates through all valid channels in index order.
+    pub fn all() -> impl Iterator<Item = Self> {
+        (0..3).filter_map(Self::from_index)
     }
 }
 
@@ -115,4 +123,7 @@ pub struct DiBudOutcome {
     pub accesses: usize,
     /// Indicates whether fusion terminated due to hitting `max_total_accesses`.
     pub budget_exhausted: bool,
+    /// Provenance records for ranked documents.
+    #[serde(default)]
+    pub provenance: AHashMap<DocId, ProvenanceRecord>,
 }

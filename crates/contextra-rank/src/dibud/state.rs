@@ -127,11 +127,16 @@ impl DiBudFusionState {
         let min_certified_reached = certified_len >= budget.min_certified_results;
 
         if min_certified_reached || max_accesses_reached || all_exhausted {
+            let provenance = ranked
+                .iter()
+                .filter_map(|id| self.provenance_of(id).cloned().map(|p| (*id, p)))
+                .collect();
             return DiBudStep::Done(DiBudOutcome {
                 ranked,
                 certified_len,
                 accesses: self.accesses,
                 budget_exhausted: max_accesses_reached,
+                provenance,
             });
         }
 
@@ -155,12 +160,19 @@ impl DiBudFusionState {
 
         match best_channel {
             Some(ch) => DiBudStep::Poll(ch),
-            None => DiBudStep::Done(DiBudOutcome {
-                ranked,
-                certified_len,
-                accesses: self.accesses,
-                budget_exhausted: max_accesses_reached,
-            }),
+            None => {
+                let provenance = ranked
+                    .iter()
+                    .filter_map(|id| self.provenance_of(id).cloned().map(|p| (*id, p)))
+                    .collect();
+                DiBudStep::Done(DiBudOutcome {
+                    ranked,
+                    certified_len,
+                    accesses: self.accesses,
+                    budget_exhausted: max_accesses_reached,
+                    provenance,
+                })
+            }
         }
     }
 
