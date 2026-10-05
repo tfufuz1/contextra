@@ -51,9 +51,20 @@ impl ContextManager {
     }
 
     /// Sets the minimum relevance score for context inclusion.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn set_relevance_threshold(&mut self, threshold: f32) {
         self.relevance_threshold = threshold;
+    }
+
+    /// Builder pattern helper to set the minimum relevance score for context inclusion.
+    pub fn with_relevance_threshold(mut self, threshold: f32) -> Self {
+        self.set_relevance_threshold(threshold);
+        self
+    }
+
+    /// Convenient builder pattern alias to set the minimum relevance threshold.
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.set_relevance_threshold(threshold);
+        self
     }
 
     /// Returns the current relevance threshold.

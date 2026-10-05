@@ -53,9 +53,19 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         self
     }
 
+    /// Erstellt eine neue Instanz des `MaintenanceScheduler` mit `EdgeReinforcementBuffer`.
+    #[cfg(feature = "edge-reinforcement-learning")]
+    pub fn new_with_edge_reinforcement(
+        config: MaintenanceConfig,
+        collection: Arc<Collection<S, V>>,
+        consolidation_config: ConsolidationConfig,
+        buffer: Arc<contextra_graph::EdgeReinforcementBuffer>,
+    ) -> Self {
+        Self::new(config, collection, consolidation_config).with_edge_reinforcement_buffer(buffer)
+    }
+
     /// Setzt den optionalen `EdgeReinforcementBuffer` für F-03.
     #[cfg(feature = "edge-reinforcement-learning")]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_edge_reinforcement_buffer(
         mut self,
         buffer: Arc<contextra_graph::EdgeReinforcementBuffer>,
@@ -70,17 +80,20 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 
     /// Erhöht die Anzahl aktiver Agenten-Sessions.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn increment_active_sessions(&self) -> usize {
         self.active_sessions.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     /// Verringert die Anzahl aktiver Agenten-Sessions.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn decrement_active_sessions(&self) -> usize {
         self.active_sessions
             .fetch_sub(1, Ordering::SeqCst)
             .saturating_sub(1)
+    }
+
+    /// Acquires an RAII session guard that increments active agent session count during its lifetime.
+    pub fn acquire_session_guard(&self) -> ActiveSessionGuard<'_, S, V> {
+        ActiveSessionGuard::new(self)
     }
 
     /// Startet den MaintenanceScheduler in einem eigenen Tokio-Task.
@@ -336,6 +349,24 @@ async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
         .await?;
     collection.storage().commit(tx).await?;
     Ok(())
+}
+
+/// RAII-Guard for active agent sessions. Increments session count on creation and decrements on drop.
+pub struct ActiveSessionGuard<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> {
+    scheduler: &'a MaintenanceScheduler<S, V>,
+}
+
+impl<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> ActiveSessionGuard<'a, S, V> {
+    fn new(scheduler: &'a MaintenanceScheduler<S, V>) -> Self {
+        scheduler.increment_active_sessions();
+        Self { scheduler }
+    }
+}
+
+impl<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> Drop for ActiveSessionGuard<'a, S, V> {
+    fn drop(&mut self) {
+        self.scheduler.decrement_active_sessions();
+    }
 }
 
 #[cfg(test)]
