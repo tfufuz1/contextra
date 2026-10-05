@@ -213,6 +213,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
         storage.budget.release_memory(bytes_freed);
+        tracing::debug!(
+            freed_bytes = bytes_freed,
+            total_used_bytes = storage.budget.memory_used(),
+            "Memory budget released during SSTable flush"
+        );
 
         storage
             .budget_tracking_drift_bytes
