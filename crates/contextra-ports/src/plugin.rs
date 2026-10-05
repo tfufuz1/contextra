@@ -123,6 +123,12 @@ impl PluginRegistry {
         }
     }
 
+    /// Activates a single plugin instance by delegating to [`activate_all`](Self::activate_all).
+    pub fn activate(&mut self, plugin: Box<dyn PluginManifest>) -> Result<(), PluginError> {
+        self.activate_all(vec![plugin])
+    }
+
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Activates a batch of plugins in an all-or-nothing manner (INV-PLUGIN-DEPENDENCY).
     ///
     /// Sequence:
