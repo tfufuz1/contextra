@@ -9,7 +9,7 @@ use crate::bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
 use crate::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
+    BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault, SURROGATE_PREFIX,
 };
 use crate::error::EgressError;
 use serde::{Deserialize, Serialize};
