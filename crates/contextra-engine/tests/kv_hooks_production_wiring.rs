@@ -17,8 +17,8 @@ async fn test_kv_hooks_not_wired_by_default_repro() -> contextra_types::Result<(
     // [BELEGT]: In Contextra::open, kv_hooks is None because kv_store is not stored as a field on Contextra
     // or passed to collections during initialization/retrieval.
     assert!(
-        col.kv_hooks().is_none(),
-        "kv_hooks is None on default collection in production Contextra::open path"
+        col.kv_hooks().is_some(),
+        "kv_hooks is set on default collection in production Contextra::open path"
     );
 
     db.close().await?;
@@ -34,7 +34,7 @@ async fn test_eviction_worker_and_hooks_share_same_store() -> contextra_types::R
     let db = Contextra::open(dir.path()).await?;
     let mut col = db.collection("default").await?;
 
-    Arc::make_mut(&mut col).set_kv_cache_store(store.clone());
+    col.set_kv_hooks(store.clone());
 
     let hooks = col
         .kv_hooks()
@@ -42,7 +42,7 @@ async fn test_eviction_worker_and_hooks_share_same_store() -> contextra_types::R
 
     // Verify pointer equality between store and hooks trait object pointer
     let store_ptr = Arc::as_ptr(&store) as *const ();
-    let hooks_ptr = Arc::as_ptr(hooks) as *const ();
+    let hooks_ptr = Arc::as_ptr(&hooks) as *const ();
     assert_eq!(
         store_ptr, hooks_ptr,
         "EvictionWorker store and Collection kv_hooks share the exact same Arc store instance"
