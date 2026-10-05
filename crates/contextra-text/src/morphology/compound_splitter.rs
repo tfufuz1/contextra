@@ -73,36 +73,27 @@ impl GermanCompoundSplitter {
 
     /// Creates a splitter with custom minimum component length and default embedded vocabulary.
     pub fn with_min_length(min_len: usize) -> Self {
-        let mut trie = Trie::new();
-        for line in DEFAULT_GERMAN_WORDS.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
-            let norm = normalize_umlauts(trimmed);
-            if norm.len() >= 2 {
-                trie.insert(&norm);
-            }
-        }
-        Self {
+        let mut splitter = Self {
             min_component_len: min_len,
-            trie,
-        }
+            trie: Trie::new(),
+        };
+        splitter.extend_vocabulary(
+            DEFAULT_GERMAN_WORDS
+                .lines()
+                .map(|line| line.trim())
+                .filter(|trimmed| !trimmed.is_empty() && !trimmed.starts_with('#')),
+        );
+        splitter
     }
 
     /// Creates a splitter with custom minimum component length and custom dictionary set.
     pub fn with_dictionary(min_len: usize, custom_words: HashSet<String>) -> Self {
-        let mut trie = Trie::new();
-        for word in custom_words {
-            let norm = normalize_umlauts(&word);
-            if norm.len() >= 2 {
-                trie.insert(&norm);
-            }
-        }
-        Self {
+        let mut splitter = Self {
             min_component_len: min_len,
-            trie,
-        }
+            trie: Trie::new(),
+        };
+        splitter.extend_vocabulary(custom_words);
+        splitter
     }
 
     /// Creates a splitter with the default vocabulary plus compound stems and protected terms from specific domain packages.
@@ -116,7 +107,6 @@ impl GermanCompoundSplitter {
     }
 
     /// Creates a splitter loaded with default German vocabulary and all built-in domain vocabularies (Legal & Medical).
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn new_with_all_domains() -> Self {
         let legal = LegalDomainVocabulary;
         let medical = MedicalDomainVocabulary;
@@ -176,7 +166,7 @@ impl GermanCompoundSplitter {
 
 impl Default for GermanCompoundSplitter {
     fn default() -> Self {
-        Self::new()
+        Self::new_with_all_domains()
     }
 }
 
