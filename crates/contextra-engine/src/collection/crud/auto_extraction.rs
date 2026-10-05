@@ -66,7 +66,6 @@ impl LlmTextGenerator for NoopLlmGenerator {
 /// Die Entscheidung über eine globale Anpassung obliegt der Produktverantwortung und bleibt als offener
 /// Punkt im PR-Text dokumentiert.
 #[inline]
-#[allow(dead_code)]
 pub fn recommended_mode_for_regulated(is_regulated: bool) -> AutoExtractionMode {
     if is_regulated {
         AutoExtractionMode::Disabled
@@ -95,6 +94,11 @@ impl AutoExtractionConfig {
             enabled: mode.is_enabled(),
             entity_config: EntityExtractionConfig::default(),
         }
+    }
+
+    /// Erstellt eine neue `AutoExtractionConfig` unter Verwendung der Empfehlung fuer Regulierungs-Kontexte.
+    pub fn for_regulated(is_regulated: bool) -> Self {
+        Self::new(recommended_mode_for_regulated(is_regulated))
     }
 
     /// Setzt den Laufzeit-Modus (Builder Pattern).
