@@ -81,6 +81,7 @@ impl EgressGuard {
 
     /// Checks a `TenantScoped` egress payload for bulk exfiltration only if the bound `TenantId`
     /// matches `expected_tenant_id`. Returns `Block(BlockReason::PolicyDenied(...))` on tenant scope mismatch.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn check_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,

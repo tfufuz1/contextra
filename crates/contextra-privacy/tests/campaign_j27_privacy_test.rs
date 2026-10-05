@@ -35,7 +35,8 @@ async fn test_h1_cloud_response_rehydrator_cross_session_and_foreign_token_injec
     let secret_e2 = "Bob Jones (Session 2 Secret)";
     vault_map.insert(token_e2.clone(), secret_e2.to_string());
 
-    let rehydrator = CloudResponseRehydrator::new(vault_map);
+    let rehydrator = CloudResponseRehydrator::new(vault_map)
+        .scoped_to_request(vec![token_e1.clone(), token_e2.clone()]);
 
     // Cloud response containing:
     // (a) Valid token T1 for E1 (from THIS request) -> should be replaced
