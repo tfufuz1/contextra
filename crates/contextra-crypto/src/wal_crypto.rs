@@ -244,7 +244,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no {
+        if let Some(last_seq) = self.last_seq_no_snapshot() {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -308,7 +308,7 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
         Ok(())
     }
 
@@ -332,7 +332,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no {
+        if let Some(last_seq) = self.last_seq_no_snapshot() {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -388,14 +388,14 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
         Ok(())
     }
 
     /// Updates the chain state for legacy V1 entries without HMAC verification.
     pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot) {
         self.last_hmac = entry.checksum;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
     }
 
     /// Default verification delegating to V3 verification.
