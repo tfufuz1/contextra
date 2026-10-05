@@ -111,3 +111,53 @@ pub fn render_register_json(
 ) -> Result<String, AuditExportError> {
     serde_json::to_string_pretty(entries).map_err(AuditExportError::from)
 }
+
+/// Exporter for generating GDPR Article 30 processing register exports from a [`ProcessingRegisterSource`].
+#[derive(Debug, Clone)]
+pub struct AuditRegisterExporter<S> {
+    source: S,
+}
+
+impl<S> AuditRegisterExporter<S> {
+    /// Creates a new [`AuditRegisterExporter`] backed by the specified source.
+    pub fn new(source: S) -> Self {
+        Self { source }
+    }
+
+    /// Returns a reference to the underlying processing register source.
+    pub fn source(&self) -> &S {
+        &self.source
+    }
+
+    /// Returns a mutable reference to the underlying processing register source.
+    pub fn source_mut(&mut self) -> &mut S {
+        &mut self.source
+    }
+}
+
+impl AuditRegisterExporter<testkit::InMemoryProcessingRegisterSource> {
+    /// Creates an exporter pre-populated with synthetic sample processing register entries for `tenant_id`.
+    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    pub fn with_sample_data_for(tenant_id: TenantId) -> Self {
+        Self::new(testkit::InMemoryProcessingRegisterSource::with_sample_data_for(tenant_id))
+    }
+
+    /// Appends a processing register entry to the underlying in-memory register source.
+    pub fn add_entry(&mut self, entry: ProcessingRegisterEntry) {
+        self.source.add_entry(entry);
+    }
+}
+
+impl<S: ProcessingRegisterSource> AuditRegisterExporter<S> {
+    /// Exports the processing register entries for `tenant_id` as a formatted JSON string.
+    pub fn export_json(&self, tenant_id: TenantId) -> Result<String, AuditExportError> {
+        let entries = self.source.collect_entries(tenant_id)?;
+        render_register_json(&entries)
+    }
+
+    /// Exports the processing register entries for `tenant_id` as a Markdown document.
+    pub fn export_markdown(&self, tenant_id: TenantId) -> Result<String, AuditExportError> {
+        let entries = self.source.collect_entries(tenant_id)?;
+        render_register_markdown(&entries)
+    }
+}
