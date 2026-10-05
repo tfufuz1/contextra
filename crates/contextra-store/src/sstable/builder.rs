@@ -219,7 +219,19 @@ pub struct SstableBuilder {
 impl SstableBuilder {
     /// Creates a new SstableBuilder that writes to the given file path.
     pub async fn create(path: impl AsRef<Path>) -> Result<Self> {
-        Self::create_with_key_manager(path, None).await
+        Self::create_with_version(path, 4).await
+    }
+
+    /// Creates a new SstableBuilder with an explicit format version.
+    pub async fn create_with_version(path: impl AsRef<Path>, version: u16) -> Result<Self> {
+        let mut builder = Self::create_with_key_manager(path, None).await?;
+        builder.set_format_version(version);
+        Ok(builder)
+    }
+
+    /// Returns the estimated current total SSTable size written so far.
+    pub fn current_size(&self) -> u64 {
+        self.offset.saturating_add(self.block_builder.current_size() as u64)
     }
 
     pub async fn create_with_key_manager(
@@ -331,7 +343,7 @@ impl SstableBuilder {
     }
 
     async fn flush_block(&mut self) -> Result<()> {
-        if self.block_builder.is_empty() {
+        if self.block_builder.is_empty() || self.block_builder.current_size() == 0 {
             return Ok(());
         }
 
@@ -340,9 +352,11 @@ impl SstableBuilder {
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
         let current_block_bytes = self.block_builder.current_size();
+        let estimated_total = self.current_size();
         tracing::trace!(
             path = %self.path.display(),
             current_block_bytes,
+            estimated_total,
             format_version = self.format_version,
             "Flushing SSTable block"
         );
