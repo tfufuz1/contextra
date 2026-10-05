@@ -62,6 +62,8 @@ impl RandomizedLoggingPolicy {
             };
             (action, propensities[action as usize])
         } else {
+            // FIX(2026-10-05): Sample in [0, epsilon) divided by epsilon gives value in [0, 1), multiplied by num_actions gives non-negative bounded f32 fit for u32 cast.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let action = ((sample / self.epsilon) * self.num_actions as f32) as u32;
             let clamped_action = action.min(self.num_actions - 1);
             (clamped_action, propensities[clamped_action as usize])

@@ -201,11 +201,15 @@ impl LyapunovDriftWatcher {
         let mut baseline_counts = [0usize; NUM_BINS];
 
         for &score in current_scores {
+            // FIX(2026-10-05): Score is clamped in [0.0, 1.0] and NUM_BINS is 10, so cast to usize is always non-negative and bounded.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let bin = ((score.clamp(0.0, 1.0) * NUM_BINS as f32) as usize).min(NUM_BINS - 1);
             current_counts[bin] += 1;
         }
 
         for &score in &self.baseline_distribution {
+            // FIX(2026-10-05): Score is clamped in [0.0, 1.0] and NUM_BINS is 10, so cast to usize is always non-negative and bounded.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let bin = ((score.clamp(0.0, 1.0) * NUM_BINS as f32) as usize).min(NUM_BINS - 1);
             baseline_counts[bin] += 1;
         }
