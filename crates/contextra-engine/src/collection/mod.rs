@@ -516,6 +516,20 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.kv_hooks = Some(hooks);
     }
 
+    /// Attaches a `TenantIsolatedKvStore` from `contextra-kvcache` to the collection for KV cache lifecycle management.
+    pub fn with_kv_cache_store(
+        mut self,
+        kv_store: Arc<contextra_kvcache::TenantIsolatedKvStore>,
+    ) -> Self {
+        self.kv_hooks = Some(kv_store);
+        self
+    }
+
+    /// Sets a `TenantIsolatedKvStore` from `contextra-kvcache` on the collection for KV cache lifecycle management.
+    pub fn set_kv_cache_store(&mut self, kv_store: Arc<contextra_kvcache::TenantIsolatedKvStore>) {
+        self.kv_hooks = Some(kv_store);
+    }
+
     /// Returns a reference to the attached `KvLifecycleHooks`, if configured.
     pub fn kv_hooks(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
         self.kv_hooks.as_ref()
@@ -537,10 +551,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn set_kv_store(&mut self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {}
+    pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
+        let _ = kv_store;
+    }
 
     #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn with_kv_store(self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+    pub fn with_kv_store(self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+        let _ = kv_store;
         self
     }
 
