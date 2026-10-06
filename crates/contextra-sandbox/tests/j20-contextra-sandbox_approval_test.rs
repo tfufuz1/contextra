@@ -16,7 +16,8 @@ fn test_auto_approve_low_risk_execution_workflow() -> TestResult {
     assert_eq!(request.status, ApprovalStatus::Pending);
 
     // Auto-approve low-risk request via production path
-    let processed_req = request.auto_approve_if_low_risk("auto_approver_daemon".to_string(), 1200)?;
+    let processed_req =
+        request.auto_approve_if_low_risk("auto_approver_daemon".to_string(), 1200)?;
 
     assert_eq!(
         processed_req.status,
@@ -43,7 +44,8 @@ fn test_auto_approve_bypasses_elevated_and_high_risk_requests() -> TestResult {
     assert_eq!(fs_req.risk, ApprovalRisk::Elevated);
     assert!(fs_req.requires_approval());
 
-    let fs_processed = fs_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
+    let fs_processed =
+        fs_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
     assert_eq!(
         fs_processed.status,
         ApprovalStatus::Pending,
@@ -66,7 +68,8 @@ fn test_auto_approve_bypasses_elevated_and_high_risk_requests() -> TestResult {
     assert_eq!(net_req.risk, ApprovalRisk::High);
     assert!(net_req.requires_approval());
 
-    let net_processed = net_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
+    let net_processed =
+        net_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
     assert_eq!(
         net_processed.status,
         ApprovalStatus::Pending,
@@ -82,7 +85,8 @@ fn test_auto_approve_bypasses_elevated_and_high_risk_requests() -> TestResult {
     assert_eq!(egress_req.risk, ApprovalRisk::High);
     assert!(egress_req.requires_approval());
 
-    let egress_processed = egress_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
+    let egress_processed =
+        egress_req.auto_approve_if_low_risk("auto_approver".to_string(), now_ms + 100)?;
     assert_eq!(
         egress_processed.status,
         ApprovalStatus::Pending,

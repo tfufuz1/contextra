@@ -23,8 +23,7 @@ impl TextSearchEngine for DummyEngine {
         &'a self,
         _text: &'a str,
         _limit: usize,
-    ) -> contextra_privacy::egress_vault::BoxFuture<'a, Result<Vec<TextSearchResult>, String>>
-    {
+    ) -> contextra_privacy::egress_vault::BoxFuture<'a, Result<Vec<TextSearchResult>, String>> {
         Box::pin(async move { Ok(vec![]) })
     }
 }
@@ -44,8 +43,7 @@ async fn test_j19_closure_11_symbols_verification() -> Result<(), Box<dyn std::e
         .generate_surrogate("bob@company.org")?;
     assert!(vault.get_entity(&generated_16hex).is_some());
 
-    let _ = vault
-        .sanitize_and_vault("alice@company.org", &NoOpRecognizer)?;
+    let _ = vault.sanitize_and_vault("alice@company.org", &NoOpRecognizer)?;
 
     assert_eq!(vault.policy_category(), PolicyCategory::CloudEgress);
 
@@ -123,10 +121,7 @@ async fn test_j19_closure_11_symbols_verification() -> Result<(), Box<dyn std::e
     let res_guard_mismatch = guard_check
         .check_scoped(TenantScoped::new(tenant_a, "Short payload"), &tenant_b)
         .await;
-    assert!(matches!(
-        res_guard_mismatch,
-        EgressClassification::Block(_)
-    ));
+    assert!(matches!(res_guard_mismatch, EgressClassification::Block(_)));
 
     // 6. handle_cloud_query_scoped, handle_cloud_query_scoped_with_guard, handle_cloud_query_scoped_with_bulk_detector
     let query_req = CloudQueryRequest {
@@ -158,8 +153,10 @@ async fn test_j19_closure_11_symbols_verification() -> Result<(), Box<dyn std::e
     let err = EgressError::policy_violation("Access denied by policy");
     assert!(matches!(err, EgressError::PolicyViolation(msg) if msg == "Access denied by policy"));
 
-    let sanitized_payload =
-        GuardedPayload::<Sanitized>::from_sanitized("Clean text".to_string(), "sess_999".to_string());
+    let sanitized_payload = GuardedPayload::<Sanitized>::from_sanitized(
+        "Clean text".to_string(),
+        "sess_999".to_string(),
+    );
     assert_eq!(sanitized_payload.session_id(), "sess_999");
     assert_eq!(sanitized_payload.into_inner(), "Clean text");
 

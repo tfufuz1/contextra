@@ -22,7 +22,9 @@ async fn test_mock_embedder_with_fixed_output_via_trait_path() {
     // Test through EmbeddingProvider trait
     assert_eq!(embedder.provider_name(), "mock");
     assert_eq!(embedder.embedding_dim(), 4);
-    let output = EmbeddingProvider::embed(&embedder, "sample query").await.unwrap();
+    let output = EmbeddingProvider::embed(&embedder, "sample query")
+        .await
+        .unwrap();
     assert_eq!(output, fixed_vec);
 
     // Test through blanket implementation of TextEmbeddingEngine
@@ -49,5 +51,8 @@ async fn test_context_segment_with_rope_offset_via_llm_generator() {
         .await
         .unwrap();
 
-    assert_eq!(result, "LLM Output: First segment\n\nSecond segment with RoPE");
+    assert_eq!(
+        result,
+        "LLM Output: First segment\n\nSecond segment with RoPE"
+    );
 }

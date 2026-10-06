@@ -61,7 +61,10 @@ impl DocEdgeIndex {
         let mut prov_guard = self.edge_provenance.write();
 
         for &doc_id in &provenance.source_doc_ids {
-            doc_guard.entry(doc_id).or_default().insert(provenance.edge_id);
+            doc_guard
+                .entry(doc_id)
+                .or_default()
+                .insert(provenance.edge_id);
         }
 
         if let Some(existing) = prov_guard.get_mut(&provenance.edge_id) {

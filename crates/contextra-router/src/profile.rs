@@ -366,7 +366,8 @@ impl ProfileCalibrationState {
 
     /// Prüft, ob der Kalibrierungszustand gesunde Metriken aufweist.
     pub fn is_healthy(&self) -> bool {
-        self.average_confidence() >= 0.5 && self.empirical_error_rate() <= self.conformal.alpha * 2.0
+        self.average_confidence() >= 0.5
+            && self.empirical_error_rate() <= self.conformal.alpha * 2.0
     }
 
     /// Recalibrates using the conformal calibrator.

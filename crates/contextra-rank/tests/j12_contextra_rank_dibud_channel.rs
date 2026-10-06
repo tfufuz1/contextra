@@ -6,9 +6,13 @@ use contextra_rank::{
 use contextra_types::{ContextraError, DocId};
 
 #[test]
-fn test_budgeted_channel_from_index_bidirectional_and_state_polling() -> Result<(), ContextraError> {
+fn test_budgeted_channel_from_index_bidirectional_and_state_polling() -> Result<(), ContextraError>
+{
     // Check indexing 0 -> Vector, 1 -> Text, 2 -> Graph
-    assert_eq!(BudgetedChannel::from_index(0), Some(BudgetedChannel::Vector));
+    assert_eq!(
+        BudgetedChannel::from_index(0),
+        Some(BudgetedChannel::Vector)
+    );
     assert_eq!(BudgetedChannel::from_index(1), Some(BudgetedChannel::Text));
     assert_eq!(BudgetedChannel::from_index(2), Some(BudgetedChannel::Graph));
 

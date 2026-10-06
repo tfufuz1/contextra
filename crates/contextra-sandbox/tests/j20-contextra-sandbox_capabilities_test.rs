@@ -9,8 +9,14 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 fn test_pure_merge_operator_capabilities_preset() {
     let caps = WasmCapabilities::pure_merge_operator();
 
-    assert!(!caps.allow_stdout, "stdout must be disabled by default for pure capabilities");
-    assert!(!caps.allow_stderr, "stderr must be disabled by default for pure capabilities");
+    assert!(
+        !caps.allow_stdout,
+        "stdout must be disabled by default for pure capabilities"
+    );
+    assert!(
+        !caps.allow_stderr,
+        "stderr must be disabled by default for pure capabilities"
+    );
     assert!(!caps.allow_filesystem, "filesystem must be disabled");
     assert!(!caps.allow_network, "network must be disabled");
     assert!(!caps.allow_clock, "clock must be disabled");

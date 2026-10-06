@@ -62,7 +62,8 @@ fn test_reproduce_non_atomic_write_vulnerability_or_atomic_guarantee() {
     }
 
     // Check file state after failure
-    let after_failure_contents = std::fs::read(&log_path).expect("Failed to read log file after crash");
+    let after_failure_contents =
+        std::fs::read(&log_path).expect("Failed to read log file after crash");
 
     // Before fix: log_path is 0 bytes, all initial revoked targets lost.
     let reopen_res = RevocationLog::open_or_create(&log_path, clock.clone(), None, vk);
@@ -95,21 +96,28 @@ fn test_atomic_persistence_preserves_old_state_on_write_failure() {
     let initial_bytes = std::fs::read(&log_path).unwrap();
 
     // Reopen log with signing key
-    let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk.clone()), vk).unwrap();
+    let log =
+        RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk.clone()), vk).unwrap();
 
     // Make parent directory read-only so creating temp file in log.append() will fail with EACCES
     std::fs::set_permissions(temp_dir.path(), Permissions::from_mode(0o555)).unwrap();
 
     // Attempt append - must fail with I/O error when creating temp file
     let append_res = log.append(target_2.clone());
-    assert!(append_res.is_err(), "Append must fail when temp file creation fails");
+    assert!(
+        append_res.is_err(),
+        "Append must fail when temp file creation fails"
+    );
 
     // Restore permissions so we can inspect directory
     std::fs::set_permissions(temp_dir.path(), Permissions::from_mode(0o755)).unwrap();
 
     // Verify original log file on disk remains 100% unchanged
     let current_bytes = std::fs::read(&log_path).unwrap();
-    assert_eq!(initial_bytes, current_bytes, "Original log file MUST remain intact after failed append");
+    assert_eq!(
+        initial_bytes, current_bytes,
+        "Original log file MUST remain intact after failed append"
+    );
 
     // Reopen from disk to verify integrity
     let reopened = RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).unwrap();
@@ -131,7 +139,8 @@ fn test_reopen_and_read_after_successful_atomic_append() {
     let target_2 = RevocationTarget::Record("rec-2".into());
 
     {
-        let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk.clone()), vk).unwrap();
+        let log =
+            RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk.clone()), vk).unwrap();
         log.append(target_1.clone()).unwrap();
         log.append(target_2.clone()).unwrap();
     }

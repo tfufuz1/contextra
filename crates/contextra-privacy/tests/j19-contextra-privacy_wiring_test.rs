@@ -4,17 +4,13 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_privacy::bulk_exfiltration_detector::{
-    BulkExfiltrationDetector, SessionId,
-};
+use contextra_privacy::bulk_exfiltration_detector::{BulkExfiltrationDetector, SessionId};
 use contextra_privacy::egress_gateway::{
     guard_and_sanitize_payload, handle_cloud_query_scoped,
     handle_cloud_query_scoped_with_bulk_detector, handle_cloud_query_scoped_with_guard,
     CloudQueryRequest,
 };
-use contextra_privacy::egress_guard::{
-    EgressGuard, TextSearchEngine, TextSearchResult,
-};
+use contextra_privacy::egress_guard::{EgressGuard, TextSearchEngine, TextSearchResult};
 use contextra_privacy::egress_vault::{
     BlockReason, EgressClassification, EgressVault, NoOpRecognizer, PolicyCategory, SurrogateVault,
 };
@@ -128,8 +124,10 @@ async fn test_j19_symbols_integration() -> Result<(), Box<dyn std::error::Error>
     assert!(matches!(err, EgressError::PolicyViolation(msg) if msg == "Policy denied test"));
 
     // 9. GuardedPayload::<Sanitized>::from_sanitized via guard_and_sanitize_payload
-    let raw_payload = GuardedPayload::<Unsanitized>::new("Safe input".to_string(), "sess_42".to_string());
-    let sanitized_payload: GuardedPayload<Sanitized> = guard_and_sanitize_payload(raw_payload, &vault, None).await?;
+    let raw_payload =
+        GuardedPayload::<Unsanitized>::new("Safe input".to_string(), "sess_42".to_string());
+    let sanitized_payload: GuardedPayload<Sanitized> =
+        guard_and_sanitize_payload(raw_payload, &vault, None).await?;
     assert_eq!(sanitized_payload.session_id(), "sess_42");
     assert_eq!(sanitized_payload.into_inner(), "Safe input");
 

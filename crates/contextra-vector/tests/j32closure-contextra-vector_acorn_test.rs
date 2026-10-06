@@ -8,10 +8,7 @@ fn test_naive_reference_index_from_vectors() {
     let vec1 = vec![1.0, 2.0, 3.0];
     let vec2 = vec![4.0, 5.0, 6.0];
 
-    let index = NaiveReferenceIndex::from_vectors(vec![
-        (doc1, vec1),
-        (doc2, vec2),
-    ]);
+    let index = NaiveReferenceIndex::from_vectors(vec![(doc1, vec1), (doc2, vec2)]);
 
     // Simple assertion to verify creation via from_vectors
     let _ = format!("{:?}", index);

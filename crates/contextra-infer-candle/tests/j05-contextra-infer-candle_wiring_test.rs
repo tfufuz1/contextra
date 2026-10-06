@@ -12,8 +12,8 @@ use contextra_infer_candle::inference::{CandleLlmClient, DefaultCandleLlmModel};
 use contextra_infer_candle::kv_state::{KvState, LayerKv};
 use contextra_infer_candle::model_registry::{CandleQuantization, ModelFingerprint};
 use contextra_ports::RequestId;
-use std::sync::Arc;
 use std::io::Write;
+use std::sync::Arc;
 use tempfile::NamedTempFile;
 
 #[tokio::test]
@@ -58,7 +58,8 @@ fn test_set_threshold_gasp_validator_wiring() {
 
 #[cfg(feature = "kv-stage-b")]
 #[test]
-fn test_kv_state_layer_count_and_import_block_at_wiring() -> Result<(), Box<dyn std::error::Error>> {
+fn test_kv_state_layer_count_and_import_block_at_wiring() -> Result<(), Box<dyn std::error::Error>>
+{
     use candle_core::Tensor;
 
     let k1 = Tensor::zeros((1, 4, 2, 8), candle_core::DType::F32, &Device::Cpu)?;
@@ -80,11 +81,8 @@ fn test_kv_state_layer_count_and_import_block_at_wiring() -> Result<(), Box<dyn 
 #[test]
 fn test_embed_client_with_max_concurrent_embeddings_wiring() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let client_res = CandleEmbedClient::from_dir_with_concurrency(
-        temp_dir.path(),
-        CandleQuantization::Q4KM,
-        16,
-    );
+    let client_res =
+        CandleEmbedClient::from_dir_with_concurrency(temp_dir.path(), CandleQuantization::Q4KM, 16);
     assert!(client_res.is_ok());
     let client = client_res.unwrap();
     assert_eq!(client.max_concurrent_embeddings, 16);

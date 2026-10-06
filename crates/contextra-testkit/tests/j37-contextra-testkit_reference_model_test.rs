@@ -64,7 +64,13 @@ fn test_j37_reference_model_methods_integration() {
 
     // Verify snapshot_map_at at seq2 (which delegates to scan_range_at)
     let map_seq2 = model.snapshot_map_at(seq2);
-    assert_eq!(map_seq2.get(b"app:setting1".as_slice()), Some(&b"value1_updated".to_vec()));
+    assert_eq!(
+        map_seq2.get(b"app:setting1".as_slice()),
+        Some(&b"value1_updated".to_vec())
+    );
     assert!(!map_seq2.contains_key(b"app:setting2".as_slice()));
-    assert_eq!(map_seq2.get(b"user:100".as_slice()), Some(&b"alice".to_vec()));
+    assert_eq!(
+        map_seq2.get(b"user:100".as_slice()),
+        Some(&b"alice".to_vec())
+    );
 }

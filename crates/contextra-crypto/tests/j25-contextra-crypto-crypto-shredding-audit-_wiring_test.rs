@@ -64,9 +64,8 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         tenant_id: TenantId::try_new(7).unwrap(),
     };
 
-    let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-    ];
+    let cleanup_proofs =
+        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
     let proof_v3 = DeletionProof::create_v3(
         scope.clone(),
@@ -104,8 +103,8 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
     let prev_hmac = [0xAAu8; 32];
     let payload = b"delete_event_payload_doc_42";
 
-    let receipt = compute_wal_delete_receipt(&prev_hmac, payload, integrity_key)
-        .expect("compute receipt");
+    let receipt =
+        compute_wal_delete_receipt(&prev_hmac, payload, integrity_key).expect("compute receipt");
 
     let proof_with_receipt = DeletionProof::create_with_wal_receipt_v3(
         DeletionScope::Tenant {

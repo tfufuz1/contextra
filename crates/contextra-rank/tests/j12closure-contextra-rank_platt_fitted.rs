@@ -19,12 +19,7 @@ fn test_j12closure_platt_scaler_is_fitted() {
     );
     assert!(ctx.is_calibrated);
 
-    let observations = vec![
-        (0.1, false),
-        (0.2, false),
-        (0.8, true),
-        (0.9, true),
-    ];
+    let observations = vec![(0.1, false), (0.2, false), (0.8, true), (0.9, true)];
     let trained_scaler = PlattScaler::fit(&observations);
     assert!(trained_scaler.is_fitted());
 }

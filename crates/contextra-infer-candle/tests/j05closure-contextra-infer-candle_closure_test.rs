@@ -110,16 +110,16 @@ fn test_symbol_3_with_prefix_store() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let store = Arc::new(MockPrefixStore);
-    let client = CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer)
-        .with_prefix_store(store);
+    let client =
+        CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer).with_prefix_store(store);
 
     assert!(client.prefix_store.is_some());
 }
 
 #[cfg(feature = "kv-stage-b")]
 #[test]
-fn test_symbols_4_and_5_import_block_at_and_layer_count(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_symbols_4_and_5_import_block_at_and_layer_count() -> Result<(), Box<dyn std::error::Error>>
+{
     use candle_core::Tensor;
 
     let k = Tensor::zeros((1, 2, 4, 8), candle_core::DType::F32, &Device::Cpu)?;
@@ -141,12 +141,9 @@ fn test_symbols_4_and_5_import_block_at_and_layer_count(
 #[test]
 fn test_symbol_6_with_max_concurrent_embeddings() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let client = CandleEmbedClient::from_dir_with_concurrency(
-        temp_dir.path(),
-        CandleQuantization::Q4KM,
-        12,
-    )
-    .expect("from_dir_with_concurrency should succeed");
+    let client =
+        CandleEmbedClient::from_dir_with_concurrency(temp_dir.path(), CandleQuantization::Q4KM, 12)
+            .expect("from_dir_with_concurrency should succeed");
 
     assert_eq!(client.max_concurrent_embeddings, 12);
 

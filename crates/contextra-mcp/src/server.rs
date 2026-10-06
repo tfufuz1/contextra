@@ -1,8 +1,8 @@
 use crate::config::LlmConfig;
 use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier, EgressGuardCheck};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
-use crate::proof_key::deletion_proof_key_from_env;
 use crate::prompt_injection::PromptInjectionGuard;
+use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
 #[cfg(feature = "kv-bridge")]
 use crate::routing::setup_kv_bridge;
@@ -139,7 +139,10 @@ impl McpServer {
     }
 
     /// Retrieves and decrypts a volatile tool result stored in the MCP sandbox.
-    pub fn get_volatile_output(&self, key: &str) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, ContextraError> {
+    pub fn get_volatile_output(
+        &self,
+        key: &str,
+    ) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, ContextraError> {
         self.sandbox.get_volatile(key)
     }
 

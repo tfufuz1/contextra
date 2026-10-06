@@ -148,8 +148,8 @@ impl DiBudFusionState {
         for idx in [2, 1, 0] {
             if let Some(ch) = BudgetedChannel::from_index(idx) {
                 if !self.exhausted[idx] {
-                    let score =
-                        budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
+                    let score = budget.channel_weights[idx]
+                        / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
                     if score > best_score {
                         best_score = score;
                         best_channel = Some(ch);

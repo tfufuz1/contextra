@@ -43,6 +43,8 @@ fn test_j37_fault_vfs_lifecycle_integration() {
     vfs.set_config(FaultConfig::default());
 
     assert!(vfs.write_file(path3, b"payload3_recovered").is_ok());
-    let data3 = vfs.read_file(path3).expect("read file3 should succeed after reset");
+    let data3 = vfs
+        .read_file(path3)
+        .expect("read file3 should succeed after reset");
     assert_eq!(data3, b"payload3_recovered");
 }

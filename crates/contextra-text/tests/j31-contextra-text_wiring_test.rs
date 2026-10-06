@@ -2,9 +2,9 @@ use contextra_ports::{BoxFuture, StorageEngine, StorageStats, TextIndex};
 use contextra_text::morphology::MorphologicalTokenizer;
 use contextra_text::{GermanCompoundSplitter, InvertedIndex, Posting, ResidentPostingIndex};
 use contextra_types::{DocId, Result, TxId};
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 struct MockStorage {
     data: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
@@ -20,14 +20,7 @@ impl MockStorage {
 
 impl StorageEngine for MockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move {
-            Ok(self
-                .data
-                .lock()
-                .get(key)
-                .cloned()
-                .map(bytes::Bytes::from))
-        })
+        Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
 
     fn put<'a>(
@@ -37,9 +30,7 @@ impl StorageEngine for MockStorage {
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            self.data
-                .lock()
-                .insert(key.to_vec(), value.to_vec());
+            self.data.lock().insert(key.to_vec(), value.to_vec());
             Ok(())
         })
     }
@@ -175,7 +166,9 @@ fn test_resident_posting_index_remove_terms_direct_and_delegation() {
     // Test remove_terms directly
     index.remove_terms(doc1, &[term.clone()]);
 
-    let list_after_doc1 = index.get(&term).expect("term contextra should remain for doc2");
+    let list_after_doc1 = index
+        .get(&term)
+        .expect("term contextra should remain for doc2");
     assert_eq!(list_after_doc1.len(), 1);
     assert_eq!(list_after_doc1.as_slice()[0].doc_id(), doc2);
 

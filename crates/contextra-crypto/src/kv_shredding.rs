@@ -451,7 +451,9 @@ impl KeyRegistry {
         if let Some((expected_wrapped_dek, expected_dek_nonce)) =
             self.get_wrapped_dek(payload.group_id, payload.record_id)
         {
-            if payload.wrapped_dek != expected_wrapped_dek || payload.dek_nonce != expected_dek_nonce {
+            if payload.wrapped_dek != expected_wrapped_dek
+                || payload.dek_nonce != expected_dek_nonce
+            {
                 return Err(CryptoError::Crypto(format!(
                     "Wrapped DEK mismatch for record {} in group {}",
                     payload.record_id, payload.group_id
@@ -715,7 +717,10 @@ mod tests {
 
         // Second revocation attempt for same unknown group_id returns Ok(false) and does not call listener
         let res2 = registry.revoke_group(unknown_group_id)?;
-        assert!(!res2, "Second revocation of unknown group_id returns Ok(false)");
+        assert!(
+            !res2,
+            "Second revocation of unknown group_id returns Ok(false)"
+        );
         assert_eq!(
             listener.call_count.load(Ordering::SeqCst),
             1,

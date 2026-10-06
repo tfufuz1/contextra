@@ -133,9 +133,8 @@ impl CsrGraph {
     /// Erstellt CsrGraph mit aktiviertem ConsistencyEnforcer für Widerspruchsprävention (F-04/ADR-073).
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
         let mut graph = Self::new();
-        graph.consistency_enforcer = Some(RwLock::new(ConsistencyEnforcer::new(
-            suppression_threshold,
-        )));
+        graph.consistency_enforcer =
+            Some(RwLock::new(ConsistencyEnforcer::new(suppression_threshold)));
         graph
     }
 
@@ -224,7 +223,8 @@ impl CsrGraph {
         wal_tx: TxId,
     ) -> Result<Vec<crate::consistency_enforcement::EdgeId>> {
         let tombstone_candidates = self.doc_edge_index.remove_doc(doc_id);
-        let tombstone_candidates = self.suggest_tombstone_candidates_for_pattern(&tombstone_candidates);
+        let tombstone_candidates =
+            self.suggest_tombstone_candidates_for_pattern(&tombstone_candidates);
 
         {
             let mut inner = self.inner_write();

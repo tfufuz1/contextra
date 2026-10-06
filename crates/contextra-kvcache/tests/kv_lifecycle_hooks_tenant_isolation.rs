@@ -39,8 +39,14 @@ fn test_kv_lifecycle_hooks_remove_doc_segments_tenant_isolation() {
     let tenant2 = TenantId::try_new(202).unwrap();
     let doc_id = DocId::new(55);
 
-    store.insert_segment(tenant1, KvSegment::new(tenant1, doc_id.inner() as u64, vec![0xA1; 16]));
-    store.insert_segment(tenant2, KvSegment::new(tenant2, doc_id.inner() as u64, vec![0xB2; 16]));
+    store.insert_segment(
+        tenant1,
+        KvSegment::new(tenant1, doc_id.inner() as u64, vec![0xA1; 16]),
+    );
+    store.insert_segment(
+        tenant2,
+        KvSegment::new(tenant2, doc_id.inner() as u64, vec![0xB2; 16]),
+    );
 
     let hooks: &dyn KvLifecycleHooks = &store;
     hooks.remove_doc_segments(tenant1, doc_id);
@@ -48,7 +54,9 @@ fn test_kv_lifecycle_hooks_remove_doc_segments_tenant_isolation() {
     // Assert doc segment removed for tenant1, tenant2 remains unaffected
     assert_eq!(store.get_tenant_segment_len(tenant1), 0);
     assert_eq!(store.get_tenant_segment_len(tenant2), 1);
-    assert!(store.get_segment_bytes(tenant2, doc_id.inner() as u64).is_some());
+    assert!(store
+        .get_segment_bytes(tenant2, doc_id.inner() as u64)
+        .is_some());
 }
 
 #[test]

@@ -55,7 +55,10 @@ async fn test_reopen_fd_leak() {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     let final_fd = get_open_fd_count();
-    println!("Reopen test - FD count initial: {}, final: {}", initial_fd, final_fd);
+    println!(
+        "Reopen test - FD count initial: {}, final: {}",
+        initial_fd, final_fd
+    );
 
     assert!(
         final_fd <= initial_fd + 2,

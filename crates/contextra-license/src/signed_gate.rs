@@ -358,8 +358,7 @@ impl SignedLicenseGate {
         let (payload_bytes, signature, verifying_key_bytes) =
             Self::create_test_signed_payload(rings, expires_at);
         if let Ok(verifying_key) = VerifyingKey::from_bytes(&verifying_key_bytes) {
-            if let Ok(gate) = Self::from_signed_payload(&payload_bytes, &signature, verifying_key)
-            {
+            if let Ok(gate) = Self::from_signed_payload(&payload_bytes, &signature, verifying_key) {
                 return gate;
             }
         }

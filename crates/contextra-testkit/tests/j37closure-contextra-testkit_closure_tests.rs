@@ -126,7 +126,10 @@ fn test_j37closure_reference_model_all_symbols() {
 
     // 13. snapshot_map_at
     let map_seq2 = model.snapshot_map_at(seq2);
-    assert_eq!(map_seq2.get(b"alpha:1".as_slice()), Some(&b"v1_updated".to_vec()));
+    assert_eq!(
+        map_seq2.get(b"alpha:1".as_slice()),
+        Some(&b"v1_updated".to_vec())
+    );
     assert!(!map_seq2.contains_key(b"alpha:2".as_slice()));
     assert_eq!(map_seq2.get(b"beta:1".as_slice()), Some(&b"v3".to_vec()));
 }

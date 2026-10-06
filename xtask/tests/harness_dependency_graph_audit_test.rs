@@ -1,8 +1,8 @@
 #[path = "../src/harness/dependency_graph_audit.rs"]
 mod dependency_graph_audit;
 
-use std::collections::{BTreeMap, HashMap};
 use dependency_graph_audit::{detect_cycles, detect_ring_jumps, Finding};
+use std::collections::{BTreeMap, HashMap};
 use xtask::check_ring_layering::Ring;
 
 #[test]
@@ -47,9 +47,15 @@ fn test_synthetic_graph_acyclic() {
 fn test_synthetic_ring_jumps() {
     let mut graph = BTreeMap::new();
     // contextra-agent (Ring 3) -> contextra-types (Ring 0): distance = 3 > 1 => ring jump
-    graph.insert("contextra-agent".to_string(), vec!["contextra-types".to_string()]);
+    graph.insert(
+        "contextra-agent".to_string(),
+        vec!["contextra-types".to_string()],
+    );
     // contextra-store (Ring 1) -> contextra-types (Ring 0): distance = 1 <= 1 => no jump
-    graph.insert("contextra-store".to_string(), vec!["contextra-types".to_string()]);
+    graph.insert(
+        "contextra-store".to_string(),
+        vec!["contextra-types".to_string()],
+    );
 
     let mut ring_map = HashMap::new();
     ring_map.insert("contextra-agent".to_string(), Ring::Ring3);

@@ -6,9 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use xtask::check_ring_layering::{
-    get_ring_map_from_metadata_json, get_workspace_ring_map, Ring,
-};
+use xtask::check_ring_layering::{get_ring_map_from_metadata_json, get_workspace_ring_map, Ring};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "category", rename_all = "snake_case")]
@@ -44,8 +42,13 @@ pub fn build_graph_from_crates(root: &Path) -> Result<BTreeMap<String, Vec<Strin
         ));
     }
 
-    let entries = fs::read_dir(&crates_dir)
-        .map_err(|e| format!("Failed to read crates directory {}: {}", crates_dir.display(), e))?;
+    let entries = fs::read_dir(&crates_dir).map_err(|e| {
+        format!(
+            "Failed to read crates directory {}: {}",
+            crates_dir.display(),
+            e
+        )
+    })?;
 
     let mut graph: BTreeMap<String, Vec<String>> = BTreeMap::new();
 

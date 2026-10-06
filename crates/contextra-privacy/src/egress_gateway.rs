@@ -268,14 +268,16 @@ pub async fn handle_cloud_query_scoped_with_bulk_detector(
         check_bulk_exfiltration(detector, session, &req.query)?;
     }
 
-    let scoped_payload = contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
+    let scoped_payload =
+        contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
     let l1_classification = classifier
         .classify_scoped(scoped_payload, expected_tenant_id)
         .await;
     evaluate_classification_result(l1_classification)?;
 
     if let Some(guard) = egress_guard {
-        let scoped_guard_payload = contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
+        let scoped_guard_payload =
+            contextra_types::TenantScoped::new(*expected_tenant_id, req.query.as_str());
         let l4_classification = guard
             .check_scoped(scoped_guard_payload, expected_tenant_id)
             .await;
@@ -411,15 +413,20 @@ pub async fn guard_and_sanitize_payload_scoped(
         .map_err(|e| EgressError::policy_violation(e.to_string()))?;
     let session_id = unpacked.session_id().to_string();
 
-    let scoped_text = contextra_types::TenantScoped::new(*expected_tenant_id, unpacked.inner.as_str());
-    let (sanitized_scoped, _count) = vault.sanitize_and_vault_scoped(scoped_text, expected_tenant_id, recognizer)?;
+    let scoped_text =
+        contextra_types::TenantScoped::new(*expected_tenant_id, unpacked.inner.as_str());
+    let (sanitized_scoped, _count) =
+        vault.sanitize_and_vault_scoped(scoped_text, expected_tenant_id, recognizer)?;
 
     let sanitized_str = sanitized_scoped
         .into_inner_checked(expected_tenant_id)
         .map_err(|e| EgressError::policy_violation(e.to_string()))?;
 
     let guarded = GuardedPayload::<Sanitized>::from_sanitized(sanitized_str, session_id);
-    Ok(contextra_types::TenantScoped::new(*expected_tenant_id, guarded))
+    Ok(contextra_types::TenantScoped::new(
+        *expected_tenant_id,
+        guarded,
+    ))
 }
 
 fn evaluate_classification_result(classification: EgressClassification) -> Result<(), EgressError> {

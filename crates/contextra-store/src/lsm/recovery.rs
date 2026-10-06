@@ -554,13 +554,11 @@ impl LsmStorage {
         .with_pressure_rx(pressure_rx.clone());
 
         if config.compaction.enable_adaptive_compaction {
-            let planner = Arc::new(
-                crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
-                    config.compaction.adaptive_read_ratio_threshold,
-                    config.compaction.min_sstables_per_tier,
-                    config.compaction.size_ratio,
-                ),
-            );
+            let planner = Arc::new(crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
+                config.compaction.adaptive_read_ratio_threshold,
+                config.compaction.min_sstables_per_tier,
+                config.compaction.size_ratio,
+            ));
             compaction_engine_builder = compaction_engine_builder.with_adaptive_planner(planner);
         }
 

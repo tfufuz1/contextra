@@ -121,10 +121,7 @@ async fn test_contextra_list_collections_for_tenant_and_importance_update() {
         .unwrap();
 
     let tenant = TenantId::try_new(100).unwrap();
-    let col = db
-        .collection_for_tenant("test_col", tenant)
-        .await
-        .unwrap();
+    let col = db.collection_for_tenant("test_col", tenant).await.unwrap();
 
     let cols = db.list_collections_for_tenant(tenant).await.unwrap();
     assert!(cols.contains(&"test_col".to_string()));

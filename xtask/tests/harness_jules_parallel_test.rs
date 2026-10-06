@@ -100,7 +100,10 @@ fn test_parallel_group_deterministic_order_and_no_early_exit() {
                     serial: false,
                 },
                 jules::JulesFacadeStep {
-                    cmd: vec!["cargo".to_string(), "nonexistent_subcmd_test_xyz".to_string()],
+                    cmd: vec![
+                        "cargo".to_string(),
+                        "nonexistent_subcmd_test_xyz".to_string(),
+                    ],
                     required: true,
                     parallel_group: Some("group1".to_string()),
                     when_changed: None,
@@ -138,38 +141,64 @@ fn test_when_changed_skip_and_failsafe() {
     let config_failsafe = jules::JulesFacadeConfig {
         phase: jules::JulesFacadePhaseConfig {
             start: None,
-            check: Some(vec![
-                jules::JulesFacadeStep {
-                    cmd: vec!["cargo".to_string(), "--version".to_string()],
-                    required: true,
-                    parallel_group: None,
-                    when_changed: Some(vec!["non_existent_path/**/*.rs".to_string()]),
-                    serial: false,
-                },
-            ]),
+            check: Some(vec![jules::JulesFacadeStep {
+                cmd: vec!["cargo".to_string(), "--version".to_string()],
+                required: true,
+                parallel_group: None,
+                when_changed: Some(vec!["non_existent_path/**/*.rs".to_string()]),
+                serial: false,
+            }]),
             verify: None,
             submit: None,
             stop: None,
         },
     };
 
-    let (code1, res1) = jules::jules_facade_execute_phase(&root, "check", &[], Some(&config_failsafe));
+    let (code1, res1) =
+        jules::jules_facade_execute_phase(&root, "check", &[], Some(&config_failsafe));
     assert_eq!(code1, 0);
     let steps1 = res1.get("steps").unwrap().as_array().unwrap();
-    assert_eq!(steps1[0]["status"], "pass", "Fail-safe behavior should run the step when git diff fails");
+    assert_eq!(
+        steps1[0]["status"], "pass",
+        "Fail-safe behavior should run the step when git diff fails"
+    );
 
     // 2. With git repo: initialize git and commit initial files on 'main'
-    let _ = std::process::Command::new("git").args(["init", "-b", "main"]).current_dir(&root).output();
-    let _ = std::process::Command::new("git").args(["config", "user.name", "Test"]).current_dir(&root).output();
-    let _ = std::process::Command::new("git").args(["config", "user.email", "test@example.com"]).current_dir(&root).output();
-    let _ = std::process::Command::new("git").args(["add", "."]).current_dir(&root).output();
-    let _ = std::process::Command::new("git").args(["commit", "-m", "initial"]).current_dir(&root).output();
+    let _ = std::process::Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(&root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(&root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(&root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(&root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["commit", "-m", "initial"])
+        .current_dir(&root)
+        .output();
 
     // Create feature branch and modify file
-    let _ = std::process::Command::new("git").args(["checkout", "-b", "feature"]).current_dir(&root).output();
+    let _ = std::process::Command::new("git")
+        .args(["checkout", "-b", "feature"])
+        .current_dir(&root)
+        .output();
     fs::write(root.join("crates/contextra-core/src/lib.rs"), "// mod\n").unwrap();
-    let _ = std::process::Command::new("git").args(["add", "."]).current_dir(&root).output();
-    let _ = std::process::Command::new("git").args(["commit", "-m", "feature change"]).current_dir(&root).output();
+    let _ = std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(&root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["commit", "-m", "feature change"])
+        .current_dir(&root)
+        .output();
 
     // Step with non-matching pattern should skip
     let config_skip = jules::JulesFacadeConfig {
@@ -212,15 +241,18 @@ fn test_pkgs_expansion_workspace_and_timings() {
     let config = jules::JulesFacadeConfig {
         phase: jules::JulesFacadePhaseConfig {
             start: None,
-            check: Some(vec![
-                jules::JulesFacadeStep {
-                    cmd: vec!["cargo".to_string(), "check".to_string(), "-h".to_string(), "{pkgs}".to_string()],
-                    required: true,
-                    parallel_group: None,
-                    when_changed: None,
-                    serial: false,
-                },
-            ]),
+            check: Some(vec![jules::JulesFacadeStep {
+                cmd: vec![
+                    "cargo".to_string(),
+                    "check".to_string(),
+                    "-h".to_string(),
+                    "{pkgs}".to_string(),
+                ],
+                required: true,
+                parallel_group: None,
+                when_changed: None,
+                serial: false,
+            }]),
             verify: None,
             submit: None,
             stop: None,
@@ -246,7 +278,8 @@ fn test_backwards_compatibility_harness_phases_toml() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let config_path = root.join(".jules/harness-phases.toml");
     let content = fs::read_to_string(&config_path).expect("harness-phases.toml readable");
-    let config: jules::JulesFacadeConfig = toml::from_str(&content).expect("harness-phases.toml parses");
+    let config: jules::JulesFacadeConfig =
+        toml::from_str(&content).expect("harness-phases.toml parses");
 
     // Verify all steps deserialize cleanly with optional fields defaulted
     let check_steps = config.phase.check.expect("check phase steps exist");

@@ -13,7 +13,10 @@ async fn test_j08closure_block_builder_and_sstable_builder() -> Result<()> {
 
     bb.add(b"key1", b"value1", 1, 100);
     let size_one = bb.current_size();
-    assert!(size_one > size_empty, "BlockBuilder current_size should grow after add");
+    assert!(
+        size_one > size_empty,
+        "BlockBuilder current_size should grow after add"
+    );
 
     // 2. SstableBuilder::set_format_version & SstableBuilder::current_size
     let dir = tempdir().expect("tempdir");

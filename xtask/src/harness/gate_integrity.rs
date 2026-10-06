@@ -80,7 +80,19 @@ pub fn run_gate_integrity(args: &[String]) -> i32 {
         let det = files.iter().any(|f| {
             f.starts_with("crates/contextra-")
                 || f.starts_with("xtask/")
-                || (f.ends_with(".rs") && file_contains_pattern(&root_dir.join(f), &["Clock", "Rng", "IdGenerator", "SystemTime", "thread_rng", "HashMap", "HashSet"]))
+                || (f.ends_with(".rs")
+                    && file_contains_pattern(
+                        &root_dir.join(f),
+                        &[
+                            "Clock",
+                            "Rng",
+                            "IdGenerator",
+                            "SystemTime",
+                            "thread_rng",
+                            "HashMap",
+                            "HashSet",
+                        ],
+                    ))
         });
 
         let unsafe_code = files.iter().any(|f| {
@@ -99,7 +111,11 @@ pub fn run_gate_integrity(args: &[String]) -> i32 {
                 || f.starts_with("crates/contextra-store/")
                 || f.starts_with("crates/contextra-graph/")
                 || f.starts_with("crates/contextra-db/")
-                || (f.ends_with(".rs") && file_contains_pattern(&root_dir.join(f), &["parking_lot", "tokio", "RwLock", "Mutex"]))
+                || (f.ends_with(".rs")
+                    && file_contains_pattern(
+                        &root_dir.join(f),
+                        &["parking_lot", "tokio", "RwLock", "Mutex"],
+                    ))
         });
 
         let wal = files.iter().any(|f| {
@@ -184,17 +200,27 @@ pub fn run_gate_integrity(args: &[String]) -> i32 {
             println!("{}", json_str);
         }
     } else {
-        println!("=== Gate gate-integrity: {} ===", final_status.to_uppercase());
+        println!(
+            "=== Gate gate-integrity: {} ===",
+            final_status.to_uppercase()
+        );
         for r in &results {
             println!("{:<20} {}", r.status, r.name);
         }
     }
 
-    if overall_fail { 1 } else { 0 }
+    if overall_fail {
+        1
+    } else {
+        0
+    }
 }
 
 fn execute_xtask_subcmd(cmd: &str, args: &[String], root: &Path) -> (i32, String, String) {
-    if let Ok(out) = Command::new("git").args(["rev-parse", "--show-toplevel"]).output() {
+    if let Ok(out) = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
         if out.status.success() {
             let ws_root = String::from_utf8_lossy(&out.stdout).trim().to_string();
             let xtask_bin = PathBuf::from(&ws_root).join("target/debug/xtask");
@@ -242,7 +268,11 @@ fn execute_xtask_subcmd(cmd: &str, args: &[String], root: &Path) -> (i32, String
             let code = out.status.code().unwrap_or(2);
             (code, stdout, stderr)
         }
-        Err(e) => (2, "".to_string(), format!("Prozessaufruf fehlgeschlagen: {e}")),
+        Err(e) => (
+            2,
+            "".to_string(),
+            format!("Prozessaufruf fehlgeschlagen: {e}"),
+        ),
     }
 }
 
