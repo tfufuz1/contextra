@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// STAND: 2026-10-06T00:00:00Z (SESSION: p02a-fix)
+// ZWECK: Haupt-Storage-Engine LsmStorage (SSTable-Management, Flushes, Merges, Observer, MVCC-Anbindung).
+// INVARIANTEN: Compaction Engine berücksichtigt MVCC TxBuffer Reader (Invariante I-2); WAL before memtable; atomic manifest transitions.
+// HOTSPOTS: 100-350
+
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
