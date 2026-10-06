@@ -1,3 +1,11 @@
+//! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
+//! Stand: 2026-10-06
+//! Zweck: Background flusher actor processing WAL I/O commands sequentially with error truncation.
+//! Invarianten:
+//! - I-2 (Atomarer Group-Commit): Ungefluste Data-Bytes werden bei sync_all-Fehler sofort per set_len(size_before) zurückgeschnitten.
+//! - I-3 (Crash-Konsistenz): Nach fsync-Fehler verbleiben keine unbestätigten Bytes im Page-Cache.
+//! - I-5 (Poison-State Isolation): Nach I/O- oder fsync-Fehler bleibt das Handle poisoned bis zur expliziten Replay-Recovery.
+
 use contextra_core::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -8,7 +16,7 @@ use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 #[cfg(feature = "fault-injection")]
-pub(crate) static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
+pub static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
 pub(crate) enum WalCommand {
@@ -350,6 +358,20 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
+                            if let Err(e) = file.set_len(size_before).await {
+                                tracing::warn!(
+                                    wal_path = %path.display(),
+                                    error = %e,
+                                    "Failed to truncate file length to size_before during append write error recovery"
+                                );
+                            }
+                            if let Err(e) = file.seek(std::io::SeekFrom::Start(size_before)).await {
+                                tracing::warn!(
+                                    wal_path = %path.display(),
+                                    error = %e,
+                                    "Failed to seek to size_before during append write error recovery"
+                                );
+                            }
                             poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
 
                             for ack in acks {
@@ -386,12 +408,20 @@ impl Wal {
                         .await;
 
                         if let Err(sync_err) = sync_res {
-                            // TODO(Implementer): [P01 / F-01 / CRITICAL / JULES-P01-01]
-                            // Page-Cache Resurrection ungefluster Bytes nach `fsync()`-Fehler (I-2, I-3, I-5):
-                            // Nach fehlerhaftem `file.sync_all()` verbleiben geschriebene Daten im OS-Page-Cache.
-                            // Bei späterer Recovery oder Kernel-Delay-Flush können unbestätigte Transaktionen auferstehen!
-                            // 1. Die Datei MUSS hier sofort mittels `file.set_len(size_before).await` auf die Länge vor dem Write zurückgesetzt werden.
-                            // 2. Das Handle bleibt streng `poisoned` und verweigert weitere Writes bis zum Replay.
+                            if let Err(e) = file.set_len(size_before).await {
+                                tracing::warn!(
+                                    wal_path = %path.display(),
+                                    error = %e,
+                                    "Failed to truncate file length to size_before during append sync error recovery"
+                                );
+                            }
+                            if let Err(e) = file.seek(std::io::SeekFrom::Start(size_before)).await {
+                                tracing::warn!(
+                                    wal_path = %path.display(),
+                                    error = %e,
+                                    "Failed to seek to size_before during append sync error recovery"
+                                );
+                            }
                             poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                             for ack in acks {
                                 let _ =
