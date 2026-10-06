@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-10-06
+// ZWECK: HNSW-Knoten-Einfügepfad (`compute_insert`, `apply_insert`) mit atomarem Speicherreseriverungsschutz.
+// INVARIANTEN: Zero-Panic Guarantee (I-8), Kantensymmetrie (I-3), Atomares Einfügen bei Allokationsfehlern.
+
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
@@ -363,14 +368,7 @@ impl HnswIndexCore {
         })
     }
 
-    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
-        let node = HnswNode {
-            doc_id: prepared.doc_id,
-            vector: prepared.vector_data,
-            max_layer: prepared.new_layer,
-            committed_tx: tx_id,
-        };
-
+    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) -> Result<()> {
         let m = self.cold.config.m;
         let mmap_count = self
             .cold
@@ -380,29 +378,26 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        // TODO(Implementer): [P03 / F-01 / CRITICAL / JULES-P03-01]
-        // Panic- und Korruptionsanfälligkeit in Arena Allocation (Invariante I-8 / Zero-Panic Guarantee):
-        // `allocate_node` schlägt bei Kapazitätsüberschreitung fehl. Durch `unwrap_or_else` wird ein unallozierter
-        // Ersatzindex (`prepared.new_idx.saturating_sub(mmap_count)`) vergeben, obwohl kein Speicher in der Arena
-        // reserviert wurde. Folgende Zugriffe greifen out-of-bounds zu und panizen.
-        // Der Fehler MUSS per `Result<DocId, ContextraError>` via `?` nach oben propagiert werden!
-        // Niemals einen unallozierten Fallback-Index verwenden.
-        let ram_idx = self
-            .hot
-            .arena
-            .allocate_node(prepared.new_layer, m, &prepared.final_connections)
-            .unwrap_or_else(|_| prepared.new_idx.saturating_sub(mmap_count));
-
-        for backlink in prepared.neighbor_backlinks {
+        // Perform node allocation first to ensure atomicity before any state modification.
+        let ram_idx =
             self.hot
                 .arena
-                .update_backlink(
-                    backlink.neighbor_ram_idx,
-                    backlink.layer,
-                    m,
-                    &backlink.updated_connections,
-                )
-                .ok();
+                .allocate_node(prepared.new_layer, m, &prepared.final_connections)?;
+
+        let node = HnswNode {
+            doc_id: prepared.doc_id,
+            vector: prepared.vector_data,
+            max_layer: prepared.new_layer,
+            committed_tx: tx_id,
+        };
+
+        for backlink in prepared.neighbor_backlinks {
+            self.hot.arena.update_backlink(
+                backlink.neighbor_ram_idx,
+                backlink.layer,
+                m,
+                &backlink.updated_connections,
+            )?;
         }
 
         let mut nodes = self.hot.nodes.write();
@@ -434,11 +429,13 @@ impl HnswIndexCore {
         if prepared.should_update_ram_entry_point || self.hot.get_ram_entry_point().is_none() {
             self.hot.set_ram_entry_point(Some(prepared.new_idx));
         }
+
+        Ok(())
     }
 
     pub(super) fn do_insert(&self, id: DocId, vector: &[f32], tx_id: u64) -> Result<()> {
         let prepared = self.compute_insert(id, vector)?;
-        self.apply_insert(prepared, tx_id);
+        self.apply_insert(prepared, tx_id)?;
         Ok(())
     }
 
