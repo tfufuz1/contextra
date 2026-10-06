@@ -1,9 +1,9 @@
 use std::sync::Arc;
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence; idempotenter WAL-Recovery-Deduplizierung.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
+// STAND: TS:2026-10-06T12:00:00Z (SESSION: fix/p03-d-diskann-pending-wal)
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
 use super::format::{
@@ -38,16 +38,40 @@ impl DiskAnnIndex {
     }
 
     pub fn persist_delta_sync(&self) -> Result<()> {
-        let pending = {
+        let raw_pending = {
             let mut guard = self.inner.pending_inserts.write();
             self.inner.pending_count.store(0, Ordering::Relaxed);
             std::mem::take(&mut *guard)
         };
 
+        // Deduplizierung über doc_id (Vektoren, deren doc_id bereits im Index existiert,
+        // werden nicht erneut eingefügt).
+        let existing_doc_ids = self.inner.doc_ids.read();
+        let mut seen_pending = std::collections::HashSet::new();
+        let mut pending = Vec::with_capacity(raw_pending.len());
+        for (id, vec) in raw_pending {
+            if existing_doc_ids.contains(&id) || !seen_pending.insert(id) {
+                tracing::info!(
+                    doc_id = %id.inner(),
+                    "DiskANN persist_delta_sync: DocId existiert bereits im Index oder doppelt in pending; Vektor wird verworfen (Idempotenz)"
+                );
+            } else {
+                pending.push((id, vec));
+            }
+        }
+        drop(existing_doc_ids);
+
         if pending.is_empty() {
             let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
             if pending_wal.exists() {
-                let _ = std::fs::remove_file(&pending_wal);
+                if let Err(e) = std::fs::remove_file(&pending_wal) {
+                    tracing::warn!(error = %e, "Fehler beim Entfernen der unberechtigten pending.wal");
+                }
+                if let Some(parent) = pending_wal.parent() {
+                    if let Ok(dir) = std::fs::File::open(parent) {
+                        let _ = dir.sync_all();
+                    }
+                }
             }
             return Ok(());
         }
@@ -70,31 +94,43 @@ impl DiskAnnIndex {
         let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
         self.write_incremental_to_file_sync(&tmp_path, &pending)?;
 
-        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
+        // Atomares Write & Durability Order:
+        // 1. fsync der neuen Indexdatei (delta.tmp)
         let index_path = self.inner.config.index_path.clone();
         let tmp_file = std::fs::File::open(&tmp_path)?;
         tmp_file
             .sync_all()
             .map_err(|e| ContextraError::Storage(format!("fsync tmp: {e}")))?;
         drop(tmp_file);
+
+        // 2. rename delta.tmp auf index_path
         std::fs::rename(&tmp_path, &index_path)
             .map_err(|e| ContextraError::Storage(format!("rename: {e}")))?;
+
+        // 3. fsync_parent_dir nach rename
         if let Some(parent) = index_path.parent() {
             if let Ok(dir) = std::fs::File::open(parent) {
-                dir.sync_all()
-                    .map_err(|e| ContextraError::Storage(format!("parent fsync: {e}")))?;
+                dir.sync_all().map_err(|e| {
+                    ContextraError::Storage(format!("parent fsync post-rename: {e}"))
+                })?;
             }
         }
 
-        // TODO(Implementer): [P03 / F-04 / HIGH / JULES-P03-04]
-        // Crash-Recovery-Inkonsistenz bei DiskANN Delta-Flushing (Invariante I-7):
-        // Ein Absturz direkt nach `std::fs::rename` aber VOR `remove_file(&pending_wal)` führt beim Neustart
-        // dazu, dass die in `pending.wal` enthaltenen Vektoren erneut geladen und dupliziert werden.
-        // Das Löschen/Abschneiden der pending WAL muss atomar zum Index-Recovery-Status synchronisiert sein
-        // (z. B. durch eine im Index-Header und in der WAL abgeglichene Checkpoint-Sequenz-ID).
+        // 4. Entfernen des pending.wal (Fehler dürfen Korrektheit nicht gefährden)
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if pending_wal.exists() {
-            let _ = std::fs::remove_file(&pending_wal);
+            if let Err(e) = std::fs::remove_file(&pending_wal) {
+                tracing::warn!(error = %e, "Fehler beim Entfernen der pending.wal nach Delta-Persistenz");
+            }
+        }
+
+        // 5. fsync_parent_dir erneut nach pending.wal-Entfernung
+        if let Some(parent) = index_path.parent() {
+            if let Ok(dir) = std::fs::File::open(parent) {
+                dir.sync_all().map_err(|e| {
+                    ContextraError::Storage(format!("parent fsync post-wal-remove: {e}"))
+                })?;
+            }
         }
 
         self.load_sync() // Mmap neu laden
