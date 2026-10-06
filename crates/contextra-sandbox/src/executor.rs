@@ -60,7 +60,10 @@ impl wasmtime::ResourceLimiter for SandboxState {
         _max: Option<usize>,
     ) -> anyhow::Result<bool> {
         // INV-SBX-2: Rounding up with div_ceil ensures exact page limits without page under-counting
-        let desired_pages = desired.div_ceil(65536) as u32;
+        let desired_pages = match u32::try_from(desired.div_ceil(65536)) {
+            Ok(p) => p,
+            Err(_) => return Ok(false), // page count exceeds u32::MAX — deny
+        };
         Ok(desired_pages <= self.max_pages)
     }
 
@@ -157,7 +160,7 @@ impl WasmExecutor {
         } else {
             timeout
         };
-        let timeout_ms = effective_timeout.as_millis() as u64;
+        let timeout_ms = u64::try_from(effective_timeout.as_millis()).unwrap_or(u64::MAX);
         let deadline = tokio::time::Instant::now() + effective_timeout;
 
         // Check input size limit prior to execution

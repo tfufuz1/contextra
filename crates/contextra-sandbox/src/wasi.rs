@@ -76,8 +76,8 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
             };
 
             let mem_slice = memory.data(&caller);
-            let iovs_start = iovs_ptr as usize;
-            let iovs_count = iovs_len as usize;
+            let iovs_start = iovs_ptr as u32 as usize;
+            let iovs_count = iovs_len as u32 as usize;
 
             let iovs_bytes = match iovs_count.checked_mul(8) {
                 Some(bytes) => bytes,
@@ -112,7 +112,7 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 iovecs.push((buf_ptr, buf_len));
             }
 
-            let nread_offset = nread_ptr as usize;
+            let nread_offset = nread_ptr as u32 as usize;
             let nread_end = match nread_offset.checked_add(4) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
@@ -167,7 +167,7 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 }
 
                 input_offset += to_copy;
-                total_read = match total_read.checked_add(to_copy as u32) {
+                total_read = match total_read.checked_add(u32::try_from(to_copy).unwrap_or(u32::MAX)) {
                     Some(sum) => sum,
                     None => return ERRNO_INVAL,
                 };
@@ -212,8 +212,8 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
             };
 
             let mem_slice = memory.data(&caller);
-            let iovs_start = iovs_ptr as usize;
-            let iovs_count = iovs_len as usize;
+            let iovs_start = iovs_ptr as u32 as usize;
+            let iovs_count = iovs_len as u32 as usize;
 
             let iovs_bytes = match iovs_count.checked_mul(8) {
                 Some(bytes) => bytes,
@@ -294,13 +294,13 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                     }
                 }
 
-                total_written = match total_written.checked_add(buf_len as u32) {
+                total_written = match total_written.checked_add(u32::try_from(buf_len).unwrap_or(u32::MAX)) {
                     Some(sum) => sum,
                     None => return Ok(ERRNO_INVAL),
                 };
             }
 
-            let nwritten_offset = nwritten_ptr as usize;
+            let nwritten_offset = nwritten_ptr as u32 as usize;
             let nwritten_end = match nwritten_offset.checked_add(4) {
                 Some(end) => end,
                 None => return Ok(ERRNO_INVAL),
@@ -349,13 +349,14 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 return ERRNO_INVAL;
             }
 
-            let time_offset = time_ptr as usize;
+            let time_offset = time_ptr as u32 as usize;
             let time_end = match time_offset.checked_add(8) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
             };
 
-            let nanos = caller.data().start_instant.elapsed().as_nanos() as u64;
+            let nanos = u64::try_from(caller.data().start_instant.elapsed().as_nanos())
+                .unwrap_or(u64::MAX);
 
             let memory = match caller.get_export("memory") {
                 Some(wasmtime::Extern::Memory(mem)) => mem,
@@ -385,8 +386,8 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 return ERRNO_INVAL;
             }
 
-            let buf_offset = buf_ptr as usize;
-            let len = buf_len as usize;
+            let buf_offset = buf_ptr as u32 as usize;
+            let len = buf_len as u32 as usize;
 
             let buf_end = match buf_offset.checked_add(len) {
                 Some(end) => end,
@@ -445,13 +446,13 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 _ => return ERRNO_INVAL,
             };
 
-            let argc_offset = argc_ptr as usize;
+            let argc_offset = argc_ptr as u32 as usize;
             let argc_end = match argc_offset.checked_add(4) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
             };
 
-            let buf_size_offset = argv_buf_size_ptr as usize;
+            let buf_size_offset = argv_buf_size_ptr as u32 as usize;
             let buf_size_end = match buf_size_offset.checked_add(4) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
@@ -497,7 +498,7 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
             };
 
             let mem_slice = memory.data(&caller);
-            if (argv_ptr as usize) > mem_slice.len() || (argv_buf_ptr as usize) > mem_slice.len() {
+            if (argv_ptr as u32 as usize) > mem_slice.len() || (argv_buf_ptr as u32 as usize) > mem_slice.len() {
                 return ERRNO_INVAL;
             }
 
@@ -522,13 +523,13 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 _ => return ERRNO_INVAL,
             };
 
-            let envc_offset = environc_ptr as usize;
+            let envc_offset = environc_ptr as u32 as usize;
             let envc_end = match envc_offset.checked_add(4) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
             };
 
-            let buf_size_offset = environ_buf_size_ptr as usize;
+            let buf_size_offset = environ_buf_size_ptr as u32 as usize;
             let buf_size_end = match buf_size_offset.checked_add(4) {
                 Some(end) => end,
                 None => return ERRNO_INVAL,
@@ -573,8 +574,8 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
             };
 
             let mem_slice = memory.data(&caller);
-            if (environ_ptr as usize) > mem_slice.len()
-                || (environ_buf_ptr as usize) > mem_slice.len()
+            if (environ_ptr as u32 as usize) > mem_slice.len()
+                || (environ_buf_ptr as u32 as usize) > mem_slice.len()
             {
                 return ERRNO_INVAL;
             }
