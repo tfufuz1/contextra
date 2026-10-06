@@ -1,3 +1,9 @@
+//! FILE-CONTEXT:
+//! STAND: 2026-10-06
+//! ZWECK: Format-Spezifikation (V1/V2/V3), `WalEntry`, `WalOp`, CRC32 & HMAC-Berechnung sowie Binär-Serialisierung.
+//! INVARIANTEN:
+//! - I-4: Monotone Sequenznummern: seq_no == u64::MAX wird als Überlauf abgelehnt.
+
 use contextra_core::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::WalHmac;
@@ -125,10 +131,11 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<Self> {
-        // TODO(Implementer): [P01 / F-07 / LOW]
-        // Monotone Sequenznummer-Validierung / Überlaufschutz (Invariante I-4):
-        // Sicherstellen, dass `seq_no < u64::MAX` gilt. Bei `seq_no == u64::MAX` mit
-        // `Err(ContextraError::InvalidInput("WAL sequence number overflow".into()))` ablehnen.
+        if seq_no == u64::MAX {
+            return Err(ContextraError::InvalidInput(
+                "WAL sequence number overflow".into(),
+            ));
+        }
         let checksum = Self::compute_checksum(&op, seq_no, integrity_key, prev_hmac)?;
         Ok(Self {
             op,

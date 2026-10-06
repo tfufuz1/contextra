@@ -1,3 +1,11 @@
+//! FILE-CONTEXT:
+//! STAND: 2026-10-06
+//! ZWECK: Implementierung von WAL-Replay, Mmap-/Stream-Scans, CRC/HMAC-Tail-Truncation und Bak-Recovery.
+//! INVARIANTEN:
+//! - I-1: HMAC-Verkettung muss intakt sein. Nach verworfenem Tail dürfen keine weiteren Frames verarbeitet werden.
+//! - I-3: Torn Writes am physischen Dateiende (pos >= file_size) werden abgeschnitten; Bitrot (pos < file_size) liefert WalCorruption.
+//! - I-6: Verzeichnis-Fsync (fsync_parent_dir) nach allen .bak Recovery-Verzeichnis-Mutationen.
+
 use contextra_core::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
@@ -26,37 +34,28 @@ impl Wal {
         pos: u64,
         file_size: u64,
     ) -> Option<ContextraError> {
-        match e {
-            // TODO(Implementer): [P01 / F-02 & F-04 / HIGH & MEDIUM / JULES-P01-02]
-            // Differenzierung zwischen CRC32-Fehlern am physischen Dateiende (Torn Write) und Bitrot in Dateimitte (I-3):
-            // Aktuell wird jeder CrcMismatch bedingungslos als harter `wal_corruption`-Fehler gewertet.
-            // Tritt der CrcMismatch jedoch am physischen Dateiende auf (`pos >= file_size`), liegt ein partieller
-            // Tail Write (Crash mitten im Schreiben) vor, der sauber abgeschnitten (truncation warning) und
-            // bis zum letzten validen HMAC-Frame recovered werden muss.
-            // Nur CRC-Fehler VOR dem physischen Dateiende dürfen als harte Bitrot-Korruption (`wal_corruption`) ablehnen!
-            WalParseError::CrcMismatch { stored, computed } => {
-                Some(ContextraError::wal_corruption(
-                    chunk_start_pos,
-                    format!(
-                        "CRC validation failed: stored={:#010x}, computed={:#010x}",
-                        stored, computed
-                    ),
-                ))
-            }
-            _ => {
-                if pos >= file_size {
-                    tracing::warn!(
-                        "WAL truncation at tail (offset {}), partial entry: {}",
-                        chunk_start_pos,
-                        e
-                    );
-                    None
-                } else {
+        if pos >= file_size {
+            tracing::warn!(
+                "WAL truncation at tail (offset {}), partial entry: {}",
+                chunk_start_pos,
+                e
+            );
+            None
+        } else {
+            match e {
+                WalParseError::CrcMismatch { stored, computed } => {
                     Some(ContextraError::wal_corruption(
                         chunk_start_pos,
-                        format!("Deserialization failed: {}", e),
+                        format!(
+                            "CRC validation failed: stored={:#010x}, computed={:#010x}",
+                            stored, computed
+                        ),
                     ))
                 }
+                _ => Some(ContextraError::wal_corruption(
+                    chunk_start_pos,
+                    format!("Deserialization failed: {}", e),
+                )),
             }
         }
     }
@@ -756,23 +755,25 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                         .map_err(|e| {
                             ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
                         })?;
-                    let _ = crate::wal::fs::remove_file(&bak_path).await;
+                    crate::wal::fs::remove_file(&bak_path)
+                        .await
+                        .map_err(|e| {
+                            ContextraError::Storage(format!("WAL backup recovery remove failed: {e}"))
+                        })?;
                 }
             }
-            if let Ok(f) = crate::wal::fs::OpenOptions::new()
+            let f = crate::wal::fs::OpenOptions::new()
                 .write(true)
                 .open(wal_path)
                 .await
-            {
-                f.sync_all().await.map_err(|e| {
-                    ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
+                .map_err(|e| {
+                    ContextraError::Storage(format!("WAL recovery open failed: {e}"))
                 })?;
-            }
-            // TODO(Implementer): [P01 / F-05 / MEDIUM]
-            // Directory Fsync Discipline (Invariante I-6):
-            // Nach dem Umbenennen (`rename`) bzw. Löschen (`remove_file`) der `.bak`-Datei fehlt der
-            // Verzeichnis-Fsync (`crate::util::fsync_parent_dir(wal_path).await?`), wodurch der Verzeichniseintrag
-            // nach Stromausfall verloren gehen kann. Zwingend Verzeichnis synchronisieren.
+            f.sync_all().await.map_err(|e| {
+                ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
+            })?;
+
+            crate::util::fsync_parent_dir(wal_path).await?;
             return Ok(true);
         }
     }

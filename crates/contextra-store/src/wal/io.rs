@@ -1,3 +1,10 @@
+//! FILE-CONTEXT:
+//! STAND: 2026-10-06
+//! ZWECK: Synchrones/asynchrones Stream-Reading, Scans, Batch-Appending und File-I/O für das WAL.
+//! INVARIANTEN:
+//! - I-1: HMAC-Verkettung muss intakt sein. Nach verworfenem Tail dürfen keine weiteren Frames verarbeitet werden.
+//! - I-3: End-of-File Partial Entries werden als Tail Truncation behandelt.
+
 use contextra_core::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
