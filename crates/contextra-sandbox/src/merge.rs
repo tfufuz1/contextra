@@ -12,13 +12,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{capabilities::MergeOperatorCapabilities, error::SandboxError, executor::WasmExecutor};
-
-/// Standalone, pure, deterministic WASM merge operator executor.
-///
-/// Encapsulates a pre-validated WASM module and executes pure merge logic
-/// over binary inputs via stdin/stdout.
-use crate::capabilities::WasmCapabilities;
+use crate::{
+    capabilities::{MergeOperatorCapabilities, ModulePolicy, WasmCapabilities},
+    error::SandboxError,
+    executor::WasmExecutor,
+};
 
 /// Standalone, pure, deterministic WASM merge operator executor.
 ///
@@ -45,6 +43,27 @@ impl WasmMergeFunction {
         )
     }
 
+    /// Creates a new `WasmMergeFunction` configured with a strict SHA-256 module allowlist (fail-closed provenance).
+    ///
+    /// # Errors
+    /// Returns `SandboxError::InvalidModule` if the WASM binary is not in the allowlist or fails WASM validation.
+    pub fn new_with_allowlist(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        allowed_hashes: Vec<[u8; 32]>,
+    ) -> Result<Self, SandboxError> {
+        Self::new_with_policy(wasm_bytes, ModulePolicy::HashAllowlist(allowed_hashes))
+    }
+
+    /// Creates a new `WasmMergeFunction` with a specific module provenance [`ModulePolicy`].
+    pub fn new_with_policy(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        policy: ModulePolicy,
+    ) -> Result<Self, SandboxError> {
+        let mut caps = MergeOperatorCapabilities::pure_with_result_channel();
+        caps.module_policy = policy;
+        Self::new_with_capabilities(wasm_bytes, caps)
+    }
+
     /// Creates a new `WasmMergeFunction` with custom capability limits (e.g. `max_fuel` or `max_wall_clock_ms`).
     pub fn new_with_capabilities(
         wasm_bytes: impl Into<Arc<[u8]>>,
@@ -54,6 +73,7 @@ impl WasmMergeFunction {
         let wasm_bytes: Arc<[u8]> = wasm_bytes.into();
 
         executor.validate_module(&wasm_bytes, caps.max_module_size_bytes)?;
+        caps.verify_module_policy(&wasm_bytes)?;
 
         Ok(Self {
             executor,
