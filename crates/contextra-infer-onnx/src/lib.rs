@@ -194,7 +194,6 @@ pub async fn ensure_onnx_model_download(
 pub const MAX_EMBED_BATCH_SIZE: usize = 512;
 
 /// Configuration settings for the text embedder.
-#[cfg(feature = "onnx")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TextEmbedderConfig {
     /// Maximum number of tokens per text sequence (default: 512).
@@ -211,7 +210,6 @@ pub struct TextEmbedderConfig {
     pub max_batch_size: usize,
 }
 
-#[cfg(feature = "onnx")]
 impl Default for TextEmbedderConfig {
     fn default() -> Self {
         Self {
@@ -224,19 +222,18 @@ impl Default for TextEmbedderConfig {
     }
 }
 
-#[cfg(feature = "onnx")]
 impl TextEmbedderConfig {
     /// Validates configuration parameters.
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> contextra_types::Result<()> {
         if self.pool_size != 1 {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
                 "TextEmbedder: pool_size > 1 ({}) not supported — ONNX session is not thread-safe \
                  under concurrent access without external serialization. Use pool_size = 1.",
                 self.pool_size
             )));
         }
         if self.max_concurrent_embeddings == 0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "TextEmbedder: max_concurrent_embeddings must be > 0".into(),
             ));
         }
