@@ -76,7 +76,9 @@ pub fn render_art30_register_markdown(
     }
 
     out.push_str("| Mandant | Verantwortlicher (lit. a) | Zweck (lit. b) | Betroffene Personen (lit. c) | Datenkategorien (lit. c) | Empfänger (lit. d) | Drittlandübermittlung (lit. e) | Löschfristen (lit. f) | TOMs (lit. g) | Rechtsgrundlage | Löschnachweise | Egress-Events | Generiert am |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str(
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+    );
 
     for entry in entries {
         let tenant = sanitize_markdown_cell(&entry.tenant_id.to_string());

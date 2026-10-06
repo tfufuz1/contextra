@@ -142,11 +142,12 @@ impl Wal {
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-            let std_file = std::fs::File::open(&self.path)
-                .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
-            let metadata = std_file
-                .metadata()
-                .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
+            let std_file = std::fs::File::open(&self.path).map_err(|e| {
+                ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
+            })?;
+            let metadata = std_file.metadata().map_err(|e| {
+                ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}"))
+            })?;
             let file_size = metadata.len();
 
             if file_size == 0 {

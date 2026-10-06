@@ -29,8 +29,12 @@ fn test_j35closure_error_constructors_and_check_helpers() {
     assert!(ContextraError::check_vector_reference(true, "doc_1", "vec_1").is_ok());
     assert!(ContextraError::check_vector_reference(false, "doc_1", "vec_1").is_err());
 
-    let err_kind_orphan = ContextraError::from_kind_and_message("OrphanedVectorReference", "doc_A -> vec_B");
-    assert!(matches!(err_kind_orphan, ContextraError::OrphanedVectorReference { .. }));
+    let err_kind_orphan =
+        ContextraError::from_kind_and_message("OrphanedVectorReference", "doc_A -> vec_B");
+    assert!(matches!(
+        err_kind_orphan,
+        ContextraError::OrphanedVectorReference { .. }
+    ));
 }
 
 #[test]
@@ -94,6 +98,7 @@ fn test_j35closure_domain_misc_methods() {
     assert_eq!(edge.tx_valid_to, Some(TxId::new(20)));
 
     // 11. with_weight
-    let weighted_edge = Edge::try_new(EntityId::new(1), EntityId::new(2), "rel", 0.75).expect("valid edge");
+    let weighted_edge =
+        Edge::try_new(EntityId::new(1), EntityId::new(2), "rel", 0.75).expect("valid edge");
     assert!((weighted_edge.weight - 0.75).abs() < f32::EPSILON);
 }

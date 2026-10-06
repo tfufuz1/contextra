@@ -1,12 +1,12 @@
 //! Integration tests verifying wiring and production reachability for the 13 symbols in campaign J23-contextra-mvcc.
 
 use contextra_mvcc::{
-    DocId, IndexOp, ReadSet, SequenceLog, SequenceLogSsiValidator, SnapshotRegistry,
-    SsiValidator, TxBuffer, TxId,
+    DocId, IndexOp, ReadSet, SequenceLog, SequenceLogSsiValidator, SnapshotRegistry, SsiValidator,
+    TxBuffer, TxId,
 };
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
 
 #[test]
 fn test_j23_seq_log_expired_pins_and_set_max_pin_duration() {
@@ -90,7 +90,15 @@ fn test_j23_tx_buffer_staged_status_and_drain_wiring() {
     let doc_id = DocId::from(1u64);
 
     buffer.begin(tx);
-    buffer.stage_kv(tx, IndexOp::Insert { doc_id, data: (b"key1".to_vec(), b"val1".to_vec()) }).unwrap();
+    buffer
+        .stage_kv(
+            tx,
+            IndexOp::Insert {
+                doc_id,
+                data: (b"key1".to_vec(), b"val1".to_vec()),
+            },
+        )
+        .unwrap();
 
     // Enclosing staged_status calls is_key_staged_for_tx
     assert_eq!(buffer.staged_status(b"key1"), Some(true));

@@ -16,7 +16,10 @@ fn test_art30_register_complete_single_entry() -> Result<(), Box<dyn std::error:
             "Vektoreinbettungen".to_string(),
             "Chat-Verläufe".to_string(),
         ],
-        recipient_categories: vec!["Interne IT".to_string(), "Auftragsverarbeiter Cloud GMBH".to_string()],
+        recipient_categories: vec![
+            "Interne IT".to_string(),
+            "Auftragsverarbeiter Cloud GMBH".to_string(),
+        ],
         third_country_transfers: Some("Keine Übermittlung an Drittländer".to_string()),
         erasure_deadlines: "30 Tage nach Vertragsende oder auf Verlangen (Art. 17)".to_string(),
         technical_organizational_measures: vec![
@@ -67,7 +70,8 @@ fn test_art30_register_complete_single_entry() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn test_art30_register_multi_entry_aggregation_and_order() -> Result<(), Box<dyn std::error::Error>> {
+fn test_art30_register_multi_entry_aggregation_and_order() -> Result<(), Box<dyn std::error::Error>>
+{
     let entry1 = Art30ProcessingRegisterEntry {
         tenant_id: TenantId::try_new(101).unwrap(),
         controller_details: "Tenant 101 Corp".to_string(),

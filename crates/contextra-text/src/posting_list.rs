@@ -516,7 +516,9 @@ mod tests {
 
         index.remove_terms(doc1, &[term.clone()]);
 
-        let list_after = index.get(&term).expect("term alpha should still exist for doc2");
+        let list_after = index
+            .get(&term)
+            .expect("term alpha should still exist for doc2");
         assert_eq!(list_after.len(), 1);
         assert_eq!(list_after.as_slice()[0].doc_id(), doc2);
     }

@@ -11,7 +11,10 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_j18closure_mcp_server_from_env_and_volatile_integration() {
-    std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", "j18closure_proof_key_secret_32b!");
+    std::env::set_var(
+        "CONTEXTRA_DELETION_PROOF_KEY",
+        "j18closure_proof_key_secret_32b!",
+    );
     std::env::set_var("CONTEXTRA_LLM_PROVIDER", "mock");
 
     let tmp_dir = tempfile::tempdir().expect("tempdir");
@@ -62,7 +65,10 @@ async fn test_j18closure_mcp_server_from_env_and_volatile_integration() {
         }
     });
     let resp = server.handle_value(req_plugin_status).await;
-    assert!(resp.is_some(), "Expected JSON-RPC response for contextra_plugin_status");
+    assert!(
+        resp.is_some(),
+        "Expected JSON-RPC response for contextra_plugin_status"
+    );
 
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
     std::env::remove_var("CONTEXTRA_LLM_PROVIDER");

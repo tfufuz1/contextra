@@ -41,7 +41,10 @@ fn test_j22closure_volatile_vault_preview_metadata_and_purge() {
     assert_eq!(preview.len(), 2);
     assert_eq!(preview[0].id, DocId::new(201));
     assert_eq!(preview[0].modality, SignalModality::TextInput);
-    assert_eq!(preview[0].size_bytes, b"confidential information text".len());
+    assert_eq!(
+        preview[0].size_bytes,
+        b"confidential information text".len()
+    );
     assert_eq!(preview[0].label.as_deref(), Some("doc_201"));
 
     assert_eq!(preview[1].id, DocId::new(202));

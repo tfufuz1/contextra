@@ -741,10 +741,14 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
     // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
-        let mut recovered = self.orphan_registry.recover_and_clean(&*self.storage).await?;
+        let mut recovered = self
+            .orphan_registry
+            .recover_and_clean(&*self.storage)
+            .await?;
         #[allow(deprecated)]
-        if let Ok(global_recovered) =
-            global_orphan_registry().recover_and_clean(&*self.storage).await
+        if let Ok(global_recovered) = global_orphan_registry()
+            .recover_and_clean(&*self.storage)
+            .await
         {
             recovered.extend(global_recovered);
         }

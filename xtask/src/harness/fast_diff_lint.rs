@@ -58,16 +58,14 @@ pub(crate) fn parse_unified_diff(diff_text: &str) -> Vec<DiffFile> {
             if raw_path == "/dev/null" || raw_path.is_empty() {
                 current_file = None;
             } else {
-                let cleaned_path = raw_path
-                    .strip_prefix("b/")
-                    .unwrap_or(raw_path)
-                    .to_string();
+                let cleaned_path = raw_path.strip_prefix("b/").unwrap_or(raw_path).to_string();
                 current_file = Some(cleaned_path);
             }
             continue;
         }
 
-        if line.starts_with("--- ") || line.starts_with("diff --git") || line.starts_with("index ") {
+        if line.starts_with("--- ") || line.starts_with("diff --git") || line.starts_with("index ")
+        {
             continue;
         }
 
@@ -120,7 +118,10 @@ fn extract_crate_name(file_path: &str) -> Option<String> {
 }
 
 fn is_test_context(file_path: &str, diff_window_before: &[String]) -> bool {
-    if file_path.contains("/tests/") || file_path.starts_with("tests/") || file_path.ends_with("_test.rs") {
+    if file_path.contains("/tests/")
+        || file_path.starts_with("tests/")
+        || file_path.ends_with("_test.rs")
+    {
         return true;
     }
 
@@ -147,12 +148,14 @@ fn lint_file(file: &DiffFile) -> Vec<FastDiffFinding> {
     let is_rs = file.path.ends_with(".rs");
     let crate_name = extract_crate_name(&file.path);
 
-    let re_zero_panic = Regex::new(r"\.unwrap\(\)|\.expect\(|panic!|todo!|unimplemented!|unreachable!").unwrap();
+    let re_zero_panic =
+        Regex::new(r"\.unwrap\(\)|\.expect\(|panic!|todo!|unimplemented!|unreachable!").unwrap();
     let re_debug = Regex::new(r"\bdbg!\(|^\s*println!\(").unwrap();
     let re_unsafe = Regex::new(r"\bunsafe\b.*(?:\{|\bfn\b)").unwrap();
     let re_ring2_use = Regex::new(r"\buse\s+(?:contextra_infer_candle|contextra_infer_ollama|contextra_infer_onnx|contextra_sandbox)\b").unwrap();
     let re_todo = Regex::new(r"\b(TODO|FIXME|XXX)\b").unwrap();
-    let re_shell_commit = Regex::new(r#"(?i)git\s+commit\s+-m\s+["'](wip|fix|update|test|tmp|stuff)["']"#).unwrap();
+    let re_shell_commit =
+        Regex::new(r#"(?i)git\s+commit\s+-m\s+["'](wip|fix|update|test|tmp|stuff)["']"#).unwrap();
 
     let allowed_islands: HashSet<&str> = ["contextra-sys", "contextra-simd", "contextra-wire"]
         .iter()
@@ -183,7 +186,8 @@ fn lint_file(file: &DiffFile) -> Vec<FastDiffFinding> {
                     file: file.path.clone(),
                     line: line_num,
                     category: "todo-marker".to_string(),
-                    message: "TODO/FIXME/XXX-Marker ohne Issue/Task-Referrenzsyntax (#...)".to_string(),
+                    message: "TODO/FIXME/XXX-Marker ohne Issue/Task-Referrenzsyntax (#...)"
+                        .to_string(),
                     text: text.clone(),
                 });
                 break;
@@ -195,7 +199,8 @@ fn lint_file(file: &DiffFile) -> Vec<FastDiffFinding> {
                 file: file.path.clone(),
                 line: line_num,
                 category: "shell-commit".to_string(),
-                message: "Potentielles Entwickler-Shell-Scripting mit 'git commit -m ...' entdeckt".to_string(),
+                message: "Potentielles Entwickler-Shell-Scripting mit 'git commit -m ...' entdeckt"
+                    .to_string(),
                 text: text.clone(),
             });
         }
@@ -207,7 +212,8 @@ fn lint_file(file: &DiffFile) -> Vec<FastDiffFinding> {
                     file: file.path.clone(),
                     line: line_num,
                     category: "zero-panic".to_string(),
-                    message: "Verwendung von panic-auslösenden Konstrukten in Nicht-Test-Code".to_string(),
+                    message: "Verwendung von panic-auslösenden Konstrukten in Nicht-Test-Code"
+                        .to_string(),
                     text: text.clone(),
                 });
             }
@@ -330,11 +336,18 @@ pub fn run_fast_diff_lint(args: &[String]) -> i32 {
         all_findings.extend(lint_file(file));
     }
 
-    let status = if all_findings.is_empty() { "pass" } else { "fail" };
+    let status = if all_findings.is_empty() {
+        "pass"
+    } else {
+        "fail"
+    };
     let summary = if all_findings.is_empty() {
         "Keine Doktrin-Verstöße im Diff gefunden".to_string()
     } else {
-        format!("{} Doktrin-Verstoß/Verstöße im Diff gefunden", all_findings.len())
+        format!(
+            "{} Doktrin-Verstoß/Verstöße im Diff gefunden",
+            all_findings.len()
+        )
     };
 
     let gate_result = FastDiffGateResult {
@@ -345,7 +358,10 @@ pub fn run_fast_diff_lint(args: &[String]) -> i32 {
     };
 
     if json_output {
-        println!("{}", serde_json::to_string(&gate_result).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string(&gate_result).unwrap_or_default()
+        );
     } else {
         println!("=== Gate fast-diff-lint: {} ===", gate_result.status);
         println!("{}", gate_result.summary);

@@ -100,8 +100,14 @@ async fn test_wiring_audit_migration_and_metrics_and_dlq_drain() -> Result<()> {
     );
 
     // Get actual committed tx_id from step 0 in state_collection
-    let step0_val = col.get_kv("task:task-wire:step:0").await?.expect("step 0 committed");
-    let committed_tx_id = step0_val.get("tx_id").and_then(|v| v.as_u64()).expect("tx_id exists");
+    let step0_val = col
+        .get_kv("task:task-wire:step:0")
+        .await?
+        .expect("step 0 committed");
+    let committed_tx_id = step0_val
+        .get("tx_id")
+        .and_then(|v| v.as_u64())
+        .expect("tx_id exists");
 
     // 5. Set up DLQ entries (1 uncommitted, 1 already committed in storage)
     let dlq = engine.dead_letter_queue.as_ref().expect("DLQ exists");
@@ -145,7 +151,8 @@ async fn test_wiring_audit_migration_and_metrics_and_dlq_drain() -> Result<()> {
     assert_eq!(uncommitted[0].step_index, 888);
 
     // 7. Verify PollingDocumentEventSource::new_from_seq
-    let mut poll_src = PollingDocumentEventSource::new_from_seq(col.clone(), Duration::from_millis(10), 100);
+    let mut poll_src =
+        PollingDocumentEventSource::new_from_seq(col.clone(), Duration::from_millis(10), 100);
     assert_eq!(poll_src.next_event().await?, None);
 
     Ok(())

@@ -87,7 +87,8 @@ fn j06closure_test_eviction_worker_registration_symbols() {
 fn j06closure_test_prefix_store_builder_symbols() {
     // Symbol 3: with_byte_budget_per_tenant
     // Symbol 4: with_reuse_policy
-    let store = TenantPrefixKvStore::with_capacity_and_policy(2 * 1024 * 1024, KvReusePolicy::Always);
+    let store =
+        TenantPrefixKvStore::with_capacity_and_policy(2 * 1024 * 1024, KvReusePolicy::Always);
 
     let tenant = TenantId::try_new(501).unwrap();
     let key = make_prefix_key("closure-model");
@@ -98,7 +99,9 @@ fn j06closure_test_prefix_store_builder_symbols() {
     };
 
     store.insert(tenant, &key, &tokens, vec![block]).unwrap();
-    let hit = store.lookup(tenant, &key, &tokens).expect("Lookup should succeed");
+    let hit = store
+        .lookup(tenant, &key, &tokens)
+        .expect("Lookup should succeed");
     assert_eq!(hit.matched_tokens, 3);
 }
 
@@ -115,7 +118,9 @@ fn j06closure_test_scratchpad_invalidator_with_keys_symbol() {
         data: Bytes::from_static(b"data"),
     };
 
-    store.insert(tenant, &key1, &tokens, vec![block.clone()]).unwrap();
+    store
+        .insert(tenant, &key1, &tokens, vec![block.clone()])
+        .unwrap();
     store.insert(tenant, &key2, &tokens, vec![block]).unwrap();
 
     // Symbol 5: with_keys
@@ -146,7 +151,8 @@ fn j06closure_test_segment_crypto_and_quantization_symbols() {
         key_group_size: 16,
         quantize_values: true,
     };
-    let raw = KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2).unwrap();
+    let raw =
+        KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2).unwrap();
 
     // Symbol 9: write_quantized
     let mut seg = KvSegment::new(tenant, 999, vec![]);
@@ -169,7 +175,9 @@ fn j06closure_test_store_acquire_block_guard_symbol() {
     store.insert_segment(tenant, seg);
 
     // Symbol 10: acquire_block_guard
-    let guard = store.acquire_block_guard(tenant, 777, None).expect("Guard must be acquired");
+    let guard = store
+        .acquire_block_guard(tenant, 777, None)
+        .expect("Guard must be acquired");
     assert_eq!(guard.active_refs(), 1);
 
     // Verify pinned protection against LRU eviction

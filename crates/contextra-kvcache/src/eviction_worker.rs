@@ -151,7 +151,8 @@ impl EvictionWorker {
         segment_id: u64,
         request_id: RequestId,
     ) {
-        self.store.register_segment_request(tenant_id, segment_id, request_id);
+        self.store
+            .register_segment_request(tenant_id, segment_id, request_id);
     }
 
     /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.

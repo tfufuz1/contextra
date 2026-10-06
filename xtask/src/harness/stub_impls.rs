@@ -127,7 +127,10 @@ fn match_trivial_expr(stmt: &syn::Stmt) -> Option<(&'static str, &'static str)> 
     ];
 
     for (display, lit) in literals {
-        let lit_norm = lit.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        let lit_norm = lit
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect::<String>();
         if norm == lit_norm {
             return Some((display, lit));
         }
@@ -210,8 +213,10 @@ impl<'a, 'ast> Visit<'ast> for ItemVisitor<'a> {
                 if block.stmts.len() == 1 {
                     if let Some((display_lit, _lit)) = match_trivial_expr(&block.stmts[0]) {
                         // EXCEPTION check:
-                        let is_constructor_idiom = (method_name == "new" || method_name == "default")
-                            && (display_lit == "Self::default()" || display_lit == "Default::default()");
+                        let is_constructor_idiom = (method_name == "new"
+                            || method_name == "default")
+                            && (display_lit == "Self::default()"
+                                || display_lit == "Default::default()");
 
                         if !is_constructor_idiom {
                             self.findings.push(StubFinding {
@@ -433,11 +438,21 @@ pub fn run_stub_impls_with_writer<W: Write>(args: &[String], writer: &mut W) -> 
         let json_str = serde_json::to_string_pretty(&gate_res).unwrap_or_default();
         let _ = writeln!(writer, "{}", json_str);
     } else {
-        let _ = writeln!(writer, "### Stub Implementations Report ({})\n", status.to_uppercase());
+        let _ = writeln!(
+            writer,
+            "### Stub Implementations Report ({})\n",
+            status.to_uppercase()
+        );
         if filtered_findings.is_empty() {
-            let _ = writeln!(writer, "Keine verdächtigen Stub-/Platzhalter-Methodenkörper gefunden.\n");
+            let _ = writeln!(
+                writer,
+                "Keine verdächtigen Stub-/Platzhalter-Methodenkörper gefunden.\n"
+            );
         } else {
-            let _ = writeln!(writer, "| Severity | Crate | Type / Trait | Method | Reason | Location |");
+            let _ = writeln!(
+                writer,
+                "| Severity | Crate | Type / Trait | Method | Reason | Location |"
+            );
             let _ = writeln!(writer, "|---|---|---|---|---|---|");
             for f in &filtered_findings {
                 let icon = match f.severity.as_str() {

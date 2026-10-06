@@ -116,8 +116,12 @@ fn j06_test_scratchpad_invalidator_with_keys_wiring() {
     assert_eq!(count, 1);
 
     // key_target is invalidated, key_other remains retrievable
-    assert!(store.lookup(tenant, &key_target, &scratchpad_tokens).is_none());
-    assert!(store.lookup(tenant, &key_other, &scratchpad_tokens).is_some());
+    assert!(store
+        .lookup(tenant, &key_target, &scratchpad_tokens)
+        .is_none());
+    assert!(store
+        .lookup(tenant, &key_other, &scratchpad_tokens)
+        .is_some());
 }
 
 #[test]
@@ -128,13 +132,9 @@ fn j06_test_tier2_encrypted_segment_wiring() {
     let passphrase = "j06-passphrase-secret";
 
     // Create Tier-2 segment with random key
-    let tier2 = Tier2EncryptedSegment::new_with_random_key(
-        tenant,
-        segment_id,
-        plaintext,
-        passphrase,
-    )
-    .unwrap();
+    let tier2 =
+        Tier2EncryptedSegment::new_with_random_key(tenant, segment_id, plaintext, passphrase)
+            .unwrap();
 
     assert_eq!(tier2.tenant_id, tenant);
     assert_eq!(tier2.segment_id, segment_id);

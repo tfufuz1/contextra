@@ -108,9 +108,7 @@ impl DeletionProofBuilder<Missing, Missing, Missing, Missing, Missing, Missing, 
     }
 }
 
-impl<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb>
-    DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb>
-{
+impl<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb> {
     /// Sets an optional WAL HMAC chain receipt.
     pub fn with_wal_chain_receipt(mut self, receipt: Option<[u8; 32]>) -> Self {
         self.wal_chain_receipt = receipt;
@@ -118,9 +116,7 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb>
     }
 }
 
-impl<Sst, Hnsw, Wal, Csr, Kv, Emb>
-    DeletionProofBuilder<Missing, Sst, Hnsw, Wal, Csr, Kv, Emb>
-{
+impl<Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Missing, Sst, Hnsw, Wal, Csr, Kv, Emb> {
     /// Attests physical cleanup of the LSM memtable layer.
     pub fn with_lsm_memtable_cleanup(
         mut self,
@@ -145,9 +141,7 @@ impl<Sst, Hnsw, Wal, Csr, Kv, Emb>
     }
 }
 
-impl<Lsm, Hnsw, Wal, Csr, Kv, Emb>
-    DeletionProofBuilder<Lsm, Missing, Hnsw, Wal, Csr, Kv, Emb>
-{
+impl<Lsm, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Missing, Hnsw, Wal, Csr, Kv, Emb> {
     /// Attests physical cleanup of all SSTable levels.
     pub fn with_sstable_all_levels_cleanup(
         mut self,
@@ -172,9 +166,7 @@ impl<Lsm, Hnsw, Wal, Csr, Kv, Emb>
     }
 }
 
-impl<Lsm, Sst, Wal, Csr, Kv, Emb>
-    DeletionProofBuilder<Lsm, Sst, Missing, Wal, Csr, Kv, Emb>
-{
+impl<Lsm, Sst, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Missing, Wal, Csr, Kv, Emb> {
     /// Attests physical cleanup of the HNSW vector index.
     pub fn with_hnsw_index_cleanup(
         mut self,
@@ -199,9 +191,7 @@ impl<Lsm, Sst, Wal, Csr, Kv, Emb>
     }
 }
 
-impl<Lsm, Sst, Hnsw, Csr, Kv, Emb>
-    DeletionProofBuilder<Lsm, Sst, Hnsw, Missing, Csr, Kv, Emb>
-{
+impl<Lsm, Sst, Hnsw, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Missing, Csr, Kv, Emb> {
     /// Attests physical cleanup of all WAL log segments.
     pub fn with_wal_all_segments_cleanup(
         mut self,
@@ -226,9 +216,7 @@ impl<Lsm, Sst, Hnsw, Csr, Kv, Emb>
     }
 }
 
-impl<Lsm, Sst, Hnsw, Wal, Kv, Emb>
-    DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Missing, Kv, Emb>
-{
+impl<Lsm, Sst, Hnsw, Wal, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Missing, Kv, Emb> {
     /// Attests physical cleanup of the CSR knowledge graph.
     pub fn with_csr_graph_cleanup(
         mut self,
@@ -253,9 +241,7 @@ impl<Lsm, Sst, Hnsw, Wal, Kv, Emb>
     }
 }
 
-impl<Lsm, Sst, Hnsw, Wal, Csr, Emb>
-    DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Missing, Emb>
-{
+impl<Lsm, Sst, Hnsw, Wal, Csr, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Missing, Emb> {
     /// Attests physical cleanup of key-value cache segments.
     pub fn with_kv_cache_segments_cleanup(
         mut self,
@@ -280,9 +266,7 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Emb>
     }
 }
 
-impl<Lsm, Sst, Hnsw, Wal, Csr, Kv>
-    DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Missing>
-{
+impl<Lsm, Sst, Hnsw, Wal, Csr, Kv> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Missing> {
     /// Attests physical cleanup of the embedding cache.
     pub fn with_embedding_cache_cleanup(
         mut self,
@@ -360,11 +344,9 @@ mod tests {
         let csr_proof =
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::CsrGraph, 0).unwrap();
         let kv_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0)
-                .unwrap();
+            LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0).unwrap();
         let emb_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0)
-                .unwrap();
+            LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0).unwrap();
 
         // Direct creation reference
         let expected_proof = DeletionProof::create_with_wal_receipt(
@@ -387,23 +369,18 @@ mod tests {
         .unwrap();
 
         // Typestate builder creation
-        let built_proof = DeletionProofBuilder::new(
-            scope,
-            deleted_keys,
-            tx_id,
-            excluded,
-            key.clone(),
-        )
-        .with_wal_chain_receipt(receipt)
-        .with_lsm_memtable_cleanup(lsm_proof)
-        .with_sstable_all_levels_cleanup(sst_proof)
-        .with_hnsw_index_cleanup(hnsw_proof)
-        .with_wal_all_segments_cleanup(wal_proof)
-        .with_csr_graph_cleanup(csr_proof)
-        .with_kv_cache_segments_cleanup(kv_proof)
-        .with_embedding_cache_cleanup(emb_proof)
-        .finish()
-        .unwrap();
+        let built_proof =
+            DeletionProofBuilder::new(scope, deleted_keys, tx_id, excluded, key.clone())
+                .with_wal_chain_receipt(receipt)
+                .with_lsm_memtable_cleanup(lsm_proof)
+                .with_sstable_all_levels_cleanup(sst_proof)
+                .with_hnsw_index_cleanup(hnsw_proof)
+                .with_wal_all_segments_cleanup(wal_proof)
+                .with_csr_graph_cleanup(csr_proof)
+                .with_kv_cache_segments_cleanup(kv_proof)
+                .with_embedding_cache_cleanup(emb_proof)
+                .finish()
+                .unwrap();
 
         assert_eq!(built_proof, expected_proof);
         assert!(built_proof.verify(&key).unwrap());
@@ -419,13 +396,7 @@ mod tests {
         let wrong_proof =
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap();
 
-        let _ = DeletionProofBuilder::new(
-            scope,
-            vec![],
-            TxId(1),
-            vec![],
-            test_proof_key(),
-        )
-        .with_lsm_memtable_cleanup(wrong_proof);
+        let _ = DeletionProofBuilder::new(scope, vec![], TxId(1), vec![], test_proof_key())
+            .with_lsm_memtable_cleanup(wrong_proof);
     }
 }

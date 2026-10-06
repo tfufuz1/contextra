@@ -9,8 +9,8 @@
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
-use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use contextra_crypto::kdf::KDF_HEADER_VERSION_1;
+use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use contextra_crypto::{KeyManager, ModelFingerprint};
 use contextra_types::{DocId, TenantId, TenantScoped, TxId};
 
@@ -24,9 +24,7 @@ fn test_wire_generate_default_via_try_new_argon2id() {
 
     let plaintext = b"argon2id-protected-data";
     let (ciphertext, nonce) = km.encrypt_auto_nonce(plaintext).expect("encrypt");
-    let decrypted = km
-        .decrypt_auto_nonce(&ciphertext, &nonce)
-        .expect("decrypt");
+    let decrypted = km.decrypt_auto_nonce(&ciphertext, &nonce).expect("decrypt");
 
     assert_eq!(decrypted, plaintext);
 }
@@ -42,10 +40,11 @@ fn test_wire_derive_deletion_proof_key_via_create_deletion_proof() {
         tenant_id: tenant,
     };
 
-    let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-            .expect("LayerCleanupProof"),
-    ];
+    let cleanup_proofs =
+        vec![
+            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+                .expect("LayerCleanupProof"),
+        ];
 
     let proof = km
         .create_deletion_proof(
@@ -149,9 +148,7 @@ fn test_wire_derive_kv_key_scoped_happy_and_mismatch() {
 
     let data = b"kv-cache-layer-data";
     let (ct, nonce) = key_scoped.encrypt_auto_nonce(data).expect("encrypt");
-    let dec = key_direct
-        .decrypt_auto_nonce(&ct, &nonce)
-        .expect("decrypt");
+    let dec = key_direct.decrypt_auto_nonce(&ct, &nonce).expect("decrypt");
     assert_eq!(dec, data);
 
     // Mismatch path: expected tenant mismatch rejected
@@ -168,28 +165,29 @@ fn test_wire_last_seq_no_snapshot_and_set_last_seq_no_via_handoff_from() {
     let mut verifier_a = IntegrityVerifier::new(key);
 
     // Helper to create valid WAL v3 entry
-    let create_v3_entry = |prev_hmac: [u8; 32], seq_no: u64, k: &[u8], v: &[u8]| -> WalEntrySnapshot {
-        let tx_id = seq_no;
-        let mut mac = WalHmac::new(key).expect("mac init");
-        mac.update(&prev_hmac);
-        mac.update(&seq_no.to_le_bytes());
-        mac.update(&tx_id.to_le_bytes());
-        mac.update(&[0u8]); // Put op
-        mac.update(&(k.len() as u32).to_le_bytes());
-        mac.update(k);
-        mac.update(&(v.len() as u32).to_le_bytes());
-        mac.update(v);
-        let checksum = mac.finalize();
-        WalEntrySnapshot {
-            tx_id,
-            seq_no,
-            op_type: 0,
-            key: k.to_vec(),
-            value: v.to_vec(),
-            checksum,
-            prev_hmac,
-        }
-    };
+    let create_v3_entry =
+        |prev_hmac: [u8; 32], seq_no: u64, k: &[u8], v: &[u8]| -> WalEntrySnapshot {
+            let tx_id = seq_no;
+            let mut mac = WalHmac::new(key).expect("mac init");
+            mac.update(&prev_hmac);
+            mac.update(&seq_no.to_le_bytes());
+            mac.update(&tx_id.to_le_bytes());
+            mac.update(&[0u8]); // Put op
+            mac.update(&(k.len() as u32).to_le_bytes());
+            mac.update(k);
+            mac.update(&(v.len() as u32).to_le_bytes());
+            mac.update(v);
+            let checksum = mac.finalize();
+            WalEntrySnapshot {
+                tx_id,
+                seq_no,
+                op_type: 0,
+                key: k.to_vec(),
+                value: v.to_vec(),
+                checksum,
+                prev_hmac,
+            }
+        };
 
     // Entry 1 processed on verifier A
     let e1 = create_v3_entry([0u8; 32], 1, b"key1", b"val1");

@@ -17,21 +17,28 @@ use contextra_types::ScoredEntry;
 struct DummyLlmGenerator;
 
 impl LlmTextGenerator for DummyLlmGenerator {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_core::error::Result<String>> {
-        Box::pin(async move {
-            Ok("Subquery 1\nSubquery 2\nSubquery 3\nSubquery 4".to_string())
-        })
+    fn generate<'a>(
+        &'a self,
+        _prompt: &'a str,
+    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
+        Box::pin(async move { Ok("Subquery 1\nSubquery 2\nSubquery 3\nSubquery 4".to_string()) })
     }
 }
 
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
-    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, contextra_core::error::Result<Vec<f32>>> {
+    fn embed<'a>(
+        &'a self,
+        _text: &'a str,
+    ) -> BoxFuture<'a, contextra_core::error::Result<Vec<f32>>> {
         Box::pin(async move { Ok(vec![0.1; 16]) })
     }
 
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_core::error::Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> BoxFuture<'a, contextra_core::error::Result<Vec<Vec<f32>>>> {
         Box::pin(async move { Ok(vec![vec![0.1; 16]; texts.len()]) })
     }
 }
@@ -39,8 +46,10 @@ impl TextEmbeddingEngine for MockEmbedder {
 /// Tests that `open_with_config` (primary facade) executes builder setters:
 /// `with_max_elements`, `with_distance_metric`, `with_encryption_passphrase`, `with_embedding_backend`, `with_consolidation`.
 #[tokio::test]
-async fn test_open_with_config_executes_builder_setters() -> Result<(), Box<dyn std::error::Error>> {
-    let tmp_path = std::env::temp_dir().join(format!("j36_open_with_config_{}", std::process::id()));
+async fn test_open_with_config_executes_builder_setters() -> Result<(), Box<dyn std::error::Error>>
+{
+    let tmp_path =
+        std::env::temp_dir().join(format!("j36_open_with_config_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
     let config = ContextraConfig {
@@ -58,10 +67,16 @@ async fn test_open_with_config_executes_builder_setters() -> Result<(), Box<dyn 
     let builder = ContextraBuilder::from_config(config.clone());
     assert_eq!(builder.config().max_elements, 5000);
     assert_eq!(builder.config().distance_metric, DistanceMetric::Cosine);
-    assert_eq!(builder.config().encryption_passphrase.as_deref(), Some("secret_pwd"));
+    assert_eq!(
+        builder.config().encryption_passphrase.as_deref(),
+        Some("secret_pwd")
+    );
     assert_eq!(builder.config().embedding_backend, EmbeddingBackend::None);
     assert!(builder.config().consolidation_enabled);
-    assert_eq!(builder.config().consolidation_interval, Duration::from_secs(120));
+    assert_eq!(
+        builder.config().consolidation_interval,
+        Duration::from_secs(120)
+    );
 
     let db = open_with_config(&tmp_path, config).await?;
     assert_eq!(db.len().await?, 0);
@@ -119,7 +134,8 @@ async fn test_builder_from_tier_invokes_validate_with_license() {
 /// Tests that `LlmQueryRewriter::new` delegates to `new_with_limits`, executing `with_max_subqueries`,
 /// `with_max_context_results`, and `with_max_snippet_chars`.
 #[tokio::test]
-async fn test_llm_query_rewriter_new_executes_limit_setters() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_llm_query_rewriter_new_executes_limit_setters(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dummy_gen = Arc::new(DummyLlmGenerator);
     // LlmQueryRewriter::new delegates to new_with_limits, invoking all 3 limit setters
     let rewriter = LlmQueryRewriter::new(dummy_gen);

@@ -529,7 +529,8 @@ mod quantize_validation_tests {
     }
 
     #[test]
-    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()> {
+    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()>
+    {
         let vec1 = vec![0.0, 5.0, 10.0];
         let vec2 = vec![10.0, 5.0, 0.0];
         let batch = vec![vec1.as_slice(), vec2.as_slice()];
@@ -541,7 +542,11 @@ mod quantize_validation_tests {
         let out_of_bounds = vec![-5.0, 5.0, 15.0]; // 2 dimensions out of range
         let calc_drift = sq.calculate_vector_drift(&out_of_bounds);
         assert!((calc_drift - (2.0 / 3.0)).abs() < f32::EPSILON);
-        assert_eq!(sq.drift_ratio(), 0.0, "Pure drift calculation must not update drift ratio");
+        assert_eq!(
+            sq.drift_ratio(),
+            0.0,
+            "Pure drift calculation must not update drift ratio"
+        );
 
         // Quantizing in-range vector -> 1 query, 0 out-of-range -> ratio = 0.0
         let _ = sq.quantize(&[5.0, 5.0, 5.0])?;

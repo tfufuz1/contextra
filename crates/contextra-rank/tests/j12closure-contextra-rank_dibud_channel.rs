@@ -4,7 +4,10 @@ use contextra_rank::BudgetedChannel;
 
 #[test]
 fn test_j12closure_budgeted_channel_from_index() {
-    assert_eq!(BudgetedChannel::from_index(0), Some(BudgetedChannel::Vector));
+    assert_eq!(
+        BudgetedChannel::from_index(0),
+        Some(BudgetedChannel::Vector)
+    );
     assert_eq!(BudgetedChannel::from_index(1), Some(BudgetedChannel::Text));
     assert_eq!(BudgetedChannel::from_index(2), Some(BudgetedChannel::Graph));
     assert_eq!(BudgetedChannel::from_index(3), None);

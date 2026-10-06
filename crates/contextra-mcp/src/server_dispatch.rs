@@ -336,7 +336,9 @@ impl McpServer {
                     _ => {
                         return response_from_error(
                             id,
-                            McpError::invalid_params("Invalid params: missing or empty tool 'name'"),
+                            McpError::invalid_params(
+                                "Invalid params: missing or empty tool 'name'",
+                            ),
                         );
                     }
                 };

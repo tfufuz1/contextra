@@ -41,7 +41,10 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
     let keypair = DeletionProofKeyPair::generate();
     let head_sig = audit_chain.sign_head(keypair.signing_key())?;
     let is_sig_valid = AuditChain::verify_head_signature(&head_sig, &keypair.verifying_key)?;
-    assert!(is_sig_valid, "verify_head_signature MUST succeed for valid sign_head signature");
+    assert!(
+        is_sig_valid,
+        "verify_head_signature MUST succeed for valid sign_head signature"
+    );
 
     let wrong_keypair = DeletionProofKeyPair::generate();
     let is_wrong_sig_valid =
@@ -54,9 +57,8 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
     // 3. create_v3_with_audit_position in DeletionProof
     let tenant_id = TenantId::try_new(1).expect("valid tenant_id");
     let scope = DeletionScope::Document { doc_id, tenant_id };
-    let cleanup_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-            .expect("valid cleanup proof");
+    let cleanup_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+        .expect("valid cleanup proof");
     let audit_position = Some(head_sig.chain_index);
 
     let proof = DeletionProof::create_v3_with_audit_position(

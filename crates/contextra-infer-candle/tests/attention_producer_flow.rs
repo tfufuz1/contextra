@@ -62,8 +62,12 @@ async fn test_attention_producer_flow_with_and_without_exporter() -> Result<()> 
     };
     let tokenizer = create_dummy_tokenizer()?;
 
-    let client_without_exporter =
-        CandleLlmClient::new(Device::Cpu, mock_model, fingerprint.clone(), tokenizer.clone());
+    let client_without_exporter = CandleLlmClient::new(
+        Device::Cpu,
+        mock_model,
+        fingerprint.clone(),
+        tokenizer.clone(),
+    );
 
     let res_without = client_without_exporter.generate("Hello World").await?;
     assert_eq!(
@@ -79,13 +83,9 @@ async fn test_attention_producer_flow_with_and_without_exporter() -> Result<()> 
         vec![0.3, 0.4, 0.3],
     ]));
 
-    let client_with_exporter = CandleLlmClient::new(
-        Device::Cpu,
-        mock_model_with_exp,
-        fingerprint,
-        tokenizer,
-    )
-    .with_attention_exporter(exporter.clone());
+    let client_with_exporter =
+        CandleLlmClient::new(Device::Cpu, mock_model_with_exp, fingerprint, tokenizer)
+            .with_attention_exporter(exporter.clone());
 
     let res_with = client_with_exporter.generate("Hello World").await?;
     assert_eq!(res_with, "[MockAttentionModel] Response for: Hello World");

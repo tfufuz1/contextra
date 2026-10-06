@@ -4,7 +4,7 @@
 use contextra_adapt::{FcTsArmSet, FcTsConfig, FlowCorrectedThompsonBandit};
 use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
 #[cfg(feature = "flow-corrected-thompson")]
-use contextra_router::{FcTsDispatchError, deterministic_fc_ts_rng, select_profile_fc_ts};
+use contextra_router::{deterministic_fc_ts_rng, select_profile_fc_ts, FcTsDispatchError};
 use contextra_router::{RouterEngine, SlmProfile};
 use contextra_types::{
     ContextChunk, ContextWindow, ContextraError, DocId, EntityId, Result, TokenBudget,

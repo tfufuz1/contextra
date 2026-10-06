@@ -285,25 +285,24 @@ where
                             let legacy_key = legacy_integrity_key()?;
                             let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                             legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                            let legacy_res =
-                                match version {
-                                    WalVersion::V3 => legacy_verifier
-                                        .verify_and_update_v3(&snapshot, chunk_start_pos),
-                                    WalVersion::V2 => {
-                                        let _v2_chk = WalEntry::compute_checksum_v2(
-                                            &entry.op,
-                                            entry.seq_no,
-                                            &integrity_key,
-                                            entry.prev_hmac,
-                                        );
-                                        legacy_verifier
-                                            .verify_and_update_v2(&snapshot, chunk_start_pos)
-                                    }
-                                    WalVersion::V1 => {
-                                        legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                        Ok(())
-                                    }
-                                };
+                            let legacy_res = match version {
+                                WalVersion::V3 => {
+                                    legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
+                                }
+                                WalVersion::V2 => {
+                                    let _v2_chk = WalEntry::compute_checksum_v2(
+                                        &entry.op,
+                                        entry.seq_no,
+                                        &integrity_key,
+                                        entry.prev_hmac,
+                                    );
+                                    legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
+                                }
+                                WalVersion::V1 => {
+                                    legacy_verifier.skip_hmac_verify_legacy(&snapshot);
+                                    Ok(())
+                                }
+                            };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
                                     target: "contextra_store::wal::legacy_fallback",

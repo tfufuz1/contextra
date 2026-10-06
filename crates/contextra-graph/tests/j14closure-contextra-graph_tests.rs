@@ -1,12 +1,10 @@
-use std::sync::Arc;
 use contextra_graph::consistency_enforcement::{
     ConsistencyEnforcer, EdgeAssertion, ExactPredicateConflictDetector,
 };
 use contextra_graph::csr::{CsrGraph, EdgeType};
-use contextra_graph::hyperedge::{
-    HyperEdge, HyperEdgeId, RoleBinding, RoleInterner,
-};
+use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleInterner};
 use contextra_types::{DocId, EntityId, TxId};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_closure_consistency_enforcer_and_csr_symbols() {
@@ -184,10 +182,7 @@ fn test_closure_role_interner_and_hyperedge_view_slice() {
     assert!(!interner.contains_id(contextra_graph::hyperedge::RoleId::new(999)));
 
     // 21. resolve_string
-    assert_eq!(
-        interner.resolve_string(id_obj),
-        Some("object".to_string())
-    );
+    assert_eq!(interner.resolve_string(id_obj), Some("object".to_string()));
 
     let hyperedge = HyperEdge::new(
         HyperEdgeId::new(300),

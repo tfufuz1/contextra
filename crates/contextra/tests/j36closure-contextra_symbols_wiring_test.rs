@@ -17,7 +17,10 @@ use std::time::Duration;
 struct DummyLlmGenerator;
 
 impl LlmTextGenerator for DummyLlmGenerator {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String, contextra_core::error::ContextraError>> {
+    fn generate<'a>(
+        &'a self,
+        _prompt: &'a str,
+    ) -> BoxFuture<'a, Result<String, contextra_core::error::ContextraError>> {
         Box::pin(async move { Ok("subquery 1\nsubquery 2".to_string()) })
     }
 }
@@ -80,7 +83,10 @@ fn test_collection_profile_validate_with_license_reachability() {
 
     // Direct invocation of validate_with_license
     let result = profile.validate_with_license(&gate);
-    assert!(result.is_ok(), "EdgeMinimal profile validation with OpenFastGate should succeed");
+    assert!(
+        result.is_ok(),
+        "EdgeMinimal profile validation with OpenFastGate should succeed"
+    );
 }
 
 #[test]

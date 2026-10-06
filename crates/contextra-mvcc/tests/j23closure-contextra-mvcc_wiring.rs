@@ -1,8 +1,8 @@
 //! Integration tests verifying wiring and production reachability for the 13 symbols in campaign J23-contextra-mvcc.
 
 use contextra_mvcc::{
-    DocId, IndexOp, ReadSet, SequenceLog, SequenceLogSsiValidator, SnapshotRegistry,
-    SsiValidator, TxBuffer, TxId,
+    DocId, IndexOp, ReadSet, SequenceLog, SequenceLogSsiValidator, SnapshotRegistry, SsiValidator,
+    TxBuffer, TxId,
 };
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -91,7 +91,15 @@ fn test_j23closure_tx_buffer_staged_status_and_validate_ops() {
     let doc_id = DocId::from(1u64);
 
     buffer.begin(tx);
-    buffer.stage_kv(tx, IndexOp::Insert { doc_id, data: (b"key1".to_vec(), b"val1".to_vec()) }).unwrap();
+    buffer
+        .stage_kv(
+            tx,
+            IndexOp::Insert {
+                doc_id,
+                data: (b"key1".to_vec(), b"val1".to_vec()),
+            },
+        )
+        .unwrap();
 
     // is_key_staged_for_tx directly tested and used by staged_status
     assert!(buffer.is_key_staged_for_tx(tx, b"key1"));

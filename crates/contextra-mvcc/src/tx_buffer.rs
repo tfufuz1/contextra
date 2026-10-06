@@ -707,7 +707,13 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
                 tx
             )));
         }
-        self.stage_kv(tx, IndexOp::Insert { doc_id, data: (key, val) })
+        self.stage_kv(
+            tx,
+            IndexOp::Insert {
+                doc_id,
+                data: (key, val),
+            },
+        )
     }
 
     /// Stages a key-value operation and updates atomic key staging map.

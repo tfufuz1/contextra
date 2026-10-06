@@ -65,8 +65,13 @@ async fn test_j15_closure_all_symbols() {
         let apprh_params = ApprhParams::default();
         let ppr_params = PprParams::default();
 
-        let diff_result = graph.apprh_diffusion(&seeds, &apprh_params).expect("apprh_diffusion failed");
-        assert!(!diff_result.is_empty(), "apprh_diffusion result must not be empty");
+        let diff_result = graph
+            .apprh_diffusion(&seeds, &apprh_params)
+            .expect("apprh_diffusion failed");
+        assert!(
+            !diff_result.is_empty(),
+            "apprh_diffusion result must not be empty"
+        );
 
         let shadow_report = graph
             .apprh_shadow_compare(&seeds, &ppr_params, &apprh_params, 10)
@@ -94,7 +99,9 @@ async fn test_j15_closure_all_symbols() {
         estimated_cost: 1000.0,
         measured_edge_accesses: 1000,
     });
-    let mult = calibrator.recommended_multiplier().expect("multiplier expected");
+    let mult = calibrator
+        .recommended_multiplier()
+        .expect("multiplier expected");
     assert!((mult - 1.0).abs() < 1e-6);
 
     // 6. log_tl_hfd_vs_baseline_discrepancy
@@ -135,5 +142,8 @@ async fn test_j15_closure_all_symbols() {
     let tl_result = graph
         .thresholded_local_hfd(&seeds, &tl_hfd_params)
         .expect("thresholded_local_hfd failed");
-    assert!(!tl_result.is_empty(), "thresholded_local_hfd result must not be empty");
+    assert!(
+        !tl_result.is_empty(),
+        "thresholded_local_hfd result must not be empty"
+    );
 }

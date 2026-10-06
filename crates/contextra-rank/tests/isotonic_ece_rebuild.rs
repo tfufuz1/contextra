@@ -13,7 +13,10 @@ fn test_well_calibrated_data_no_rebuild() {
 
     // High threshold (0.10) for well-calibrated data where ECE is near 0
     let rebuild_triggered = calibrator.maybe_rebuild_on_ece(DEFAULT_ECE_REBUILD_THRESHOLD);
-    assert!(!rebuild_triggered, "Well calibrated data should not trigger rebuild");
+    assert!(
+        !rebuild_triggered,
+        "Well calibrated data should not trigger rebuild"
+    );
 }
 
 #[test]
@@ -26,15 +29,22 @@ fn test_systematically_biased_observations_triggers_rebuild() {
         calibrator.record_outcome(score, score > 0.5);
     }
 
-    let initial_ece = calibrator.expected_calibration_error().expect("ECE should be computed");
+    let initial_ece = calibrator
+        .expected_calibration_error()
+        .expect("ECE should be computed");
 
     // Pass a threshold lower than the current ECE (e.g., -0.01) to simulate threshold breach
     let threshold = -0.01;
     let rebuild_triggered = calibrator.maybe_rebuild_on_ece(threshold);
 
-    assert!(rebuild_triggered, "ECE exceeding threshold should trigger rebuild");
+    assert!(
+        rebuild_triggered,
+        "ECE exceeding threshold should trigger rebuild"
+    );
 
-    let ece_after = calibrator.expected_calibration_error().expect("ECE after rebuild");
+    let ece_after = calibrator
+        .expected_calibration_error()
+        .expect("ECE after rebuild");
     assert!(
         ece_after <= initial_ece || (ece_after - initial_ece).abs() < 1e-5,
         "ECE after rebuild should be less than or equal to initial ECE"
