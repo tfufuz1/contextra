@@ -53,7 +53,8 @@ async fn test_eviction_worker_and_hooks_share_same_store() -> contextra_types::R
 }
 
 #[tokio::test]
-async fn test_rollback_doc_delete_tenant_purge_kv_segment_isolation() -> contextra_types::Result<()> {
+async fn test_rollback_doc_delete_tenant_purge_kv_segment_isolation() -> contextra_types::Result<()>
+{
     let store = Arc::new(TenantIsolatedKvStore::new());
     let tenant1 = TenantId::try_new(1).unwrap();
     let tenant2 = TenantId::try_new(2).unwrap();

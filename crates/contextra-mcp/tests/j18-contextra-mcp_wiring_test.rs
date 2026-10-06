@@ -35,7 +35,9 @@ async fn test_j18_llm_config_build_generator_integration() {
     assert!(response.contains("[Mock LLM response for: hello from integration test]"));
 
     let env_config = LlmConfig::from_env();
-    let env_generator = env_config.build_generator().expect("build generator from_env");
+    let env_generator = env_config
+        .build_generator()
+        .expect("build generator from_env");
     let env_response = env_generator
         .generate("hello from env generator")
         .await
@@ -45,7 +47,10 @@ async fn test_j18_llm_config_build_generator_integration() {
 
 #[test]
 fn test_j18_deletion_proof_key_from_env_integration() {
-    std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", "integration_test_key_32bytes!!");
+    std::env::set_var(
+        "CONTEXTRA_DELETION_PROOF_KEY",
+        "integration_test_key_32bytes!!",
+    );
     let resolved = deletion_proof_key_from_env().expect("deletion proof key resolved");
     assert_eq!(resolved.as_str(), "integration_test_key_32bytes!!");
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
@@ -114,7 +119,10 @@ async fn test_j18_server_builder_wiring_integration() {
         }
     });
     let resp_plugin = server.handle_value(req_plugin_status).await;
-    assert!(resp_plugin.is_some(), "Expected response for contextra_plugin_status");
+    assert!(
+        resp_plugin.is_some(),
+        "Expected response for contextra_plugin_status"
+    );
 
     // Exercise enclosing production path: handle_value for contextra_cloud_query
     let req_cloud_query = json!({
@@ -129,5 +137,8 @@ async fn test_j18_server_builder_wiring_integration() {
         }
     });
     let resp_cloud = server.handle_value(req_cloud_query).await;
-    assert!(resp_cloud.is_some(), "Expected response for contextra_cloud_query");
+    assert!(
+        resp_cloud.is_some(),
+        "Expected response for contextra_cloud_query"
+    );
 }

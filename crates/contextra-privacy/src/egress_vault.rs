@@ -387,7 +387,9 @@ fn eval_text(text: &str, patterns: &[CompiledPattern]) -> Option<EgressClassific
                 pattern = %cp.regex.as_str(),
                 "Egress DLP sensitive pattern match detected"
             );
-            return Some(EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone())));
+            return Some(EgressClassification::Block(BlockReason::SensitivePattern(
+                cp.name.clone(),
+            )));
         }
 
         if normalized != text {
@@ -398,7 +400,9 @@ fn eval_text(text: &str, patterns: &[CompiledPattern]) -> Option<EgressClassific
                     pattern = %cp.regex.as_str(),
                     "Egress DLP sensitive pattern match detected via normalized payload"
                 );
-                return Some(EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone())));
+                return Some(EgressClassification::Block(BlockReason::SensitivePattern(
+                    cp.name.clone(),
+                )));
             }
         }
     }
@@ -840,7 +844,9 @@ mod tests {
         let eval_res = eval_text(&normalized, &patterns);
         assert_eq!(
             eval_res,
-            Some(EgressClassification::Block(BlockReason::SensitivePattern("R-001".to_string())))
+            Some(EgressClassification::Block(BlockReason::SensitivePattern(
+                "R-001".to_string()
+            )))
         );
 
         // Verification through EgressVault classification pipeline
@@ -1022,10 +1028,7 @@ mod tests {
 
     #[test]
     fn test_normalize_payload_delimiters() {
-        assert_eq!(
-            normalize_payload("4532-0151-1283-0366"),
-            "4532015112830366"
-        );
+        assert_eq!(normalize_payload("4532-0151-1283-0366"), "4532015112830366");
         assert_eq!(
             normalize_payload("DE89 3704 0044 0532 0130 00"),
             "DE89370400440532013000"

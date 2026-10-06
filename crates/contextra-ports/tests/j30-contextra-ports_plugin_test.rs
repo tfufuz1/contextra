@@ -3,9 +3,7 @@
 use std::sync::Arc;
 
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
-use contextra_ports::plugin::{
-    PluginCapability, PluginError, PluginManifest, PluginRegistry,
-};
+use contextra_ports::plugin::{PluginCapability, PluginError, PluginManifest, PluginRegistry};
 
 struct PermissiveLicenseGate;
 

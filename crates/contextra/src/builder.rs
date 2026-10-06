@@ -87,10 +87,8 @@ impl ContextraBuilder {
             builder = builder.with_encryption_passphrase(passphrase);
         }
         builder = builder.with_embedding_backend(config.embedding_backend);
-        builder = builder.with_consolidation(
-            config.consolidation_enabled,
-            config.consolidation_interval,
-        );
+        builder =
+            builder.with_consolidation(config.consolidation_enabled, config.consolidation_interval);
         builder.explicit_user_config = true;
         builder
     }

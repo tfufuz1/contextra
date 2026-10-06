@@ -216,8 +216,7 @@ pub fn run_doctrine_scan(args: &[String]) -> i32 {
                         if let Some(inner) = cap.get(1) {
                             for raw_item in inner.as_str().split(',') {
                                 let trimmed = raw_item.trim();
-                                let lint_name =
-                                    trimmed.strip_prefix("clippy::").unwrap_or(trimmed);
+                                let lint_name = trimmed.strip_prefix("clippy::").unwrap_or(trimmed);
                                 if forbidden_lints.contains(lint_name) {
                                     findings.push(DoctrineFinding {
                                         category: "allow_override".to_string(),

@@ -437,9 +437,7 @@ fn registry_check_finish(
     } else if exit_code == 0 {
         println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/registry.toml registriert.");
     } else {
-        println!(
-            "❌ [REGISTRY-CHECK]: Konsistencyprüfungen für xtask-Kommandos fehlgeschlagen."
-        );
+        println!("❌ [REGISTRY-CHECK]: Konsistencyprüfungen für xtask-Kommandos fehlgeschlagen.");
         for f in findings {
             println!(
                 "  - [{}] {} (Datei: {}:{})",

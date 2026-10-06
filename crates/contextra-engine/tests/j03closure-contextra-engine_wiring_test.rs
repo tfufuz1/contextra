@@ -74,8 +74,7 @@ async fn test_j03_closure_auto_extraction_config_and_regulated_mode() {
     }
 
     let col_val = Arc::unwrap_or_clone(col);
-    let col_with =
-        col_val.with_auto_extraction(Arc::new(TestGen), AutoExtractionConfig::default());
+    let col_with = col_val.with_auto_extraction(Arc::new(TestGen), AutoExtractionConfig::default());
     assert!(col_with.auto_extraction_config().is_some());
 }
 

@@ -62,7 +62,10 @@ impl ArmRegistry {
 
     /// Löse eine `RetrievalStrategy` deterministisch in ihr Arm-Index/Strategie-Paar auf.
     /// Nutzt intern `arm_for` und `strategy_for` zur Verifizierung der bijektiven Zuordnung.
-    pub fn resolve_strategy(&self, strategy: RetrievalStrategy) -> Option<(u32, RetrievalStrategy)> {
+    pub fn resolve_strategy(
+        &self,
+        strategy: RetrievalStrategy,
+    ) -> Option<(u32, RetrievalStrategy)> {
         let arm_idx = self.arm_for(strategy);
         self.strategy_for(arm_idx)
             .ok()

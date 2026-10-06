@@ -35,7 +35,10 @@ impl MergeOperator for TestMergeOp {
 async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
     // 1–4. KV Segment symbols: delete_segment, generate_deletion_proof, read_segment, write_segment
     let registry = Arc::new(KeyRegistry::new());
-    let master_km = Arc::new(KeyManager::try_new("passphrase", b"01234567890123456789012345678901")?);
+    let master_km = Arc::new(KeyManager::try_new(
+        "passphrase",
+        b"01234567890123456789012345678901",
+    )?);
     let kv_config = KvSegmentConfig {
         delete_mode: KvDeleteMode::CryptoShred,
     };
@@ -76,7 +79,9 @@ async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
         Arc::new(contextra_store::sstable::BlockCache::new(16)),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget { memory_limit: 1024 * 1024 },
+            contextra_core::ResourceBudget {
+                memory_limit: 1024 * 1024,
+            },
         )),
         None,
     )
@@ -107,7 +112,8 @@ async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
     storage.clear_circuit_breaker(&obs);
 
     // 13. point_lookup_metrics
-    let (_eval, _bloom, _range, _reads, found) = storage.point_lookup_metrics(b"nonexistent-key").await;
+    let (_eval, _bloom, _range, _reads, found) =
+        storage.point_lookup_metrics(b"nonexistent-key").await;
     assert!(!found);
 
     // 14. shard_entry_counts

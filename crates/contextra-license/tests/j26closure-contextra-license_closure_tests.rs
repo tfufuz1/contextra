@@ -13,12 +13,8 @@ fn test_j26closure_symbols_direct_invocation() {
     let expires = 2_100_000_000i64;
 
     // 1. Symbol: create_signed
-    let activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        inst_id,
-        expires,
-        &signing_key,
-    );
+    let activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, inst_id, expires, &signing_key);
     assert_eq!(activation.ring, FeatureRing::Sovereign);
     assert!(activation.verify_signature(&verifying_key));
 

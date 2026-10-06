@@ -12,7 +12,10 @@ async fn test_valid_iban_blocked_and_invalid_checksum_allowed() {
     let valid_iban = "DE89370400440532013000";
     let res_valid = vault.classify(valid_iban).await;
     assert!(
-        matches!(res_valid, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_valid,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "Valid IBAN must be blocked"
     );
 
@@ -33,7 +36,10 @@ async fn test_jwt_token_blocked() {
     let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
     let res = vault.classify(jwt).await;
     assert!(
-        matches!(res, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "JWT token must be blocked"
     );
 }
@@ -45,7 +51,10 @@ async fn test_pem_block_blocked() {
     let pem = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----";
     let res = vault.classify(pem).await;
     assert!(
-        matches!(res, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "PEM private key block must be blocked"
     );
 }
@@ -58,7 +67,10 @@ async fn test_credit_card_luhn_validation_and_delimiters() {
     let valid_card = "4532015112830366";
     let res_valid = vault.classify(valid_card).await;
     assert!(
-        matches!(res_valid, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_valid,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "Valid credit card with Luhn checksum must be blocked"
     );
 
@@ -66,14 +78,20 @@ async fn test_credit_card_luhn_validation_and_delimiters() {
     let delimited_card_dashes = "4532-0151-1283-0366";
     let res_delimited_dashes = vault.classify(delimited_card_dashes).await;
     assert!(
-        matches!(res_delimited_dashes, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_delimited_dashes,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "Delimited credit card number must be recognized and blocked via normalization"
     );
 
     let delimited_card_spaces = "4532 0151 1283 0366";
     let res_delimited_spaces = vault.classify(delimited_card_spaces).await;
     assert!(
-        matches!(res_delimited_spaces, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_delimited_spaces,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "Spaced credit card number must be recognized and blocked via normalization"
     );
 
@@ -94,14 +112,20 @@ async fn test_phone_numbers_blocked() {
     let national_phone = "030 1234567";
     let res_nat = vault.classify(national_phone).await;
     assert!(
-        matches!(res_nat, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_nat,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "National phone number must be blocked"
     );
 
     let intl_phone = "+49 170 1234567";
     let res_intl = vault.classify(intl_phone).await;
     assert!(
-        matches!(res_intl, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res_intl,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "International E.164 phone number must be blocked"
     );
 }
@@ -113,7 +137,10 @@ async fn test_ipv4_address_blocked() {
     let ipv4 = "192.168.1.1";
     let res = vault.classify(ipv4).await;
     assert!(
-        matches!(res, EgressClassification::Block(BlockReason::SensitivePattern(_))),
+        matches!(
+            res,
+            EgressClassification::Block(BlockReason::SensitivePattern(_))
+        ),
         "IPv4 address must be blocked"
     );
 }

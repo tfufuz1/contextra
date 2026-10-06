@@ -36,20 +36,16 @@ fn test_avv_context_new_production_path_wires_default_measures_and_renders() {
 fn test_avv_context_builder_production_path_wires_customizations_and_renders() {
     let tenant_id = TenantId(888);
     // Exercise production path via AvvContext::builder
-    let markdown = AvvContext::builder(
-        "Praxis Dr. Schmidt",
-        "Contextra On-Premise",
-        tenant_id,
-    )
-    .add_subprocessor("Hetzner Online GmbH")
-    .with_deletion_sla_days(7)
-    .add_technical_measure(TechnicalMeasure {
-        name: "Spezifisches Backup-Konzept".to_string(),
-        description: "Tägliches verschlüsseltes Offsite-Backup.".to_string(),
-        reference_article: "Art. 32 Abs. 1 lit. c DSGVO".to_string(),
-    })
-    .render()
-    .expect("Rendering via AvvContextBuilder::render succeeds");
+    let markdown = AvvContext::builder("Praxis Dr. Schmidt", "Contextra On-Premise", tenant_id)
+        .add_subprocessor("Hetzner Online GmbH")
+        .with_deletion_sla_days(7)
+        .add_technical_measure(TechnicalMeasure {
+            name: "Spezifisches Backup-Konzept".to_string(),
+            description: "Tägliches verschlüsseltes Offsite-Backup.".to_string(),
+            reference_article: "Art. 32 Abs. 1 lit. c DSGVO".to_string(),
+        })
+        .render()
+        .expect("Rendering via AvvContextBuilder::render succeeds");
 
     assert!(markdown.contains("**Verantwortlicher (Auftraggeber):** Praxis Dr. Schmidt"));
     assert!(markdown.contains("**Auftragsverarbeiter (Auftragnehmer):** Contextra On-Premise"));

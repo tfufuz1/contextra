@@ -34,13 +34,21 @@ fn test_closure_symbol_derive_deletion_proof_key() -> Result<()> {
     let key1 = km.derive_deletion_proof_key()?;
     let key2 = km.derive_deletion_proof_key()?;
     assert_ne!(key1, [0u8; 32]);
-    assert_eq!(key1, key2, "Deletion proof key derivation MUST be deterministic");
+    assert_eq!(
+        key1, key2,
+        "Deletion proof key derivation MUST be deterministic"
+    );
 
     let integrity_key = km.integrity_key()?;
-    assert_ne!(key1, integrity_key, "Deletion proof key MUST be distinct from integrity key");
+    assert_ne!(
+        key1, integrity_key,
+        "Deletion proof key MUST be distinct from integrity key"
+    );
 
     let proof = km.create_deletion_proof(
-        DeletionScope::Tenant { tenant_id: TenantId::try_new(99).unwrap() },
+        DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(99).unwrap(),
+        },
         vec![b"key1".to_vec()],
         contextra_types::TxId(10),
         vec![],

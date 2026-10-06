@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use contextra_graph::consistency_enforcement::{EdgeAssertion, ExactPredicateConflictDetector};
 use contextra_graph::csr::{CsrGraph, EdgeType};
-use contextra_graph::hyperedge::{
-    HyperEdge, HyperEdgeId, RoleBinding,
-};
+use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding};
 use contextra_types::{DocId, EntityId, TxId};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_wiring_consistency_enforcer_and_conflict_patterns() {

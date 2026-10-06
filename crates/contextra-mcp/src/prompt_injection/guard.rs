@@ -669,9 +669,9 @@ impl PromptInjectionGuard {
         }
 
         // 5. Kombinierte Dekodierungs-Ansicht (HTML -> Leetspeak -> Markdown)
-        let combined = Self::strip_markdown_inline_formatting_view(
-            &Self::decode_leetspeak_view(&Self::decode_html_entities_view(text)),
-        );
+        let combined = Self::strip_markdown_inline_formatting_view(&Self::decode_leetspeak_view(
+            &Self::decode_html_entities_view(text),
+        ));
         if combined != text && combined != leet && combined != html && combined != md {
             if let Some(matched) = self.detect_recursive(&combined, 0) {
                 return Some(matched);

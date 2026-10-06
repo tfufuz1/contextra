@@ -66,7 +66,9 @@ pub fn run_repo_doctor(args: &[String]) -> i32 {
         findings.push(RepoDoctorFinding {
             severity: "info".to_string(),
             source: "repo_doctor".to_string(),
-            message: "Schritte 4-5 (Branch-Überschneidung und Commit-Health) wegen --quick übersprungen.".to_string(),
+            message:
+                "Schritte 4-5 (Branch-Überschneidung und Commit-Health) wegen --quick übersprungen."
+                    .to_string(),
         });
     }
 
@@ -99,7 +101,10 @@ pub fn run_repo_doctor(args: &[String]) -> i32 {
     };
 
     if use_json {
-        println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| json!(result).to_string()));
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&result).unwrap_or_else(|_| json!(result).to_string())
+        );
     } else {
         println!("=== Gate repo-doctor: {} ===", result.status);
         println!("{}", result.summary);
@@ -153,19 +158,26 @@ fn run_git_status_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) -> b
         findings.push(RepoDoctorFinding {
             severity: "kritisch".to_string(),
             source: "git".to_string(),
-            message: "Verzeichnis ist kein Git-Repository oder 'git status' ist fehlgeschlagen.".to_string(),
+            message: "Verzeichnis ist kein Git-Repository oder 'git status' ist fehlgeschlagen."
+                .to_string(),
         });
         return false;
     }
 
     let stdout_str = String::from_utf8_lossy(&status_out.as_ref().unwrap().stdout);
-    let changed_lines: Vec<&str> = stdout_str.lines().filter(|l| !l.trim().is_empty()).collect();
+    let changed_lines: Vec<&str> = stdout_str
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
 
     if !changed_lines.is_empty() {
         findings.push(RepoDoctorFinding {
             severity: "warnung".to_string(),
             source: "git".to_string(),
-            message: format!("Uncommitted changes im Arbeitsbaum ({} Datei(en) berührt).", changed_lines.len()),
+            message: format!(
+                "Uncommitted changes im Arbeitsbaum ({} Datei(en) berührt).",
+                changed_lines.len()
+            ),
         });
     } else {
         findings.push(RepoDoctorFinding {
@@ -176,7 +188,11 @@ fn run_git_status_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) -> b
     }
 
     // Git stash list
-    if let Ok(stash_out) = Command::new("git").current_dir(root).args(["stash", "list"]).output() {
+    if let Ok(stash_out) = Command::new("git")
+        .current_dir(root)
+        .args(["stash", "list"])
+        .output()
+    {
         if stash_out.status.success() {
             let stash_str = String::from_utf8_lossy(&stash_out.stdout);
             let stashes = stash_str.lines().filter(|l| !l.trim().is_empty()).count();
@@ -205,7 +221,10 @@ fn run_git_status_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) -> b
                 findings.push(RepoDoctorFinding {
                     severity: "info".to_string(),
                     source: "git".to_string(),
-                    message: format!("Branch-Status gegenüber origin/main: {} dahinter, {} voraus.", behind, ahead),
+                    message: format!(
+                        "Branch-Status gegenüber origin/main: {} dahinter, {} voraus.",
+                        behind, ahead
+                    ),
                 });
             }
         }
@@ -246,7 +265,10 @@ fn run_workspace_verify_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>
                 findings.push(RepoDoctorFinding {
                     severity: "info".to_string(),
                     source: "workspace_verify".to_string(),
-                    message: format!("Workspace-Konsistenz ok ({} Crates geprüft).", results.len()),
+                    message: format!(
+                        "Workspace-Konsistenz ok ({} Crates geprüft).",
+                        results.len()
+                    ),
                 });
             }
         }
@@ -254,7 +276,10 @@ fn run_workspace_verify_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>
             findings.push(RepoDoctorFinding {
                 severity: "kritisch".to_string(),
                 source: "workspace_verify".to_string(),
-                message: format!("Workspace-Konsistenzprüfung ergab Fehler oder Member-Drift: {}", err_msg),
+                message: format!(
+                    "Workspace-Konsistenzprüfung ergab Fehler oder Member-Drift: {}",
+                    err_msg
+                ),
             });
         }
     }
@@ -277,7 +302,10 @@ fn run_env_check(findings: &mut Vec<RepoDoctorFinding>) {
             }
             crate::env_validate::ToolStatus::WrongVersion { found, required } => {
                 if check.required {
-                    missing_req.push(format!("{} (gefunden {}, benötigt {})", check.name, found, required));
+                    missing_req.push(format!(
+                        "{} (gefunden {}, benötigt {})",
+                        check.name, found, required
+                    ));
                 }
             }
         }
@@ -287,26 +315,34 @@ fn run_env_check(findings: &mut Vec<RepoDoctorFinding>) {
         findings.push(RepoDoctorFinding {
             severity: "warnung".to_string(),
             source: "env_validate".to_string(),
-            message: format!("Erforderliche Umgebungstools fehlen oder haben falsche Version: {}", missing_req.join(", ")),
+            message: format!(
+                "Erforderliche Umgebungstools fehlen oder haben falsche Version: {}",
+                missing_req.join(", ")
+            ),
         });
     } else {
         findings.push(RepoDoctorFinding {
             severity: "info".to_string(),
             source: "env_validate".to_string(),
-            message: format!("Umgebungstools geprüft ok: {} Tool(s) bereit.", ok_tools.len()),
+            message: format!(
+                "Umgebungstools geprüft ok: {} Tool(s) bereit.",
+                ok_tools.len()
+            ),
         });
     }
 }
 
 fn run_branch_overlap_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) {
     let branch_args = vec!["--root".to_string(), root.display().to_string()];
-    let overlap_ok = crate::agent_lifecycle::branch_overlap::run_check_branch_overlap_with_args(&branch_args);
+    let overlap_ok =
+        crate::agent_lifecycle::branch_overlap::run_check_branch_overlap_with_args(&branch_args);
 
     if overlap_ok {
         findings.push(RepoDoctorFinding {
             severity: "info".to_string(),
             source: "branch_overlap".to_string(),
-            message: "Branch-Überschneidung ok: Keine Konflikte mit claim/* Remote-Branches.".to_string(),
+            message: "Branch-Überschneidung ok: Keine Konflikte mit claim/* Remote-Branches."
+                .to_string(),
         });
     } else {
         findings.push(RepoDoctorFinding {
@@ -323,7 +359,8 @@ fn run_commit_health_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) {
             findings.push(RepoDoctorFinding {
                 severity: "info".to_string(),
                 source: "commit_health".to_string(),
-                message: "Commit-Gesundheitsbericht der letzten 7 Tage erfolgreich erstellt.".to_string(),
+                message: "Commit-Gesundheitsbericht der letzten 7 Tage erfolgreich erstellt."
+                    .to_string(),
             });
         }
         Err(err) => {

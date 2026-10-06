@@ -341,13 +341,23 @@ pub fn run_check_placeholder_refs(args: &[String]) -> i32 {
 
 pub fn run_check_bandit_latency_budget(args: &[String]) -> i32 {
     let status = std::process::Command::new("cargo")
-        .args(["run", "--quiet", "-p", "xtask-heavy", "--", "check-bandit-latency-budget"])
+        .args([
+            "run",
+            "--quiet",
+            "-p",
+            "xtask-heavy",
+            "--",
+            "check-bandit-latency-budget",
+        ])
         .status();
     match status {
         Ok(s) if s.success() => 0,
         Ok(s) => s.code().unwrap_or(1),
         Err(e) => {
-            eprintln!("❌ Failed to execute xtask-heavy check-bandit-latency-budget: {}", e);
+            eprintln!(
+                "❌ Failed to execute xtask-heavy check-bandit-latency-budget: {}",
+                e
+            );
             1
         }
     }

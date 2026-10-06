@@ -163,7 +163,9 @@ async fn test_instance_orphan_registry_register_and_recover_closure() -> Result<
     storage.pin_manually(test_pin);
     assert!(storage.is_pinned(test_pin));
 
-    registry.register_orphan(test_pin).map_err(ContextraError::Io)?;
+    registry
+        .register_orphan(test_pin)
+        .map_err(ContextraError::Io)?;
     assert_eq!(registry.get_orphan_pins().len(), 1);
     assert_eq!(registry.get_orphan_pins()[0].seq_no, test_pin);
 
@@ -191,7 +193,9 @@ async fn test_deprecated_orphan_registry_register_and_recover_closure() -> Resul
     storage.pin_manually(test_pin);
     assert!(storage.is_pinned(test_pin));
 
-    registry.register_orphan(test_pin).map_err(ContextraError::Io)?;
+    registry
+        .register_orphan(test_pin)
+        .map_err(ContextraError::Io)?;
     assert_eq!(registry.get_orphans(), vec![test_pin]);
 
     let recovered = registry.recover_and_clean(&storage).await?;
@@ -228,7 +232,9 @@ async fn test_checkpoint_registry_trait_closure_wiring() -> Result<()> {
     storage.pin_manually(test_pin);
 
     // Call register_orphan via CheckpointRegistry trait
-    registry.register_orphan(test_pin).map_err(ContextraError::Io)?;
+    registry
+        .register_orphan(test_pin)
+        .map_err(ContextraError::Io)?;
 
     // Recover via trait
     let recovered = registry.recover_orphaned_pins().await?;

@@ -38,7 +38,9 @@ fn test_ppr_cost_calibrator_recommended_multiplier_integration() {
         measured_edge_accesses: 160,
     });
 
-    let mult = calibrator.recommended_multiplier().expect("multiplier calculated");
+    let mult = calibrator
+        .recommended_multiplier()
+        .expect("multiplier calculated");
     // (1.2 + 0.8) / 2 = 1.0
     assert!((mult - 1.0).abs() < 1e-6);
 }

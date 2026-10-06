@@ -6,12 +6,10 @@ use contextra_privacy::bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
 use contextra_privacy::context_edit_audit::{
-    build_context_edit_audit_record, render_audit_line, verify_audit_chain,
-    ContextEditAuditError, ContextEditInput, ContextEditKind,
+    build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
+    ContextEditInput, ContextEditKind,
 };
-use contextra_privacy::egress_gateway::{
-    pii_vault_forces_crypto_shred, CloudResponseRehydrator,
-};
+use contextra_privacy::egress_gateway::{pii_vault_forces_crypto_shred, CloudResponseRehydrator};
 use contextra_privacy::egress_guard::{EgressGuard, TextSearchEngine, TextSearchResult};
 use contextra_privacy::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
@@ -71,7 +69,9 @@ async fn test_h1_cloud_response_rehydrator_cross_session_and_foreign_token_injec
     let foreign_token_replaced = rehydrated.contains(secret_e2);
     if foreign_token_replaced {
         // Confirm finding J-27-F01 / H1: CloudResponseRehydrator blindly replaces foreign session surrogates!
-        tracing::warn!("H1 CONFIRMED: Foreign session surrogate token was replaced with Vault plaintext!");
+        tracing::warn!(
+            "H1 CONFIRMED: Foreign session surrogate token was replaced with Vault plaintext!"
+        );
     }
     assert!(
         foreign_token_replaced,
@@ -85,12 +85,19 @@ async fn test_h1_cloud_response_rehydrator_cross_session_and_foreign_token_injec
     let vault = EgressVault::try_default().expect("valid vault");
     let scoped_payload = TenantScoped::new(tenant_a, "Clean public payload text");
 
-    let class_ok = vault.classify_scoped(scoped_payload.clone(), &tenant_a).await;
+    let class_ok = vault
+        .classify_scoped(scoped_payload.clone(), &tenant_a)
+        .await;
     assert_eq!(class_ok, EgressClassification::Allow);
 
-    let class_err = vault.classify_scoped(scoped_payload.clone(), &tenant_b).await;
+    let class_err = vault
+        .classify_scoped(scoped_payload.clone(), &tenant_b)
+        .await;
     assert!(
-        matches!(class_err, EgressClassification::Block(BlockReason::PolicyDenied(_))),
+        matches!(
+            class_err,
+            EgressClassification::Block(BlockReason::PolicyDenied(_))
+        ),
         "Tenant ID mismatch must return PolicyDenied block"
     );
 }
@@ -136,11 +143,20 @@ async fn test_h2_layer1_dlp_corpus_and_evasion_matrix() {
 
     // Evasion attacks against default patterns
     let evasion_tests = vec![
-        ("Unicode Cyrillic a in sk-", "sк-proj-1234567890abcdef1234567890abcdef"), // Cyrillic к
-        ("Zero-Width Space in sk-", "s\u{200B}k-proj-1234567890abcdef1234567890abcdef"),
+        (
+            "Unicode Cyrillic a in sk-",
+            "sк-proj-1234567890abcdef1234567890abcdef",
+        ), // Cyrillic к
+        (
+            "Zero-Width Space in sk-",
+            "s\u{200B}k-proj-1234567890abcdef1234567890abcdef",
+        ),
         ("Fullwidth email", "ａｌｉｃｅ＠ｅｘａｍｐｌｅ．ｃｏｍ"),
         ("Space inside sk-", "s k - p r o j - 1 2 3 4"),
-        ("Base64 encoded sk-", "c2stcHJvai0xMjM0NTY3ODkwYWJjZGVmMTIzNDU2Nzg5MGFiY2RlZg=="),
+        (
+            "Base64 encoded sk-",
+            "c2stcHJvai0xMjM0NTY3ODkwYWJjZGVmMTIzNDU2Nzg5MGFiY2RlZg==",
+        ),
         ("RTL Override email", "\u{202E}moc.elpmaxe@ecila"),
     ];
 
@@ -185,7 +201,9 @@ impl TextSearchEngine for MockSearchEngineH4 {
 
 #[tokio::test]
 async fn test_h4_layer4_egress_guard_fail_closed_behavior() {
-    let test_payload = "Sensitive outbound data stream exceeding 128 bytes threshold for similarity scanning. ".repeat(2);
+    let test_payload =
+        "Sensitive outbound data stream exceeding 128 bytes threshold for similarity scanning. "
+            .repeat(2);
     assert!(test_payload.len() >= 128);
 
     // Case (a): Index Error -> Block(InternalError)
@@ -207,7 +225,8 @@ async fn test_h4_layer4_egress_guard_fail_closed_behavior() {
         results: Ok(vec![]),
         delay: Some(Duration::from_millis(100)),
     });
-    let guard_timeout = EgressGuard::new(engine_timeout, 0.85, 128).with_timeout(Duration::from_millis(5));
+    let guard_timeout =
+        EgressGuard::new(engine_timeout, 0.85, 128).with_timeout(Duration::from_millis(5));
     let res_b = guard_timeout.check(&test_payload).await;
     assert_eq!(
         res_b,
@@ -287,7 +306,8 @@ async fn test_h5_bulk_exfiltration_detector_limits_time_regression_and_concurren
     // Submit request with earlier timestamp to simulate clock regression
     let out_reg = reg_detector.record_and_check(s_time, 100);
     assert!(
-        matches!(out_reg, BulkExfiltrationOutcome::Allow) || matches!(out_reg, BulkExfiltrationOutcome::Block { .. }),
+        matches!(out_reg, BulkExfiltrationOutcome::Allow)
+            || matches!(out_reg, BulkExfiltrationOutcome::Block { .. }),
         "Clock evaluation completes cleanly"
     );
 
@@ -299,9 +319,7 @@ async fn test_h5_bulk_exfiltration_detector_limits_time_regression_and_concurren
     for _ in 0..32 {
         let det = par_detector.clone();
         let sess = par_session.clone();
-        tasks.push(tokio::spawn(async move {
-            det.record_and_check(sess, 50)
-        }));
+        tasks.push(tokio::spawn(async move { det.record_and_check(sess, 50) }));
     }
 
     let mut total_allowed_bytes = 0;
@@ -322,13 +340,25 @@ async fn test_h5_bulk_exfiltration_detector_limits_time_regression_and_concurren
     let s_bob = SessionId::from("bob");
     let iso_detector = BulkExfiltrationDetector::new(500, Duration::from_secs(60));
 
-    assert_eq!(iso_detector.record_and_check(s_alice.clone(), 400), BulkExfiltrationOutcome::Allow);
-    assert_eq!(iso_detector.record_and_check(s_bob.clone(), 400), BulkExfiltrationOutcome::Allow);
+    assert_eq!(
+        iso_detector.record_and_check(s_alice.clone(), 400),
+        BulkExfiltrationOutcome::Allow
+    );
+    assert_eq!(
+        iso_detector.record_and_check(s_bob.clone(), 400),
+        BulkExfiltrationOutcome::Allow
+    );
     assert_eq!(
         iso_detector.record_and_check(s_alice, 200),
-        BulkExfiltrationOutcome::Block { window_bytes: 600, limit: 500 }
+        BulkExfiltrationOutcome::Block {
+            window_bytes: 600,
+            limit: 500
+        }
     );
-    assert_eq!(iso_detector.record_and_check(s_bob, 100), BulkExfiltrationOutcome::Allow);
+    assert_eq!(
+        iso_detector.record_and_check(s_bob, 100),
+        BulkExfiltrationOutcome::Allow
+    );
 }
 
 // ── H6: Type-State GuardedPayload Type Safety ──────────────────────────────────
@@ -342,7 +372,8 @@ fn test_h6_guarded_payload_type_state_safety() {
     let raw = GuardedPayload::<Unsanitized>::new("raw_data".into(), "sess_1".into());
     assert_eq!(raw.session_id(), "sess_1");
 
-    let sanitized = GuardedPayload::<Sanitized>::from_sanitized("sanitized_data".into(), "sess_1".into());
+    let sanitized =
+        GuardedPayload::<Sanitized>::from_sanitized("sanitized_data".into(), "sess_1".into());
     let sent = dispatch_to_cloud_mock(sanitized);
     assert_eq!(sent, "sanitized_data");
 
@@ -355,11 +386,10 @@ fn test_h6_guarded_payload_type_state_safety() {
 #[test]
 fn test_h7_pii_vault_forces_crypto_shred_truth_table() {
     // 1. {PII match} x {is_memory_only} -> forces CryptoShred
-    assert!(pii_vault_forces_crypto_shred(true, false));  // PII match + non-memory -> forced
-    assert!(!pii_vault_forces_crypto_shred(true, true));  // PII match + memory-only -> not forced
+    assert!(pii_vault_forces_crypto_shred(true, false)); // PII match + non-memory -> forced
+    assert!(!pii_vault_forces_crypto_shred(true, true)); // PII match + memory-only -> not forced
     assert!(!pii_vault_forces_crypto_shred(false, false)); // No PII match -> not forced
-    assert!(!pii_vault_forces_crypto_shred(false, true));  // No PII match + memory-only -> not forced
-
+    assert!(!pii_vault_forces_crypto_shred(false, true)); // No PII match + memory-only -> not forced
 }
 
 // ── H8: Audit Trace Determinism & Tamper Detection ──────────────────────────────
@@ -386,7 +416,10 @@ fn test_h8_audit_trace_determinism_tamper_detection_and_no_pii_leak() {
     // Determinism check: same inputs produce identical BLAKE3 audit trace
     let trace1 = compute_audit_trace(payload, rule_id, nanos);
     let trace2 = compute_audit_trace(payload, rule_id, nanos);
-    assert_eq!(trace1, trace2, "compute_audit_trace must be 100% deterministic");
+    assert_eq!(
+        trace1, trace2,
+        "compute_audit_trace must be 100% deterministic"
+    );
 
     // Mutation sensitivity: modifying payload, rule_id, or nanos changes trace
     let trace_diff_payload = compute_audit_trace("different payload", rule_id, nanos);
@@ -423,7 +456,10 @@ fn test_h8_audit_trace_determinism_tamper_detection_and_no_pii_leak() {
     let rec1 = build_context_edit_audit_record(rec0.record_hash, input1, &clock);
 
     let chain = vec![rec0.clone(), rec1.clone()];
-    assert!(verify_audit_chain(&chain).is_ok(), "Valid chain passes verification");
+    assert!(
+        verify_audit_chain(&chain).is_ok(),
+        "Valid chain passes verification"
+    );
 
     // Tamper with rec1
     let mut tampered_rec1 = rec1.clone();

@@ -3,7 +3,9 @@ use contextra_adapt::{pid_regulated_candidate_pool, PidController};
 #[test]
 fn test_pid_regulated_candidate_pool_high_latency_monotonic_decrease() {
     let mut controller = PidController::new(150.0, 50, 200, Some(100));
-    let mut prev_pool = controller.current_pool_size().unwrap_or(controller.min_pool_size);
+    let mut prev_pool = controller
+        .current_pool_size()
+        .unwrap_or(controller.min_pool_size);
 
     for _ in 0..10 {
         let new_pool = pid_regulated_candidate_pool(&mut controller, 300.0);
@@ -32,7 +34,9 @@ fn test_pid_regulated_candidate_pool_high_latency_monotonic_decrease() {
 #[test]
 fn test_pid_regulated_candidate_pool_low_latency_monotonic_increase() {
     let mut controller = PidController::new(150.0, 50, 200, Some(100));
-    let mut prev_pool = controller.current_pool_size().unwrap_or(controller.min_pool_size);
+    let mut prev_pool = controller
+        .current_pool_size()
+        .unwrap_or(controller.min_pool_size);
 
     for _ in 0..10 {
         let new_pool = pid_regulated_candidate_pool(&mut controller, 50.0);
@@ -90,7 +94,16 @@ fn test_pid_regulated_candidate_pool_determinism() {
     let mut controller_b = PidController::new(150.0, 50, 200, Some(100));
 
     let observation_sequence = vec![
-        150.0, 200.0, 350.0, 300.0, f32::NAN, 100.0, 50.0, -20.0, f32::INFINITY, 120.0,
+        150.0,
+        200.0,
+        350.0,
+        300.0,
+        f32::NAN,
+        100.0,
+        50.0,
+        -20.0,
+        f32::INFINITY,
+        120.0,
     ];
 
     let results_a: Vec<usize> = observation_sequence

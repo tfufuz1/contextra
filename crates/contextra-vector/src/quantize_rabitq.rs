@@ -449,7 +449,9 @@ mod tests {
             } else {
                 // Correlated / near vector
                 let noise_scale = rng.gen_range(0.01..0.5);
-                q.iter().map(|&val| val + rng.gen_range(-noise_scale..noise_scale)).collect()
+                q.iter()
+                    .map(|&val| val + rng.gen_range(-noise_scale..noise_scale))
+                    .collect()
             };
 
             let exact_dist: f32 = q

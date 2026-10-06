@@ -275,11 +275,6 @@ impl SstableBuilder {
         self.block_builder = BlockBuilder::new_with_version(BLOCK_SIZE, version);
     }
 
-    /// Returns the estimated current byte size of the SSTable being built.
-    pub fn current_size(&self) -> u64 {
-        self.offset.saturating_add(self.block_builder.current_size() as u64)
-    }
-
     /// Adds a key-value pair to the SSTable being built.
     pub async fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> Result<()> {
         if key.is_empty() {

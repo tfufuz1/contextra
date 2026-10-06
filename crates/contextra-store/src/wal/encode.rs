@@ -227,7 +227,6 @@ impl WalEntry {
         }
     }
 
-
     /// Serializes the entry to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let op_size = match &self.op {

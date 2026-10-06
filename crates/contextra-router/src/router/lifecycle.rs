@@ -106,11 +106,8 @@ impl RouterEngine {
         .with_initial_decision_id(0);
 
         #[cfg(feature = "bandit-routing")]
-        let engine = engine.with_routing_strategy(
-            RoutingStrategy::Cascade,
-            0.1,
-            0x1234_5678_9abc_def0,
-        );
+        let engine =
+            engine.with_routing_strategy(RoutingStrategy::Cascade, 0.1, 0x1234_5678_9abc_def0);
 
         Ok(engine)
     }

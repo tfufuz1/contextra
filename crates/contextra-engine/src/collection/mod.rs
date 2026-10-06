@@ -774,7 +774,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         manager: &contextra_store::kv::KvSegmentManager,
         group_id: u64,
         plaintext: &[u8],
-    ) -> std::result::Result<contextra_store::kv::KvSegmentPayload, contextra_types::ContextraError> {
+    ) -> std::result::Result<contextra_store::kv::KvSegmentPayload, contextra_types::ContextraError>
+    {
         manager.write_segment(group_id, plaintext)
     }
 
@@ -825,7 +826,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Evaluates point lookup traversal metrics on the underlying LSM storage engine.
-    pub async fn point_lookup_metrics(&self, storage: &contextra_store::LsmStorage, key: &[u8]) -> (usize, usize, usize, usize, bool) {
+    pub async fn point_lookup_metrics(
+        &self,
+        storage: &contextra_store::LsmStorage,
+        key: &[u8],
+    ) -> (usize, usize, usize, usize, bool) {
         storage.point_lookup_metrics(key).await
     }
 

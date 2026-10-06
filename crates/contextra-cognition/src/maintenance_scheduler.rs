@@ -363,7 +363,9 @@ impl<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> ActiveSessionGuar
     }
 }
 
-impl<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> Drop for ActiveSessionGuard<'a, S, V> {
+impl<'a, S: StorageEngine + 'static, V: VectorIndex + 'static> Drop
+    for ActiveSessionGuard<'a, S, V>
+{
     fn drop(&mut self) {
         self.scheduler.decrement_active_sessions();
     }

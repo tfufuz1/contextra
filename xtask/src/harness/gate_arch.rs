@@ -119,8 +119,18 @@ pub fn run_gate_arch(args: &[String]) -> i32 {
         ("check-ring-layering", strict_flag.clone(), true, ""),
         ("check-vetoes", vec![], true, ""),
         ("check-duplicate-symbols", vec![], true, ""),
-        ("check-unsafe-islands", strict_flag, trigger_unsafe, "no path match"),
-        ("check-ring0-async-purity", vec![], trigger_purity, "no path match"),
+        (
+            "check-unsafe-islands",
+            strict_flag,
+            trigger_unsafe,
+            "no path match",
+        ),
+        (
+            "check-ring0-async-purity",
+            vec![],
+            trigger_purity,
+            "no path match",
+        ),
         (
             "check-ring-capabilities-consistency",
             vec![],
@@ -196,11 +206,18 @@ pub fn run_gate_arch(args: &[String]) -> i32 {
         }
     }
 
-    if overall_fail { 1 } else { 0 }
+    if overall_fail {
+        1
+    } else {
+        0
+    }
 }
 
 fn execute_xtask_subcmd(cmd: &str, args: &[String], root: &Path) -> (i32, String, String) {
-    if let Ok(out) = Command::new("git").args(["rev-parse", "--show-toplevel"]).output() {
+    if let Ok(out) = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
         if out.status.success() {
             let ws_root = String::from_utf8_lossy(&out.stdout).trim().to_string();
             let xtask_bin = PathBuf::from(&ws_root).join("target/debug/xtask");
@@ -248,7 +265,11 @@ fn execute_xtask_subcmd(cmd: &str, args: &[String], root: &Path) -> (i32, String
             let code = out.status.code().unwrap_or(2);
             (code, stdout, stderr)
         }
-        Err(e) => (2, "".to_string(), format!("Prozessaufruf fehlgeschlagen: {e}")),
+        Err(e) => (
+            2,
+            "".to_string(),
+            format!("Prozessaufruf fehlgeschlagen: {e}"),
+        ),
     }
 }
 

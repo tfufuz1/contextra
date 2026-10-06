@@ -19,8 +19,8 @@ use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
 #[cfg(not(feature = "kv-stage-b"))]
 use candle_transformers::models::quantized_llama::ModelWeights;
-use contextra_ports::{BoxFuture, BoxStream};
 pub(crate) use contextra_ports::ContextSegment;
+use contextra_ports::{BoxFuture, BoxStream};
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
 use futures_util::stream;

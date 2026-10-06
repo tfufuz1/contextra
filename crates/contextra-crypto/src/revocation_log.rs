@@ -278,7 +278,12 @@ impl RevocationLog {
                 .and_then(|s| s.to_str())
                 .unwrap_or("revocation.log");
             let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let tmp_path = parent.join(format!("{}.tmp-{}-{}", file_name, std::process::id(), count));
+            let tmp_path = parent.join(format!(
+                "{}.tmp-{}-{}",
+                file_name,
+                std::process::id(),
+                count
+            ));
 
             let write_tmp = || -> Result<()> {
                 let mut tmp_file = OpenOptions::new()
@@ -286,7 +291,9 @@ impl RevocationLog {
                     .create_new(true)
                     .open(&tmp_path)
                     .map_err(|e| {
-                        CryptoError::Crypto(format!("Failed to create temp revocation log file: {e}"))
+                        CryptoError::Crypto(format!(
+                            "Failed to create temp revocation log file: {e}"
+                        ))
                     })?;
 
                 tmp_file.write_all(&serialized).map_err(|e| {

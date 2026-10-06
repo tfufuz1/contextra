@@ -11,9 +11,7 @@ use contextra_cognition::maintenance_scheduler::MaintenanceScheduler;
 use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
 use contextra_engine::collection::Collection;
 use contextra_graph::CsrGraph;
-use contextra_ports::{
-    BoxFuture, GroundingAssessment, GroundingValidator, LlmTextGenerator,
-};
+use contextra_ports::{BoxFuture, GroundingAssessment, GroundingValidator, LlmTextGenerator};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextChunk, DocId, Result};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -51,10 +49,7 @@ impl GroundingValidator for MockRichValidator {
     }
 }
 
-async fn create_test_collection() -> (
-    Arc<Collection<LsmStorage, HnswIndex>>,
-    tempfile::TempDir,
-) {
+async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir) {
     let dir = tempdir().expect("tempdir creation");
     let storage = Arc::new(
         LsmStorage::new(LsmConfig {
@@ -133,7 +128,10 @@ async fn test_consolidation_engine_builders_and_start_worker() {
 
     // Execute one cycle on the configured engine
     let cycle_res = engine.run_cycle().await;
-    assert!(cycle_res.is_ok(), "run_cycle on configured engine should succeed");
+    assert!(
+        cycle_res.is_ok(),
+        "run_cycle on configured engine should succeed"
+    );
 
     cancel_token_worker.cancel();
     cancel_token_top.cancel();
@@ -172,7 +170,9 @@ fn test_context_manager_set_relevance_threshold() {
         },
     ];
 
-    let window = mgr.prepare_context(chunks).expect("prepare_context should succeed");
+    let window = mgr
+        .prepare_context(chunks)
+        .expect("prepare_context should succeed");
     assert_eq!(window.chunks.len(), 1);
     assert_eq!(window.chunks[0].doc_id, DocId::new(2));
     assert_eq!(window.chunks[0].relevance, 0.8);

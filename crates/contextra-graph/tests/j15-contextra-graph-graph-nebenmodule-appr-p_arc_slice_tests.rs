@@ -21,7 +21,12 @@ fn test_arc_slice_as_arc_integration() {
     assert_eq!(backing_arc[0].entity, EntityId::new(100));
     assert_eq!(backing_arc[1].entity, EntityId::new(200));
 
-    let edge = HyperEdge::new(HyperEdgeId::new(1), EdgeType::Default, arc_slice.as_arc().clone(), 1.0);
+    let edge = HyperEdge::new(
+        HyperEdgeId::new(1),
+        EdgeType::Default,
+        arc_slice.as_arc().clone(),
+        1.0,
+    );
     let view = edge.view();
 
     assert_eq!(view.participants.as_arc().len(), 2);

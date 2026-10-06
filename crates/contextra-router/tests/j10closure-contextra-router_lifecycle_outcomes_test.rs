@@ -1,11 +1,9 @@
 use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
-use contextra_router::{
-    RoutingOutcome, SlmProfile,
-};
 #[cfg(feature = "bandit-routing")]
 use contextra_router::DecisionId;
 #[cfg(feature = "bandit-routing")]
 use contextra_router::RoutingStrategy;
+use contextra_router::{RoutingOutcome, SlmProfile};
 use contextra_types::{ContextChunk, ContextWindow, DocId, EntityId, Result, TokenBudget};
 use std::sync::Arc;
 
@@ -71,8 +69,7 @@ async fn test_j10closure_router_lifecycle_and_outcomes() {
     let p2 = SlmProfile::new("p2", "mcp2", vec![20], TokenBudget::default(), 0.5);
 
     // 1. with_initial_decision_id
-    let router = create_mock_router(vec![p1.clone(), p2.clone()])
-        .with_initial_decision_id(500);
+    let router = create_mock_router(vec![p1.clone(), p2.clone()]).with_initial_decision_id(500);
 
     #[cfg(feature = "bandit-routing")]
     let router = router.with_routing_strategy(RoutingStrategy::ContextualBandit, 0.2, 9999);
@@ -98,16 +95,12 @@ async fn test_j10closure_router_lifecycle_and_outcomes() {
         let propensity = router.bandit_decision_propensity(decision.decision_id);
         assert!(propensity.is_some());
 
-        let unknown_propensity =
-            router.bandit_decision_propensity(DecisionId::from_raw(999_999));
+        let unknown_propensity = router.bandit_decision_propensity(DecisionId::from_raw(999_999));
         assert!(unknown_propensity.is_none());
     }
 
     // Record outcome to clear pending decision
-    let recorded = router.record_outcome(
-        decision.decision_id,
-        RoutingOutcome::Success,
-    );
+    let recorded = router.record_outcome(decision.decision_id, RoutingOutcome::Success);
     assert!(recorded);
     assert_eq!(router.pending_decision_count(), 0);
 

@@ -71,10 +71,10 @@ async fn test_drop_collection_generates_verifiable_deletion_proof() {
         "Proof must cover LsmMemtable"
     );
     assert!(
-        proof
+        !proof
             .covered_layers
             .contains(&DeletionLayer::SsTableAllLevels),
-        "Proof must cover SsTableAllLevels"
+        "drop_collection must not claim unverified SSTable cleanup"
     );
 
     // 4. Verify signature with correct proof key

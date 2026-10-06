@@ -78,7 +78,11 @@ fn test_fast_diff_lint_safety_comment() {
 
 #[test]
 fn test_run_fast_diff_lint_execution() {
-    let args = vec!["--base".to_string(), "HEAD".to_string(), "--json".to_string()];
+    let args = vec![
+        "--base".to_string(),
+        "HEAD".to_string(),
+        "--json".to_string(),
+    ];
     let exit_code = run_fast_diff_lint(&args);
     // Exit code should be either 0 (no findings in current HEAD diff) or 2 (if findings exist)
     assert!(exit_code == 0 || exit_code == 2);

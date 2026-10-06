@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use contextra_avv_generator::{
-    default_technical_measures, render_avv_markdown, AvvContext, AvvGeneratorError, TechnicalMeasure,
+    default_technical_measures, render_avv_markdown, AvvContext, AvvGeneratorError,
+    TechnicalMeasure,
 };
 use contextra_types::TenantId;
 
@@ -60,7 +61,10 @@ fn test_render_avv_markdown_standalone_and_error_paths() -> Result<(), AvvGenera
     };
 
     let err_result = render_avv_markdown(&invalid_ctx);
-    assert!(matches!(err_result, Err(AvvGeneratorError::InvalidContext(_))));
+    assert!(matches!(
+        err_result,
+        Err(AvvGeneratorError::InvalidContext(_))
+    ));
 
     if let Err(AvvGeneratorError::InvalidContext(msg)) = err_result {
         assert!(msg.contains("Verantwortlicher (controller_name) darf nicht leer sein."));

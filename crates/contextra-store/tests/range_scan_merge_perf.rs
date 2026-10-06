@@ -39,11 +39,7 @@ async fn benchmark_and_verify_range_scan() {
     // Also put some keys in active memtable
     let mem_tx = TxId(100);
     storage
-        .put(
-            mem_tx,
-            b"k:004150",
-            b"v:override_4150",
-        )
+        .put(mem_tx, b"k:004150", b"v:override_4150")
         .await
         .unwrap();
     storage.commit(mem_tx).await.unwrap();
@@ -52,10 +48,7 @@ async fn benchmark_and_verify_range_scan() {
     let start_bound = Bound::Included(b"k:004100".as_slice());
     let end_bound = Bound::Included(b"k:004200".as_slice());
 
-    let results = storage
-        .scan(start_bound, end_bound, None)
-        .await
-        .unwrap();
+    let results = storage.scan(start_bound, end_bound, None).await.unwrap();
 
     // k:004100 to k:004200 inclusive is 101 keys
     assert_eq!(results.len(), 101, "Expected 101 keys in narrow range scan");
@@ -76,10 +69,7 @@ async fn benchmark_and_verify_range_scan() {
     let start_time = Instant::now();
 
     for _ in 0..iterations {
-        let res = storage
-            .scan(start_bound, end_bound, None)
-            .await
-            .unwrap();
+        let res = storage.scan(start_bound, end_bound, None).await.unwrap();
         assert_eq!(res.len(), 101);
     }
 
