@@ -157,10 +157,7 @@ fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> St
             .join("harness")
             .join(format!("{}.rs", stem));
         let path_str = harness_path.to_str().unwrap().replace('\\', "/");
-        code.push_str(&format!(
-            "#[path = \"{}\"]\npub mod {};\n\n",
-            path_str, stem
-        ));
+        code.push_str(&format!("#[path = \"{}\"]\npub mod {};\n\n", path_str, stem));
     }
 
     code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");

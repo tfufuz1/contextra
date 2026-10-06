@@ -8,7 +8,9 @@ const PERMANENT_ALLOW: &[&str] = &[
     "crates/contextra-engine/src/lib.rs",
 ];
 
-const TEMPORARY_ALLOW: &[&str] = &["crates/contextra-mcp/src/tools_crud.rs"];
+const TEMPORARY_ALLOW: &[&str] = &[
+    "crates/contextra-mcp/src/tools_crud.rs",
+];
 
 #[derive(Debug, PartialEq, Eq)]
 struct Violation {
@@ -42,10 +44,7 @@ fn find_unverified_layer_proof_violations(content: &str) -> Vec<Violation> {
     let mut violations = Vec::new();
 
     for (match_idx, _) in preprocessed.match_indices(key) {
-        let line = 1 + preprocessed[..match_idx]
-            .bytes()
-            .filter(|&b| b == b'\n')
-            .count();
+        let line = 1 + preprocessed[..match_idx].bytes().filter(|&b| b == b'\n').count();
         let open_paren_idx = match_idx + key.len() - 1;
 
         if let Some(args) = extract_top_level_args(&preprocessed[open_paren_idx..]) {

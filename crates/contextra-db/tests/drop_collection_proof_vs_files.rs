@@ -19,10 +19,7 @@ fn search_dir_for_marker(dir: &Path, marker: &[u8]) -> std::io::Result<bool> {
             }
         } else if path.is_file() {
             if let Ok(contents) = fs::read(&path) {
-                if contents
-                    .windows(marker.len())
-                    .any(|window| window == marker)
-                {
+                if contents.windows(marker.len()).any(|window| window == marker) {
                     return Ok(true);
                 }
             }
@@ -69,15 +66,14 @@ async fn test_drop_collection_proof_vs_raw_files() -> Result<(), Box<dyn std::er
         );
     }
 
-    let proof = db.drop_collection(col_name, tenant_id, proof_key).await?;
+    let proof = db
+        .drop_collection(col_name, tenant_id, proof_key)
+        .await?;
 
     db.flush().await?;
 
     let residue = search_dir_for_marker(tmp.path(), marker)?;
-    eprintln!(
-        "Raw file residue scan for drop_collection: residue = {}",
-        residue
-    );
+    eprintln!("Raw file residue scan for drop_collection: residue = {}", residue);
 
     if residue {
         for layer in &proof.covered_layers {
