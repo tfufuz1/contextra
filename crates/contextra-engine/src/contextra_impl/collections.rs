@@ -350,13 +350,11 @@ impl Contextra {
 
         tenant_storage.commit(tx).await?;
 
-        // TODO(#JULES-P02-03, Implementer): [P02 / F-03 / HIGH]
-        // DeletionProof wird vor vollständigem WAL-fsync ausgestellt (Invariante I-5 / Durability Gap):
-        // Bei einem Crash unmittelbar nach `commit(tx)` (bevor der Hintergrund-Flusher `fsync()` auf Disk
-        // ausgeführt hat) gehen die Tombstones der gelöschten Collection im Page-Cache verloren.
-        // `drop_collection` MUSS vor Erzeugung und Rückgabe des `DeletionProof` ein explizites
-        // `tenant_storage.wal.sync_all()` (oder synchrones WAL-Fsync-Await) ausführen und dessen Erfolg abwarten,
-        // damit nach Crash-Recovery keine gelöschten Daten trotz gültigem DeletionProof wiederauferstehen!
+        // Durability Audit Note (Review P02 / F-03 / Invariante I-2 & I-5):
+        // `tenant_storage.commit(tx).await` executes `LsmStorage::commit`, which dispatches WAL ops to the WAL flusher
+        // actor and awaits oneshot ACK (`file.sync_all()`) before returning `Ok(())` (both in single commit and group
+        // commit leader/follower paths). Thus, disk durability (`fsync`) of all deletion tombstones is strictly
+        // guaranteed BEFORE `DeletionProof::create` is invoked and returned to caller.
 
         let remaining_col_data = tenant_storage
             .scan_prefix(col_data_prefix.as_bytes())
