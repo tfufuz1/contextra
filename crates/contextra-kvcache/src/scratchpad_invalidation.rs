@@ -73,6 +73,8 @@ impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
             return Ok(0);
         }
 
+        let keys_to_use = self.keys.clone();
+
         self.store.invalidate_prefix_scope_keys(
             scope.tenant_id,
             &scope.scratchpad_key_prefix,
