@@ -167,10 +167,11 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 }
 
                 input_offset += to_copy;
-                total_read = match total_read.checked_add(u32::try_from(to_copy).unwrap_or(u32::MAX)) {
-                    Some(sum) => sum,
-                    None => return ERRNO_INVAL,
-                };
+                total_read =
+                    match total_read.checked_add(u32::try_from(to_copy).unwrap_or(u32::MAX)) {
+                        Some(sum) => sum,
+                        None => return ERRNO_INVAL,
+                    };
             }
 
             // Update stdin position
@@ -294,10 +295,11 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                     }
                 }
 
-                total_written = match total_written.checked_add(u32::try_from(buf_len).unwrap_or(u32::MAX)) {
-                    Some(sum) => sum,
-                    None => return Ok(ERRNO_INVAL),
-                };
+                total_written =
+                    match total_written.checked_add(u32::try_from(buf_len).unwrap_or(u32::MAX)) {
+                        Some(sum) => sum,
+                        None => return Ok(ERRNO_INVAL),
+                    };
             }
 
             let nwritten_offset = nwritten_ptr as u32 as usize;
@@ -355,8 +357,8 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 None => return ERRNO_INVAL,
             };
 
-            let nanos = u64::try_from(caller.data().start_instant.elapsed().as_nanos())
-                .unwrap_or(u64::MAX);
+            let nanos =
+                u64::try_from(caller.data().start_instant.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
             let memory = match caller.get_export("memory") {
                 Some(wasmtime::Extern::Memory(mem)) => mem,
@@ -498,7 +500,9 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
             };
 
             let mem_slice = memory.data(&caller);
-            if (argv_ptr as u32 as usize) > mem_slice.len() || (argv_buf_ptr as u32 as usize) > mem_slice.len() {
+            if (argv_ptr as u32 as usize) > mem_slice.len()
+                || (argv_buf_ptr as u32 as usize) > mem_slice.len()
+            {
                 return ERRNO_INVAL;
             }
 
