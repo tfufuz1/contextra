@@ -40,14 +40,17 @@ impl Clock for SystemClock {
     fn now_unix_nanos(&self) -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
             .unwrap_or(0)
     }
 
     fn monotonic_nanos(&self) -> u64 {
-        Instant::now()
-            .saturating_duration_since(self.start_instant)
-            .as_nanos() as u64
+        u64::try_from(
+            Instant::now()
+                .saturating_duration_since(self.start_instant)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX)
     }
 }
 
