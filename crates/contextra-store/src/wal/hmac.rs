@@ -170,8 +170,22 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
+    /// Returns the legacy integrity key status for this WAL segment.
+    pub fn legacy_key_status(&self) -> LegacyKeyStatus {
+        if self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
+            LegacyKeyStatus::LegacyActive
+        } else {
+            LegacyKeyStatus::Standard
+        }
+    }
+
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
+        if self.legacy_key_status().is_standard() {
+            tracing::trace!("Using standard WAL integrity key");
+        } else {
+            tracing::trace!("Using legacy WAL integrity key");
+        }
         if let Some(km) = &self.key_manager {
             km.integrity_key().map_err(Into::into)
         } else if let Some(key) = self.fallback_integrity_key {

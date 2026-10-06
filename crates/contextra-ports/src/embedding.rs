@@ -26,6 +26,11 @@ impl<'a> ContextSegment<'a> {
         }
     }
 
+    /// Constructs a `ContextSegment` initialized with a RoPE positional offset.
+    pub fn with_offset(chunk_id: u64, text: &'a str, offset: usize) -> Self {
+        Self::new(chunk_id, text).with_rope_offset(offset)
+    }
+
     /// Builder method to set the model fingerprint.
     pub fn with_fingerprint(mut self, fingerprint: &'a ModelFingerprint) -> Self {
         self.model_fingerprint = Some(fingerprint);
@@ -186,6 +191,11 @@ impl MockEmbedder {
             dim,
             fixed_output: Some(fixed_output),
         }
+    }
+
+    /// Creates a mock embedder with standard fixed unit output.
+    pub fn fixed_unit(dim: usize) -> Self {
+        Self::with_fixed_output(vec![0.1f32; dim])
     }
 }
 

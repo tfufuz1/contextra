@@ -30,6 +30,11 @@ impl DocIdWidth {
             Self::Bit128 => 16,
         }
     }
+
+    /// Returns the size in bytes of the active compile-time `DocIdWidth`.
+    pub fn current_bytes_len() -> usize {
+        Self::current().bytes_len()
+    }
 }
 
 /// SSTable and WAL Manifest schema version identifier.
@@ -67,6 +72,16 @@ impl ManifestSchemaVersion {
             other => Err(ContextraError::Serialization(format!(
                 "Unsupported Manifest schema version byte: {other}"
             ))),
+        }
+    }
+
+    /// Parses and validates build compatibility of a schema version byte.
+    pub fn from_u8_checked(version_byte: u8) -> Result<Self> {
+        let version = Self::from_u8(version_byte)?;
+        if version.is_compatible_with_current_build() {
+            Ok(version)
+        } else {
+            version.validate_build_compatibility()
         }
     }
 

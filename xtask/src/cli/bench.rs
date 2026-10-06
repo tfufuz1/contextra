@@ -12,11 +12,18 @@ pub fn run_bench_trend(args: &[String]) -> i32 {
 
 pub fn run_bench_gate(args: &[String]) -> i32 {
     let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-    let success = bench_gate::run_bench_gate(extra_args);
-    if !success {
-        return 1;
+    let status = std::process::Command::new("cargo")
+        .args(["run", "--quiet", "-p", "xtask-heavy", "--", "bench-gate"])
+        .args(extra_args)
+        .status();
+    match status {
+        Ok(s) if s.success() => 0,
+        Ok(s) => s.code().unwrap_or(1),
+        Err(e) => {
+            eprintln!("❌ Failed to execute xtask-heavy bench-gate: {}", e);
+            1
+        }
     }
-    0
 }
 
 pub fn run_bench_compile(args: &[String]) -> i32 {

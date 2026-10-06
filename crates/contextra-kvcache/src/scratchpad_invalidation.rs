@@ -82,7 +82,7 @@ impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
         self.store.invalidate_prefix_scope_keys(
             scope.tenant_id,
             &scope.scratchpad_key_prefix,
-            &keys_to_use,
+            &self.keys,
         )
     }
 }

@@ -8,6 +8,8 @@
 
 //! contextra-embed — In-process text embeddings using ONNX Runtime.
 //!
+//! Dieses Crate stellt ausschließlich ONNX-basierte Embedder bereit (TextEmbedder, OnnxEmbedder). Candle-basierte Embedder liegen in `contextra-infer-candle`.
+//!
 //! This crate provides a high-level API for generating vector embeddings from text
 //! without requiring external API calls. It uses the `ort` crate for ONNX Runtime
 //! and `tokenizers` for text preprocessing.
@@ -185,18 +187,6 @@ pub async fn ensure_onnx_model_download(
         reason: "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
             .to_string(),
     })
-}
-
-#[cfg(feature = "candle-backend")]
-pub use contextra_infer_candle::CandleEmbedClient;
-
-#[cfg(feature = "candle-backend")]
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
-/// Creates a trait object `Box<dyn EmbeddingProvider>` wrapping a `CandleEmbedClient`.
-pub fn create_candle_embedder(
-    client: CandleEmbedClient,
-) -> Box<dyn contextra_ports::EmbeddingProvider> {
-    Box::new(client)
 }
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.

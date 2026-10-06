@@ -395,12 +395,12 @@ mod tests {
         assert_eq!(plist.as_slice()[0].doc_id(), DocId::new(50));
         assert_eq!(plist.as_slice()[1].doc_id(), DocId::new(100));
 
-        index.remove_posting_from_terms(std::slice::from_ref(&term), DocId::new(50));
+        index.remove_terms(DocId::new(50), std::slice::from_ref(&term));
         let plist_after = index.get(&term).unwrap();
         assert_eq!(plist_after.len(), 1);
         assert_eq!(plist_after.as_slice()[0].doc_id(), DocId::new(100));
 
-        index.remove_posting_from_terms(std::slice::from_ref(&term), DocId::new(100));
+        index.remove_terms(DocId::new(100), std::slice::from_ref(&term));
         assert!(index.get(&term).is_none());
     }
 

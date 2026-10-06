@@ -420,6 +420,12 @@ impl TxId {
         Self(Self::INTERNAL_BASE)
     }
 
+    /// Returns a new internal/system transaction ID with the given offset from INTERNAL_BASE.
+    #[inline]
+    pub fn internal_with_offset(offset: u64) -> Result<Self> {
+        Self::try_from_internal_offset(offset)
+    }
+
     /// Safely constructs an internal system TxId from an offset relative to `TxId::INTERNAL_BASE`.
     ///
     /// # Domain Range Separation (ADR-028)

@@ -128,7 +128,6 @@ impl PluginRegistry {
         self.activate_all(vec![plugin])
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Activates a batch of plugins in an all-or-nothing manner (INV-PLUGIN-DEPENDENCY).
     ///
     /// Sequence:
