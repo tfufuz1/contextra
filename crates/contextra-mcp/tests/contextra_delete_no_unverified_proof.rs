@@ -101,9 +101,15 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     };
     let delete_resp = server.handle(delete_req).await;
     let delete_val = serde_json::to_value(&delete_resp)?;
-    assert_ne!(delete_val["result"]["isError"], true, "delete returned error: {:?}", delete_val);
+    assert_ne!(
+        delete_val["result"]["isError"], true,
+        "delete returned error: {:?}",
+        delete_val
+    );
 
-    let content_text = delete_val["result"]["content"][0]["text"].as_str().ok_or("missing content text")?;
+    let content_text = delete_val["result"]["content"][0]["text"]
+        .as_str()
+        .ok_or("missing content text")?;
     let content_json: Value = serde_json::from_str(content_text)?;
 
     assert_eq!(content_json["ok"], true);
@@ -148,7 +154,9 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     let forget_val = serde_json::to_value(&forget_resp)?;
     assert_ne!(forget_val["result"]["isError"], true);
 
-    let forget_text = forget_val["result"]["content"][0]["text"].as_str().ok_or("missing forget content text")?;
+    let forget_text = forget_val["result"]["content"][0]["text"]
+        .as_str()
+        .ok_or("missing forget content text")?;
     let forget_json: Value = serde_json::from_str(forget_text)?;
 
     assert_eq!(forget_json["ok"], true);
@@ -166,10 +174,18 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     };
     let list_resp = server.handle(list_req).await;
     let list_val = serde_json::to_value(&list_resp)?;
-    let tools = list_val["result"]["tools"].as_array().ok_or("missing tools array")?;
+    let tools = list_val["result"]["tools"]
+        .as_array()
+        .ok_or("missing tools array")?;
 
-    let delete_tool = tools.iter().find(|t| t["name"] == "contextra_delete").ok_or("missing contextra_delete tool")?;
-    let forget_tool = tools.iter().find(|t| t["name"] == "contextra_forget").ok_or("missing contextra_forget tool")?;
+    let delete_tool = tools
+        .iter()
+        .find(|t| t["name"] == "contextra_delete")
+        .ok_or("missing contextra_delete tool")?;
+    let forget_tool = tools
+        .iter()
+        .find(|t| t["name"] == "contextra_forget")
+        .ok_or("missing contextra_forget tool")?;
 
     assert_eq!(
         delete_tool["description"],
@@ -182,8 +198,14 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
 
     // Also verify TOOL_REGISTRY descriptions in sandbox
     let registry = contextra_mcp::sandbox::TOOL_REGISTRY;
-    let reg_delete = registry.iter().find(|t| t.name == "contextra_delete").ok_or("missing contextra_delete in registry")?;
-    let reg_forget = registry.iter().find(|t| t.name == "contextra_forget").ok_or("missing contextra_forget in registry")?;
+    let reg_delete = registry
+        .iter()
+        .find(|t| t.name == "contextra_delete")
+        .ok_or("missing contextra_delete in registry")?;
+    let reg_forget = registry
+        .iter()
+        .find(|t| t.name == "contextra_forget")
+        .ok_or("missing contextra_forget in registry")?;
 
     assert_eq!(
         reg_delete.description,

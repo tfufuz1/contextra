@@ -3,9 +3,7 @@
 //! Known limitation: Macro-generated code (such as derive macros `#[derive(...)]` or custom `macro_rules!`)
 //! is invisible to `syn` at the source text level.
 
-use crate::harness::scan_common::{
-    classify_file, resolve_external_test_modules, FileClass,
-};
+use crate::harness::scan_common::{classify_file, resolve_external_test_modules, FileClass};
 use crate::ws_cache;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -427,7 +425,10 @@ impl<'a, 'ast> Visit<'ast> for AstIndexVisitor<'a> {
     }
 }
 
-fn scan_text_refs(root: &Path, ident_refs: &HashMap<String, ClassCounts>) -> HashMap<String, usize> {
+fn scan_text_refs(
+    root: &Path,
+    ident_refs: &HashMap<String, ClassCounts>,
+) -> HashMap<String, usize> {
     let mut text_refs = HashMap::new();
     let crates_dir = root.join("crates");
     if !crates_dir.exists() {
