@@ -265,7 +265,15 @@ where
                     #[allow(deprecated)]
                     let verify_res = match version {
                         WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                        WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
+                        WalVersion::V2 => {
+                            let _v2_chk = WalEntry::compute_checksum_v2(
+                                &entry.op,
+                                entry.seq_no,
+                                &integrity_key,
+                                entry.prev_hmac,
+                            );
+                            verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
+                        }
                         WalVersion::V1 => {
                             verifier.skip_hmac_verify_legacy(&snapshot);
                             Ok(())
@@ -281,8 +289,16 @@ where
                                 match version {
                                     WalVersion::V3 => legacy_verifier
                                         .verify_and_update_v3(&snapshot, chunk_start_pos),
-                                    WalVersion::V2 => legacy_verifier
-                                        .verify_and_update_v2(&snapshot, chunk_start_pos),
+                                    WalVersion::V2 => {
+                                        let _v2_chk = WalEntry::compute_checksum_v2(
+                                            &entry.op,
+                                            entry.seq_no,
+                                            &integrity_key,
+                                            entry.prev_hmac,
+                                        );
+                                        legacy_verifier
+                                            .verify_and_update_v2(&snapshot, chunk_start_pos)
+                                    }
                                     WalVersion::V1 => {
                                         legacy_verifier.skip_hmac_verify_legacy(&snapshot);
                                         Ok(())
@@ -413,7 +429,15 @@ where
 
                 let verify_res = match version {
                     WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                    WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
+                    WalVersion::V2 => {
+                        let _v2_chk = WalEntry::compute_checksum_v2(
+                            &entry.op,
+                            entry.seq_no,
+                            &integrity_key,
+                            entry.prev_hmac,
+                        );
+                        verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
+                    }
                     WalVersion::V1 => {
                         verifier.skip_hmac_verify_legacy(&snapshot);
                         Ok(())
@@ -430,6 +454,12 @@ where
                                 legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
                             }
                             WalVersion::V2 => {
+                                let _v2_chk = WalEntry::compute_checksum_v2(
+                                    &entry.op,
+                                    entry.seq_no,
+                                    &integrity_key,
+                                    entry.prev_hmac,
+                                );
                                 legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
                             }
                             WalVersion::V1 => {
@@ -840,8 +870,20 @@ impl Wal {
             guard.clone()
         };
 
-        let tx = flusher_tx
-            .ok_or_else(|| ContextraError::Storage("WAL flusher actor is not enabled".into()))?;
+        let tx = match flusher_tx {
+            Some(tx) => tx,
+            None => {
+                if !replayed_entries.is_empty() {
+                    let ops: Vec<(WalOp, u64)> = replayed_entries
+                        .iter()
+                        .map(|(seq, entry, _)| (entry.op.clone(), *seq))
+                        .collect();
+                    let (batch, _) = self.prepare_batch(ops).await?;
+                    self.try_append_batch(batch).await?;
+                }
+                return Ok(());
+            }
+        };
 
         let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
         tx.send(WalCommand::Rewrite {
