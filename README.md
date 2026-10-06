@@ -1,6 +1,6 @@
 # Contextra
 
-Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25; BM25F-Spezifikation), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
+Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — als Git-Abhängigkeit einbindbar, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25; BM25F-Spezifikation), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
 > **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v15 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
@@ -8,10 +8,10 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 
 ## Produktthese & Alleinstellungsmerkmale
 
-1. **Beweisbarkeit statt Zusage:** Löschung (`DeletionProof`), Datenzugriff und Agentenhandlungen sind kryptographisch nachprüfbar und ohne Contextra-Zugriff extern verifizierbar.
-2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`).
+1. **Beweisbarkeit statt Zusage:** Das Löschen einer Collection (`drop_collection`) erzeugt einen signierten `DeletionProof` (HMAC-SHA256, Signaturversion 2), der das logische Entfernen des LSM-Schlüsselraums testiert. Externe Verifizierung ohne Contextra-Zugriff ist für Ed25519-Beweise (v3) auf API-Ebene möglich (`DeletionProof::create_v3`, `DeletionProof::verify_external`).
+2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers.
 3. **Pure Rust Inferenz (Candle):** Lokale GGUF-Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen.
-4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, schrittweise Reduzierung verbleibender Panic-Stellen über CI-Ratchet-Mechanismus) und injizierter Determinismus (P28).
+4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, per CI-Ratchet auf 502 `unwrap` und 242 `expect` reduziert) und injizierter Determinismus (P28).
 5. **Drei abgestufte Feature-Ringe:**
    - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Candle-Inferenz, Bandit-Routing.
    - **Ring `sovereign`:** Quelloffener Krypto-Code (Löschbeweis, Privacy-Gateway, Zero-Net-Traffic).
@@ -35,7 +35,7 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 | **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten (`contextra` ohne Ollama). |
 | **Python Bindings (`contextra-py`)** | Opt-in | `contextra-py` | 🟢 Produktiv | FFI-Bindings für Python (aus default-members entfernt). |
 | **WASM-Sandbox** | Opt-in | `contextra-sandbox` | 🟢 Produktiv | Wasmtime Isolation (aus default-members entfernt). |
-| **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟢 Produktiv | `DeletionProof` (7 Ebenen), AEAD-Schlüsselhierarchie, Anti-Tamper. |
+| **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟡 Eingeschränkt | `DeletionProof` für Collection-Drop (HMAC v2 / Ed25519 v3 auf API-Ebene); KV-Segment Crypto-Shredding profilabhängig via `KvSegmentManager` (`CollectionProfile`, `KvDeleteMode::CryptoShred`). |
 | **Privacy Gateway** | `sovereign` | `contextra-privacy` | 🟢 Produktiv | Egress-Gateway, PII-Vault, DLP, Prompt-Injection-Filter. |
 | **AVV Generator (Art. 28 DSGVO)** | `sovereign` | `contextra-avv-generator` | 🟢 Produktiv | AVV-Vertragstemplate-Generator mit technischen Garantien. |
 | **Audit- & Art.-30-Export** | `sovereign` | `contextra-audit-export` | 🟢 Produktiv | BSI TR-02102-1 Kryptomapping und DSGVO Art. 30 Export. |
@@ -48,11 +48,11 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 
 ## Installation & Einbindung
 
-Füge `contextra` zu deiner `Cargo.toml` hinzu:
+Da Contextra derzeit nicht auf crates.io veröffentlicht ist (Stand 06.10.2026), binde `contextra` als Git-Abhängigkeit in deine `Cargo.toml` ein:
 
 ```toml
 [dependencies]
-contextra = "0.1"
+contextra = { git = "https://github.com/tfufuz1/contextra" }
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 ```
@@ -62,7 +62,7 @@ serde_json = "1.0"
 ## Quick Start (Rust)
 
 ```rust
-use contextra_db::{Contextra, ContextraConfig};
+use contextra::{Contextra, ContextraConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -129,11 +129,15 @@ Die folgenden Leistungskennzahlen stammen aus reproduzierbaren Läufen der `crit
 
 | Kennzahl | Contextra (Sovereign Local Engine) | Beschreibung & Rahmenbedingungen |
 |---|---|---|
-| **1. Kaltstart / Recovery** | **Offen / Messung in Arbeit** | Recovery-Zeit für 1 Mio. Einträge in [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) (§2.e) als nicht gemessen / fehlerhaft dokumentiert (File-Descriptor-Thematik). |
+| **1. Kaltstart / Recovery** | **Offen / Messung in Arbeit** | Recovery-Zeit für 1 Mio. Einträge ist ungemessen. Der 100k-Dokumente-Messlauf vom 30.09.2026 wurde wegen Budgetgrenzen abgebrochen; verifizierte 100k- oder 1M-Zahlen liegen nicht vor. |
 | **2. Footprint** | **~5,5–12,8 MB Base RSS / 148,85 MB Peak** | RAM Base-Footprint ~5,5–12,8 MB bei kleinen Korpora bis 100 Chunks ([`benches/results/scale_rss.csv`](benches/results/scale_rss.csv)); Peak VmRSS 148,85 MB bei 1.000 Chunks im VM-Messlauf ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1). |
 | **3. Search- & Punktabfrage-Latenz** | **p50 = 2,61 ms (1k) – 5,13 ms (10k) / ~6,9 µs Punktabfrage** | In-Memory-Suchlatenz p50 = 2,61 ms bei 1.000 Chunks, 5,13 ms bei 10.000 Chunks ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1). Punktabfragen: 690,71 ms für 100.000 Lookups (ca. 6,9 µs je Lookup, [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) §2.b). 4-Signal-Hybrid p99: Zielwert (< 15 ms), nicht gemessen ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §0). |
-| **4. LoCoMo / LongMemEval-Score** | **78,6 % Accuracy (LongMemEval_s) / 100,0 % Recall@5 (LoCoMo Fixture)** | 78,6 % Accuracy auf LongMemEval-S (500 Testfälle, [`benchmarks/contextra-bench/baseline_metrics.json`](benchmarks/contextra-bench/baseline_metrics.json)); 100,0 % Recall@5 auf synthetischem LoCoMo-Fixture (1 Gespräch, [`benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json`](benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json); im vollen LoCoMo-10 mit 1.540 Fällen beträgt der Recall@5 0,45 %, [`benchmarks/contextra-bench/baseline_metrics.json`](benchmarks/contextra-bench/baseline_metrics.json)). |
+| **4. LoCoMo / LongMemEval-Score** | **78,6 % Accuracy (LongMemEval_s)** | 78,6 % Accuracy auf LongMemEval-S (500 Testfälle). Der Recall@5 von 100,0 % bezieht sich ausschließlich auf das synthetische Sanity-Check-Fixture (1 Gespräch, [`benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json`](benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json)); im ungefilterten LoCoMo-10 beträgt Recall@5 0,45 % ([`benchmarks/contextra-bench/baseline_metrics.json`](benchmarks/contextra-bench/baseline_metrics.json), Messwert stammt aus der Zeit vor dem Harness-Fix vom 02.10.2026). |
 | **5. Löschbeweis-Zeit** | **2,28 µs (O(1) Verifikation) / 2,49 µs (1 Key Erzeugung)** | Rechnerische Latenz für kryptographische DSGVO Art. 17 `DeletionProof`-Erzeugung und -Verifikation (Blake3/HMAC-SHA256, ohne Disk-Cleanup; [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) §3 und [`docs/BENCHMARKS_DELETION_PROOF.md`](docs/BENCHMARKS_DELETION_PROOF.md) §1). |
+
+### Grenzen des Löschbeweises
+
+Ein `DeletionProof` wird ausschließlich beim Löschen einer gesamten Collection (`drop_collection`) ausgestellt. Er attestiert das logische Entfernen des LSM-Schlüsselraums (`LsmMemtable`), garantiert jedoch kein physisches Purgen von SSTables, WAL-Segmenten, HNSW- oder Graph-Strukturen auf SSD-Ebene. Einzelne Dokumentlöschungen (`contextra_forget`, `contextra_delete`) setzen Tombstones ohne Beweisausstellung (`"proof": null`). Details siehe [`docs/reports/deletion_proof_verifiability_report.md`](docs/reports/deletion_proof_verifiability_report.md).
 
 ### Einordnung im Vergleich zu externen Systemen
 
