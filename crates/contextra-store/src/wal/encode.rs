@@ -125,6 +125,10 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<Self> {
+        // TODO(Implementer): [P01 / F-07 / LOW]
+        // Monotone Sequenznummer-Validierung / Überlaufschutz (Invariante I-4):
+        // Sicherstellen, dass `seq_no < u64::MAX` gilt. Bei `seq_no == u64::MAX` mit
+        // `Err(ContextraError::InvalidInput("WAL sequence number overflow".into()))` ablehnen.
         let checksum = Self::compute_checksum(&op, seq_no, integrity_key, prev_hmac)?;
         Ok(Self {
             op,

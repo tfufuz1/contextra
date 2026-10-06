@@ -32,6 +32,10 @@ pub enum DeletionProofError {
 }
 
 /// Schlüsselpaar für Ed25519-Löschbeweise.
+// TODO(#JULES-P04-4, Implementer): [P04 / F-4 / HIGH]
+// DeletionProofKeyPair versäumt RAM-Zeroization (`ZeroizeOnDrop`) für Ed25519-Privatschlüssel (I-6):
+// Auch hier in `ed25519_proof.rs` muss `DeletionProofKeyPair` mit `Zeroize` / `ZeroizeOnDrop`
+// versehen werden, um In-Memory-Key-Scrubbing bei Freigabe zu erzwingen.
 #[derive(Debug)]
 pub struct DeletionProofKeyPair {
     /// Privater Signierschlüssel.

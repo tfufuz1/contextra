@@ -7,6 +7,11 @@ use std::io;
 /// The caller guarantees that `file` is an open read-only file handle.
 /// The memory map remains valid as long as the underlying storage exists.
 pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
+    // TODO(Implementer): [P05 / F-03 / MEDIUM]
+    // Virtuelle Speicher-Anfälligkeit (SIGBUS) bei externer Dateitrunkierung von mmap-Slices:
+    // Externe Kürzung gemappter Dateien führt zu SIGBUS bei Seitenzugriffen außerhalb der neuen Dateigröße.
+    // 1. Vertraglich dokumentieren: Das unterliegende Dateisystem darf nicht extern mutiert/getrunkt werden.
+    // 2. Wo nötig, Advisory/Mandatory Locks (flock) auf File-Deskriptoren halten oder SIGBUS-Signalhandler/Stream-Reader-Fallbacks vorsehen.
     // SAFETY:
     // 1. `file` is a valid open read-only file descriptor.
     // 2. Read-only mapping prevents data mutation races in Rust address space.

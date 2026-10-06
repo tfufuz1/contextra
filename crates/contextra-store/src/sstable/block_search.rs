@@ -90,6 +90,13 @@ pub fn get_entry_key_at_index(
         .ok_or_else(|| ContextraError::Storage("malformed block: entry_key out of bounds".into()))
 }
 
+// TODO(Implementer): [P02 / F-02 / HIGH / JULES-P02-02]
+// Binärsuche in SSTable-Blöcken: Erste/neueste Version bei Mehrfachversionen garantieren (Invariante I-1):
+// Bei mehreren Versionen desselben Keys in einem Datenblock MUSS die Binärsuche deterministisch
+// den ersten Index (die neueste Version mit höchster Sequenznummer, da im Block absteigend sortiert)
+// zurückgeben. Sicherstellen, dass die Partition-Point-Logik (Left-Rewind) für alle Block-Suchfunktionen
+// (`binary_search_first_index_in_block`, `binary_search_index_in_block`, `binary_search_entry_in_block`)
+// ausnahmslos zum ersten Vorkommen führt, um Stale Reads zu verhindern.
 pub fn binary_search_first_index_in_block(
     block_data: &[u8],
     offsets_start: usize,

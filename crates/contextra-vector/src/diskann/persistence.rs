@@ -86,6 +86,12 @@ impl DiskAnnIndex {
             }
         }
 
+        // TODO(Implementer): [P03 / F-04 / HIGH / JULES-P03-04]
+        // Crash-Recovery-Inkonsistenz bei DiskANN Delta-Flushing (Invariante I-7):
+        // Ein Absturz direkt nach `std::fs::rename` aber VOR `remove_file(&pending_wal)` führt beim Neustart
+        // dazu, dass die in `pending.wal` enthaltenen Vektoren erneut geladen und dupliziert werden.
+        // Das Löschen/Abschneiden der pending WAL muss atomar zum Index-Recovery-Status synchronisiert sein
+        // (z. B. durch eine im Index-Header und in der WAL abgeglichene Checkpoint-Sequenz-ID).
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if pending_wal.exists() {
             let _ = std::fs::remove_file(&pending_wal);
@@ -410,6 +416,12 @@ impl DiskAnnIndex {
                     let doc_id_end = doc_id_offset
                         .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
+                    // TODO(Implementer): [P05 / F-03 & F-04 / MEDIUM]
+                    // F-03: Schutz gegen Dateitrunkierung während Mmap-Zugriff.
+                    // F-04: Fehlender Struct-Alignment-Guard bei Rohdaten-Casts in On-Disk-Slices:
+                    // Aktuell wird `from_le_bytes` verwendet (speichersicher), aber für direkte Direct-Structure-Pointers
+                    // müssen strikte Alignment-Invarianten (`bytemuck::Pod` oder explizite Offset-Ausrichtungsprüfungen)
+                    // garantiert werden, um Alignment-Faults auf strikt ausgerichteten CPUs zu verhindern.
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
                             ContextraError::Storage("DiskANN file truncated before doc_id".into())

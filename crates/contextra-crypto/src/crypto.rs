@@ -331,6 +331,10 @@ impl KeyManager {
     }
 
     /// Derives a deletion proof signing key for cryptographic deletion verification.
+    // TODO(#JULES-P04-3, Implementer): [P04 / F-2 / HIGH]
+    // Fehlende Schlüssel-Objekt-Separation bei HMAC v1/v2-Beweisen (F-2):
+    // Ableitung des Löschbeweis-HMAC-Schlüssels direkt vom Master-Key ermöglicht Fälschung durch Angreifer mit Disk-Access.
+    // Symmetrische v1/v2-Erzeugungsmethoden als `#[deprecated]` markieren.
     pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
@@ -343,6 +347,9 @@ impl KeyManager {
 
     /// Creates and signs a v2 [`DeletionProof`][crate::deletion_proof::DeletionProof] using a sub-key
     /// derived specifically for cryptographic deletion proofs via [`Self::derive_deletion_proof_key`].
+    // TODO(#JULES-P04-3, Implementer): [P04 / F-2 / HIGH]
+    // `KeyManager::create_deletion_proof` muss standardmäßig Ed25519-v3-Löschnachweise erzeugen (I-2),
+    // getrennt vom Master-Key. Der bisherige symmetrische HMAC-Pfad ist als deprecated abzukündigen.
     pub fn create_deletion_proof(
         &self,
         scope: crate::deletion_proof::DeletionScope,

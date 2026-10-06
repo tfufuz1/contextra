@@ -204,6 +204,14 @@ impl CompactionEngine {
         }
 
         // 2. Perform the merge (no lock held — this is the expensive part)
+        // TODO(Implementer): [P02 / F-01 / CRITICAL / JULES-P02-01]
+        // MVCC Isolation Violation (Invariante I-2):
+        // Kompaktion ignoriert aktive MVCC-Reader in TxBuffer und löscht sichtbare Daten vorzeitig!
+        // Aktuell: `let min_snapshot_seq = self.snapshot_registry.min_active_seqno();`
+        // Dadurch werden Tombstones und historische Versionen sichtbarer Daten langlaufender Transaktionen gepurgt.
+        // Soll: CompactionEngine muss das Minimum aus `self.snapshot_registry.min_active_seqno()` UND
+        // `tx_buffer.min_read_snapshot()` (aus `contextra-mvcc`) bilden, z.B. über eine injizierte
+        // `tx_buffer`-Referenz oder einen dynamischen Snapshot-Watermark-Provider.
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
         self.merge_sstables_with_cancel(
