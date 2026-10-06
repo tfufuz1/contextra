@@ -1,9 +1,15 @@
+// FILE-CONTEXT
+// STAND: 2026-10-06T00:00:00Z (SESSION: p02a-fix)
+// ZWECK: Tiered/Leveled CompactionEngine & Multi-Way SSTable Merging mit MVCC-Snapshot-Watermark-Retention.
+// INVARIANTEN: GC/Tombstone-Entfernung muss bound = min(snapshot_registry.min_active_seqno(), tx_buffer.min_read_snapshot()) einhalten (Invariante I-2).
+// HOTSPOTS: 150-250, 400-750
+
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
-use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
+use contextra_core::{Result, SnapshotRegistry, StorageStats, TxBuffer, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 
@@ -15,6 +21,7 @@ use tracing;
 pub struct CompactionEngine {
     config: CompactionConfig,
     pub(super) snapshot_registry: Arc<SnapshotRegistry>,
+    tx_buffer: Option<Arc<TxBuffer<(Vec<u8>, Vec<u8>)>>>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
     budget: Arc<contextra_core::ResourceTracker>,
@@ -51,6 +58,7 @@ impl CompactionEngine {
         Self {
             config,
             snapshot_registry,
+            tx_buffer: None,
             block_cache,
             key_manager,
             budget,
@@ -62,6 +70,12 @@ impl CompactionEngine {
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
         }
+    }
+
+    /// Attaches the MVCC transaction buffer for active reader snapshot watermark evaluation (Invariante I-2).
+    pub fn with_tx_buffer(mut self, tx_buffer: Arc<TxBuffer<(Vec<u8>, Vec<u8>)>>) -> Self {
+        self.tx_buffer = Some(tx_buffer);
+        self
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -104,6 +118,27 @@ impl CompactionEngine {
         self.workload_metrics.record_write(seq_no);
     }
 
+    /// Calculates the effective lower sequence bound for MVCC tombstone/version GC (Invariante I-2).
+    ///
+    /// Computes `min(snapshot_registry.min_active_seqno(), tx_buffer.min_read_snapshot().unwrap_or(u64::MAX))`.
+    ///
+    /// # Race-Betrachtung / Concurrency Safety
+    /// Ein Reader-Thread, der sich *nach* der Berechnung dieses Watermarks registriert, liest mit einer
+    /// Sequenznummer `seq >= last_allocated_seq`. Da der Watermark aus den bereits registrierten Readern und
+    /// aktiven Snapshots gebildet wird, sind alle Versionen mit `seq >= min_snapshot_seq_bound()` streng geschützt.
+    /// Neue Reader registrieren sich stets mit `seq >= last_allocated_seq >= min_snapshot_seq_bound()`,
+    /// weshalb ihre sichtbaren Daten nicht durch eine zeitgleich laufende Kompaktion entfernt werden können.
+    #[inline]
+    pub fn min_snapshot_seq_bound(&self) -> u64 {
+        let registry_min = self.snapshot_registry.min_active_seqno();
+        let tx_buffer_min = self
+            .tx_buffer
+            .as_ref()
+            .and_then(|tb| tb.min_read_snapshot())
+            .unwrap_or(u64::MAX);
+        registry_min.min(tx_buffer_min)
+    }
+
     /// Evaluates whether compaction should run and performs it if needed.
     ///
     /// Takes a write-lock on the SSTable list to atomically swap old SSTables
@@ -143,7 +178,7 @@ impl CompactionEngine {
                         memtable_size_bytes: 0,
                     };
                     let metrics_snap = self.workload_metrics.snapshot();
-                    let min_seq = self.snapshot_registry.min_active_seqno();
+                    let min_seq = self.min_snapshot_seq_bound();
 
                     if let Some(plan) =
                         planner.plan_compaction(&stats, &metrics_snap, &ssts, min_seq)?
@@ -204,15 +239,8 @@ impl CompactionEngine {
         }
 
         // 2. Perform the merge (no lock held — this is the expensive part)
-        // TODO(Implementer): [P02 / F-01 / CRITICAL / JULES-P02-01]
-        // MVCC Isolation Violation (Invariante I-2):
-        // Kompaktion ignoriert aktive MVCC-Reader in TxBuffer und löscht sichtbare Daten vorzeitig!
-        // Aktuell: `let min_snapshot_seq = self.snapshot_registry.min_active_seqno();`
-        // Dadurch werden Tombstones und historische Versionen sichtbarer Daten langlaufender Transaktionen gepurgt.
-        // Soll: CompactionEngine muss das Minimum aus `self.snapshot_registry.min_active_seqno()` UND
-        // `tx_buffer.min_read_snapshot()` (aus `contextra-mvcc`) bilden, z.B. über eine injizierte
-        // `tx_buffer`-Referenz oder einen dynamischen Snapshot-Watermark-Provider.
-        let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
+        // Invariante I-2: Minimum aus snapshot_registry.min_active_seqno() UND tx_buffer.min_read_snapshot()
+        let min_snapshot_seq = self.min_snapshot_seq_bound();
         let output_path = self.generate_sst_path(data_path)?;
         self.merge_sstables_with_cancel(
             &input_ssts,
