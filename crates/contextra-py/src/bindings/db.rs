@@ -143,13 +143,11 @@ impl PyContextra {
         let inner = self.inner.clone();
         run_blocking_ffi(py, &self.poisoned, || {
             let proof = rt
-                .block_on(
-                    inner.drop_collection(&name_owned, tenant_id, &key_bytes),
-                )
+                .block_on(inner.drop_collection(&name_owned, tenant_id, &key_bytes))
                 .map_err(contextra_err)?;
-            proof
-                .export_for_audit()
-                .map_err(|e| ContextraValueError::new_err(format!("Failed to export proof JSON: {}", e)))
+            proof.export_for_audit().map_err(|e| {
+                ContextraValueError::new_err(format!("Failed to export proof JSON: {}", e))
+            })
         })
     }
 
@@ -209,10 +207,7 @@ impl PyContextra {
 /// Resolves the deletion proof key from an explicit byte slice or an environment variable value.
 /// Explicit argument takes precedence over the environment variable.
 /// Trims whitespace for environment variable values.
-fn resolve_proof_key(
-    arg: Option<&[u8]>,
-    env: Option<String>,
-) -> PyResult<Vec<u8>> {
+fn resolve_proof_key(arg: Option<&[u8]>, env: Option<String>) -> PyResult<Vec<u8>> {
     if let Some(arg_bytes) = arg {
         if arg_bytes.is_empty() {
             return Err(ContextraValueError::new_err(
@@ -295,14 +290,18 @@ mod tests {
 
     #[test]
     fn test_resolve_proof_key_whitespace_env() {
-        let err = resolve_proof_key(None, Some("   \t\n ".to_string())).unwrap_err().to_string();
+        let err = resolve_proof_key(None, Some("   \t\n ".to_string()))
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("deletion proof key not configured"));
     }
 
     #[test]
     fn test_resolve_proof_key_short_explicit() {
         let secret = "secret_key_12345";
-        let err = resolve_proof_key(Some(secret.as_bytes()), None).unwrap_err().to_string();
+        let err = resolve_proof_key(Some(secret.as_bytes()), None)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("deletion proof key must be at least 32 bytes"));
         assert!(!err.contains(secret));
     }
@@ -310,7 +309,9 @@ mod tests {
     #[test]
     fn test_resolve_proof_key_short_env() {
         let secret = "secret_env_key";
-        let err = resolve_proof_key(None, Some(secret.to_string())).unwrap_err().to_string();
+        let err = resolve_proof_key(None, Some(secret.to_string()))
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("deletion proof key must be at least 32 bytes"));
         assert!(!err.contains(secret));
     }
