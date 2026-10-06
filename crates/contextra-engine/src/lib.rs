@@ -54,6 +54,12 @@ mod no_crypto_stubs {
             layer: DeletionLayer,
             remaining_count: usize,
         ) -> contextra_types::Result<Self> {
+            if remaining_count != 0 {
+                return Err(contextra_types::ContextraError::Internal(format!(
+                    "INV-DELETION-1 violation: layer {:?} cleanup verification failed with remaining_count={}",
+                    layer, remaining_count
+                )));
+            }
             Ok(Self {
                 layer,
                 remaining_count,
@@ -67,8 +73,14 @@ mod no_crypto_stubs {
         where
             F: FnOnce() -> contextra_types::Result<bool>,
         {
-            let _ = verifier();
-            Self::new_after_verified_empty(layer, 0)
+            match verifier() {
+                Ok(true) => Self::new_after_verified_empty(layer, 0),
+                Ok(false) => Err(contextra_types::ContextraError::Internal(format!(
+                    "INV-DELETION-1 violation: layer {:?} verifier returned false",
+                    layer
+                ))),
+                Err(e) => Err(e),
+            }
         }
     }
 
@@ -142,6 +154,36 @@ mod no_crypto_stubs {
         }
     }
 
+    fn construct_hmac_payload(
+        scope: &DeletionScope,
+        deleted_keys_hash: &[u8; 32],
+        deleted_after_tx: TxId,
+        covered_layers: &[DeletionLayer],
+        excluded_scopes: &[ExcludedScope],
+    ) -> contextra_types::Result<Vec<u8>> {
+        let scope_bytes = bincode::serialize(scope)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let tx_bytes = deleted_after_tx.0.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(covered_layers)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(excluded_scopes)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+        let mut payload = Vec::with_capacity(
+            scope_bytes.len()
+                + 32
+                + tx_bytes.len()
+                + covered_layers_bytes.len()
+                + excluded_scopes_bytes.len(),
+        );
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+        Ok(payload)
+    }
+
     impl DeletionProof {
         pub fn create(
             scope: DeletionScope,
@@ -154,7 +196,12 @@ mod no_crypto_stubs {
             deleted_keys.sort();
             let mut hasher = blake3::Hasher::new();
             for key in &deleted_keys {
-                hasher.update(&(key.len() as u32).to_le_bytes());
+                let key_len = u32::try_from(key.len()).map_err(|_| {
+                    contextra_types::ContextraError::InvalidInput(
+                        "deleted key length exceeds u32::MAX".to_string(),
+                    )
+                })?;
+                hasher.update(&key_len.to_le_bytes());
                 hasher.update(key);
             }
             let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
@@ -163,24 +210,20 @@ mod no_crypto_stubs {
                 layer_proofs.into_iter().map(|p| p.layer).collect();
             let excluded_scopes: Vec<ExcludedScope> = vec![];
 
-            let scope_bytes = bincode::serialize(&scope)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
-            let tx_bytes = tx_id.0.to_le_bytes();
-            let covered_layers_bytes = bincode::serialize(&covered_layers)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
-            let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+            let payload = construct_hmac_payload(
+                &scope,
+                &deleted_keys_hash,
+                tx_id,
+                &covered_layers,
+                &excluded_scopes,
+            )?;
 
             use hmac::{Hmac, Mac};
             use sha2::Sha256;
             let mut mac = Hmac::<Sha256>::new_from_slice(proof_key).map_err(|e| {
                 contextra_types::ContextraError::Internal(format!("HMAC key error: {e}"))
             })?;
-            mac.update(&scope_bytes);
-            mac.update(&deleted_keys_hash);
-            mac.update(&tx_bytes);
-            mac.update(&covered_layers_bytes);
-            mac.update(&excluded_scopes_bytes);
+            mac.update(&payload);
             let signature = mac.finalize().into_bytes().to_vec();
 
             Ok(Self {
@@ -193,7 +236,10 @@ mod no_crypto_stubs {
                 covered_layers,
                 excluded_scopes,
                 wal_chain_receipt: None,
-                integrity_warning: None,
+                integrity_warning: Some(
+                    "generated without feature encryption-at-rest: HMAC-SHA256 v2 only, no timestamp"
+                        .to_string(),
+                ),
                 deleted_keys,
             })
         }
@@ -206,7 +252,50 @@ mod no_crypto_stubs {
             }
         }
 
-        pub fn verify(&self, _key: &[u8]) -> contextra_types::Result<bool> {
+        pub fn verify(&self, key: &[u8]) -> contextra_types::Result<bool> {
+            if self.signature_version != 2 {
+                return Err(contextra_types::ContextraError::InvalidInput(format!(
+                    "Unsupported signature_version: expected 2, got {}",
+                    self.signature_version
+                )));
+            }
+
+            if !self.deleted_keys.is_empty() {
+                let mut sorted_keys = self.deleted_keys.clone();
+                sorted_keys.sort();
+                let mut hasher = blake3::Hasher::new();
+                for k in &sorted_keys {
+                    let key_len = match u32::try_from(k.len()) {
+                        Ok(len) => len,
+                        Err(_) => return Ok(false),
+                    };
+                    hasher.update(&key_len.to_le_bytes());
+                    hasher.update(k);
+                }
+                let recomputed_hash: [u8; 32] = hasher.finalize().into();
+                if recomputed_hash != self.deleted_keys_hash {
+                    return Ok(false);
+                }
+            }
+
+            let payload = construct_hmac_payload(
+                &self.scope,
+                &self.deleted_keys_hash,
+                self.deleted_after_tx,
+                &self.covered_layers,
+                &self.excluded_scopes,
+            )?;
+
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            let mut mac = Hmac::<Sha256>::new_from_slice(key).map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("HMAC key error: {e}"))
+            })?;
+            mac.update(&payload);
+            if mac.verify_slice(&self.signature).is_err() {
+                return Ok(false);
+            }
+
             Ok(true)
         }
 
