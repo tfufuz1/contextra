@@ -172,7 +172,10 @@ impl Wal {
 
     /// Returns the legacy integrity key status for this WAL segment.
     pub fn legacy_key_status(&self) -> LegacyKeyStatus {
-        if self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
+        if self
+            .legacy_key_used
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
             LegacyKeyStatus::LegacyActive
         } else {
             LegacyKeyStatus::Standard
@@ -197,24 +200,14 @@ impl Wal {
         }
     }
 
-    /// Returns the [`LegacyKeyStatus`] of the active WAL instance.
-    pub fn legacy_key_status(&self) -> LegacyKeyStatus {
-        if self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
-            LegacyKeyStatus::LegacyActive
-        } else {
-            LegacyKeyStatus::Standard
-        }
-    }
-
     /// Exposes the HMAC integrity key for testing.
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
-    #[doc(hidden)]
-    #[allow(clippy::expect_used)]
-    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        legacy_integrity_key().expect("Legacy WAL key support is disabled at compile time.")
+    #[cfg(test)]
+    pub(crate) fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
+        legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
