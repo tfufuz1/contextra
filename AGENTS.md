@@ -27,20 +27,6 @@ Start: `cargo xtask jules start --card <datei>` (Arbeitskontext laden; Preflight
 
 Zusatzprüfungen werden risikobasiert durch `gate-integrity` anhand der `risk`-Einstufung der Task-Karte gewählt. Agenten müssen keine Einzel-Gates manuell aufrufen.
 Alle weiteren Qualitäts-Gates aus `governance/gates.toml` laufen automatisiert in CI und Nightly-Runs.
-
-### Entwickler & Harness Xtasks
-
-Alle früheren Python-/Shell-Audit-Skripte wurden in `cargo xtask` konsolidiert. Entwickler und Agenten nutzen folgende Kommandos:
-- `cargo xtask orphan-symbols`: Erkennt verwaiste/unbenutzte öffentliche Symbole workspace-weit.
-- `cargo xtask unwired-ports`: Prüft unangebundene Ports und Trait-Methoden.
-- `cargo xtask stub-impls`: Erkennt unvollständige Stub-Implementierungen.
-- `cargo xtask doctrine-scan`: Prüft Codebase-Doktrin und Invarianten.
-- `cargo xtask dependency-graph-audit`: Prüft Crate-Abhängigkeitszyklen und Ring-Distanzen.
-- `cargo xtask repo-doctor`: Repository-Diagnose.
-- `cargo xtask claim-guard`: Prüft PR-Claim-Integrität.
-- `cargo xtask bench-trend`: Benchmark-Trendanalysen.
-- `cargo xtask fast-diff-lint`: Schnelle Diff-basierte Lints.
-- `cargo xtask harness-list`: Zeigt die vollständige Übersicht aller registrierten Harness-Werkzeuge an.
 Anti-Gaming: Das Abschwächen, Umgehen oder Deaktivieren von Qualitäts-Gates, Lints, Schwellenwerten, Baselines oder Toolchain-Pins ist streng verboten.
 
 ## 5. Scope

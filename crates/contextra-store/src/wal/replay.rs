@@ -65,13 +65,8 @@ impl Wal {
         &self,
         sink: &S,
     ) -> Result<Vec<(u64, WalEntry, u64)>> {
-        match self.replay_mmap_with_sink(sink).await {
-            Ok((entries, _)) => Ok(entries),
-            Err(e) => {
-                tracing::warn!("WAL mmap replay failed ({e}), falling back to stream reader");
-                self.replay_stream().await
-            }
-        }
+        let (entries, _) = self.replay_mmap_with_sink(sink).await?;
+        Ok(entries)
     }
 
     /// Replays the WAL using the stream reader (`BufReader`).

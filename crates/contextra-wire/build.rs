@@ -91,19 +91,6 @@ fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
     result
 }
 
-fn replace_unwrap_with_unwrap_or_default(line: &str, prev_line: &str) -> String {
-    if !line.contains(".unwrap()") {
-        return line.to_string();
-    }
-
-    let is_get_some = |s: &str| s.contains("get") && s.contains("Some(");
-    if is_get_some(line) || is_get_some(prev_line) {
-        return line.replace(".unwrap()", ".unwrap_or_default()");
-    }
-
-    line.to_string()
-}
-
 fn post_process_generated_code(output_file: &Path) {
     let content = match std::fs::read_to_string(output_file) {
         Ok(c) => c,
@@ -111,17 +98,14 @@ fn post_process_generated_code(output_file: &Path) {
     };
 
     let mut modified = false;
-    let mut prev_line = String::new();
     let new_lines: Vec<String> = content
         .lines()
         .map(|line| {
-            let step1 = wrap_tab_get_calls_in_unsafe(line);
-            let step2 = replace_unwrap_with_unwrap_or_default(&step1, &prev_line);
-            if step2 != line {
+            let processed = wrap_tab_get_calls_in_unsafe(line);
+            if processed != line {
                 modified = true;
             }
-            prev_line = step1;
-            step2
+            processed
         })
         .collect();
 
@@ -144,34 +128,11 @@ mod tests {
         let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input1), expected1);
 
-        let input2 =
-            "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
+        let input2 = "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
         let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input2), expected2);
 
         let input3 = "    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input3), input3);
-    }
-
-    #[test]
-    fn test_replace_unwrap_with_unwrap_or_default() {
-        let single_line = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }";
-        let single_line_exp =
-            "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default() }";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(single_line, ""),
-            single_line_exp
-        );
-
-        let prev = "            self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0))";
-        let curr = "            .unwrap()";
-        let curr_exp = "            .unwrap_or_default()";
-        assert_eq!(replace_unwrap_with_unwrap_or_default(curr, prev), curr_exp);
-
-        let non_get_line = "    Some(val).unwrap()";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(non_get_line, ""),
-            non_get_line
-        );
     }
 }

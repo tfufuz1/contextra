@@ -2,13 +2,13 @@
 > Ring 2 · experimental · Quelle: capabilities.toml · Spec: K.14
 
 ## 1. Zweck
-Stellt lokale, offline-fähige Vektor-Einbettungen und Cross-Encoder-Reranking bereit. Bietet `TextEmbedder` (`OnnxEmbedder`) für ONNX-Runtime-basierte Einbettungen (Candle-basierte Embedder liegen in `contextra-infer-candle`) sowie `CrossEncoderReranker` zur Präzisionsverbesserung von Retrieval-Ergebnissen.
+Stellt lokale, offline-fähige Vektor-Einbettungen und Cross-Encoder-Reranking bereit. Bietet `TextEmbedder` (`OnnxEmbedder`) für ONNX-Runtime-basierte Einbettungen, einen Candle-Backend-Adapter (`create_candle_embedder`) sowie `CrossEncoderReranker` zur Präzisionsverbesserung von Retrieval-Ergebnissen.
 
 ## 2. Modul-Karte
 
 | Datei / Verzeichnis | Verantwortung |
 |---|---|
-| `src/lib.rs` | `TextEmbedder`, `TextEmbedderConfig` und Modell-Download (`ensure_onnx_model_download`) |
+| `src/lib.rs` | `TextEmbedder`, `TextEmbedderConfig`, `create_candle_embedder` Adapter und Modell-Download (`ensure_onnx_model_download`) |
 | `src/reranker/config.rs` | `RerankConfig` mit `MAX_CANDIDATES = 10_000` Allokationsbegrenzung |
 | `src/reranker/cross_encoder.rs` | `CrossEncoderReranker` und Kalibrierungs-/Feedback-Methoden (`record_implicit_feedback`) |
 
