@@ -89,7 +89,30 @@ pub(crate) mod fs {
             #[cfg(not(unix))]
             {
                 // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata.
-                std::fs::metadata(".").map(|m| m.permissions()).unwrap()
+                let path = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+                match std::fs::metadata(&path) {
+                    Ok(m) => m.permissions(),
+                    Err(_) => {
+                        match std::fs::metadata(std::env::temp_dir()) {
+                            Ok(m) => m.permissions(),
+                            Err(e) => {
+                                tracing::error!("Failed to query Loom mock permissions: {e}");
+                                std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
+                                tracing::error!("Retrying Loom mock permissions query failed: {e}");
+                                match std::fs::File::open(&path).and_then(|f| f.metadata()) {
+                                    Ok(m) => m.permissions(),
+                                    Err(err) => {
+                                        tracing::error!("Loom mock permissions fallback error: {err}");
+                                        std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
+                                            std::fs::metadata(&path).expect("Loom mock permissions fallback failure")
+                                        })
+                                    }
+                                }
+                            })
+                            }
+                        }
+                    }
+                }
             }
         }
     }
