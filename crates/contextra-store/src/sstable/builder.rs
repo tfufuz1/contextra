@@ -347,7 +347,7 @@ impl SstableBuilder {
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
         let current_block_bytes = self.block_builder.current_size();
-        let estimated_total = self.current_size();
+        let estimated_total = self.block_builder.current_size();
         tracing::trace!(
             path = %self.path.display(),
             current_block_bytes,
