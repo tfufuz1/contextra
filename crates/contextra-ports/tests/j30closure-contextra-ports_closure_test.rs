@@ -6,9 +6,7 @@ use contextra_ports::embedding::{
     ContextSegment, EmbeddingProvider, MockEmbedder, TextEmbeddingEngine,
 };
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
-use contextra_ports::plugin::{
-    PluginCapability, PluginError, PluginManifest, PluginRegistry,
-};
+use contextra_ports::plugin::{PluginCapability, PluginError, PluginManifest, PluginRegistry};
 use contextra_ports::ModelFingerprint;
 
 struct PermissiveLicenseGate;
@@ -59,7 +57,9 @@ async fn test_mock_embedder_with_fixed_output_behavior() {
     assert_eq!(custom_embedder.embedding_dim(), 3);
     assert_eq!(custom_embedder.fixed_output, Some(custom_fixed.clone()));
 
-    let vec = EmbeddingProvider::embed(&custom_embedder, "hello").await.unwrap();
+    let vec = EmbeddingProvider::embed(&custom_embedder, "hello")
+        .await
+        .unwrap();
     assert_eq!(vec, custom_fixed);
 
     let fixed_unit = MockEmbedder::fixed_unit(4);

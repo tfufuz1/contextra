@@ -143,7 +143,10 @@ pub fn jules_facade_run_step(
 
     final_args.extend(filtered_extra_args);
 
-    let output_res = Command::new(&program).args(&final_args).current_dir(root).output();
+    let output_res = Command::new(&program)
+        .args(&final_args)
+        .current_dir(root)
+        .output();
 
     let output = match output_res {
         Ok(o) => o,
@@ -218,7 +221,8 @@ pub fn jules_facade_execute_phase(
     let show_timings = extra_args.iter().any(|a| a == "--timings");
     let phase_start = std::time::Instant::now();
 
-    let changed_files_opt = blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD");
+    let changed_files_opt =
+        blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD");
 
     let mut overall_status = 0;
     let mut step_results = Vec::new();
@@ -262,7 +266,11 @@ pub fn jules_facade_execute_phase(
             let step = batch[0];
             let should_skip = if let Some(ref globs) = step.when_changed {
                 if let Some(ref files) = changed_files_opt {
-                    let matched = files.iter().any(|f| globs.iter().any(|g| scope_guard::scope_guard_matches_glob(f, g)));
+                    let matched = files.iter().any(|f| {
+                        globs
+                            .iter()
+                            .any(|g| scope_guard::scope_guard_matches_glob(f, g))
+                    });
                     !matched
                 } else {
                     false
@@ -285,7 +293,11 @@ pub fn jules_facade_execute_phase(
                 for &step in &batch {
                     let should_skip = if let Some(ref globs) = step.when_changed {
                         if let Some(ref files) = changed_files_opt {
-                            let matched = files.iter().any(|f| globs.iter().any(|g| scope_guard::scope_guard_matches_glob(f, g)));
+                            let matched = files.iter().any(|f| {
+                                globs
+                                    .iter()
+                                    .any(|g| scope_guard::scope_guard_matches_glob(f, g))
+                            });
                             !matched
                         } else {
                             false
@@ -416,21 +428,25 @@ pub fn jules_facade_execute_phase(
                     reasons.push(msg.clone());
                 }
 
-                let (hash, count, escalated, lg_err) =
-                    match loop_guard::loop_guard_record_text(root, Some(sub_cmd), &combined, None) {
-                        Ok((h, c)) => {
-                            let esc = c >= 2;
-                            if esc {
-                                let reason = format!(
-                                    "Wiederholter Fehler beim Gate '{}': Hash {} ({})",
-                                    sub_cmd, h, c
-                                );
-                                let _ = loop_guard::loop_guard_stop(root, &reason);
-                            }
-                            (h, c, esc, None)
+                let (hash, count, escalated, lg_err) = match loop_guard::loop_guard_record_text(
+                    root,
+                    Some(sub_cmd),
+                    &combined,
+                    None,
+                ) {
+                    Ok((h, c)) => {
+                        let esc = c >= 2;
+                        if esc {
+                            let reason = format!(
+                                "Wiederholter Fehler beim Gate '{}': Hash {} ({})",
+                                sub_cmd, h, c
+                            );
+                            let _ = loop_guard::loop_guard_stop(root, &reason);
                         }
-                        Err(e) => (String::new(), 0, false, Some(e)),
-                    };
+                        (h, c, esc, None)
+                    }
+                    Err(e) => (String::new(), 0, false, Some(e)),
+                };
 
                 let mut step_json = serde_json::json!({
                     "command": cmd_str,

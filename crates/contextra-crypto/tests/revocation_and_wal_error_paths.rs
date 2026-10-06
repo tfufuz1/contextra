@@ -5,9 +5,7 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
-use contextra_crypto::{
-    CryptoError, KeyManager, KeyRegistry, RevocationLog, RevocationTarget,
-};
+use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, RevocationLog, RevocationTarget};
 use contextra_ports::SystemClock;
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;

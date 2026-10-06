@@ -5,8 +5,7 @@
 // INVARIANTEN: Korrekter Roundtrip für Standard- und Size-Prefixed FlatBuffers; sichere Verifizierung.
 
 use contextra_wire::{
-    root_as_search_response, ScoredDocument, ScoredDocumentArgs, SearchResponse,
-    SearchResponseArgs,
+    root_as_search_response, ScoredDocument, ScoredDocumentArgs, SearchResponse, SearchResponseArgs,
 };
 use flatbuffers::{FlatBufferBuilder, VerifierOptions};
 

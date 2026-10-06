@@ -10,17 +10,25 @@ use contextra_types::TenantId;
 // ── H10: Art. 30 DSGVO Processing Register, Canary & BSI Mapping ─────────────
 
 #[test]
-fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check() -> Result<(), Box<dyn std::error::Error>> {
+fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check(
+) -> Result<(), Box<dyn std::error::Error>> {
     let tenant_id = TenantId::try_new(42)?;
     let source = InMemoryProcessingRegisterSource::with_sample_data_for(tenant_id);
     let entries = source.collect_entries(tenant_id)?;
 
-    assert_eq!(entries.len(), 2, "Sample source provides 2 Art. 30 processing entries");
+    assert_eq!(
+        entries.len(),
+        2,
+        "Sample source provides 2 Art. 30 processing entries"
+    );
 
     // 1. JSON rendering and parsing validity
     let json_output = render_register_json(&entries)?;
     let parsed_entries: Vec<ProcessingRegisterEntry> = serde_json::from_str(&json_output)?;
-    assert_eq!(parsed_entries, entries, "JSON rendering must be lossless and round-trip parseable");
+    assert_eq!(
+        parsed_entries, entries,
+        "JSON rendering must be lossless and round-trip parseable"
+    );
 
     // 2. Markdown rendering determinism & Art. 30 lit. a-g technical completeness check
     let md1 = render_register_markdown(&entries)?;
@@ -29,7 +37,10 @@ fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check() -> Result<(),
 
     assert!(md1.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
     assert!(md1.contains("Zweck"), "Art. 30 lit. b: Purpose present");
-    assert!(md1.contains("Datenkategorien"), "Art. 30 lit. c: Data categories present");
+    assert!(
+        md1.contains("Datenkategorien"),
+        "Art. 30 lit. c: Data categories present"
+    );
 
     // BEFUND H10: contextra-audit-export's ProcessingRegisterEntry omits Art. 30 (1) lit. a (controller/processor name),
     // lit. c (subject categories), lit. d (recipients), lit. e (third country transfers),
@@ -40,7 +51,12 @@ fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check() -> Result<(),
     let has_lit_f_retention = md1.contains("Löschfrist");
     let has_lit_g_toms = md1.contains("Technische und organisatorische Maßnahmen");
 
-    if !has_lit_a_controller || !has_lit_d_recipients || !has_lit_e_third_country || !has_lit_f_retention || !has_lit_g_toms {
+    if !has_lit_a_controller
+        || !has_lit_d_recipients
+        || !has_lit_e_third_country
+        || !has_lit_f_retention
+        || !has_lit_g_toms
+    {
         eprintln!("H10 CONFIRMED: contextra-audit-export Art. 30 register lacks statutory fields lit. a, d, e, f, g!");
     }
 
@@ -58,7 +74,11 @@ fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check() -> Result<(),
 
     // 4. BSI Mapping Table verification
     let bsi_table = bsi_mapping_table();
-    assert_eq!(bsi_table.len(), 4, "BSI mapping table must contain 4 core cryptographic mappings");
+    assert_eq!(
+        bsi_table.len(),
+        4,
+        "BSI mapping table must contain 4 core cryptographic mappings"
+    );
 
     let bsi_md = render_bsi_mapping_markdown(&bsi_table);
     assert!(bsi_md.contains("Ed25519"));

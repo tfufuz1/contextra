@@ -7,8 +7,8 @@ fn test_adaptive_conformal_calibrator_with_bounds_clamping() -> Result<(), Confo
     assert_eq!(calibrator_default.threshold(), 0.5);
 
     // Custom configuration using with_bounds
-    let mut calibrator = AdaptiveConformalCalibrator::with_params(0.1, 0.5, 0.2)?
-        .with_bounds(0.3, 0.7)?;
+    let mut calibrator =
+        AdaptiveConformalCalibrator::with_params(0.1, 0.5, 0.2)?.with_bounds(0.3, 0.7)?;
 
     assert_eq!(calibrator.threshold(), 0.5);
 
@@ -37,5 +37,8 @@ fn test_adaptive_conformal_calibrator_with_invalid_bounds() {
         .unwrap()
         .with_bounds(0.8, 0.2); // Min > Max
 
-    assert!(matches!(calibrator_res, Err(ConformalError::InvalidThreshold(_))));
+    assert!(matches!(
+        calibrator_res,
+        Err(ConformalError::InvalidThreshold(_))
+    ));
 }

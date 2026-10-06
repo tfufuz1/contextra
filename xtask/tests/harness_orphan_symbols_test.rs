@@ -1,10 +1,8 @@
 // xtask/tests/harness_orphan_symbols_test.rs
 
-#[path = "../src/harness/orphan_symbols.rs"]
-mod orphan_symbols;
-
 use std::fs;
 use tempfile::tempdir;
+use xtask::harness::orphan_symbols;
 
 #[test]
 fn test_orphan_symbols_unreferenced_function() {
@@ -25,12 +23,17 @@ pub fn never_called() {
         "orphan-symbols".to_string(),
         "--root".to_string(),
         root.to_string_lossy().to_string(),
+        "--exclude-crate".to_string(),
+        "none".to_string(),
         "--json".to_string(),
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
 
-    assert_eq!(code, 2, "Status must be 'fail' (exit code 2) for orphan symbol");
+    assert_eq!(
+        code, 2,
+        "Status must be 'fail' (exit code 2) for orphan symbol"
+    );
 }
 
 #[test]
@@ -59,10 +62,15 @@ fn caller() {
         "orphan-symbols".to_string(),
         "--root".to_string(),
         root.to_string_lossy().to_string(),
+        "--exclude-crate".to_string(),
+        "none".to_string(),
         "--json".to_string(),
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
 
-    assert_eq!(code, 0, "Status must be 'pass' (exit code 0) when symbol is referenced");
+    assert_eq!(
+        code, 0,
+        "Status must be 'pass' (exit code 0) when symbol is referenced"
+    );
 }

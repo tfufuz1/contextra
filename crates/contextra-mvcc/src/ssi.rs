@@ -577,7 +577,9 @@ impl SequenceLogSsiValidatorBuilder {
 
     /// Builds the configured [`SequenceLogSsiValidator`].
     pub fn build(self) -> SequenceLogSsiValidator {
-        let max_keys = self.max_tracked_keys.unwrap_or(DEFAULT_MAX_TRACKED_COMMIT_KEYS);
+        let max_keys = self
+            .max_tracked_keys
+            .unwrap_or(DEFAULT_MAX_TRACKED_COMMIT_KEYS);
         let mut validator = if let Some(seq_log) = self.sequence_log {
             SequenceLogSsiValidator::with_sequence_log(seq_log)
         } else {
@@ -805,16 +807,13 @@ impl SequenceLogSsiValidator {
             .filter(|b| matches!(b, SeqBucket::Coarsened { .. }))
             .count();
 
-        let longest_pin = self
-            .snapshot_registry
-            .as_ref()
-            .and_then(|reg| {
-                if now == Instant::now() {
-                    reg.longest_active_pin()
-                } else {
-                    reg.longest_active_pin_at(now)
-                }
-            });
+        let longest_pin = self.snapshot_registry.as_ref().and_then(|reg| {
+            if now == Instant::now() {
+                reg.longest_active_pin()
+            } else {
+                reg.longest_active_pin_at(now)
+            }
+        });
 
         let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
         let longest_pin_duration = longest_pin.map(|(_, dur)| dur);

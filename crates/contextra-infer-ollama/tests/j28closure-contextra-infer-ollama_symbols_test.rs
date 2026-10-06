@@ -60,7 +60,10 @@ async fn test_j28closure_all_5_symbols_verification() -> Result<(), Box<dyn std:
     // Symbol 5: validate_model_available
     client.validate_model_available("llama3").await?;
     let missing_res = client.validate_model_available("missing-model").await;
-    assert!(missing_res.is_err(), "validate_model_available must return Err for missing model");
+    assert!(
+        missing_res.is_err(),
+        "validate_model_available must return Err for missing model"
+    );
 
     // Symbol 1: generate_prefix_batch
     let prefix_engine = ContextPrefixEngine::new(client.clone(), ContextPrefixConfig::default());
@@ -69,8 +72,14 @@ async fn test_j28closure_all_5_symbols_verification() -> Result<(), Box<dyn std:
         .generate_prefix_batch("Vollständiges Dokument", &chunks)
         .await;
     assert_eq!(prefixes.len(), 2);
-    assert_eq!(prefixes[0].as_ref().unwrap(), "Dies ist ein Kontext-Präfix.");
-    assert_eq!(prefixes[1].as_ref().unwrap(), "Dies ist ein Kontext-Präfix.");
+    assert_eq!(
+        prefixes[0].as_ref().unwrap(),
+        "Dies ist ein Kontext-Präfix."
+    );
+    assert_eq!(
+        prefixes[1].as_ref().unwrap(),
+        "Dies ist ein Kontext-Präfix."
+    );
 
     // Symbol 2: with_concurrency
     let embedder = OllamaEmbedder::new(&server_url, "nomic-embed-text").with_concurrency(16);

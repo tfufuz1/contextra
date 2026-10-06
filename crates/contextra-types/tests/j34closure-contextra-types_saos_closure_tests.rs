@@ -101,10 +101,7 @@ fn test_j34closure_query_options_builder_alias_parity() {
     );
     assert_eq!(options.filter, Some(filter));
     assert_eq!(options.same_community_as, Some(EntityId::new(7)));
-    assert_eq!(
-        options.memory_type_filter,
-        Some(vec![MemoryType::Working])
-    );
+    assert_eq!(options.memory_type_filter, Some(vec![MemoryType::Working]));
     assert!(!options.include_superseded);
     assert!(!options.include_provenance);
     assert_eq!(options.rerank_pool_multiplier, Some(8));

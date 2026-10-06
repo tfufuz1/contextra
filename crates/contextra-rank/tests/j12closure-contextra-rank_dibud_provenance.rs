@@ -13,7 +13,12 @@ fn test_j12closure_dibud_provenance_of() {
     assert!(state.provenance_of(&doc_id).is_none());
 
     state
-        .feed(contextra_rank::BudgetedChannel::Vector, Some(doc_id), |_| 0.5, &budget)
+        .feed(
+            contextra_rank::BudgetedChannel::Vector,
+            Some(doc_id),
+            |_| 0.5,
+            &budget,
+        )
         .unwrap();
 
     let prov = state.provenance_of(&doc_id);

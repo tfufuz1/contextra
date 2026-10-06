@@ -96,7 +96,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_forget",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document or an entire collection with GDPR DeletionProof export.",
+        description: "Delete a single document (tombstone, no DeletionProof) or drop an entire collection (returns a collection-scoped DeletionProof; requires CONTEXTRA_DELETION_PROOF_KEY).",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -228,7 +228,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_delete",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document with HNSW neighborhood graph repair and issue a cryptographic DeletionProof.",
+        description: "Delete a single document (tombstone). No DeletionProof is issued for single documents; use contextra_drop_collection for a collection-scoped proof.",
         input_schema: || json!({
             "type": "object",
             "properties": {

@@ -1,8 +1,8 @@
 #[path = "../src/harness/stub_impls.rs"]
 mod stub_impls;
 
-use stub_impls::{run_stub_impls, run_stub_impls_with_writer, StubGateResult};
 use std::fs;
+use stub_impls::{run_stub_impls, run_stub_impls_with_writer, StubGateResult};
 use tempfile::TempDir;
 
 fn create_test_env(source_code: &str) -> TempDir {
@@ -22,17 +22,18 @@ fn create_test_env(source_code: &str) -> TempDir {
 
 fn run_and_parse(temp_dir: &TempDir) -> StubGateResult {
     let root_path = temp_dir.path().to_str().unwrap().to_string();
-    let args = vec![
-        "--root".to_string(),
-        root_path,
-        "--json".to_string(),
-    ];
+    let args = vec!["--root".to_string(), root_path, "--json".to_string()];
 
     let mut buf = Vec::new();
     let _code = run_stub_impls_with_writer(&args, &mut buf);
     let json_str = String::from_utf8(buf).unwrap();
 
-    serde_json::from_str(&json_str).unwrap_or_else(|e| panic!("Failed to parse JSON output: {}\nOutput was:\n{}", e, json_str))
+    serde_json::from_str(&json_str).unwrap_or_else(|e| {
+        panic!(
+            "Failed to parse JSON output: {}\nOutput was:\n{}",
+            e, json_str
+        )
+    })
 }
 
 #[test]

@@ -29,8 +29,7 @@ fn test_unregistered_group_returns_error() {
 #[test]
 fn test_registered_then_revoked_group_returns_ok_true() {
     let master_km = Arc::new(
-        KeyManager::try_new("test-passphrase", b"test-salt")
-            .expect("Failed to create KeyManager"),
+        KeyManager::try_new("test-passphrase", b"test-salt").expect("Failed to create KeyManager"),
     );
     let registry = Arc::new(KeyRegistry::new());
     let config = KvSegmentConfig {
@@ -45,7 +44,10 @@ fn test_registered_then_revoked_group_returns_ok_true() {
 
     // Revoke group 7 through normal path (delete_segment).
     let revoked = manager.delete_segment(7);
-    assert!(revoked, "delete_segment should return true for registered active key");
+    assert!(
+        revoked,
+        "delete_segment should return true for registered active key"
+    );
 
     // Calling generate_deletion_proof for revoked group 7 should return Ok(true).
     let proof_result = manager.generate_deletion_proof(7);

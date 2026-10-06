@@ -64,7 +64,9 @@ fn test_j31closure_remove_terms_cache_eviction() {
     // Remove doc_1 across terms
     index.remove_terms(doc_1, &[term_a.clone(), term_b.clone()]);
 
-    let list_a = index.get(&term_a).expect("term_a should still exist for doc_2");
+    let list_a = index
+        .get(&term_a)
+        .expect("term_a should still exist for doc_2");
     assert_eq!(list_a.len(), 1);
     assert_eq!(list_a.as_slice()[0].doc_id(), doc_2);
 

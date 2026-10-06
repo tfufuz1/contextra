@@ -1,10 +1,7 @@
 use contextra_core::{Result, TxId};
 use contextra_store::{
     sstable::{BlockBuilder, SstableBuilder},
-    wal::{
-        hmac::LegacyKeyStatus,
-        Wal, WalEntry, WalOp,
-    },
+    wal::{hmac::LegacyKeyStatus, Wal, WalEntry, WalOp},
 };
 use tempfile::tempdir;
 

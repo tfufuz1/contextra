@@ -16,7 +16,14 @@ fn test_session_branch_tree_dag_operations_integration() {
     assert_eq!(tree.active_head(), 1);
 
     let step2 = tree
-        .branch_from(step1, "Prompt 2 alt".into(), "Resp 2 alt".into(), None, vec![], "explore")
+        .branch_from(
+            step1,
+            "Prompt 2 alt".into(),
+            "Resp 2 alt".into(),
+            None,
+            vec![],
+            "explore",
+        )
         .unwrap();
     assert_eq!(step2, 2);
     assert_eq!(tree.active_head(), 1);

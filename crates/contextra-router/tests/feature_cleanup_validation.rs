@@ -111,7 +111,10 @@ async fn test_adr_n16_router_bandit_execution_without_noop_flags() {
 
     // 2. Verify propensity score retrieval before consuming decision
     let propensity = router.bandit_decision_propensity(decision.decision_id);
-    assert!(propensity.is_some(), "Propensity should be available for pending decision");
+    assert!(
+        propensity.is_some(),
+        "Propensity should be available for pending decision"
+    );
     assert!(propensity.unwrap() > 0.0);
 
     // 3. Record outcome to verify bandit update

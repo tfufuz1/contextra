@@ -1,8 +1,8 @@
 //! Integration tests for J01 contextra-agent scratchpad & context symbol wiring.
 
 use contextra_agent::clm_scratchpad::{
-    ClmScratchpad, CountingContextEditAuditSink, CountingScratchpadCacheInvalidator, PinnedRegionId,
-    ScratchpadEditOp,
+    ClmScratchpad, CountingContextEditAuditSink, CountingScratchpadCacheInvalidator,
+    PinnedRegionId, ScratchpadEditOp,
 };
 use contextra_agent::context::{AgentContext, AgentEngine};
 use contextra_agent::event_source::BackgroundEvent;
@@ -16,7 +16,8 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn test_scratchpad_builder_and_context_symbol_wiring() -> contextra_types::Result<()> {
     let temp_dir = TempDir::new()?;
-    let db = Arc::new(Contextra::open_with_config(temp_dir.path(), ContextraConfig::default()).await?);
+    let db =
+        Arc::new(Contextra::open_with_config(temp_dir.path(), ContextraConfig::default()).await?);
     let state_coll = db.collection("j01_scratchpad_state").await?;
 
     let audit_sink = Arc::new(CountingContextEditAuditSink::new());
@@ -75,7 +76,10 @@ async fn test_scratchpad_builder_and_context_symbol_wiring() -> contextra_types:
     let step1 = StepId::new(1);
     let directive1 = engine.run(&mut ctx, step1, "System_Prompt_Node");
     assert!(matches!(directive1, CacheDirective::Pin { ttl: None }));
-    assert_eq!(ctx.get_cache_directive(), &CacheDirective::Pin { ttl: None });
+    assert_eq!(
+        ctx.get_cache_directive(),
+        &CacheDirective::Pin { ttl: None }
+    );
 
     let step2 = StepId::new(2);
     let directive2 = engine.run(&mut ctx, step2, "Transient_Reasoning_Node");
@@ -91,7 +95,10 @@ async fn test_scratchpad_builder_and_context_symbol_wiring() -> contextra_types:
 
     // 3. directive_for_node direct call
     let direct_directive = ctx.directive_for_node("System_Prompt_Node", StepId::new(3));
-    assert!(matches!(direct_directive, CacheDirective::Pin { ttl: None }));
+    assert!(matches!(
+        direct_directive,
+        CacheDirective::Pin { ttl: None }
+    ));
 
     // 4. try_attach_event
     let event = BackgroundEvent {

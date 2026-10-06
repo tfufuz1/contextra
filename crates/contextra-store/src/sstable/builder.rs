@@ -229,11 +229,6 @@ impl SstableBuilder {
         Ok(builder)
     }
 
-    /// Returns the estimated current total SSTable size written so far.
-    pub fn current_size(&self) -> u64 {
-        self.offset.saturating_add(self.block_builder.current_size() as u64)
-    }
-
     pub async fn create_with_key_manager(
         path: impl AsRef<Path>,
         key_manager: Option<Arc<KeyManager>>,
@@ -278,11 +273,6 @@ impl SstableBuilder {
     pub fn set_format_version(&mut self, version: u16) {
         self.format_version = version;
         self.block_builder = BlockBuilder::new_with_version(BLOCK_SIZE, version);
-    }
-
-    /// Returns the estimated current byte size of the SSTable being built.
-    pub fn current_size(&self) -> u64 {
-        self.offset.saturating_add(self.block_builder.current_size() as u64)
     }
 
     /// Adds a key-value pair to the SSTable being built.

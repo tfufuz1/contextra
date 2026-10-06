@@ -380,7 +380,8 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let ram_idx = self.hot
+        let ram_idx = self
+            .hot
             .arena
             .allocate_node(prepared.new_layer, m, &prepared.final_connections)
             .unwrap_or_else(|_| prepared.new_idx.saturating_sub(mmap_count));

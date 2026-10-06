@@ -37,9 +37,7 @@ fn test_unactivated_local_and_default_production_path() {
     // Test unactivated_local
     let unactivated_gate = SignedLicenseGate::unactivated_local(None);
     assert!(unactivated_gate.check_ring(FeatureRing::Fast).is_ok());
-    assert!(unactivated_gate
-        .check_ring(FeatureRing::Sovereign)
-        .is_err());
+    assert!(unactivated_gate.check_ring(FeatureRing::Sovereign).is_err());
 }
 
 #[test]

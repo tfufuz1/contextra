@@ -335,7 +335,12 @@ pub fn blast_radius_get_affected_crates(
     };
 
     let mut root_changed = false;
-    let root_files = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "capabilities.toml"];
+    let root_files = [
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        "capabilities.toml",
+    ];
     for file in &changed_files {
         if root_files.contains(&file.as_str()) {
             root_changed = true;

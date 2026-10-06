@@ -8,7 +8,9 @@ use contextra_cognition::{
 };
 use contextra_engine::collection::Collection;
 use contextra_graph::CsrGraph;
-use contextra_ports::{BoxFuture, ContextChunk, GroundingAssessment, GroundingValidator, LlmTextGenerator};
+use contextra_ports::{
+    BoxFuture, ContextChunk, GroundingAssessment, GroundingValidator, LlmTextGenerator,
+};
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TokenBudget};
 use contextra_vector::HnswIndex;
@@ -99,17 +101,18 @@ async fn test_start_consolidation_worker_full_wiring() {
     cancel_token.cancel();
 
     let res = worker_handle.await;
-    assert!(res.is_ok(), "consolidation worker full should exit cleanly on cancellation");
+    assert!(
+        res.is_ok(),
+        "consolidation worker full should exit cleanly on cancellation"
+    );
 }
 
 #[test]
 fn test_context_manager_relevance_threshold_wiring() {
-    let mgr = ContextManager::with_defaults()
-        .with_relevance_threshold(0.85);
+    let mgr = ContextManager::with_defaults().with_relevance_threshold(0.85);
     assert_eq!(mgr.relevance_threshold(), 0.85);
 
-    let mgr2 = ContextManager::new(TokenBudget::default())
-        .with_threshold(0.65);
+    let mgr2 = ContextManager::new(TokenBudget::default()).with_threshold(0.65);
     assert_eq!(mgr2.relevance_threshold(), 0.65);
 }
 

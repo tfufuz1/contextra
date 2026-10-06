@@ -39,8 +39,7 @@ use contextra_store::{
     },
     kv::{KvDeleteMode, KvSegmentConfig, KvSegmentManager},
     lsm::{
-        AsyncObserverAdapter, CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry,
-        WalObserver,
+        AsyncObserverAdapter, CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalObserver,
     },
     memtable::MemTable,
     sstable::BlockCache,
@@ -137,14 +136,7 @@ fn test_compaction_engine_with_adaptive_planner_symbol() {
     }));
     let config = CompactionConfig::default();
 
-    let engine = CompactionEngine::new(
-        config,
-        snapshot_registry,
-        block_cache,
-        None,
-        budget,
-        None,
-    );
+    let engine = CompactionEngine::new(config, snapshot_registry, block_cache, None, budget, None);
 
     // Symbol 5: with_adaptive_planner
     let planner: Arc<dyn AdaptiveCompactionPlanner> = Arc::new(DummyAdaptivePlanner);
@@ -165,9 +157,12 @@ async fn test_lsm_storage_and_observer_symbols() {
 
     // Symbol 6: has_pending_legacy_wal_migration
     // Symbol 7: migrate_legacy_wal_keys
-    let migrated = LsmStorage::migrate_legacy_wal_keys(&lsm_config, Arc::clone(&clock) as Arc<dyn contextra_ports::Clock>)
-        .await
-        .expect("migrate_legacy_wal_keys should succeed on empty dir");
+    let migrated = LsmStorage::migrate_legacy_wal_keys(
+        &lsm_config,
+        Arc::clone(&clock) as Arc<dyn contextra_ports::Clock>,
+    )
+    .await
+    .expect("migrate_legacy_wal_keys should succeed on empty dir");
     assert_eq!(migrated, 0);
 
     // Symbol 8: open_with_merge_operator
@@ -193,7 +188,10 @@ async fn test_lsm_storage_and_observer_symbols() {
     assert!(rx.await.unwrap());
 
     // Symbol 11: force_flush
-    storage.force_flush().await.expect("force_flush should succeed");
+    storage
+        .force_flush()
+        .await
+        .expect("force_flush should succeed");
 
     // Symbol 15: point_lookup_metrics
     let tx_id = TxId(101);

@@ -92,8 +92,8 @@ impl Contextra {
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
 
-        let auto_cfg = AutoExtractionConfig::for_regulated(false)
-            .with_mode(AutoExtractionMode::Enabled);
+        let auto_cfg =
+            AutoExtractionConfig::for_regulated(false).with_mode(AutoExtractionMode::Enabled);
         col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
@@ -210,8 +210,8 @@ impl Contextra {
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
 
-        let auto_cfg = AutoExtractionConfig::for_regulated(false)
-            .with_mode(AutoExtractionMode::Enabled);
+        let auto_cfg =
+            AutoExtractionConfig::for_regulated(false).with_mode(AutoExtractionMode::Enabled);
         col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
@@ -290,6 +290,12 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.
+    ///
+    /// # Limitations / Non-Guarantees
+    /// - Does NOT guarantee immediate physical purge or removal of SSTable files, WAL segments, HNSW index files, or CSR graph data files from disk storage.
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
+    /// - Attests strictly to logical deletion (tombstones committed and verified empty in active MemTable/LSM key space scans).
     #[tracing::instrument(level = "trace", skip(self, proof_key))]
     pub async fn drop_collection(
         &self,
@@ -363,21 +369,21 @@ impl Contextra {
             tenant_id,
         };
 
-        let layer_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::LsmMemtable,
-                remaining_col_data.len(),
-            ),
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::SsTableAllLevels,
-                remaining_txt_data.len(),
-            ),
-        ]
+        // LSM deletion via `delete_prefix` is tombstone-only.
+        // Post-commit prefix scans verify logical key space emptiness in active MemTable / LSM state.
+        // SSTable compaction and WAL truncation are asynchronous background operations; existing SSTable files
+        // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
+        // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
+        // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
+        let layer_proofs = vec![LayerCleanupProof::new_after_verified_empty(
+            DeletionLayer::LsmMemtable,
+            remaining_col_data.len() + remaining_txt_data.len(),
+        )]
         .into_iter()
         .collect::<Result<Vec<_>>>()
         .map_err(|e| {
             contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
+                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
                 tx.inner()
             ))
         })?;
@@ -392,7 +398,7 @@ impl Contextra {
         )
         .map_err(|e| {
             contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
+                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
                 tx.inner()
             ))
         })?;
@@ -416,7 +422,10 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn purge_tenant(&self, tenant_id: TenantId) -> Result<()> {
         // 0. Query collections for tenant to log and inspect before purge
-        let _tenant_cols = self.list_collections_for_tenant(tenant_id).await.unwrap_or_default();
+        let _tenant_cols = self
+            .list_collections_for_tenant(tenant_id)
+            .await
+            .unwrap_or_default();
 
         // 1. Notify KV lifecycle hooks on Contextra and across active collections
         if let Some(hooks) = self.kv_hooks() {

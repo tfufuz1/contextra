@@ -112,7 +112,8 @@ fn test_gate_guard_canary_scope_guard_defect() {
 
     // Defect: out-of-scope file
     fs::create_dir_all(root.join("xtask")).expect("failed to create xtask dir");
-    fs::write(root.join("xtask/forbidden.rs"), "fn forbidden() {}\n").expect("failed to write forbidden.rs");
+    fs::write(root.join("xtask/forbidden.rs"), "fn forbidden() {}\n")
+        .expect("failed to write forbidden.rs");
     commit_changes(root, "feat: forbidden edit");
 
     let root_str = root.to_string_lossy().to_string();
@@ -140,7 +141,8 @@ fn test_gate_guard_canary_protected_paths_defect() {
     let root = temp_dir.path();
 
     // Defect: protected file touched without authorization
-    fs::write(root.join("governance/protected-paths.toml"), "# modified\n").expect("failed to modify protected file");
+    fs::write(root.join("governance/protected-paths.toml"), "# modified\n")
+        .expect("failed to modify protected file");
     commit_changes(root, "chore: modify protected paths");
 
     let root_str = root.to_string_lossy().to_string();

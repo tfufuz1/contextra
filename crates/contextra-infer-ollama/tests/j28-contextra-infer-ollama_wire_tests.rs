@@ -36,7 +36,9 @@ async fn test_wire_generate_prefix_batch() {
     let client = OllamaClient::new(server_url);
     let engine = ContextPrefixEngine::new(client, ContextPrefixConfig::default());
     let chunks = vec!["Chunk A", "Chunk B"];
-    let results = engine.generate_prefix_batch("Volltext Dokument", &chunks).await;
+    let results = engine
+        .generate_prefix_batch("Volltext Dokument", &chunks)
+        .await;
 
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].as_ref().unwrap(), "Batch-Präfix");

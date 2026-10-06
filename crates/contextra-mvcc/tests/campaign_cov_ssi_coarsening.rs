@@ -18,8 +18,8 @@ fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     // Create an active snapshot at seq 0 to hold back pruning
     let snap = registry.register(0);
 
-    let validator = SequenceLogSsiValidator::new_with_bounds(10)
-        .with_snapshot_registry(registry.clone());
+    let validator =
+        SequenceLogSsiValidator::new_with_bounds(10).with_snapshot_registry(registry.clone());
 
     // Record keys up to 80% threshold (8 keys)
     for i in 0..10 {
@@ -29,7 +29,10 @@ fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
 
     // 1. Verify diagnose_pruning_blocker returns active blocker info
     let blocker_info = validator.diagnose_pruning_blocker();
-    assert!(blocker_info.is_some(), "Expected pruning blocker diagnostic info");
+    assert!(
+        blocker_info.is_some(),
+        "Expected pruning blocker diagnostic info"
+    );
     let info = blocker_info.expect("PruningBlockerInfo");
     assert!(info.tracked_commit_keys > 0);
     assert!(info.min_unpruned_seq > 0);
