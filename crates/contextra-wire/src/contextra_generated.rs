@@ -98,7 +98,11 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }
+                unsafe {
+                    self._tab
+                        .get::<i8>(Embedding::VT_METRIC, Some(0))
+                        .unwrap_or_default()
+                }
             }
         }
 
@@ -255,7 +259,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<f32>(ScoredDocument::VT_SCORE, Some(0.0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -445,7 +449,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -456,7 +460,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
 
@@ -790,7 +794,11 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }
+                unsafe {
+                    self._tab
+                        .get::<u32>(RoleId::VT_ID, Some(0))
+                        .unwrap_or_default()
+                }
             }
         }
 
@@ -887,7 +895,11 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }
+                unsafe {
+                    self._tab
+                        .get::<u64>(HyperEdgeId::VT_ID, Some(0))
+                        .unwrap_or_default()
+                }
             }
         }
 
@@ -988,7 +1000,11 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }
+                unsafe {
+                    self._tab
+                        .get::<u32>(RoleBinding::VT_ROLE, Some(0))
+                        .unwrap_or_default()
+                }
             }
             #[inline]
             pub fn entity(&self) -> u64 {
@@ -998,7 +1014,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u64>(RoleBinding::VT_ENTITY, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
         }
@@ -1128,7 +1144,11 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }
+                unsafe {
+                    self._tab
+                        .get::<u64>(HyperEdge::VT_ID, Some(0))
+                        .unwrap_or_default()
+                }
             }
             #[inline]
             pub fn predicate(&self) -> u8 {
@@ -1138,7 +1158,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u8>(HyperEdge::VT_PREDICATE, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1163,7 +1183,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1174,7 +1194,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1185,7 +1205,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1196,7 +1216,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1207,7 +1227,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
@@ -1218,7 +1238,7 @@ pub mod contextra {
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0))
-                        .unwrap()
+                        .unwrap_or_default()
                 }
             }
             #[inline]
