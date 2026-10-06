@@ -27,6 +27,13 @@ impl Wal {
         file_size: u64,
     ) -> Option<ContextraError> {
         match e {
+            // TODO(Implementer): [P01 / F-02 & F-04 / HIGH & MEDIUM / JULES-P01-02]
+            // Differenzierung zwischen CRC32-Fehlern am physischen Dateiende (Torn Write) und Bitrot in Dateimitte (I-3):
+            // Aktuell wird jeder CrcMismatch bedingungslos als harter `wal_corruption`-Fehler gewertet.
+            // Tritt der CrcMismatch jedoch am physischen Dateiende auf (`pos >= file_size`), liegt ein partieller
+            // Tail Write (Crash mitten im Schreiben) vor, der sauber abgeschnitten (truncation warning) und
+            // bis zum letzten validen HMAC-Frame recovered werden muss.
+            // Nur CRC-Fehler VOR dem physischen Dateiende dürfen als harte Bitrot-Korruption (`wal_corruption`) ablehnen!
             WalParseError::CrcMismatch { stored, computed } => {
                 Some(ContextraError::wal_corruption(
                     chunk_start_pos,
@@ -761,6 +768,11 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                     ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
                 })?;
             }
+            // TODO(Implementer): [P01 / F-05 / MEDIUM]
+            // Directory Fsync Discipline (Invariante I-6):
+            // Nach dem Umbenennen (`rename`) bzw. Löschen (`remove_file`) der `.bak`-Datei fehlt der
+            // Verzeichnis-Fsync (`crate::util::fsync_parent_dir(wal_path).await?`), wodurch der Verzeichniseintrag
+            // nach Stromausfall verloren gehen kann. Zwingend Verzeichnis synchronisieren.
             return Ok(true);
         }
     }

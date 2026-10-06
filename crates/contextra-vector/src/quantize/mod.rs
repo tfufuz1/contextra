@@ -168,6 +168,11 @@ impl ScalarQuantizer {
     }
 
     /// Creates a new ScalarQuantizer trained on a batch of vectors with custom percentile bounds.
+    // TODO(Implementer): [P03 / F-03 / HIGH / JULES-P03-03]
+    // Stiller Rückfall auf Null-Skalierungs-Dummy-Quantisierer bei Schulungsfehlern (Invariante I-6, I-8):
+    // `unwrap_or_else` verschluckt Dimensionsmismatches oder NaN/Inf-Werte und erzeugt einen unbrauchbaren
+    // Standard-[0.0, 1.0]-Quantisierer, was zu massivem Recall-Einbruch führt.
+    // Methode als deprecated markieren oder Fehler per `Result<Self, ContextraError>` (`try_train_with_percentiles`) erzwingen.
     pub fn train_with_percentiles(
         batch: &[&[f32]],
         dimension: usize,
@@ -191,6 +196,9 @@ impl ScalarQuantizer {
     /// quantizer (e.g., during index rebuilds) using a representative sample of active vectors.
     /// Without recalibration, new vectors that fall outside the initial range will be clamped,
     /// leading to degraded quantization accuracy.
+    // TODO(Implementer): [P03 / F-03 / HIGH / JULES-P03-03]
+    // Siehe oben: `train` darf Fehler nicht stumm verschlucken. Aufrufer müssen `try_train` nutzen
+    // und ungültige Eingaben (NaN, falsche Dimensionen) als Fehler behandeln.
     pub fn train(batch: &[&[f32]], dimension: usize) -> Self {
         Self::try_train(batch, dimension).unwrap_or_else(|_| Self {
             mins: vec![0.0; dimension],

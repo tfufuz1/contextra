@@ -44,6 +44,11 @@ pub struct WasmCapabilities {
     pub max_stdin_bytes: usize,
     /// Seed für deterministisches `random_get`. Default: `None` (`random_get` liefert `NOSYS`).
     pub random_seed: Option<u64>,
+    // TODO(#JULES-P05-02, Implementer): [P05 / F-02 / HIGH]
+    // Konfigurationsfelder für WASM-Modulverifikation ergänzen:
+    // z.B. `pub allowed_module_hashes: Option<std::collections::HashSet<[u8; 32]>>`,
+    // und/oder `pub trusted_verifying_key: Option<ed25519_dalek::VerifyingKey>`,
+    // um nicht-autorisierte WASM-Module vor der Ausführung in `WasmExecutor` abzufangen.
 }
 
 impl Default for WasmCapabilities {

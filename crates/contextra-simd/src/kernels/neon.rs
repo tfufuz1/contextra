@@ -8,6 +8,13 @@ use std::arch::aarch64::*;
 #[cfg(target_arch = "aarch64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
+// TODO(Implementer): [P05 / F-01 / HIGH / JULES-P05-01]
+// Erforderliche `// SAFETY:`-Dokumentation ergänzen:
+// 1. Aufrufer muss garantieren, dass die Zielarchitektur aarch64 ist und "neon" unterstützt.
+// 2. `a` und `b` müssen gleiche Länge haben; unaligned loads (`vld1q_f32`) erfordern gültigen
+//    Speicherzugriff im Bereich `[i..i+4]`.
+// 3. Alle internen `unsafe {}`-Blöcke in dieser Datei mit expliziten SAFETY-Kommentaren versehen,
+//    damit `cargo xtask unsafe-audit` ohne Findings durchläuft.
 pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;

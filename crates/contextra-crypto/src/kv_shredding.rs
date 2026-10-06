@@ -197,6 +197,11 @@ impl KeyRegistry {
     }
 
     /// Checks if a group is revoked.
+    // TODO(#JULES-P04-1, Implementer): [P04 / F-3 / CRITICAL & Phase D]
+    // 1. Durability/Fail-Closed: Sicherstellen, dass bei fehlgeschlagenem Log-Reopen oder korruptem
+    //    RevocationLog keine Entschlüsselung von geshreddeten Datensätzen möglich ist (fail-closed).
+    // 2. Phase D Optimierung: Lock-freie Prüfung per `ArcSwap<HashSet<u64>>` oder Atomic-Bitset erwägen,
+    //    um RwLock-Contention im heißen Lesepfad von `is_group_revoked` zu eliminieren.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
         if let Some(ref log) = self.revocation_log {
             if log.is_revoked(&RevocationTarget::Group(group_id)) {

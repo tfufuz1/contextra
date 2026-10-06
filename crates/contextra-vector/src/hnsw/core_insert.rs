@@ -380,6 +380,13 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
+        // TODO(Implementer): [P03 / F-01 / CRITICAL / JULES-P03-01]
+        // Panic- und Korruptionsanfälligkeit in Arena Allocation (Invariante I-8 / Zero-Panic Guarantee):
+        // `allocate_node` schlägt bei Kapazitätsüberschreitung fehl. Durch `unwrap_or_else` wird ein unallozierter
+        // Ersatzindex (`prepared.new_idx.saturating_sub(mmap_count)`) vergeben, obwohl kein Speicher in der Arena
+        // reserviert wurde. Folgende Zugriffe greifen out-of-bounds zu und panizen.
+        // Der Fehler MUSS per `Result<DocId, ContextraError>` via `?` nach oben propagiert werden!
+        // Niemals einen unallozierten Fallback-Index verwenden.
         let ram_idx = self
             .hot
             .arena

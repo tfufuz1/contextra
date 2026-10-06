@@ -295,6 +295,13 @@ impl HnswIndex {
         let mut ghost_pointers = 0usize;
         let mut inspected_nodes = 0usize;
 
+        // TODO(Implementer): [P03 / F-02 / HIGH / JULES-P03-02]
+        // Unvollständige Ghost-Pointer-Verifikation durch vorzeitigen Budget-Abbruch im linearen Scan (INV-DELETION-2):
+        // Aktuell iteriert der Scan sequentiell über `0..total_nodes` und bricht mit `break` ab, sobald
+        // `inspected_nodes >= budget`. Verbleibende Ghost-Pointer jenseits von `budget` werden übersehen,
+        // was zu falsch-positiver Bestätigung der Zeigerfreiheit führt.
+        // Soll: Gezielte BFS/DFS-Traversierung der 2.-Ordnungs-Nachbarschaft des reparierten Knotens durchführen,
+        // anstatt den linearen Indexraum ab 0 unvollständig zu scannen.
         for i in 0..total_nodes {
             if inspected_nodes >= budget {
                 break;

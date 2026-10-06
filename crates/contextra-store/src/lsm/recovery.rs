@@ -543,6 +543,11 @@ impl LsmStorage {
                 .await;
         });
 
+        // TODO(Implementer): [P02 / F-01 / CRITICAL / JULES-P02-01]
+        // TxBuffer-Anbindung für CompactionEngine (Invariante I-2):
+        // `CompactionEngine` benötigt Zugriff auf `tx_buffer` (oder eine Watermark-Provider-Abstraktion),
+        // damit die Kompaktion aktive MVCC-Lesetransaktionen aus `TxBuffer::min_read_snapshot()` berücksichtigt
+        // und keine Daten löscht, die von laufenden Abfragen noch benötigt werden.
         let mut compaction_engine_builder = CompactionEngine::new(
             config.compaction.clone(),
             Arc::clone(&snapshot_registry),

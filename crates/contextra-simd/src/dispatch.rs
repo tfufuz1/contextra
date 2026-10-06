@@ -14,6 +14,11 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
         });
     }
 
+    // TODO(#JULES-P05-01, Implementer): [P05 / F-01 / HIGH]
+    // Systematisches Fehlen von `// SAFETY:`-Kommentaren in `contextra-simd` (Invariante I-2 / INV-SYS-UNSAFE-SAFETY-DOC):
+    // Alle `unsafe {}`-Blöcke und `unsafe fn`-Aufrufe in `dispatch.rs` und den Kernel-Modulen müssen mit strukturierten
+    // `// SAFETY:`-Kommentaren dokumentiert werden, welche die CPU-Feature-Erkennung (z.B. avx512f, avx2+fma, neon)
+    // sowie die Gleichheit der Slice-Längen (`a.len() == b.len()`) explizit als Aufrufer-Garantie belegen.
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {

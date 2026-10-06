@@ -60,6 +60,11 @@ pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
 }
 
 /// KeyPair for Ed25519 signing and verification of DeletionProofs (version 3).
+// TODO(#JULES-P04-4, Implementer): [P04 / F-4 / HIGH]
+// DeletionProofKeyPair versäumt RAM-Zeroization (`ZeroizeOnDrop`) für Ed25519-Privatschlüssel (I-6):
+// Secret Key-Material des Ed25519-Signierschlüssels verbleibt beim Drop unbereinigt im Speicher.
+// `DeletionProofKeyPair` muss mit `#[derive(Zeroize, ZeroizeOnDrop)]` annotiert bzw. mit manuellem
+// `Drop`-Handler ausgestattet werden, der das Schlüsselmaterial (`signing_key.to_bytes()`) überschreibt.
 #[derive(Debug)]
 pub struct DeletionProofKeyPair {
     signing_key: ed25519_dalek::SigningKey,
@@ -364,6 +369,11 @@ impl DeletionProof {
             &[]
         };
 
+        // TODO(#JULES-P04-2, Implementer): [P04 / F-1 / HIGH]
+        // Unvollständige Signatur-Payload-Bindung bei Version 2 HMAC DeletionProof:
+        // `timestamp` (und ggf. `audit_chain_position`) sind nicht in compute_hmac_sha256 eingebunden!
+        // Der Erstellungspfad muss `timestamp.to_le_bytes()` in die HMAC-Eingabe aufnehmen, damit
+        // Zeitstempel nicht unbemerkt manipuliert werden können.
         let signature = compute_hmac_sha256(
             proof_key,
             &[
@@ -595,6 +605,12 @@ impl DeletionProof {
                 } else {
                     &[]
                 };
+                // TODO(#JULES-P04-2, Implementer): [P04 / F-1 / HIGH]
+                // DeletionProof::verify() muss für SignatureVersion::V2 den Zeitstempel (und Metadaten)
+                // im HMAC prüfen (`self.timestamp.to_le_bytes()`).
+                // Zudem: [P04 / F-5 & F-6 / MEDIUM]
+                // F-5: Schlüsselrotation entwertet Alt-HMAC-Beweise; historisierte Schlüsselregistratur unterstützen.
+                // F-6: Strikte Bindung von SignatureVersion an den Key-Typ gegen Downgrade-Angriffe.
                 let expected = compute_hmac_sha256(
                     proof_key,
                     &[

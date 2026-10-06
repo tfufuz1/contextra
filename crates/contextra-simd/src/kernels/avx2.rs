@@ -10,6 +10,13 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
+// TODO(#JULES-P05-01, Implementer): [P05 / F-01 / HIGH]
+// Erforderliche `// SAFETY:`-Dokumentation ergänzen:
+// 1. Aufrufer muss garantieren, dass die CPU "avx2" und "fma" unterstützt (via target_feature).
+// 2. `a` und `b` müssen gleiche Länge haben; unaligned loads (`_mm256_loadu_ps`) erfordern gültigen
+//    Speicherzugriff im Bereich `[i..i+8]`.
+// 3. Alle internen `unsafe {}`-Blöcke in dieser Datei mit expliziten SAFETY-Kommentaren versehen,
+//    damit `cargo xtask unsafe-audit` ohne Findings durchläuft.
 pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
