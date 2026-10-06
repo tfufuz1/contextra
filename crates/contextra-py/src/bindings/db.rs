@@ -116,19 +116,40 @@ impl PyContextra {
         })
     }
 
-    /// Drops a collection, removing all its data from storage.
-    pub fn drop_collection(&self, name: &str, py: Python<'_>) -> PyResult<()> {
+    /// Drops a collection, removing all its data from storage and returning a collection-scoped DeletionProof as JSON.
+    ///
+    /// # Key Resolution
+    /// Drops require a valid 32-byte proof key, passed via `proof_key` or configured via the
+    /// `CONTEXTRA_DELETION_PROOF_KEY` environment variable.
+    ///
+    /// # Proof Semantics
+    /// Note: Without the `sovereign` feature chain, the returned proof is HMAC-SHA256 v2 with a stub integrity warning,
+    /// and no physical SSTable/WAL purge is attested.
+    #[pyo3(signature = (name, proof_key=None))]
+    pub fn drop_collection(
+        &self,
+        name: &str,
+        proof_key: Option<&Bound<'_, PyBytes>>,
+        py: Python<'_>,
+    ) -> PyResult<String> {
         validate_collection_name(name)?;
+        let arg_bytes = proof_key.map(|b| b.as_bytes());
+        let env_key = std::env::var("CONTEXTRA_DELETION_PROOF_KEY").ok();
+        let key_bytes = resolve_proof_key(arg_bytes, env_key)?;
+
         let rt = &self.runtime;
         let name_owned = name.to_string();
         let tenant_id = contextra_types::TenantId::SYSTEM;
+        let inner = self.inner.clone();
         run_blocking_ffi(py, &self.poisoned, || {
-            rt.block_on(
-                self.inner
-                    .drop_collection(&name_owned, tenant_id, &[0u8; 32]),
-            )
-            .map(|_| ())
-            .map_err(contextra_err)
+            let proof = rt
+                .block_on(
+                    inner.drop_collection(&name_owned, tenant_id, &key_bytes),
+                )
+                .map_err(contextra_err)?;
+            proof
+                .export_for_audit()
+                .map_err(|e| ContextraValueError::new_err(format!("Failed to export proof JSON: {}", e)))
         })
     }
 
@@ -183,6 +204,114 @@ impl PyContextra {
     }
 }
 
+// ── Key Resolution Helper ──
+
+/// Resolves the deletion proof key from an explicit byte slice or an environment variable value.
+/// Explicit argument takes precedence over the environment variable.
+/// Trims whitespace for environment variable values.
+fn resolve_proof_key(
+    arg: Option<&[u8]>,
+    env: Option<String>,
+) -> PyResult<Vec<u8>> {
+    if let Some(arg_bytes) = arg {
+        if arg_bytes.is_empty() {
+            return Err(ContextraValueError::new_err(
+                "deletion proof key not configured",
+            ));
+        }
+        if arg_bytes.len() < 32 {
+            return Err(ContextraValueError::new_err(
+                "deletion proof key must be at least 32 bytes",
+            ));
+        }
+        return Ok(arg_bytes.to_vec());
+    }
+
+    if let Some(env_str) = env {
+        let trimmed = env_str.trim();
+        if trimmed.is_empty() {
+            return Err(ContextraValueError::new_err(
+                "deletion proof key not configured",
+            ));
+        }
+        let env_bytes = trimmed.as_bytes();
+        if env_bytes.len() < 32 {
+            return Err(ContextraValueError::new_err(
+                "deletion proof key must be at least 32 bytes",
+            ));
+        }
+        return Ok(env_bytes.to_vec());
+    }
+
+    Err(ContextraValueError::new_err(
+        "deletion proof key not configured",
+    ))
+}
+
 // ── Generated CRUD + Batch Methods ──
 contextra_crud_methods!(PyContextra);
 contextra_batch_methods!(PyContextra);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_proof_key_explicit() -> std::result::Result<(), String> {
+        let key = vec![b'a'; 32];
+        let res = resolve_proof_key(Some(&key), None).map_err(|e| e.to_string())?;
+        if res != key {
+            return Err("Expected explicit key".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_proof_key_env_trimmed() -> std::result::Result<(), String> {
+        let env = format!("   {}   ", "b".repeat(32));
+        let res = resolve_proof_key(None, Some(env)).map_err(|e| e.to_string())?;
+        if res != "b".repeat(32).as_bytes() {
+            return Err("Expected trimmed env key".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_proof_key_explicit_overrides_env() -> std::result::Result<(), String> {
+        let explicit = vec![b'a'; 32];
+        let env = "b".repeat(32);
+        let res = resolve_proof_key(Some(&explicit), Some(env)).map_err(|e| e.to_string())?;
+        if res != explicit {
+            return Err("Expected explicit key to override env".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_proof_key_missing() {
+        let err = resolve_proof_key(None, None).unwrap_err().to_string();
+        assert!(err.contains("deletion proof key not configured"));
+    }
+
+    #[test]
+    fn test_resolve_proof_key_whitespace_env() {
+        let err = resolve_proof_key(None, Some("   \t\n ".to_string())).unwrap_err().to_string();
+        assert!(err.contains("deletion proof key not configured"));
+    }
+
+    #[test]
+    fn test_resolve_proof_key_short_explicit() {
+        let secret = "secret_key_12345";
+        let err = resolve_proof_key(Some(secret.as_bytes()), None).unwrap_err().to_string();
+        assert!(err.contains("deletion proof key must be at least 32 bytes"));
+        assert!(!err.contains(secret));
+    }
+
+    #[test]
+    fn test_resolve_proof_key_short_env() {
+        let secret = "secret_env_key";
+        let err = resolve_proof_key(None, Some(secret.to_string())).unwrap_err().to_string();
+        assert!(err.contains("deletion proof key must be at least 32 bytes"));
+        assert!(!err.contains(secret));
+    }
+}
