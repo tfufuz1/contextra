@@ -73,11 +73,7 @@ impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
             return Ok(0);
         }
 
-        let keys_to_use = if self.keys.is_empty() {
-            vec![]
-        } else {
-            self.with_keys(self.keys.clone()).keys
-        };
+        let keys_to_use = self.keys.clone();
 
         self.store.invalidate_prefix_scope_keys(
             scope.tenant_id,
