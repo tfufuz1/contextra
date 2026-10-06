@@ -1,10 +1,8 @@
 // xtask/tests/harness_orphan_symbols_test.rs
 
-#[path = "../src/harness/orphan_symbols.rs"]
-mod orphan_symbols;
-
 use std::fs;
 use tempfile::tempdir;
+use xtask::harness::orphan_symbols;
 
 #[test]
 fn test_orphan_symbols_unreferenced_function() {
@@ -25,6 +23,8 @@ pub fn never_called() {
         "orphan-symbols".to_string(),
         "--root".to_string(),
         root.to_string_lossy().to_string(),
+        "--exclude-crate".to_string(),
+        "none".to_string(),
         "--json".to_string(),
     ];
 
@@ -59,6 +59,8 @@ fn caller() {
         "orphan-symbols".to_string(),
         "--root".to_string(),
         root.to_string_lossy().to_string(),
+        "--exclude-crate".to_string(),
+        "none".to_string(),
         "--json".to_string(),
     ];
 

@@ -636,6 +636,13 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "orphan-symbols"
+owner_tier = "gate-constituent"
+summary = "Findet öffentliche Symbole, die workspace-weit nicht verwendet werden."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
 name = "panic-inventory"
 owner_tier = "report"
 summary = "Subcommand panic-inventory"
