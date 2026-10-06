@@ -101,6 +101,7 @@ pub mod shell_commit_audit;
 pub mod tag_health;
 pub mod validate_pr_checklist;
 pub mod veto_deadline_gate;
+pub mod workspace_index;
 pub mod workspace_verify;
 pub mod ws_cache;
 

@@ -769,6 +769,13 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "scan-common"
+owner_tier = "tool"
+summary = "Gemeinsame Infrastruktur für Dateiklassifikation und Testmodul-Auflösung."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
 name = "workspace-verify"
 owner_tier = "tool"
 summary = "Subcommand workspace-verify"

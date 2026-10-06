@@ -13,6 +13,9 @@ pub use contextra_crypto::deletion_proof::{
 #[cfg(not(feature = "encryption-at-rest"))]
 pub use no_crypto_stubs::*;
 
+/// Bewusster Fallback für Builds ohne `encryption-at-rest`.
+/// Die Methoden loggen statt zu werfen, weil die Signaturen `()` zurückgeben und Aufrufer nicht brechen dürfen.
+/// Siehe auch offene Entscheidung E1.
 #[cfg(not(feature = "encryption-at-rest"))]
 mod no_crypto_stubs {
     use contextra_types::{CollectionId, TenantId, TxId};
@@ -116,11 +119,27 @@ mod no_crypto_stubs {
             Self
         }
 
-        pub fn purge_tenant_segments(&self, _tenant: TenantId) {}
+        pub fn purge_tenant_segments(&self, tenant: TenantId) {
+            tracing::error!(
+                tenant = %tenant,
+                "no-op: built without encryption-at-rest, deletion NOT performed"
+            );
+        }
 
-        pub fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
+        pub fn on_rollback(&self, tenant: TenantId, _chunk_ids: &[u64]) {
+            tracing::error!(
+                tenant = %tenant,
+                "no-op: built without encryption-at-rest, deletion NOT performed"
+            );
+        }
 
-        pub fn remove_tenant_segment(&self, _tenant: TenantId, _doc_id: contextra_types::DocId) {}
+        pub fn remove_tenant_segment(&self, tenant: TenantId, doc_id: contextra_types::DocId) {
+            tracing::error!(
+                tenant = %tenant,
+                doc_id = %doc_id,
+                "no-op: built without encryption-at-rest, deletion NOT performed"
+            );
+        }
     }
 
     impl DeletionProof {
@@ -194,6 +213,22 @@ mod no_crypto_stubs {
         pub fn export_for_audit(&self) -> contextra_types::Result<String> {
             serde_json::to_string_pretty(self)
                 .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_no_crypto_stubs_logging_no_panic() {
+            let store = TenantIsolatedKvStore::new();
+            let tenant = TenantId::try_new(42).unwrap_or_default();
+            let doc_id = contextra_types::DocId::new(100);
+
+            store.purge_tenant_segments(tenant);
+            store.on_rollback(tenant, &[1, 2, 3]);
+            store.remove_tenant_segment(tenant, doc_id);
         }
     }
 }
@@ -571,7 +606,7 @@ impl Contextra {
         Arc::clone(&self.license_gate)
     }
 
-    /// Returns the active KV eviction worker's attention score source if initialized.
+    /// Public observability API: exposes the active KV eviction worker's attention score source for external monitoring integrations. Intentionally has no internal caller.
     pub fn kv_eviction_attention_source(
         &self,
     ) -> Option<Arc<dyn contextra_kvcache::AttentionScoreSource>> {
