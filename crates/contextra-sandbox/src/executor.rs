@@ -180,14 +180,8 @@ impl WasmExecutor {
             )));
         }
 
-        // TODO(#JULES-P05-02, Implementer): [P05 / F-02 / HIGH]
-        // Kryptografische Modul-Verifikation / Allowlist-Prüfung vor Modulkompilierung (I-4, I-6):
-        // Aktuell wird jedes beliebige WASM-Binary kompiliert, sofern die Dateigröße passt.
-        // Bei Agenten-Output unter Prompt-Injection besteht RCE/Sandbox-Missbrauchsrisiko.
-        // Vor `Module::from_binary`:
-        // 1. Prüfen, ob der SHA-256/Blake3-Hash von `wasm_bytes` in einer konfigurierten Modul-Allowlist enthalten ist
-        //    ODER eine Ed25519-Signatur über `wasm_bytes` gegen den konfigurierten Vertrauensanker gültig ist.
-        // 2. Unverifizierte/unbekannte Module mit `Err(SandboxError::InvalidModule(...))` ablehnen.
+        // P05 / F-02 / HIGH: Module Provenance & Authorization Policy check prior to compilation and resource allocation
+        capabilities.verify_module_policy(wasm_bytes)?;
 
         // INV-SBX-1: Offload synchronous Module compilation to spawn_blocking with wall-clock timeout to prevent compilation DoS
         let engine_clone = self.engine.clone();
