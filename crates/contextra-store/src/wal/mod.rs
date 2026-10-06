@@ -1,4 +1,9 @@
-//! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
+//! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
+//! Stand: 2026-10-06
+//! Zweck: Write-Ahead Log (WAL) core structure, lifecycle management, and recovery.
+//! Invarianten:
+//! - I-3 (Crash-Konsistenz): Restores Log up to last HMAC-verified frame.
+//! - I-5 (Poison-State Isolation): Flusher panics in close() are evaluated and propagated as ContextraError::Internal.
 
 pub mod encode;
 pub mod flusher;
@@ -806,12 +811,11 @@ impl Wal {
         };
 
         if let Some(task) = flusher_task {
-            // TODO(Implementer): [P01 / F-06 / MEDIUM]
-            // Unbehandelte JoinHandle-Panik im Flusher-Actor Shutdown (Invariante I-5):
-            // `close()` ignoriert das Ergebnis von `task.await`. Falls der Hintergrund-Flusher paniziert ist,
-            // muss der Fehler als `Err(ContextraError::Internal(format!("WAL flusher panicked: {e}")))`
-            // propagiert werden, anstatt die Panik beim geordneten Herunterfahren still zu verschlucken.
-            let _ = task.await;
+            if let Err(join_err) = task.await {
+                return Err(ContextraError::Internal(format!(
+                    "WAL flusher task panicked: {join_err}"
+                )));
+            }
         }
 
         Ok(())
@@ -847,6 +851,14 @@ impl Wal {
     pub fn was_legacy_rekeyed(&self) -> bool {
         self.was_legacy_rekeyed
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn abort_flusher_for_test(&self) {
+        if let Ok(task_guard) = self.flusher_task.lock() {
+            if let Some(task) = task_guard.as_ref() {
+                task.abort();
+            }
+        }
     }
 
     /// Recovers a poisoned `Wal` handle after a suspected torn write event.
