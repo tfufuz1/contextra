@@ -109,7 +109,7 @@ async fn test_filtered_search_selectivity_recall() {
 
     for (label, modulus, target_rem) in selectivities {
         let predicate =
-            Arc::new(move |id: DocId| id.inner() % (modulus as u128) == target_rem as u128);
+            Arc::new(move |id: DocId| (id.inner() as u128) % (modulus as u128) == target_rem as u128);
 
         let mut query_rng = SimpleRng::new(54321);
         let mut std_hits = 0;
