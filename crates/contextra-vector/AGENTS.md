@@ -55,6 +55,9 @@ tokio::spawn(async move { ... });
 cargo test -p contextra-vector --locked
 cargo test -p contextra-vector --features experimental-diskann
 cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-vector
+cargo xtask check-ring0-async-purity
+cargo xtask check-unsafe-islands
 ```
 
 ## 7. Bekannte Lücken / SOLL

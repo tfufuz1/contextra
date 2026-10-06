@@ -36,8 +36,12 @@ Gewährleistet den lizenzfreien Betrieb im Open-Source-Fast-Ring, während höhe
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-license`
-- `cargo check -p contextra-license`
+```bash
+cargo test -p contextra-license
+cargo check -p contextra-license
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-license
+```
 
 ## 7. Bekannte Lücken / SOLL
 

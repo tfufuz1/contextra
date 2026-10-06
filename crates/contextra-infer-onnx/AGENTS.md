@@ -30,9 +30,13 @@ Stellt lokale, offline-fähige Vektor-Einbettungen und Cross-Encoder-Reranking b
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-infer-onnx --locked`
-- `cargo test -p contextra-infer-onnx --test onnx_embedder_test`
-- `cargo test -p contextra-infer-onnx --test reranker_adversarial_test`
+```bash
+cargo test -p contextra-infer-onnx --locked
+cargo test -p contextra-infer-onnx --test onnx_embedder_test
+cargo test -p contextra-infer-onnx --test reranker_adversarial_test
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-infer-onnx
+```
 
 ## 7. Bekannte Lücken / SOLL
 

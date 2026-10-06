@@ -37,8 +37,13 @@ Ordnet kryptographische Primitiven den BSI-Grundschutz- und TR-02102-Richtlinien
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-audit-export`
-- `cargo check -p contextra-audit-export`
+```bash
+cargo test -p contextra-audit-export
+cargo check -p contextra-audit-export
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-audit-export
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 

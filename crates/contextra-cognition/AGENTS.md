@@ -1,10 +1,12 @@
 # AGENTS.md — contextra-cognition
 > Ring 3 · stable · Quelle: capabilities.toml · Spec: K.6, III.15
 
-1. Zweck
+## 1. Zweck
+
 Implementiert die Kognitions-Pipeline für Gedächtniskonsolidierung, Near-Duplicate-Detection, Turn-Segmentierung, Kontextkomprimierung (`ContextCompactor`) und synthetische Zusammenfassungsdurchläufe (`SynthesisPhaseResult`). Steuert den Konsolidierungs-Lebenszyklus und Wartungszeitpläne (`MaintenanceScheduler`).
 
-2. Modul-Karte
+## 2. Modul-Karte
+
 | Datei / Verzeichnis | Verantwortung |
 |---|---|
 | `src/lib.rs` | `#![forbid(unsafe_code)]`, Re-Exports, Facade für Konsolidierungspässe |
@@ -22,20 +24,32 @@ Implementiert die Kognitions-Pipeline für Gedächtniskonsolidierung, Near-Dupli
 | `src/leanrag_input.rs` | Vorbereitung strukturierter Prompts für Konsolidierungs-LLMs |
 | `src/semantic_aggregation_facade.rs` | Fassade für semantische Aggregation über Vektor-Clustering |
 
-3. Invarianten
+## 3. Invarianten
+
 - **INV-DEDUP-TRANSITIVITY-1:** Dedup-Clustering wendet bei Kandidatenpaaren ein Transitivitäts-Veto an, um falsch-positive Verschmelzungen bei indirekter Ähnlichkeit zu verhindern.
 - **P28 Determinismus:** Zeitstempel und Zeitabstände in `MaintenanceScheduler` werden ausschließlich über den `Clock`-Port (`with_clock`) injiziert.
 - **INV-SUMMARY-DECAY:** Der `AdaptiveDecayController` wird in `consolidation_executor` erst nach Bestätigen der synthetischen Zusammenfassungen angewendet.
 
-4. Verboten / Anti-Patterns
+## 4. Verboten / Anti-Patterns
+
 - **Keine direkte SystemTime in Schedulern:** Zeit-Injektion via `Arc<dyn Clock>` ist Pflicht für deterministische Tests.
 - **Keine Konsolidierung ohne Node-Lock Guard:** Konsolidierung gleicher Node-IDs ohne `ConsolidationNodesGuard` führt zu Datenrennen.
 
-5. Nebenläufigkeit, Async- und Lock-Regeln
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
+
 Arbeitet asynchron auf Layer 3 über `contextra-engine`. LLM-Konsolidierungsdurchläufe dauern lang und dürfen niemals unter aktiven Key-Locks oder ReadGuards gehalten werden. Knoten-Sperren für Konsolidierung werden über `ConsolidationNodesGuard` verwaltet.
 
-6. Verifikation
-- `cargo test -p contextra-cognition`
+## 6. Verifikation
 
-7. Bekannte Lücken / SOLL
+```bash
+cargo test -p contextra-cognition
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-cognition
+cargo xtask determinism-check
+cargo xtask check-unsafe-islands
+```
+
+## 7. Bekannte Lücken / SOLL
+
 - `filter_candidates_with_transitivity_veto` ist im Code vollständig implementiert und in `memory_consolidation.rs` integriert.
+

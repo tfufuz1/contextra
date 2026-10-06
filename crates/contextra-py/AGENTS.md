@@ -43,8 +43,12 @@ Stellt sicher, dass keine Rust-Panics über die CPython FFI-Grenze hinweg entwei
 
 ## 6. Verifikation
 
-- `cargo xtask check-ffi-panic-boundary`
-- `cargo test -p contextra-py`
+```bash
+cargo xtask check-ffi-panic-boundary
+cargo test -p contextra-py
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-py
+```
 
 ## 7. Bekannte Lücken / SOLL
 

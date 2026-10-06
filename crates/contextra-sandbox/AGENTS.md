@@ -37,10 +37,15 @@ Stellt eine isolierte WASM-Ausführungsgrenze für die `CodeExecution`-Berechtig
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-sandbox --locked`
-- `cargo test -p contextra-sandbox --test wasm_boundary_tests`
-- `cargo test -p contextra-sandbox --test pure_merge_operator_capabilities_test`
-- `cargo test -p contextra-sandbox --test wasm_wasi_io`
+```bash
+cargo test -p contextra-sandbox --locked
+cargo test -p contextra-sandbox --test wasm_boundary_tests
+cargo test -p contextra-sandbox --test pure_merge_operator_capabilities_test
+cargo test -p contextra-sandbox --test wasm_wasi_io
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-sandbox
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 

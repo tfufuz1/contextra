@@ -1,11 +1,11 @@
 # AGENTS.md — contextra-ports
 > Ring 0 · stable · Quelle: capabilities.toml · Spec: K.19, §A2, §0, §3, §4, §9, §20
 
-1. Zweck
+## 1. Zweck
 `contextra-ports` definiert die abstrahierenden, dyn-kompatiblen Trait-Schnittstellen (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `Clock`, `Rng`, `IdGenerator` u. a.) zur Entkopplung aller Subsysteme.
 Er erzwingt `#![forbid(unsafe_code)]` und dient als zentraler Ring-0-Vertrag ohne konkrete Implementierungen.
 
-2. Modul-Karte
+## 2. Modul-Karte
 | Datei / Verzeichnis | Verantwortung |
 | :--- | :--- |
 | `src/lib.rs` | Re-Exporte aller Port-Traits. |
@@ -30,24 +30,31 @@ Er erzwingt `#![forbid(unsafe_code)]` und dient als zentraler Ring-0-Vertrag ohn
 | `src/text_index.rs` | `TextIndex` Trait für BM25-Volltextsuche. |
 | `src/vector_index.rs` | `VectorIndex` Trait für HNSW- / DiskANN-Vektorsuche. |
 
-3. Invarianten
+## 3. Invarianten
 - **INV-P28-DETERMINISM:** Zeit (`Clock`), Zufall (`Rng`) und IDs (`IdGenerator`) dürfen in produktiven Subsystemen niemals direkt über `SystemTime::now()` oder `rand::thread_rng()` bezogen werden, sondern ausschließlich über die injizierten Ports.
 - **INV-CSPRNG-EXEMPTION:** Kryptographische Schlüssel und Salts (z. B. in WAL HMAC, Vaults) MÜSSEN echten CSPRNG nutzen und dürfen NICHT über den `Rng`-Port bezogen werden (Sicherheitsausnahme zu P28).
 - **INV-TOCTOU-DEFAULTS:** Standardmethoden in Ports dürfen keine TOCTOU-Races induzieren. Prüfung: `cargo xtask check-toctou-defaults`.
 - **INV-TXID-ALLOCATION:** `TxId` darf nicht über `IdGenerator` erzeugt werden, sondern strikt über `collection.allocate_tx()`.
 
-4. Verboten / Anti-Patterns
+## 4. Verboten / Anti-Patterns
 - **VERBOTEN:** Konkrete Speicher- oder Indeximplementierungen in `contextra-ports` ablegen.
 - **VERBOTEN:** Trait-Methoden definieren, die `dyn`-Inkompatibilität erzwingen (z. B. Methoden mit generischen Parametern ohne `where Self: Sized`), sofern der Port dyn-kompatibel sein muss.
 - **VERBOTEN:** Runtime-Abhängigkeiten zu Async-Runtimes in synchronen Port-Traits.
 
-5. Nebenläufigkeit, Async- und Lock-Regeln
+## 5. Nebenläufigkeit, Async- und Lock-Regeln
 - Synchrone Trait-Methoden (z. B. `StorageRead`, `Clock`, `Rng`) dürfen keine Async-Signaturen tragen.
 - Async-Methoden in I/O-Port-Traits (wie `StorageWrite` oder `Embedder`) nutzen `BoxFuture` für Thread-Sicherheit (`Send + Sync`).
 
-6. Verifikation
-- `cargo test -p contextra-ports`
-- `cargo xtask check-toctou-defaults`
+## 6. Verifikation
 
-7. Bekannte Lücken / SOLL
+```bash
+cargo test -p contextra-ports
+cargo xtask check-toctou-defaults
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-ports
+cargo xtask check-ring0-async-purity
+cargo xtask check-unsafe-islands
+```
+
+## 7. Bekannte Lücken / SOLL
 - Einige Trait-Standardimplementierungen werden fortlaufend auf strikte TOCTOU-Sicherheit geprüft.

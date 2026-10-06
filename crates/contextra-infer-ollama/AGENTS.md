@@ -36,8 +36,13 @@ Schnittstelle zu lokalen oder externen Ollama-Instanzen. Stellt `OllamaClient` f
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-infer-ollama --locked`
-- `cargo test -p contextra-infer-ollama --test campaign_stub_ollama`
+```bash
+cargo test -p contextra-infer-ollama --locked
+cargo test -p contextra-infer-ollama --test campaign_stub_ollama
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-infer-ollama
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 

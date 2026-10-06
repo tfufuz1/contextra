@@ -229,6 +229,12 @@ impl SstableBuilder {
         Ok(builder)
     }
 
+    /// Returns the estimated current total SSTable size written so far.
+    pub fn current_size(&self) -> u64 {
+        self.offset
+            .saturating_add(self.block_builder.current_size() as u64)
+    }
+
     pub async fn create_with_key_manager(
         path: impl AsRef<Path>,
         key_manager: Option<Arc<KeyManager>>,
@@ -347,7 +353,7 @@ impl SstableBuilder {
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
         let current_block_bytes = self.block_builder.current_size();
-        let estimated_total = self.block_builder.current_size();
+        let estimated_total = self.current_size();
         tracing::trace!(
             path = %self.path.display(),
             current_block_bytes,

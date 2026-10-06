@@ -43,8 +43,12 @@ Bietet Regressions-Gates und Baseline-Vergleiche für CI-Sicherheitsprüfungen (
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-bench`
-- `cargo check -p contextra-bench`
+```bash
+cargo test -p contextra-bench
+cargo check -p contextra-bench
+cargo xtask check-agents-integrity
+cargo xtask bench-gate --tolerance 0.05
+```
 - Dokumentation und Historie siehe `docs/BENCHMARKS.md` und `docs/BENCH-LOG.md`.
 
 ## 7. Bekannte Lücken / SOLL

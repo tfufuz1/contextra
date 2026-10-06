@@ -53,6 +53,9 @@ let terms = query.split_whitespace();
 ```bash
 cargo test -p contextra-text --locked
 cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-text
+cargo xtask check-ring0-async-purity
+cargo xtask check-unsafe-islands
 ```
 
 ## 7. Bekannte Lücken / SOLL

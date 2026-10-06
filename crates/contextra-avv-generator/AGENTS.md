@@ -35,8 +35,13 @@ Stellt rechtskonforme Textbausteine für Verantwortliche und Auftragsverarbeiter
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-avv-generator`
-- `cargo check -p contextra-avv-generator`
+```bash
+cargo test -p contextra-avv-generator
+cargo check -p contextra-avv-generator
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-avv-generator
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 

@@ -68,6 +68,9 @@ impl LegacyKeyStatus {
 }
 
 /// Internal const helper for deobfuscating the legacy static integrity key bytes.
+///
+/// Only available when the `legacy-wal-key` Cargo feature is enabled because it
+/// references the obfuscated key constants that are likewise feature-gated.
 #[cfg(feature = "legacy-wal-key")]
 pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     let mut out = [0u8; 32];
@@ -77,6 +80,16 @@ pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
         i += 1;
     }
     out
+}
+
+/// Stub used when `legacy-wal-key` is disabled: returns an all-zero sentinel.
+///
+/// This variant exists solely so that `legacy_integrity_key_for_test` compiles in all
+/// configurations (the test helper is `#[doc(hidden)]` and used only in unit tests that
+/// themselves require the feature).
+#[cfg(not(feature = "legacy-wal-key"))]
+pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
+    [0u8; 32]
 }
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
@@ -205,9 +218,10 @@ impl Wal {
         self.get_integrity_key()
     }
 
-    #[cfg(test)]
-    pub(crate) fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
-        legacy_integrity_key()
+    /// Returns the static legacy HMAC integrity key for testing.
+    #[doc(hidden)]
+    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
+        deobfuscate_legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).

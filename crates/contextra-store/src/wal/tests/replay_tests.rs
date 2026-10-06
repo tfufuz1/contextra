@@ -328,7 +328,7 @@ async fn test_wal_legacy_key_fallback_migration() {
         let legacy_entry = WalEntry::try_new(
             op,
             1,
-            &Wal::legacy_integrity_key_for_test().expect("legacy WAL key (feature legacy-wal-key)"),
+            &Wal::legacy_integrity_key_for_test(),
             [0u8; 32],
         )
         .expect("legacy entry"); // expect
@@ -608,7 +608,7 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
         let entry = WalEntry::try_new(
             op,
             1,
-            &Wal::legacy_integrity_key_for_test().expect("legacy WAL key (feature legacy-wal-key)"),
+            &Wal::legacy_integrity_key_for_test(),
             [0u8; 32],
         )
         .expect("v1 entry"); // expect
@@ -701,7 +701,7 @@ async fn test_full_rewrite_crash_recovery_pipeline() {
     let entry = WalEntry::try_new(
         op,
         1,
-        &Wal::legacy_integrity_key_for_test().expect("legacy WAL key (feature legacy-wal-key)"),
+        &Wal::legacy_integrity_key_for_test(),
         [0u8; 32],
     )
     .expect("v1 entry");
@@ -766,7 +766,7 @@ async fn test_v1_plaintext_rejected_when_key_manager_active() {
     let entry = WalEntry::try_new(
         op,
         1,
-        &Wal::legacy_integrity_key_for_test().expect("legacy WAL key (feature legacy-wal-key)"),
+        &Wal::legacy_integrity_key_for_test(),
         [0u8; 32],
     )
     .expect("entry");
@@ -825,8 +825,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     let wal_path = dir.path().join("split_brain.wal");
 
     let normal_key = b"normal-integrity-key-32-bytes---";
-    let legacy_key =
-        Wal::legacy_integrity_key_for_test().expect("legacy WAL key (feature legacy-wal-key)");
+    let legacy_key = Wal::legacy_integrity_key_for_test();
 
     // 1. Entry 1: created with normal key, prev_hmac = [0u8; 32]
     let op1 = WalOp::Put {

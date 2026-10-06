@@ -66,6 +66,9 @@ Implementiert die Schnittstelle `StorageEngine` aus `contextra-core` für produk
 
 ```bash
 cargo test -p contextra-store --locked
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-store
+cargo xtask check-unsafe-islands
 cargo xtask check-result-dropped-io
 ```
 

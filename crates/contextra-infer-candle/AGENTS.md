@@ -38,9 +38,14 @@ Native GGUF-Modellausführung und Vektor-Einbettungen auf Basis von Candle (`can
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-infer-candle --locked`
-- `cargo test -p contextra-infer-candle --test real_inference_test`
-- `cargo test -p contextra-infer-candle --test kv_bridge_and_stress_test`
+```bash
+cargo test -p contextra-infer-candle --locked
+cargo test -p contextra-infer-candle --test real_inference_test
+cargo test -p contextra-infer-candle --test kv_bridge_and_stress_test
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-infer-candle
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 

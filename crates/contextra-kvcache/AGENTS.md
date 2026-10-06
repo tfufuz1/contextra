@@ -47,6 +47,10 @@ Erzwingt `#![forbid(unsafe_code)]` im gesamten Crate.
 
 ```bash
 cargo test -p contextra-kvcache --locked
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-kvcache
+cargo xtask check-unsafe-islands
+cargo xtask check-result-dropped-io
 ```
 
 ## 7. Bekannte Lücken / SOLL

@@ -5,9 +5,7 @@
 // INVARIANTEN: Korrekter Roundtrip für Standard- und Size-Prefixed FlatBuffers; sichere Verifizierung.
 
 use contextra_wire::{
-    finish_search_response_buffer, finish_size_prefixed_search_response_buffer,
-    root_as_search_response, size_prefixed_root_as_search_response_with_opts, ScoredDocument,
-    ScoredDocumentArgs, SearchResponse, SearchResponseArgs,
+    root_as_search_response, ScoredDocument, ScoredDocumentArgs, SearchResponse, SearchResponseArgs,
 };
 use flatbuffers::{FlatBufferBuilder, VerifierOptions};
 
@@ -37,7 +35,7 @@ fn test_search_response_standard_finish_buffer_roundtrip() {
     );
 
     // Call public method that wires finish_search_response_buffer
-    finish_search_response_buffer(&mut builder, resp_offset);
+    SearchResponse::finish_buffer(&mut builder, resp_offset);
 
     let buf = builder.finished_data();
     let resp = root_as_search_response(buf).expect("Failed to parse standard SearchResponse");
@@ -75,7 +73,7 @@ fn test_search_response_size_prefixed_finish_buffer_roundtrip() {
     );
 
     // Call public method that wires finish_size_prefixed_search_response_buffer
-    finish_size_prefixed_search_response_buffer(&mut builder, resp_offset);
+    SearchResponse::finish_size_prefixed_buffer(&mut builder, resp_offset);
 
     let buf = builder.finished_data();
 
@@ -90,7 +88,7 @@ fn test_search_response_size_prefixed_finish_buffer_roundtrip() {
     };
 
     // Call public method that wires size_prefixed_root_as_search_response_with_opts
-    let resp = size_prefixed_root_as_search_response_with_opts(&opts, buf)
+    let resp = SearchResponse::size_prefixed_root_with_opts(&opts, buf)
         .expect("Failed to parse size-prefixed SearchResponse with options");
 
     assert_eq!(resp.total_hits(), 100);
@@ -106,9 +104,9 @@ fn test_size_prefixed_root_with_opts_corruption_handling() {
 
     // Corrupted payload
     let garbage = vec![0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF];
-    assert!(size_prefixed_root_as_search_response_with_opts(&opts, &garbage).is_err());
+    assert!(SearchResponse::size_prefixed_root_with_opts(&opts, &garbage).is_err());
 
     // Truncated size-prefixed payload
     let truncated = vec![0x10, 0x00, 0x00, 0x00, 0x00];
-    assert!(size_prefixed_root_as_search_response_with_opts(&opts, &truncated).is_err());
+    assert!(SearchResponse::size_prefixed_root_with_opts(&opts, &truncated).is_err());
 }

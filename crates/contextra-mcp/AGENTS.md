@@ -45,8 +45,13 @@ Erzwingt strikte Sandbox-Richtlinien, Egress-Gateway-Grenzen und Quarantäne dur
 
 ## 6. Verifikation
 
-- `cargo test -p contextra-mcp`
-- `cargo check -p contextra-mcp`
+```bash
+cargo test -p contextra-mcp
+cargo check -p contextra-mcp
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-mcp
+cargo xtask check-unsafe-islands
+```
 
 ## 7. Bekannte Lücken / SOLL
 
