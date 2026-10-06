@@ -7,14 +7,27 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs` and `xtask/src/harness/*.rs`.
-pub fn extract_valid_subcommands(main_rs_content: &str) -> HashSet<String> {
+/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs`, `xtask/src/cli/mod.rs`, and `xtask/src/harness/*.rs`.
+pub fn extract_valid_subcommands(
+    main_rs_content: &str,
+    cli_mod_content: Option<&str>,
+) -> HashSet<String> {
     let mut valid_commands = HashSet::new();
     let str_regex = Regex::new(r#""([a-z0-9_-]+)""#).expect("Valid regex");
 
     for line in main_rs_content.lines() {
         if let Some((patterns, _)) = line.split_once("=>") {
             for caps in str_regex.captures_iter(patterns) {
+                if let Some(cmd) = caps.get(1) {
+                    valid_commands.insert(cmd.as_str().to_string());
+                }
+            }
+        }
+    }
+
+    if let Some(cli_content) = cli_mod_content {
+        for line in cli_content.lines() {
+            for caps in str_regex.captures_iter(line) {
                 if let Some(cmd) = caps.get(1) {
                     valid_commands.insert(cmd.as_str().to_string());
                 }
@@ -95,7 +108,11 @@ pub fn run_check_workflow_commands(root: &Path) -> bool {
         }
     };
 
-    let mut valid_subcommands = extract_valid_subcommands(&main_rs_content);
+    let cli_mod_path = root.join("xtask/src/cli/mod.rs");
+    let cli_mod_content = fs::read_to_string(&cli_mod_path).ok();
+
+    let mut valid_subcommands =
+        extract_valid_subcommands(&main_rs_content, cli_mod_content.as_deref());
     let harness_subcommands = extract_harness_subcommands(&root.join("xtask/src/harness"));
     valid_subcommands.extend(harness_subcommands);
 
@@ -201,6 +218,43 @@ fn main() {
 }
 "#;
         fs::write(xtask_src.join("main.rs"), main_rs_content).expect("write main.rs");
+
+        let workflows_dir = root.join(".github/workflows");
+        fs::create_dir_all(&workflows_dir).expect("create workflows dir");
+        let workflow_content = r#"
+name: Test Workflow
+jobs:
+  test:
+    steps:
+      - name: Step 1
+        run: cargo run -p xtask -- check-compile
+      - name: Step 2
+        run: cargo xtask check-dag
+"#;
+        fs::write(workflows_dir.join("test.yml"), workflow_content).expect("write workflow.yml");
+
+        assert!(run_check_workflow_commands(root));
+    }
+
+    #[test]
+    fn test_valid_cli_mod_workflow() {
+        let dir = tempdir().expect("tempdir creation");
+        let root = dir.path();
+
+        let xtask_src = root.join("xtask/src");
+        let cli_dir = xtask_src.join("cli");
+        fs::create_dir_all(&cli_dir).expect("create_dir_all");
+        let main_rs_content = r#"
+fn main() {}
+"#;
+        let cli_mod_content = r#"
+pub const COMMAND_DISPATCH_TABLE: &[(&str, fn(&[String]) -> i32)] = &[
+    ("check-compile", run_check_compile),
+    ("check-dag", run_check_dag),
+];
+"#;
+        fs::write(xtask_src.join("main.rs"), main_rs_content).expect("write main.rs");
+        fs::write(cli_dir.join("mod.rs"), cli_mod_content).expect("write cli/mod.rs");
 
         let workflows_dir = root.join(".github/workflows");
         fs::create_dir_all(&workflows_dir).expect("create workflows dir");
