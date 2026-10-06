@@ -30,7 +30,10 @@ pub fn never_called() {
 
     let code = orphan_symbols::run_orphan_symbols(&args);
 
-    assert_eq!(code, 2, "Status must be 'fail' (exit code 2) for orphan symbol");
+    assert_eq!(
+        code, 2,
+        "Status must be 'fail' (exit code 2) for orphan symbol"
+    );
 }
 
 #[test]
@@ -66,5 +69,8 @@ fn caller() {
 
     let code = orphan_symbols::run_orphan_symbols(&args);
 
-    assert_eq!(code, 0, "Status must be 'pass' (exit code 0) when symbol is referenced");
+    assert_eq!(
+        code, 0,
+        "Status must be 'pass' (exit code 0) when symbol is referenced"
+    );
 }

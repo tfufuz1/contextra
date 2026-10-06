@@ -231,7 +231,8 @@ impl SstableBuilder {
 
     /// Returns the estimated current total SSTable size written so far.
     pub fn current_size(&self) -> u64 {
-        self.offset.saturating_add(self.block_builder.current_size() as u64)
+        self.offset
+            .saturating_add(self.block_builder.current_size() as u64)
     }
 
     pub async fn create_with_key_manager(

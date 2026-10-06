@@ -29,7 +29,10 @@ pub fn foo() {
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
-    assert_eq!(code, 2, "Status must be 'fail' (exit code 2) for orphan symbol");
+    assert_eq!(
+        code, 2,
+        "Status must be 'fail' (exit code 2) for orphan symbol"
+    );
 }
 
 #[test]
@@ -65,7 +68,10 @@ fn test_bar() {
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
-    assert_eq!(code, 0, "Status must be 'pass' (exit code 0) when symbol is used in tests");
+    assert_eq!(
+        code, 0,
+        "Status must be 'pass' (exit code 0) when symbol is used in tests"
+    );
 }
 
 #[test]
@@ -135,7 +141,10 @@ macro_rules! my_macro {
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
-    assert_eq!(code, 0, "Symbol in macro_rules is excluded from declarations");
+    assert_eq!(
+        code, 0,
+        "Symbol in macro_rules is excluded from declarations"
+    );
 
     let report_content = fs::read_to_string(&out_file).expect("Failed to read report file");
     assert!(report_content.contains("## Zusammenfassung"));
@@ -200,5 +209,8 @@ pub fn boundary_unused_fn() {}
     ];
 
     let code = orphan_symbols::run_orphan_symbols(&args);
-    assert_eq!(code, 0, "Excluded boundary crate orphan does not trigger exit 2");
+    assert_eq!(
+        code, 0,
+        "Excluded boundary crate orphan does not trigger exit 2"
+    );
 }

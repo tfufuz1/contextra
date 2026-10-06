@@ -80,7 +80,8 @@ impl<'a> DeclVisitor<'a> {
             }
             match item {
                 Item::Fn(f) => {
-                    if Self::is_vis_public_or_restricted(&f.vis) && self.kinds_filter.contains("fn") {
+                    if Self::is_vis_public_or_restricted(&f.vis) && self.kinds_filter.contains("fn")
+                    {
                         self.decls.push(DeclItem {
                             name: f.sig.ident.to_string(),
                             kind: "fn".to_string(),
@@ -91,7 +92,9 @@ impl<'a> DeclVisitor<'a> {
                     }
                 }
                 Item::Struct(s) => {
-                    if Self::is_vis_public_or_restricted(&s.vis) && self.kinds_filter.contains("struct") {
+                    if Self::is_vis_public_or_restricted(&s.vis)
+                        && self.kinds_filter.contains("struct")
+                    {
                         self.decls.push(DeclItem {
                             name: s.ident.to_string(),
                             kind: "struct".to_string(),
@@ -102,7 +105,9 @@ impl<'a> DeclVisitor<'a> {
                     }
                 }
                 Item::Enum(e) => {
-                    if Self::is_vis_public_or_restricted(&e.vis) && self.kinds_filter.contains("enum") {
+                    if Self::is_vis_public_or_restricted(&e.vis)
+                        && self.kinds_filter.contains("enum")
+                    {
                         self.decls.push(DeclItem {
                             name: e.ident.to_string(),
                             kind: "enum".to_string(),
@@ -113,7 +118,9 @@ impl<'a> DeclVisitor<'a> {
                     }
                 }
                 Item::Trait(t) => {
-                    if Self::is_vis_public_or_restricted(&t.vis) && self.kinds_filter.contains("trait") {
+                    if Self::is_vis_public_or_restricted(&t.vis)
+                        && self.kinds_filter.contains("trait")
+                    {
                         self.decls.push(DeclItem {
                             name: t.ident.to_string(),
                             kind: "trait".to_string(),
@@ -124,7 +131,9 @@ impl<'a> DeclVisitor<'a> {
                     }
                 }
                 Item::Type(ty) => {
-                    if Self::is_vis_public_or_restricted(&ty.vis) && self.kinds_filter.contains("type") {
+                    if Self::is_vis_public_or_restricted(&ty.vis)
+                        && self.kinds_filter.contains("type")
+                    {
                         self.decls.push(DeclItem {
                             name: ty.ident.to_string(),
                             kind: "type".to_string(),
@@ -135,7 +144,9 @@ impl<'a> DeclVisitor<'a> {
                     }
                 }
                 Item::Const(c) => {
-                    if Self::is_vis_public_or_restricted(&c.vis) && self.kinds_filter.contains("const") {
+                    if Self::is_vis_public_or_restricted(&c.vis)
+                        && self.kinds_filter.contains("const")
+                    {
                         self.decls.push(DeclItem {
                             name: c.ident.to_string(),
                             kind: "const".to_string(),
@@ -565,14 +576,8 @@ pub fn run_orphan_symbols(args: &[String]) -> i32 {
     ));
     md.push_str("- **Klassen-Zählung:**\n");
     md.push_str(&format!("  - **ORPHAN:** {}\n", summary.orphan_count));
-    md.push_str(&format!(
-        "  - **NUR_TESTS:** {}\n",
-        summary.nur_tests_count
-    ));
-    md.push_str(&format!(
-        "  - **PRODUKTIV:** {}\n",
-        summary.produktiv_count
-    ));
+    md.push_str(&format!("  - **NUR_TESTS:** {}\n", summary.nur_tests_count));
+    md.push_str(&format!("  - **PRODUKTIV:** {}\n", summary.produktiv_count));
     md.push_str(&format!("  - **VERDACHT:** {}\n", summary.verdacht_count));
     md.push_str(&format!(
         "  - **Ausgeschlossene Grenz-Crate-Funde:** {}\n\n",
