@@ -305,7 +305,13 @@ pub fn run_unwired_ports(args: &[String]) -> i32 {
         let cargo_toml = PathBuf::from(r).join("Cargo.toml");
         if cargo_toml.exists() {
             if let Ok(out) = Command::new("cargo")
-                .args(["metadata", "--format-version", "1", "--no-deps", "--manifest-path"])
+                .args([
+                    "metadata",
+                    "--format-version",
+                    "1",
+                    "--no-deps",
+                    "--manifest-path",
+                ])
                 .arg(&cargo_toml)
                 .output()
             {
@@ -469,11 +475,7 @@ pub fn run_unwired_ports(args: &[String]) -> i32 {
     let solo_count = findings.iter().filter(|f| f.severity == "SOLO").count();
     let ok_count = findings.iter().filter(|f| f.severity == "OK").count();
 
-    let status = if unwired_count > 0 {
-        "fail"
-    } else {
-        "pass"
-    };
+    let status = if unwired_count > 0 { "fail" } else { "pass" };
     let summary = format!(
         "Unwired ports audit: {} UNWIRED, {} SOLO, {} OK traits found.",
         unwired_count, solo_count, ok_count
@@ -500,7 +502,10 @@ pub fn run_unwired_ports(args: &[String]) -> i32 {
         println!("{}", summary);
         println!("\n> **Hinweis:** Die Typ-Suche basiert auf Wortgrenzen-Regex (`\\b<Typ>\\b`). Bei sehr kurzen oder generischen Typnamen kann diese Heuristik False Positives bezüglich der Verdrahtung erzeugen.\n");
 
-        let unwired_findings: Vec<_> = findings.iter().filter(|f| f.severity == "UNWIRED").collect();
+        let unwired_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.severity == "UNWIRED")
+            .collect();
         println!("## UNWIRED (Traits ohne Implementierung)");
         if unwired_findings.is_empty() {
             println!("- (keine)");
