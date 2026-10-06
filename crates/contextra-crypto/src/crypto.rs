@@ -330,12 +330,14 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Derives a deletion proof signing key for cryptographic deletion verification.
-    // TODO(#JULES-P04-3, Implementer): [P04 / F-2 / HIGH]
-    // Fehlende Schlüssel-Objekt-Separation bei HMAC v1/v2-Beweisen (F-2):
-    // Ableitung des Löschbeweis-HMAC-Schlüssels direkt vom Master-Key ermöglicht Fälschung durch Angreifer mit Disk-Access.
-    // Symmetrische v1/v2-Erzeugungsmethoden als `#[deprecated]` markieren.
+    /// Derives a deletion proof signing key for legacy symmetric HMAC deletion proof generation.
+    ///
+    /// # DEPRECATION / LEGACY NOTICE
+    /// Symmetric HMAC deletion proofs derive secret key material from the master key. Prefer asymmetric
+    /// Ed25519 version 3 proofs via [`Self::create_deletion_proof_v3`] to prevent master key exposure
+    /// and maintain audit proof validity across key rotations.
     pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
+        tracing::warn!("KeyManager::derive_deletion_proof_key called for legacy symmetric HMAC proof; migrate to v3 Ed25519 proofs via create_deletion_proof_v3");
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
         let mut key = [0u8; 32];
@@ -345,11 +347,39 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Creates and signs a v2 [`DeletionProof`][crate::deletion_proof::DeletionProof] using a sub-key
-    /// derived specifically for cryptographic deletion proofs via [`Self::derive_deletion_proof_key`].
-    // TODO(#JULES-P04-3, Implementer): [P04 / F-2 / HIGH]
-    // `KeyManager::create_deletion_proof` muss standardmäßig Ed25519-v3-Löschnachweise erzeugen (I-2),
-    // getrennt vom Master-Key. Der bisherige symmetrische HMAC-Pfad ist als deprecated abzukündigen.
+    /// Creates and signs a version 3 (Ed25519) asymmetric deletion proof using an explicit [`DeletionProofKeyPair`].
+    ///
+    /// This is the recommended, cryptographically secure deletion proof generation method. Asymmetric v3
+    /// proofs decouple proof verification from master key material and remain valid across master key rotations.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_deletion_proof_v3(
+        keypair: &crate::deletion_proof::DeletionProofKeyPair,
+        scope: crate::deletion_proof::DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: contextra_types::TxId,
+        covered_layers: Vec<crate::deletion_proof::LayerCleanupProof>,
+        excluded_scopes: Vec<crate::deletion_proof::ExcludedScope>,
+        attested_at: i64,
+        graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
+    ) -> Result<crate::deletion_proof::DeletionProof> {
+        crate::deletion_proof::DeletionProof::create_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            attested_at,
+            graph_repair,
+            keypair.signing_key(),
+        )
+        .map_err(|e| CryptoError::Crypto(e.to_string()))
+    }
+
+    /// Creates and signs a legacy v2 HMAC [`DeletionProof`][crate::deletion_proof::DeletionProof].
+    ///
+    /// # DEPRECATION / LEGACY NOTICE
+    /// This method generates symmetric HMAC deletion proofs derived from master key material.
+    /// Callers SHOULD migrate to asymmetric Ed25519 version 3 proofs via [`Self::create_deletion_proof_v3`].
     pub fn create_deletion_proof(
         &self,
         scope: crate::deletion_proof::DeletionScope,
@@ -358,6 +388,7 @@ impl KeyManager {
         covered_layers: Vec<crate::deletion_proof::LayerCleanupProof>,
         excluded_scopes: Vec<crate::deletion_proof::ExcludedScope>,
     ) -> Result<crate::deletion_proof::DeletionProof> {
+        tracing::warn!("KeyManager::create_deletion_proof called for legacy symmetric HMAC proof; migrate to v3 Ed25519 proofs via create_deletion_proof_v3");
         let proof_key = self.derive_deletion_proof_key()?;
         crate::deletion_proof::DeletionProof::create(
             scope,

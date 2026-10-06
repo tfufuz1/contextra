@@ -32,11 +32,6 @@ pub enum DeletionProofError {
 }
 
 /// Schlüsselpaar für Ed25519-Löschbeweise.
-// TODO(#JULES-P04-4, Implementer): [P04 / F-4 / HIGH]
-// DeletionProofKeyPair versäumt RAM-Zeroization (`ZeroizeOnDrop`) für Ed25519-Privatschlüssel (I-6):
-// Auch hier in `ed25519_proof.rs` muss `DeletionProofKeyPair` mit `Zeroize` / `ZeroizeOnDrop`
-// versehen werden, um In-Memory-Key-Scrubbing bei Freigabe zu erzwingen.
-#[derive(Debug)]
 pub struct DeletionProofKeyPair {
     /// Privater Signierschlüssel.
     pub signing_key: ed25519_dalek::SigningKey,
@@ -44,7 +39,20 @@ pub struct DeletionProofKeyPair {
     pub verifying_key: ed25519_dalek::VerifyingKey,
 }
 
+impl std::fmt::Debug for DeletionProofKeyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeletionProofKeyPair")
+            .field("signing_key", &"***REDACTED***")
+            .field("verifying_key", &self.verifying_key)
+            .finish()
+    }
+}
+
 impl DeletionProofKeyPair {
+    /// Explicitly zeroizes the secret signing key bytes.
+    pub fn zeroize(&mut self) {
+        self.signing_key = ed25519_dalek::SigningKey::from_bytes(&[0u8; 32]);
+    }
     /// Generiert ein neues Ed25519-Schlüsselpaar unter Nutzung eines injizierten Zufallsgenerators.
     pub fn generate(rng: &mut impl RngCore) -> Self {
         let mut secret_bytes = [0u8; 32];
@@ -70,6 +78,12 @@ impl DeletionProofKeyPair {
     /// Gibt eine Referenz auf den Verifikationsschlüssel zurück.
     pub fn verifying_key(&self) -> &ed25519_dalek::VerifyingKey {
         &self.verifying_key
+    }
+}
+
+impl Drop for DeletionProofKeyPair {
+    fn drop(&mut self) {
+        self.zeroize();
     }
 }
 

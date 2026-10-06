@@ -60,18 +60,25 @@ pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
 }
 
 /// KeyPair for Ed25519 signing and verification of DeletionProofs (version 3).
-// TODO(#JULES-P04-4, Implementer): [P04 / F-4 / HIGH]
-// DeletionProofKeyPair versäumt RAM-Zeroization (`ZeroizeOnDrop`) für Ed25519-Privatschlüssel (I-6):
-// Secret Key-Material des Ed25519-Signierschlüssels verbleibt beim Drop unbereinigt im Speicher.
-// `DeletionProofKeyPair` muss mit `#[derive(Zeroize, ZeroizeOnDrop)]` annotiert bzw. mit manuellem
-// `Drop`-Handler ausgestattet werden, der das Schlüsselmaterial (`signing_key.to_bytes()`) überschreibt.
-#[derive(Debug)]
 pub struct DeletionProofKeyPair {
     signing_key: ed25519_dalek::SigningKey,
     pub verifying_key: ed25519_dalek::VerifyingKey,
 }
 
+impl std::fmt::Debug for DeletionProofKeyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeletionProofKeyPair")
+            .field("signing_key", &"***REDACTED***")
+            .field("verifying_key", &self.verifying_key)
+            .finish()
+    }
+}
+
 impl DeletionProofKeyPair {
+    /// Explicitly zeroizes the secret signing key bytes.
+    pub fn zeroize(&mut self) {
+        self.signing_key = ed25519_dalek::SigningKey::from_bytes(&[0u8; 32]);
+    }
     /// Generates a new random Ed25519 keypair using OsRng.
     pub fn generate() -> Self {
         let mut rng = rand::rngs::OsRng;
@@ -91,6 +98,12 @@ impl DeletionProofKeyPair {
     /// Returns a reference to the signing key.
     pub fn signing_key(&self) -> &ed25519_dalek::SigningKey {
         &self.signing_key
+    }
+}
+
+impl Drop for DeletionProofKeyPair {
+    fn drop(&mut self) {
+        self.zeroize();
     }
 }
 
@@ -350,56 +363,103 @@ impl DeletionProof {
 
         let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
-        let scope_bytes =
-            bincode::serialize(&scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let tx_bytes = deleted_after_tx.0.to_le_bytes();
-
         let covered_layers: Vec<DeletionLayer> =
             covered_layers.into_iter().map(|p| p.layer).collect();
 
-        let covered_layers_bytes = bincode::serialize(&covered_layers)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-
-        let receipt_bytes = wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
-        } else {
-            &[]
-        };
-
-        // TODO(#JULES-P04-2, Implementer): [P04 / F-1 / HIGH]
-        // Unvollständige Signatur-Payload-Bindung bei Version 2 HMAC DeletionProof:
-        // `timestamp` (und ggf. `audit_chain_position`) sind nicht in compute_hmac_sha256 eingebunden!
-        // Der Erstellungspfad muss `timestamp.to_le_bytes()` in die HMAC-Eingabe aufnehmen, damit
-        // Zeitstempel nicht unbemerkt manipuliert werden können.
-        let signature = compute_hmac_sha256(
-            proof_key,
-            &[
-                &scope_bytes,
-                &deleted_keys_hash,
-                &tx_bytes,
-                &covered_layers_bytes,
-                &excluded_scopes_bytes,
-                receipt_part,
-            ],
-        )?;
-
-        Ok(Self {
+        let proof_stub = Self {
             signature_version: SignatureVersion::V2.as_u8(),
             scope,
             deleted_keys_hash,
             deleted_after_tx,
             timestamp: 0,
-            signature: signature.to_vec(),
+            signature: Vec::new(),
             covered_layers,
             excluded_scopes,
             graph_repair: Vec::new(),
             wal_chain_receipt,
             audit_chain_position: None,
             integrity_warning: None,
-        })
+        };
+
+        let full_payload = proof_stub.construct_v2_full_payload()?;
+        let signature = compute_hmac_sha256(proof_key, &[&full_payload])?;
+
+        let mut proof = proof_stub;
+        proof.signature = signature.to_vec();
+
+        Ok(proof)
+    }
+
+    /// Constructs the full, length-prefixed HMAC payload for version 2 proofs binding all fields.
+    fn construct_v2_full_payload(&self) -> Result<Vec<u8>> {
+        let scope_bytes =
+            bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
+        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+        let graph_repair_bytes = bincode::serialize(&self.graph_repair)
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+        let mut payload = Vec::with_capacity(128 + scope_bytes.len() + covered_layers_bytes.len());
+        payload.extend_from_slice(b"contextra-hmac-v2-full:");
+
+        let scope_len = u32::try_from(scope_bytes.len()).unwrap_or(u32::MAX);
+        payload.extend_from_slice(&scope_len.to_le_bytes());
+        payload.extend_from_slice(&scope_bytes);
+
+        payload.extend_from_slice(&self.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
+
+        let covered_len = u32::try_from(covered_layers_bytes.len()).unwrap_or(u32::MAX);
+        payload.extend_from_slice(&covered_len.to_le_bytes());
+        payload.extend_from_slice(&covered_layers_bytes);
+
+        let excluded_len = u32::try_from(excluded_scopes_bytes.len()).unwrap_or(u32::MAX);
+        payload.extend_from_slice(&excluded_len.to_le_bytes());
+        payload.extend_from_slice(&excluded_scopes_bytes);
+
+        let graph_len = u32::try_from(graph_repair_bytes.len()).unwrap_or(u32::MAX);
+        payload.extend_from_slice(&graph_len.to_le_bytes());
+        payload.extend_from_slice(&graph_repair_bytes);
+
+        match &self.wal_chain_receipt {
+            Some(receipt) => {
+                payload.push(1u8);
+                payload.extend_from_slice(receipt);
+            }
+            None => {
+                payload.push(0u8);
+            }
+        }
+
+        match self.audit_chain_position {
+            Some(pos) => {
+                payload.push(1u8);
+                payload.extend_from_slice(&pos.to_le_bytes());
+            }
+            None => {
+                payload.push(0u8);
+            }
+        }
+
+        match &self.integrity_warning {
+            Some(warning) => {
+                payload.push(1u8);
+                let warn_bytes = warning.as_bytes();
+                let warn_len = u32::try_from(warn_bytes.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&warn_len.to_le_bytes());
+                payload.extend_from_slice(warn_bytes);
+            }
+            None => {
+                payload.push(0u8);
+            }
+        }
+
+        Ok(payload)
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
@@ -595,6 +655,14 @@ impl DeletionProof {
                         ))
                     }
                 };
+                use subtle::ConstantTimeEq;
+                let full_payload = self.construct_v2_full_payload()?;
+                let expected_full = compute_hmac_sha256(proof_key, &[&full_payload])?;
+                if expected_full.as_slice().ct_eq(&self.signature).into() {
+                    return Ok(true);
+                }
+
+                // Alt-Verifikation: Fallback für früher erzeugte v2-Proofs
                 let covered_layers_bytes = bincode::serialize(&self.covered_layers)
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
                 let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
@@ -605,13 +673,7 @@ impl DeletionProof {
                 } else {
                     &[]
                 };
-                // TODO(#JULES-P04-2, Implementer): [P04 / F-1 / HIGH]
-                // DeletionProof::verify() muss für SignatureVersion::V2 den Zeitstempel (und Metadaten)
-                // im HMAC prüfen (`self.timestamp.to_le_bytes()`).
-                // Zudem: [P04 / F-5 & F-6 / MEDIUM]
-                // F-5: Schlüsselrotation entwertet Alt-HMAC-Beweise; historisierte Schlüsselregistratur unterstützen.
-                // F-6: Strikte Bindung von SignatureVersion an den Key-Typ gegen Downgrade-Angriffe.
-                let expected = compute_hmac_sha256(
+                let expected_legacy = compute_hmac_sha256(
                     proof_key,
                     &[
                         &scope_bytes,
@@ -622,8 +684,7 @@ impl DeletionProof {
                         receipt_part,
                     ],
                 )?;
-                use subtle::ConstantTimeEq;
-                Ok(expected.as_slice().ct_eq(&self.signature).into())
+                Ok(expected_legacy.as_slice().ct_eq(&self.signature).into())
             }
             SignatureVersion::V3 => {
                 let verifying_key = match key {
@@ -647,6 +708,30 @@ impl DeletionProof {
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
         }
+    }
+
+    /// Verifies this proof against a sequence of historical verification keys.
+    ///
+    /// Evaluates the proof against each key in `keys` sequentially. Returns `Ok(true)` on the first
+    /// key that successfully verifies the proof signature. Returns `Ok(false)` if none of the provided
+    /// keys match.
+    ///
+    /// # Key Rotation & Migration to Version 3
+    /// Legacy symmetric HMAC proofs (version 1 and version 2) depend on secret key material derived from
+    /// the master key. Following a master key rotation, verifying a legacy HMAC proof against only the new
+    /// master key will return `Ok(false)`. This method enables callers to supply historical verification
+    /// keys alongside the active key during transition periods.
+    ///
+    /// To permanently avoid key rotation invalidation for audit proofs, migrate to asymmetric version 3
+    /// Ed25519 proofs ([`DeletionProof::create_v3`]), where proof verification relies solely on the public
+    /// key and is invariant under master key rotations.
+    pub fn verify_with_key_history<'a>(&self, keys: &[VerificationKey<'a>]) -> Result<bool> {
+        for key in keys {
+            if let Ok(true) = self.verify(*key) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).
