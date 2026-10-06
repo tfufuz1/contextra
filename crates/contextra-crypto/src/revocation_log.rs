@@ -1,9 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: Persistierter, Ed25519-signierter, manipulationssicherer Append-Only Widerrufslog (v17 Teil 16.1).
-// INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag.
+// INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag. Atomare Initialisierungs- & Truncation-Prüfung via Marker-Datei (<path>.initialized).
 // ABGRENZUNG PROMPT 10: Prompt 10 definiert KEK/DEK Envelope-Datenstrukturen; revocation_log stellt die persistierte Widerrufs-Engine bereit.
 // ABGRENZUNG PROMPT 12: Prompt 12 betrifft die Audit-Hash-Kette, die diesen Revocation-Log als Eingabequelle referenzieren kann, aber ein eigenständiges, separates System-Artefakt ist.
-// HOTSPOTS: [RevocationLog::open_or_create, RevocationLog::append, RevocationLog::verify_chain]
+// HOTSPOTS: [RevocationLog::open_or_create, RevocationLog::open_existing, RevocationLog::create_new, RevocationLog::append, RevocationLog::verify_chain]
 
 #![forbid(unsafe_code)]
 
@@ -29,12 +29,97 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RevocationMarker {
+    /// Minimum expected entry count in the log.
+    pub count: u64,
+    /// Head hash of the latest log entry (`[0u8; 32]` if count == 0).
+    pub head_hash: [u8; 32],
+}
+
+/// Mode for initializing or opening a `RevocationLog`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitMode {
+    /// Explicit fresh creation. Fails if log or marker file already exists with contents.
+    CreateNew,
+    /// Explicit reopen of existing log. Fails with `IntegrityViolation` if log or marker file is missing or truncated.
+    OpenExisting,
+    /// Auto-detect: Fresh creation if no marker and empty/missing log; otherwise open existing.
+    /// Fails closed if marker exists without log, log exists without marker, or if `has_existing_keys` is true when log and marker are missing.
+    OpenOrCreateIfFresh {
+        /// Whether existing wrapped key traces or registry entries are present.
+        has_existing_keys: bool,
+    },
+}
+
+/// Computes the path of the `.initialized` marker file corresponding to a given log file path.
+pub fn marker_path_for(log_path: &Path) -> PathBuf {
+    let mut os_str = log_path.as_os_str().to_os_string();
+    os_str.push(".initialized");
+    PathBuf::from(os_str)
+}
+
+fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+
+    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
+    let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp_path = parent.join(format!(
+        "{}.tmp-{}-{}",
+        file_name,
+        std::process::id(),
+        count
+    ));
+
+    let write_tmp = || -> Result<()> {
+        let mut tmp_file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
+            .map_err(|e| CryptoError::Crypto(format!("Failed to create temp file: {e}")))?;
+
+        tmp_file
+            .write_all(content)
+            .map_err(|e| CryptoError::Crypto(format!("Failed to write temp file: {e}")))?;
+
+        tmp_file
+            .sync_all()
+            .map_err(|e| CryptoError::Crypto(format!("Failed to sync temp file: {e}")))?;
+
+        Ok(())
+    };
+
+    if let Err(err) = write_tmp() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(err);
+    }
+
+    if let Err(e) = std::fs::rename(&tmp_path, path) {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(CryptoError::Crypto(format!(
+            "Failed to rename temp file: {e}"
+        )));
+    }
+
+    if let Ok(dir_file) = File::open(parent) {
+        let _ = dir_file.sync_all();
+    }
+
+    Ok(())
+}
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -142,47 +227,171 @@ impl RevocationLog {
         }
     }
 
-    /// Öffnet einen bestehenden Widerrufslog oder erzeugt einen neuen unter `path`.
-    ///
-    /// Beim Öffnen einer bestehenden Datei wird die komplette Hash-Kette sowie jede
-    /// Ed25519-Signatur anhand von `verifying_key` verifiziert.
-    /// Bei Integritätsverletzungen bricht das Öffnen mit `CryptoError::IntegrityViolation` ab.
+    /// Erzeugt einen neuen Widerrufslog unter `path` (Erstinitialisierung).
+    /// Fails mit `CryptoError::IntegrityViolation`, falls die Datei oder die Marker-Datei bereits existiert.
+    pub fn create_new(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+        signing_key: Option<SigningKey>,
+        verifying_key: VerifyingKey,
+    ) -> Result<Self> {
+        Self::open_or_create_with_mode(path, clock, signing_key, verifying_key, InitMode::CreateNew)
+    }
+
+    /// Öffnet einen bestehenden Widerrufslog unter `path`.
+    /// Fails mit `CryptoError::IntegrityViolation`, falls die Log-Datei oder die Marker-Datei fehlt oder gekürzt ist.
+    pub fn open_existing(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+        signing_key: Option<SigningKey>,
+        verifying_key: VerifyingKey,
+    ) -> Result<Self> {
+        Self::open_or_create_with_mode(
+            path,
+            clock,
+            signing_key,
+            verifying_key,
+            InitMode::OpenExisting,
+        )
+    }
+
+    /// Abwärtskompatibles Öffnen oder Erzeugen unter `path` (nutzt `InitMode::OpenOrCreateIfFresh`).
     pub fn open_or_create(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
         signing_key: Option<SigningKey>,
         verifying_key: VerifyingKey,
     ) -> Result<Self> {
+        Self::open_or_create_with_mode(
+            path,
+            clock,
+            signing_key,
+            verifying_key,
+            InitMode::OpenOrCreateIfFresh {
+                has_existing_keys: false,
+            },
+        )
+    }
+
+    /// Öffnet oder erzeugt einen Widerrufslog mit Schutz vor Stale/Missing Log wenn Schlüsselspuren existieren.
+    pub fn open_or_create_if_fresh(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+        signing_key: Option<SigningKey>,
+        verifying_key: VerifyingKey,
+        has_existing_keys: bool,
+    ) -> Result<Self> {
+        Self::open_or_create_with_mode(
+            path,
+            clock,
+            signing_key,
+            verifying_key,
+            InitMode::OpenOrCreateIfFresh { has_existing_keys },
+        )
+    }
+
+    /// Öffnet oder erzeugt einen Widerrufslog mit explizitem `InitMode`.
+    pub fn open_or_create_with_mode(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+        signing_key: Option<SigningKey>,
+        verifying_key: VerifyingKey,
+        mode: InitMode,
+    ) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
-        let mut entries = Vec::new();
-        let mut revoked_targets = HashSet::new();
+        let m_path = marker_path_for(&path_buf);
 
-        // TODO(#JULES-P04-1, Implementer): [P04 / F-3 / CRITICAL]
-        // Fehlen oder Löschung der `RevocationLog`-Datei hebelt Crypto-Shredding nach Systemneustart lautlos aus.
-        // Aktuell: Falls `!path_buf.exists()`, wird stillschweigend ein leeres Widerrufsregister zurückgegeben.
-        // Soll: Wenn ein Dateipfad angegeben ist und die Datei nicht existiert, aber das Datenbank-/Schlüsselverzeichnis
-        // bereits initialisiert ist (Schlüssel/Daten vorhanden), MUSS `open_or_create` fail-closed mit
-        // `CryptoError::IntegrityViolation` abbrechen. Neues leeres Log-File nur bei expliziter Initialisierung gestatten!
-        if path_buf.exists() {
-            let mut file = File::open(&path_buf).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to open revocation log file: {e}"))
-            })?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to read revocation log file: {e}"))
-            })?;
+        let log_exists = path_buf.exists();
+        let log_has_content = log_exists
+            && std::fs::metadata(&path_buf)
+                .map(|m| m.len() > 0)
+                .unwrap_or(false);
+        let marker_exists = m_path.exists();
 
-            if !contents.is_empty() {
-                let parsed_entries: Vec<RevocationEntry> =
-                    bincode::deserialize(&contents).map_err(|_| CryptoError::IntegrityViolation)?;
-
-                Self::verify_chain_entries(&parsed_entries, &verifying_key)?;
-
-                for entry in &parsed_entries {
-                    revoked_targets.insert(entry.target.clone());
+        let effective_mode = match mode {
+            InitMode::CreateNew => {
+                if log_has_content || marker_exists {
+                    return Err(CryptoError::IntegrityViolation);
                 }
-                entries = parsed_entries;
+                InitMode::CreateNew
             }
+            InitMode::OpenExisting => {
+                if !log_exists || !marker_exists {
+                    return Err(CryptoError::IntegrityViolation);
+                }
+                InitMode::OpenExisting
+            }
+            InitMode::OpenOrCreateIfFresh { has_existing_keys } => {
+                if !log_has_content && !marker_exists {
+                    if has_existing_keys {
+                        return Err(CryptoError::IntegrityViolation);
+                    }
+                    InitMode::CreateNew
+                } else if log_exists && marker_exists {
+                    InitMode::OpenExisting
+                } else {
+                    // One exists but the other does not (e.g. marker exists but log deleted, or log has content but marker deleted) -> Fail Closed!
+                    return Err(CryptoError::IntegrityViolation);
+                }
+            }
+        };
+
+        if effective_mode == InitMode::CreateNew {
+            // Write initial empty log and marker
+            let empty_entries: Vec<RevocationEntry> = Vec::new();
+            let serialized_empty = bincode::serialize(&empty_entries).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize empty revocation log: {e}"))
+            })?;
+            write_atomic_file(&path_buf, &serialized_empty)?;
+
+            let marker = RevocationMarker {
+                count: 0,
+                head_hash: [0u8; 32],
+            };
+            let serialized_marker = bincode::serialize(&marker).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize revocation marker: {e}"))
+            })?;
+            write_atomic_file(&m_path, &serialized_marker)?;
+
+            return Ok(Self {
+                file_path: Some(path_buf),
+                signing_key,
+                verifying_key,
+                clock,
+                entries: RwLock::new(Vec::new()),
+                revoked_targets: RwLock::new(HashSet::new()),
+            });
+        }
+
+        // Open existing path
+        let marker_bytes = std::fs::read(&m_path).map_err(|_| CryptoError::IntegrityViolation)?;
+        let marker: RevocationMarker =
+            bincode::deserialize(&marker_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
+
+        let log_bytes = std::fs::read(&path_buf).map_err(|_| CryptoError::IntegrityViolation)?;
+        let parsed_entries: Vec<RevocationEntry> =
+            bincode::deserialize(&log_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
+
+        Self::verify_chain_entries(&parsed_entries, &verifying_key)?;
+
+        // Truncation check: Log count cannot be smaller than marker count
+        let log_count = parsed_entries.len() as u64;
+        if log_count < marker.count {
+            return Err(CryptoError::IntegrityViolation);
+        }
+
+        // If log_count == marker.count and count > 0, verify head hash match
+        if log_count == marker.count && marker.count > 0 {
+            if let Some(last) = parsed_entries.last() {
+                if last.entry_hash != marker.head_hash {
+                    return Err(CryptoError::IntegrityViolation);
+                }
+            }
+        }
+
+        let mut revoked_targets = HashSet::new();
+        for entry in &parsed_entries {
+            revoked_targets.insert(entry.target.clone());
         }
 
         Ok(Self {
@@ -190,7 +399,7 @@ impl RevocationLog {
             signing_key,
             verifying_key,
             clock,
-            entries: RwLock::new(entries),
+            entries: RwLock::new(parsed_entries),
             revoked_targets: RwLock::new(revoked_targets),
         })
     }
@@ -278,57 +487,18 @@ impl RevocationLog {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            let parent = path.parent().unwrap_or_else(|| Path::new("."));
-            let file_name = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("revocation.log");
-            let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let tmp_path = parent.join(format!(
-                "{}.tmp-{}-{}",
-                file_name,
-                std::process::id(),
-                count
-            ));
+            write_atomic_file(path, &serialized)?;
 
-            let write_tmp = || -> Result<()> {
-                let mut tmp_file = OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&tmp_path)
-                    .map_err(|e| {
-                        CryptoError::Crypto(format!(
-                            "Failed to create temp revocation log file: {e}"
-                        ))
-                    })?;
-
-                tmp_file.write_all(&serialized).map_err(|e| {
-                    CryptoError::Crypto(format!("Failed to write temp revocation log file: {e}"))
-                })?;
-
-                tmp_file.sync_all().map_err(|e| {
-                    CryptoError::Crypto(format!("Failed to sync temp revocation log file: {e}"))
-                })?;
-
-                Ok(())
+            let m_path = marker_path_for(path);
+            let marker = RevocationMarker {
+                count: entries_guard.len() as u64,
+                head_hash: new_entry.entry_hash,
             };
+            let serialized_marker = bincode::serialize(&marker).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize revocation marker: {e}"))
+            })?;
 
-            if let Err(err) = write_tmp() {
-                let _ = std::fs::remove_file(&tmp_path);
-                return Err(err);
-            }
-
-            if let Err(e) = std::fs::rename(&tmp_path, path) {
-                let _ = std::fs::remove_file(&tmp_path);
-                return Err(CryptoError::Crypto(format!(
-                    "Failed to rename temp revocation log file: {e}"
-                )));
-            }
-
-            // Optional parent directory sync on supporting POSIX platforms to persist directory entry modification
-            if let Ok(dir_file) = File::open(parent) {
-                let _ = dir_file.sync_all();
-            }
+            write_atomic_file(&m_path, &serialized_marker)?;
         }
 
         drop(entries_guard);
