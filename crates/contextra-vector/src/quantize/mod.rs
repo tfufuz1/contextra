@@ -1,9 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: 8-Bit Skalare Quantisierung (SQ8) mit pro-Dimension Min/Max Skalierung.
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben.
-// NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
+// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; Ungültig geschulte Quantisierer verbleiben im untrained-Zustand und schlagen bei Quantisierung explizit fehl.
+// NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen und NaN/Inf vor Rekalibrierung der Min/Max-Grenzen; train/train_with_percentiles fangen Fehler ab und erzeugen einen untrained-Quantisierer.
 // HOTSPOTS: quantize.rs (ScalarQuantizer::try_train, quantize, dequantize)
-// STAND: TS:2026-08-30T21:55:29Z (SESSION: 10569099)
+// STAND: TS:2026-10-06T12:00:00Z (SESSION: P03-F03)
 
 //! Scalar Quantization (SQ8) for HNSW Index.
 
@@ -50,6 +50,15 @@ impl Clone for ScalarQuantizer {
 }
 
 impl ScalarQuantizer {
+    /// Returns `true` if the quantizer has been successfully trained and is valid for quantization operations.
+    pub fn is_trained(&self) -> bool {
+        self.dimension > 0
+            && self.mins.len() == self.dimension
+            && self.maxes.len() == self.dimension
+            && self.scales.len() == self.dimension
+            && self.inv_scales.len() == self.dimension
+    }
+
     /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
     ///
     /// For long-lived or growing collections, callers should periodically recalibrate the
@@ -168,46 +177,59 @@ impl ScalarQuantizer {
     }
 
     /// Creates a new ScalarQuantizer trained on a batch of vectors with custom percentile bounds.
-    // TODO(Implementer): [P03 / F-03 / HIGH / JULES-P03-03]
-    // Stiller Rückfall auf Null-Skalierungs-Dummy-Quantisierer bei Schulungsfehlern (Invariante I-6, I-8):
-    // `unwrap_or_else` verschluckt Dimensionsmismatches oder NaN/Inf-Werte und erzeugt einen unbrauchbaren
-    // Standard-[0.0, 1.0]-Quantisierer, was zu massivem Recall-Einbruch führt.
-    // Methode als deprecated markieren oder Fehler per `Result<Self, ContextraError>` (`try_train_with_percentiles`) erzwingen.
+    ///
+    /// # Note
+    /// Prefer [`try_train_with_percentiles`](Self::try_train_with_percentiles) for explicit error handling.
+    /// If training fails due to invalid input (such as dimension mismatch, NaN or infinite values),
+    /// this fallback method logs a `tracing::error!` and returns an untrained quantizer
+    /// (`is_trained() == false`) that fails fail-closed on subsequent quantization requests.
     pub fn train_with_percentiles(
         batch: &[&[f32]],
         dimension: usize,
         p_low: f32,
         p_high: f32,
     ) -> Self {
-        Self::try_train_with_percentiles(batch, dimension, p_low, p_high).unwrap_or_else(|_| Self {
-            mins: vec![0.0; dimension],
-            maxes: vec![1.0; dimension],
-            scales: vec![255.0; dimension],
-            inv_scales: vec![1.0 / 255.0; dimension],
-            dimension,
-            total_queries: AtomicU64::new(0),
-            out_of_range_queries: AtomicU64::new(0),
+        Self::try_train_with_percentiles(batch, dimension, p_low, p_high).unwrap_or_else(|err| {
+            tracing::error!(
+                error = %err,
+                dimension = dimension,
+                "ScalarQuantizer::train_with_percentiles failed; quantizer is in an untrained state"
+            );
+            Self {
+                mins: Vec::new(),
+                maxes: Vec::new(),
+                scales: Vec::new(),
+                inv_scales: Vec::new(),
+                dimension,
+                total_queries: AtomicU64::new(0),
+                out_of_range_queries: AtomicU64::new(0),
+            }
         })
     }
 
     /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
     ///
-    /// For long-lived or growing collections, callers should periodically recalibrate the
-    /// quantizer (e.g., during index rebuilds) using a representative sample of active vectors.
-    /// Without recalibration, new vectors that fall outside the initial range will be clamped,
-    /// leading to degraded quantization accuracy.
-    // TODO(Implementer): [P03 / F-03 / HIGH / JULES-P03-03]
-    // Siehe oben: `train` darf Fehler nicht stumm verschlucken. Aufrufer müssen `try_train` nutzen
-    // und ungültige Eingaben (NaN, falsche Dimensionen) als Fehler behandeln.
+    /// # Note
+    /// Prefer [`try_train`](Self::try_train) for explicit error handling.
+    /// If training fails due to invalid input (such as dimension mismatch, NaN or infinite values),
+    /// this fallback method logs a `tracing::error!` and returns an untrained quantizer
+    /// (`is_trained() == false`) that fails fail-closed on subsequent quantization requests.
     pub fn train(batch: &[&[f32]], dimension: usize) -> Self {
-        Self::try_train(batch, dimension).unwrap_or_else(|_| Self {
-            mins: vec![0.0; dimension],
-            maxes: vec![1.0; dimension],
-            scales: vec![255.0; dimension],
-            inv_scales: vec![1.0 / 255.0; dimension],
-            dimension,
-            total_queries: AtomicU64::new(0),
-            out_of_range_queries: AtomicU64::new(0),
+        Self::try_train(batch, dimension).unwrap_or_else(|err| {
+            tracing::error!(
+                error = %err,
+                dimension = dimension,
+                "ScalarQuantizer::train failed; quantizer is in an untrained state"
+            );
+            Self {
+                mins: Vec::new(),
+                maxes: Vec::new(),
+                scales: Vec::new(),
+                inv_scales: Vec::new(),
+                dimension,
+                total_queries: AtomicU64::new(0),
+                out_of_range_queries: AtomicU64::new(0),
+            }
         })
     }
 
@@ -243,8 +265,9 @@ impl ScalarQuantizer {
     /// cumulative query metrics (`total_queries`, `out_of_range_queries`).
     /// For stateful metric tracking across query history, see [`quantize`](Self::quantize)
     /// and [`drift_ratio`](Self::drift_ratio).
+    /// Returns 0.0 without panicking if the quantizer is untrained.
     pub fn calculate_vector_drift(&self, vector: &[f32]) -> f32 {
-        if self.dimension == 0 || vector.is_empty() {
+        if !self.is_trained() || self.dimension == 0 || vector.is_empty() {
             return 0.0;
         }
         let out_count = vector
@@ -271,7 +294,11 @@ impl ScalarQuantizer {
     /// This is a **stateful metric** reflecting cumulative historical queries processed via
     /// [`quantize`](Self::quantize). Pure drift checks via [`calculate_vector_drift`](Self::calculate_vector_drift)
     /// do not update query counters or affect this ratio.
+    /// Returns 0.0 if the quantizer is untrained.
     pub fn drift_ratio(&self) -> f32 {
+        if !self.is_trained() {
+            return 0.0;
+        }
         let total = self.total_queries.load(Ordering::Relaxed);
         if total == 0 {
             return 0.0;
@@ -283,7 +310,11 @@ impl ScalarQuantizer {
     /// Checks if recalibration / index rebuild is required based on cumulative quantization drift ratio.
     ///
     /// Requires at least 20 queries to avoid false positives on small initial samples.
+    /// Returns false if the quantizer is untrained.
     pub fn is_rebuild_required(&self, threshold: f32) -> bool {
+        if !self.is_trained() {
+            return false;
+        }
         let total = self.total_queries.load(Ordering::Relaxed);
         if total < 20 {
             return false;
@@ -293,6 +324,12 @@ impl ScalarQuantizer {
 
     /// Quantizes an `f32` vector to `u8`.
     pub fn quantize(&self, vector: &[f32]) -> contextra_core::Result<Vec<u8>> {
+        if !self.is_trained() {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "ScalarQuantizer is untrained or in an invalid state",
+            ));
+        }
+
         if self.mins.len() < self.dimension
             || self.maxes.len() < self.dimension
             || self.scales.len() < self.dimension
@@ -363,6 +400,12 @@ impl ScalarQuantizer {
 
     /// Dequantizes a `u8` vector back to `f32`.
     pub fn dequantize(&self, vector: &[u8]) -> contextra_core::Result<Vec<f32>> {
+        if !self.is_trained() {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "ScalarQuantizer is untrained or in an invalid state",
+            ));
+        }
+
         if self.inv_scales.len() < self.dimension || self.mins.len() < self.dimension {
             return Err(contextra_core::ContextraError::invalid_input(
                 "Quantizer internal state is corrupted or inconsistent with dimension",
@@ -401,6 +444,12 @@ impl ScalarQuantizer {
         quantized: &[u8],
         metric: DistanceMetric,
     ) -> contextra_core::Result<f32> {
+        if !self.is_trained() {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "ScalarQuantizer is untrained or in an invalid state",
+            ));
+        }
+
         if query.len() != quantized.len() {
             return Err(contextra_core::ContextraError::invalid_input(
                 "Vector dimensions must match",
@@ -460,6 +509,12 @@ impl ScalarQuantizer {
         q2: &[u8],
         metric: DistanceMetric,
     ) -> contextra_core::Result<f32> {
+        if !self.is_trained() {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "ScalarQuantizer is untrained or in an invalid state",
+            ));
+        }
+
         if q1.len() != q2.len() {
             return Err(contextra_core::ContextraError::invalid_input(
                 "Vector dimensions must match",
