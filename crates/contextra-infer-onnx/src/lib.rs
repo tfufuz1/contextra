@@ -8,6 +8,8 @@
 
 //! contextra-embed — In-process text embeddings using ONNX Runtime.
 //!
+//! Dieses Crate stellt ausschließlich ONNX-basierte Embedder bereit (TextEmbedder, OnnxEmbedder). Candle-basierte Embedder liegen in `contextra-infer-candle`.
+//!
 //! This crate provides a high-level API for generating vector embeddings from text
 //! without requiring external API calls. It uses the `ort` crate for ONNX Runtime
 //! and `tokenizers` for text preprocessing.
@@ -186,7 +188,6 @@ pub async fn ensure_onnx_model_download(
             .to_string(),
     })
 }
-
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
