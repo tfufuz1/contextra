@@ -529,6 +529,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         impl<'a> Drop for LeaderCancelGuard<'a> {
             fn drop(&mut self) {
                 if self.active {
+                    // TODO(Implementer): [P01 / F-03 / HIGH / JULES-P01-03]
+                    // Entkopplung der Leader-Cancellation von Follower-ACKs im Group-Commit (Invariante I-2):
+                    // Die Benachrichtigung der Follower über `try_lock()` ist fehleranfällig: Schlägt `try_lock()`
+                    // fehl (z.B. wegen Contention), erhalten wartende Follower keinen Fehler und prüfen ggf.
+                    // ein veraltetes/fremdes `committed_flag` oder laufen in Timeouts.
+                    // `LeaderCancelGuard` muss eine unbedingte Benachrichtigung aller Follower garantieren
+                    // (z.B. über unbedingtes Locking oder atomare Benachrichtigungs-Queue), damit kein Follower
+                    // fälschlicherweise `Ok(())` für ungeschriebene Transaktionen annimmt.
                     if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
                         if let Some(pending_queue) = queue_guard.take() {
                             for r in pending_queue.requests {

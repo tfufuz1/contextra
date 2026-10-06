@@ -386,6 +386,12 @@ impl Wal {
                         .await;
 
                         if let Err(sync_err) = sync_res {
+                            // TODO(Implementer): [P01 / F-01 / CRITICAL / JULES-P01-01]
+                            // Page-Cache Resurrection ungefluster Bytes nach `fsync()`-Fehler (I-2, I-3, I-5):
+                            // Nach fehlerhaftem `file.sync_all()` verbleiben geschriebene Daten im OS-Page-Cache.
+                            // Bei späterer Recovery oder Kernel-Delay-Flush können unbestätigte Transaktionen auferstehen!
+                            // 1. Die Datei MUSS hier sofort mittels `file.set_len(size_before).await` auf die Länge vor dem Write zurückgesetzt werden.
+                            // 2. Das Handle bleibt streng `poisoned` und verweigert weitere Writes bis zum Replay.
                             poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                             for ack in acks {
                                 let _ =

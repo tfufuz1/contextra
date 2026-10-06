@@ -157,6 +157,12 @@ impl RevocationLog {
         let mut entries = Vec::new();
         let mut revoked_targets = HashSet::new();
 
+        // TODO(#JULES-P04-1, Implementer): [P04 / F-3 / CRITICAL]
+        // Fehlen oder Löschung der `RevocationLog`-Datei hebelt Crypto-Shredding nach Systemneustart lautlos aus.
+        // Aktuell: Falls `!path_buf.exists()`, wird stillschweigend ein leeres Widerrufsregister zurückgegeben.
+        // Soll: Wenn ein Dateipfad angegeben ist und die Datei nicht existiert, aber das Datenbank-/Schlüsselverzeichnis
+        // bereits initialisiert ist (Schlüssel/Daten vorhanden), MUSS `open_or_create` fail-closed mit
+        // `CryptoError::IntegrityViolation` abbrechen. Neues leeres Log-File nur bei expliziter Initialisierung gestatten!
         if path_buf.exists() {
             let mut file = File::open(&path_buf).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to open revocation log file: {e}"))

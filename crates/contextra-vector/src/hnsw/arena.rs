@@ -99,6 +99,11 @@ impl HnswArena {
 
     /// Allocates or reuses a slot for a node's neighbor lists across all its layers.
     /// Ensures 64-byte alignment and validates capacity on slot reuse.
+    // TODO(Implementer): [P03 / F-01 / CRITICAL / JULES-P03-01]
+    // Fehlervertrag von `allocate_node` (Invariante I-8 / Zero-Panic Guarantee):
+    // Bei Allokationsfehlern (z. B. ungültige Kapazität, Speichergrenze) liefert `allocate_node` ein `Result::Err`.
+    // Aufrufer (wie `apply_insert`) dürfen diesen Fehler keinesfalls per `unwrap_or_else` in einen nicht-allokierten
+    // Phantom-Index umwandeln, sondern müssen den Insert-Vorgang sauber abbrechen.
     pub fn allocate_node(
         &self,
         max_layer: usize,

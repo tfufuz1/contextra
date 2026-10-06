@@ -751,6 +751,11 @@ impl Wal {
                     }
                 }
             } else {
+                // TODO(Implementer): [P01 / F-02 / HIGH / JULES-P01-02]
+                // Unvollständige Truncation partieller Frames beim Replay auf Open (Invariante I-3):
+                // Sicherstellen, dass `verified_end` exakt der physischen Endposition des letzten vollständig
+                // verifizierten HMAC-Frames entspricht (auch bei V3-AEAD-Verschlüsselung mit Nonce/Tag).
+                // Müll- oder Nulldaten nach einem Absturz müssen deterministisch abgeschnitten werden.
                 let (verified_end, last_hmac) =
                     if let Some((_, last_entry, end_pos)) = entries.last() {
                         (*end_pos, last_entry.checksum)
@@ -801,6 +806,11 @@ impl Wal {
         };
 
         if let Some(task) = flusher_task {
+            // TODO(Implementer): [P01 / F-06 / MEDIUM]
+            // Unbehandelte JoinHandle-Panik im Flusher-Actor Shutdown (Invariante I-5):
+            // `close()` ignoriert das Ergebnis von `task.await`. Falls der Hintergrund-Flusher paniziert ist,
+            // muss der Fehler als `Err(ContextraError::Internal(format!("WAL flusher panicked: {e}")))`
+            // propagiert werden, anstatt die Panik beim geordneten Herunterfahren still zu verschlucken.
             let _ = task.await;
         }
 

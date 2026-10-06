@@ -799,6 +799,10 @@ impl SstableReader {
             let may_contain = may_contain_key_in_block_bloom(bloom_bytes, key, self.format_version);
 
             if may_contain {
+                // TODO(Implementer): [P02 / F-02 / HIGH / JULES-P02-02]
+                // Sicherstellen, dass ab `first_entry_idx` die Blockeinträge für denselben Key in strikt
+                // absteigender Sequenzreihenfolge (`raw_seq`) evaluiert werden. Bei mehreren Versionen
+                // darf niemals eine ältere Version zurückgegeben werden, wenn eine neuere sichtbare Version existiert.
                 if let Some(first_entry_idx) = binary_search_first_index_in_block(
                     &block_data,
                     offsets_start,
