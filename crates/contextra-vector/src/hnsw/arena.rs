@@ -1,4 +1,5 @@
 // FILE-CONTEXT
+// STAND: 2026-10-06
 // ZWECK: Arena-Allocator (HnswArena) für HNSW-Nachbarlisten mit 64-Byte-Alignment, Slot-Freilisten und CAS-Relinking.
 // INVARIANTEN: Zero-Panic Doctrine (ContextraError bei Kapazität/Grenzen); SIMD-Cacheline Alignment (64 Bytes).
 
@@ -87,36 +88,46 @@ impl HnswArena {
         if layer == 0 {
             node_offset
         } else {
-            node_offset + (m * 2) + (layer - 1) * m
+            node_offset
+                .saturating_add(m.saturating_mul(2))
+                .saturating_add(layer.saturating_sub(1).saturating_mul(m))
         }
     }
 
-    /// Rounds up an allocation size in u32s to the nearest 64-byte (16 x u32) boundary.
+    /// Rounds up an allocation size in u32s to the nearest 64-byte (16 x u32) boundary safely.
     #[inline]
-    pub fn align_capacity(raw_capacity: usize) -> usize {
-        (raw_capacity + ARENA_ALIGNMENT_U32 - 1) & !(ARENA_ALIGNMENT_U32 - 1)
+    pub fn align_capacity(raw_capacity: usize) -> Option<usize> {
+        raw_capacity
+            .checked_add(ARENA_ALIGNMENT_U32 - 1)
+            .map(|val| val & !(ARENA_ALIGNMENT_U32 - 1))
     }
 
     /// Allocates or reuses a slot for a node's neighbor lists across all its layers.
     /// Ensures 64-byte alignment and validates capacity on slot reuse.
-    // TODO(Implementer): [P03 / F-01 / CRITICAL / JULES-P03-01]
-    // Fehlervertrag von `allocate_node` (Invariante I-8 / Zero-Panic Guarantee):
-    // Bei Allokationsfehlern (z. B. ungültige Kapazität, Speichergrenze) liefert `allocate_node` ein `Result::Err`.
-    // Aufrufer (wie `apply_insert`) dürfen diesen Fehler keinesfalls per `unwrap_or_else` in einen nicht-allokierten
-    // Phantom-Index umwandeln, sondern müssen den Insert-Vorgang sauber abbrechen.
     pub fn allocate_node(
         &self,
         max_layer: usize,
         m: usize,
         final_connections: &[Vec<u32>],
     ) -> Result<usize> {
-        let raw_capacity = (m * 2) + max_layer * m;
+        let max_layer_capacity = max_layer.checked_mul(m).ok_or_else(|| {
+            ContextraError::invalid_input("Overflow calculating max_layer connection capacity")
+        })?;
+        let m2 = m.checked_mul(2).ok_or_else(|| {
+            ContextraError::invalid_input("Overflow calculating layer 0 connection capacity")
+        })?;
+        let raw_capacity = m2.checked_add(max_layer_capacity).ok_or_else(|| {
+            ContextraError::invalid_input("Overflow calculating raw connection capacity")
+        })?;
+
         if raw_capacity == 0 {
             return Err(ContextraError::invalid_input(
                 "Node connection capacity cannot be 0",
             ));
         }
-        let node_capacity = Self::align_capacity(raw_capacity);
+        let node_capacity = Self::align_capacity(raw_capacity).ok_or_else(|| {
+            ContextraError::invalid_input("Capacity overflow calculating 64-byte alignment")
+        })?;
 
         let mut offsets = self.offsets.write();
         let mut capacities = self.capacities.write();
@@ -136,16 +147,24 @@ impl HnswArena {
 
         let (ram_idx, start_offset) = if let Some(free_pos) = found_free_index {
             let reused_idx = free_list.remove(free_pos);
-            (reused_idx, offsets[reused_idx])
+            let start = offsets.get(reused_idx).copied().ok_or_else(|| {
+                ContextraError::Index(format!("Invalid offset index {reused_idx} in free list"))
+            })?;
+            (reused_idx, start)
         } else {
             // Align start offset to 64-byte boundary (16 x u32 elements)
             let current_len = arena.len();
-            let aligned_start = Self::align_capacity(current_len);
+            let aligned_start = Self::align_capacity(current_len).ok_or_else(|| {
+                ContextraError::invalid_input("Capacity overflow aligning arena start offset")
+            })?;
             if aligned_start > current_len {
                 arena.resize(aligned_start, 0);
             }
             let start = arena.len();
-            arena.resize(start + node_capacity, 0);
+            let end_arena = start.checked_add(node_capacity).ok_or_else(|| {
+                ContextraError::invalid_input("Capacity overflow allocating arena block")
+            })?;
+            arena.resize(end_arena, 0);
             offsets.push(start);
             capacities.push(node_capacity);
             (offsets.len() - 1, start)
@@ -158,10 +177,17 @@ impl HnswArena {
                 let l_offset = Self::layer_offset(start_offset, layer, m);
                 let layer_cap = if layer == 0 { m * 2 } else { m };
                 let len = layer_conns.len().min(layer_cap);
-                if l_offset + len > arena.len() {
-                    arena.resize(l_offset + len, 0);
+                let end_offset = l_offset.checked_add(len).ok_or_else(|| {
+                    ContextraError::invalid_input(
+                        "Overflow calculating end offset in allocate_node",
+                    )
+                })?;
+                if end_offset > arena.len() {
+                    arena.resize(end_offset, 0);
                 }
-                arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+                if l_offset + len <= arena.len() {
+                    arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+                }
                 counts.push(len as u8);
             }
         } else {
@@ -170,10 +196,17 @@ impl HnswArena {
                 let l_offset = Self::layer_offset(start_offset, layer, m);
                 let layer_cap = if layer == 0 { m * 2 } else { m };
                 let len = layer_conns.len().min(layer_cap);
-                if l_offset + len > arena.len() {
-                    arena.resize(l_offset + len, 0);
+                let end_offset = l_offset.checked_add(len).ok_or_else(|| {
+                    ContextraError::invalid_input(
+                        "Overflow calculating end offset in allocate_node",
+                    )
+                })?;
+                if end_offset > arena.len() {
+                    arena.resize(end_offset, 0);
                 }
-                arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+                if l_offset + len <= arena.len() {
+                    arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+                }
                 if count_start + layer < counts.len() {
                     counts[count_start + layer] = len as u8;
                 }
@@ -190,32 +223,41 @@ impl HnswArena {
         let count_offsets = self.count_offsets.read();
         let counts = self.counts.read();
 
-        if ram_idx >= offsets.len() || ram_idx >= count_offsets.len() {
-            return Vec::new();
-        }
-
-        let count_start = count_offsets[ram_idx];
-        if count_start + layer >= counts.len() {
-            return Vec::new();
-        }
-
-        let count_end = if ram_idx + 1 < count_offsets.len() {
-            count_offsets[ram_idx + 1]
-        } else {
-            counts.len()
+        let node_offset = match offsets.get(ram_idx) {
+            Some(&off) => off,
+            None => return Vec::new(),
         };
 
-        if count_start + layer >= count_end {
+        let count_start = match count_offsets.get(ram_idx) {
+            Some(&c) => c,
+            None => return Vec::new(),
+        };
+
+        let count_idx = match count_start.checked_add(layer) {
+            Some(idx) => idx,
+            None => return Vec::new(),
+        };
+
+        let count_end = count_offsets
+            .get(ram_idx + 1)
+            .copied()
+            .unwrap_or_else(|| counts.len());
+
+        if count_idx >= count_end || count_idx >= counts.len() {
             return Vec::new();
         }
 
-        let len = counts[count_start + layer] as usize;
-        let node_offset = offsets[ram_idx];
+        let len = counts[count_idx] as usize;
         let l_offset = Self::layer_offset(node_offset, layer, m);
 
         let arena = self.arena.read();
-        if l_offset + len <= arena.len() {
-            arena[l_offset..l_offset + len].to_vec()
+        let end_offset = match l_offset.checked_add(len) {
+            Some(end) => end,
+            None => return Vec::new(),
+        };
+
+        if end_offset <= arena.len() {
+            arena.get(l_offset..end_offset).unwrap_or(&[]).to_vec()
         } else {
             Vec::new()
         }
@@ -231,30 +273,52 @@ impl HnswArena {
     ) -> Result<()> {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
+
+        let node_offset = match offsets.get(ram_idx) {
+            Some(&off) => off,
+            None => {
+                return Err(ContextraError::Index(format!(
+                    "Invalid ram_idx {ram_idx} for backlink update"
+                )));
+            }
+        };
+
+        let count_start = match count_offsets.get(ram_idx) {
+            Some(&c) => c,
+            None => {
+                return Err(ContextraError::Index(format!(
+                    "Invalid ram_idx {ram_idx} for backlink update"
+                )));
+            }
+        };
+
+        let count_end = count_offsets
+            .get(ram_idx + 1)
+            .copied()
+            .unwrap_or_else(|| self.counts.read().len());
+
+        let target_count_idx = match count_start.checked_add(layer) {
+            Some(idx) if idx < count_end => idx,
+            _ => return Ok(()),
+        };
+
+        let l_offset = Self::layer_offset(node_offset, layer, m);
+
+        let layer_cap = if layer == 0 { m * 2 } else { m };
+        let len = updated_connections.len().min(layer_cap);
+
+        let end_offset = match l_offset.checked_add(len) {
+            Some(end) => end,
+            None => return Ok(()),
+        };
+
         let mut counts = self.counts.write();
         let mut arena = self.arena.write();
 
-        if ram_idx >= offsets.len() || ram_idx >= count_offsets.len() {
-            return Err(ContextraError::Index(format!(
-                "Invalid ram_idx {ram_idx} for backlink update"
-            )));
-        }
-
-        let node_offset = offsets[ram_idx];
-        let count_start = count_offsets[ram_idx];
-        let count_end = if ram_idx + 1 < count_offsets.len() {
-            count_offsets[ram_idx + 1]
-        } else {
-            counts.len()
-        };
-
-        if count_start + layer < count_end {
-            let l_offset = Self::layer_offset(node_offset, layer, m);
-            let layer_cap = if layer == 0 { m * 2 } else { m };
-            let len = updated_connections.len().min(layer_cap);
-            if l_offset + len <= arena.len() {
-                arena[l_offset..l_offset + len].copy_from_slice(&updated_connections[..len]);
-                counts[count_start + layer] = len as u8;
+        if end_offset <= arena.len() && target_count_idx < counts.len() {
+            if let Some(slice) = arena.get_mut(l_offset..end_offset) {
+                slice.copy_from_slice(&updated_connections[..len]);
+                counts[target_count_idx] = len as u8;
             }
         }
 
@@ -275,23 +339,38 @@ impl HnswArena {
             self.counts.try_write(),
             self.arena.try_write(),
         ) {
-            if ram_idx < offsets.len() && ram_idx < count_offsets.len() {
-                let node_offset = offsets[ram_idx];
-                let count_start = count_offsets[ram_idx];
-                let count_end = if ram_idx + 1 < count_offsets.len() {
-                    count_offsets[ram_idx + 1]
-                } else {
-                    counts.len()
-                };
-                if count_start + layer < count_end {
-                    let l_offset = Self::layer_offset(node_offset, layer, m);
-                    let layer_cap = if layer == 0 { m * 2 } else { m };
-                    let len = kept_neighbors.len().min(layer_cap);
-                    if l_offset + len <= arena.len() {
-                        arena[l_offset..l_offset + len].copy_from_slice(&kept_neighbors[..len]);
-                        counts[count_start + layer] = len as u8;
-                        return true;
-                    }
+            let node_offset = match offsets.get(ram_idx) {
+                Some(&off) => off,
+                None => return false,
+            };
+            let count_start = match count_offsets.get(ram_idx) {
+                Some(&c) => c,
+                None => return false,
+            };
+            let count_end = count_offsets
+                .get(ram_idx + 1)
+                .copied()
+                .unwrap_or_else(|| counts.len());
+
+            let target_count_idx = match count_start.checked_add(layer) {
+                Some(idx) if idx < count_end && idx < counts.len() => idx,
+                _ => return false,
+            };
+
+            let l_offset = Self::layer_offset(node_offset, layer, m);
+
+            let layer_cap = if layer == 0 { m * 2 } else { m };
+            let len = kept_neighbors.len().min(layer_cap);
+            let end_offset = match l_offset.checked_add(len) {
+                Some(end) => end,
+                None => return false,
+            };
+
+            if end_offset <= arena.len() {
+                if let Some(slice) = arena.get_mut(l_offset..end_offset) {
+                    slice.copy_from_slice(&kept_neighbors[..len]);
+                    counts[target_count_idx] = len as u8;
+                    return true;
                 }
             }
         }
