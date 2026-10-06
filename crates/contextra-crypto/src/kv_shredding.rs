@@ -1,6 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding (AP-P0-06, Spec v17 §16.1).
 // INVARIANTEN: CryptoShred vernichtet KEK (Gruppenlöschung) oder DEK-Wrap (Einzellöschung) in O(1).
+// Fail-Closed bei Revokationsprüfungen und verifiziertem RevocationLog-Status.
 // Zufälliges KEK/DEK-Material via OsRng (keine deterministische Ableitung rein aus group_id).
 // HOTSPOTS: [SubKey, KeyRegistry, revoke_group, revoke_record, encrypt_record, decrypt_record]
 
@@ -205,6 +206,9 @@ impl KeyRegistry {
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
         if let Some(ref log) = self.revocation_log {
             if log.is_revoked(&RevocationTarget::Group(group_id)) {
+                return true;
+            }
+            if log.verify_integrity().is_err() {
                 return true;
             }
         }
