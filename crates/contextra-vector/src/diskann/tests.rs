@@ -1144,6 +1144,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_diskann_missing_file_succeeds_when_create_if_missing_true() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let missing_path = temp_dir.path().join("missing_file_create.idx");
+
+        let config = DiskAnnConfig {
+            index_path: missing_path,
+            create_if_missing: true,
+            fallback_policy: DiskAnnFallbackPolicy::FailFast,
+            ..DiskAnnConfig::default()
+        };
+
+        let index = DiskAnnIndex::try_new(config).unwrap();
+        let load_res = index.load().await;
+
+        assert!(
+            load_res.is_ok(),
+            "Loading a missing index file must succeed when create_if_missing is true"
+        );
+    }
+
+    #[tokio::test]
     async fn test_diskann_partially_written_tmp_file_does_not_corrupt_target() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let index_path = temp_dir.path().join("crash_resilience.idx");

@@ -787,6 +787,7 @@ mod tests {
         };
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap.make_read_only().unwrap()),
+            file_handle: std::sync::Arc::new(mmap_file.reopen().unwrap()),
             header,
             file_handle: std::sync::Arc::new(file),
         };
@@ -823,6 +824,7 @@ mod tests {
         };
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap),
+            file_handle: std::sync::Arc::new(mmap_file.reopen().unwrap()),
             header,
             file_handle: std::sync::Arc::new(file),
         };

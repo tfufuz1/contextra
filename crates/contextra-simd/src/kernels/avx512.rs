@@ -383,15 +383,23 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
         // SAFETY: Loop condition i + 64 <= len guarantees b[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
         let vb = unsafe { _mm512_loadu_si512(b.as_ptr().add(i) as *const __m512i) };
 
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let prod_lo = unsafe { _mm512_madd_epi16(va_lo, vb_lo) };
 
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let prod_hi = unsafe { _mm512_madd_epi16(va_hi, vb_hi) };
 
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         sum_v = unsafe { _mm512_add_epi32(sum_v, prod_lo) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         sum_v = unsafe { _mm512_add_epi32(sum_v, prod_hi) };
 
         i += 64;
@@ -502,16 +510,26 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
         // SAFETY: Loop condition i + 64 <= len guarantees b[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
         let vb = unsafe { _mm512_loadu_si512(b.as_ptr().add(i) as *const __m512i) };
 
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         dot_v = unsafe { _mm512_add_epi32(dot_v, _mm512_madd_epi16(va_lo, vb_lo)) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         norm_a_v = unsafe { _mm512_add_epi32(norm_a_v, _mm512_madd_epi16(va_lo, va_lo)) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         norm_b_v = unsafe { _mm512_add_epi32(norm_b_v, _mm512_madd_epi16(vb_lo, vb_lo)) };
 
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         dot_v = unsafe { _mm512_add_epi32(dot_v, _mm512_madd_epi16(va_hi, vb_hi)) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         norm_a_v = unsafe { _mm512_add_epi32(norm_a_v, _mm512_madd_epi16(va_hi, va_hi)) };
+        // SAFETY: Target features avx512f/bw/vnni enabled on function; operates on valid register values.
         norm_b_v = unsafe { _mm512_add_epi32(norm_b_v, _mm512_madd_epi16(vb_hi, vb_hi)) };
 
         i += 64;

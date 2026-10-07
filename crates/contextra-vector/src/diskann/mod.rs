@@ -6,6 +6,7 @@
 
 pub(crate) mod build;
 pub(crate) mod config;
+pub(crate) mod durable_fs;
 pub(crate) mod filtered;
 pub(crate) mod format;
 pub(crate) mod persistence;
