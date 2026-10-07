@@ -1,8 +1,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Integration & Property-Based Tests for contextra-sandbox (§4.18, §10.14).
 
-use contextra_sandbox::{SandboxError, WasmCapabilities, WasmExecutor};
+use contextra_sandbox::{AdmittedModule, SandboxError, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
+
+fn admit(bytes: Vec<u8>) -> AdmittedModule {
+    AdmittedModule::new(bytes, [0u8; 32])
+}
 
 #[tokio::test]
 async fn test_wasm_memory_isolation_property_variations() {
@@ -22,13 +26,14 @@ async fn test_wasm_memory_isolation_property_variations() {
         );
 
         let wasm_bytes = wat::parse_str(&wat).expect("parse WAT");
+        let admitted = admit(wasm_bytes);
         let caps = WasmCapabilities {
             max_memory_pages: max_pages,
             ..Default::default()
         };
 
         let res = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(2))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(2))
             .await;
 
         if should_succeed {
@@ -62,6 +67,7 @@ async fn test_wasm_fuel_exhaustion_returns_error_property() {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat).expect("parse WAT");
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new().expect("WasmExecutor init");
 
     for fuel_limit in [100u64, 1_000u64, 50_000u64] {
@@ -71,7 +77,7 @@ async fn test_wasm_fuel_exhaustion_returns_error_property() {
         };
 
         let res = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(5))
             .await;
 
         assert!(
@@ -94,6 +100,7 @@ async fn test_cloud_egress_strict_capability_isolation() {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat).expect("parse WAT");
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new().expect("WasmExecutor init");
 
     // Disabled capability
@@ -102,7 +109,7 @@ async fn test_cloud_egress_strict_capability_isolation() {
         ..Default::default()
     };
     let res_denied = executor
-        .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(2))
+        .execute_admitted(&admitted, b"", &caps_denied, Duration::from_secs(2))
         .await;
 
     assert!(
@@ -120,7 +127,7 @@ async fn test_cloud_egress_strict_capability_isolation() {
         ..Default::default()
     };
     let res_allowed = executor
-        .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(2))
+        .execute_admitted(&admitted, b"", &caps_allowed, Duration::from_secs(2))
         .await;
 
     assert!(

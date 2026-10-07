@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{
+    admission::AdmittedModule,
     capabilities::{MergeOperatorCapabilities, ModulePolicy, WasmCapabilities},
     error::SandboxError,
     executor::WasmExecutor,
@@ -25,7 +26,7 @@ use crate::{
 #[derive(Debug)]
 pub struct WasmMergeFunction {
     executor: WasmExecutor,
-    wasm_bytes: Arc<[u8]>,
+    admitted_module: AdmittedModule,
     caps: WasmCapabilities,
 }
 
@@ -70,14 +71,16 @@ impl WasmMergeFunction {
         caps: WasmCapabilities,
     ) -> Result<Self, SandboxError> {
         let executor = WasmExecutor::new()?;
-        let wasm_bytes: Arc<[u8]> = wasm_bytes.into();
+        let wasm_bytes_arc: Arc<[u8]> = wasm_bytes.into();
 
-        executor.validate_module(&wasm_bytes, caps.max_module_size_bytes)?;
-        caps.verify_module_policy(&wasm_bytes)?;
+        executor.validate_module(&wasm_bytes_arc, caps.max_module_size_bytes)?;
+        caps.verify_module_policy(&wasm_bytes_arc)?;
+
+        let admitted_module = AdmittedModule::new(wasm_bytes_arc.to_vec(), [0u8; 32]);
 
         Ok(Self {
             executor,
-            wasm_bytes,
+            admitted_module,
             caps,
         })
     }
@@ -131,7 +134,7 @@ impl WasmMergeFunction {
         let timeout = Duration::from_millis(caps.max_wall_clock_ms);
         let output = self
             .executor
-            .execute(&self.wasm_bytes, &input, caps, timeout)
+            .execute_admitted(&self.admitted_module, &input, caps, timeout)
             .await?;
 
         Ok(output.stdout.to_vec())
