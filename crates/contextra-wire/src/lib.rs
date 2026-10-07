@@ -6,18 +6,17 @@
 
 //! Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC bindings and zero-copy adapters for Contextra.
 
-#![allow(unsafe_code)]
-#![allow(unsafe_op_in_unsafe_fn)]
-#![allow(clippy::all)]
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::panic)]
-#![allow(clippy::undocumented_unsafe_blocks)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 #[allow(clippy::all)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
+#[allow(clippy::panic)]
+#[allow(clippy::undocumented_unsafe_blocks)]
 #[allow(missing_docs)]
 #[allow(unused_imports)]
 #[allow(unsafe_code)]
+#[allow(unsafe_op_in_unsafe_fn)]
 #[allow(mismatched_lifetime_syntaxes)]
 pub mod contextra_generated;
 
