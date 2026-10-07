@@ -79,7 +79,8 @@ pub(super) fn get_neighbor_conns_in_batch(
         return Ok(conns.clone());
     }
 
-    Ok(core.hot
+    Ok(core
+        .hot
         .get_ram_node_connections(neighbor_ram_idx, layer, core.cold.config.m))
 }
 

@@ -130,7 +130,10 @@ fn post_process_generated_code(output_file: &Path) {
         if content.ends_with('\n') {
             new_content.push('\n');
         }
-        let _ = std::fs::write(output_file, new_content);
+        if let Err(e) = std::fs::write(output_file, new_content) {
+            eprintln!("Failed to write post-processed FlatBuffers Rust code in build.rs: {e}");
+            std::process::exit(1);
+        }
     }
 }
 

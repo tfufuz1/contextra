@@ -85,8 +85,20 @@ pub fn run_shell_commit_audit_impl(
 
     // Find commits with exact subject "Shell-Commit"
     let mut log_args = vec!["log", "--format=%H|%cI|%s"];
+    let branch_range;
     if let Some(ref sa) = since_arg {
         log_args.push(sa.as_str());
+    } else {
+        let has_origin_main = Command::new("git")
+            .current_dir(root)
+            .args(["rev-parse", "--verify", "origin/main"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if has_origin_main {
+            branch_range = "origin/main..HEAD".to_string();
+            log_args.push(&branch_range);
+        }
     }
 
     let log_output = Command::new("git")

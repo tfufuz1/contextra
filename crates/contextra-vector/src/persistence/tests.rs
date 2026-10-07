@@ -201,10 +201,12 @@ fn test_file_modified_or_locked_during_mapping() -> Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("locked.hnsw");
     let header = HnswHeader::new(4, 16, 1, 0, -1.0, 1.0, 0, -1, 84, 84, 1);
-    std::fs::write(&path, &header.to_bytes()).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &header.to_bytes())
+        .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
     // Hold exclusive lock on file
-    let lock_file = std::fs::File::open(&path).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let lock_file =
+        std::fs::File::open(&path).map_err(|e| ContextraError::Storage(e.to_string()))?;
     let _ = lock_file.try_lock();
 
     let res = MmapIndex::open(&path);

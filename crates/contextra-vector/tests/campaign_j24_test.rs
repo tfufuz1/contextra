@@ -569,7 +569,10 @@ async fn test_h7_diskann_corruption_and_fallback_policy() {
 
     // BEFUND J-24-F04 (RESOLVED): DiskAnnIndex::try_new validates existing disk files immediately
     let reopen_res = DiskAnnIndex::try_new(diskann_config.clone());
-    assert!(reopen_res.is_err(), "try_new on corrupted header must return Err");
+    assert!(
+        reopen_res.is_err(),
+        "try_new on corrupted header must return Err"
+    );
 
     // Search on corrupted diskann index triggers fallback or error
     let query = gen_vector(dim, 999);
