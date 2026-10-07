@@ -7,22 +7,31 @@ on:
     # Wöchentlich Samstag 23:00 UTC (Coverage-Trend-Tracking)
     - cron: "0 23 * * 6"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   coverage:
     name: Coverage Gate (llvm-cov)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1.89.0
         with:
+          toolchain: 1.89.0
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --quiet
+        uses: taiki-e/install-action@4314395b773db6ec53370cf7e57cc6bfefb6ae8f # cargo-llvm-cov
 
       - name: Generate Coverage Report
         run: |
@@ -32,15 +41,22 @@ jobs:
             --exclude contextra-core-ipc-gen \
             --json \
             --output-path coverage.json
-        timeout-minutes: 20
 
       - name: Run Coverage Gate
         run: cargo xtask check-coverage-gate
-        # Gate-Schwellwerte: siehe xtask/src/check_coverage_gate.rs::get_threshold_for_crate (einzige maßgebliche Quelle, nicht hier duplizieren)
+
+      - name: Check Per-Crate Coverage (contextra-infer-candle)
+        run: |
+          PERCENT=$(jq -r '.data[0].files[] | select(.filename | contains("crates/contextra-infer-candle/")) | .summary.lines.percent' coverage.json | head -n 1)
+          if [ -z "$PERCENT" ] || [ "$PERCENT" = "null" ]; then
+            echo "❌ ERROR: contextra-infer-candle not found in coverage.json"
+            exit 1
+          fi
+          echo "contextra-infer-candle coverage: $PERCENT%"
 
       - name: Upload Coverage to Codecov
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
         with:
           files: coverage.json
           fail_ci_if_error: false
@@ -57,7 +73,7 @@ jobs:
 
       - name: Upload HTML Report Artifact
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.2.0
         with:
           name: coverage-report-${{ github.sha }}
           path: target/coverage/
