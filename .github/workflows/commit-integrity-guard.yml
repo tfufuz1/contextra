@@ -6,21 +6,37 @@ name: Commit Integrity Guard
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   commit-integrity-guard:
     name: Commit Integrity Guard
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: "Check Commit Integrity (No Empty Commits with Misleading Messages)"
         env:
-          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          BASE_REF_NAME: ${{ github.base_ref }}
         run: |
           set -euo pipefail
+
+          if [ -n "$BASE_REF_NAME" ]; then
+            CONTEXTRA_CI_BASE_REF="origin/$BASE_REF_NAME"
+          elif [ -n "$EVENT_BEFORE" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            CONTEXTRA_CI_BASE_REF="$EVENT_BEFORE"
+          else
+            CONTEXTRA_CI_BASE_REF="HEAD~1"
+          fi
 
           BASE_REF="${CONTEXTRA_CI_BASE_REF:-origin/main}"
           if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
@@ -81,9 +97,18 @@ jobs:
 
       - name: "PR Diff Stat vs Commit Message Discrepancy Gate (PZ-01)"
         env:
-          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          BASE_REF_NAME: ${{ github.base_ref }}
         run: |
           set -euo pipefail
+
+          if [ -n "$BASE_REF_NAME" ]; then
+            CONTEXTRA_CI_BASE_REF="origin/$BASE_REF_NAME"
+          elif [ -n "$EVENT_BEFORE" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            CONTEXTRA_CI_BASE_REF="$EVENT_BEFORE"
+          else
+            CONTEXTRA_CI_BASE_REF="HEAD~1"
+          fi
 
           BASE_REF="${CONTEXTRA_CI_BASE_REF:-origin/main}"
           if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
