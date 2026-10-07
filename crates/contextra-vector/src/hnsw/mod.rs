@@ -9,7 +9,9 @@
 pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
+pub mod durable_fs;
 pub mod sq8_bias;
+pub mod verify;
 
 mod acorn_filtered;
 mod batch;
@@ -28,9 +30,11 @@ pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
+pub use durable_fs::{atomic_replace, durable_remove};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
+pub use verify::{GhostScan, IncompleteReason};
