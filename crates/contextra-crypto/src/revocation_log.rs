@@ -115,7 +115,9 @@ fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
     }
 
     if let Ok(dir_file) = File::open(parent) {
-        let _ = dir_file.sync_all();
+        dir_file
+            .sync_all()
+            .map_err(|e| CryptoError::Crypto(format!("Failed to sync parent directory: {e}")))?;
     }
 
     Ok(())

@@ -279,10 +279,10 @@ impl VectorIndex for HnswIndex {
 
             if train_data.len() >= 50 {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let q = crate::quantize::ScalarQuantizer::train(
+                let q = crate::quantize::ScalarQuantizer::try_train(
                     &training_refs,
                     self.inner.cold.config.dimension,
-                );
+                )?;
                 let bias =
                     Sq8Bias::calibrate(&training_refs, &q, self.inner.cold.config.distance_metric);
                 *self.inner.cold.quantizer.write() = Some(q.clone());
