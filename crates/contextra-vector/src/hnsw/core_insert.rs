@@ -267,7 +267,7 @@ impl HnswIndexCore {
                     &nodes_read,
                     prior_prepared,
                     batch_ctx,
-                );
+                )?;
 
                 let mut conn_indices = existing_conns;
                 if !conn_indices.contains(&(new_idx as u32)) {
