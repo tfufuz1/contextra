@@ -6,48 +6,14 @@ use std::sync::Arc;
 // STAND: TS:2026-10-06T12:00:00Z (SESSION: fix/p03-d-diskann-pending-wal)
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
+pub(crate) use super::durable_fs::{atomic_replace, durable_remove};
 use super::format::{
     DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC, DISKANN_INTEGRITY_KEY, DISKANN_MAGIC,
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
 use contextra_core::{ContextraError, DocId, Result};
-use std::path::Path;
 use std::sync::atomic::Ordering;
-
-/// Syncs `tmp_path`, renames `tmp_path` to `target_path`, and syncs parent directory of `target_path`.
-pub(crate) fn atomic_replace(tmp_path: &Path, target_path: &Path) -> Result<()> {
-    let tmp_file = std::fs::File::open(tmp_path).map_err(ContextraError::Io)?;
-    tmp_file
-        .sync_all()
-        .map_err(|e| ContextraError::Storage(format!("fsync tmp: {e}")))?;
-    drop(tmp_file);
-
-    std::fs::rename(tmp_path, target_path)
-        .map_err(|e| ContextraError::Storage(format!("rename: {e}")))?;
-
-    if let Some(parent) = target_path.parent() {
-        let parent_dir = std::fs::File::open(parent).map_err(ContextraError::Io)?;
-        parent_dir
-            .sync_all()
-            .map_err(|e| ContextraError::Storage(format!("parent fsync post-rename: {e}")))?;
-    }
-    Ok(())
-}
-
-/// Removes `path` if it exists and syncs parent directory.
-pub(crate) fn durable_remove(path: &Path) -> Result<()> {
-    if path.exists() {
-        std::fs::remove_file(path).map_err(ContextraError::Io)?;
-        if let Some(parent) = path.parent() {
-            let parent_dir = std::fs::File::open(parent).map_err(ContextraError::Io)?;
-            parent_dir
-                .sync_all()
-                .map_err(|e| ContextraError::Storage(format!("parent fsync post-remove: {e}")))?;
-        }
-    }
-    Ok(())
-}
 
 impl DiskAnnIndex {
     pub fn trigger_background_persist_delta(&self) {
@@ -117,12 +83,8 @@ impl DiskAnnIndex {
         }
 
         // Inkrementeller Pfad
-        let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
-        self.write_incremental_to_file_sync(&tmp_path, &pending)?;
-
-        // Atomares Write & Durability Order:
         let index_path = self.inner.config.index_path.clone();
-        atomic_replace(&tmp_path, &index_path)?;
+        self.write_incremental_to_file_sync(&index_path, &pending)?;
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         durable_remove(&pending_wal)?;
@@ -169,18 +131,9 @@ impl DiskAnnIndex {
         vectors: &[Vec<f32>],
         ids: &[DocId],
     ) -> Result<()> {
-        use std::fs::OpenOptions;
-        use std::io::Write;
         use std::sync::atomic::Ordering;
 
         let n = vectors.len();
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .map_err(ContextraError::Io)?;
-
         let quantizer_opt = {
             let q_guard = self.inner.quantizer.read();
             q_guard.clone()
@@ -210,17 +163,19 @@ impl DiskAnnIndex {
         };
 
         let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut buf = Vec::new();
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
-        file.write_all(&header_bytes).map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&header_bytes);
+
         let padding = vec![
             0u8;
             self.inner.config.sector_size
                 - (DiskAnnHeader::SIZE % self.inner.config.sector_size)
         ];
         hmac.update(&padding);
-        file.write_all(&padding).map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&padding);
 
         for i in 0..n {
             let mut node_buf = Vec::new();
@@ -250,7 +205,7 @@ impl DiskAnnIndex {
             }
 
             hmac.update(&node_buf);
-            file.write_all(&node_buf).map_err(ContextraError::Io)?;
+            buf.extend_from_slice(&node_buf);
         }
 
         let computed_hmac = hmac.finalize();
@@ -258,11 +213,9 @@ impl DiskAnnIndex {
             magic: *DISKANN_FOOTER_MAGIC,
             hmac: computed_hmac,
         };
-        file.write_all(&footer.to_bytes())
-            .map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&footer.to_bytes());
 
-        file.sync_all().map_err(ContextraError::Io)?;
-        Ok(())
+        atomic_replace(path, &buf)
     }
 
     pub fn init_hnsw_fallback(&self) -> Result<Arc<crate::hnsw::HnswIndex>> {
@@ -288,6 +241,9 @@ impl DiskAnnIndex {
         let wal_exists = pending_wal.exists();
 
         if !index_exists && !wal_exists {
+            if self.inner.config.create_if_missing {
+                return Ok(());
+            }
             return Err(ContextraError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!(
