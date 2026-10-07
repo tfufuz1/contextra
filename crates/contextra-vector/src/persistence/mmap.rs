@@ -12,15 +12,53 @@ use contextra_core::{ContextraError, Result};
 pub struct MmapIndex {
     pub mmap: std::sync::Arc<memmap2::Mmap>,
     pub header: HnswHeader,
+    pub file_handle: std::sync::Arc<std::fs::File>,
 }
 
 impl MmapIndex {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let path = path.as_ref();
         let file = std::fs::File::open(path)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open HNSW file: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to open HNSW file {}: {}", path.display(), e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| ContextraError::Storage(format!("Failed to read metadata for {}: {}", path.display(), e)))?;
+        let file_len = metadata.len();
+
+        if file_len < 64 {
+            return Err(ContextraError::Storage(format!(
+                "HNSW file {} too small for header: expected at least 64 bytes, found {} bytes",
+                path.display(),
+                file_len
+            )));
+        }
+
+        // Try lock to prevent opening a file being concurrently modified/written.
+        match file.try_lock_shared() {
+            Ok(()) => {},
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(ContextraError::Storage(format!(
+                    "HNSW file {} is locked by a writer or concurrent process",
+                    path.display()
+                )));
+            }
+            Err(std::fs::TryLockError::Error(e)) => {
+                tracing::warn!("File locking not supported on filesystem for {}: {}", path.display(), e);
+            }
+        }
 
         let mmap = contextra_sys::mmap_readonly(&file)
-            .map_err(|e| ContextraError::Storage(format!("Failed to mmap HNSW: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to mmap HNSW file {}: {}", path.display(), e)))?;
+
+        if mmap.len() as u64 != file_len {
+            return Err(ContextraError::Storage(format!(
+                "Mmap length mismatch for {}: mmap length {} bytes does not match metadata length {} bytes",
+                path.display(),
+                mmap.len(),
+                file_len
+            )));
+        }
 
         let header_slice = mmap
             .get(0..HnswHeader::SIZE)
@@ -29,9 +67,34 @@ impl MmapIndex {
             .ok_or_else(|| ContextraError::Storage("HNSW file too small for header".into()))?;
         let header = HnswHeader::try_from_bytes(header_slice)?;
 
+        if header.nodes_offset() > file_len || header.connections_offset() > file_len {
+            return Err(ContextraError::Storage(format!(
+                "HNSW header offsets out of bounds: nodes_offset={}, connections_offset={}, file_len={}",
+                header.nodes_offset(),
+                header.connections_offset(),
+                file_len
+            )));
+        }
+
+        if header.version() == 2 && header.quant_calibration_len() > 0 {
+            let calib_end = header
+                .quant_calibration_offset()
+                .checked_add(header.quant_calibration_len() as u64)
+                .ok_or_else(|| ContextraError::Storage("Quant calibration offset overflow".into()))?;
+            if calib_end > file_len {
+                return Err(ContextraError::Storage(format!(
+                    "Quant calibration section out of bounds: end={}, file_len={}",
+                    calib_end, file_len
+                )));
+            }
+        }
+
+        let file_handle = std::sync::Arc::new(file);
+
         let index_obj = Self {
             mmap: std::sync::Arc::new(mmap),
             header,
+            file_handle,
         };
 
         if index_obj.header.node_count() > 0 {
