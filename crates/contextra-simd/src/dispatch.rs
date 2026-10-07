@@ -16,6 +16,18 @@ use contextra_core::ContextraError;
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct CpuFeatures {
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) avx512f: bool,
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) avx512bw: bool,
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) avx512vnni: bool,
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) avx2: bool,
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) fma: bool,
+    #[cfg(target_arch = "aarch64")]
+    pub(crate) neon: bool,
     _private: (),
 }
 
@@ -23,7 +35,28 @@ impl CpuFeatures {
     /// Detects runtime CPU capabilities using architecture feature detection.
     #[inline]
     pub fn detect() -> Self {
-        Self { _private: () }
+        #[cfg(target_arch = "x86_64")]
+        {
+            Self {
+                avx512f: is_x86_feature_detected!("avx512f"),
+                avx512bw: is_x86_feature_detected!("avx512bw"),
+                avx512vnni: is_x86_feature_detected!("avx512vnni"),
+                avx2: is_x86_feature_detected!("avx2"),
+                fma: is_x86_feature_detected!("fma"),
+                _private: (),
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            Self {
+                neon: std::arch::is_aarch64_feature_detected!("neon"),
+                _private: (),
+            }
+        }
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            Self { _private: () }
+        }
     }
 }
 
@@ -42,7 +75,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 pub fn cosine_distance_with_features(
     a: &[f32],
     b: &[f32],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -53,20 +86,20 @@ pub fn cosine_distance_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; a and b have equal lengths.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; a and b have equal lengths.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });
         }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            // SAFETY: CPU feature "neon" verified above; a and b have equal lengths.
+        if features.neon {
+            // SAFETY: CPU feature "neon" verified via features token; a and b have equal lengths.
             return Ok(unsafe { neon::cosine_distance_neon(a, b) });
         }
     }
@@ -83,7 +116,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 pub fn euclidean_distance_with_features(
     a: &[f32],
     b: &[f32],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -94,20 +127,20 @@ pub fn euclidean_distance_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; a and b have equal lengths.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; a and b have equal lengths.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });
         }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            // SAFETY: CPU feature "neon" verified above; a and b have equal lengths.
+        if features.neon {
+            // SAFETY: CPU feature "neon" verified via features token; a and b have equal lengths.
             return Ok(unsafe { neon::euclidean_distance_neon(a, b) });
         }
     }
@@ -124,7 +157,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
 pub fn dot_product_distance_with_features(
     a: &[f32],
     b: &[f32],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -135,20 +168,20 @@ pub fn dot_product_distance_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; a and b have equal lengths.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::dot_product_avx512(a, b) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; a and b have equal lengths.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::dot_product_avx2(a, b) });
         }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            // SAFETY: CPU feature "neon" verified above; a and b have equal lengths.
+        if features.neon {
+            // SAFETY: CPU feature "neon" verified via features token; a and b have equal lengths.
             return Ok(unsafe { neon::dot_product_neon(a, b) });
         }
     }
@@ -165,7 +198,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
 pub fn cosine_distance_f32_bytes_with_features(
     a: &[f32],
     b_bytes: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -176,12 +209,12 @@ pub fn cosine_distance_f32_bytes_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -198,7 +231,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
 pub fn euclidean_distance_f32_bytes_with_features(
     a: &[f32],
     b_bytes: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -209,12 +242,12 @@ pub fn euclidean_distance_f32_bytes_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -231,7 +264,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 pub fn dot_product_distance_f32_bytes_with_features(
     a: &[f32],
     b_bytes: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -242,12 +275,12 @@ pub fn dot_product_distance_f32_bytes_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") {
-            // SAFETY: CPU feature "avx512f" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx512f {
+            // SAFETY: CPU feature "avx512f" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });
         }
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-            // SAFETY: CPU features "avx2" and "fma" verified above; b_bytes has length at least a.len() * 4 bytes.
+        if features.avx2 && features.fma {
+            // SAFETY: CPU features "avx2" and "fma" verified via features token; b_bytes has length at least a.len() * 4 bytes.
             return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -264,7 +297,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 pub fn dot_product_u8_with_features(
     a: &[u8],
     b: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -275,15 +308,12 @@ pub fn dot_product_u8_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: CPU features "avx512f", "avx512bw", and "avx512vnni" verified above; a and b have equal lengths.
+        if features.avx512f && features.avx512bw && features.avx512vnni {
+            // SAFETY: CPU features "avx512f", "avx512bw", and "avx512vnni" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
         }
-        if is_x86_feature_detected!("avx2") {
-            // SAFETY: CPU feature "avx2" verified above; a and b have equal lengths.
+        if features.avx2 {
+            // SAFETY: CPU feature "avx2" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });
         }
     }
@@ -300,7 +330,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 pub fn euclidean_distance_sq_u8_with_features(
     a: &[u8],
     b: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -311,12 +341,12 @@ pub fn euclidean_distance_sq_u8_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
-            // SAFETY: CPU features "avx512f" and "avx512bw" verified above; a and b have equal lengths.
+        if features.avx512f && features.avx512bw {
+            // SAFETY: CPU features "avx512f" and "avx512bw" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });
         }
-        if is_x86_feature_detected!("avx2") {
-            // SAFETY: CPU feature "avx2" verified above; a and b have equal lengths.
+        if features.avx2 {
+            // SAFETY: CPU feature "avx2" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });
         }
     }
@@ -336,7 +366,7 @@ pub fn cosine_similarity_parts_u8(
 pub fn cosine_similarity_parts_u8_with_features(
     a: &[u8],
     b: &[u8],
-    _features: &CpuFeatures,
+    features: &CpuFeatures,
 ) -> Result<CosineSimilarityPartsU8, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -347,15 +377,12 @@ pub fn cosine_similarity_parts_u8_with_features(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: CPU features "avx512f", "avx512bw", and "avx512vnni" verified above; a and b have equal lengths.
+        if features.avx512f && features.avx512bw && features.avx512vnni {
+            // SAFETY: CPU features "avx512f", "avx512bw", and "avx512vnni" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
         }
-        if is_x86_feature_detected!("avx2") {
-            // SAFETY: CPU feature "avx2" verified above; a and b have equal lengths.
+        if features.avx2 {
+            // SAFETY: CPU feature "avx2" verified via features token; a and b have equal lengths.
             return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });
         }
     }

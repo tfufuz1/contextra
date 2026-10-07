@@ -375,6 +375,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 
     // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let mut sum_v = unsafe { _mm512_setzero_si512() };
+    let zero = unsafe { _mm512_setzero_si512() };
 
     while i + 64 <= len {
         // SAFETY: Loop condition i + 64 <= len guarantees a[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
@@ -382,8 +383,16 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
         // SAFETY: Loop condition i + 64 <= len guarantees b[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
         let vb = unsafe { _mm512_loadu_si512(b.as_ptr().add(i) as *const __m512i) };
 
-        // SAFETY: Target feature avx512vnni enabled on function; operates on valid __m512i registers.
-        sum_v = unsafe { _mm512_dpbusd_epi32(sum_v, va, vb) };
+        let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };
+        let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };
+        let prod_lo = unsafe { _mm512_madd_epi16(va_lo, vb_lo) };
+
+        let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };
+        let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };
+        let prod_hi = unsafe { _mm512_madd_epi16(va_hi, vb_hi) };
+
+        sum_v = unsafe { _mm512_add_epi32(sum_v, prod_lo) };
+        sum_v = unsafe { _mm512_add_epi32(sum_v, prod_hi) };
 
         i += 64;
     }
@@ -482,6 +491,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> Co
     let mut norm_a_v = unsafe { _mm512_setzero_si512() };
     // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let mut norm_b_v = unsafe { _mm512_setzero_si512() };
+    let zero = unsafe { _mm512_setzero_si512() };
 
     while i + 64 <= len {
         // SAFETY: Loop condition i + 64 <= len guarantees a[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
@@ -489,12 +499,17 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> Co
         // SAFETY: Loop condition i + 64 <= len guarantees b[i..i+64] is in-bounds. _mm512_loadu_si512 supports unaligned reads.
         let vb = unsafe { _mm512_loadu_si512(b.as_ptr().add(i) as *const __m512i) };
 
-        // SAFETY: Target feature avx512vnni enabled on function; operates on valid __m512i registers.
-        dot_v = unsafe { _mm512_dpbusd_epi32(dot_v, va, vb) };
-        // SAFETY: Target feature avx512vnni enabled on function; operates on valid __m512i registers.
-        norm_a_v = unsafe { _mm512_dpbusd_epi32(norm_a_v, va, va) };
-        // SAFETY: Target feature avx512vnni enabled on function; operates on valid __m512i registers.
-        norm_b_v = unsafe { _mm512_dpbusd_epi32(norm_b_v, vb, vb) };
+        let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };
+        let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };
+        dot_v = unsafe { _mm512_add_epi32(dot_v, _mm512_madd_epi16(va_lo, vb_lo)) };
+        norm_a_v = unsafe { _mm512_add_epi32(norm_a_v, _mm512_madd_epi16(va_lo, va_lo)) };
+        norm_b_v = unsafe { _mm512_add_epi32(norm_b_v, _mm512_madd_epi16(vb_lo, vb_lo)) };
+
+        let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };
+        let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };
+        dot_v = unsafe { _mm512_add_epi32(dot_v, _mm512_madd_epi16(va_hi, vb_hi)) };
+        norm_a_v = unsafe { _mm512_add_epi32(norm_a_v, _mm512_madd_epi16(va_hi, va_hi)) };
+        norm_b_v = unsafe { _mm512_add_epi32(norm_b_v, _mm512_madd_epi16(vb_hi, vb_hi)) };
 
         i += 64;
     }
