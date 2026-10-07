@@ -15,6 +15,7 @@
 | `contextra-core` | Ring 0 | 🟢 stable | `tombstone-semantics`, `tx-buffer` | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
 | `contextra-crypto` | Ring 0 | 🟢 stable | `aes-256-gcm-siv`, `hmac-sha256`, `zeroize-on-drop` | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
 | `contextra-db` | Ring 3 | 🟢 stable | `hybrid-search`, `collection-manager`, `volatile-vault` | Contextra Main Database Abstraction, Hybrid Search & Collections |
+| `contextra-durable-fs` | Ring 0 | 🟢 stable | `durable-fs`, `atomic-replace`, `sync-dir` | Durable Filesystem Operations und synchrone Disk-Flushes |
 | `contextra-engine` | Ring 3 | 🟢 stable | `bounded-compute-pool`, `ring0-async-wrapper` | Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) |
 | `contextra-graph` | Ring 0 | 🟢 stable | `csr-traversal`, `label-propagation`, `deadlock-free-dag` | CSR Graph-Engine, Path Graphing und GraphRAG Community Detection |
 | `contextra-infer-candle` | Ring 2 | 🟢 stable | `candle-llm`, `kv-cache-bridge` | Candle LLM Inference Client und KV-Bridge Adapter |
