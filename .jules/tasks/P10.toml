@@ -1,0 +1,36 @@
+id                = "T-2026-0010"
+title             = "P10: Mmap Safety and File Locking Invariants"
+crate             = "contextra-vector"
+tier              = 1
+risk              = "none"
+goal              = "Memory-Mapping ist gegen Länge und Ausrichtung abgesichert und die Invariante ist dokumentiert."
+non_goals         = [
+  "Keine Änderung an Index-Formaten",
+  "Keine Änderung in diskann/**",
+  "Keine Änderung in hnsw/**",
+  "Keine Änderung in Cargo.toml",
+  "Keine Änderung an anderen sys-Dateien"
+]
+protected_change  = "P10 mmap safety length checks file locking and alignment invariant documentation"
+scope             = [
+  "crates/contextra-vector/src/persistence/**",
+  "crates/contextra-sys/src/mmap.rs"
+]
+forbidden         = [
+  "crates/contextra-vector/src/diskann/**",
+  "crates/contextra-vector/src/hnsw/**",
+  "crates/contextra-vector/src/lib.rs",
+  "crates/contextra-vector/Cargo.toml"
+]
+invariants        = ["Unsafe Islands Only", "P2", "Zero-Panic"]
+acceptance        = [
+  "cargo test -p contextra-vector --locked persistence",
+  "cargo test -p contextra-sys --locked",
+  "cargo xtask check-unsafe-islands"
+]
+evidence_required = ["Tests in crates/contextra-vector/src/persistence/tests.rs und crates/contextra-sys/src/mmap.rs"]
+
+[budget]
+files      = 5
+lines      = 200
+iterations = 5
