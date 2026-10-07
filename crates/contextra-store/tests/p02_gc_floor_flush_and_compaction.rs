@@ -45,7 +45,7 @@ async fn test_compaction_with_reader_at_seq_80_retains_put_and_tombstone() {
     storage.force_flush().await.unwrap();
 
     // Active reader holding a snapshot lease at seq1 (before the tombstone)
-    let lease = storage.snapshot_registry.acquire(seq1);
+    let lease = storage.snapshot_registry.acquire(|| seq1);
 
     // Trigger compaction (merges SSTable 1 and SSTable 2)
     let compacted = storage.maybe_compact().await.unwrap();
@@ -84,7 +84,7 @@ async fn test_flush_with_reader_retains_version_below_tombstone() {
 
     // Acquire lease at old sequence number before tombstone
     let old_seq = storage.last_seq_no().await.unwrap();
-    let lease = storage.snapshot_registry.acquire(old_seq);
+    let lease = storage.snapshot_registry.acquire(|| old_seq);
 
     // Tx2: Delete key1 in MemTable
     let tx2 = TxId::new(2);
