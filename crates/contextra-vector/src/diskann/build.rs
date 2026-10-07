@@ -425,7 +425,7 @@ impl DiskAnnIndex {
             }
             self.persist_delta_sync()?;
         } else {
-            let _ = std::fs::remove_file(&pending_wal);
+            super::persistence::durable_remove(&pending_wal)?;
         }
         Ok(count)
     }
@@ -692,23 +692,14 @@ impl DiskAnnIndex {
         let tmp_path = self.inner.config.index_path.with_extension("idx.tmp");
         self.build_to_path_sync(&tmp_path, vectors, ids)?;
 
-        std::fs::rename(&tmp_path, &self.inner.config.index_path).map_err(ContextraError::Io)?;
-
-        // Fsync parent directory after rename for POSIX atomic directory entry durability
-        if let Some(parent) = self.inner.config.index_path.parent() {
-            let parent_dir = std::fs::File::open(parent).map_err(ContextraError::Io)?;
-            parent_dir.sync_all().map_err(ContextraError::Io)?;
-        }
+        super::persistence::atomic_replace(&tmp_path, &self.inner.config.index_path)?;
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        if pending_wal.exists() {
-            let _ = std::fs::remove_file(&pending_wal);
-        }
+        super::persistence::durable_remove(&pending_wal)?;
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
-        if tombstone_wal.exists() {
-            let _ = std::fs::remove_file(&tombstone_wal);
-        }
+        super::persistence::durable_remove(&tombstone_wal)?;
+
         self.inner.tombstones.write().clear();
 
         self.load_sync()?;
