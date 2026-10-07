@@ -334,7 +334,7 @@ impl VectorIndex for HnswIndex {
         let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
         for prepared in prepared_inserts {
             inserted_doc_ids.push(prepared.doc_id);
-            self.inner.apply_insert(prepared, seq);
+            self.inner.apply_insert(prepared, seq)?;
         }
 
         let mut seq_log = self.inner.cold.seq_log.write();

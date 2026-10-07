@@ -16,7 +16,7 @@ use std::time::Instant;
 fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     let registry = Arc::new(SnapshotRegistry::new());
     // Create an active snapshot at seq 0 to hold back pruning
-    let snap = registry.register(0);
+    let snap = registry.acquire(|| 0);
 
     let validator =
         SequenceLogSsiValidator::new_with_bounds(10).with_snapshot_registry(registry.clone());
@@ -24,7 +24,8 @@ fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     // Record keys up to 80% threshold (8 keys)
     for i in 0..10 {
         let key = format!("key_{i}").into_bytes();
-        validator.record_commit_key(&key, (i + 1) as u64);
+        let seq = u64::try_from(i + 1).unwrap_or(0);
+        validator.record_commit_key(&key, seq);
     }
 
     // 1. Verify diagnose_pruning_blocker returns active blocker info

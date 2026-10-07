@@ -10,6 +10,7 @@
 //! - `WasmOutput.stdout` ist `ZeroizeOnDrop` (P9)
 //! - Kein Dateisystem-/Netzwerkzugriff per Default
 
+pub mod admission;
 pub mod approval;
 pub mod capabilities;
 pub mod error;
@@ -18,11 +19,12 @@ pub mod merge;
 pub mod output;
 pub mod wasi;
 
+pub use admission::{AdmittedModule, ModuleVerifier};
 pub use approval::{
     classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
 };
 pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
-pub use error::SandboxError;
+pub use error::{AdmissionError, SandboxError};
 pub use executor::WasmExecutor;
 pub use merge::WasmMergeFunction;
 pub use output::WasmOutput;

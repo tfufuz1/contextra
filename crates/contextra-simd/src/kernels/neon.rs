@@ -15,7 +15,7 @@ use std::arch::aarch64::*;
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 // SAFETY: Target feature "neon" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -79,7 +79,7 @@ pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 // SAFETY: Target feature "neon" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -123,7 +123,7 @@ pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 // SAFETY: Target feature "neon" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 

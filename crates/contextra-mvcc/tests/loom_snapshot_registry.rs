@@ -136,15 +136,16 @@ mod normal_tests {
         for i in 0..num_threads {
             let reg = Arc::clone(&registry);
             let run = Arc::clone(&running);
-            let seq_base = (i + 1) as u64 * 100;
+            let seq_base = u64::try_from(i + 1).unwrap_or(0) * 100;
 
             handles.push(thread::spawn(move || {
                 let mut count = 0;
                 while run.load(Ordering::Relaxed) && count < 1000 {
-                    let g = reg.register(seq_base + (count % 10));
+                    let seq = seq_base + (count % 10);
+                    let lease = reg.acquire(|| seq);
                     let min = reg.min_active_seqno();
-                    assert!(min <= seq_base + (count % 10));
-                    drop(g);
+                    assert!(min <= seq);
+                    drop(lease);
                     count += 1;
                 }
             }));

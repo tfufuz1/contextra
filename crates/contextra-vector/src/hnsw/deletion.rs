@@ -9,6 +9,7 @@ use contextra_core::{error::HnswDeletionError, ContextraError, DocId, Result};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
+use super::verify::{GhostScan, IncompleteReason};
 
 /// Statistics returned after a ghost-free node deletion and neighborhood repair.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,11 +122,8 @@ impl GhostFreeVectorIndex for HnswIndex {
             for layer in 0..=target_max_layer {
                 let target_conns = if target_idx < mmap_node_count {
                     if let Some(mmap) = mmap_guard.as_ref() {
-                        if let Ok(rec) = mmap.get_node_record(target_idx) {
-                            mmap.get_connections(&rec, layer).unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        }
+                        let rec = mmap.get_node_record(target_idx)?;
+                        mmap.get_connections(&rec, layer)?
                     } else {
                         Vec::new()
                     }
@@ -174,11 +172,8 @@ impl GhostFreeVectorIndex for HnswIndex {
 
                     let existing_conns = if neighbor_idx < mmap_node_count {
                         if let Some(mmap) = mmap_guard.as_ref() {
-                            if let Ok(rec) = mmap.get_node_record(neighbor_idx) {
-                                mmap.get_connections(&rec, layer).unwrap_or_default()
-                            } else {
-                                Vec::new()
-                            }
+                            let rec = mmap.get_node_record(neighbor_idx)?;
+                            mmap.get_connections(&rec, layer)?
                         } else {
                             Vec::new()
                         }
@@ -210,11 +205,8 @@ impl GhostFreeVectorIndex for HnswIndex {
                             }
                             let rem_conns = if (rem as usize) < mmap_node_count {
                                 if let Some(mmap) = mmap_guard.as_ref() {
-                                    if let Ok(rec) = mmap.get_node_record(rem as usize) {
-                                        mmap.get_connections(&rec, layer).unwrap_or_default()
-                                    } else {
-                                        Vec::new()
-                                    }
+                                    let rec = mmap.get_node_record(rem as usize)?;
+                                    mmap.get_connections(&rec, layer)?
                                 } else {
                                     Vec::new()
                                 }
@@ -301,18 +293,57 @@ impl GhostFreeVectorIndex for HnswIndex {
         }
 
         // Verification scan over targeted neighborhood or full fallback
-        // Cost cap budget = (degree of deleted node) * (M) * 4
-        let total_degree = target_max_layer * m;
-        let budget = (total_degree.max(1)) * m * 4;
-        let verification_res =
+        // Compute actual total degree of deleted node across all layers
+        let actual_total_degree = {
+            let nodes_read = self.inner.hot.nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mut degree = 0usize;
+
+            for layer in 0..=target_max_layer {
+                let conns_len = if target_idx < mmap_node_count {
+                    if let Some(mmap) = mmap_guard.as_ref() {
+                        if let Ok(rec) = mmap.get_node_record(target_idx) {
+                            mmap.get_connections(&rec, layer)
+                                .map(|c| c.len())
+                                .unwrap_or(0)
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                } else {
+                    let ram_idx = target_idx - mmap_node_count;
+                    if ram_idx < nodes_read.len() {
+                        self.inner
+                            .hot
+                            .arena
+                            .get_ram_node_connections(ram_idx, layer, m)
+                            .len()
+                    } else {
+                        0
+                    }
+                };
+                degree += conns_len;
+            }
+            degree
+        };
+
+        let budget = (actual_total_degree.max(1)) * m * 4;
+        let (verification_res, scan_result) =
             self.verify_no_ghost_pointers(target_idx as u32, budget, Some(&targeted_nodes));
 
         repaired_edges += verification_res.repaired_ghost_pointers;
 
-        if verification_res.remaining_ghost_pointers > 0 || !verification_res.is_complete {
+        if !scan_result.is_verified_no_ghost_pointers() {
+            let remaining = match scan_result {
+                GhostScan::Violated(n) => n as usize,
+                GhostScan::Complete(n) => n as usize,
+                GhostScan::Incomplete(_) => verification_res.remaining_ghost_pointers.max(1),
+            };
             return Err(ContextraError::GraphRepairFailed(
                 HnswDeletionError::VerificationFailed {
-                    remaining_pointers: verification_res.remaining_ghost_pointers,
+                    remaining_pointers: remaining,
                 },
             ));
         }
@@ -333,15 +364,14 @@ impl HnswIndex {
     /// Internal helper method to perform a verification scan for residual ghost pointers
     /// pointing to `target_idx_u32`.
     ///
-    /// If `targeted_nodes` is provided and its size is within `budget`, inspects all targeted
-    /// 1st and 2nd order neighbor nodes. If `targeted_nodes` is `None` or its size exceeds `budget`,
-    /// performs a complete fallback scan over all `0..total_nodes`.
+    /// Returns a tuple of `(VerificationResult, GhostScan)`. Only `GhostScan::Complete(0)`
+    /// indicates a verified ghost-pointer-free graph.
     pub fn verify_no_ghost_pointers(
         &self,
         target_idx_u32: u32,
         budget: usize,
         targeted_nodes: Option<&AHashSet<usize>>,
-    ) -> VerificationResult {
+    ) -> (VerificationResult, GhostScan) {
         let mmap_node_count = self
             .inner
             .cold
@@ -369,7 +399,21 @@ impl HnswIndex {
 
         if execute_targeted {
             if let Some(nodes_to_check) = targeted_nodes {
+                let mut inspected = 0usize;
                 for &i in nodes_to_check {
+                    inspected += 1;
+                    if inspected > budget {
+                        let res = VerificationResult {
+                            remaining_ghost_pointers,
+                            repaired_ghost_pointers,
+                            is_complete: false,
+                        };
+                        return (
+                            res,
+                            GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+                        );
+                    }
+
                     if i >= total_nodes
                         || deleted.contains(i as u64)
                         || i == target_idx_u32 as usize
@@ -379,9 +423,20 @@ impl HnswIndex {
 
                     let max_layer = if i < mmap_node_count {
                         if let Some(mmap) = mmap_guard.as_ref() {
-                            mmap.get_node_record(i)
-                                .map(|r| r.max_layer as usize)
-                                .unwrap_or(0)
+                            match mmap.get_node_record(i) {
+                                Ok(r) => r.max_layer as usize,
+                                Err(_) => {
+                                    let res = VerificationResult {
+                                        remaining_ghost_pointers,
+                                        repaired_ghost_pointers,
+                                        is_complete: false,
+                                    };
+                                    return (
+                                        res,
+                                        GhostScan::Incomplete(IncompleteReason::ReadError),
+                                    );
+                                }
+                            }
                         } else {
                             0
                         }
@@ -393,10 +448,33 @@ impl HnswIndex {
                     for layer in 0..=max_layer {
                         let conns = if i < mmap_node_count {
                             if let Some(mmap) = mmap_guard.as_ref() {
-                                if let Ok(rec) = mmap.get_node_record(i) {
-                                    mmap.get_connections(&rec, layer).unwrap_or_default()
-                                } else {
-                                    Vec::new()
+                                let rec = match mmap.get_node_record(i) {
+                                    Ok(r) => r,
+                                    Err(_) => {
+                                        let res = VerificationResult {
+                                            remaining_ghost_pointers,
+                                            repaired_ghost_pointers,
+                                            is_complete: false,
+                                        };
+                                        return (
+                                            res,
+                                            GhostScan::Incomplete(IncompleteReason::ReadError),
+                                        );
+                                    }
+                                };
+                                match mmap.get_connections(&rec, layer) {
+                                    Ok(c) => c,
+                                    Err(_) => {
+                                        let res = VerificationResult {
+                                            remaining_ghost_pointers,
+                                            repaired_ghost_pointers,
+                                            is_complete: false,
+                                        };
+                                        return (
+                                            res,
+                                            GhostScan::Incomplete(IncompleteReason::ReadError),
+                                        );
+                                    }
                                 }
                             } else {
                                 Vec::new()
@@ -412,10 +490,8 @@ impl HnswIndex {
                         if conns.contains(&target_idx_u32) {
                             if i >= mmap_node_count {
                                 let ram_idx = i - mmap_node_count;
-                                let cleaned: Vec<u32> = conns
-                                    .into_iter()
-                                    .filter(|&c| c != target_idx_u32)
-                                    .collect();
+                                let cleaned: Vec<u32> =
+                                    conns.into_iter().filter(|&c| c != target_idx_u32).collect();
                                 if self
                                     .inner
                                     .hot
@@ -434,25 +510,67 @@ impl HnswIndex {
                     }
                 }
 
-                return VerificationResult {
+                let total_ghosts = (remaining_ghost_pointers + repaired_ghost_pointers) as u64;
+                let scan = if total_ghosts == 0 {
+                    GhostScan::Complete(0)
+                } else {
+                    GhostScan::Violated(total_ghosts)
+                };
+
+                let res = VerificationResult {
                     remaining_ghost_pointers,
                     repaired_ghost_pointers,
                     is_complete: true,
                 };
+                return (res, scan);
             }
         }
 
         // Fallback: Full scan over all nodes 0..total_nodes
+        if total_nodes > budget {
+            let res = VerificationResult {
+                remaining_ghost_pointers,
+                repaired_ghost_pointers,
+                is_complete: false,
+            };
+            return (
+                res,
+                GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+            );
+        }
+
+        let mut inspected = 0usize;
         for i in 0..total_nodes {
+            inspected += 1;
+            if inspected > budget {
+                let res = VerificationResult {
+                    remaining_ghost_pointers,
+                    repaired_ghost_pointers,
+                    is_complete: false,
+                };
+                return (
+                    res,
+                    GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+                );
+            }
+
             if deleted.contains(i as u64) || i == target_idx_u32 as usize {
                 continue;
             }
 
             let max_layer = if i < mmap_node_count {
                 if let Some(mmap) = mmap_guard.as_ref() {
-                    mmap.get_node_record(i)
-                        .map(|r| r.max_layer as usize)
-                        .unwrap_or(0)
+                    match mmap.get_node_record(i) {
+                        Ok(r) => r.max_layer as usize,
+                        Err(_) => {
+                            let res = VerificationResult {
+                                remaining_ghost_pointers,
+                                repaired_ghost_pointers,
+                                is_complete: false,
+                            };
+                            return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                        }
+                    }
                 } else {
                     0
                 }
@@ -464,10 +582,27 @@ impl HnswIndex {
             for layer in 0..=max_layer {
                 let conns = if i < mmap_node_count {
                     if let Some(mmap) = mmap_guard.as_ref() {
-                        if let Ok(rec) = mmap.get_node_record(i) {
-                            mmap.get_connections(&rec, layer).unwrap_or_default()
-                        } else {
-                            Vec::new()
+                        let rec = match mmap.get_node_record(i) {
+                            Ok(r) => r,
+                            Err(_) => {
+                                let res = VerificationResult {
+                                    remaining_ghost_pointers,
+                                    repaired_ghost_pointers,
+                                    is_complete: false,
+                                };
+                                return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                            }
+                        };
+                        match mmap.get_connections(&rec, layer) {
+                            Ok(c) => c,
+                            Err(_) => {
+                                let res = VerificationResult {
+                                    remaining_ghost_pointers,
+                                    repaired_ghost_pointers,
+                                    is_complete: false,
+                                };
+                                return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                            }
                         }
                     } else {
                         Vec::new()
@@ -503,11 +638,19 @@ impl HnswIndex {
             }
         }
 
-        VerificationResult {
+        let total_ghosts = (remaining_ghost_pointers + repaired_ghost_pointers) as u64;
+        let scan = if total_ghosts == 0 {
+            GhostScan::Complete(0)
+        } else {
+            GhostScan::Violated(total_ghosts)
+        };
+
+        let res = VerificationResult {
             remaining_ghost_pointers,
             repaired_ghost_pointers,
             is_complete: true,
-        }
+        };
+        (res, scan)
     }
 }
 
@@ -572,6 +715,115 @@ mod tests {
             .arena
             .get_ram_node_connections(ram_idx_80, 0, m);
         assert!(!after.contains(&target_idx_u32));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_verifier_ghost_scan_outcomes() -> Result<()> {
+        let dim = 8;
+        let config = HnswConfig {
+            dimension: dim,
+            m: 8,
+            ef_construction: 32,
+            ..Default::default()
+        };
+
+        let index = HnswIndex::try_new(config.clone())?;
+
+        for i in 1..=20 {
+            let doc_id = DocId::new(i as u64);
+            let vector = vec![(i as f32) / 20.0; dim];
+            index.insert(TxId::new(i as u64), doc_id, &vector).await?;
+            index.commit(TxId::new(i as u64)).await?;
+        }
+
+        // Delete doc 1 cleanly
+        let mut mut_index = index;
+        let target_doc = DocId::new(1);
+        let stats = mut_index.remove_with_graph_repair(target_doc)?;
+        assert!(stats.verified_no_ghost_pointers);
+
+        // 1. Clean graph scan for deleted doc -> Complete(0)
+        let target_idx_u32 = 0u32;
+        let (_res, scan_clean) = mut_index.verify_no_ghost_pointers(target_idx_u32, 1000, None);
+        assert_eq!(scan_clean, GhostScan::Complete(0));
+        assert!(scan_clean.is_verified_no_ghost_pointers());
+
+        // 2. Budget exhaustion -> Incomplete(BudgetExhausted)
+        let (_res, scan_budget) = mut_index.verify_no_ghost_pointers(target_idx_u32, 2, None);
+        assert_eq!(
+            scan_budget,
+            GhostScan::Incomplete(IncompleteReason::BudgetExhausted)
+        );
+        assert!(!scan_budget.is_verified_no_ghost_pointers());
+
+        // 3. Unrepairable Ghost pointer on read-only / mmap node -> Violated(n)
+        // Clear deleted set so mmap node index 0 is evaluated as active
+        mut_index.inner.cold.deleted_nodes.write().clear();
+
+        let header = crate::persistence::HnswHeader::new_v2_with_bias(
+            dim as u32, 8, 0, 0, 0.0, 1.0, 1, 0, 80, 200, 1, 0, 0, 0.0, 0.0,
+        );
+        let mut fake_mmap = memmap2::MmapMut::map_anon(300).unwrap();
+        // Write header
+        fake_mmap[..crate::persistence::HnswHeader::SIZE].copy_from_slice(&header.to_bytes());
+        // Node 0 record at offset 80
+        let rec0 = crate::persistence::NodeRecord {
+            doc_id: 100,
+            max_layer: 0,
+            vector_offset: 120,
+            connections_offset: 200,
+        };
+        fake_mmap[80..80 + crate::persistence::NodeRecord::SIZE].copy_from_slice(&rec0.to_bytes());
+        // Connections at offset 200: 1 layer, 1 connection pointing to 999
+        fake_mmap[200] = 1; // 1 layer
+        fake_mmap[201..205].copy_from_slice(&1u32.to_le_bytes()); // len 1
+        fake_mmap[205..209].copy_from_slice(&999u32.to_le_bytes()); // conn 999
+
+        let mmap_index = crate::persistence::MmapIndex {
+            mmap: std::sync::Arc::new(fake_mmap.make_read_only().unwrap()),
+            file_handle: std::sync::Arc::new(std::fs::File::open("/dev/null").unwrap()),
+            header,
+        };
+        *mut_index.inner.cold.mmap_index.write() = Some(mmap_index);
+
+        let (_res, scan_violated) = mut_index.verify_no_ghost_pointers(999, 1000, None);
+        assert_eq!(scan_violated, GhostScan::Violated(1));
+        assert!(!scan_violated.is_verified_no_ghost_pointers());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_verifier_mmap_read_error_incomplete() -> Result<()> {
+        let config = HnswConfig {
+            dimension: 4,
+            m: 8,
+            ..Default::default()
+        };
+
+        let index = HnswIndex::try_new(config)?;
+
+        let header = crate::persistence::HnswHeader::new_v2_with_bias(
+            4, 8, 0, 0, 0.0, 1.0, 10, 0, 80, 200, 1, 0, 0, 0.0, 0.0,
+        );
+        let fake_mmap = memmap2::MmapMut::map_anon(100)
+            .unwrap()
+            .make_read_only()
+            .unwrap();
+
+        let mmap_index = crate::persistence::MmapIndex {
+            mmap: std::sync::Arc::new(fake_mmap),
+            file_handle: std::sync::Arc::new(std::fs::File::open("/dev/null").unwrap()),
+            header,
+        };
+
+        *index.inner.cold.mmap_index.write() = Some(mmap_index);
+
+        let (_res, scan) = index.verify_no_ghost_pointers(0, 1000, None);
+        assert_eq!(scan, GhostScan::Incomplete(IncompleteReason::ReadError));
+        assert!(!scan.is_verified_no_ghost_pointers());
 
         Ok(())
     }
