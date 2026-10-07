@@ -344,6 +344,15 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
+    /// Deletes a document by removing its DocId mapping and recording a tombstone.
+    ///
+    /// If `is_safe_to_free` is true (i.e., no active snapshot pin requires the node's retention sequence),
+    /// the node's vector memory in process RAM (`nodes[ram_idx].vector`) is overwritten with zeros
+    /// (best-effort in process memory; no guarantees regarding hardware registers, OS swap, or underlying SSD storage)
+    /// prior to returning `ram_idx` to the arena free-list.
+    ///
+    /// Note: Memory-mapped bytes (`mmap_index`) remain read-only and unchanged; therefore, zeroing RAM vector slots
+    /// does NOT constitute a cryptographic deletion proof for `contextra_types::DeletionLayer::HnswIndex`.
     pub(super) fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
@@ -367,6 +376,15 @@ impl HnswIndexCore {
                     _ => false,
                 };
                 if is_safe_to_free {
+                    {
+                        let mut nodes = self.hot.nodes.write();
+                        if let Some(node) = nodes.get_mut(ram_idx) {
+                            match &mut node.vector {
+                                VectorData::F32(v) => v.fill(0.0),
+                                VectorData::U8(v) => v.fill(0),
+                            }
+                        }
+                    }
                     self.hot.arena.free_node(ram_idx);
                 }
             }
