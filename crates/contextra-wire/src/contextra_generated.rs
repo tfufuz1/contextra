@@ -82,7 +82,7 @@ impl<'a> Embedding<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}
   }
 }
 
@@ -208,7 +208,7 @@ impl<'a> ScoredDocument<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0)).unwrap()}
   }
   #[inline]
   pub fn metadata(&self) -> Option<&'a str> {
@@ -354,14 +354,14 @@ impl<'a> SearchResponse<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0)).unwrap()}
   }
   #[inline]
   pub fn processing_time_ms(&self) -> f32 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0)).unwrap()}
   }
 }
 
@@ -605,7 +605,7 @@ impl<'a> RoleId<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap()}
   }
 }
 
@@ -702,7 +702,7 @@ impl<'a> HyperEdgeId<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap()}
   }
 }
 
@@ -801,14 +801,14 @@ impl<'a> RoleBinding<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap()}
   }
   #[inline]
   pub fn entity(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(RoleBinding::VT_ENTITY, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(RoleBinding::VT_ENTITY, Some(0)).unwrap()}
   }
 }
 
@@ -931,14 +931,14 @@ impl<'a> HyperEdge<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap()}
   }
   #[inline]
   pub fn predicate(&self) -> u8 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u8>(HyperEdge::VT_PREDICATE, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u8>(HyperEdge::VT_PREDICATE, Some(0)).unwrap()}
   }
   #[inline]
   pub fn participants(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RoleBinding<'a>>>> {
@@ -952,42 +952,42 @@ impl<'a> HyperEdge<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0)).unwrap()}
   }
   #[inline]
   pub fn tx_valid_from(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0)).unwrap()}
   }
   #[inline]
   pub fn tx_valid_to(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0)).unwrap()}
   }
   #[inline]
   pub fn business_valid_from(&self) -> i64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0)).unwrap()}
   }
   #[inline]
   pub fn business_valid_to(&self) -> i64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0)).unwrap()}
   }
   #[inline]
   pub fn source_doc_id(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0)).unwrap()}
   }
   #[inline]
   pub fn child_edge_ids(&self) -> Option<flatbuffers::Vector<'a, u64>> {
