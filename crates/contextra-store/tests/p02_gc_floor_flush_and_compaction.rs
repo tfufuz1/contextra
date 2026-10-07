@@ -61,7 +61,10 @@ async fn test_compaction_with_reader_at_seq_80_retains_put_and_tombstone() {
 
     // Query without snapshot (at current HEAD) should see None (deleted by tombstone)
     let val_at_head = storage.get(b"key1").await.unwrap();
-    assert_eq!(val_at_head, None, "HEAD query must return None due to tombstone");
+    assert_eq!(
+        val_at_head, None,
+        "HEAD query must return None due to tombstone"
+    );
 
     drop(lease);
 }

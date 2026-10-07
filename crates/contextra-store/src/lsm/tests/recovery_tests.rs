@@ -894,7 +894,7 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
                         tx_id: tx1,
                         committed: true,
                     },
-                2,
+                    2,
                 ),
             ])
             .await
