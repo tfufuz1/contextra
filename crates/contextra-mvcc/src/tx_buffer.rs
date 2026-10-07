@@ -20,12 +20,14 @@
 // INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
 use crate::error::{ContextraError, Result};
+use crate::snapshot::{SnapshotLease, SnapshotRegistry};
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Single canonical constant for overhead calculation per staged entry (32 bytes).
@@ -173,6 +175,7 @@ struct TxShard<T: Clone> {
     ops: AHashMap<TxId, (Vec<IndexOp<T>>, Instant)>,
     read_sets: AHashMap<TxId, ReadSet>,
     staged_bytes: AHashMap<TxId, usize>,
+    leases: AHashMap<TxId, SnapshotLease>,
 }
 
 impl<T: Clone> TxShard<T> {
@@ -181,6 +184,7 @@ impl<T: Clone> TxShard<T> {
             ops: AHashMap::new(),
             read_sets: AHashMap::new(),
             staged_bytes: AHashMap::new(),
+            leases: AHashMap::new(),
         }
     }
 }
@@ -217,6 +221,8 @@ pub struct TxBuffer<T: Clone> {
     tx_timeout: Duration,
     config: TxBufferConfig,
     global_staged_bytes: AtomicUsize,
+    snapshot_registry: Option<Arc<SnapshotRegistry>>,
+    last_applied: Option<Arc<AtomicU64>>,
 }
 
 impl<T: Clone> TxBuffer<T> {
@@ -256,7 +262,31 @@ impl<T: Clone> TxBuffer<T> {
             tx_timeout: config.tx_timeout,
             config,
             global_staged_bytes: AtomicUsize::new(0),
+            snapshot_registry: None,
+            last_applied: None,
         }
+    }
+
+    /// Attaches a [`SnapshotRegistry`] to this `TxBuffer`.
+    pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
+        self.snapshot_registry = Some(registry);
+        self
+    }
+
+    /// Sets a [`SnapshotRegistry`] on this `TxBuffer`.
+    pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {
+        self.snapshot_registry = Some(registry);
+    }
+
+    /// Attaches `last_applied` atomic sequence tracker to this `TxBuffer`.
+    pub fn with_last_applied(mut self, last_applied: Arc<AtomicU64>) -> Self {
+        self.last_applied = Some(last_applied);
+        self
+    }
+
+    /// Sets `last_applied` atomic sequence tracker on this `TxBuffer`.
+    pub fn set_last_applied(&mut self, last_applied: Arc<AtomicU64>) {
+        self.last_applied = Some(last_applied);
     }
 
     /// Returns the current total staged bytes across all active transactions.
@@ -285,8 +315,13 @@ impl<T: Clone> TxBuffer<T> {
         shard.read().ops.contains_key(&tx)
     }
 
-    /// Registers a new transaction in the buffer at timestamp `at`.
+    /// Registers a new transaction in the buffer at timestamp `at`, acquiring a `SnapshotLease` if registered.
     pub fn begin_at(&self, tx: TxId, at: Instant) {
+        let lease = self.snapshot_registry.as_ref().map(|reg| {
+            let la = self.last_applied.as_ref();
+            reg.acquire_at(|| la.map_or(0, |a| a.load(Ordering::Acquire)), at)
+        });
+
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard
@@ -295,11 +330,39 @@ impl<T: Clone> TxBuffer<T> {
             .or_insert_with(|| (Vec::with_capacity(16), at));
         shard.read_sets.entry(tx).or_default();
         shard.staged_bytes.entry(tx).or_insert(0);
+        if let Some(l) = lease {
+            shard.leases.insert(tx, l);
+        }
     }
 
     /// Registers a new transaction in the buffer.
     pub fn begin(&self, tx: TxId) {
         self.begin_at(tx, Instant::now());
+    }
+
+    /// Registers a new transaction in the buffer with an explicit sequence number at timestamp `at`.
+    pub fn begin_with_seq_at(&self, tx: TxId, seq_no: u64, at: Instant) {
+        let lease = self
+            .snapshot_registry
+            .as_ref()
+            .map(|reg| reg.acquire_at(|| seq_no, at));
+
+        let shard_idx = self.shard_idx(tx);
+        let mut shard = self.shards[shard_idx].write();
+        shard
+            .ops
+            .entry(tx)
+            .or_insert_with(|| (Vec::with_capacity(16), at));
+        shard.read_sets.entry(tx).or_default();
+        shard.staged_bytes.entry(tx).or_insert(0);
+        if let Some(l) = lease {
+            shard.leases.insert(tx, l);
+        }
+    }
+
+    /// Registers a new transaction in the buffer with an explicit sequence number.
+    pub fn begin_with_seq(&self, tx: TxId, seq_no: u64) {
+        self.begin_with_seq_at(tx, seq_no, Instant::now());
     }
 
     /// Registers a read key and its snapshot sequence number for transaction `tx`.
@@ -361,15 +424,15 @@ impl<T: Clone> TxBuffer<T> {
 
     /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
     ///
+    /// Note: `GcFloor::floor()` now encapsulates capping `min_read_snapshot()` with `min_active_seqno()` and `last_applied`.
+    ///
     /// # Concurrency & Atomicity Note
     /// Iterates through shards sequentially in ascending order (0 to N-1), acquiring and releasing a single shard read lock at a time.
     /// The returned minimum snapshot sequence is NOT an atomic snapshot across all shards.
-    /// Callers determining a safe pruning watermark MUST compute:
-    /// `min(min_read_snapshot(), last_allocated_seq_before_call)`.
-    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
+    /// Callers determining a safe pruning watermark MUST compute `GcFloor::floor()`.
     ///
     /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` uses `min_read_snapshot()` combined with `SnapshotRegistry::min_active_seqno()` to
+    /// `contextra-store` uses `GcFloor::floor()` (which encapsulates `min_read_snapshot()`) to
     /// prevent pruning SSI write keys active transactions still depend on.
     /// Locks each shard sequentially in ascending index order (0..N-1) without holding multiple shard locks simultaneously.
     pub fn min_read_snapshot(&self) -> Option<u64> {
@@ -534,6 +597,7 @@ impl<T: Clone> TxBuffer<T> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        shard.leases.remove(&tx);
         let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
         if tx_bytes > 0 {
             self.global_staged_bytes
@@ -551,6 +615,7 @@ impl<T: Clone> TxBuffer<T> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        shard.leases.remove(&tx);
         let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
         if tx_bytes > 0 {
             self.global_staged_bytes
@@ -621,6 +686,7 @@ impl<T: Clone> TxBuffer<T> {
                 });
                 for tx in &shard_expired {
                     shard.read_sets.remove(tx);
+                    shard.leases.remove(tx);
                     let tx_bytes = shard.staged_bytes.remove(tx).unwrap_or(0);
                     if tx_bytes > 0 {
                         self.global_staged_bytes

@@ -30,7 +30,7 @@ fn test_j23closure_seq_log_expired_pins_and_set_max_pin_duration() {
 #[test]
 fn test_j23closure_snapshot_longest_active_pin() {
     let registry = Arc::new(SnapshotRegistry::new());
-    let _g = registry.register(42);
+    let _g = registry.acquire(|| 42);
 
     let pin_info = registry.longest_active_pin();
     assert!(pin_info.is_some());

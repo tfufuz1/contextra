@@ -31,7 +31,7 @@ fn test_j23_seq_log_expired_pins_and_set_max_pin_duration() {
 #[test]
 fn test_j23_snapshot_longest_active_pin_via_ssi() {
     let registry = Arc::new(SnapshotRegistry::new());
-    let _g = registry.register(42);
+    let _g = registry.acquire(|| 42);
 
     let validator = SequenceLogSsiValidator::builder()
         .with_snapshot_registry(registry.clone())

@@ -22,6 +22,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[path = "floor.rs"]
+pub mod floor;
+#[path = "lease.rs"]
+pub mod lease;
+
+pub use floor::GcFloor;
+pub use lease::SnapshotLease;
+
 /// Registry for active read snapshots.
 ///
 /// ### Synchronization & Memory Ordering Strategy
@@ -57,23 +65,37 @@ impl SnapshotRegistry {
         }
     }
 
+    /// Acquires a new snapshot lease atomically reading the sequence number inside the registry lock.
+    pub fn acquire(self: &Arc<Self>, read_last_applied: impl FnOnce() -> u64) -> SnapshotLease {
+        self.acquire_at(read_last_applied, Instant::now())
+    }
+
+    /// Acquires a new snapshot lease at a specific creation timestamp `at`.
+    pub fn acquire_at(
+        self: &Arc<Self>,
+        read_last_applied: impl FnOnce() -> u64,
+        at: Instant,
+    ) -> SnapshotLease {
+        let mut active = self.active.lock();
+        let raw_seq = read_last_applied();
+        let seq_no = raw_seq & !TOMBSTONE_BIT;
+        active.entry(seq_no).or_default().push(at);
+        self.update_min(&active);
+        SnapshotLease::new(self.clone(), seq_no, Some(at))
+    }
+
     /// Registers a read snapshot. Returns an RAII guard that
     /// automatically deregisters on drop.
+    #[deprecated(note = "Use SnapshotRegistry::acquire instead to eliminate the read-then-register race window")]
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
         self.register_at(seq_no, Instant::now())
     }
 
     /// Registers a read snapshot at a specific creation timestamp `at`.
+    #[deprecated(note = "Use SnapshotRegistry::acquire_at instead to eliminate the read-then-register race window")]
     pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
-        let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
-        active.entry(seq_no).or_default().push(at);
-        self.update_min(&active);
-        SnapshotGuard {
-            registry: self.clone(),
-            seq_no,
-            created_at: Some(at),
-        }
+        let lease = self.acquire_at(|| seq_no, at);
+        SnapshotGuard { lease }
     }
 
     /// Returns the minimum active sequence number (`u64::MAX` if none).
@@ -178,22 +200,15 @@ impl SnapshotRegistry {
 }
 
 /// RAII Guard for an active snapshot.
+#[deprecated(note = "Use SnapshotLease returned by SnapshotRegistry::acquire instead")]
 pub struct SnapshotGuard {
-    registry: Arc<SnapshotRegistry>,
-    seq_no: u64,
-    created_at: Option<Instant>,
+    lease: SnapshotLease,
 }
 
 impl SnapshotGuard {
     /// Returns the sequence number pinned by this snapshot guard.
     pub fn seq_no(&self) -> u64 {
-        self.seq_no
-    }
-}
-
-impl Drop for SnapshotGuard {
-    fn drop(&mut self) {
-        self.registry.release_at(self.seq_no, self.created_at);
+        self.lease.seq_no()
     }
 }
 
@@ -209,20 +224,20 @@ mod tests {
         let registry = Arc::new(SnapshotRegistry::new());
         assert_eq!(registry.min_active_seqno(), u64::MAX);
 
-        let guard = registry.register(100);
-        assert_eq!(guard.seq_no(), 100);
+        let lease = registry.acquire(|| 100);
+        assert_eq!(lease.seq_no(), 100);
         assert_eq!(registry.min_active_seqno(), 100);
 
-        drop(guard);
+        drop(lease);
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
     #[test]
     fn test_multiple_snapshots_min_calc() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let _g1 = registry.register(200);
-        let g2 = registry.register(100);
-        let _g3 = registry.register(300);
+        let _g1 = registry.acquire(|| 200);
+        let g2 = registry.acquire(|| 100);
+        let _g3 = registry.acquire(|| 300);
 
         assert_eq!(registry.min_active_seqno(), 100);
 
@@ -236,7 +251,7 @@ mod tests {
         registry.pin(50);
         assert_eq!(registry.min_active_seqno(), 50);
 
-        let g = registry.register(100);
+        let g = registry.acquire(|| 100);
         assert_eq!(registry.min_active_seqno(), 50);
 
         registry.unpin(50);
@@ -251,17 +266,17 @@ mod tests {
         let registry = Arc::new(SnapshotRegistry::new());
         // seq_no with tombstone bit set
         let seq = 100 | crate::types::TOMBSTONE_BIT;
-        let guard = registry.register(seq);
+        let lease = registry.acquire(|| seq);
 
-        assert_eq!(guard.seq_no(), 100);
+        assert_eq!(lease.seq_no(), 100);
         assert_eq!(registry.min_active_seqno(), 100);
     }
 
     #[test]
     fn test_ref_counting() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let g1 = registry.register(100);
-        let g2 = registry.register(100);
+        let g1 = registry.acquire(|| 100);
+        let g2 = registry.acquire(|| 100);
 
         assert_eq!(registry.min_active_seqno(), 100);
 
@@ -292,8 +307,8 @@ mod tests {
     #[test]
     fn test_double_registration_and_sequential_drop() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let g1 = registry.register(42);
-        let g2 = registry.register(42);
+        let g1 = registry.acquire(|| 42);
+        let g2 = registry.acquire(|| 42);
 
         assert_eq!(registry.min_active_seqno(), 42);
 
@@ -320,27 +335,27 @@ mod tests {
             seqs in proptest::collection::vec(0..1000u64, 1..50)
         ) {
             let registry = Arc::new(SnapshotRegistry::new());
-            let mut guards = Vec::new();
+            let mut leases = Vec::new();
 
             for &seq in &seqs {
-                guards.push(registry.register(seq));
+                leases.push(registry.acquire(|| seq));
             }
 
             let min_expected = *seqs.iter().min().unwrap(); // #[cfg(test)]
             prop_assert_eq!(registry.min_active_seqno(), min_expected);
 
-            guards.pop(); // Drop last element
+            leases.pop(); // Drop last element
 
             // If all elements dropped, min_active is MAX, else it's min of remaining
-            if guards.is_empty() {
+            if leases.is_empty() {
                 prop_assert_eq!(registry.min_active_seqno(), u64::MAX);
             } else {
-                let remaining_min = guards.iter().map(|g| g.seq_no()).min().unwrap_or(u64::MAX);
+                let remaining_min = leases.iter().map(|l| l.seq_no()).min().unwrap_or(u64::MAX);
                 prop_assert_eq!(registry.min_active_seqno(), remaining_min);
             }
         }
 
-        /// Proptest: Proves that dropping guards one-by-one in arbitrary order
+        /// Proptest: Proves that dropping leases one-by-one in arbitrary order
         /// always maintains the correct min_active_seqno invariant.
         ///
         /// # Anti-Mirroring
@@ -349,15 +364,15 @@ mod tests {
         #[test]
         fn prop_snapshot_register_unregister_stress(
             seqs in proptest::collection::vec(0..5000u64, 2..80),
-            // Indices into the guards vec to determine drop order
+            // Indices into the leases vec to determine drop order
             drop_order_seed in proptest::collection::vec(0..1000usize, 2..80),
         ) {
             let registry = Arc::new(SnapshotRegistry::new());
-            let mut guards: Vec<Option<SnapshotGuard>> = Vec::new();
+            let mut leases: Vec<Option<SnapshotLease>> = Vec::new();
 
-            // Register all
+            // Acquire all
             for &seq in &seqs {
-                guards.push(Some(registry.register(seq)));
+                leases.push(Some(registry.acquire(|| seq)));
             }
 
             // Build independent reference: sorted multiset of active seqs
@@ -367,18 +382,18 @@ mod tests {
             // Verify initial state
             prop_assert_eq!(registry.min_active_seqno(), active_seqs[0]);
 
-            // Drop guards one-by-one using the seed to pick which to drop
-            let mut remaining_indices: Vec<usize> = (0..guards.len()).collect();
+            // Drop leases one-by-one using the seed to pick which to drop
+            let mut remaining_indices: Vec<usize> = (0..leases.len()).collect();
             for seed_val in &drop_order_seed {
                 if remaining_indices.is_empty() {
                     break;
                 }
                 let idx_in_remaining = seed_val % remaining_indices.len();
-                let guard_idx = remaining_indices.remove(idx_in_remaining);
+                let lease_idx = remaining_indices.remove(idx_in_remaining);
 
-                // Drop the guard
-                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
-                guards[guard_idx] = None;
+                // Drop the lease
+                let seq_val = leases[lease_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
+                leases[lease_idx] = None;
 
                 // Remove from reference (one occurrence only)
                 if let Some(pos) = active_seqs.iter().position(|&s| s == seq_val) {
@@ -390,22 +405,22 @@ mod tests {
                 prop_assert_eq!(
                     registry.min_active_seqno(),
                     expected_min,
-                    "After dropping guard for seq={}, min should be {}",
+                    "After dropping lease for seq={}, min should be {}",
                     seq_val,
                     expected_min
                 );
             }
         }
 
-        /// Proptest: Pin/Unpin combined with register/drop.
-        /// Proves that persistent pins and RAII guards coexist correctly.
+        /// Proptest: Pin/Unpin combined with acquire/drop.
+        /// Proves that persistent pins and RAII leases coexist correctly.
         ///
         /// # Anti-Mirroring
         /// Reference min is maintained in an independent BTreeMap<u64, usize>.
         #[test]
         fn prop_snapshot_pin_unpin_interleaving(
             pin_seqs in proptest::collection::vec(0..500u64, 1..20),
-            guard_seqs in proptest::collection::vec(0..500u64, 1..20),
+            lease_seqs in proptest::collection::vec(0..500u64, 1..20),
         ) {
             use std::collections::BTreeMap;
             let registry = Arc::new(SnapshotRegistry::new());
@@ -417,10 +432,10 @@ mod tests {
                 *ref_counts.entry(seq).or_default() += 1;
             }
 
-            // Register guards
-            let mut guards = Vec::new();
-            for &seq in &guard_seqs {
-                guards.push(registry.register(seq));
+            // Acquire leases
+            let mut leases = Vec::new();
+            for &seq in &lease_seqs {
+                leases.push(registry.acquire(|| seq));
                 *ref_counts.entry(seq).or_default() += 1;
             }
 
@@ -442,8 +457,8 @@ mod tests {
             let expected_min2 = ref_counts.keys().next().copied().unwrap_or(u64::MAX);
             prop_assert_eq!(registry.min_active_seqno(), expected_min2);
 
-            // Drop all guards
-            drop(guards);
+            // Drop all leases
+            drop(leases);
             prop_assert_eq!(registry.min_active_seqno(), u64::MAX);
         }
     }

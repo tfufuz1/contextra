@@ -16,7 +16,7 @@ use std::time::Instant;
 fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     let registry = Arc::new(SnapshotRegistry::new());
     // Create an active snapshot at seq 0 to hold back pruning
-    let snap = registry.register(0);
+    let snap = registry.acquire(|| 0);
 
     let validator =
         SequenceLogSsiValidator::new_with_bounds(10).with_snapshot_registry(registry.clone());
