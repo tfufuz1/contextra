@@ -12,13 +12,19 @@ fn test_try_train_validates_nan_inf_and_dimension_mismatch() {
     let batch_nan = vec![valid_vec.as_slice(), nan_vec.as_slice()];
     let res_nan = ScalarQuantizer::try_train(&batch_nan, 3);
     assert!(res_nan.is_err());
-    assert!(res_nan.unwrap_err().to_string().contains("NaN or infinite values"));
+    assert!(res_nan
+        .unwrap_err()
+        .to_string()
+        .contains("NaN or infinite values"));
 
     // Infinity in training batch -> Err
     let batch_inf = vec![valid_vec.as_slice(), inf_vec.as_slice()];
     let res_inf = ScalarQuantizer::try_train(&batch_inf, 3);
     assert!(res_inf.is_err());
-    assert!(res_inf.unwrap_err().to_string().contains("NaN or infinite values"));
+    assert!(res_inf
+        .unwrap_err()
+        .to_string()
+        .contains("NaN or infinite values"));
 
     // Dimension mismatch in batch -> Err
     let batch_mismatch = vec![valid_vec.as_slice(), short_vec.as_slice()];
@@ -38,7 +44,10 @@ fn test_train_on_invalid_input_returns_untrained_quantizer() {
     let sq = ScalarQuantizer::train(&batch, 3);
 
     // Is trained must report false
-    assert!(!sq.is_trained(), "Quantizer trained on invalid batch must report is_trained() == false");
+    assert!(
+        !sq.is_trained(),
+        "Quantizer trained on invalid batch must report is_trained() == false"
+    );
 
     // Operations must fail with ContextraError::InvalidInput
     let vec_to_quant = vec![1.0, 2.0, 3.0];
@@ -55,13 +64,21 @@ fn test_train_on_invalid_input_returns_untrained_quantizer() {
         "dequantize on untrained quantizer must return InvalidInput error"
     );
 
-    let res_asym = sq.asymmetric_dist(&vec_to_quant, &dummy_quant, contextra_core::DistanceMetric::Euclidean);
+    let res_asym = sq.asymmetric_dist(
+        &vec_to_quant,
+        &dummy_quant,
+        contextra_core::DistanceMetric::Euclidean,
+    );
     assert!(
         matches!(res_asym, Err(ContextraError::InvalidInput(_))),
         "asymmetric_dist on untrained quantizer must return InvalidInput error"
     );
 
-    let res_sym = sq.symmetric_dist(&dummy_quant, &dummy_quant, contextra_core::DistanceMetric::Euclidean);
+    let res_sym = sq.symmetric_dist(
+        &dummy_quant,
+        &dummy_quant,
+        contextra_core::DistanceMetric::Euclidean,
+    );
     assert!(
         matches!(res_sym, Err(ContextraError::InvalidInput(_))),
         "symmetric_dist on untrained quantizer must return InvalidInput error"

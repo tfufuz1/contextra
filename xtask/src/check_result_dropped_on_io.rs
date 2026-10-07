@@ -1,12 +1,19 @@
 use regex::Regex;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct Violation {
     pub file_path: String,
     pub line_num: usize,
     pub line_content: String,
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct IoResultBaselineFile {
+    pub violations: BTreeMap<String, bool>,
 }
 
 #[allow(dead_code)]
@@ -174,15 +181,52 @@ fn strip_comments_and_strings(source: &str) -> String {
     result
 }
 
+fn get_crate_ring(root: &Path, rel_path: &str) -> Option<u8> {
+    let caps_path = root.join("capabilities.toml");
+    if !caps_path.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(&caps_path).ok()?;
+    let val: serde_json::Value = toml::from_str(&content).ok()?;
+    let crates_map = val.get("crates")?.as_object()?;
+
+    for (crate_name, crate_obj) in crates_map {
+        let path = crate_obj.get("path")?.as_str()?;
+        if rel_path.starts_with(path) {
+            let ring_str = crate_obj.get("ring")?.as_str()?;
+            if ring_str.contains('0') {
+                return Some(0);
+            } else if ring_str.contains('1') {
+                return Some(1);
+            }
+            let _ = crate_name;
+        }
+    }
+    None
+}
+
 pub fn run_check_result_dropped_on_io_with_options(
     root: &Path,
     include_tests: bool,
 ) -> Result<Vec<Violation>, String> {
-    let mut violations = Vec::new();
+    let mut raw_violations = Vec::new();
 
     let drop_re = Regex::new(r"\blet\s+_\s*=").unwrap();
-    let io_expr_re =
-        Regex::new(r"\b(write|write_all|flush|set_len|fsync|sync_all|seek|truncate)\s*\(").unwrap();
+    let io_expr_re = Regex::new(
+        r"\b(write|write_all|flush|set_len|fsync|sync_all|seek|truncate|remove_file|rename|create_dir_all)\s*\(",
+    )
+    .unwrap();
+
+    let if_let_ok_io_re =
+        Regex::new(r"\bif\s+let\s+Ok\s*\([^)]*\)\s*=\s*(File::|OpenOptions::|fs::|std::fs::)")
+            .unwrap();
+
+    let ok_ignored_re = Regex::new(
+        r"\.(write|write_all|flush|set_len|fsync|sync_all|seek|truncate|remove_file|rename|create_dir_all)\s*\([^;]*\)\s*\.ok\s*\(\s*\)\s*;",
+    )
+    .unwrap();
+
+    let unwrap_or_else_re = Regex::new(r"\bunwrap_or_else\s*\(\s*\|[^|]*\|\s*").unwrap();
 
     for entry in WalkDir::new(root)
         .into_iter()
@@ -204,9 +248,14 @@ pub fn run_check_result_dropped_on_io_with_options(
                 continue;
             }
 
-            if !include_tests && (rel_path.ends_with("_test.rs") || rel_path.contains("/tests/")) {
+            let is_test = rel_path.ends_with("_test.rs") || rel_path.contains("/tests/");
+
+            if !include_tests && is_test {
                 continue;
             }
+
+            let ring = get_crate_ring(root, &rel_path);
+            let is_ring0_or_1 = ring == Some(0) || ring == Some(1);
 
             if let Ok(content) = fs::read_to_string(path) {
                 let stripped = strip_comments_and_strings(&content);
@@ -222,8 +271,34 @@ pub fn run_check_result_dropped_on_io_with_options(
 
                     let stripped_line = stripped_lines.get(idx).copied().unwrap_or("");
 
+                    let mut matched = false;
+
+                    // 1. Existing let _ = with I/O function
                     if drop_re.is_match(stripped_line) && io_expr_re.is_match(stripped_line) {
-                        violations.push(Violation {
+                        matched = true;
+                    }
+
+                    // 2. if let Ok(...) = File::open / OpenOptions / fs::* in Ring 0 and Ring 1
+                    if !matched && is_ring0_or_1 && if_let_ok_io_re.is_match(stripped_line) {
+                        matched = true;
+                    }
+
+                    // 3. .ok(); after I/O calls
+                    if !matched && ok_ignored_re.is_match(stripped_line) {
+                        matched = true;
+                    }
+
+                    // 4. unwrap_or_else(|_| ...) in Ring 0 and Ring 1, not in test code
+                    if !matched
+                        && is_ring0_or_1
+                        && !is_test
+                        && unwrap_or_else_re.is_match(stripped_line)
+                    {
+                        matched = true;
+                    }
+
+                    if matched {
+                        raw_violations.push(Violation {
                             file_path: rel_path.clone(),
                             line_num: idx + 1,
                             line_content: trimmed.to_string(),
@@ -234,7 +309,31 @@ pub fn run_check_result_dropped_on_io_with_options(
         }
     }
 
-    Ok(violations)
+    // Baseline Ratchet Filtering
+    let baseline_path = root.join("governance/io-result-baseline.toml");
+    let baseline_set: HashSet<String> = if baseline_path.exists() {
+        if let Ok(content) = fs::read_to_string(&baseline_path) {
+            if let Ok(parsed) = toml::from_str::<IoResultBaselineFile>(&content) {
+                parsed.violations.into_keys().collect()
+            } else {
+                HashSet::new()
+            }
+        } else {
+            HashSet::new()
+        }
+    } else {
+        HashSet::new()
+    };
+
+    let new_violations: Vec<Violation> = raw_violations
+        .into_iter()
+        .filter(|v| {
+            let key = format!("{}:{}:{}", v.file_path, v.line_num, v.line_content);
+            !baseline_set.contains(&key)
+        })
+        .collect();
+
+    Ok(new_violations)
 }
 
 #[cfg(test)]
@@ -338,5 +437,74 @@ async fn run(storage: &Storage) {
 
         let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
         assert_eq!(violations.len(), 0);
+    }
+
+    #[test]
+    fn test_detects_remove_file_rename_create_dir_all_dropped() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("fs_op.rs");
+        fs::write(
+            &file,
+            r#"
+fn ops() {
+    let _ = std::fs::remove_file("a.tmp");
+    let _ = std::fs::rename("a.tmp", "b.tmp");
+    let _ = std::fs::create_dir_all("/tmp/dir");
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
+        assert_eq!(violations.len(), 3);
+    }
+
+    #[test]
+    fn test_detects_ok_ignored_call() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("ok_op.rs");
+        fs::write(
+            &file,
+            r#"
+fn ops(file: &mut std::fs::File) {
+    file.flush().ok();
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].line_num, 3);
+    }
+
+    #[test]
+    fn test_detects_if_let_ok_and_unwrap_or_else_in_ring0_1() {
+        let dir = tempdir().unwrap();
+
+        let caps = r#"
+[crates.contextra-mvcc]
+ring = "Ring 0"
+path = "crates/contextra-mvcc"
+"#;
+        fs::write(dir.path().join("capabilities.toml"), caps).unwrap();
+
+        let mvcc_src = dir.path().join("crates/contextra-mvcc/src");
+        fs::create_dir_all(&mvcc_src).unwrap();
+
+        let file = mvcc_src.join("sample.rs");
+        fs::write(
+            &file,
+            r#"
+fn sample() {
+    if let Ok(f) = std::fs::File::open("data") {}
+    let val = parse_val().unwrap_or_else(|_| 0);
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
+        assert_eq!(violations.len(), 2);
     }
 }

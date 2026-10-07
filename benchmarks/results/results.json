@@ -24,30 +24,32 @@
     },
     "recall_at_1_delta_pct": 0.0,
     "recall_at_5_delta_pct": 0.0,
-    "error_rate_reduction_pct": 0.0
+    "error_rate_reduction_pct": 0.0,
+    "mechanism_active": true
   },
   "scenario_b_reranking": {
-    "scenario_name": "Ohne vs. mit Cross-Encoder-Reranking",
+    "scenario_name": "Ohne vs. mit Cross-Encoder-Reranking (deaktiviert)",
     "baseline_metrics": {
-      "total_queries": 5,
-      "recall_at_1": 0.6,
-      "recall_at_3": 0.6,
-      "recall_at_5": 0.6,
-      "mrr": 0.6,
-      "error_rate_at_1": 0.4,
-      "error_rate_at_5": 0.4
+      "total_queries": 0,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "mrr": 0.0,
+      "error_rate_at_1": 0.0,
+      "error_rate_at_5": 0.0
     },
     "feature_metrics": {
-      "total_queries": 5,
-      "recall_at_1": 0.6,
-      "recall_at_3": 0.6,
-      "recall_at_5": 0.6,
-      "mrr": 0.6,
-      "error_rate_at_1": 0.4,
-      "error_rate_at_5": 0.4
+      "total_queries": 0,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "mrr": 0.0,
+      "error_rate_at_1": 0.0,
+      "error_rate_at_5": 0.0
     },
     "recall_at_1_delta_pct": 0.0,
     "recall_at_5_delta_pct": 0.0,
-    "error_rate_reduction_pct": 0.0
+    "error_rate_reduction_pct": 0.0,
+    "mechanism_active": false
   }
 }

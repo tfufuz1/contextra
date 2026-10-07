@@ -1,4 +1,5 @@
 use super::*;
+use contextra_mvcc::floor::SnapshotFloor;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_compaction_stress_and_gc() {
@@ -63,7 +64,7 @@ async fn test_compaction_stress_and_gc() {
 
     // 3. Register a Snapshot [INV-C1]
     let snapshot_seq = storage.last_seq_no().await.expect("last_seq_no"); // expect
-    let _guard = storage.snapshot_registry.register(snapshot_seq);
+    let _guard = storage.snapshot_registry.acquire(|| snapshot_seq);
 
     // 4. Heavy Load: 10,000 Inserts to trigger churn and background compaction
     for i in 0..10000 {
@@ -151,7 +152,7 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry.clone() as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -274,7 +275,7 @@ async fn test_phantom_data_after_partial_compaction() {
             min_sstables_per_tier: 2,
             ..CompactionConfig::default()
         },
-        registry,
+        registry.clone() as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -324,8 +325,8 @@ async fn test_phantom_data_after_partial_compaction() {
     ]));
 
     // min_snapshot_seq is 100 (high enough that 20 would normally be GC'd)
+    registry.pin(100);
     let engine = Arc::new(engine);
-    engine.snapshot_registry.pin(100);
 
     // Manually trigger merger for {sst1, sst2} -> partial compaction
     let output_path = tmp.path().join("merged.sst");
@@ -402,7 +403,7 @@ async fn test_compaction_pressure_awareness() {
 
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -529,7 +530,7 @@ async fn test_compaction_cancellation() {
     };
     let engine = Arc::new(CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         bc,
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -675,7 +676,7 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -747,7 +748,7 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -820,7 +821,7 @@ async fn test_chain_linkage_tier_grouping() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -887,7 +888,7 @@ async fn test_compaction_concurrent_rollback_flush_no_panic() {
     };
     let engine = Arc::new(CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -986,7 +987,7 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
     ));
     let engine = CompactionEngine::new(
         config,
-        registry.clone(),
+        registry.clone() as Arc<dyn SnapshotFloor>,
         bc.clone(),
         None,
         budget,

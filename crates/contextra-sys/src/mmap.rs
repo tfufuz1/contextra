@@ -20,10 +20,20 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
 
     // SAFETY:
     // 1. `file` is a valid, open read-only file descriptor with verified non-zero length (`file_len`).
-    // 2. Read-only mapping prevents data mutation races within Rust address space.
-    // 3. External truncation or concurrent file modification is contractually prohibited.
-    // 4. Page allocation and virtual memory mapping are safely managed by OS page tables.
-    unsafe { memmap2::Mmap::map(file) }
+    // 2. The file length was pre-verified via `file.metadata()?.len()`.
+    // 3. Read-only mapping prevents data mutation races within Rust address space.
+    // 4. External truncation or concurrent file modification is contractually prohibited.
+    // 5. Page allocation and virtual memory mapping are safely managed by OS page tables.
+    let mmap = unsafe { memmap2::Mmap::map(file)? };
+
+    if mmap.len() as u64 != file_len {
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "Mapped memory length mismatch with file metadata length",
+        ));
+    }
+
+    Ok(mmap)
 }
 
 #[cfg(test)]

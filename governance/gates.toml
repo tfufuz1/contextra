@@ -33,6 +33,16 @@ fixture = "none"
 tier = "agent"
 
 [[gate]]
+name = "gc-floor-single-source"
+phase = "verify"
+required_local = false
+required_ci = true
+risk_class = "high"
+owner = "core"
+fixture = "none"
+tier = "ci"
+
+[[gate]]
 name = "gate-arch"
 phase = "verify"
 required_local = true
