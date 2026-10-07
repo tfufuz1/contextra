@@ -3,7 +3,7 @@ mod verdict;
 
 use std::fs;
 use tempfile::tempdir;
-use verdict::run_verdict;
+use verdict::{normalize_gate_name, run_verdict};
 
 fn setup_test_env(
     required_toml_content: &str,
@@ -22,6 +22,53 @@ fn setup_test_env(
     }
 
     (temp, req_path, results_dir)
+}
+
+#[test]
+fn test_normalize_gate_name_unit() {
+    assert_eq!(normalize_gate_name("gate-determinism-check"), "determinism-check");
+    assert_eq!(normalize_gate_name("determinism-check"), "determinism-check");
+    assert_eq!(normalize_gate_name("gate-gate-weakening"), "gate-weakening");
+}
+
+#[test]
+fn test_verdict_gate_prefix_normalization_matching() {
+    let toml = r#"
+[[gate]]
+name = "gate-determinism-check"
+blocking = true
+
+[[gate]]
+name = "unsafe-audit"
+blocking = true
+"#;
+
+    let g1 = r#"{
+        "gate": "determinism-check",
+        "status": "pass",
+        "summary": "Determinism check passed",
+        "findings": []
+    }"#;
+
+    let g2 = r#"{
+        "gate": "gate-unsafe-audit",
+        "status": "pass",
+        "summary": "Unsafe audit passed",
+        "findings": []
+    }"#;
+
+    // g1 artifact saved as "determinism-check.json", g2 saved as "gate-unsafe-audit.json"
+    let (_temp, req_path, results_dir) =
+        setup_test_env(toml, &[("determinism-check", g1), ("gate-unsafe-audit", g2)]);
+
+    let code = run_verdict(&[
+        "--required".to_string(),
+        req_path.to_str().unwrap().to_string(),
+        "--results-dir".to_string(),
+        results_dir.to_str().unwrap().to_string(),
+    ]);
+
+    assert_eq!(code, 0);
 }
 
 #[test]
