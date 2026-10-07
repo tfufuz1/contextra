@@ -8,6 +8,10 @@ on:
     branches: ["main", "master"]
   pull_request:
 
+concurrency:
+  group: rust-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -18,23 +22,26 @@ env:
 jobs:
   compile-check:
     name: Compile Check (cargo check)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Workspace Compile Gate
         run: cargo run -p xtask -- check-compile
 
   fmt:
     name: Format Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
         with:
+          toolchain: 1.89.0
           components: rustfmt
       - name: Run rustfmt check
         run: |
@@ -42,7 +49,7 @@ jobs:
 
   supply-chain:
     name: Dependency Security & License Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
@@ -54,14 +61,15 @@ jobs:
 
   coverage:
     name: Line Coverage Gate (>= 50%)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
         with:
+          toolchain: 1.89.0
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@4314395b773db6ec53370cf7e57cc6bfefb6ae8f # cargo-llvm-cov
@@ -76,24 +84,36 @@ jobs:
 
   per-crate-coverage-report:
     name: Per-Crate Coverage Report (Non-blocking)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
         with:
+          toolchain: 1.89.0
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@4314395b773db6ec53370cf7e57cc6bfefb6ae8f # cargo-llvm-cov
+      - name: Pre-check Crate Names against Workspace Metadata
+        run: |
+          TARGET_CRATES="contextra-store contextra-infer-candle contextra-db contextra-vector"
+          WORKSPACE_CRATES=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name')
+          for crate in $TARGET_CRATES; do
+            if ! echo "$WORKSPACE_CRATES" | grep -q -w "$crate"; then
+              echo "❌ Error: Crate '$crate' does not exist in workspace metadata!"
+              exit 1
+            fi
+          done
+          echo "✅ All target crates verified against workspace metadata."
       - name: Generate Per-Crate Coverage Summary
         run: |
           echo "## Per-Crate Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Crate | Line Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
 
-          for crate in contextra-store contextra-candle contextra-db contextra-vector; do
+          for crate in contextra-store contextra-infer-candle contextra-db contextra-vector; do
             COV_OUTPUT=$(cargo llvm-cov -p "$crate" --locked 2>&1)
             # Parse line coverage percentage from the TOTAL line
             PCT=$(echo "$COV_OUTPUT" | grep -E "^TOTAL" | awk '{print $(NF)}')
@@ -105,13 +125,14 @@ jobs:
 
   clippy:
     name: Clippy (-D warnings)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
         with:
+          toolchain: 1.89.0
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Check for duplicate symbols (fast pre-build gate)
@@ -122,13 +143,15 @@ jobs:
 
   asan-contextra-vector:
     name: AddressSanitizer Gate (contextra-vector)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
+        with:
+          toolchain: nightly
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run contextra-vector tests with AddressSanitizer
         run: |
@@ -136,14 +159,16 @@ jobs:
 
   asan-contextra-vector-unequal-lengths:
     name: ASan Gate — u8 Distance Unequal Length Slices (contextra-vector)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [compile-check]
     # Dieser Job schlägt FEHL, solange P-G1 (AVX2 OOB-Fix) nicht gemergt ist.
     # Er ist absichtlich als Sicherheitsnetz konzipiert, kein continue-on-error.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
+        with:
+          toolchain: nightly
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run u8 distance unequal-length tests with AddressSanitizer
         run: |
@@ -156,14 +181,15 @@ jobs:
 
   miri-contextra-vector:
     name: Miri Gate (contextra-vector unsafe fn boundary tests)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [compile-check]
     continue-on-error: true  # Miri-Failures blockieren nicht den Merge, werden aber sichtbar
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
         with:
+          toolchain: nightly
           components: miri
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run Miri on contextra-vector
@@ -178,13 +204,15 @@ jobs:
 
   cargo-hack-feature-check:
     name: Cargo Hack Feature Flag Matrix Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@cargo-hack
       - name: Run cargo hack --each-feature --workspace --no-dev-deps
@@ -192,91 +220,128 @@ jobs:
 
   feature-matrix:
     name: Feature Matrix Checks (Powerset CI §17)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: [compile-check]
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Workspace
+          - crate: workspace
+            flags: "--workspace --no-default-features"
+          # contextra-store
+          - crate: contextra-store
+            flags: "-p contextra-store --no-default-features"
+          - crate: contextra-store
+            flags: "-p contextra-store --features block-cache-v2"
+          - crate: contextra-store
+            flags: "-p contextra-store --features fault-injection"
+          - crate: contextra-store
+            flags: "-p contextra-store --features block-cache-v2,fault-injection"
+          # contextra-vector
+          - crate: contextra-vector
+            flags: "-p contextra-vector --no-default-features"
+          - crate: contextra-vector
+            flags: "-p contextra-vector --features experimental-diskann"
+          - crate: contextra-vector
+            flags: "-p contextra-vector --features experimental-rabitq"
+          - crate: contextra-vector
+            flags: "-p contextra-vector --features graph"
+          - crate: contextra-vector
+            flags: "-p contextra-vector --features partial-index-rebuild"
+          - crate: contextra-vector
+            flags: "-p contextra-vector --features experimental-diskann,experimental-rabitq,graph,partial-index-rebuild"
+          # contextra-adapt
+          - crate: contextra-adapt
+            flags: "-p contextra-adapt --no-default-features"
+          - crate: contextra-adapt
+            flags: "-p contextra-adapt --features bandit-routing"
+          - crate: contextra-adapt
+            flags: "-p contextra-adapt --features flow-corrected-thompson"
+          - crate: contextra-adapt
+            flags: "-p contextra-adapt --features bandit-routing,flow-corrected-thompson"
+          # contextra-crypto
+          - crate: contextra-crypto
+            flags: "-p contextra-crypto --no-default-features"
+          - crate: contextra-crypto
+            flags: "-p contextra-crypto --features kv-encryption"
+          - crate: contextra-crypto
+            flags: "-p contextra-crypto --features cloud-egress-guard"
+          - crate: contextra-crypto
+            flags: "-p contextra-crypto --features kv-encryption,cloud-egress-guard,test-utils"
+          # contextra-router
+          - crate: contextra-router
+            flags: "-p contextra-router --no-default-features"
+          - crate: contextra-router
+            flags: "-p contextra-router --features bandit-routing"
+          - crate: contextra-router
+            flags: "-p contextra-router --features cloud-egress-guard"
+          - crate: contextra-router
+            flags: "-p contextra-router --features bandit-routing,cloud-egress-guard"
+          # contextra-infer-onnx
+          - crate: contextra-infer-onnx
+            flags: "-p contextra-infer-onnx --no-default-features"
+          - crate: contextra-infer-onnx
+            flags: "-p contextra-infer-onnx --features onnx"
+          # contextra-infer-candle
+          - crate: contextra-infer-candle
+            flags: "-p contextra-infer-candle --no-default-features"
+          - crate: contextra-infer-candle
+            flags: "-p contextra-infer-candle --features candle"
+          - crate: contextra-infer-candle
+            flags: "-p contextra-infer-candle --features kv-bridge,kv-stage-b"
+          # contextra-db
+          - crate: contextra-db
+            flags: "-p contextra-db --no-default-features"
+          - crate: contextra-db
+            flags: "-p contextra-db --features reranking"
+          - crate: contextra-db
+            flags: "-p contextra-db --features volatile-vault"
+          - crate: contextra-db
+            flags: "-p contextra-db --features experimental-diskann"
+          # contextra-graph
+          - crate: contextra-graph
+            flags: "-p contextra-graph --no-default-features"
+          - crate: contextra-graph
+            flags: "-p contextra-graph --features physio-percolation"
+          # contextra-mcp
+          - crate: contextra-mcp
+            flags: "-p contextra-mcp --no-default-features"
+          - crate: contextra-mcp
+            flags: "-p contextra-mcp --features agent-workflows"
+          - crate: contextra-mcp
+            flags: "-p contextra-mcp --features onnx"
+          - crate: contextra-mcp
+            flags: "-p contextra-mcp --features candle"
+          - crate: contextra-mcp
+            flags: "-p contextra-mcp --features kv-bridge"
+          # contextra facade
+          - crate: contextra
+            flags: "-p contextra --no-default-features"
+          - crate: contextra
+            flags: "-p contextra --all-features"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Workspace --no-default-features Check
-        run: cargo check --locked --workspace --no-default-features
-      - name: Check contextra-store Feature Combinations
-        run: |
-          cargo check --locked -p contextra-store --no-default-features
-          cargo check --locked -p contextra-store --features block-cache-v2
-          cargo check --locked -p contextra-store --features sieve-cache
-          cargo check --locked -p contextra-store --features fault-injection
-          cargo check --locked -p contextra-store --features block-cache-v2,sieve-cache,fault-injection
-      - name: Check contextra-vector Feature Combinations
-        run: |
-          cargo check --locked -p contextra-vector --no-default-features
-          cargo check --locked -p contextra-vector --features experimental-diskann
-          cargo check --locked -p contextra-vector --features experimental-rabitq
-          cargo check --locked -p contextra-vector --features graph
-          cargo check --locked -p contextra-vector --features partial-index-rebuild
-          cargo check --locked -p contextra-vector --features experimental-diskann,experimental-rabitq,graph,partial-index-rebuild
-      - name: Check contextra-adapt Feature Combinations
-        run: |
-          cargo check --locked -p contextra-adapt --no-default-features
-          cargo check --locked -p contextra-adapt --features bandit-routing
-          cargo check --locked -p contextra-adapt --features flow-corrected-thompson
-          cargo check --locked -p contextra-adapt --features bandit-routing,flow-corrected-thompson,egress-sherman-morrison
-      - name: Check contextra-crypto Feature Combinations
-        run: |
-          cargo check --locked -p contextra-crypto --no-default-features
-          cargo check --locked -p contextra-crypto --features kv-encryption
-          cargo check --locked -p contextra-crypto --features cloud-egress-guard
-          cargo check --locked -p contextra-crypto --features kv-encryption,cloud-egress-guard,test-utils
-      - name: Check contextra-router Feature Combinations
-        run: |
-          cargo check --locked -p contextra-router --no-default-features
-          cargo check --locked -p contextra-router --features bandit-routing
-          cargo check --locked -p contextra-router --features cloud-egress-guard
-          cargo check --locked -p contextra-router --features egress-sherman-morrison
-          cargo check --locked -p contextra-router --features bandit-routing,cloud-egress-guard,egress-sherman-morrison
-      - name: Check contextra-infer-onnx Feature Combinations
-        run: |
-          cargo check --locked -p contextra-infer-onnx --no-default-features
-          cargo check --locked -p contextra-infer-onnx --features onnx
-      - name: Check contextra-infer-candle Feature Combinations
-        run: |
-          cargo check --locked -p contextra-infer-candle --no-default-features
-          cargo check --locked -p contextra-infer-candle --features candle
-          cargo check --locked -p contextra-infer-candle --features kv-bridge,kv-stage-b,contextra-store
-      - name: Check contextra-db Feature Combinations
-        run: |
-          cargo check --locked -p contextra-db --no-default-features
-          cargo check --locked -p contextra-db --features reranking
-          cargo check --locked -p contextra-db --features volatile-vault
-          cargo check --locked -p contextra-db --features experimental-diskann
-      - name: Check contextra-graph Feature Combinations
-        run: |
-          cargo check --locked -p contextra-graph --no-default-features
-          cargo check --locked -p contextra-graph --features ppr-forward-push
-          cargo check --locked -p contextra-graph --features physio-percolation
-      - name: Check contextra-mcp Feature Combinations
-        run: |
-          cargo check --locked -p contextra-mcp --no-default-features
-          cargo check --locked -p contextra-mcp --features agent-workflows
-          cargo check --locked -p contextra-mcp --features onnx
-          cargo check --locked -p contextra-mcp --features candle
-          cargo check --locked -p contextra-mcp --features kv-bridge
-      - name: Check contextra facade Feature Combinations
-        run: |
-          cargo check --locked -p contextra --no-default-features
-          cargo check --locked -p contextra --all-features
+      - name: Check Feature Combination (${{ matrix.crate }} ${{ matrix.flags }})
+        run: cargo check --locked ${{ matrix.flags }}
 
   maturin-dry-run:
     name: PyPI Wheel Build Check (Maturin Dry-Run)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -288,12 +353,14 @@ jobs:
 
   test:
     name: Test Suite (cargo-nextest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@45fceba0fc176f41d2aee1ca9d6598ba628eea62 # nextest
       - name: Run Tests with Nextest
@@ -312,39 +379,44 @@ jobs:
 
   clippy-py:
     name: Clippy (contextra-py)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
         with:
+          toolchain: 1.89.0
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo clippy --manifest-path crates/contextra-py/Cargo.toml --all-targets -- -D warnings
 
   test-py:
     name: Test Suite (contextra-py)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo test --manifest-path crates/contextra-py/Cargo.toml
 
   lockfile-check-py:
     name: Check contextra-py Lockfile in sync
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [compile-check]
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Check contextra-py Lockfile in sync
         run: |
@@ -354,12 +426,14 @@ jobs:
 
   docid-128-check:
     name: DocId 128-bit Validation Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [compile-check]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@cargo-hack
       - name: Workspace check with contextra-types/docid-128
@@ -383,10 +457,12 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Test core storage/crypto crates
-        run: cargo test --locked -p contextra-core -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-db
+        run: cargo test --locked -p contextra-core -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-db -p contextra-durable-fs -p contextra-wire -p contextra-sys -p contextra-mvcc -p contextra-simd
 
   # KONSOLIDIERUNGS-HINWEIS: Der redundante context-gates Job wurde hier entfernt.
   # Die Kanonische Quelle für Context Integrity Gates ist .github/workflows/context-gates.yml,
