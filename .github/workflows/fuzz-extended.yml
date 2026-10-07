@@ -6,28 +6,53 @@ on:
 
 jobs:
   fuzz-extended:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
         target:
+          - { crate: contextra-crypto, target: deletion_proof_tamper }
+          - { crate: contextra-crypto, target: wal_hmac_chain_verify_fuzz }
+          - { crate: contextra-crypto, target: deletion_proof_verify_external_fuzz }
+          - { crate: contextra-wire,   target: fuzz_flatbuffers_ipc }
+          - { crate: contextra-mcp,    target: fuzz_prompt_injection_guard }
+          - { crate: contextra-mcp,    target: fuzz_jsonrpc_parsing }
+          - { crate: contextra-store,  target: wal_roundtrip }
           - { crate: contextra-store,  target: wal_mutation_chaos }
+          - { crate: contextra-store,  target: fuzz_sstable_binary_search }
           - { crate: contextra-store,  target: fuzz_manifest_load }
-          - { crate: contextra-vector,  target: fuzz_hnsw_persistence }
-          - { crate: contextra-db,     target: fuzz_rrf_edge_cases }
-          - { crate: contextra-text,   target: fuzz_bm25_query }
-          - { crate: contextra-vector,  target: fuzz_distance_boundaries }
+          - { crate: contextra-store,  target: fuzz_wal_replay }
+          - { crate: contextra-store,  target: fuzz_memtable_concurrent }
+          - { crate: contextra-store,  target: fuzz_compaction_interleave }
+          - { crate: contextra-store,  target: fuzz_recovery_arbitrary_state }
+          - { crate: contextra-db,     target: rrf_fusion }
+          - { crate: contextra-text,   target: fuzz_bm25_tokenize }
+          - { crate: contextra-vector, target: hnsw_insert_search }
+          - { crate: contextra-vector, target: fuzz_hnsw_persistence }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-10-07
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --quiet
+      - name: Verify Target Registered
+        run: |
+          cargo fuzz list --fuzz-dir crates/${{ matrix.target.crate }}/fuzz | grep -x "${{ matrix.target.target }}"
       - name: Fuzz ${{ matrix.target.target }} (3600s)
         run: |
           cd crates/${{ matrix.target.crate }}
           cargo fuzz run ${{ matrix.target.target }} -- -max_total_time=3600
+      - name: Upload Crash Artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target.target }}-${{ github.run_id }}
+          path: crates/${{ matrix.target.crate }}/fuzz/artifacts/**
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Upload Corpus
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
