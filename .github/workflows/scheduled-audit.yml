@@ -5,85 +5,35 @@ on:
     - cron: "0 22 * * 5"
   workflow_dispatch: {}
 
+concurrency:
+  group: scheduled-audit
+  cancel-in-progress: false
+
+permissions: {}
+
 jobs:
   prepare-audit-context:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     outputs:
       task_file: ${{ steps.task.outputs.task_file }}
       task_date: ${{ steps.task.outputs.task_date }}
       task_created: ${{ steps.task.outputs.task_created }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Prüfe und erstelle Audit-Task-Datei
         id: task
-        run: |
-          YEAR_WEEK=$(date -u +'%Y-W%V')
-          DATE=$(date -u +'%Y-%m-%d')
-          TASK_FILE=".jules/tasks/AUDIT-${YEAR_WEEK}.toml"
-
-          echo "task_date=$YEAR_WEEK" >> "$GITHUB_OUTPUT"
-          echo "task_file=$TASK_FILE" >> "$GITHUB_OUTPUT"
-
-          if [ -f "$TASK_FILE" ]; then
-            echo "::notice::Audit-Task-Datei $TASK_FILE existiert bereits für ISO-Woche $YEAR_WEEK. Überspringe Erstellung."
-            echo "task_created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          mkdir -p .jules/tasks
-
-          SHAS=$(git log --since="7 days ago" --format="%H" --no-merges)
-          if [ -z "$SHAS" ]; then
-            SHA_LIST='# Keine Commits in den letzten 7 Tagen'
-          else
-            SHA_LIST=$(echo "$SHAS" | sed 's/^/"/;s/$/",/')
-          fi
-
-          cat << EOF > "$TASK_FILE"
-# Audit-Task-Karte
-# ID Format: AUDIT-YYYY-Www
-id        = "AUDIT-${YEAR_WEEK}"
-title     = "Woechentlicher Proaktiv-Audit-Auftrag ${YEAR_WEEK}"
-crate     = "workspace"
-tier      = 1
-risk      = "sec"
-goal      = "Proaktive Analyse der Commits der letzten 7 Tage auf Race Conditions, unwrap-Regressions, Silent Failures und DAG-Grenzverletzungen."
-non_goals = ["Refactoring ausserhalb verifizierter Befunde", "Stilles Ignorieren nicht verifizierter Findings"]
-scope     = ["crates/**", "xtask/**"]
-forbidden = ["capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
-invariants = ["Zero-Panic", "P28 Determinismus", "Audit Intake Protocol"]
-acceptance = [
-  "cargo test --workspace --locked",
-  "cargo xtask check-ring-layering",
-  "cargo xtask panic-inventory"
-]
-evidence_required = ["Verifizierte Befunde mit Test oder Entkraeftungsbegruendung im PR-Text"]
-
-[audit_context]
-created_date = "${DATE}"
-instructions = "Lies .jules/AUDIT_INTAKE_PROTOCOL.md. Führe 'git show <sha>' für die aufgeführten commit_shas aus, um Diff/Änderungen zu analysieren. Jeder Fund muss gegen den AKTUELLEN Quellcode verifiziert werden."
-commit_shas = [
-${SHA_LIST}
-]
-
-[budget]
-files = 10
-lines = 300
-iterations = 10
-EOF
-
-          echo "task_created=true" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/render_audit_task.sh
 
       - name: Erstelle Pull Request mit Audit-Task
         if: steps.task.outputs.task_created == 'true'
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
         with:
           branch: automated/weekly-audit-task-${{ steps.task.outputs.task_date }}
           title: "Wöchentlicher Audit-Auftrag ${{ steps.task.outputs.task_date }}"
@@ -98,13 +48,13 @@ EOF
           delete-branch: true
 
   trigger-mutation-testing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       actions: write
     steps:
       - name: Trigger Rotating Mutation Testing Workflow
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const crates = ["contextra-graph", "contextra-vector", "contextra-agent", "contextra-db"];
