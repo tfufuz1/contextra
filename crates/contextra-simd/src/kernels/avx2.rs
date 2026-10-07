@@ -17,7 +17,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -81,7 +81,7 @@ pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -125,7 +125,7 @@ pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -166,7 +166,7 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -238,7 +238,7 @@ pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -292,7 +292,7 @@ pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
 // SAFETY: Target features "avx2" and "fma" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -342,7 +342,7 @@ pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 // SAFETY: Target feature "avx2" enabled by target_feature attribute.
-pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
+pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: Valid AVX2 cast from 256-bit float vector to lower 128-bit lane.
     let vlow = unsafe { _mm256_castps256_ps128(v) };
     // SAFETY: Valid AVX2 extraction of upper 128-bit lane (index 1).
@@ -367,7 +367,7 @@ pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 // SAFETY: Target feature "avx2" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -426,7 +426,7 @@ pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 // SAFETY: Target feature "avx2" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -490,7 +490,10 @@ pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 // SAFETY: Target feature "avx2" enabled by target_feature attribute; caller guarantees valid slice bounds.
-pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
+    a: &[u8],
+    b: &[u8],
+) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -568,7 +571,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimil
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 // SAFETY: Target feature "avx2" enabled by target_feature attribute.
-pub unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
+pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: Valid AVX2 cast from 256-bit integer vector to lower 128-bit lane.
     let vlow = unsafe { _mm256_castsi256_si128(v) };
     // SAFETY: Valid AVX2 extraction of upper 128-bit lane (index 1).

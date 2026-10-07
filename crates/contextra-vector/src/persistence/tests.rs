@@ -181,6 +181,82 @@ fn test_open_rejects_invalid_magic() -> Result<()> {
 }
 
 #[test]
+fn test_file_shorter_than_header_returns_error() -> Result<()> {
+    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let path = temp_dir.path().join("too_short.hnsw");
+    std::fs::write(&path, &[0u8; 32]).map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+    let res = MmapIndex::open(&path);
+    assert!(res.is_err());
+    if let Err(ContextraError::Storage(msg)) = res {
+        assert!(msg.contains("too small"), "Unexpected error: {}", msg);
+    } else {
+        panic!("Expected Storage error");
+    }
+    Ok(())
+}
+
+#[test]
+fn test_file_modified_or_locked_during_mapping() -> Result<()> {
+    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let path = temp_dir.path().join("locked.hnsw");
+    let header = HnswHeader::new(4, 16, 1, 0, -1.0, 1.0, 0, -1, 84, 84, 1);
+    std::fs::write(&path, &header.to_bytes()).map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+    // Hold exclusive lock on file
+    let lock_file = std::fs::File::open(&path).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let _ = lock_file.try_lock();
+
+    let res = MmapIndex::open(&path);
+    if res.is_err() {
+        if let Err(ContextraError::Storage(msg)) = res {
+            assert!(
+                msg.contains("locked") || msg.contains("mmap") || msg.contains("metadata"),
+                "Unexpected error message: {}",
+                msg
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_unaligned_read_access() -> Result<()> {
+    // Construct unaligned byte slice (offset by 1 byte) for NodeRecord and connection data
+    let mut unaligned_buf = vec![0u8; 1 + NodeRecord::SIZE + 16];
+    let record = NodeRecord {
+        doc_id: 0x1234_5678_9ABC_DEF0,
+        max_layer: 2,
+        vector_offset: 128,
+        connections_offset: 256,
+    };
+    unaligned_buf[1..1 + NodeRecord::SIZE].copy_from_slice(&record.to_bytes());
+
+    // Verify NodeRecord deserializes correctly from unaligned slice
+    let parsed = NodeRecord::from_bytes(&unaligned_buf[1..1 + NodeRecord::SIZE])?;
+    assert_eq!(parsed.doc_id, record.doc_id);
+    assert_eq!(parsed.max_layer, record.max_layer);
+    assert_eq!(parsed.vector_offset, record.vector_offset);
+    assert_eq!(parsed.connections_offset, record.connections_offset);
+
+    // Construct unaligned connection IDs slice
+    let mut conn_buf = vec![0u8; 3 + 12];
+    conn_buf[3..7].copy_from_slice(&101u32.to_le_bytes());
+    conn_buf[7..11].copy_from_slice(&102u32.to_le_bytes());
+    conn_buf[11..15].copy_from_slice(&103u32.to_le_bytes());
+
+    let val1 = u32::from_le_bytes(conn_buf[3..7].try_into().unwrap());
+    let val2 = u32::from_le_bytes(conn_buf[7..11].try_into().unwrap());
+    let val3 = u32::from_le_bytes(conn_buf[11..15].try_into().unwrap());
+
+    assert_eq!(val1, 101);
+    assert_eq!(val2, 102);
+    assert_eq!(val3, 103);
+
+    Ok(())
+}
+
+#[test]
 fn test_open_rejects_unsupported_version() -> Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("unsupported_version.hnsw");
