@@ -141,12 +141,13 @@ impl WasmExecutor {
     /// use contextra_sandbox::{WasmExecutor, WasmCapabilities};
     /// use std::time::Duration;
     /// #[tokio::main]
-    /// async fn main() {
-    ///     let executor = WasmExecutor::new().unwrap();
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let executor = WasmExecutor::new()?;
     ///     let caps = WasmCapabilities::default();
     ///     let bytes: &[u8] = b"wasm bytes";
     ///     // Calling execute_admitted with raw byte slice fails compilation:
     ///     let _ = executor.execute_admitted(bytes, b"", &caps, Duration::from_secs(1)).await;
+    ///     Ok(())
     /// }
     /// ```
     ///
