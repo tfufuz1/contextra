@@ -22,7 +22,35 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-pub use crate::lease::SnapshotLease;
+/// Trait for querying the minimum sequence number floor for active MVCC snapshots and transaction readers.
+pub trait SnapshotFloor: Send + Sync {
+    /// Returns the active GC sequence floor. Sequence numbers strictly below this floor may be safely garbage collected.
+    fn floor(&self) -> u64;
+}
+
+impl<T: SnapshotFloor + ?Sized> SnapshotFloor for Arc<T> {
+    fn floor(&self) -> u64 {
+        (**self).floor()
+    }
+}
+
+impl SnapshotFloor for SnapshotRegistry {
+    fn floor(&self) -> u64 {
+        self.min_active_seqno()
+    }
+}
+
+/// An RAII lease for a read snapshot sequence number.
+pub struct SnapshotLease {
+    guard: SnapshotGuard,
+}
+
+impl SnapshotLease {
+    /// Returns the sequence number pinned by this snapshot lease.
+    pub fn seq_no(&self) -> u64 {
+        self.guard.seq_no()
+    }
+}
 
 /// Registry for active read snapshots.
 ///
@@ -59,23 +87,12 @@ impl SnapshotRegistry {
         }
     }
 
-    /// Acquires a new snapshot lease atomically reading the sequence number inside the registry lock.
-    pub fn acquire(self: &Arc<Self>, read_last_applied: impl FnOnce() -> u64) -> SnapshotLease {
-        self.acquire_at(read_last_applied, Instant::now())
-    }
-
-    /// Acquires a new snapshot lease at a specific creation timestamp `at`.
-    pub fn acquire_at(
-        self: &Arc<Self>,
-        read_last_applied: impl FnOnce() -> u64,
-        at: Instant,
-    ) -> SnapshotLease {
-        let mut active = self.active.lock();
-        let raw_seq = read_last_applied();
-        let seq_no = raw_seq & !TOMBSTONE_BIT;
-        active.entry(seq_no).or_default().push(at);
-        self.update_min(&active);
-        SnapshotLease::new(self.clone(), seq_no, Some(at))
+    /// Acquires a read snapshot lease at `seq_no`. Returns an RAII lease that
+    /// automatically releases on drop.
+    pub fn acquire(self: &Arc<Self>, seq_no: u64) -> SnapshotLease {
+        SnapshotLease {
+            guard: self.register(seq_no),
+        }
     }
 
     /// Registers a read snapshot. Returns an RAII guard that

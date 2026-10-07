@@ -111,7 +111,7 @@ async fn test_pin_unpin_checkpoint_prevents_gc() {
 
     let engine = CompactionEngine::new(
         config.compaction.clone(),
-        storage.snapshot_registry.clone(),
+        Arc::clone(&storage.floor),
         storage.block_cache.clone(),
         storage.key_manager.clone(),
         Arc::clone(&storage.budget),

@@ -618,7 +618,7 @@ impl OrchestratorEngine {
                 .budget
                 .effective_limit()
                 .saturating_sub(ctx.budget.reserved);
-            let available_usize = usize::try_from(available).unwrap_or(usize::MAX);
+            let available_usize = usize::try_from(available).unwrap_or(usize::MAX); // UNBOUNDED-OK: available budget fallback
             let consumed = total_usable.saturating_sub(available_usize);
             let restored_budget =
                 contextra_types::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
