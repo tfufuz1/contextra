@@ -89,7 +89,7 @@ mod loom_floor_tests {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod normal_floor_tests {
-    use contextra_mvcc::snapshot::{GcFloor, SnapshotRegistry};
+    use contextra_mvcc::{GcFloor, SnapshotRegistry};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     use std::thread;
