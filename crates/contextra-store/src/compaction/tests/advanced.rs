@@ -63,7 +63,7 @@ async fn test_compaction_stress_and_gc() {
 
     // 3. Register a Snapshot [INV-C1]
     let snapshot_seq = storage.last_seq_no().await.expect("last_seq_no"); // expect
-    let _guard = storage.snapshot_registry.register(snapshot_seq);
+    let _guard = storage.snapshot_registry.acquire(|| snapshot_seq);
 
     // 4. Heavy Load: 10,000 Inserts to trigger churn and background compaction
     for i in 0..10000 {
