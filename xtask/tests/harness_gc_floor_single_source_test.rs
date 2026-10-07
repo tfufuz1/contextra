@@ -68,7 +68,11 @@ fn bad(reg: &SnapshotRegistry) {
     let baseline = r#"[occurrences]
 "crates/contextra-store/src/bad.rs:3:let min = reg.min_active_seqno();" = true
 "#;
-    fs::write(root.join("governance/gc-floor-single-source-baseline.toml"), baseline).unwrap();
+    fs::write(
+        root.join("governance/gc-floor-single-source-baseline.toml"),
+        baseline,
+    )
+    .unwrap();
 
     let args = vec![
         "--root".to_string(),

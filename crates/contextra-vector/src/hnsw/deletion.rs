@@ -303,7 +303,9 @@ impl GhostFreeVectorIndex for HnswIndex {
                 let conns_len = if target_idx < mmap_node_count {
                     if let Some(mmap) = mmap_guard.as_ref() {
                         if let Ok(rec) = mmap.get_node_record(target_idx) {
-                            mmap.get_connections(&rec, layer).map(|c| c.len()).unwrap_or(0)
+                            mmap.get_connections(&rec, layer)
+                                .map(|c| c.len())
+                                .unwrap_or(0)
                         } else {
                             0
                         }
@@ -337,9 +339,7 @@ impl GhostFreeVectorIndex for HnswIndex {
             let remaining = match scan_result {
                 GhostScan::Violated(n) => n as usize,
                 GhostScan::Complete(n) => n as usize,
-                GhostScan::Incomplete(_) => {
-                    verification_res.remaining_ghost_pointers.max(1)
-                }
+                GhostScan::Incomplete(_) => verification_res.remaining_ghost_pointers.max(1),
             };
             return Err(ContextraError::GraphRepairFailed(
                 HnswDeletionError::VerificationFailed {
@@ -408,7 +408,10 @@ impl HnswIndex {
                             repaired_ghost_pointers,
                             is_complete: false,
                         };
-                        return (res, GhostScan::Incomplete(IncompleteReason::BudgetExhausted));
+                        return (
+                            res,
+                            GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+                        );
                     }
 
                     if i >= total_nodes
@@ -428,7 +431,10 @@ impl HnswIndex {
                                         repaired_ghost_pointers,
                                         is_complete: false,
                                     };
-                                    return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                                    return (
+                                        res,
+                                        GhostScan::Incomplete(IncompleteReason::ReadError),
+                                    );
                                 }
                             }
                         } else {
@@ -450,7 +456,10 @@ impl HnswIndex {
                                             repaired_ghost_pointers,
                                             is_complete: false,
                                         };
-                                        return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                                        return (
+                                            res,
+                                            GhostScan::Incomplete(IncompleteReason::ReadError),
+                                        );
                                     }
                                 };
                                 match mmap.get_connections(&rec, layer) {
@@ -461,7 +470,10 @@ impl HnswIndex {
                                             repaired_ghost_pointers,
                                             is_complete: false,
                                         };
-                                        return (res, GhostScan::Incomplete(IncompleteReason::ReadError));
+                                        return (
+                                            res,
+                                            GhostScan::Incomplete(IncompleteReason::ReadError),
+                                        );
                                     }
                                 }
                             } else {
@@ -478,10 +490,8 @@ impl HnswIndex {
                         if conns.contains(&target_idx_u32) {
                             if i >= mmap_node_count {
                                 let ram_idx = i - mmap_node_count;
-                                let cleaned: Vec<u32> = conns
-                                    .into_iter()
-                                    .filter(|&c| c != target_idx_u32)
-                                    .collect();
+                                let cleaned: Vec<u32> =
+                                    conns.into_iter().filter(|&c| c != target_idx_u32).collect();
                                 if self
                                     .inner
                                     .hot
@@ -523,7 +533,10 @@ impl HnswIndex {
                 repaired_ghost_pointers,
                 is_complete: false,
             };
-            return (res, GhostScan::Incomplete(IncompleteReason::BudgetExhausted));
+            return (
+                res,
+                GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+            );
         }
 
         let mut inspected = 0usize;
@@ -535,7 +548,10 @@ impl HnswIndex {
                     repaired_ghost_pointers,
                     is_complete: false,
                 };
-                return (res, GhostScan::Incomplete(IncompleteReason::BudgetExhausted));
+                return (
+                    res,
+                    GhostScan::Incomplete(IncompleteReason::BudgetExhausted),
+                );
             }
 
             if deleted.contains(i as u64) || i == target_idx_u32 as usize {
@@ -759,16 +775,17 @@ mod tests {
             vector_offset: 120,
             connections_offset: 200,
         };
-        fake_mmap[80..80 + crate::persistence::NodeRecord::SIZE]
-            .copy_from_slice(&rec0.to_bytes());
+        fake_mmap[80..80 + crate::persistence::NodeRecord::SIZE].copy_from_slice(&rec0.to_bytes());
         // Connections at offset 200: 1 layer, 1 connection pointing to 999
         fake_mmap[200] = 1; // 1 layer
         fake_mmap[201..205].copy_from_slice(&1u32.to_le_bytes()); // len 1
         fake_mmap[205..209].copy_from_slice(&999u32.to_le_bytes()); // conn 999
 
+        let dummy_file = tempfile::tempfile().unwrap();
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap.make_read_only().unwrap()),
             header,
+            file_handle: std::sync::Arc::new(dummy_file),
         };
         *mut_index.inner.cold.mmap_index.write() = Some(mmap_index);
 
@@ -792,11 +809,16 @@ mod tests {
         let header = crate::persistence::HnswHeader::new_v2_with_bias(
             4, 8, 0, 0, 0.0, 1.0, 10, 0, 80, 200, 1, 0, 0, 0.0, 0.0,
         );
-        let fake_mmap = memmap2::MmapMut::map_anon(100).unwrap().make_read_only().unwrap();
+        let fake_mmap = memmap2::MmapMut::map_anon(100)
+            .unwrap()
+            .make_read_only()
+            .unwrap();
 
+        let dummy_file = tempfile::tempfile().unwrap();
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap),
             header,
+            file_handle: std::sync::Arc::new(dummy_file),
         };
 
         *index.inner.cold.mmap_index.write() = Some(mmap_index);

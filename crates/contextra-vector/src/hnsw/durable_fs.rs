@@ -2,8 +2,8 @@
 // STAND: 2026-10-06
 // ZWECK: Durable Filesystem Operations (APM-1) für HNSW Index Persistence.
 
-use std::path::Path;
 use contextra_core::{ContextraError, Result};
+use std::path::Path;
 
 /// Atomically replaces target file `dst` with temporary file `src` adhering to APM-1 durability rules:
 /// 1. fsync the source file (`src`).
@@ -17,7 +17,9 @@ pub fn atomic_replace(src: &Path, dst: &Path) -> Result<()> {
     }
 
     std::fs::rename(src, dst).map_err(|e| {
-        ContextraError::Storage(format!("Failed to rename temporary file to destination: {e}"))
+        ContextraError::Storage(format!(
+            "Failed to rename temporary file to destination: {e}"
+        ))
     })?;
 
     if let Some(parent) = dst.parent() {
@@ -32,9 +34,8 @@ pub fn atomic_replace(src: &Path, dst: &Path) -> Result<()> {
 /// Durably removes `path` and fsyncs its parent directory.
 pub fn durable_remove(path: &Path) -> Result<()> {
     if path.exists() {
-        std::fs::remove_file(path).map_err(|e| {
-            ContextraError::Storage(format!("Failed to remove file: {e}"))
-        })?;
+        std::fs::remove_file(path)
+            .map_err(|e| ContextraError::Storage(format!("Failed to remove file: {e}")))?;
     }
 
     if let Some(parent) = path.parent() {
