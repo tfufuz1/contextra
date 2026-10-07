@@ -44,7 +44,11 @@ fn bench_simd_kernels(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("cosine_dispatch", dim),
             &dim,
-            |b_bench, _| b_bench.iter(|| { let _ = cosine_distance(black_box(&a), black_box(&b)); }),
+            |b_bench, _| {
+                b_bench.iter(|| {
+                    let _ = cosine_distance(black_box(&a), black_box(&b));
+                })
+            },
         );
 
         // Euclidean
@@ -59,7 +63,8 @@ fn bench_simd_kernels(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    let _ = euclidean_distance_with_features(black_box(&a), black_box(&b), &features);
+                    let _ =
+                        euclidean_distance_with_features(black_box(&a), black_box(&b), &features);
                 })
             },
         );
@@ -67,7 +72,11 @@ fn bench_simd_kernels(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("euclidean_dispatch", dim),
             &dim,
-            |b_bench, _| b_bench.iter(|| { let _ = euclidean_distance(black_box(&a), black_box(&b)); }),
+            |b_bench, _| {
+                b_bench.iter(|| {
+                    let _ = euclidean_distance(black_box(&a), black_box(&b));
+                })
+            },
         );
 
         // Dot Product
@@ -82,7 +91,8 @@ fn bench_simd_kernels(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    let _ = dot_product_distance_with_features(black_box(&a), black_box(&b), &features);
+                    let _ =
+                        dot_product_distance_with_features(black_box(&a), black_box(&b), &features);
                 })
             },
         );
@@ -91,7 +101,9 @@ fn bench_simd_kernels(c: &mut Criterion) {
             BenchmarkId::new("dot_product_dispatch", dim),
             &dim,
             |b_bench, _| {
-                b_bench.iter(|| { let _ = dot_product_distance(black_box(&a), black_box(&b)); })
+                b_bench.iter(|| {
+                    let _ = dot_product_distance(black_box(&a), black_box(&b));
+                })
             },
         );
     }
