@@ -42,7 +42,8 @@ async fn test_untrusted_wasm_module_rejected() -> Result<(), Box<dyn std::error:
 }
 
 #[tokio::test]
-async fn test_trusted_wasm_module_in_allowlist_allowed() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_trusted_wasm_module_in_allowlist_allowed() -> Result<(), Box<dyn std::error::Error>>
+{
     let wat = r#"
         (module
             (func (export "_start"))

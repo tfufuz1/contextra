@@ -2,7 +2,9 @@
 // STAND: 2026-10-06T00:00:00Z
 // ZWECK: Integration test for contextra-infer-onnx symbol verification and removal closure (J29).
 
-use contextra_infer_onnx::{default_model_cache_dir, CrossEncoderReranker, RerankConfig};
+use contextra_infer_onnx::{
+    default_model_cache_dir, CrossEncoderReranker, RerankConfig,
+};
 
 #[test]
 fn test_onnx_crate_exports_and_removal_verification() {

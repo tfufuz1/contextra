@@ -755,16 +755,20 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                         .map_err(|e| {
                             ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
                         })?;
-                    crate::wal::fs::remove_file(&bak_path).await.map_err(|e| {
-                        ContextraError::Storage(format!("WAL backup recovery remove failed: {e}"))
-                    })?;
+                    crate::wal::fs::remove_file(&bak_path)
+                        .await
+                        .map_err(|e| {
+                            ContextraError::Storage(format!("WAL backup recovery remove failed: {e}"))
+                        })?;
                 }
             }
             let f = crate::wal::fs::OpenOptions::new()
                 .write(true)
                 .open(wal_path)
                 .await
-                .map_err(|e| ContextraError::Storage(format!("WAL recovery open failed: {e}")))?;
+                .map_err(|e| {
+                    ContextraError::Storage(format!("WAL recovery open failed: {e}"))
+                })?;
             f.sync_all().await.map_err(|e| {
                 ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
             })?;

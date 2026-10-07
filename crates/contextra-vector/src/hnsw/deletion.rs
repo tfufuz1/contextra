@@ -412,8 +412,10 @@ impl HnswIndex {
                         if conns.contains(&target_idx_u32) {
                             if i >= mmap_node_count {
                                 let ram_idx = i - mmap_node_count;
-                                let cleaned: Vec<u32> =
-                                    conns.into_iter().filter(|&c| c != target_idx_u32).collect();
+                                let cleaned: Vec<u32> = conns
+                                    .into_iter()
+                                    .filter(|&c| c != target_idx_u32)
+                                    .collect();
                                 if self
                                     .inner
                                     .hot
