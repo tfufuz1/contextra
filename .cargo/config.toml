@@ -1,2 +1,8 @@
 [alias]
 xtask = "run --manifest-path xtask/Cargo.toml --"
+
+# Workaround gegen OOM-Kills beim Linken großer Test-Binaries (z.B. plugin_status_tool).
+# Nutzt lld als Linker, um RAM-Bedarf beim Linken vieler Rlibs zu reduzieren.
+# lld/rust-lld muss auf der Toolchain verfügbar sein.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
