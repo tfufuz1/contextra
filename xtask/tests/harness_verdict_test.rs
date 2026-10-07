@@ -26,8 +26,14 @@ fn setup_test_env(
 
 #[test]
 fn test_normalize_gate_name_unit() {
-    assert_eq!(normalize_gate_name("gate-determinism-check"), "determinism-check");
-    assert_eq!(normalize_gate_name("determinism-check"), "determinism-check");
+    assert_eq!(
+        normalize_gate_name("gate-determinism-check"),
+        "determinism-check"
+    );
+    assert_eq!(
+        normalize_gate_name("determinism-check"),
+        "determinism-check"
+    );
     assert_eq!(normalize_gate_name("gate-gate-weakening"), "gate-weakening");
 }
 
@@ -58,8 +64,10 @@ blocking = true
     }"#;
 
     // g1 artifact saved as "determinism-check.json", g2 saved as "gate-unsafe-audit.json"
-    let (_temp, req_path, results_dir) =
-        setup_test_env(toml, &[("determinism-check", g1), ("gate-unsafe-audit", g2)]);
+    let (_temp, req_path, results_dir) = setup_test_env(
+        toml,
+        &[("determinism-check", g1), ("gate-unsafe-audit", g2)],
+    );
 
     let code = run_verdict(&[
         "--required".to_string(),

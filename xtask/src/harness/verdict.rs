@@ -408,8 +408,14 @@ mod tests {
 
     #[test]
     fn test_normalize_gate_name() {
-        assert_eq!(normalize_gate_name("gate-determinism-check"), "determinism-check");
-        assert_eq!(normalize_gate_name("determinism-check"), "determinism-check");
+        assert_eq!(
+            normalize_gate_name("gate-determinism-check"),
+            "determinism-check"
+        );
+        assert_eq!(
+            normalize_gate_name("determinism-check"),
+            "determinism-check"
+        );
         assert_eq!(normalize_gate_name("gate-gate-weakening"), "gate-weakening");
         assert_eq!(normalize_gate_name("protected-paths"), "protected-paths");
     }
