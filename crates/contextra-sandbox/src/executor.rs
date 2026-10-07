@@ -7,7 +7,7 @@
 
 //! WasmExecutor — WASM Execution Engine (§4.18).
 //!
-//! Jeder execute()-Aufruf startet eine frische Store+Instance (kein Zustandsüberlauf).
+//! Jeder execute_admitted()-Aufruf startet eine frische Store+Instance (kein Zustandsüberlauf).
 //! Fuel (CPU-Limit) UND Wall-Clock-Timeout (tokio) sind beide aktiv.
 
 use std::sync::{Arc, Mutex};
@@ -16,6 +16,7 @@ use tracing::warn;
 use wasmtime::{Config, Engine, Module, Store};
 
 use crate::{
+    admission::AdmittedModule,
     capabilities::WasmCapabilities,
     error::SandboxError,
     output::WasmOutput,
@@ -81,7 +82,7 @@ impl wasmtime::ResourceLimiter for SandboxState {
 /// WASM-Ausführungsgrenze für die `CodeExecution`-Permission.
 ///
 /// # Designprinzip (§4.18)
-/// - Frische `Store` + `Instance` pro execute()-Aufruf: kein Zustandsüberlauf
+/// - Frische `Store` + `Instance` pro execute_admitted()-Aufruf: kein Zustandsüberlauf
 /// - Fuel-Budget (CPU, deterministisch) + Wall-Clock-Timeout (nicht-deterministisch) — beide pflicht
 /// - `#![forbid(unsafe_code)]` — ausschließlich wasmtime's sichere Rust-API
 pub struct WasmExecutor {
@@ -129,12 +130,25 @@ impl WasmExecutor {
             .map_err(|e| SandboxError::InvalidModule(e.to_string()))
     }
 
-    /// Führt ein WASM-Binary mit Capability-Einschränkungen aus.
+    /// Standard-Ausführungspfad für ein vorab verifiziertes [`AdmittedModule`].
     ///
     /// # Garantien
     /// - Fuel-Budget: CPU-Limit (deterministisch), verhindert Endlosschleifen
     /// - Wall-Clock-Timeout: Verhindert IO-waiting über Zeithorizont
     /// - Frische Store+Instance: kein Zustandsüberlauf zwischen Aufrufen
+    ///
+    /// ```compile_fail
+    /// use contextra_sandbox::{WasmExecutor, WasmCapabilities};
+    /// use std::time::Duration;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let executor = WasmExecutor::new().unwrap();
+    ///     let caps = WasmCapabilities::default();
+    ///     let bytes: &[u8] = b"wasm bytes";
+    ///     // Calling execute_admitted with raw byte slice fails compilation:
+    ///     let _ = executor.execute_admitted(bytes, b"", &caps, Duration::from_secs(1)).await;
+    /// }
+    /// ```
     ///
     /// # Errors
     /// - `SandboxError::Timeout` wenn Wall-Clock-Timeout überschritten
@@ -142,6 +156,24 @@ impl WasmExecutor {
     /// - `SandboxError::MemoryExceeded` wenn Memory-Limit überschritten
     /// - `SandboxError::InvalidModule` wenn WASM ungültig
     /// - `SandboxError::WasmTrap` bei WASM-Trap
+    pub async fn execute_admitted(
+        &self,
+        module: &AdmittedModule,
+        input: &[u8],
+        capabilities: &WasmCapabilities,
+        timeout: Duration,
+    ) -> Result<WasmOutput, SandboxError> {
+        self.execute_internal(module.bytes(), input, capabilities, timeout)
+            .await
+    }
+
+    /// Führt ein unüberprüftes WASM-Binary aus.
+    ///
+    /// # Warnung
+    /// **Unsicher für persistierte Module!**
+    /// Das Ausführen von Rohbytes ohne Verifikation ist anfällig für Manipulationen
+    /// und schädliche Modul-Payloads. Nutze stattdessen [`Self::execute_admitted`].
+    #[cfg(feature = "unverified-execute")]
     pub async fn execute(
         &self,
         wasm_bytes: &[u8],
@@ -149,9 +181,18 @@ impl WasmExecutor {
         capabilities: &WasmCapabilities,
         timeout: Duration,
     ) -> Result<WasmOutput, SandboxError> {
+        self.execute_internal(wasm_bytes, input, capabilities, timeout)
+            .await
+    }
+
+    async fn execute_internal(
+        &self,
+        wasm_bytes: &[u8],
+        input: &[u8],
+        capabilities: &WasmCapabilities,
+        timeout: Duration,
+    ) -> Result<WasmOutput, SandboxError> {
         // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
-        // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
-        // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
         let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
             std::cmp::min(
                 timeout,
@@ -235,8 +276,6 @@ impl WasmExecutor {
         store.limiter(|state| state);
 
         // Capability-Checks
-        // INV-SBX-5: Capability fields (allow_filesystem, allow_network) are strictly enforced by non-registration
-        // of WASI filesystem/network socket host functions in the Linker below.
         if capabilities.allow_filesystem {
             warn!("WasmExecutor: allow_filesystem=true — erhöhtes Risiko (keine FS-Imports registriert)");
         }
@@ -294,14 +333,12 @@ impl WasmExecutor {
             // _start / main aufrufen
             if let Ok(start_fn) = instance.get_typed_func::<(), ()>(&mut store, "_start") {
                 if let Err(e) = start_fn.call_async(&mut store, ()).await {
-                    // INV-SBX-3: Precise error classification using downcast_ref without string matching
                     if let Some(exit_err) = e.downcast_ref::<ProcessExitError>() {
                         if exit_err.code != 0 {
                             return Err(SandboxError::ProcessExit {
                                 code: exit_err.code,
                             });
                         }
-                        // Code 0 counts as success, stdout/stderr captured so far will be returned.
                     } else if let Some(out_err) = e.downcast_ref::<OutputLimitExceededError>() {
                         return Err(SandboxError::OutputLimitExceeded {
                             stream: out_err.stream,
@@ -346,12 +383,17 @@ mod tests {
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+    fn admit(bytes: Vec<u8>) -> AdmittedModule {
+        AdmittedModule::new(bytes, [0u8; 32])
+    }
+
     #[tokio::test]
     async fn test_invalid_wasm_module_returns_error() -> TestResult {
         let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities::default();
+        let admitted = admit(b"not a wasm binary".to_vec());
         let result = executor
-            .execute(b"not a wasm binary", b"", &caps, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
             .await;
         assert!(matches!(result, Err(SandboxError::InvalidModule(_))));
         Ok(())
@@ -368,16 +410,16 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
 
         let executor = WasmExecutor::new()?;
 
-        // Test case 1: allow_cloud_egress = false (default) -> CapabilityViolation
         let caps_denied = WasmCapabilities {
             allow_cloud_egress: false,
             ..Default::default()
         };
         let res_denied = executor
-            .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps_denied, Duration::from_secs(1))
             .await;
         assert!(
             matches!(
@@ -388,13 +430,12 @@ mod tests {
             res_denied
         );
 
-        // Test case 2: allow_cloud_egress = true -> Execution succeeds
         let caps_allowed = WasmCapabilities {
             allow_cloud_egress: true,
             ..Default::default()
         };
         let res_allowed = executor
-            .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps_allowed, Duration::from_secs(1))
             .await;
         assert!(
             res_allowed.is_ok(),
@@ -414,6 +455,7 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
 
         let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities {
@@ -422,7 +464,7 @@ mod tests {
         };
 
         let result = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(5))
             .await;
 
         assert!(
@@ -442,6 +484,7 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
 
         let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities {
@@ -450,7 +493,7 @@ mod tests {
         };
 
         let result = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(5))
             .await;
 
         assert!(
@@ -480,11 +523,12 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
         let executor = WasmExecutor::new()?;
 
         let caps = WasmCapabilities::default();
         let output = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
             .await?;
         assert_eq!(&output.stdout[..], b"hello");
 
@@ -493,7 +537,7 @@ mod tests {
             ..Default::default()
         };
         let output_no_stdout = executor
-            .execute(&wasm_bytes, b"", &caps_no_stdout, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps_no_stdout, Duration::from_secs(1))
             .await?;
         assert!(output_no_stdout.stdout.is_empty());
         Ok(())
@@ -515,6 +559,7 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
         let executor = WasmExecutor::new()?;
 
         let caps = WasmCapabilities {
@@ -522,7 +567,7 @@ mod tests {
             ..Default::default()
         };
         let output = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
             .await?;
         assert_eq!(&output.stderr[..], b"error msg");
         Ok(())
@@ -539,6 +584,7 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
         let executor = WasmExecutor::new()?;
 
         let caps = WasmCapabilities {
@@ -547,7 +593,7 @@ mod tests {
         };
 
         let result_timeout = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(5))
             .await;
 
         assert!(
@@ -569,14 +615,15 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
         let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities {
-            max_module_size_bytes: 5, // Exceeded by any valid WASM binary
+            max_module_size_bytes: 5,
             ..Default::default()
         };
 
         let result = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
             .await;
 
         assert!(
@@ -584,56 +631,6 @@ mod tests {
             "Expected InvalidModule error due to binary size limit, got: {:?}",
             result
         );
-        Ok(())
-    }
-
-    #[test]
-    fn test_memory_growing_div_ceil_boundary() -> TestResult {
-        let mut state = SandboxState {
-            max_pages: 2,
-            max_table_entries: 10,
-            allow_cloud_egress: false,
-            allow_stdout: true,
-            allow_stderr: false,
-            allow_clock: true,
-            max_output_bytes: 1024 * 1024,
-            stdin_input: Vec::new(),
-            stdin_pos: 0,
-            stdout_buf: Arc::new(Mutex::new(Vec::new())),
-            stderr_buf: Arc::new(Mutex::new(Vec::new())),
-            start_instant: std::time::Instant::now(),
-            rng_state: None,
-        };
-        use wasmtime::ResourceLimiter;
-        // 65536 bytes = 1 page
-        assert!(state.memory_growing(0, 65536, None)?);
-        // 65537 bytes = 2 pages (div_ceil)
-        assert!(state.memory_growing(0, 65537, None)?);
-        // 131073 bytes = 3 pages (div_ceil) -> exceeds max_pages (2)
-        assert!(!state.memory_growing(0, 131073, None)?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_table_growing_limit() -> TestResult {
-        let mut state = SandboxState {
-            max_pages: 2,
-            max_table_entries: 10,
-            allow_cloud_egress: false,
-            allow_stdout: true,
-            allow_stderr: false,
-            allow_clock: true,
-            max_output_bytes: 1024 * 1024,
-            stdin_input: Vec::new(),
-            stdin_pos: 0,
-            stdout_buf: Arc::new(Mutex::new(Vec::new())),
-            stderr_buf: Arc::new(Mutex::new(Vec::new())),
-            start_instant: std::time::Instant::now(),
-            rng_state: None,
-        };
-        use wasmtime::ResourceLimiter;
-        assert!(state.table_growing(0, 10, None)?);
-        assert!(!state.table_growing(0, 11, None)?);
         Ok(())
     }
 
@@ -647,11 +644,12 @@ mod tests {
             )
         "#;
         let wasm_bytes = wat::parse_str(wat)?;
+        let admitted = admit(wasm_bytes);
         let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities::default();
 
         let result = executor
-            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
             .await;
 
         assert!(

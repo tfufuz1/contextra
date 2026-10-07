@@ -4,7 +4,8 @@
 // INVARIANTEN: Untrusted WASM binaries are rejected before compilation with SandboxError::InvalidModule
 
 use contextra_sandbox::{
-    capabilities::ModulePolicy, SandboxError, WasmCapabilities, WasmExecutor, WasmMergeFunction,
+    capabilities::ModulePolicy, AdmittedModule, SandboxError, WasmCapabilities, WasmExecutor,
+    WasmMergeFunction,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,6 +18,7 @@ async fn test_untrusted_wasm_module_rejected() -> Result<(), Box<dyn std::error:
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = AdmittedModule::new(wasm_bytes, [0u8; 32]);
 
     let executor = WasmExecutor::new()?;
 
@@ -29,7 +31,7 @@ async fn test_untrusted_wasm_module_rejected() -> Result<(), Box<dyn std::error:
 
     // Attempting execution of untrusted binary must be rejected with SandboxError::InvalidModule
     let res = executor
-        .execute(&wasm_bytes, b"", &caps_restricted, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_restricted, Duration::from_secs(1))
         .await;
 
     assert!(
@@ -54,8 +56,8 @@ async fn test_trusted_wasm_module_in_allowlist_allowed() -> Result<(), Box<dyn s
     let executor = WasmExecutor::new()?;
 
     // Calculate actual hash of wasm_bytes using helper or capabilities verify
-    // Using simple sha256
     let hash = WasmCapabilities::compute_sha256(&wasm_bytes);
+    let admitted = AdmittedModule::new(wasm_bytes, hash);
 
     let caps_allowed = WasmCapabilities {
         module_policy: ModulePolicy::HashAllowlist(vec![hash]),
@@ -63,7 +65,7 @@ async fn test_trusted_wasm_module_in_allowlist_allowed() -> Result<(), Box<dyn s
     };
 
     let res = executor
-        .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_allowed, Duration::from_secs(1))
         .await;
 
     assert!(
