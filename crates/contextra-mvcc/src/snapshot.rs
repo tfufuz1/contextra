@@ -87,12 +87,14 @@ impl SnapshotRegistry {
     /// Registers a read snapshot. Returns an RAII guard that
     /// automatically deregisters on drop.
     #[deprecated(note = "Use SnapshotRegistry::acquire instead to eliminate the read-then-register race window")]
+    #[allow(deprecated)]
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
         self.register_at(seq_no, Instant::now())
     }
 
     /// Registers a read snapshot at a specific creation timestamp `at`.
     #[deprecated(note = "Use SnapshotRegistry::acquire_at instead to eliminate the read-then-register race window")]
+    #[allow(deprecated)]
     pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
         let lease = self.acquire_at(|| seq_no, at);
         SnapshotGuard { lease }
@@ -202,9 +204,10 @@ impl SnapshotRegistry {
 /// RAII Guard for an active snapshot.
 #[deprecated(note = "Use SnapshotLease returned by SnapshotRegistry::acquire instead")]
 pub struct SnapshotGuard {
-    lease: SnapshotLease,
+    pub(crate) lease: SnapshotLease,
 }
 
+#[allow(deprecated)]
 impl SnapshotGuard {
     /// Returns the sequence number pinned by this snapshot guard.
     pub fn seq_no(&self) -> u64 {

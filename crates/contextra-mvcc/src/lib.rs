@@ -20,6 +20,8 @@ pub mod ssi;
 pub mod tx_buffer;
 
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
+#[allow(deprecated)]
+pub use snapshot::SnapshotGuard;
+pub use snapshot::SnapshotRegistry;
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tx_buffer::{IndexOp, TxBuffer};

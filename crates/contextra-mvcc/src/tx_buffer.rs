@@ -297,7 +297,10 @@ impl<T: Clone> TxBuffer<T> {
     #[inline]
     fn shard_idx(&self, tx: TxId) -> usize {
         // SAFETY: Modulo-Cast u64→usize (sicher wegen %-Operator)
-        (tx.inner() % self.shards.len() as u64) as usize
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            (tx.inner() % self.shards.len() as u64) as usize
+        }
     }
 
     #[inline]
@@ -305,7 +308,10 @@ impl<T: Clone> TxBuffer<T> {
         use std::hash::Hasher;
         let mut hasher = ahash::AHasher::default();
         hasher.write(key);
-        (hasher.finish() % self.key_shards.len() as u64) as usize
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            (hasher.finish() % self.key_shards.len() as u64) as usize
+        }
     }
 
     /// Checks if the given transaction exists in the buffer.
