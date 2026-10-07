@@ -22,13 +22,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-#[path = "floor.rs"]
-pub mod floor;
-#[path = "lease.rs"]
-pub mod lease;
-
-pub use floor::GcFloor;
-pub use lease::SnapshotLease;
+pub use crate::lease::SnapshotLease;
 
 /// Registry for active read snapshots.
 ///
