@@ -15,6 +15,7 @@
 // INVARIANTE: Solange SnapshotGuard lebt → keine Tombstone-GC für seq >= guard.seq_no.
 // RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
 
+use crate::lease::SnapshotLease;
 use crate::types::TOMBSTONE_BIT;
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
@@ -37,18 +38,6 @@ impl<T: SnapshotFloor + ?Sized> SnapshotFloor for Arc<T> {
 impl SnapshotFloor for SnapshotRegistry {
     fn floor(&self) -> u64 {
         self.min_active_seqno()
-    }
-}
-
-/// An RAII lease for a read snapshot sequence number.
-pub struct SnapshotLease {
-    guard: SnapshotGuard,
-}
-
-impl SnapshotLease {
-    /// Returns the sequence number pinned by this snapshot lease.
-    pub fn seq_no(&self) -> u64 {
-        self.guard.seq_no()
     }
 }
 
@@ -87,12 +76,30 @@ impl SnapshotRegistry {
         }
     }
 
-    /// Acquires a read snapshot lease at `seq_no`. Returns an RAII lease that
-    /// automatically releases on drop.
-    pub fn acquire(self: &Arc<Self>, seq_no: u64) -> SnapshotLease {
-        SnapshotLease {
-            guard: self.register(seq_no),
-        }
+    /// Erwirbt einen Read-Snapshot, indem `f` *innerhalb* des Registry-Locks ausgewertet
+    /// wird. Das Lesen der aktuellen Sequenznummer und ihre Registrierung als "aktiv" sind
+    /// dadurch atomar bezüglich konkurrierender GC-Floor-Berechnung — das schließt das
+    /// Read-then-Register-Race, das `register`/`register_at` aufweisen.
+    ///
+    /// # Kontrakt
+    /// `f` muss günstig und synchron sein und darf NICHT re-entrant in diese
+    /// `SnapshotRegistry` zurückrufen (kein verschachtelter Lock-Erwerb), sonst droht ein
+    /// Deadlock.
+    pub fn acquire(self: &Arc<Self>, f: impl FnOnce() -> u64) -> SnapshotLease {
+        self.acquire_at(f, Instant::now())
+    }
+
+    /// Wie [`acquire`], erlaubt aber einen expliziten Erstellungszeitstempel `at`
+    /// (u. a. für Diagnosen wie [`SnapshotRegistry::longest_active_pin`]).
+    pub fn acquire_at(self: &Arc<Self>, f: impl FnOnce() -> u64, at: Instant) -> SnapshotLease {
+        let seq_no = {
+            let mut active = self.active.lock();
+            let seq_no = f() & !TOMBSTONE_BIT;
+            active.entry(seq_no).or_default().push(at);
+            self.update_min(&active);
+            seq_no
+        };
+        SnapshotLease::new(Arc::clone(self), seq_no, Some(at))
     }
 
     /// Registers a read snapshot. Returns an RAII guard that
