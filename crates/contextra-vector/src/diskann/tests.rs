@@ -580,7 +580,11 @@ mod tests {
             let load_res = match index_res {
                 Ok(idx) => {
                     let spawn_res = tokio::spawn(async move { idx.load().await }).await;
-                    assert!(spawn_res.is_ok(), "DiskAnnIndex::load panicked on file size {}!", size);
+                    assert!(
+                        spawn_res.is_ok(),
+                        "DiskAnnIndex::load panicked on file size {}!",
+                        size
+                    );
                     spawn_res.unwrap()
                 }
                 Err(e) => Err(e),
@@ -638,8 +642,9 @@ mod tests {
                 );
                 let load_res = spawn_res.unwrap();
 
-                let catch_node =
-                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reloaded.load_node(9999)));
+                let catch_node = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    reloaded.load_node(9999)
+                }));
                 assert!(
                     catch_node.is_ok(),
                     "load_node panicked on out of bounds node index!"
@@ -1085,10 +1090,7 @@ mod tests {
         };
 
         let index = DiskAnnIndex::try_new(config.clone())?;
-        let vectors = vec![
-            vec![1.0, 0.0, 0.0, 0.0],
-            vec![0.0, 2.0, 0.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 2.0, 0.0, 0.0]];
         let ids = vec![DocId::from(10u64), DocId::from(20u64)];
         index.build(&vectors, &ids).await?;
 
@@ -1130,7 +1132,10 @@ mod tests {
         let index = DiskAnnIndex::try_new(config).unwrap();
         let load_res = index.load().await;
 
-        assert!(load_res.is_err(), "Loading a non-existent index file must return Err, not empty index");
+        assert!(
+            load_res.is_err(),
+            "Loading a non-existent index file must return Err, not empty index"
+        );
         if let Err(ContextraError::Io(io_err)) = load_res {
             assert_eq!(io_err.kind(), std::io::ErrorKind::NotFound);
         } else {
@@ -1175,10 +1180,7 @@ mod tests {
         };
 
         let index = DiskAnnIndex::try_new(config.clone())?;
-        let vectors = vec![
-            vec![1.0, 0.0, 0.0, 0.0],
-            vec![0.0, 1.0, 0.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]];
         let ids = vec![DocId::from(1u64), DocId::from(2u64)];
         index.build(&vectors, &ids).await?;
 
@@ -1186,15 +1188,22 @@ mod tests {
 
         // Simulate a interrupted/crashed build/persist_delta that leaves a partial .idx.tmp or .delta.tmp
         let partial_tmp = index_path.with_extension("idx.tmp");
-        std::fs::write(&partial_tmp, b"PARTIAL_CRASH_DATA_TRUNCATED_BYTES").map_err(ContextraError::Io)?;
+        std::fs::write(&partial_tmp, b"PARTIAL_CRASH_DATA_TRUNCATED_BYTES")
+            .map_err(ContextraError::Io)?;
 
         // Reload index — load_sync should clean up the orphaned .idx.tmp without corrupting index_path
         let reloaded = DiskAnnIndex::try_new(config)?;
         reloaded.load().await?;
 
         let current_bytes = std::fs::read(&index_path).map_err(ContextraError::Io)?;
-        assert_eq!(original_bytes, current_bytes, "Target index file must remain intact and uncorrupted");
-        assert!(!partial_tmp.exists(), "Orphaned tmp file must be durably removed");
+        assert_eq!(
+            original_bytes, current_bytes,
+            "Target index file must remain intact and uncorrupted"
+        );
+        assert!(
+            !partial_tmp.exists(),
+            "Orphaned tmp file must be durably removed"
+        );
 
         Ok(())
     }

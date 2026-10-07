@@ -17,12 +17,21 @@ pub struct MmapIndex {
 impl MmapIndex {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path = path.as_ref();
-        let file = std::fs::File::open(path)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open HNSW file {}: {}", path.display(), e)))?;
+        let file = std::fs::File::open(path).map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to open HNSW file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
 
-        let metadata = file
-            .metadata()
-            .map_err(|e| ContextraError::Storage(format!("Failed to read metadata for {}: {}", path.display(), e)))?;
+        let metadata = file.metadata().map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to read metadata for {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
         let file_len = metadata.len();
 
         if file_len < HnswHeader::SIZE as u64 {
@@ -36,7 +45,7 @@ impl MmapIndex {
 
         // Try lock to prevent opening a file being concurrently modified/written.
         match file.try_lock_shared() {
-            Ok(()) => {},
+            Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
                 return Err(ContextraError::Storage(format!(
                     "HNSW file {} is locked by a writer or concurrent process",
@@ -44,12 +53,21 @@ impl MmapIndex {
                 )));
             }
             Err(std::fs::TryLockError::Error(e)) => {
-                tracing::warn!("File locking not supported on filesystem for {}: {}", path.display(), e);
+                tracing::warn!(
+                    "File locking not supported on filesystem for {}: {}",
+                    path.display(),
+                    e
+                );
             }
         }
 
-        let mmap = contextra_sys::mmap_readonly(&file)
-            .map_err(|e| ContextraError::Storage(format!("Failed to mmap HNSW file {}: {}", path.display(), e)))?;
+        let mmap = contextra_sys::mmap_readonly(&file).map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to mmap HNSW file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         if mmap.len() as u64 != file_len {
             return Err(ContextraError::Storage(format!(
@@ -80,7 +98,9 @@ impl MmapIndex {
             let calib_end = header
                 .quant_calibration_offset()
                 .checked_add(header.quant_calibration_len() as u64)
-                .ok_or_else(|| ContextraError::Storage("Quant calibration offset overflow".into()))?;
+                .ok_or_else(|| {
+                    ContextraError::Storage("Quant calibration offset overflow".into())
+                })?;
             if calib_end > file_len {
                 return Err(ContextraError::Storage(format!(
                     "Quant calibration section out of bounds: end={}, file_len={}",

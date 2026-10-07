@@ -359,7 +359,16 @@ impl HnswIndexCore {
                 .unwrap_or(0);
             if idx >= mmap_node_count {
                 let ram_idx = idx - mmap_node_count;
-                self.hot.arena.free_node(ram_idx);
+                let seq_log = self.cold.seq_log.read();
+                let is_safe_to_free = match (seq_log.min_retention_seq(), seq_log.deletion_seq(id))
+                {
+                    (Some(min_seq), Some(del_seq)) => del_seq < min_seq,
+                    (None, _) => true,
+                    _ => false,
+                };
+                if is_safe_to_free {
+                    self.hot.arena.free_node(ram_idx);
+                }
             }
 
             let ep_val = self.hot.get_entry_point();
@@ -755,10 +764,10 @@ impl HnswIndexCore {
 
             if !train_data.is_empty() {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let new_q = crate::quantize::ScalarQuantizer::train(
+                let new_q = crate::quantize::ScalarQuantizer::try_train(
                     &training_refs,
                     self.cold.config.dimension,
-                );
+                )?;
                 let bias =
                     Sq8Bias::calibrate(&training_refs, &new_q, self.cold.config.distance_metric);
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
@@ -786,7 +795,29 @@ impl HnswIndexCore {
                 }
             }
             if is_deleted {
-                new_index.inner.do_delete(doc_id)?;
+                let mmap_count = new_index
+                    .inner
+                    .cold
+                    .mmap_index
+                    .read()
+                    .as_ref()
+                    .map(|m| m.header.node_count() as usize)
+                    .unwrap_or(0);
+                let ram_len = new_index.inner.hot.nodes.read().len();
+                if ram_len > 0 {
+                    let global_idx = (mmap_count + ram_len - 1) as u64;
+                    new_index
+                        .inner
+                        .cold
+                        .deleted_nodes
+                        .write()
+                        .insert(global_idx);
+                    new_index
+                        .inner
+                        .hot
+                        .deleted_count
+                        .fetch_add(1, Ordering::SeqCst);
+                }
             }
         }
 
