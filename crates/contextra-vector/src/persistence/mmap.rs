@@ -12,7 +12,6 @@ use contextra_core::{ContextraError, Result};
 pub struct MmapIndex {
     pub mmap: std::sync::Arc<memmap2::Mmap>,
     pub header: HnswHeader,
-    pub file_handle: std::sync::Arc<std::fs::File>,
 }
 
 impl MmapIndex {
@@ -26,10 +25,11 @@ impl MmapIndex {
             .map_err(|e| ContextraError::Storage(format!("Failed to read metadata for {}: {}", path.display(), e)))?;
         let file_len = metadata.len();
 
-        if file_len < 64 {
+        if file_len < HnswHeader::SIZE as u64 {
             return Err(ContextraError::Storage(format!(
-                "HNSW file {} too small for header: expected at least 64 bytes, found {} bytes",
+                "HNSW file {} too small for header: expected at least {} bytes, found {} bytes",
                 path.display(),
+                HnswHeader::SIZE,
                 file_len
             )));
         }
@@ -89,12 +89,9 @@ impl MmapIndex {
             }
         }
 
-        let file_handle = std::sync::Arc::new(file);
-
         let index_obj = Self {
             mmap: std::sync::Arc::new(mmap),
             header,
-            file_handle,
         };
 
         if index_obj.header.node_count() > 0 {
