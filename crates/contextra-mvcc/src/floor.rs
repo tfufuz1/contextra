@@ -1,39 +1,50 @@
-//! Snapshot floor GC interface and implementation.
+//! `GcFloor` calculation for tombstone garbage collection watermark.
 
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Untergrenze für GC. Wird unter demselben Lock gebildet wie Registrierungen.
-pub trait SnapshotFloor: Send + Sync {
-    /// Untergrenze für GC. Wird unter demselben Lock gebildet wie Registrierungen.
-    fn floor(&self) -> u64;
-}
+use crate::snapshot::SnapshotRegistry;
+use crate::tx_buffer::TxBuffer;
 
-/// Garbage collection floor tracking active snapshot bounds.
+/// Calculator for the MVCC garbage collection sequence floor.
+///
+/// Ensures tombstone GC never purges entries at or above the floor sequence number.
 #[derive(Debug)]
-pub struct GcFloor {
-    _registry: Arc<crate::snapshot::SnapshotRegistry>,
-    _tx_buffer: Arc<crate::tx_buffer::TxBuffer<(Vec<u8>, Vec<u8>)>>,
-    _last_applied: Arc<AtomicU64>,
+pub struct GcFloor<T: Clone> {
+    registry: Arc<SnapshotRegistry>,
+    tx_buffer: Option<Arc<TxBuffer<T>>>,
+    last_applied: Arc<AtomicU64>,
 }
 
-impl GcFloor {
-    /// Constructs a new `GcFloor` instance.
+impl<T: Clone> GcFloor<T> {
+    /// Creates a new `GcFloor` evaluator.
     pub fn new(
-        registry: Arc<crate::snapshot::SnapshotRegistry>,
-        tx_buffer: Arc<crate::tx_buffer::TxBuffer<(Vec<u8>, Vec<u8>)>>,
+        registry: Arc<SnapshotRegistry>,
+        tx_buffer: Option<Arc<TxBuffer<T>>>,
         last_applied: Arc<AtomicU64>,
     ) -> Self {
         Self {
-            _registry: registry,
-            _tx_buffer: tx_buffer,
-            _last_applied: last_applied,
+            registry,
+            tx_buffer,
+            last_applied,
         }
     }
-}
 
-impl SnapshotFloor for GcFloor {
-    fn floor(&self) -> u64 {
-        0
+    /// Calculates the GC sequence floor under a unified evaluation contract.
+    ///
+    /// The floor is computed as:
+    /// `min(registry.min_active_seqno(), tx_buffer.min_read_snapshot(), last_applied.load(Acquire))`
+    ///
+    /// If no active readers or transaction reads exist, `last_applied` serves as the floor.
+    pub fn floor(&self) -> u64 {
+        let registry_min = self.registry.min_active_seqno();
+        let tx_buffer_min = self
+            .tx_buffer
+            .as_ref()
+            .and_then(|tb| tb.min_read_snapshot())
+            .unwrap_or(u64::MAX);
+        let last_applied = self.last_applied.load(Ordering::Acquire);
+
+        registry_min.min(tx_buffer_min).min(last_applied)
     }
 }
