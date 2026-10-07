@@ -21,9 +21,10 @@ pub mod snapshot;
 pub mod ssi;
 pub mod tx_buffer;
 
-pub use floor::{GcFloor, SnapshotFloor};
+pub use floor::GcFloor;
 pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
+#[allow(deprecated)]
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tx_buffer::{IndexOp, TxBuffer};
