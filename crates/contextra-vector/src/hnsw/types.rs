@@ -618,6 +618,7 @@ impl HnswIndex {
         let q_guard = inner.cold.quantizer.read();
 
         let temp_path = path_buf.with_extension("hnsw.tmp");
+        let _ = super::durable_fs::durable_remove(&temp_path);
         let file = std::fs::File::create(&temp_path).map_err(|e| {
             ContextraError::Storage(format!("Failed to create temporary HNSW file: {}", e))
         })?;
@@ -791,20 +792,11 @@ impl HnswIndex {
         }
         file.sync_all()
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        drop(file);
 
-        std::fs::rename(&temp_path, &path_buf).map_err(|e| {
-            ContextraError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
-        })?;
-
-        if let Some(parent) = path_buf.parent() {
-            if let Ok(parent_dir) = std::fs::File::open(parent) {
-                parent_dir.sync_all().map_err(|e| {
-                    ContextraError::Storage(format!(
-                        "Failed to fsync parent directory after rename: {}",
-                        e
-                    ))
-                })?;
-            }
+        if let Err(err) = super::durable_fs::atomic_replace(&temp_path, &path_buf) {
+            let _ = super::durable_fs::durable_remove(&temp_path);
+            return Err(err);
         }
 
         Ok(())

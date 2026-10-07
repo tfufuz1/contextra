@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_core::DocId;
+use contextra_core::{DocId, Result};
 
 use super::arena::{BacklinkTable, HnswArena};
 use super::types::{HnswIndexCore, HnswNode, VectorData};
@@ -54,27 +54,33 @@ pub(super) fn get_neighbor_conns_in_batch(
     _nodes_read: &[HnswNode],
     prior_prepared: &[PreparedInsert],
     batch_ctx: &BatchContext,
-) -> Vec<u32> {
+) -> Result<Vec<u32>> {
     if neighbor_idx >= base_batch_idx {
         let offset = neighbor_idx - base_batch_idx;
-        return prior_prepared
+        let conns = prior_prepared
             .get(offset)
             .and_then(|p| p.final_connections.get(layer))
             .cloned()
             .unwrap_or_default();
+        return Ok(conns);
     }
 
     if neighbor_idx < mmap_node_count {
-        return Vec::new();
+        let mmap_guard = core.cold.mmap_index.read();
+        if let Some(mmap) = mmap_guard.as_ref() {
+            let rec = mmap.get_node_record(neighbor_idx)?;
+            return mmap.get_connections(&rec, layer);
+        }
+        return Ok(Vec::new());
     }
 
     let neighbor_ram_idx = neighbor_idx - mmap_node_count;
     if let Some(conns) = batch_ctx.backlink_map.get(neighbor_ram_idx, layer) {
-        return conns.clone();
+        return Ok(conns.clone());
     }
 
-    core.hot
-        .get_ram_node_connections(neighbor_ram_idx, layer, core.cold.config.m)
+    Ok(core.hot
+        .get_ram_node_connections(neighbor_ram_idx, layer, core.cold.config.m))
 }
 
 /// Helper for hybrid resolution of nodes (RAM vs Mmap, plus in-flight batch prepared inserts).
