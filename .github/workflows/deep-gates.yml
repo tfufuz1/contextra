@@ -14,7 +14,7 @@ env:
 jobs:
   gate-determinism-check:
     name: Determinism Check Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -27,16 +27,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- determinism-check --json --base "$BASE_SHA" --head "$HEAD_SHA" > determinism-check.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- determinism-check --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/determinism-check.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-determinism-check
-          path: determinism-check.json
+          path: gate-results/determinism-check.json
 
   gate-unsafe-audit:
     name: Unsafe Audit Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -51,16 +52,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- unsafe-audit --json --miri > unsafe-audit.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- unsafe-audit --json --miri > gate-results/unsafe-audit.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-unsafe-audit
-          path: unsafe-audit.json
+          path: gate-results/unsafe-audit.json
 
   gate-lock-audit:
     name: Lock Audit Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -73,16 +75,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- lock-audit --json --base "$BASE_SHA" --head "$HEAD_SHA" > lock-audit.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- lock-audit --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/lock-audit.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-lock-audit
-          path: lock-audit.json
+          path: gate-results/lock-audit.json
 
   gate-wal-replay-verify:
     name: WAL Replay Verify Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -95,16 +98,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- wal-replay-verify --json --base "$BASE_SHA" --head "$HEAD_SHA" > wal-replay-verify.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- wal-replay-verify --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/wal-replay-verify.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-wal-replay-verify
-          path: wal-replay-verify.json
+          path: gate-results/wal-replay-verify.json
 
   gate-mutants-diff:
     name: Mutants Diff Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -118,16 +122,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- mutants-diff --json --base "$BASE_SHA" --head "$HEAD_SHA" > mutants-diff.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- mutants-diff --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/mutants-diff.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-mutants-diff
-          path: mutants-diff.json
+          path: gate-results/mutants-diff.json
 
   gate-fuzz-smoke:
     name: Fuzz Smoke Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -142,9 +147,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cargo run --manifest-path xtask/Cargo.toml -- fuzz-smoke --json --base "$BASE_SHA" --head "$HEAD_SHA" > fuzz-smoke.json
+          mkdir -p gate-results
+          cargo run --manifest-path xtask/Cargo.toml -- fuzz-smoke --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/fuzz-smoke.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-fuzz-smoke
-          path: fuzz-smoke.json
+          path: gate-results/fuzz-smoke.json

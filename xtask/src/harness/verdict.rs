@@ -6,6 +6,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+/// Normalizes gate names by stripping an optional `gate-` prefix.
+/// Example: `gate-determinism-check` -> `determinism-check`
+pub fn normalize_gate_name(name: &str) -> &str {
+    name.strip_prefix("gate-").unwrap_or(name)
+}
+
 #[derive(Debug, Deserialize)]
 struct VerdictRequiredConfig {
     #[serde(default)]
@@ -120,16 +126,24 @@ pub fn run_verdict(args: &[String]) -> i32 {
             total_blocking += 1;
         }
 
-        let json_file_name = format!("{}.json", gate_cfg.name);
-        let found_artifact = verdict_find_artifact(&results_dir, &json_file_name);
+        let normalized_cfg_name = normalize_gate_name(&gate_cfg.name);
+        let found_artifact = verdict_find_artifact(&results_dir, normalized_cfg_name);
 
         match found_artifact {
             None => {
                 let reason = VerdictFailureReason {
                     gate_name: gate_cfg.name.clone(),
                     severity: "error".to_string(),
-                    message: format!("Artefakt '{}.json' fehlt im Ordner '{}'", gate_cfg.name, results_dir.display()),
-                    fix: format!("Stelle sicher, dass der Job für '{}' ausgeführt wurde und das Artefakt hochlädt.", gate_cfg.name),
+                    message: format!(
+                        "Artefakt '{}.json' bzw. 'gate-{}.json' fehlt im Ordner '{}'",
+                        normalized_cfg_name,
+                        normalized_cfg_name,
+                        results_dir.display()
+                    ),
+                    fix: format!(
+                        "Stelle sicher, dass der Job für '{}' ausgeführt wurde und das Artefakt hochlädt.",
+                        gate_cfg.name
+                    ),
                 };
                 if gate_cfg.blocking {
                     failure_reasons.push(reason);
@@ -177,13 +191,20 @@ pub fn run_verdict(args: &[String]) -> i32 {
                         }
                     }
                     Ok(report) => {
-                        if report.gate != gate_cfg.name {
+                        let normalized_report_gate = normalize_gate_name(&report.gate);
+                        if normalized_report_gate != normalized_cfg_name {
                             let reason = VerdictFailureReason {
-                                        gate_name: gate_cfg.name.clone(),
-                                        severity: "error".to_string(),
-                                        message: format!("Gate-Name im JSON ('{}') stimmt nicht mit Dateiname ('{}') überein.", report.gate, gate_cfg.name),
-                                        fix: format!("Korrigiere den übergebenen Gate-Namen beim Aufruf von '{}'.", gate_cfg.name),
-                                    };
+                                gate_name: gate_cfg.name.clone(),
+                                severity: "error".to_string(),
+                                message: format!(
+                                    "Gate-Name im JSON ('{}') stimmt nicht mit Dateiname ('{}') überein.",
+                                    report.gate, gate_cfg.name
+                                ),
+                                fix: format!(
+                                    "Korrigiere den übergebenen Gate-Namen beim Aufruf von '{}'.",
+                                    gate_cfg.name
+                                ),
+                            };
                             if gate_cfg.blocking {
                                 failure_reasons.push(reason);
                             } else {
@@ -363,14 +384,39 @@ pub fn run_verdict(args: &[String]) -> i32 {
     }
 }
 
-fn verdict_find_artifact(dir: &Path, file_name: &str) -> Option<PathBuf> {
+fn verdict_find_artifact(dir: &Path, normalized_gate_name: &str) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
+    let expected_file_1 = format!("{}.json", normalized_gate_name);
+    let expected_file_2 = format!("gate-{}.json", normalized_gate_name);
+
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() && entry.file_name() == file_name {
-            return Some(entry.path().to_path_buf());
+        if entry.file_type().is_file() {
+            let file_name = entry.file_name().to_string_lossy();
+            if file_name == expected_file_1 || file_name == expected_file_2 {
+                return Some(entry.path().to_path_buf());
+            }
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_gate_name() {
+        assert_eq!(
+            normalize_gate_name("gate-determinism-check"),
+            "determinism-check"
+        );
+        assert_eq!(
+            normalize_gate_name("determinism-check"),
+            "determinism-check"
+        );
+        assert_eq!(normalize_gate_name("gate-gate-weakening"), "gate-weakening");
+        assert_eq!(normalize_gate_name("protected-paths"), "protected-paths");
+    }
 }
