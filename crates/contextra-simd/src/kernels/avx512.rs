@@ -375,6 +375,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 
     // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let mut sum_v = unsafe { _mm512_setzero_si512() };
+    // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let zero = unsafe { _mm512_setzero_si512() };
 
     while i + 64 <= len {
@@ -502,6 +503,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     let mut norm_a_v = unsafe { _mm512_setzero_si512() };
     // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let mut norm_b_v = unsafe { _mm512_setzero_si512() };
+    // SAFETY: Target features avx512f/bw/vnni enabled on function; zero vector initialization has no memory hazards.
     let zero = unsafe { _mm512_setzero_si512() };
 
     while i + 64 <= len {
@@ -557,6 +559,278 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
         dot,
         norm_a_sq,
         norm_b_sq,
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64"))]
+mod tests {
+    use super::*;
+    use crate::kernels::scalar::*;
+
+    struct XorShift64(u64);
+    impl XorShift64 {
+        fn new(seed: u64) -> Self {
+            Self(if seed == 0 { 0x1234_5678_9ABC_DEF0 } else { seed })
+        }
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        fn next_f32_range(&mut self, min: f32, max: f32) -> f32 {
+            let val = (self.next_u64() as f64) / (u64::MAX as f64);
+            (min as f64 + val * (max - min) as f64) as f32
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        fn next_u8(&mut self) -> u8 {
+            self.next_u64() as u8
+        }
+    }
+
+    fn check_avx512f_support() -> bool {
+        let has_avx512f = is_x86_feature_detected!("avx512f");
+        if !has_avx512f {
+            eprintln!("SKIPPED: AVX-512F feature not supported on host CPU");
+            false
+        } else {
+            true
+        }
+    }
+
+    fn check_avx512bw_support() -> bool {
+        let has_avx512f = is_x86_feature_detected!("avx512f");
+        let has_avx512bw = is_x86_feature_detected!("avx512bw");
+        if !has_avx512f || !has_avx512bw {
+            eprintln!("SKIPPED: AVX-512BW feature not supported on host CPU (avx512f={has_avx512f}, avx512bw={has_avx512bw})");
+            false
+        } else {
+            true
+        }
+    }
+
+    fn check_avx512vnni_support() -> bool {
+        let has_avx512f = is_x86_feature_detected!("avx512f");
+        let has_avx512bw = is_x86_feature_detected!("avx512bw");
+        let has_avx512vnni = is_x86_feature_detected!("avx512vnni");
+        if !has_avx512f || !has_avx512bw || !has_avx512vnni {
+            eprintln!("SKIPPED: AVX-512VNNI feature not supported on host CPU (f={has_avx512f}, bw={has_avx512bw}, vnni={has_avx512vnni})");
+            false
+        } else {
+            true
+        }
+    }
+
+    const TEST_LENGTHS: &[usize] = &[
+        0, 1, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 1_000_003,
+    ];
+
+    fn approx_eq(a: f32, b: f32, tol: f32) -> bool {
+        if a.is_nan() && b.is_nan() {
+            return true;
+        }
+        if a.is_infinite() && b.is_infinite() && a.is_sign_positive() == b.is_sign_positive() {
+            return true;
+        }
+        let diff = (a - b).abs();
+        let scale = a.abs().max(b.abs()).max(1.0);
+        diff <= tol * scale
+    }
+
+    #[test]
+    fn test_avx512_cosine_distance_direct() {
+        if !check_avx512f_support() {
+            return;
+        }
+        let mut rng = XorShift64::new(42);
+
+        for &len in TEST_LENGTHS {
+            for offset in 0..8 {
+                let mut backing_a = vec![0.0f32; len + offset];
+                let mut backing_b = vec![0.0f32; len + offset];
+                for i in offset..(offset + len) {
+                    backing_a[i] = rng.next_f32_range(-10.0, 10.0);
+                    backing_b[i] = rng.next_f32_range(-10.0, 10.0);
+                }
+                let a = &backing_a[offset..offset + len];
+                let b = &backing_b[offset..offset + len];
+
+                let s = cosine_distance_scalar(a, b);
+                // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+                let simd = unsafe { cosine_distance_avx512(a, b) };
+
+                assert!(
+                    approx_eq(s, simd, 1e-4),
+                    "Cosine AVX512 mismatch at len {len}, offset {offset}: scalar={s}, simd={simd}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_avx512_euclidean_distance_direct() {
+        if !check_avx512f_support() {
+            return;
+        }
+        let mut rng = XorShift64::new(123);
+
+        for &len in TEST_LENGTHS {
+            for offset in 0..8 {
+                let mut backing_a = vec![0.0f32; len + offset];
+                let mut backing_b = vec![0.0f32; len + offset];
+                for i in offset..(offset + len) {
+                    backing_a[i] = rng.next_f32_range(-10.0, 10.0);
+                    backing_b[i] = rng.next_f32_range(-10.0, 10.0);
+                }
+                let a = &backing_a[offset..offset + len];
+                let b = &backing_b[offset..offset + len];
+
+                let s = euclidean_distance_scalar(a, b);
+                // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+                let simd = unsafe { euclidean_distance_avx512(a, b) };
+
+                assert!(
+                    approx_eq(s, simd, 1e-3),
+                    "Euclidean AVX512 mismatch at len {len}, offset {offset}: scalar={s}, simd={simd}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_avx512_dot_product_direct() {
+        if !check_avx512f_support() {
+            return;
+        }
+        let mut rng = XorShift64::new(456);
+
+        for &len in TEST_LENGTHS {
+            for offset in 0..8 {
+                let mut backing_a = vec![0.0f32; len + offset];
+                let mut backing_b = vec![0.0f32; len + offset];
+                for i in offset..(offset + len) {
+                    backing_a[i] = rng.next_f32_range(-10.0, 10.0);
+                    backing_b[i] = rng.next_f32_range(-10.0, 10.0);
+                }
+                let a = &backing_a[offset..offset + len];
+                let b = &backing_b[offset..offset + len];
+
+                let s = dot_product_scalar(a, b);
+                // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+                let simd = unsafe { dot_product_avx512(a, b) };
+
+                assert!(
+                    approx_eq(s, simd, 1e-3),
+                    "Dot product AVX512 mismatch at len {len}, offset {offset}: scalar={s}, simd={simd}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_avx512_f32_bytes_direct() {
+        if !check_avx512f_support() {
+            return;
+        }
+        let mut rng = XorShift64::new(789);
+
+        for &len in &[0, 1, 7, 8, 15, 16, 31, 32, 100] {
+            let a: Vec<f32> = (0..len).map(|_| rng.next_f32_range(-5.0, 5.0)).collect();
+            let b: Vec<f32> = (0..len).map(|_| rng.next_f32_range(-5.0, 5.0)).collect();
+            let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();
+
+            let s_cos = cosine_distance_f32_bytes_scalar(&a, &b_bytes);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_cos = unsafe { cosine_distance_f32_bytes_avx512(&a, &b_bytes) };
+            assert!(approx_eq(s_cos, simd_cos, 1e-4));
+
+            let s_euc = euclidean_distance_f32_bytes_scalar(&a, &b_bytes);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_euc = unsafe { euclidean_distance_f32_bytes_avx512(&a, &b_bytes) };
+            assert!(approx_eq(s_euc, simd_euc, 1e-3));
+
+            let s_dot = dot_product_f32_bytes_scalar(&a, &b_bytes);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_dot = unsafe { dot_product_f32_bytes_avx512(&a, &b_bytes) };
+            assert!(approx_eq(s_dot, simd_dot, 1e-3));
+        }
+    }
+
+    #[test]
+    fn test_avx512_u8_kernels_exact() {
+        let mut rng = XorShift64::new(999);
+
+        for &len in &[0, 1, 3, 16, 31, 32, 33, 64, 128, 255] {
+            for offset in 0..8 {
+                let mut backing_a = vec![0u8; len + offset];
+                let mut backing_b = vec![0u8; len + offset];
+                for i in offset..(offset + len) {
+                    backing_a[i] = rng.next_u8();
+                    backing_b[i] = rng.next_u8();
+                }
+                let a = &backing_a[offset..offset + len];
+                let b = &backing_b[offset..offset + len];
+
+                if check_avx512vnni_support() {
+                    let s_dot = dot_product_u8_scalar(a, b);
+                    // SAFETY: CPU features avx512f, bw, vnni verified via check_avx512vnni_support.
+                    let simd_dot = unsafe { dot_product_u8_avx512vnni(a, b) };
+                    assert_eq!(s_dot, simd_dot, "u8 dot mismatch len={len}");
+
+                    let s_parts = cosine_similarity_parts_u8_scalar(a, b);
+                    // SAFETY: CPU features avx512f, bw, vnni verified via check_avx512vnni_support.
+                    let simd_parts = unsafe { cosine_similarity_parts_u8_avx512(a, b) };
+                    assert_eq!(s_parts, simd_parts, "u8 cosine parts mismatch len={len}");
+                }
+
+                if check_avx512bw_support() {
+                    let s_euc = euclidean_distance_sq_u8_scalar(a, b);
+                    // SAFETY: CPU features avx512f, bw verified via check_avx512bw_support.
+                    let simd_euc = unsafe { euclidean_distance_sq_u8_avx512(a, b) };
+                    assert_eq!(s_euc, simd_euc, "u8 euc sq mismatch len={len}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_avx512_special_float_values() {
+        if !check_avx512f_support() {
+            return;
+        }
+
+        let special_vals = [
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            -0.0f32,
+            0.0f32,
+            1e-38f32,
+            f32::MIN_POSITIVE,
+        ];
+
+        for &v in &special_vals {
+            let a = vec![v; 32];
+            let b = vec![1.0f32; 32];
+
+            let s_cos = cosine_distance_scalar(&a, &b);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_cos = unsafe { cosine_distance_avx512(&a, &b) };
+            assert!(approx_eq(s_cos, simd_cos, 1e-4));
+
+            let s_euc = euclidean_distance_scalar(&a, &b);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_euc = unsafe { euclidean_distance_avx512(&a, &b) };
+            assert!(approx_eq(s_euc, simd_euc, 1e-3));
+
+            let s_dot = dot_product_scalar(&a, &b);
+            // SAFETY: CPU feature avx512f verified via check_avx512f_support.
+            let simd_dot = unsafe { dot_product_avx512(&a, &b) };
+            assert!(approx_eq(s_dot, simd_dot, 1e-3));
+        }
     }
 }
 
