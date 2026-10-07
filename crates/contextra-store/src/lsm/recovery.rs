@@ -9,6 +9,8 @@ use contextra_core::{
     ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
     TOMBSTONE_BIT,
 };
+use contextra_mvcc::snapshot::SnapshotFloor;
+use crate::lsm::gc_floor::GcFloor;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -391,7 +393,7 @@ impl LsmStorage {
             }
         }
 
-        let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
+        let tx_buffer = Arc::new(TxBuffer::new_with_config(16, config.tx_timeout));
 
         let mut pending_rollbacks = Vec::new();
         let mut entries = tokio::fs::read_dir(&config.path)
@@ -548,9 +550,17 @@ impl LsmStorage {
         // `CompactionEngine` benötigt Zugriff auf `tx_buffer` (oder eine Watermark-Provider-Abstraktion),
         // damit die Kompaktion aktive MVCC-Lesetransaktionen aus `TxBuffer::min_read_snapshot()` berücksichtigt
         // und keine Daten löscht, die von laufenden Abfragen noch benötigt werden.
+        let last_applied_seq = Arc::new(AtomicU64::new(max_seq));
+
+        let gc_floor: Arc<dyn SnapshotFloor> = Arc::new(GcFloor::new(
+            Arc::clone(&snapshot_registry),
+            Arc::clone(&tx_buffer),
+            Arc::clone(&last_applied_seq),
+        ));
+
         let mut compaction_engine_builder = CompactionEngine::new(
             config.compaction.clone(),
-            Arc::clone(&snapshot_registry),
+            Arc::clone(&gc_floor),
             Arc::clone(&block_cache),
             key_manager.clone(),
             Arc::clone(&resource_tracker),
@@ -591,11 +601,12 @@ impl LsmStorage {
             block_cache,
             wal: RwLock::new(Arc::new(wal)),
             snapshot_registry,
+            floor: gc_floor,
             compaction_engine,
             manifest,
             next_seq_no: AtomicU64::new(max_seq.saturating_add(1)),
             last_committed_tx: AtomicU64::new(max_tx),
-            last_applied_seq: AtomicU64::new(max_seq),
+            last_applied_seq,
             flush_notify,
             health,
             commit_mutex: tokio::sync::Mutex::new(()),

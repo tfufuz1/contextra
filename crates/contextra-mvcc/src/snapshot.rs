@@ -22,6 +22,36 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Trait for querying the minimum sequence number floor for active MVCC snapshots and transaction readers.
+pub trait SnapshotFloor: Send + Sync {
+    /// Returns the active GC sequence floor. Sequence numbers strictly below this floor may be safely garbage collected.
+    fn floor(&self) -> u64;
+}
+
+impl<T: SnapshotFloor + ?Sized> SnapshotFloor for Arc<T> {
+    fn floor(&self) -> u64 {
+        (**self).floor()
+    }
+}
+
+impl SnapshotFloor for SnapshotRegistry {
+    fn floor(&self) -> u64 {
+        self.min_active_seqno()
+    }
+}
+
+/// An RAII lease for a read snapshot sequence number.
+pub struct SnapshotLease {
+    guard: SnapshotGuard,
+}
+
+impl SnapshotLease {
+    /// Returns the sequence number pinned by this snapshot lease.
+    pub fn seq_no(&self) -> u64 {
+        self.guard.seq_no()
+    }
+}
+
 /// Registry for active read snapshots.
 ///
 /// ### Synchronization & Memory Ordering Strategy
@@ -54,6 +84,14 @@ impl SnapshotRegistry {
         Self {
             active: Mutex::new(BTreeMap::new()),
             min_active_seqno: AtomicU64::new(u64::MAX),
+        }
+    }
+
+    /// Acquires a read snapshot lease at `seq_no`. Returns an RAII lease that
+    /// automatically releases on drop.
+    pub fn acquire(self: &Arc<Self>, seq_no: u64) -> SnapshotLease {
+        SnapshotLease {
+            guard: self.register(seq_no),
         }
     }
 
