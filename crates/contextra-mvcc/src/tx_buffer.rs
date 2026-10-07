@@ -959,7 +959,7 @@ mod tests {
             let res = buffer.stage_bounded(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::from(i as u64),
+                    doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                     data: format!("data_{i}"),
                 },
             );
@@ -985,7 +985,7 @@ mod tests {
             let res = buffer.stage(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::from(i as u64),
+                    doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                     data: format!("data_{i}"),
                 },
             );
@@ -1156,13 +1156,13 @@ mod tests {
 
         for i in 0..num_tasks {
             let buffer = buffer.clone();
-            let tx = TxId::new(i as u64 + 100);
+            let tx = TxId::new(u64::try_from(i).unwrap_or(0) + 100);
             handles.push(tokio::spawn(async move {
                 buffer.begin(tx);
                 let _ = buffer.stage(
                     tx,
                     IndexOp::Insert {
-                        doc_id: DocId::from(i as u64),
+                        doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                         data: format!("data_{i}"),
                     },
                 );

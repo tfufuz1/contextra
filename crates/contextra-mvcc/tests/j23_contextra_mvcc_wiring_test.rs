@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 //! Integration tests verifying wiring and production reachability for the 13 symbols in campaign J23-contextra-mvcc.
 
 use contextra_mvcc::{

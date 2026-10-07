@@ -21,7 +21,8 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     // Commit 17 distinct keys to exceed the 80% threshold (17 / 20 = 85%)
     for i in 1..=17 {
         let key = format!("user_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), i as u64);
+        let seq = u64::try_from(i).unwrap_or(0);
+        validator.record_commit_key(key.as_bytes(), seq);
     }
 
     let events = test_sink.events();
@@ -63,7 +64,7 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     let registry = Arc::new(SnapshotRegistry::new());
     let now = Instant::now();
     let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
-    let _guard = registry.register_at(42, past_350s);
+    let _lease = registry.acquire_at(|| 42, past_350s);
 
     let max_keys = 20;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
@@ -73,7 +74,8 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     // Commit 17 distinct keys to exceed threshold
     for i in 1..=17 {
         let key = format!("data_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), i as u64);
+        let seq = u64::try_from(i).unwrap_or(0);
+        validator.record_commit_key(key.as_bytes(), seq);
     }
 
     let events = test_sink.events();

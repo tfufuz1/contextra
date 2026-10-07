@@ -11,7 +11,10 @@ fn bench_snapshot_registry_min_active(c: &mut Criterion) {
     for density in [10, 1000, 100_000] {
         let registry = Arc::new(SnapshotRegistry::new());
         let _guards: Vec<_> = (1..=density)
-            .map(|i| registry.acquire(|| i as u64 * 10))
+            .map(|i| {
+                let seq = u64::try_from(i).unwrap_or(0) * 10;
+                registry.acquire(|| seq)
+            })
             .collect();
 
         group.bench_with_input(
@@ -32,7 +35,10 @@ fn bench_snapshot_registry_register_drop(c: &mut Criterion) {
     for density in [10, 1000, 100_000] {
         let registry = Arc::new(SnapshotRegistry::new());
         let _active_guards: Vec<_> = (1..=density)
-            .map(|i| registry.register(i as u64 * 10))
+            .map(|i| {
+                let seq = u64::try_from(i).unwrap_or(0) * 10;
+                registry.acquire(|| seq)
+            })
             .collect();
 
         group.bench_with_input(
