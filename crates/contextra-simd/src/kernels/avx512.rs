@@ -18,7 +18,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; equal slice lengths required.
-pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -82,7 +82,7 @@ pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; equal slice lengths required.
-pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -126,7 +126,7 @@ pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; equal slice lengths required.
-pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -167,7 +167,7 @@ pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; b_bytes.len() >= a.len() * 4 required.
-pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -239,7 +239,7 @@ pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; b_bytes.len() >= a.len() * 4 required.
-pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -293,7 +293,7 @@ pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> 
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller; b_bytes.len() >= a.len() * 4 required.
-pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -343,7 +343,7 @@ pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller.
-pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
+pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     // SAFETY: Target feature avx512f enabled on function; extracts and adds valid 256-bit halves of __m512 vector.
     let v256 = unsafe { _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1)) };
     // SAFETY: Target feature avx512f enabled; valid 256-bit to 128-bit vector cast.
@@ -369,7 +369,7 @@ pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
 // SAFETY: Host CPU support for avx512f, avx512bw, and avx512vnni guaranteed by caller.
-pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -409,7 +409,7 @@ pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
 // SAFETY: Host CPU support for avx512f and avx512bw guaranteed by caller.
-pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -472,7 +472,7 @@ pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
 // SAFETY: Host CPU support for avx512f, avx512bw, and avx512vnni guaranteed by caller.
-pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -533,7 +533,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSim
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 // SAFETY: Host CPU support for avx512f guaranteed by caller.
-pub unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
+pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: Target feature avx512f enabled on function; extracts and adds valid 256-bit halves of __m512i vector.
     let v256 =
         unsafe { _mm256_add_epi32(_mm512_castsi512_si256(v), _mm512_extracti32x8_epi32(v, 1)) };

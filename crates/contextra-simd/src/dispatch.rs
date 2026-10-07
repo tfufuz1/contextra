@@ -2,11 +2,48 @@
 // ZWECK: Runtime Hardware Feature Detection & Dispatcher.
 // INVARIANTEN: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
 
+#![allow(unsafe_code)]
+
 use crate::kernels::*;
 use contextra_core::ContextraError;
 
+/// Opaque CPU feature token required to execute SIMD kernels.
+/// Private constructor enforces that instances can only be instantiated via [`CpuFeatures::detect`].
+///
+/// ```compile_fail
+/// use contextra_simd::CpuFeatures;
+/// let _f = CpuFeatures {}; // Compile error: CpuFeatures has private fields
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct CpuFeatures {
+    _private: (),
+}
+
+impl CpuFeatures {
+    /// Detects runtime CPU capabilities using architecture feature detection.
+    #[inline]
+    pub fn detect() -> Self {
+        Self { _private: () }
+    }
+}
+
+/// Standalone detection function for hardware CPU feature tokens.
+#[inline]
+pub fn detect() -> CpuFeatures {
+    CpuFeatures::detect()
+}
+
 #[inline]
 pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
+    cosine_distance_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn cosine_distance_with_features(
+    a: &[f32],
+    b: &[f32],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -39,6 +76,15 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 
 #[inline]
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
+    euclidean_distance_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn euclidean_distance_with_features(
+    a: &[f32],
+    b: &[f32],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -71,6 +117,15 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 
 #[inline]
 pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
+    dot_product_distance_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn dot_product_distance_with_features(
+    a: &[f32],
+    b: &[f32],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -103,6 +158,15 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
 
 #[inline]
 pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
+    cosine_distance_f32_bytes_with_features(a, b_bytes, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn cosine_distance_f32_bytes_with_features(
+    a: &[f32],
+    b_bytes: &[u8],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -127,6 +191,15 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
 
 #[inline]
 pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
+    euclidean_distance_f32_bytes_with_features(a, b_bytes, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn euclidean_distance_f32_bytes_with_features(
+    a: &[f32],
+    b_bytes: &[u8],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -151,6 +224,15 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
 
 #[inline]
 pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
+    dot_product_distance_f32_bytes_with_features(a, b_bytes, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn dot_product_distance_f32_bytes_with_features(
+    a: &[f32],
+    b_bytes: &[u8],
+    _features: &CpuFeatures,
+) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -175,6 +257,15 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 
 #[inline]
 pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
+    dot_product_u8_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn dot_product_u8_with_features(
+    a: &[u8],
+    b: &[u8],
+    _features: &CpuFeatures,
+) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -202,6 +293,15 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 
 #[inline]
 pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
+    euclidean_distance_sq_u8_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn euclidean_distance_sq_u8_with_features(
+    a: &[u8],
+    b: &[u8],
+    _features: &CpuFeatures,
+) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
@@ -228,6 +328,15 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 pub fn cosine_similarity_parts_u8(
     a: &[u8],
     b: &[u8],
+) -> Result<CosineSimilarityPartsU8, ContextraError> {
+    cosine_similarity_parts_u8_with_features(a, b, &CpuFeatures::detect())
+}
+
+#[inline]
+pub fn cosine_similarity_parts_u8_with_features(
+    a: &[u8],
+    b: &[u8],
+    _features: &CpuFeatures,
 ) -> Result<CosineSimilarityPartsU8, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {

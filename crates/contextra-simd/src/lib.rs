@@ -5,26 +5,20 @@
 
 //! Contextra SIMD — Ring 0 SIMD distance kernels and hardware runtime dispatch.
 
-#![allow(unsafe_code)]
-#![allow(clippy::undocumented_unsafe_blocks)]
-#![allow(clippy::missing_safety_doc)]
-#![allow(unused_unsafe)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod dispatch;
 pub mod kernels;
 
-pub use dispatch::*;
-#[cfg(target_arch = "aarch64")]
-pub use kernels::neon;
-pub use kernels::scalar::{
-    cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
-    cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,
-    dot_product_scalar, dot_product_u8_scalar, euclidean_distance_f32_bytes_scalar,
-    euclidean_distance_scalar, euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8_scalar,
-    normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
+pub use dispatch::{
+    cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, detect,
+    dot_product_distance, dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
+    euclidean_distance_f32_bytes, euclidean_distance_sq_u8, CpuFeatures,
 };
-#[cfg(target_arch = "x86_64")]
-pub use kernels::{avx2, avx512};
+pub use kernels::scalar::{
+    dot_product_f32_u8, euclidean_distance_sq_f32_u8, normalize_inplace,
+    CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
+};
 
 use contextra_core::{ContextraError, DistanceMetric};
 
