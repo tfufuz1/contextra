@@ -365,26 +365,42 @@ coverage-json:
 fuzz-all SECONDS="60":
 	#!/usr/bin/env bash
 	set -euo pipefail
-	which cargo-fuzz || cargo install cargo-fuzz
+	if ! command -v cargo-fuzz &>/dev/null && ! cargo fuzz --version &>/dev/null 2>&1; then
+		echo "❌ cargo-fuzz ist nicht installiert."
+		echo "   Für lokale Verifikation: cargo install cargo-fuzz"
+		exit 1
+	fi
+	if ! rustup run nightly cargo --version &>/dev/null 2>&1; then
+		echo "❌ Nightly Toolchain ist nicht installiert."
+		echo "   Für Fuzzing: rustup toolchain install nightly"
+		exit 1
+	fi
 	echo "🔥 Fuzzing für {{SECONDS}} Sekunden pro Target..."
 	targets=(
-		"contextra-store:fuzz_wal_replay"
-		"contextra-vector:fuzz_hnsw_persistence"
-		"contextra-text:fuzz_bm25_tokenize"
-		"contextra-wire:fuzz_flatbuffers_ipc"
-		"contextra-mcp:fuzz_jsonrpc_parsing"
-		"contextra-store:wal_roundtrip"
-		"contextra-store:fuzz_manifest_load"
-		"contextra-store:wal_mutation_chaos"
-		"contextra-vector:hnsw_insert_search"
+		"contextra-crypto:deletion_proof_tamper"
+		"contextra-crypto:wal_hmac_chain_verify_fuzz"
+		"contextra-crypto:deletion_proof_verify_external_fuzz"
 		"contextra-db:rrf_fusion"
 		"contextra-mcp:fuzz_prompt_injection_guard"
+		"contextra-mcp:fuzz_jsonrpc_parsing"
+		"contextra-store:wal_roundtrip"
+		"contextra-store:wal_mutation_chaos"
+		"contextra-store:fuzz_sstable_binary_search"
+		"contextra-store:fuzz_manifest_load"
+		"contextra-store:fuzz_wal_replay"
+		"contextra-store:fuzz_memtable_concurrent"
+		"contextra-store:fuzz_compaction_interleave"
+		"contextra-store:fuzz_recovery_arbitrary_state"
+		"contextra-text:fuzz_bm25_tokenize"
+		"contextra-vector:hnsw_insert_search"
+		"contextra-vector:fuzz_hnsw_persistence"
+		"contextra-wire:fuzz_flatbuffers_ipc"
 	)
 	for entry in "${targets[@]}"; do
 		crate="${entry%%:*}"
 		target="${entry##*:}"
 		echo "  → crates/${crate} :: ${target}"
-		(cd "crates/${crate}" && cargo +nightly fuzz run "${target}" -- -max_total_time={{SECONDS}} 2>&1 | tail -3) || true
+		(cd "crates/${crate}" && cargo +nightly fuzz run "${target}" -- -max_total_time={{SECONDS}})
 	done
 	echo "✅ Fuzz-Suite abgeschlossen"
 
