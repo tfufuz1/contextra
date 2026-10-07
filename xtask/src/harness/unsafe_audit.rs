@@ -88,7 +88,6 @@ pub fn unsafe_audit_scan_file(
     is_island: bool,
     findings: &mut Vec<UnsafeAuditFinding>,
     unsafe_counts: &mut BTreeMap<String, usize>,
-    missing_safety_counts: &mut BTreeMap<String, usize>,
 ) {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
@@ -137,36 +136,15 @@ pub fn unsafe_audit_scan_file(
             }
         }
     } else {
-        let mut missing_safety = 0;
         let mut unsafe_sites = 0;
-
-        for (idx, line) in lines.iter().enumerate() {
+        for line in lines {
             let trimmed = line.trim();
             if (trimmed.contains("unsafe ") || trimmed == "unsafe") && !trimmed.starts_with("//") {
                 unsafe_sites += 1;
-
-                let mut has_safety_comment = false;
-                let lookback = idx.saturating_sub(3);
-                for prev in &lines[lookback..idx] {
-                    if prev.contains("SAFETY:") || prev.contains("# Safety") {
-                        has_safety_comment = true;
-                        break;
-                    }
-                }
-
-                if !has_safety_comment {
-                    missing_safety += 1;
-                }
             }
         }
-
         if unsafe_sites > 0 {
             *unsafe_counts.entry(rel_path.to_string()).or_insert(0) += unsafe_sites;
-        }
-        if missing_safety > 0 {
-            *missing_safety_counts
-                .entry(rel_path.to_string())
-                .or_insert(0) += missing_safety;
         }
     }
 }
@@ -175,7 +153,7 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
     let mut root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut json = false;
     let mut run_miri = false;
-    let mut write_baseline = false;
+    let mut _write_baseline = false;
 
     let mut i = 0;
     while i < args.len() {
@@ -193,7 +171,7 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                 run_miri = true;
             }
             "--write-baseline" => {
-                write_baseline = true;
+                _write_baseline = true;
             }
             _ => {}
         }
@@ -220,8 +198,8 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
     let mut unsafe_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut missing_safety_counts: BTreeMap<String, usize> = BTreeMap::new();
 
+    // Scan non-island crates for forbidden unsafe blocks / missing forbid lints, and count unsafe sites
     for crate_info in &all_crates {
-        let _name = crate_info.name_ref();
         let src_dir = crate_info.path.join("src");
         if !src_dir.exists() {
             continue;
@@ -244,58 +222,116 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                     crate_info.is_island,
                     &mut findings,
                     &mut unsafe_counts,
-                    &mut missing_safety_counts,
                 );
             }
         }
     }
 
-    let baseline_path = root.join("governance/unsafe-safety-baseline.toml");
-    let mut baseline_map: BTreeMap<String, usize> = BTreeMap::new();
+    // Run cargo clippy -p <island> -- -D clippy::undocumented_unsafe_blocks for unsafe islands
+    for island in &islands {
+        let clippy_output = Command::new("cargo")
+            .args([
+                "clippy",
+                "-p",
+                island,
+                "--message-format=json",
+                "--",
+                "-D",
+                "clippy::undocumented_unsafe_blocks",
+            ])
+            .current_dir(&root)
+            .output();
 
-    if baseline_path.exists() {
-        if let Ok(content) = fs::read_to_string(&baseline_path) {
-            if let Ok(parsed) = toml::from_str::<UnsafeSafetyBaselineFile>(&content) {
-                baseline_map = parsed.missing_safety_comments;
+        if let Ok(output) = clippy_output {
+            let stdout_str = String::from_utf8_lossy(&output.stdout);
+            for line in stdout_str.lines() {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                    if val.get("reason").and_then(|r| r.as_str()) == Some("compiler-message") {
+                        if let Some(msg) = val.get("message") {
+                            let code = msg
+                                .get("code")
+                                .and_then(|c| c.get("code"))
+                                .and_then(|s| s.as_str());
+                            if code == Some("clippy::undocumented_unsafe_blocks") {
+                                if let Some(spans) = msg.get("spans").and_then(|s| s.as_array()) {
+                                    for span in spans {
+                                        if span.get("is_primary").and_then(|b| b.as_bool())
+                                            == Some(true)
+                                        {
+                                            if let Some(file_name) = span
+                                                .get("file_name")
+                                                .and_then(|f| f.as_str())
+                                            {
+                                                let norm_file = file_name.replace('\\', "/");
+                                                *missing_safety_counts
+                                                    .entry(norm_file)
+                                                    .or_insert(0) += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-    } else if write_baseline || !baseline_path.exists() {
-        if let Ok(toml_str) = toml::to_string(&UnsafeSafetyBaselineFile {
-            missing_safety_comments: missing_safety_counts.clone(),
-        }) {
-            let _ = fs::create_dir_all(root.join("governance"));
-            let _ = fs::write(&baseline_path, toml_str);
-        }
-        baseline_map = missing_safety_counts.clone();
     }
 
-    for (file, current_missing) in &missing_safety_counts {
-        let baseline_missing = baseline_map.get(file).copied().unwrap_or(0);
-        if *current_missing > baseline_missing {
-            findings.push(UnsafeAuditFinding {
-                id: "MISSING_SAFETY_COMMENT_INCREASE".to_string(),
-                severity: "error".to_string(),
-                file: file.clone(),
-                line: 1,
-                message: format!(
-                    "Missing // SAFETY: comments increased in {} from {} to {}",
-                    file, baseline_missing, current_missing
-                ),
-                fix: "Add // SAFETY: comment explaining safety invariants before unsafe block"
-                    .to_string(),
-            });
-        } else if *current_missing < baseline_missing {
-            findings.push(UnsafeAuditFinding {
-                id: "SAFETY_COMMENT_IMPROVED".to_string(),
-                severity: "info".to_string(),
-                file: file.clone(),
-                line: 1,
-                message: format!(
-                    "Missing // SAFETY: comments decreased in {} from {} to {}! Consider lowering baseline.",
-                    file, baseline_missing, current_missing
-                ),
-                fix: "Update governance/unsafe-safety-baseline.toml".to_string(),
-            });
+    let baseline_path = root.join("governance/unsafe-safety-baseline.toml");
+    let baseline_map: BTreeMap<String, usize> = if baseline_path.exists() {
+        if let Ok(content) = fs::read_to_string(&baseline_path) {
+            if let Ok(parsed) = toml::from_str::<UnsafeSafetyBaselineFile>(&content) {
+                parsed.missing_safety_comments
+            } else {
+                BTreeMap::new()
+            }
+        } else {
+            BTreeMap::new()
+        }
+    } else {
+        // Enforce baseline existence requirement! Do NOT write baseline silently.
+        findings.push(UnsafeAuditFinding {
+            id: "MISSING_BASELINE_FILE".to_string(),
+            severity: "error".to_string(),
+            file: "governance/unsafe-safety-baseline.toml".to_string(),
+            line: 0,
+            message: "Required baseline file governance/unsafe-safety-baseline.toml is missing!"
+                .to_string(),
+            fix: "Create governance/unsafe-safety-baseline.toml".to_string(),
+        });
+        BTreeMap::new()
+    };
+
+    if baseline_path.exists() {
+        for (file, current_missing) in &missing_safety_counts {
+            let baseline_missing = baseline_map.get(file).copied().unwrap_or(0);
+            if *current_missing > baseline_missing {
+                findings.push(UnsafeAuditFinding {
+                    id: "MISSING_SAFETY_COMMENT_INCREASE".to_string(),
+                    severity: "error".to_string(),
+                    file: file.clone(),
+                    line: 1,
+                    message: format!(
+                        "Undocumented unsafe blocks increased in {} from {} to {}",
+                        file, baseline_missing, current_missing
+                    ),
+                    fix: "Add // SAFETY: comment explaining safety invariants before unsafe block"
+                        .to_string(),
+                });
+            } else if *current_missing < baseline_missing {
+                findings.push(UnsafeAuditFinding {
+                    id: "SAFETY_COMMENT_IMPROVED".to_string(),
+                    severity: "info".to_string(),
+                    file: file.clone(),
+                    line: 1,
+                    message: format!(
+                        "Undocumented unsafe blocks decreased in {} from {} to {}! Consider lowering baseline.",
+                        file, baseline_missing, current_missing
+                    ),
+                    fix: "Update governance/unsafe-safety-baseline.toml".to_string(),
+                });
+            }
         }
     }
 
