@@ -35,6 +35,16 @@ impl CpuFeatures {
     /// Detects runtime CPU capabilities using architecture feature detection.
     #[inline]
     pub fn detect() -> Self {
+        #[cfg(test)]
+        if let Ok(forced) = std::env::var("CONTEXTRA_SIMD_FORCE") {
+            return Self::detect_forced(&forced);
+        }
+
+        Self::detect_hardware()
+    }
+
+    #[inline]
+    fn detect_hardware() -> Self {
         #[cfg(target_arch = "x86_64")]
         {
             Self {
@@ -57,6 +67,50 @@ impl CpuFeatures {
         {
             Self { _private: () }
         }
+    }
+
+    #[cfg(test)]
+    fn detect_forced(forced: &str) -> Self {
+        let hw = Self::detect_hardware();
+        let mut f = Self {
+            #[cfg(target_arch = "x86_64")]
+            avx512f: false,
+            #[cfg(target_arch = "x86_64")]
+            avx512bw: false,
+            #[cfg(target_arch = "x86_64")]
+            avx512vnni: false,
+            #[cfg(target_arch = "x86_64")]
+            avx2: false,
+            #[cfg(target_arch = "x86_64")]
+            fma: false,
+            #[cfg(target_arch = "aarch64")]
+            neon: false,
+            _private: (),
+        };
+
+        match forced {
+            "scalar" => {}
+            #[cfg(target_arch = "x86_64")]
+            "avx2" => {
+                f.avx2 = hw.avx2;
+                f.fma = hw.fma;
+            }
+            #[cfg(target_arch = "x86_64")]
+            "avx512" => {
+                f.avx512f = hw.avx512f;
+                f.avx512bw = hw.avx512bw;
+                f.avx512vnni = hw.avx512vnni;
+            }
+            #[cfg(target_arch = "aarch64")]
+            "neon" => {
+                f.neon = hw.neon;
+            }
+            _ => {
+                eprintln!("Unknown CONTEXTRA_SIMD_FORCE value: '{forced}', falling back to scalar");
+            }
+        }
+
+        f
     }
 }
 
