@@ -772,6 +772,7 @@ dependencies = [
  "bincode",
  "blake3",
  "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-ports",
  "contextra-types",
  "criterion",
@@ -827,6 +828,13 @@ dependencies = [
  "tokio-util",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "contextra-durable-fs"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]
@@ -1189,6 +1197,7 @@ dependencies = [
  "bytes",
  "contextra-core",
  "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
@@ -1287,6 +1296,7 @@ dependencies = [
  "bincode",
  "contextra-core",
  "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-ports",
  "contextra-simd",
  "contextra-sys",

@@ -1,0 +1,18 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-durable-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Durable filesystem operations and synchronous disk flushing for Contextra"
+
+[package.metadata.contextra]
+ring = "0"
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = { workspace = true }
