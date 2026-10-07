@@ -11,17 +11,17 @@ pub trait SnapshotFloor: Send + Sync {
 
 /// Garbage collection floor tracking active snapshot bounds.
 #[derive(Debug)]
-pub struct GcFloor<T: Clone = (Vec<u8>, Vec<u8>)> {
+pub struct GcFloor {
     _registry: Arc<crate::snapshot::SnapshotRegistry>,
-    _tx_buffer: Arc<crate::tx_buffer::TxBuffer<T>>,
+    _tx_buffer: Arc<crate::tx_buffer::TxBuffer<(Vec<u8>, Vec<u8>)>>,
     _last_applied: Arc<AtomicU64>,
 }
 
-impl<T: Clone> GcFloor<T> {
+impl GcFloor {
     /// Constructs a new `GcFloor` instance.
     pub fn new(
         registry: Arc<crate::snapshot::SnapshotRegistry>,
-        tx_buffer: Arc<crate::tx_buffer::TxBuffer<T>>,
+        tx_buffer: Arc<crate::tx_buffer::TxBuffer<(Vec<u8>, Vec<u8>)>>,
         last_applied: Arc<AtomicU64>,
     ) -> Self {
         Self {
@@ -32,7 +32,7 @@ impl<T: Clone> GcFloor<T> {
     }
 }
 
-impl<T: Clone + Send + Sync> SnapshotFloor for GcFloor<T> {
+impl SnapshotFloor for GcFloor {
     fn floor(&self) -> u64 {
         0
     }

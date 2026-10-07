@@ -33,8 +33,10 @@ fn test_durable_remove_success_and_not_found() -> std::io::Result<()> {
 
     // Durable remove missing file returns NotFound error
     let missing_file = dir.path().join("missing.txt");
-    let err = durable_remove(&missing_file).unwrap_err();
-    assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    assert!(matches!(
+        durable_remove(&missing_file),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound
+    ));
 
     Ok(())
 }
