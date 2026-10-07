@@ -32,6 +32,7 @@ docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
 
 [dependencies]
+contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }

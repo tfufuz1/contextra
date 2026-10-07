@@ -43,6 +43,9 @@ pub struct DiskAnnConfig {
     pub pending_flush_threshold: Option<u64>,
     /// Optional compute pool for background operations.
     pub compute_pool: Option<ComputePool>,
+    /// Whether to create a new empty index if the index file does not exist on load.
+    /// Default is `false` (missing index file returns a `NotFound` error).
+    pub create_if_missing: bool,
 }
 
 impl Default for DiskAnnConfig {
@@ -59,6 +62,7 @@ impl Default for DiskAnnConfig {
             fallback_policy: DiskAnnFallbackPolicy::default(),
             pending_flush_threshold: None,
             compute_pool: None,
+            create_if_missing: false,
         }
     }
 }

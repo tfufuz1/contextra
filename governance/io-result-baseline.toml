@@ -1,0 +1,98 @@
+[violations]
+"benchmarks/contextra-bench/src/main.rs:1059:let _ = fs::create_dir_all(embed_dir);" = true
+"crates/contextra-checkpoint/src/hardlink_cloner.rs:164:let _ = fs::remove_file(&target_path).await;" = true
+"crates/contextra-checkpoint/src/orphan.rs:164:if let Ok(data) = std::fs::read(path) {" = true
+"crates/contextra-checkpoint/src/orphan.rs:226:if let Ok(data) = std::fs::read(path) {" = true
+"crates/contextra-checkpoint/src/store.rs:257:" = true
+"crates/contextra-crypto/src/revocation_log.rs:71:let parent = path.parent().unwrap_or_else(|| Path::new(\".\"));" = true
+"crates/contextra-crypto/src/revocation_log.rs:106:let _ = std::fs::remove_file(&tmp_path);" = true
+"crates/contextra-crypto/src/revocation_log.rs:111:let _ = std::fs::remove_file(&tmp_path);" = true
+"crates/contextra-crypto/src/revocation_log.rs:117:if let Ok(dir_file) = File::open(parent) {" = true
+"crates/contextra-crypto/src/revocation_log.rs:118:let _ = dir_file.sync_all();" = true
+"crates/contextra-durable-fs/src/lib.rs:54:let _ = std::fs::remove_file(self.0);" = true
+"crates/contextra-graph/src/arc_slice.rs:66:self.try_slice(range).unwrap_or_else(|| Self {" = true
+"crates/contextra-graph/src/community.rs:518:.unwrap_or_else(|| local_u64_ids[u]);" = true
+"crates/contextra-graph/src/community.rs:575:.unwrap_or_else(|| local_u64_ids[u]);" = true
+"crates/contextra-graph/src/csr/graph_write.rs:979:tx_valid_from.unwrap_or_else(|| TxId::new(0))," = true
+"crates/contextra-graph/src/csr/graph_write.rs:1142:tx_valid_from.unwrap_or_else(|| TxId::new(0))," = true
+"crates/contextra-graph/src/csr/inner.rs:686:.unwrap_or_else(|| {" = true
+"crates/contextra-graph/src/hyperedge_suggest.rs:132:.unwrap_or_else(|| format!(\"Entity({})\"; id.inner()))" = true
+"crates/contextra-graph/src/hyperedge_suggest.rs:132:.unwrap_or_else(|| format!(\"Entity({})\", id.inner()))" = true
+"crates/contextra-ports/src/embedding.rs:212:.unwrap_or_else(|| vec![0.1f32; self.dim]))" = true
+"crates/contextra-ports/src/metrics.rs:86:.unwrap_or_else(|e| e.into_inner())" = true
+"crates/contextra-ports/src/metrics.rs:94:.unwrap_or_else(|e| e.into_inner())" = true
+"crates/contextra-ports/src/metrics.rs:107:.unwrap_or_else(|e| e.into_inner())" = true
+"crates/contextra-ports/src/metrics.rs:122:.unwrap_or_else(|e| e.into_inner())" = true
+"crates/contextra-ports/src/metrics.rs:137:.unwrap_or_else(|e| e.into_inner())" = true
+"crates/contextra-rank/src/explain.rs:85:.unwrap_or_else(|| \"kein Rang\".to_string());" = true
+"crates/contextra-rank/src/fusion/rrf.rs:660:.unwrap_or_else(|| strategies.strategy_for_signal(signal_name));" = true
+"crates/contextra-rank/src/fusion/rrf.rs:686:.unwrap_or_else(|| strategies.strategy_for_signal(signal_name));" = true
+"crates/contextra-rank/src/fusion/rrf.rs:767:.unwrap_or_else(|| strategies.strategy_for_signal(signal_name));" = true
+"crates/contextra-store/benches/lsm_concurrency_bench.rs:10:if let Ok(statm) = std::fs::read_to_string(\"/proc/self/statm\") {" = true
+"crates/contextra-store/src/lsm/commit.rs:31:let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:65:.unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:100:.unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:454:let mut shared_guard = shared.lock().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:503:let shared_guard = q.shared.lock().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:516:queue.shared.lock().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:576:let mut shared = self.shared.lock().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/ops/write.rs:646:.unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/lsm/recovery.rs:892:" = true
+"crates/contextra-store/src/manifest/core.rs:293:.unwrap_or_else(|| path.clone());" = true
+"crates/contextra-store/src/manifest/core.rs:301:.unwrap_or_else(|| path.clone());" = true
+"crates/contextra-store/src/manifest/core.rs:310:.unwrap_or_else(|| p.clone());" = true
+"crates/contextra-store/src/manifest/core.rs:316:.unwrap_or_else(|| added.clone());" = true
+"crates/contextra-store/src/manifest/core.rs:344:.unwrap_or_else(|| path.clone());" = true
+"crates/contextra-store/src/manifest/core.rs:354:.unwrap_or_else(|| p.clone());" = true
+"crates/contextra-store/src/util.rs:107:let parent = path.parent().unwrap_or_else(|| Path::new(\"\"));" = true
+"crates/contextra-store/src/wal/flusher.rs:173:let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());" = true
+"crates/contextra-store/src/wal/hmac.rs:235:let parent = wal_path.parent().unwrap_or_else(|| Path::new(\"\"));" = true
+"crates/contextra-store/src/wal/hmac.rs:304:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:311:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:321:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:326:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:348:let parent = wal_path.parent().unwrap_or_else(|| Path::new(\".\"));" = true
+"crates/contextra-store/src/wal/hmac.rs:357:.unwrap_or_else(|_| dir_path.to_string_lossy().to_string());" = true
+"crates/contextra-store/src/wal/hmac.rs:378:let parent = marker_path.parent().unwrap_or_else(|| Path::new(\".\"));" = true
+"crates/contextra-store/src/wal/hmac.rs:414:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:422:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:431:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:487:let parent = uuid_path.parent().unwrap_or_else(|| Path::new(\"\"));" = true
+"crates/contextra-store/src/wal/hmac.rs:512:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:520:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/hmac.rs:529:let _ = super::fs::remove_file(&tmp_path).await;" = true
+"crates/contextra-store/src/wal/io.rs:724:let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;" = true
+"crates/contextra-store/src/wal/io.rs:782:let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;" = true
+"crates/contextra-store/src/wal/io.rs:832:F: FnMut(u64, WalEntry, u64) -> bool," = true
+"crates/contextra-store/src/wal/io.rs:872:let integrity_key = self.get_integrity_key()?;" = true
+"crates/contextra-store/src/wal/io.rs:918:}" = true
+"crates/contextra-store/src/wal/mod.rs:97:let path = std::env::current_dir().unwrap_or_else(|_| Path::new(\".\").to_path_buf());" = true
+"crates/contextra-store/src/wal/mod.rs:105:std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {" = true
+"crates/contextra-store/src/wal/mod.rs:111:std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {" = true
+"crates/contextra-sys/src/mmap.rs:48:let _ = std::fs::remove_file(path);" = true
+"crates/contextra-sys/src/mmap.rs:66:let _ = std::fs::remove_file(path);" = true
+"crates/contextra-sys/src/posix.rs:80:let _ = std::fs::remove_file(dummy_path);" = true
+"crates/contextra-sys/src/posix.rs:89:let _ = std::fs::remove_file(path);" = true
+"crates/contextra-adapt/src/bandit.rs:1068:.unwrap_or_else(|e| panic!(\"Deserialisierung alter Snapshots fehlgeschlagen: {e}\"));" = true
+"crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:101:let _ = std::fs::remove_file(&path);" = true
+"crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:107:if let Ok(mut file) = OpenOptions::new().read(true).write(true).open(&path) {" = true
+"crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:123:let _ = std::fs::remove_file(&path);" = true
+"crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:134:let _ = std::fs::remove_file(&path);" = true
+"crates/contextra-vector/src/diskann/build.rs:428:let _ = std::fs::remove_file(&pending_wal);" = true
+"crates/contextra-vector/src/diskann/build.rs:705:let _ = std::fs::remove_file(&pending_wal);" = true
+"crates/contextra-vector/src/diskann/build.rs:710:let _ = std::fs::remove_file(&tombstone_wal);" = true
+"crates/contextra-vector/src/diskann/persistence.rs:71:if let Ok(dir) = std::fs::File::open(parent) {" = true
+"crates/contextra-vector/src/diskann/persistence.rs:72:let _ = dir.sync_all();" = true
+"crates/contextra-vector/src/diskann/persistence.rs:112:if let Ok(dir) = std::fs::File::open(parent) {" = true
+"crates/contextra-vector/src/diskann/persistence.rs:129:if let Ok(dir) = std::fs::File::open(parent) {" = true
+"crates/contextra-vector/src/diskann/tests.rs:48:threshold_override.unwrap_or_else(|| compute_adaptive_flush_threshold(n_persisted));" = true
+"crates/contextra-vector/src/diskann/vector_index_impl.rs:42:.unwrap_or_else(|| compute_adaptive_flush_threshold(n_persisted));" = true
+"crates/contextra-vector/src/hnsw/arena.rs:244:.unwrap_or_else(|| counts.len());" = true
+"crates/contextra-vector/src/hnsw/arena.rs:298:.unwrap_or_else(|| self.counts.read().len());" = true
+"crates/contextra-vector/src/hnsw/arena.rs:353:.unwrap_or_else(|| counts.len());" = true
+"crates/contextra-vector/src/hnsw/types.rs:800:if let Ok(parent_dir) = std::fs::File::open(parent) {" = true
+"crates/contextra-vector/src/quantize/mod.rs:192:Self::try_train_with_percentiles(batch, dimension, p_low, p_high).unwrap_or_else(|err| {" = true
+"crates/contextra-vector/src/quantize/mod.rs:218:Self::try_train(batch, dimension).unwrap_or_else(|err| {" = true
+"crates/contextra-wire/build.rs:133:let _ = std::fs::write(output_file, new_content);" = true
+"benches/rrf_scale_bench.rs:43:let _ = fs::create_dir_all(&dir);" = true
+"benches/scale_bench.rs:44:let _ = fs::create_dir_all(&dir);" = true

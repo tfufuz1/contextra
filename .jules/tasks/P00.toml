@@ -1,0 +1,34 @@
+id                = "T-2026-0000"
+title             = "P00: Gemeinsame Verträge und contextra-durable-fs anlegen"
+crate             = "contextra-store"
+tier              = 1
+risk              = "none"
+goal              = "Lege alle gemeinsam genutzten Verträge an, damit neun weitere Agenten parallel gegen stabile Signaturen arbeiten können."
+non_goals         = ["Keine Logik-Änderungen außerhalb der genannten Stellen", "Keine Umbenennungen", "Keine Formatierung fremder Dateien"]
+protected_change  = "P00 bootstrapping shared contracts and registering contextra-durable-fs in capabilities.toml"
+scope             = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "capabilities.toml",
+  "crates/contextra-durable-fs/**",
+  "crates/contextra-mvcc/src/lib.rs",
+  "crates/contextra-mvcc/src/floor.rs",
+  "crates/contextra-mvcc/src/lease.rs",
+  "crates/contextra-store/Cargo.toml",
+  "crates/contextra-vector/Cargo.toml",
+  "crates/contextra-crypto/Cargo.toml"
+]
+forbidden         = [".github/**", "xtask/**", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants        = ["Zero-Panic", "Unsafe Islands Only", "P12"]
+acceptance        = [
+  "cargo check --workspace",
+  "cargo test -p contextra-durable-fs",
+  "cargo xtask registry-check",
+  "cargo xtask check-ring-capabilities-consistency"
+]
+evidence_required = ["Tests in crates/contextra-durable-fs/tests/basic.rs"]
+
+[budget]
+files      = 10
+lines      = 300
+iterations = 5

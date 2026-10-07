@@ -4,7 +4,7 @@
 // INVARIANTEN: INV-DELETION-2: After Ok(..) of remove_with_graph_repair(doc_id), no neighborhood pointer points to doc_id.
 
 use contextra_core::{DocId, Result, TxId, VectorIndex};
-use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
+use contextra_vector::hnsw::{GhostFreeVectorIndex, GhostScan, HnswConfig, HnswIndex};
 
 #[tokio::test]
 async fn test_normal_deletion_complete_verification() -> Result<()> {
@@ -69,17 +69,24 @@ async fn test_verify_no_ghost_pointers_standalone_complete_scan() -> Result<()> 
         index.commit(TxId::new(i as u64)).await?;
     }
 
-    // Call verify_no_ghost_pointers with budget = 5 and targeted_nodes = None
-    // This triggers full fallback scan over all 50 nodes.
-    let verif_res = index.verify_no_ghost_pointers(0, 5, None);
+    let mut mut_index = index;
+    // Delete doc 1 (node 0)
+    let target_doc = DocId::new(1);
+    let stats = mut_index.remove_with_graph_repair(target_doc)?;
+    assert!(stats.verified_no_ghost_pointers);
+
+    // Call verify_no_ghost_pointers with budget = 100 and targeted_nodes = None
+    // This triggers full fallback scan over all remaining nodes for deleted node 0.
+    let (verif_res, scan) = mut_index.verify_no_ghost_pointers(0, 100, None);
 
     assert!(
         verif_res.is_complete,
         "Fallback scan over all nodes MUST be complete"
     );
+    assert_eq!(scan, GhostScan::Complete(0));
     assert_eq!(
         verif_res.remaining_ghost_pointers, 0,
-        "Fresh index must have 0 residual ghost pointers to node 0"
+        "Deleted node must have 0 residual ghost pointers"
     );
 
     Ok(())
@@ -114,9 +121,10 @@ async fn test_multiple_deletions_verification_integrity() -> Result<()> {
         assert!(stats.verified_no_ghost_pointers);
     }
 
-    // Direct standalone verification check over remaining graph
-    let verif = mut_index.verify_no_ghost_pointers(0, 100, None);
+    // Direct standalone verification check over remaining graph for deleted node index (e.g. node index 4 for doc 5)
+    let (verif, scan) = mut_index.verify_no_ghost_pointers(4, 100, None);
     assert!(verif.is_complete);
+    assert_eq!(scan, GhostScan::Complete(0));
     assert_eq!(verif.remaining_ghost_pointers, 0);
 
     Ok(())

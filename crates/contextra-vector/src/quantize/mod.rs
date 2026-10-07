@@ -200,7 +200,7 @@ impl ScalarQuantizer {
                 maxes: Vec::new(),
                 scales: Vec::new(),
                 inv_scales: Vec::new(),
-                dimension,
+                dimension: 0,
                 total_queries: AtomicU64::new(0),
                 out_of_range_queries: AtomicU64::new(0),
             }
@@ -226,7 +226,7 @@ impl ScalarQuantizer {
                 maxes: Vec::new(),
                 scales: Vec::new(),
                 inv_scales: Vec::new(),
-                dimension,
+                dimension: 0,
                 total_queries: AtomicU64::new(0),
                 out_of_range_queries: AtomicU64::new(0),
             }

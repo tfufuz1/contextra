@@ -1,2 +1,7 @@
 [alias]
 xtask = "run --manifest-path xtask/Cargo.toml --"
+
+# Hinweis zur Vermeidung von OOM-Kills beim Linken großer Test-Binaries (z.B. plugin_status_tool):
+# Falls lld auf der Zielumgebung/dem CI-Runner nicht installiert ist (-fuse-ld=lld schlägt fehl mit "cannot find 'ld'"),
+# muss CARGO_BUILD_JOBS=1 (oder ein reduzierter Wert) als Umgebungsvariable beim CI-Runner gesetzt werden,
+# um gleichzeitige Link-Jobs zu begrenzen und Kernel-OOM-Kills (Signal 9) zu vermeiden.

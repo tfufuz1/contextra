@@ -236,6 +236,10 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
         crate::cli::checks::run_check_result_dropped_io,
     ),
     (
+        "gc-floor-single-source",
+        crate::cli::checks::run_gc_floor_single_source,
+    ),
+    (
         "check-coverage-gate",
         crate::cli::checks::run_check_coverage_gate,
     ),

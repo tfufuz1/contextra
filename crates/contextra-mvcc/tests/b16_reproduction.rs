@@ -73,7 +73,7 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
     let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
 
     // Register a snapshot guard at past_350s (350s ago > DEFAULT_MAX_PIN_DURATION of 300s)
-    let _guard = registry.register_at(42, past_350s);
+    let _lease = registry.acquire_at(|| 42, past_350s);
 
     let validator =
         SequenceLogSsiValidator::new_with_bounds(10).with_snapshot_registry(registry.clone());
@@ -81,7 +81,8 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
     // Record keys to trigger coarsening check / diagnostic check
     for i in 1..=10 {
         let key = format!("data:{i:02}");
-        validator.record_commit_key(key.as_bytes(), 50 + i as u64);
+        let seq = 50 + u64::try_from(i).unwrap_or(0);
+        validator.record_commit_key(key.as_bytes(), seq);
     }
 
     // Query pruning blocker diagnostics at `now`
