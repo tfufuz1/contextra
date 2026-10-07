@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
+    "crates/contextra-durable-fs",
     "crates/contextra-simd",
     "crates/contextra-core",
     "crates/contextra-store",
@@ -47,6 +48,7 @@ members = [
 default-members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
+    "crates/contextra-durable-fs",
     "crates/contextra-simd",
     "crates/contextra-core",
     "crates/contextra-store",
@@ -119,6 +121,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Workspace crates
 contextra-wire = { path = "crates/contextra-wire" }
 contextra-sys = { path = "crates/contextra-sys" }
+contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
