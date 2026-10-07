@@ -71,15 +71,17 @@ jobs:
 
       - name: "Gate 3: Kein silent let _ für IO-Operationen"
         run: |
-          if grep -rn "let _ = .*sync\|let _ = .*flush\|let _ = .*write" \
-             crates/ --include="*.rs"; then
-            echo "❌ Silent IO-Fehler gefunden — propagiere mit ?"
-            exit 1
-          fi
+          cargo xtask check-result-dropped-io
           cargo clippy --workspace -- \
             -D clippy::unused_must_use \
             -W clippy::let_underscore_must_use
           echo "✅ Keine silent IO-Fehler"
+
+      - name: "Gate: GC Floor Single Source Integrity"
+        run: cargo xtask gc-floor-single-source
+
+      - name: "Gate: Jules Verify"
+        run: cargo xtask jules verify
 
       - name: "Gate 4: axum nicht in contextra-mcp"
         run: |

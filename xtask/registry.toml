@@ -321,6 +321,13 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "gc-floor-single-source"
+owner_tier = "ci-gate"
+summary = "Gate forbidding calls to min_active_seqno() outside GcFloor"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
 name = "check-review-coverage"
 owner_tier = "ci-gate"
 summary = "Subcommand check-review-coverage"
@@ -495,12 +502,6 @@ summary = "Subcommand feature-matrix"
 blocking = true
 phase = "Phase 0"
 
-[[commands]]
-name = "forensic-test"
-owner_tier = "legacy"
-summary = "Subcommand forensic-test"
-blocking = true
-phase = "Phase 0"
 
 [[commands]]
 name = "gate-check"
@@ -572,12 +573,6 @@ summary = "Subcommand hotspot-report"
 blocking = true
 phase = "Phase 0"
 
-[[commands]]
-name = "init-audit-fix"
-owner_tier = "legacy"
-summary = "Subcommand init-audit-fix"
-blocking = true
-phase = "Phase 0"
 
 [[commands]]
 name = "json"
@@ -628,12 +623,6 @@ summary = "Subcommand mutation-score-record"
 blocking = true
 phase = "Phase 0"
 
-[[commands]]
-name = "onnx-test-model"
-owner_tier = "legacy"
-summary = "Subcommand onnx-test-model"
-blocking = true
-phase = "Phase 0"
 
 [[commands]]
 name = "orphan-symbols"
@@ -656,12 +645,6 @@ summary = "Subcommand post-merge-report"
 blocking = true
 phase = "Phase 0"
 
-[[commands]]
-name = "pre-push"
-owner_tier = "legacy"
-summary = "Subcommand pre-push"
-blocking = true
-phase = "Phase 0"
 
 [[commands]]
 name = "prune-branches"
@@ -761,12 +744,6 @@ summary = "Subcommand tag-health"
 blocking = true
 phase = "Phase 0"
 
-[[commands]]
-name = "validate-pr-checklist"
-owner_tier = "legacy"
-summary = "Subcommand validate-pr-checklist"
-blocking = true
-phase = "Phase 0"
 
 [[commands]]
 name = "validate-tags"
