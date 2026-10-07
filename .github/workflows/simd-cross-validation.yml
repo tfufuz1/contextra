@@ -1,3 +1,6 @@
+# Note: `contextra-simd` uses runtime hardware feature detection (`CpuFeatures::detect()`).
+# RUSTFLAGS target-feature overrides do not force dispatch paths.
+# A future prompt ("SIMD-Tests") can add environment variables / features to explicitly override dispatch.
 name: SIMD Cross Validation
 
 on:
@@ -12,18 +15,17 @@ env:
 
 jobs:
   simd-cross-validation:
-    name: SIMD vs Scalar Cross-Validation (${{ matrix.target }}, rustflags="${{ matrix.rustflags }}")
-    runs-on: ubuntu-latest
+    name: SIMD vs Scalar Cross-Validation (${{ matrix.target }}, os="${{ matrix.os }}")
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          # TODO: Add aarch64-unknown-linux-gnu via QEMU / cross runner when QEMU cross-test pattern is established.
-        rustflags:
-          - ""
-          - "-C target-feature=-avx2,-avx512f"
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
 
     permissions:
       contents: read
@@ -39,7 +41,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
+      - name: Check AVX-512 Support (x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          if grep -q -o avx512f /proc/cpuinfo; then
+            echo "::notice title=AVX-512 Execution::AVX-512 hardware features present. AVX-512 SIMD code path was executed."
+          else
+            echo "::notice title=AVX-512 Execution::AVX-512 hardware features missing on runner. Test executed AVX2/Scalar fallback path."
+          fi
+
       - name: Run SIMD Cross-Validation Tests
-        env:
-          RUSTFLAGS: ${{ matrix.rustflags }}
         run: cargo test -p contextra-simd --test simd_cross_validation --target ${{ matrix.target }}
