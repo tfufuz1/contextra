@@ -1,0 +1,17 @@
+id        = "T-2026-0229"
+title     = "loom_quantizer_race_test: Tokio-Runtime-Panic unter Loom diagnostizieren und, falls Harness-Fehler, beheben"
+crate     = "contextra-vector"
+tier      = 1
+risk      = "concurrency"
+goal      = "Klaerung und ggf. Fix des roten Loom-Tests aus dem J-05-Audit."
+non_goals = ["Kein Fix an Produktionscode", "Keine Aenderung an xtask/loom_run.rs", "Keine CI-Verdrahtung"]
+scope     = ["crates/contextra-vector/tests/loom_quantizer_race_test.rs", ".jules/tasks/T-2026-0229.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "crates/contextra-vector/src/**"]
+invariants = ["Kein Produktionscode-Fix ohne menschliche Freigabe"]
+acceptance = ["RUSTFLAGS=\"--cfg loom\" cargo test -p contextra-vector --test loom_quantizer_race_test (grün, Fall A) ODER dokumentierter Befund (Fall B)"]
+evidence_required = ["Panic-/Stacktrace wortwörtlich vor dem Fix", "Lauf nach dem Fix bzw. Fundstelle in Fall B"]
+
+[budget]
+files      = 2
+lines      = 150
+iterations = 5
