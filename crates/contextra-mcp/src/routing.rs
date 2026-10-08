@@ -185,36 +185,36 @@ pub fn setup_kv_bridge(
         }
     };
 
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
+    let data_dir = db
+        .config()
+        .orphan_registry_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let log_path = data_dir.join("kv-revocation.log");
 
-    let col_res = match tokio::runtime::Handle::try_current() {
-        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),
-        Err(_) => {
-            if let Ok(rt) = tokio::runtime::Builder::new_current_thread().build() {
-                rt.block_on(db.collection("default"))
-            } else {
-                return None;
-            }
-        }
-    };
+    let clock: Arc<dyn contextra_ports::Clock> = Arc::new(contextra_ports::SystemClock::new());
 
-    let store = match col_res {
-        Ok(mut col) => {
-            if let Some(existing) = col.kv_store() {
-                Arc::clone(existing)
-            } else {
-                let new_store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
-                if let Some(col_mut) = Arc::get_mut(&mut col) {
-                    col_mut.set_kv_store(Arc::clone(&new_store));
-                }
-                new_store
-            }
-        }
+    // AI-TAG(W1-03, setup_kv_bridge): has_existing_keys is set to false because setup_kv_bridge is invoked during server startup before any active KV cache segments are inserted into memory.
+    let has_existing_keys = false;
+
+    let cipher = match contextra_crypto::KvSegmentCipher::open_durable(
+        master_km,
+        &log_path,
+        clock,
+        has_existing_keys,
+    ) {
+        Ok(c) => Arc::new(c),
         Err(e) => {
-            tracing::warn!("KvBridgeAdapter: Failed to acquire default collection: {e}");
-            Arc::new(contextra_crypto::TenantIsolatedKvStore::new())
+            tracing::error!(
+                "KvBridgeAdapter: Failed to open durable RevocationLog at {}: {e}",
+                log_path.display()
+            );
+            return None;
         }
     };
+
+    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
 
     Some(Arc::new(contextra_infer_candle::KvBridgeAdapter::new(
         store, cipher,
@@ -328,5 +328,33 @@ mod tests {
         assert!(window.chunks.is_empty());
         assert_eq!(window.total_tokens, 0);
         assert!(window.truncated);
+    }
+
+    #[cfg(feature = "kv-bridge")]
+    #[tokio::test]
+    async fn test_setup_kv_bridge_unwritable_log_path_returns_none() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let log_dir_blocker = temp_dir.path().join("kv-revocation.log");
+        std::fs::create_dir_all(&log_dir_blocker).expect("create dir blocker");
+
+        let orphan_file = temp_dir.path().join(".orphan_registry.json");
+        let config = contextra::ContextraConfig {
+            encryption_passphrase: Some("valid-passphrase-123".to_string()),
+            orphan_registry_path: Some(orphan_file),
+            ..Default::default()
+        };
+
+        let db = Arc::new(
+            contextra::Contextra::open_with_config(temp_dir.path(), config)
+                .await
+                .expect("open db"),
+        );
+
+        let bridge = setup_kv_bridge(&db);
+
+        assert!(
+            bridge.is_none(),
+            "setup_kv_bridge MUST return None when log path is unwritable / blocked"
+        );
     }
 }
