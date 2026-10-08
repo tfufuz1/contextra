@@ -675,7 +675,7 @@ pub fn fuse_search_results_with_signal_strategies(
     // --- Phase 1: Lightweight scoring ---
     for (sig_idx, (signal_name, result_set, weight)) in result_sets.iter().enumerate() {
         let weight = *weight;
-        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() { // NAN-CHECK-OK
             continue;
         }
         valid_signal_count += 1;
@@ -752,7 +752,7 @@ pub fn fuse_search_results_with_signal_strategies(
     // --- Phase 2: Materialize FusedEntry strictly for Top-K candidates ---
     for (sig_idx, (signal_name, result_set, weight)) in result_sets.iter().enumerate() {
         let weight = *weight;
-        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() { // NAN-CHECK-OK
             continue;
         }
         let sig_key = SignalKey::from_name(signal_name);
