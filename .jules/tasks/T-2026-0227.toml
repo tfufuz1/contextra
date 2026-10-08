@@ -1,0 +1,17 @@
+id        = "T-2026-0227"
+title     = "drop_collection: Scan-Race- und Kollisionstests aus A-03 implementieren"
+crate     = "contextra-engine"
+tier      = 1
+risk      = "sec"
+goal      = "Die in A-03 textuell beschriebenen Tests T1-T3 als Code verifizieren."
+non_goals = ["Kein Fix für gefundene Race-Bedingungen", "Keine Änderung an drop_collection selbst"]
+scope     = ["crates/contextra-engine/tests/drop_collection_scan_race.rs", "crates/contextra-engine/tests/drop_collection_id_collision.rs", "crates/contextra-engine/tests/drop_collection_layer_coverage.rs", ".jules/tasks/T-2026-0227.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "crates/contextra-engine/src/**", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["INV-DELETION-1", "Keine Testanpassung zur künstlichen Grünfärbung bei Sicherheitsbefund"]
+acceptance = ["cargo test -p contextra-engine --test drop_collection_scan_race", "cargo test -p contextra-engine --test drop_collection_id_collision", "cargo test -p contextra-engine --test drop_collection_layer_coverage", "cargo clippy -p contextra-engine --all-targets -- -D warnings"]
+evidence_required = ["Testausgabe aller drei Tests", "Abgleich mit Audit-Vorhersage, Abweichungen explizit benannt"]
+
+[budget]
+files      = 4
+lines      = 300
+iterations = 6
