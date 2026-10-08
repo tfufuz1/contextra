@@ -1,0 +1,17 @@
+id        = "T-2026-0213"
+title     = "Analyse: drop_collection Scan-Race und collection_id-Kollision"
+crate     = "contextra-engine"
+tier      = 1
+risk      = "sec"
+goal      = "Belegter Bericht zu Q1–Q3, ohne Codeänderung."
+non_goals = ["Keine Codeänderung"]
+scope     = ["docs/audits/drop-collection-race-2026-10.md", ".jules/tasks/T-2026-0213.toml"]
+forbidden = ["crates/**", "Cargo.toml", "Cargo.lock", ".github/**", "xtask/**", "governance/**", "deny.toml", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Doku-Wahrheit", "INV-DELETION-1 (nur lesen)"]
+acceptance = ["cargo xtask gate-guard"]
+evidence_required = ["Liste der gelesenen Dateien"]
+
+[budget]
+files      = 2
+lines      = 250
+iterations = 5
