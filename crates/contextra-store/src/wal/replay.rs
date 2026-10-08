@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation)]
+
 //! FILE-CONTEXT:
 //! STAND: 2026-10-06
 //! ZWECK: Implementierung von WAL-Replay, Mmap-/Stream-Scans, CRC/HMAC-Tail-Truncation und Bak-Recovery.
@@ -11,9 +13,10 @@ use contextra_core::{ContextraError, Result};
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
+#[cfg(feature = "wal-integrity")]
+use super::{legacy_integrity_key, WalOp};
 use super::{
-    legacy_integrity_key, Wal, WalEntry, WalOp, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE,
-    WAL_V2_HEADER, WAL_V3_HEADER,
+    Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
 
 pub type WalSeq = u64;
@@ -106,7 +109,7 @@ impl Wal {
             .collect())
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(dead_code, clippy::type_complexity)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -114,7 +117,7 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(dead_code, clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
         _file_size: u64,
@@ -353,6 +356,7 @@ impl Wal {
         let integrity_key = self.get_integrity_key()?;
         #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
+        #[cfg(feature = "wal-integrity")]
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -368,6 +372,16 @@ impl Wal {
                     pos = 0;
                 }
             }
+        }
+
+        let allow_legacy_fallback = self
+            .allow_legacy_integrity_key_fallback
+            .load(std::sync::atomic::Ordering::SeqCst);
+        if version < self.min_wal_version || (version != WalVersion::V3 && !allow_legacy_fallback) {
+            return Err(ContextraError::Storage(format!(
+                "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
+                version, self.min_wal_version, allow_legacy_fallback
+            )));
         }
 
         'scan_loop: loop {
@@ -728,6 +742,7 @@ impl Wal {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {
         let bak_path = PathBuf::from(format!("{}.{}", wal_path.display(), suffix));
