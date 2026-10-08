@@ -13,12 +13,14 @@ use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
+#[allow(dead_code)]
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 #[cfg(feature = "fault-injection")]
 pub static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+#[allow(dead_code)]
 pub(crate) enum WalCommand {
     Append {
         payload: Vec<u8>,
@@ -109,6 +111,7 @@ impl Default for WalFlusherConfig {
     }
 }
 
+#[allow(dead_code)]
 fn encode_encrypted_rewrite_chunks(
     v3_entries: &[WalEntry],
     km: &crate::wal::KeyManager,
@@ -159,6 +162,7 @@ fn encode_encrypted_rewrite_chunks(
 
 impl Wal {
     /// Enables background flusher actor for processing WAL I/O commands sequentially.
+    #[allow(dead_code)]
     pub(crate) fn enable_flusher_with_config(
         &self,
         mut file: crate::wal::fs::File,
@@ -170,7 +174,10 @@ impl Wal {
             ));
         }
 
-        let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
+        let mut tx_guard = match self.flusher_tx.write() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
         if tx_guard.is_some() {
             return Ok(());
         }
@@ -185,6 +192,7 @@ impl Wal {
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback =
             Arc::clone(&self.allow_legacy_integrity_key_fallback);
+        let min_wal_version = self.min_wal_version;
         let legacy_key_used = Arc::clone(&self.legacy_key_used);
 
         let handle = tokio::spawn(async move {
@@ -740,6 +748,7 @@ impl Wal {
                             fallback_integrity_key,
                             allow_legacy_integrity_key_fallback
                                 .load(std::sync::atomic::Ordering::SeqCst),
+                            min_wal_version,
                             &legacy_key_used,
                             |seq, entry, pos| item_tx.send((seq, entry, pos)).is_ok(),
                         )
