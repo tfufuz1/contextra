@@ -11,7 +11,10 @@ pub(crate) async fn get_tracked(
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
+    let snapshot_seq = _lease.seq_no();
     get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
 }
 
@@ -36,8 +39,11 @@ pub(crate) async fn get_at_seq_tracked(
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
-    let registered_seq = snapshot_seq.min(current_seq);
+    let _lease = storage.snapshot_registry.acquire(|| {
+        let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
+        snapshot_seq.min(current_seq)
+    });
+    let registered_seq = _lease.seq_no();
     storage
         .tx_buffer
         .register_read(tx_id, key.to_vec(), registered_seq);
@@ -49,7 +55,10 @@ pub(crate) async fn scan_prefix_tracked(
     tx_id: contextra_core::TxId,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
+    let snapshot_seq = _lease.seq_no();
     storage
         .tx_buffer
         .register_prefix_read(tx_id, prefix.to_vec(), snapshot_seq);
@@ -64,7 +73,10 @@ pub(crate) async fn scan_prefix_tracked(
 
 pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
+    let snapshot_seq = _lease.seq_no();
     let res = storage.get_at_seq(key, snapshot_seq).await?;
     tracing::debug!(
         "LsmStorage::get key={:?} seq={} found={}",
@@ -81,6 +93,7 @@ pub(super) async fn get_at_seq(
     seq_no: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
+    let _lease = storage.snapshot_registry.acquire(|| seq_no);
     storage.compaction_engine.record_read_op();
     // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
     let snapshot_tx = storage.last_committed_tx.load(Ordering::Acquire);
@@ -149,7 +162,11 @@ pub(super) async fn scan_prefix(
     storage: &LsmStorage,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    storage.scan_prefix_at(prefix, u64::MAX).await
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
+    let snapshot_seq = _lease.seq_no();
+    storage.scan_prefix_at(prefix, snapshot_seq).await
 }
 
 pub(super) async fn scan_prefix_bounded(
@@ -158,6 +175,9 @@ pub(super) async fn scan_prefix_bounded(
     limit: usize,
     cursor: Option<&[u8]>,
 ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
     let cur_bytes = cursor.map(Bytes::copy_from_slice);
 
     let map = storage
@@ -220,6 +240,7 @@ pub(super) async fn scan_prefix_at(
     prefix: &[u8],
     seq_no: u64,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let _lease = storage.snapshot_registry.acquire(|| seq_no);
     let map = storage
         .collect_visible_entries(
             SstableScanMode::Prefix(prefix),
@@ -248,6 +269,10 @@ pub(super) async fn scan_bounded(
     cursor: Option<&[u8]>,
 ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
     use std::ops::Bound;
+
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
 
     let effective_start = match cursor {
         Some(c) => Bound::Excluded(c),
@@ -303,6 +328,9 @@ pub(super) async fn scan(
     end: std::ops::Bound<&[u8]>,
     limit: Option<usize>,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let _lease = storage
+        .snapshot_registry
+        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
     let map = storage
         .collect_visible_entries(
             SstableScanMode::Range(start, end),

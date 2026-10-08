@@ -6,7 +6,7 @@ use contextra_core::{
     VectorIndexStats,
 };
 
-use super::batch::{BatchContext, SearchContext};
+use super::batch::{BatchContext, PreparedInsert, SearchContext};
 use super::config::validate_vector;
 use super::sq8_bias::Sq8Bias;
 use super::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
@@ -180,7 +180,10 @@ impl VectorIndex for HnswIndex {
                     }
                 }
             }
-            let doc_id = self.inner.resolve_doc_id(c.index, &ctx)?;
+            let doc_id = match self.inner.resolve_doc_id(c.index, &ctx) {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
 
             let final_dist = if self.inner.cold.config.quantize {
                 self.inner.resolve_dist(c.index, query, None, &ctx)?
@@ -253,83 +256,161 @@ impl VectorIndex for HnswIndex {
         }
         let _lock = self.inner.hot.write_mutex.lock();
         let ops = self.inner.cold.tx_buffer.drain(tx);
+        if ops.is_empty() {
+            return Ok(());
+        }
 
-        if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
-            let mut train_data = Vec::with_capacity(256.min(ops.len()));
+        // Phase 1: Op Normalization and Validation in Stage Order
+        let mut doc_order: Vec<DocId> = Vec::new();
+        let mut last_op_map: ahash::AHashMap<DocId, IndexOp<Vec<f32>>> = ahash::AHashMap::new();
+
+        let norm_res: Result<()> = (|| {
             for op in &ops {
-                if let IndexOp::Insert { data, .. } = op {
-                    train_data.push(data.clone());
-                    if train_data.len() >= 256 {
-                        break;
+                let doc_id = match op {
+                    IndexOp::Insert { doc_id, data } => {
+                        if data.len() != self.inner.cold.config.dimension {
+                            return Err(ContextraError::invalid_input(format!(
+                                "Dimension mismatch: expected {}, got {}",
+                                self.inner.cold.config.dimension,
+                                data.len()
+                            )));
+                        }
+                        validate_vector(data)?;
+                        *doc_id
                     }
+                    IndexOp::Delete { doc_id, .. } => *doc_id,
+                    other => {
+                        return Err(ContextraError::Index(format!(
+                            "HNSW commit received unsupported IndexOp variant: {:?}. \
+                             Add a handler arm before enabling this operation.",
+                            std::mem::discriminant(other)
+                        )));
+                    }
+                };
+
+                if !last_op_map.contains_key(&doc_id) {
+                    doc_order.push(doc_id);
+                }
+                last_op_map.insert(doc_id, op.clone());
+            }
+            Ok(())
+        })();
+
+        if let Err(err) = norm_res {
+            for op in ops {
+                if let Err(stage_err) = self.inner.cold.tx_buffer.stage(tx, op) {
+                    return Err(ContextraError::Index(format!(
+                        "Failed to re-stage operations for tx {} after validation failure ({err}): {stage_err}",
+                        tx.inner()
+                    )));
                 }
             }
+            return Err(err);
+        }
 
-            if train_data.len() < 256 {
-                let nodes = self.inner.hot.nodes.read();
-                for node in nodes.iter() {
-                    if let VectorData::F32(v) = &node.vector {
-                        train_data.push(v.clone());
+        // Phase 2: Quantizer Training (if needed) & Preparation of Inserts / Deletes
+        let prep_res: Result<(Vec<PreparedInsert>, Vec<(usize, DocId)>)> = (|| {
+            if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
+                let mut train_data = Vec::with_capacity(256.min(doc_order.len()));
+                for doc_id in &doc_order {
+                    if let Some(IndexOp::Insert { data, .. }) = last_op_map.get(doc_id) {
+                        train_data.push(data.clone());
                         if train_data.len() >= 256 {
                             break;
                         }
                     }
                 }
-            }
 
-            if train_data.len() >= 50 {
-                let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let q = crate::quantize::ScalarQuantizer::train(
-                    &training_refs,
-                    self.inner.cold.config.dimension,
-                );
-                let bias =
-                    Sq8Bias::calibrate(&training_refs, &q, self.inner.cold.config.distance_metric);
-                *self.inner.cold.quantizer.write() = Some(q.clone());
-                *self.inner.cold.sq8_bias.write() = bias;
+                if train_data.len() < 256 {
+                    let nodes = self.inner.hot.nodes.read();
+                    for node in nodes.iter() {
+                        if let VectorData::F32(v) = &node.vector {
+                            train_data.push(v.clone());
+                            if train_data.len() >= 256 {
+                                break;
+                            }
+                        }
+                    }
+                }
 
-                let mut nodes = self.inner.hot.nodes.write();
-                for node in nodes.iter_mut() {
-                    if let VectorData::F32(v) = &node.vector {
-                        node.vector = VectorData::U8(q.quantize(v)?);
+                if train_data.len() >= 50 {
+                    let training_refs: Vec<&[f32]> =
+                        train_data.iter().map(|v| v.as_slice()).collect();
+                    let q = crate::quantize::ScalarQuantizer::try_train(
+                        &training_refs,
+                        self.inner.cold.config.dimension,
+                    )?;
+                    let bias = Sq8Bias::calibrate(
+                        &training_refs,
+                        &q,
+                        self.inner.cold.config.distance_metric,
+                    );
+                    *self.inner.cold.quantizer.write() = Some(q.clone());
+                    *self.inner.cold.sq8_bias.write() = bias;
+
+                    let mut nodes = self.inner.hot.nodes.write();
+                    for node in nodes.iter_mut() {
+                        if let VectorData::F32(v) = &node.vector {
+                            node.vector = VectorData::U8(q.quantize(v)?);
+                        }
                     }
                 }
             }
-        }
 
-        let mut prepared_inserts = Vec::new();
-        let mut deletes_to_apply = Vec::new();
-        let mut batch_ctx = BatchContext::new(&self.inner);
+            let mut prepared_inserts = Vec::new();
+            let mut deletes_to_apply = Vec::new();
+            let mut batch_ctx = BatchContext::new(&self.inner);
 
-        for op in &ops {
-            match op {
-                IndexOp::Insert { doc_id, data } => {
-                    let prepared = self.inner.compute_insert_with_context(
-                        *doc_id,
-                        data,
-                        prepared_inserts.len(),
-                        &mut prepared_inserts,
-                        &mut batch_ctx,
-                    )?;
-                    prepared_inserts.push(prepared);
-                }
-                IndexOp::Delete { doc_id, .. } => {
-                    deletes_to_apply.push(*doc_id);
-                }
-                other => {
-                    return Err(ContextraError::Index(format!(
-                        "HNSW commit received unsupported IndexOp variant: {:?}. \
-                         Add a handler arm before enabling this operation.",
-                        std::mem::discriminant(other)
-                    )));
+            for doc_id in &doc_order {
+                let Some(op) = last_op_map.get(doc_id) else {
+                    continue;
+                };
+                match op {
+                    IndexOp::Insert { doc_id, data } => {
+                        if let Some(&old_idx) =
+                            self.inner.hot.doc_to_node.read().get(&doc_id.inner())
+                        {
+                            deletes_to_apply.push((old_idx, *doc_id));
+                        }
+                        let prepared = self.inner.compute_insert_with_context(
+                            *doc_id,
+                            data,
+                            prepared_inserts.len(),
+                            &mut prepared_inserts,
+                            &mut batch_ctx,
+                        )?;
+                        prepared_inserts.push(prepared);
+                    }
+                    IndexOp::Delete { doc_id, .. } => {
+                        if let Some(&old_idx) =
+                            self.inner.hot.doc_to_node.read().get(&doc_id.inner())
+                        {
+                            deletes_to_apply.push((old_idx, *doc_id));
+                        }
+                    }
+                    _ => unreachable!(),
                 }
             }
-        }
 
-        for doc_id in deletes_to_apply {
-            self.inner.do_delete(doc_id)?;
-        }
+            Ok((prepared_inserts, deletes_to_apply))
+        })();
 
+        let (prepared_inserts, deletes_to_apply) = match prep_res {
+            Ok(res) => res,
+            Err(err) => {
+                for op in ops {
+                    if let Err(stage_err) = self.inner.cold.tx_buffer.stage(tx, op) {
+                        return Err(ContextraError::Index(format!(
+                            "Failed to re-stage operations for tx {} after preparation failure ({err}): {stage_err}",
+                            tx.inner()
+                        )));
+                    }
+                }
+                return Err(err);
+            }
+        };
+
+        // Phase 3: Apply Mutations (Atomic execution once preparation succeeded)
         let seq = tx.inner();
         let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
         for prepared in prepared_inserts {
@@ -337,8 +418,23 @@ impl VectorIndex for HnswIndex {
             self.inner.apply_insert(prepared, seq)?;
         }
 
+        let mut doc_map = self.inner.hot.doc_to_node.write();
+        for (old_idx, doc_id) in &deletes_to_apply {
+            if doc_map.get(&doc_id.inner()) == Some(old_idx) {
+                doc_map.remove(&doc_id.inner());
+            }
+        }
+        drop(doc_map);
+
+        for (old_idx, doc_id) in deletes_to_apply {
+            self.inner.do_delete_node_idx(old_idx, doc_id)?;
+        }
+
         let mut seq_log = self.inner.cold.seq_log.write();
-        for op in &ops {
+        for doc_id in &doc_order {
+            let Some(op) = last_op_map.get(doc_id) else {
+                continue;
+            };
             match op {
                 IndexOp::Insert { doc_id, .. } => {
                     seq_log.record_insert(*doc_id, seq);
@@ -565,5 +661,18 @@ impl VectorIndex for HnswIndex {
             deleted_ratio: self.inner.deleted_ratio(),
             rebuild_count: self.inner.rebuild_count(),
         })
+    }
+}
+
+impl HnswIndex {
+    /// Returns a reference to the inner core structure.
+    pub fn inner_core(&self) -> &std::sync::Arc<super::types::HnswIndexCore> {
+        &self.inner
+    }
+
+    /// Returns a clone of the vector data at `ram_idx` in process RAM (for testing).
+    pub fn ram_vector_at(&self, ram_idx: usize) -> Option<super::types::VectorData> {
+        let nodes = self.inner.hot.nodes.read();
+        nodes.get(ram_idx).map(|n| n.vector.clone())
     }
 }

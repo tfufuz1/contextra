@@ -1,0 +1,29 @@
+id                = "T-2026-0007"
+title             = "P07: Lint-Ausnahmen aufräumen und SIMD Kernel Encapsulation mit CpuFeatures"
+crate             = "contextra-simd"
+tier              = 1
+risk              = "simd"
+goal              = "Entfernen der Lint-Ausnahmen in contextra-simd und contextra-wire sowie Einkapselung der Kernel-Funktionen hinter CpuFeatures Token."
+non_goals         = ["Keine neuen SIMD-Kernels", "Keine Performance-Änderung ohne Bench-Nachweis", "Keine Änderungen außerhalb des freigegebenen Scopes"]
+scope             = [
+  "crates/contextra-simd/**",
+  "crates/contextra-wire/**",
+  "benchmarks/contextra-bench/**",
+  "crates/contextra-mvcc/**",
+  "crates/contextra-core/**",
+  ".jules/tasks/P07.toml"
+]
+forbidden         = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants        = ["Zero-Panic", "Unsafe Islands Only", "RC-7"]
+acceptance        = [
+  "cargo test -p contextra-simd --locked",
+  "cargo test -p contextra-wire --locked",
+  "cargo clippy -p contextra-simd -p contextra-wire -- -D warnings",
+  "cargo xtask check-unsafe-islands"
+]
+evidence_required = ["Cross validation tests and CpuFeatures compile_fail doctest passing"]
+
+[budget]
+files      = 10
+lines      = 300
+iterations = 5

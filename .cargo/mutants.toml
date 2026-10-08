@@ -1,10 +1,4 @@
-# Configuration for cargo-mutants scoped to Tier-0/1 crates
-
-examine_globs = [
-    "crates/contextra-crypto/src/**/*.rs",
-    "crates/contextra-store/src/**/*.rs",
-    "crates/contextra-checkpoint/src/**/*.rs",
-]
+# Configuration for cargo-mutants
 
 exclude_globs = [
     "**/tests/**",
@@ -16,16 +10,8 @@ exclude_globs = [
     "**/*_generated.rs",
 ]
 
-test_package = [
-    "contextra-crypto",
-]
-
 copy_target = true
 output = "target"
-
-additional_cargo_args = [
-    "--lib",
-]
 
 additional_cargo_test_args = [
     "--",

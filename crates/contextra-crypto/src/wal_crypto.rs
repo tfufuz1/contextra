@@ -273,17 +273,20 @@ impl IntegrityVerifier {
         let tx_id_bytes = entry.tx_id.to_le_bytes();
         mac.update(&tx_id_bytes);
 
+        let key_len_u32 = u32::try_from(entry.key.len()).unwrap_or(u32::MAX);
+        let val_len_u32 = u32::try_from(entry.value.len()).unwrap_or(u32::MAX);
+
         if entry.op_type == 0 {
             // Put
             mac.update(&[0u8]);
-            mac.update(&(entry.key.len() as u32).to_le_bytes());
+            mac.update(&key_len_u32.to_le_bytes());
             mac.update(&entry.key);
-            mac.update(&(entry.value.len() as u32).to_le_bytes());
+            mac.update(&val_len_u32.to_le_bytes());
             mac.update(&entry.value);
         } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
-            mac.update(&(entry.key.len() as u32).to_le_bytes());
+            mac.update(&key_len_u32.to_le_bytes());
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd

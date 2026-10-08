@@ -8,12 +8,18 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: prune-branches-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   prune:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: write
     if: github.event_name != 'pull_request'
     steps:
       - name: Checkout repository
@@ -23,21 +29,45 @@ jobs:
 
       - name: Run prune script
         run: |
-          # Führt das Skript im schreibenden Modus aus (z.B. mit --apply, falls standardmäßig Dry-Run)
+          if [ ! -f "scripts/prune_remote_branches.sh" ]; then
+            echo "❌ Erwartetes Skript 'scripts/prune_remote_branches.sh' existiert nicht im Repository!"
+            exit 1
+          fi
           bash scripts/prune_remote_branches.sh --apply
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   overlap-report:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Check branch file overlap
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          if [ -z "$HEAD_REF" ]; then
+            echo "❌ HEAD_REF ist leer!"
+            exit 1
+          fi
+          if [[ ! "$HEAD_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "❌ Ungültiges HEAD_REF Format: '$HEAD_REF'. Erwartet: ^[A-Za-z0-9._/-]+$"
+            exit 1
+          fi
+          if [ ! -f "scripts/check_branch_overlap.sh" ]; then
+            echo "❌ Erwartetes Skript 'scripts/check_branch_overlap.sh' existiert nicht im Repository!"
+            echo "Erwartete Skript-Spezifikation:"
+            echo "  - Pfad: scripts/check_branch_overlap.sh"
+            echo "  - Eingabe: \$1 = Branch-Name (\$HEAD_REF)"
+            echo "  - Ausgabe: Analyse bezüglich Datei- und Scope-Überschneidungen mit aktiven Claims"
+            echo "  - Exit-Codes: 0 bei keinem Overlap (oder erfolgreichem Check), non-zero bei Fehler/Überschneidung"
+            exit 1
+          fi
           git fetch origin --prune
-          bash scripts/check_branch_overlap.sh "${{ github.head_ref }}"
+          bash scripts/check_branch_overlap.sh "$HEAD_REF"
         continue-on-error: true  # Advisory only, kein Merge-Block

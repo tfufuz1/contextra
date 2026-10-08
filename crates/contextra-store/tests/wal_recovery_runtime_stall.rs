@@ -53,6 +53,9 @@ async fn test_wal_recovery_linear_throughput_no_runtime_stall() {
         writer.write_all(&WAL_V3_HEADER).expect("write header");
 
         let integrity_key = [0u8; 32];
+        let key_path = dir.path().join(".wal_integrity_key");
+        std::fs::write(&key_path, &integrity_key).expect("write integrity key file");
+
         let mut prev_hmac = [0u8; 32];
 
         for i in 1..=TOTAL_ENTRIES {

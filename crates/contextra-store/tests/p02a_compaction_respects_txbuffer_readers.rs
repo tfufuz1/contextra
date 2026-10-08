@@ -5,6 +5,7 @@
 
 use contextra_core::{ResourceTracker, SnapshotRegistry, TxBuffer, TxId, TOMBSTONE_BIT};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
+use contextra_store::lsm::GcFloor;
 use contextra_store::sstable::{create_block_cache_with_shards, SstableBuilder, SstableReader};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -27,15 +28,20 @@ async fn test_compaction_respects_txbuffer_active_reader() {
         ..Default::default()
     };
 
+    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> = Arc::new(GcFloor::new(
+        Arc::clone(&snapshot_registry),
+        Arc::clone(&tx_buffer),
+        Arc::new(std::sync::atomic::AtomicU64::new(100)),
+    ));
+
     let engine = CompactionEngine::new(
         comp_config,
-        Arc::clone(&snapshot_registry),
+        gc_floor,
         Arc::clone(&block_cache),
         None,
         budget,
         None,
-    )
-    .with_tx_buffer(Arc::clone(&tx_buffer));
+    );
 
     // SSTable 1: Put(50) for key K = "key_k"
     let sst_path_1 = dir_path.join("sst1.sst");
@@ -126,15 +132,20 @@ async fn test_compaction_without_active_readers_purges_tombstone() {
         ..Default::default()
     };
 
+    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> = Arc::new(GcFloor::new(
+        Arc::clone(&snapshot_registry),
+        Arc::clone(&tx_buffer),
+        Arc::new(std::sync::atomic::AtomicU64::new(100)),
+    ));
+
     let engine = CompactionEngine::new(
         comp_config,
-        Arc::clone(&snapshot_registry),
+        gc_floor,
         Arc::clone(&block_cache),
         None,
         budget,
         None,
-    )
-    .with_tx_buffer(Arc::clone(&tx_buffer));
+    );
 
     // SSTable 1: Put(50) for key K = "key_k"
     let sst_path_1 = dir_path.join("sst1.sst");

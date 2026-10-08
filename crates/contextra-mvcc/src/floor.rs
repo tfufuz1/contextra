@@ -6,6 +6,12 @@ use std::sync::Arc;
 use crate::snapshot::SnapshotRegistry;
 use crate::tx_buffer::TxBuffer;
 
+/// Untergrenze für GC.
+pub trait SnapshotFloor: Send + Sync {
+    /// Untergrenze für GC.
+    fn floor(&self) -> u64;
+}
+
 /// Calculator for the MVCC garbage collection sequence floor.
 ///
 /// Ensures tombstone GC never purges entries at or above the floor sequence number.

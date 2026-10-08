@@ -15,6 +15,7 @@ use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
 use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
+use contextra_mvcc::snapshot::SnapshotFloor;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -34,18 +35,19 @@ pub struct LsmStorage {
     pub(super) state: RwLock<LsmState>,
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
-    pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
+    pub(super) tx_buffer: Arc<TxBuffer<(Vec<u8>, Vec<u8>)>>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
+    pub floor: Arc<dyn SnapshotFloor>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
-    pub(super) last_applied_seq: AtomicU64,
+    pub(super) last_applied_seq: Arc<AtomicU64>,
     pub(super) flush_notify: Arc<tokio::sync::Notify>,
     pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).

@@ -20,10 +20,7 @@ async fn test_partial_tail_crc_mismatch_truncates_and_opens() {
         value: b"value2".to_vec(),
     };
 
-    let (batch, _) = wal
-        .prepare_batch(vec![(op1, 1), (op2, 2)])
-        .await
-        .unwrap();
+    let (batch, _) = wal.prepare_batch(vec![(op1, 1), (op2, 2)]).await.unwrap();
     wal.append_batch(batch).await.unwrap();
     wal.close().await.unwrap();
 
@@ -55,7 +52,10 @@ async fn test_partial_tail_crc_mismatch_truncates_and_opens() {
 
     // Physical file size should be truncated back to valid_len
     let final_len = std::fs::metadata(&wal_path).unwrap().len();
-    assert_eq!(final_len, valid_len, "File should be truncated to valid length");
+    assert_eq!(
+        final_len, valid_len,
+        "File should be truncated to valid length"
+    );
 }
 
 #[tokio::test]

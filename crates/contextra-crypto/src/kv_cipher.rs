@@ -112,6 +112,36 @@ impl KvSegmentCipher {
         }
     }
 
+    /// Opens or creates a durable `KvSegmentCipher` backed by a file-based `RevocationLog` at `log_path`.
+    ///
+    /// Derives the Ed25519 signing key for the revocation log deterministically from `master_km`
+    /// via HKDF domain separation (`derive_segment_key("contextra-kv-revocation-log-ed25519-v1")`)
+    /// before storing `master_km`.
+    pub fn open_durable(
+        master_km: KeyManager,
+        log_path: impl AsRef<std::path::Path>,
+        clock: Arc<dyn contextra_ports::Clock>,
+        has_existing_keys: bool,
+    ) -> Result<Self> {
+        let sub_km = master_km.derive_segment_key("contextra-kv-revocation-log-ed25519-v1")?;
+        let key_bytes = *sub_km.raw_key_bytes();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&key_bytes);
+        let verifying_key = signing_key.verifying_key();
+
+        let registry = KeyRegistry::open_durable(
+            log_path,
+            clock,
+            Some(signing_key),
+            verifying_key,
+            has_existing_keys,
+        )?;
+
+        Ok(Self {
+            key_manager: master_km,
+            registry,
+        })
+    }
+
     /// Attaches a `RevocationLog` to the underlying `KeyRegistry`.
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         self.registry = self.registry.with_revocation_log(log);

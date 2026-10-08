@@ -3,27 +3,50 @@ name: Unwrap Gate
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   unwrap-gate:
     name: Production Unwrap Counter Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Count Production Unwraps
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Count Production Unwraps and Check Baseline
         run: |
-          COUNT=$(grep -r '\.unwrap()\|\.expect(' crates/ --include="*.rs" \
-            | grep -v '/tests' | grep -v '/test' | grep -v '/bench' \
-            | grep -v '#\[cfg(test)\]' | wc -l)
-          echo "Production unwrap/expect count: $COUNT"
-          BASELINE=$(cat .github/unwrap_baseline.txt 2>/dev/null || echo 99999)
+          if [ ! -f .github/unwrap_baseline.txt ]; then
+            echo "::error::Baseline file .github/unwrap_baseline.txt missing"
+            exit 1
+          fi
+
+          BASELINE=$(tr -d '\r\n ' < .github/unwrap_baseline.txt)
+          if ! [[ "$BASELINE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Baseline file .github/unwrap_baseline.txt does not contain a valid integer: '$BASELINE'"
+            exit 1
+          fi
+
+          OUTPUT=$(cargo xtask panic-inventory --exclude-tests)
+          echo "$OUTPUT"
+          COUNT=$(echo "$OUTPUT" | grep -oP '\d+(?= panic entries found)')
+          echo "Production panic/unwrap count: $COUNT"
+
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Production unwrap count increased from $BASELINE to $COUNT"
             exit 1
+          elif [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::Production unwrap count decreased from $BASELINE to $COUNT (ratchet condition met)"
+          else
+            echo "Production unwrap count matches baseline ($BASELINE)"
           fi
