@@ -4,7 +4,44 @@ use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::sync::Arc;
 
+/// Derives a [`CollectionId`] from a raw `u64` hash prefix value.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`](contextra_types::ContextraError::InvalidInput) if `prefix` is 0.
+pub fn collection_id_from_hash_prefix(prefix: u64) -> Result<CollectionId> {
+    CollectionId::try_new(prefix)
+}
+
+/// Derives a [`CollectionId`] deterministically from a collection name using the first 8 bytes of BLAKE3 hash.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`](contextra_types::ContextraError::InvalidInput) if `name` is empty or if derived ID is 0.
+pub fn derive_collection_id(name: &str) -> Result<CollectionId> {
+    if name.is_empty() {
+        return Err(contextra_types::ContextraError::invalid_input(
+            "Collection name cannot be empty",
+        ));
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(name.as_bytes());
+    let hash_bytes = hasher.finalize();
+    let col_id_u64 =
+        u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().map_err(|_| {
+            contextra_types::ContextraError::invalid_input("Hash truncation failed")
+        })?);
+    collection_id_from_hash_prefix(col_id_u64)
+}
+
 impl Contextra {
+    /// Derives a [`CollectionId`] from a raw `u64` hash prefix value.
+    pub fn collection_id_from_hash_prefix(prefix: u64) -> Result<CollectionId> {
+        collection_id_from_hash_prefix(prefix)
+    }
+
+    /// Derives a [`CollectionId`] deterministically from a collection name using BLAKE3.
+    pub fn derive_collection_id(name: &str) -> Result<CollectionId> {
+        derive_collection_id(name)
+    }
     pub async fn collection_for_tenant(
         &self,
         name: &str,
@@ -309,6 +346,8 @@ impl Contextra {
             ));
         }
 
+        let collection_id = derive_collection_id(name)?;
+
         let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
             self.storage.clone(),
             tenant_id,
@@ -362,13 +401,6 @@ impl Contextra {
         let remaining_txt_data = tenant_storage
             .scan_prefix(txt_data_prefix.as_bytes())
             .await?;
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(name.as_bytes());
-        let hash_bytes = hasher.finalize();
-        let col_id_u64 =
-            u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().unwrap_or([1; 8]));
-        let collection_id = CollectionId::try_new(col_id_u64).unwrap_or(CollectionId::new(1));
 
         let scope = DeletionScope::Collection {
             collection_id,

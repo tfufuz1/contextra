@@ -1,0 +1,17 @@
+id        = "T-2026-0233"
+title     = "drop_collection: CollectionId fail-closed und vor der Löschung ableiten"
+crate     = "contextra-engine"
+tier      = 1
+risk      = "sec"
+goal      = "Kein stiller Fallback auf CollectionId 1; Ableitungsfehler löschen nichts."
+non_goals = ["Keine Änderung an Scan-/Proof-Logik", "Kein Umbau auf persistente Collection-IDs (nur melden)"]
+scope     = ["crates/contextra-engine/src/contextra_impl/collections.rs", "crates/contextra-engine/tests/drop_collection_id_derivation.rs", ".jules/tasks/T-2026-0233.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**", "crates/contextra-crypto/**", "crates/contextra-store/**"]
+invariants = ["Zero-Panic", "INV-DELETION-1", "Fail-Closed vor destruktiver Operation"]
+acceptance = ["cargo test -p contextra-engine --test drop_collection_id_derivation", "cargo clippy -p contextra-engine --all-targets -- -D warnings"]
+evidence_required = ["Rote Tests vor dem Fix", "Nachweis, dass W3-01-Tests unverändert grün sind"]
+
+[budget]
+files      = 3
+lines      = 200
+iterations = 5
