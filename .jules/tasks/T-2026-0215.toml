@@ -1,0 +1,17 @@
+id        = "T-2026-0215"
+title     = "Analyse: Inventar der Löschaussagen in Doku und README"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "sec"
+goal      = "Vollständige Tabelle der Löschaussagen mit Einstufung und Vorschlag, ohne Doku-Änderung."
+non_goals = ["Keine Doku-Änderung", "Keine rechtliche Bewertung"]
+scope     = ["docs/audits/deletion-claims-inventory-2026-10.md", ".jules/tasks/T-2026-0215.toml"]
+forbidden = ["README.md", "docs/spec/**", "docs/decisions/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/**", "xtask/**", "governance/**", "deny.toml", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Doku-Wahrheit"]
+acceptance = ["cargo xtask doc-truth"]
+evidence_required = ["rg-Befehl und Trefferzahl im PR"]
+
+[budget]
+files      = 2
+lines      = 400
+iterations = 4
