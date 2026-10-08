@@ -417,6 +417,55 @@ impl CompactionEngine {
         .await
     }
 
+    /// Helper to fetch next item from source stream and push to heap.
+    async fn fetch_next_entry<T: Send>(
+        source_idx: usize,
+        streams: &mut [crate::sstable::SstableStream],
+        heap: &mut std::collections::BinaryHeap<T>,
+    ) -> Result<()>
+    where
+        T: Ord,
+        T: From<(bytes::Bytes, bytes::Bytes, u64, u64, usize)>,
+    {
+        if let Some((key, value, seq, tx)) = streams[source_idx].next_entry().await? {
+            heap.push(T::from((key, value, seq, tx, source_idx)));
+        }
+        Ok(())
+    }
+
+    /// Writes a single SSTable entry and applies token-bucket I/O rate limiting.
+    async fn write_entry_with_rate_limit(
+        &self,
+        builder: &mut SstableBuilder,
+        key: &bytes::Bytes,
+        value: &bytes::Bytes,
+        seq: u64,
+        tx: u64,
+        io_bytes_written: &mut u64,
+        io_last_reset: &mut std::time::Instant,
+    ) -> Result<()> {
+        let entry_bytes = (key.len() + value.len() + 16) as u64;
+        builder.add(key, value, seq, tx).await?;
+
+        if let Some(max_bps) = self.config.max_io_bytes_per_second {
+            if max_bps > 0 {
+                *io_bytes_written += entry_bytes;
+                let elapsed = io_last_reset.elapsed();
+                let target =
+                    std::time::Duration::from_secs_f64(*io_bytes_written as f64 / max_bps as f64);
+                if target > elapsed {
+                    let delay = (target - elapsed).min(std::time::Duration::from_millis(100));
+                    tokio::time::sleep(delay).await;
+                    let total_elapsed = io_last_reset.elapsed();
+                    let allowed_bytes = (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
+                    *io_bytes_written = io_bytes_written.saturating_sub(allowed_bytes);
+                    *io_last_reset = std::time::Instant::now();
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Performs a multi-way merge with an optional cancellation token.
     pub async fn merge_sstables_with_cancel(
         &self,
@@ -465,6 +514,18 @@ impl CompactionEngine {
             seq: u64,
             tx: u64,
             source_idx: usize,
+        }
+
+        impl From<(bytes::Bytes, bytes::Bytes, u64, u64, usize)> for HeapItem {
+            fn from(tuple: (bytes::Bytes, bytes::Bytes, u64, u64, usize)) -> Self {
+                Self {
+                    key: tuple.0,
+                    value: tuple.1,
+                    seq: tuple.2,
+                    tx: tuple.3,
+                    source_idx: tuple.4,
+                }
+            }
         }
 
         impl PartialEq for HeapItem {
@@ -528,7 +589,7 @@ impl CompactionEngine {
         let mut io_token_bytes_written: u64 = 0;
         let mut io_token_last_reset = std::time::Instant::now();
 
-        while let Some(item) = heap.pop() {
+        while let Some(current_item) = heap.pop() {
             if let Some(ct) = cancel_token {
                 if ct.is_cancelled() {
                     return Err(contextra_core::ContextraError::Internal(
@@ -540,8 +601,6 @@ impl CompactionEngine {
             processed_count += 1;
             if processed_count % self.config.yield_threshold == 0 {
                 // PERF-3: System Pressure-Awareness
-                // Check pressure_rx at batch boundaries between merge iterations.
-                // Critical pressure level triggers a 50ms backpressure sleep delay to reduce NVMe / CPU contention.
                 if let Some(ref pressure_rx) = self.pressure_rx {
                     let level = pressure_rx.borrow().pressure_level;
                     if level == crate::system_pressure::PressureLevel::Critical {
@@ -553,7 +612,6 @@ impl CompactionEngine {
                 }
 
                 // FIND-STO-002: Budgeted Compaction
-                // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
                     let wait_start = std::time::Instant::now();
                     while !self.budget.has_memory_capacity() {
@@ -581,48 +639,74 @@ impl CompactionEngine {
                         tracing::warn!("Compaction engine paused due to memory budget exhaustion.");
                         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                     }
-                    // Yield after blocking to give other tasks a fair chance
                     tokio::task::yield_now().await;
                 }
-                // When budget is fine: no yield, just continue — the budget check above
-                // already provided cooperative scheduling opportunities via the sleep loop.
             }
 
-            let is_tombstone = (item.seq & TOMBSTONE_BIT) != 0;
-            let raw_seq = item.seq & !TOMBSTONE_BIT;
+            // Immediately advance stream for popped item to maintain global heap invariant
+            Self::fetch_next_entry(current_item.source_idx, &mut streams, &mut heap).await?;
 
-            if last_key.as_ref() != Some(&item.key) {
+            let is_tombstone = (current_item.seq & TOMBSTONE_BIT) != 0;
+            let raw_seq = current_item.seq & !TOMBSTONE_BIT;
+
+            if last_key.as_ref() != Some(&current_item.key) {
                 floor_emitted = false;
             }
 
-            let mut merged = false;
-            let mut failed_merge_keep = false;
+            // AI-TAG[BOUND_UNIFICATION]
+            // Standardize boundary check for version retention and multi-way merging to `<=` min_snapshot_seq.
+            // Versions strictly greater than min_snapshot_seq are visible to active/future snapshots and must remain separate.
+            // Versions `<= min_snapshot_seq` belong to the floor and are candidates for folding into a single entry.
+            if raw_seq > min_snapshot_seq {
+                // Version is above floor: keep as separate entry
+                let should_gc_tombstone =
+                    is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
+                if !should_gc_tombstone {
+                    self.write_entry_with_rate_limit(
+                        &mut builder,
+                        &current_item.key,
+                        &current_item.value,
+                        current_item.seq,
+                        current_item.tx,
+                        &mut io_token_bytes_written,
+                        &mut io_token_last_reset,
+                    )
+                    .await?;
+                }
+                last_key = Some(current_item.key.clone());
+            } else if !floor_emitted {
+                // Version is at or below the floor (raw_seq <= min_snapshot_seq) AND floor has not been emitted yet.
+                // Exhaust and fold ALL remaining versions for this key `<= min_snapshot_seq` into a single entry.
+                let mut acc_val = current_item.value.clone();
+                let acc_seq = current_item.seq;
+                let acc_tx = current_item.tx;
+                let is_acc_tombstone = is_tombstone;
+                let mut merge_failed = false;
 
-            // MergeOperator logic:
-            // 1. key_manager MUST be None (encrypted values cannot be merged as raw bytes).
-            //    Note: If encryption is enabled (key_manager.is_some()), values are encrypted
-            //    ciphertexts and cannot be merged by a raw MergeOperator. Merging is skipped,
-            //    preserving existing versions according to standard retention rules.
-            // 2. Both current item and next item must be Put entries (not tombstones).
-            // 3. Both sequence numbers must be strictly below min_snapshot_seq (no active snapshot
-            //    can view the older version independently).
-            // 4. No tombstone exists for this key in inputs (tombstone keys are never merged to avoid resurrecting deleted data).
-            if let Some(ref merge_op) = self.merge_operator {
-                if self.key_manager.is_none() && !is_tombstone && raw_seq < min_snapshot_seq {
-                    if let Some(next_item) = heap.peek() {
-                        let next_is_same_key = next_item.key == item.key;
-                        let next_is_tombstone = (next_item.seq & TOMBSTONE_BIT) != 0;
-                        let next_raw_seq = next_item.seq & !TOMBSTONE_BIT;
+                // Inner loop: consume all older versions for current_item.key with raw_seq <= min_snapshot_seq
+                while let Some(next_item) = heap.peek() {
+                    if next_item.key != current_item.key {
+                        break;
+                    }
+                    let next_raw_seq = next_item.seq & !TOMBSTONE_BIT;
+                    if next_raw_seq > min_snapshot_seq {
+                        // Older version is somehow above min_snapshot_seq (impossible given heap sort, but safe check)
+                        break;
+                    }
 
-                        if next_is_same_key
-                            && !next_is_tombstone
-                            && next_raw_seq < min_snapshot_seq
-                            && !heap
-                                .iter()
-                                .any(|h| h.key == item.key && (h.seq & TOMBSTONE_BIT) != 0)
-                        {
+                    let next_is_tombstone = (next_item.seq & TOMBSTONE_BIT) != 0;
+
+                    // If either current accumulated value or next value is a tombstone, stop folding
+                    if is_acc_tombstone || next_is_tombstone {
+                        break;
+                    }
+
+                    // Check if MergeOperator can fold these two values
+                    if let Some(ref merge_op) = self.merge_operator {
+                        if self.key_manager.is_none() {
                             let start_nanos = self.clock.monotonic_nanos();
-                            let merge_res = merge_op.merge(&next_item.value, &item.value);
+                            // Folding order: older version (next_item) is existing, newer version (acc_val) is new
+                            let merge_res = merge_op.merge(&next_item.value, &acc_val);
                             let elapsed_nanos =
                                 self.clock.monotonic_nanos().saturating_sub(start_nanos);
                             let timeout_nanos =
@@ -637,144 +721,68 @@ impl CompactionEngine {
                                 merge_res
                             };
 
-                            // existing_val is older version (next_item), new_val is newer version (item)
                             match merge_res {
-                                Ok(merged_val) => {
-                                    // Consume next_item from heap and advance its stream
-                                    if let Some(popped_next) = heap.pop() {
-                                        if let Some((key, value, seq, tx)) =
-                                            streams[popped_next.source_idx].next_entry().await?
-                                        {
-                                            heap.push(HeapItem {
-                                                key,
-                                                value,
-                                                seq,
-                                                tx,
-                                                source_idx: popped_next.source_idx,
-                                            });
-                                        }
-                                    }
-
-                                    let merged_bytes = bytes::Bytes::from(merged_val);
-                                    let entry_bytes =
-                                        (item.key.len() + merged_bytes.len() + 16) as u64;
-                                    builder
-                                        .add(&item.key, &merged_bytes, item.seq, item.tx)
+                                Ok(merged_bytes) => {
+                                    acc_val = bytes::Bytes::from(merged_bytes);
+                                    // Pop next_item from heap and advance its stream
+                                    if let Some(popped) = heap.pop() {
+                                        Self::fetch_next_entry(
+                                            popped.source_idx,
+                                            &mut streams,
+                                            &mut heap,
+                                        )
                                         .await?;
-
-                                    // Token-Bucket I/O Rate Limiting
-                                    if let Some(max_bps) = self.config.max_io_bytes_per_second {
-                                        if max_bps > 0 {
-                                            io_token_bytes_written += entry_bytes;
-                                            let elapsed = io_token_last_reset.elapsed();
-                                            let target = std::time::Duration::from_secs_f64(
-                                                io_token_bytes_written as f64 / max_bps as f64,
-                                            );
-                                            if target > elapsed {
-                                                let delay = (target - elapsed)
-                                                    .min(std::time::Duration::from_millis(100));
-                                                tokio::time::sleep(delay).await;
-                                                let total_elapsed = io_token_last_reset.elapsed();
-                                                let allowed_bytes = (total_elapsed.as_secs_f64()
-                                                    * max_bps as f64)
-                                                    as u64;
-                                                io_token_bytes_written = io_token_bytes_written
-                                                    .saturating_sub(allowed_bytes);
-                                                io_token_last_reset = std::time::Instant::now();
-                                            }
-                                        }
                                     }
-
-                                    last_key = Some(item.key.clone());
-                                    floor_emitted = true;
-                                    merged = true;
                                 }
                                 Err(err) => {
                                     tracing::warn!(
-                                        "Merge operator error for key {:?}: {}, retaining both versions (fail-safe)",
-                                        item.key,
+                                        "Merge operator error for key {:?}: {}, retaining remaining versions (fail-safe)",
+                                        current_item.key,
                                         err
                                     );
-                                    failed_merge_keep = true;
+                                    merge_failed = true;
+                                    break;
                                 }
                             }
+                        } else {
+                            // Encrypted tables cannot fold values via MergeOperator; break to retain current version as floor
+                            break;
+                        }
+                    } else {
+                        // Without MergeOperator, newest value (current_item) replaces all older versions;
+                        // consume older versions without merging
+                        if let Some(popped) = heap.pop() {
+                            Self::fetch_next_entry(popped.source_idx, &mut streams, &mut heap)
+                                .await?;
                         }
                     }
                 }
-            }
 
-            if !merged {
-                // LSM Retention Rule:
-                // Keep all versions with raw_seq > min_snapshot_seq (visible to active or future snapshots)
-                // PLUS the newest version with raw_seq <= min_snapshot_seq (the "floor" version).
-                // All further, older versions for the key below min_snapshot_seq are discarded.
-                let keep = if raw_seq > min_snapshot_seq {
-                    true
-                } else if !floor_emitted {
-                    if !failed_merge_keep {
-                        floor_emitted = true;
-                    }
-                    true
-                } else {
-                    false
-                };
-
-                if keep {
-                    // O(1): Bytes::clone is an Arc refcount increment
-                    last_key = Some(item.key.clone());
-
-                    // FIND-STO-001: Tombstone-Retention
-                    // Only GC tombstones during FULL compaction when no snapshot references them
-                    // and no older SSTables outside this compaction round can contain older values.
-                    // NOTE: If raw_seq < min_snapshot_seq and is_full_compaction is true, this tombstone
-                    // is the floor version below min_snapshot_seq. Being a tombstone below min_snapshot_seq
-                    // during full compaction, no active snapshot references a non-deleted version below it
-                    // and no older SSTables exist, so GC'ing it is safe.
-                    let should_gc_tombstone =
-                        is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
-                    if !should_gc_tombstone {
-                        let entry_bytes = (item.key.len() + item.value.len() + 16) as u64; // +16 für Overhead
-                        builder
-                            .add(&item.key, &item.value, item.seq, item.tx)
-                            .await?;
-
-                        // Token-Bucket I/O Rate Limiting (plattformneutral, außerhalb aller Write-Locks)
-                        if let Some(max_bps) = self.config.max_io_bytes_per_second {
-                            if max_bps > 0 {
-                                io_token_bytes_written += entry_bytes;
-                                let elapsed = io_token_last_reset.elapsed();
-                                let target = std::time::Duration::from_secs_f64(
-                                    io_token_bytes_written as f64 / max_bps as f64,
-                                );
-                                if target > elapsed {
-                                    let delay = (target - elapsed)
-                                        .min(std::time::Duration::from_millis(100));
-                                    // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
-                                    // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
-                                    tokio::time::sleep(delay).await;
-                                    // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
-                                    let total_elapsed = io_token_last_reset.elapsed();
-                                    let allowed_bytes =
-                                        (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
-                                    io_token_bytes_written =
-                                        io_token_bytes_written.saturating_sub(allowed_bytes);
-                                    io_token_last_reset = std::time::Instant::now();
-                                }
-                            }
-                        }
-                    }
+                // Write the resulting folded floor entry
+                let should_gc_tombstone = is_acc_tombstone
+                    && is_full_compaction
+                    && (acc_seq & !TOMBSTONE_BIT) < min_snapshot_seq;
+                if !should_gc_tombstone {
+                    self.write_entry_with_rate_limit(
+                        &mut builder,
+                        &current_item.key,
+                        &acc_val,
+                        acc_seq,
+                        acc_tx,
+                        &mut io_token_bytes_written,
+                        &mut io_token_last_reset,
+                    )
+                    .await?;
                 }
-            }
 
-            // Immediately fetch the next item from the source stream
-            if let Some((key, value, seq, tx)) = streams[item.source_idx].next_entry().await? {
-                heap.push(HeapItem {
-                    key,
-                    value,
-                    seq,
-                    tx,
-                    source_idx: item.source_idx,
-                });
+                last_key = Some(current_item.key.clone());
+                if !merge_failed {
+                    floor_emitted = true;
+                }
+            } else {
+                // floor_emitted is true AND raw_seq <= min_snapshot_seq:
+                // An older version for this key below floor watermark that was not folded (e.g. due to merge failure or tombstone).
+                // Discard to prevent stale duplicates.
             }
         }
         builder.finish().await?;

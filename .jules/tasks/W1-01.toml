@@ -1,0 +1,23 @@
+id        = "T-2026-9101"
+title     = "LSM-Compaction: N-Wege-Merge pro Schlüssel vollständig konsumieren"
+crate     = "contextra-store"
+tier      = 1
+risk      = "crash"
+goal      = "merge_sstables_inner faltet alle Versionen eines Schlüssels unterhalb der Snapshot-Grenze in genau einen Ausgabeeintrag; kein stiller Verlust älterer Versionen."
+non_goals = ["Keine Änderung am MergeOperator-Trait oder am Lesepfad", "Kein remove_file/Dateilöschen in dieser Datei", "Keine Änderung des Floor-Retentionsmodells außer der Grenzvereinheitlichung"]
+scope     = ["crates/contextra-store/src/compaction/engine.rs", "crates/contextra-store/tests/lsm_nway_merge_chain.rs", ".jules/tasks/W1-01.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "INV-MVCC-SSI-1", "Kein Datenverlust bei Merge-Fehler"]
+acceptance = [
+  "cargo test -p contextra-store --test campaign_deepresearch_merge_overlap",
+  "cargo test -p contextra-store --test lsm_nway_merge_chain",
+  "cargo test -p contextra-store compaction",
+  "cargo clippy -p contextra-store --all-targets -- -D warnings",
+  "cargo xtask jules check"
+]
+evidence_required = ["Roter Lauf des bestehenden Tests vor dem Fix (Meldung zitieren), grüner Lauf danach", "Neue Tests für N>=4, Tombstone in der Mitte, Grenzfall raw_seq == min_snapshot_seq, Merge-Fehler mitten in der Kette"]
+
+[budget]
+files      = 3
+lines      = 700
+iterations = 8
