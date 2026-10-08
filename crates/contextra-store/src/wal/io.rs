@@ -876,17 +876,10 @@ impl Wal {
             guard.clone()
         };
 
+        // FIX(2026-10-07): Skip rewrite_as_v3 when flusher_tx is None (read-only Wal handle)
         let tx = match flusher_tx {
             Some(tx) => tx,
             None => {
-                if !replayed_entries.is_empty() {
-                    let ops: Vec<(WalOp, u64)> = replayed_entries
-                        .iter()
-                        .map(|(seq, entry, _)| (entry.op.clone(), *seq))
-                        .collect();
-                    let (batch, _) = self.prepare_batch(ops).await?;
-                    self.try_append_batch(batch).await?;
-                }
                 return Ok(());
             }
         };
