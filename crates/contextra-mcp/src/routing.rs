@@ -185,26 +185,60 @@ pub fn setup_kv_bridge(
         }
     };
 
-    let data_dir = db
+    let db_dir = db
         .config()
         .orphan_registry_path
         .as_ref()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let log_path = data_dir.join("kv-revocation.log");
+        .unwrap_or_else(|| std::path::PathBuf::from("./contextra_data"));
 
-    let clock: Arc<dyn contextra_ports::Clock> = Arc::new(contextra_ports::SystemClock::new());
+    let log_path = db_dir.join("kv_revocation.log");
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let sk = match master_km.derive_revocation_signing_key() {
+        Ok(sk) => sk,
+        Err(e) => {
+            tracing::warn!("KvBridgeAdapter: Failed to derive revocation signing key: {e}");
+            return None;
+        }
+    };
+    let vk = sk.verifying_key();
 
-    // AI-TAG(W1-03, setup_kv_bridge): has_existing_keys is set to false because setup_kv_bridge is invoked during server startup before any active KV cache segments are inserted into memory.
-    let has_existing_keys = false;
+    let log = match contextra_crypto::RevocationLog::open_or_create(&log_path, clock, Some(sk), vk) {
+        Ok(l) => Arc::new(l),
+        Err(e) => {
+            tracing::warn!(
+                "KvBridgeAdapter: Failed to open revocation log at {}: {e}",
+                log_path.display()
+            );
+            return None;
+        }
+    };
 
-    let cipher = match contextra_crypto::KvSegmentCipher::open_durable(
-        master_km,
-        &log_path,
-        clock,
-        has_existing_keys,
-    ) {
-        Ok(c) => Arc::new(c),
+    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km, log));
+
+    let col_res = match tokio::runtime::Handle::try_current() {
+        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),
+        Err(_) => {
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread().build() {
+                rt.block_on(db.collection("default"))
+            } else {
+                return None;
+            }
+        }
+    };
+
+    let store = match col_res {
+        Ok(mut col) => {
+            if let Some(existing) = col.kv_store() {
+                Arc::clone(existing)
+            } else {
+                let new_store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
+                if let Some(col_mut) = Arc::get_mut(&mut col) {
+                    col_mut.set_kv_store(Arc::clone(&new_store));
+                }
+                new_store
+            }
+        }
         Err(e) => {
             tracing::error!(
                 "KvBridgeAdapter: Failed to open durable RevocationLog at {}: {e}",

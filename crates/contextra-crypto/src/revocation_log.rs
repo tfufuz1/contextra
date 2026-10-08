@@ -34,16 +34,8 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-const MARKER_MAGIC: &[u8; 4] = b"RVMK";
-const MARKER_VERSION_1: u8 = 1;
 
 /// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,60 +143,8 @@ pub fn marker_path_for(log_path: &Path) -> PathBuf {
 }
 
 fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
-    let parent = path.parent().unwrap_or(Path::new("."));
-    let parent = if parent.as_os_str().is_empty() {
-        Path::new(".")
-    } else {
-        parent
-    };
-
-    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-    let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp_path = parent.join(format!(
-        "{}.tmp-{}-{}",
-        file_name,
-        std::process::id(),
-        count
-    ));
-
-    let write_tmp = || -> Result<()> {
-        let mut tmp_file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp_path)
-            .map_err(|e| CryptoError::Crypto(format!("Failed to create temp file: {e}")))?;
-
-        tmp_file
-            .write_all(content)
-            .map_err(|e| CryptoError::Crypto(format!("Failed to write temp file: {e}")))?;
-
-        tmp_file
-            .sync_all()
-            .map_err(|e| CryptoError::Crypto(format!("Failed to sync temp file: {e}")))?;
-
-        Ok(())
-    };
-
-    if let Err(err) = write_tmp() {
-        std::fs::remove_file(&tmp_path).ok();
-        return Err(err);
-    }
-
-    if let Err(e) = std::fs::rename(&tmp_path, path) {
-        std::fs::remove_file(&tmp_path).ok();
-        return Err(CryptoError::Crypto(format!(
-            "Failed to rename temp file: {e}"
-        )));
-    }
-
-    let dir_file = File::open(parent).map_err(|e| {
-        CryptoError::Crypto(format!("Failed to open parent directory for sync: {e}"))
-    })?;
-    dir_file.sync_all().map_err(|e| {
-        CryptoError::Crypto(format!("Failed to sync parent directory: {e}"))
-    })?;
-
-    Ok(())
+    contextra_durable_fs::atomic_replace(path, content)
+        .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))
 }
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
@@ -665,34 +605,33 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut candidate_entries = entries_write_guard.clone();
-        candidate_entries.push(new_entry.clone());
+        let mut prospective_entries = entries_guard.clone();
+        prospective_entries.push(new_entry.clone());
 
         if let Some(ref path) = self.file_path {
-            let serialized_log = bincode::serialize(&candidate_entries).map_err(|e| {
+            let serialized = bincode::serialize(&prospective_entries).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
             write_atomic_file(path, &serialized_log)?;
 
             let m_path = marker_path_for(path);
-            let serialized_marker = serialize_signed_marker(
-                candidate_entries.len() as u64,
-                new_entry.entry_hash,
-                Some(signing_key),
-            );
+            let marker = RevocationMarker {
+                count: prospective_entries.len() as u64,
+                head_hash: new_entry.entry_hash,
+            };
+            let serialized_marker = bincode::serialize(&marker).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize revocation marker: {e}"))
+            })?;
 
             write_atomic_file(&m_path, &serialized_marker)?;
         }
 
-        let mut revoked_write_guard = self.revoked_targets.write();
+        entries_guard.push(new_entry.clone());
+        revoked_guard.insert(target);
 
-        entries_write_guard.push(new_entry.clone());
-        revoked_write_guard.insert(target);
-
-        let mut cursor_guard = self.verified_cursor.write();
-        cursor_guard.verified_len = entries_write_guard.len();
-        cursor_guard.last_verified_hash = new_entry.entry_hash;
+        drop(entries_guard);
+        drop(revoked_guard);
 
         drop(entries_write_guard);
         drop(revoked_write_guard);

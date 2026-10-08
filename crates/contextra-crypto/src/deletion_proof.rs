@@ -107,30 +107,57 @@ impl Drop for DeletionProofKeyPair {
     }
 }
 
-/// Key parameter for verification (either HMAC-SHA256 byte slice or Ed25519 VerifyingKey).
+/// Attestation confirming that physical layer sanitization and deletion logs have been flushed to durable storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DurabilityProof {
+    /// Monotonically increasing sequence number or TxId confirmed durable by disk fsync.
+    pub confirmed_seq_no: u64,
+}
+
+impl DurabilityProof {
+    /// Constructs a new DurabilityProof for a confirmed fsynced sequence number.
+    pub fn new(confirmed_seq_no: u64) -> Self {
+        Self { confirmed_seq_no }
+    }
+}
+
+/// Key parameter for verification coupled with its signature version.
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationKey<'a> {
-    /// Key for HMAC-SHA256 signature verification (version 1 and 2).
-    Hmac(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (version 1 legacy).
+    HmacV1(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (version 2 legacy).
+    HmacV2(&'a [u8]),
     /// Key for Ed25519 signature verification (version 3).
     Ed25519(&'a ed25519_dalek::VerifyingKey),
 }
 
+impl<'a> VerificationKey<'a> {
+    /// Returns the associated signature version for this verification key.
+    pub fn version(&self) -> SignatureVersion {
+        match self {
+            Self::HmacV1(_) => SignatureVersion::V1,
+            Self::HmacV2(_) => SignatureVersion::V2,
+            Self::Ed25519(_) => SignatureVersion::V3,
+        }
+    }
+}
+
 impl<'a> From<&'a [u8]> for VerificationKey<'a> {
     fn from(key: &'a [u8]) -> Self {
-        VerificationKey::Hmac(key)
+        VerificationKey::HmacV2(key)
     }
 }
 
 impl<'a, const N: usize> From<&'a [u8; N]> for VerificationKey<'a> {
     fn from(key: &'a [u8; N]) -> Self {
-        VerificationKey::Hmac(key.as_slice())
+        VerificationKey::HmacV2(key.as_slice())
     }
 }
 
 impl<'a> From<&'a Vec<u8>> for VerificationKey<'a> {
     fn from(key: &'a Vec<u8>) -> Self {
-        VerificationKey::Hmac(key.as_slice())
+        VerificationKey::HmacV2(key.as_slice())
     }
 }
 
@@ -337,57 +364,90 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         proof_key: &[u8],
     ) -> Result<Self> {
-        Self::create_with_wal_receipt(
+        let durability = DurabilityProof::new(deleted_after_tx.0);
+        Self::create_with_durability(
             scope,
             deleted_keys,
             deleted_after_tx,
             covered_layers,
             excluded_scopes,
-            None,
+            Some(&durability),
             proof_key,
         )
     }
 
-    /// Erstellt und signiert einen DeletionProof (Version 2) inklusive optionaler WAL-HMAC-Kettenquittung.
+    /// Creates a DeletionProof with explicit DurabilityProof verification.
+    ///
+    /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    pub fn create_with_durability(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        durability_proof: Option<&DurabilityProof>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        if durability_proof.is_none() {
+            return Err(CryptoError::NotDurable.into());
+        }
+
+        let signing_key = if proof_key.len() >= 32 {
+            let mut key_bytes = [0u8; 32];
+            key_bytes.copy_from_slice(&proof_key[..32]);
+            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
+        } else {
+            return Err(ContextraError::Internal(
+                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
+            ));
+        };
+
+        Self::create_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            0,
+            &[],
+            durability_proof,
+            &signing_key,
+        )
+    }
+
+    /// Erstellt und signiert einen DeletionProof (Version 3) inklusive optionaler WAL-HMAC-Kettenquittung.
     pub fn create_with_wal_receipt(
         scope: DeletionScope,
-        mut deleted_keys: Vec<Vec<u8>>,
+        deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
         wal_chain_receipt: Option<[u8; 32]>,
         proof_key: &[u8],
     ) -> Result<Self> {
-        // Keys sortieren für deterministischen Hash
-        deleted_keys.sort();
-
-        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
-
-        let covered_layers: Vec<DeletionLayer> =
-            covered_layers.into_iter().map(|p| p.layer).collect();
-
-        let proof_stub = Self {
-            signature_version: SignatureVersion::V2.as_u8(),
-            scope,
-            deleted_keys_hash,
-            deleted_after_tx,
-            timestamp: 0,
-            signature: Vec::new(),
-            covered_layers,
-            excluded_scopes,
-            graph_repair: Vec::new(),
-            wal_chain_receipt,
-            audit_chain_position: None,
-            integrity_warning: None,
+        let durability = DurabilityProof::new(deleted_after_tx.0);
+        let signing_key = if proof_key.len() >= 32 {
+            let mut key_bytes = [0u8; 32];
+            key_bytes.copy_from_slice(&proof_key[..32]);
+            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
+        } else {
+            return Err(ContextraError::Internal(
+                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
+            ));
         };
 
-        let full_payload = proof_stub.construct_v2_full_payload()?;
-        let signature = compute_hmac_sha256(proof_key, &[&full_payload])?;
-
-        let mut proof = proof_stub;
-        proof.signature = signature.to_vec();
-
-        Ok(proof)
+        Self::create_with_wal_receipt_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            wal_chain_receipt,
+            0,
+            &[],
+            Some(&durability),
+            &signing_key,
+        )
     }
 
     /// Constructs the full, length-prefixed HMAC payload for version 2 proofs binding all fields.
@@ -472,6 +532,7 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
+        durability_proof: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_v3_with_audit_position(
@@ -483,6 +544,7 @@ impl DeletionProof {
             None,
             attested_at,
             graph_repair,
+            durability_proof,
             signing_key,
         )
     }
@@ -498,6 +560,7 @@ impl DeletionProof {
         audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
+        durability_proof: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_full_v3(
@@ -510,6 +573,7 @@ impl DeletionProof {
             audit_chain_position,
             attested_at,
             graph_repair,
+            durability_proof,
             signing_key,
         )
     }
@@ -525,6 +589,7 @@ impl DeletionProof {
         wal_chain_receipt: Option<[u8; 32]>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
+        durability_proof: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_full_v3(
@@ -537,6 +602,7 @@ impl DeletionProof {
             None,
             attested_at,
             graph_repair,
+            durability_proof,
             signing_key,
         )
     }
@@ -553,8 +619,12 @@ impl DeletionProof {
         audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
+        durability_proof: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
+        if durability_proof.is_none() {
+            return Err(CryptoError::NotDurable.into());
+        }
         deleted_keys.sort();
         let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
@@ -629,16 +699,9 @@ impl DeletionProof {
             bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
-        match version {
-            SignatureVersion::V1 => {
-                let proof_key = match key {
-                    VerificationKey::Hmac(k) => k,
-                    VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
-                            "Ed25519 key provided for HMAC signature_version 1 proof".to_string(),
-                        ))
-                    }
-                };
+        match (version, key) {
+            (SignatureVersion::V1, VerificationKey::HmacV1(proof_key))
+            | (SignatureVersion::V1, VerificationKey::HmacV2(proof_key)) => {
                 let expected = compute_hmac_sha256(
                     proof_key,
                     &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes],
@@ -646,15 +709,8 @@ impl DeletionProof {
                 use subtle::ConstantTimeEq;
                 Ok(expected.as_slice().ct_eq(&self.signature).into())
             }
-            SignatureVersion::V2 => {
-                let proof_key = match key {
-                    VerificationKey::Hmac(k) => k,
-                    VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
-                            "Ed25519 key provided for HMAC signature_version 2 proof".to_string(),
-                        ))
-                    }
-                };
+            (SignatureVersion::V2, VerificationKey::HmacV1(proof_key))
+            | (SignatureVersion::V2, VerificationKey::HmacV2(proof_key)) => {
                 use subtle::ConstantTimeEq;
                 let full_payload = self.construct_v2_full_payload()?;
                 let expected_full = compute_hmac_sha256(proof_key, &[&full_payload])?;
@@ -686,15 +742,7 @@ impl DeletionProof {
                 )?;
                 Ok(expected_legacy.as_slice().ct_eq(&self.signature).into())
             }
-            SignatureVersion::V3 => {
-                let verifying_key = match key {
-                    VerificationKey::Ed25519(vk) => vk,
-                    VerificationKey::Hmac(_) => {
-                        return Err(ContextraError::Internal(
-                            "HMAC key provided for Ed25519 signature_version 3 proof".to_string(),
-                        ))
-                    }
-                };
+            (SignatureVersion::V3, VerificationKey::Ed25519(verifying_key)) => {
                 let payload = self
                     .construct_v3_payload()
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
@@ -707,6 +755,11 @@ impl DeletionProof {
 
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
+            _ => Err(ContextraError::Internal(format!(
+                "VerificationKey version mismatch: key version {:?} does not match DeletionProof signature_version {:?}",
+                key.version(),
+                version
+            ))),
         }
     }
 
@@ -965,6 +1018,7 @@ mod tests {
             doc_id: DocId(42),
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(100);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec(), b"k2".to_vec()],
@@ -975,6 +1029,7 @@ mod tests {
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -992,6 +1047,7 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1000,6 +1056,7 @@ mod tests {
             vec![],
             1700000000,
             &[],
+            Some(&durability),
             keypair1.signing_key(),
         )
         .unwrap();
@@ -1013,6 +1070,7 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
         let mut proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1021,6 +1079,7 @@ mod tests {
             vec![],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1036,6 +1095,7 @@ mod tests {
             doc_id: DocId(42),
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
         let proof = DeletionProof::create_with_wal_receipt_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1047,6 +1107,7 @@ mod tests {
             Some([0xABu8; 32]),
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1093,6 +1154,7 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1101,18 +1163,42 @@ mod tests {
             vec![],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
 
         let hmac_key = vec![0u8; 32];
-        let res = proof.verify(&hmac_key);
+        let res = proof.verify(VerificationKey::HmacV2(&hmac_key));
         assert!(res.is_err());
         match res {
             Err(ContextraError::Internal(msg)) => {
-                assert!(msg.contains("HMAC key provided for Ed25519 signature_version 3 proof"));
+                assert!(msg.contains("VerificationKey version mismatch"));
             }
             _ => panic!("Expected ContextraError::Internal"),
+        }
+    }
+
+    #[test]
+    fn test_memory_only_create_returns_not_durable_error() {
+        let scope = DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let res = DeletionProof::create_with_durability(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![],
+            vec![],
+            None, // MemoryOnly path
+            &test_key(),
+        );
+        assert!(res.is_err());
+        match res {
+            Err(ContextraError::Crypto(msg)) => {
+                assert!(msg.contains("not durable") || msg.contains("NotDurable"));
+            }
+            _ => panic!("Expected ContextraError::Crypto with NotDurable details"),
         }
     }
 
@@ -1123,25 +1209,35 @@ mod tests {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
 
-        // v2
-        let proof_v2 = DeletionProof::create(
-            scope.clone(),
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            ],
-            vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
-        )
-        .unwrap();
-        assert_eq!(proof_v2.signature_version, 2);
-        assert!(proof_v2.verify(&test_key()).unwrap());
-
-        // v1
+        // v2 HMAC proof (constructed for verifying legacy support)
         let scope_bytes = bincode::serialize(&scope).unwrap();
-        let deleted_keys_hash = [0u8; 32];
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&[b"k1".to_vec()]);
         let tx_bytes = TxId(10).0.to_le_bytes();
+
+        let stub_v2 = DeletionProof {
+            signature_version: 2,
+            scope: scope.clone(),
+            deleted_keys_hash,
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+        let full_payload = stub_v2.construct_v2_full_payload().unwrap();
+        let v2_sig = compute_hmac_sha256(&test_key(), &[&full_payload]).unwrap();
+
+        let mut proof_v2 = stub_v2;
+        proof_v2.signature = v2_sig.to_vec();
+
+        assert_eq!(proof_v2.signature_version, 2);
+        assert!(proof_v2.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+
+        // v1 HMAC proof
         let v1_signature =
             compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
                 .unwrap();
@@ -1161,7 +1257,7 @@ mod tests {
             integrity_warning: None,
         };
         assert_eq!(v1_proof.signature_version, 1);
-        assert!(v1_proof.verify(&test_key()).unwrap());
+        assert!(v1_proof.verify(VerificationKey::HmacV1(&test_key())).unwrap());
     }
 
     #[test]
@@ -1170,6 +1266,7 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
 
         let proof_ab_c = DeletionProof::create_v3(
             scope.clone(),
@@ -1179,6 +1276,7 @@ mod tests {
             vec![],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1191,6 +1289,7 @@ mod tests {
             vec![],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1206,20 +1305,24 @@ mod tests {
             tenant_id: tenant,
         };
         let keys = vec![b"key1".to_vec(), b"key2".to_vec()];
+        let proof_key = test_key();
+        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+        let vk = sk.verifying_key();
+
         let proof = DeletionProof::create(
             scope,
             keys,
             TxId(100),
             vec![
                 LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
             ],
             vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
+            &proof_key,
         )
         .unwrap();
 
-        assert!(proof.verify(&test_key()).unwrap());
+        assert_eq!(proof.signature_version, 3);
+        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
     }
 
     #[test]
@@ -1243,8 +1346,8 @@ mod tests {
         let proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
 
-        let wrong_key = vec![1u8; 32];
-        assert!(!proof.verify(&wrong_key).unwrap());
+        let wrong_keypair = DeletionProofKeyPair::generate();
+        assert!(!proof.verify(VerificationKey::Ed25519(&wrong_keypair.verifying_key)).unwrap());
     }
 
     #[test]
@@ -1252,6 +1355,10 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let proof_key = test_key();
+        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+        let vk = sk.verifying_key();
+
         let proof = DeletionProof::create(
             scope,
             vec![b"k1".to_vec()],
@@ -1260,29 +1367,29 @@ mod tests {
                 LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
             ],
             vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
+            &proof_key,
         )
         .unwrap();
 
         // Tamper with deleted_after_tx
         let mut tampered_tx = proof.clone();
         tampered_tx.deleted_after_tx = TxId(11);
-        assert!(!tampered_tx.verify(&test_key()).unwrap());
+        assert!(!tampered_tx.verify(VerificationKey::Ed25519(&vk)).unwrap());
 
         // Tamper with deleted_keys_hash
         let mut tampered_hash = proof.clone();
         tampered_hash.deleted_keys_hash[0] ^= 0xFF;
-        assert!(!tampered_hash.verify(&test_key()).unwrap());
+        assert!(!tampered_hash.verify(VerificationKey::Ed25519(&vk)).unwrap());
 
         // Tamper with scope
         let mut tampered_scope = proof.clone();
         tampered_scope.scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(2).unwrap(),
         };
-        assert!(!tampered_scope.verify(&test_key()).unwrap());
+        assert!(!tampered_scope.verify(VerificationKey::Ed25519(&vk)).unwrap());
 
         // Untampered original must verify successfully
-        assert!(proof.verify(&test_key()).unwrap());
+        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
     }
 
     #[test]
@@ -1372,12 +1479,15 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(100).unwrap(),
         };
+        let proof_key = test_key();
+        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+        let vk = sk.verifying_key();
 
         let cleanup_proofs = vec![
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
                 .unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+            LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0).unwrap(),
         ];
 
         let proof = DeletionProof::create(
@@ -1386,17 +1496,17 @@ mod tests {
             TxId(1),
             cleanup_proofs,
             vec![],
-            &test_key(),
+            &proof_key,
         )
         .unwrap();
 
-        assert!(proof.verify(&test_key()).unwrap());
+        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
         assert_eq!(
             proof.covered_layers,
             vec![
                 DeletionLayer::LsmMemtable,
                 DeletionLayer::SsTableAllLevels,
-                DeletionLayer::HnswIndex,
+                DeletionLayer::KvCacheSegments,
             ]
         );
     }
@@ -1406,27 +1516,36 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
-        let proof = DeletionProof::create(
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&[b"k1".to_vec()]);
+        let stub_v2 = DeletionProof {
+            signature_version: 2,
             scope,
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            ],
-            vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
-        )
-        .unwrap();
+            deleted_keys_hash,
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+        let full_payload = stub_v2.construct_v2_full_payload().unwrap();
+        let v2_sig = compute_hmac_sha256(&test_key(), &[&full_payload]).unwrap();
+
+        let mut proof = stub_v2;
+        proof.signature = v2_sig.to_vec();
 
         assert_eq!(proof.signature_version, 2);
-        assert!(proof.verify(&test_key()).unwrap());
+        assert!(proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
 
         let mut tampered_layers = proof.clone();
         tampered_layers
             .covered_layers
             .push(DeletionLayer::KvCacheSegments);
 
-        assert!(!tampered_layers.verify(&test_key()).unwrap());
+        assert!(!tampered_layers.verify(VerificationKey::HmacV2(&test_key())).unwrap());
     }
 
     #[test]
@@ -1434,28 +1553,37 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
-        let proof = DeletionProof::create(
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&[b"k1".to_vec()]);
+        let stub_v2 = DeletionProof {
+            signature_version: 2,
             scope,
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            ],
-            vec![
+            deleted_keys_hash,
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            excluded_scopes: vec![
                 ExcludedScope::LlmParameterMemory,
                 ExcludedScope::ConsolidatedAndDistilled,
             ],
-            &test_key(),
-        )
-        .unwrap();
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+        let full_payload = stub_v2.construct_v2_full_payload().unwrap();
+        let v2_sig = compute_hmac_sha256(&test_key(), &[&full_payload]).unwrap();
+
+        let mut proof = stub_v2;
+        proof.signature = v2_sig.to_vec();
 
         assert_eq!(proof.signature_version, 2);
-        assert!(proof.verify(&test_key()).unwrap());
+        assert!(proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
 
         let mut tampered_scopes = proof.clone();
         tampered_scopes.excluded_scopes.pop();
 
-        assert!(!tampered_scopes.verify(&test_key()).unwrap());
+        assert!(!tampered_scopes.verify(VerificationKey::HmacV2(&test_key())).unwrap());
     }
 
     #[test]
@@ -1572,17 +1700,21 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
-        let proof = DeletionProof::create(
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&[b"k1".to_vec()]);
+        let proof = DeletionProof {
+            signature_version: 2,
             scope,
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            ],
-            vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
-        )
-        .unwrap();
+            deleted_keys_hash,
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: vec![0u8; 32],
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
 
         assert_eq!(proof.signature_version, 2);
         let json = proof.export_for_audit().unwrap();
@@ -1625,6 +1757,9 @@ mod tests {
         let integrity_key = b"integrity-key-32-bytes-wal-rec!";
         let prev_hmac = [0x77u8; 32];
         let delete_event = b"doc_42_delete";
+        let proof_key = test_key();
+        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+        let vk = sk.verifying_key();
 
         let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();
 
@@ -1637,17 +1772,17 @@ mod tests {
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some(receipt),
-            &test_key(),
+            &proof_key,
         )
         .unwrap();
 
         assert_eq!(proof.wal_chain_receipt, Some(receipt));
-        assert!(proof.verify(&test_key()).unwrap());
+        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
 
         // Tamper with receipt
         let mut tampered_proof = proof.clone();
         tampered_proof.wal_chain_receipt = Some([0xFFu8; 32]);
-        assert!(!tampered_proof.verify(&test_key()).unwrap());
+        assert!(!tampered_proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
     }
 
     #[test]
@@ -1678,6 +1813,7 @@ mod tests {
             doc_id: DocId(42),
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(100);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1688,6 +1824,7 @@ mod tests {
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1705,16 +1842,20 @@ mod tests {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
-        let hmac_key = b"secret_hmac_key_32_bytes_long!!";
-        let proof = DeletionProof::create(
+        let proof = DeletionProof {
+            signature_version: 2,
             scope,
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![],
-            vec![],
-            hmac_key,
-        )
-        .unwrap();
+            deleted_keys_hash: [0u8; 32],
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: vec![0u8; 32],
+            covered_layers: vec![],
+            excluded_scopes: vec![],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
 
         let keypair = DeletionProofKeyPair::generate();
         assert!(proof.verify_external(&keypair.verifying_key).is_err());
@@ -1798,23 +1939,32 @@ mod tests {
         assert!(!v1_proof.verify(&test_key()).unwrap());
 
         // --- Version 2 ---
-        let mut v2_proof = DeletionProof::create(
-            scope.clone(),
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            ],
-            vec![ExcludedScope::LlmParameterMemory],
-            &test_key(),
-        )
-        .unwrap();
-        assert!(v2_proof.verify(&test_key()).unwrap());
+        let stub_v2 = DeletionProof {
+            signature_version: 2,
+            scope: scope.clone(),
+            deleted_keys_hash: hash_deleted_keys_length_prefixed(&[b"k1".to_vec()]),
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+        let full_payload = stub_v2.construct_v2_full_payload().unwrap();
+        let v2_sig = compute_hmac_sha256(&test_key(), &[&full_payload]).unwrap();
+        let mut v2_proof = stub_v2;
+        v2_proof.signature = v2_sig.to_vec();
+
+        assert!(v2_proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
         v2_proof.signature[0] ^= 0x01; // Bit-flip
-        assert!(!v2_proof.verify(&test_key()).unwrap());
+        assert!(!v2_proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
 
         // --- Version 3 ---
         let keypair = DeletionProofKeyPair::generate();
+        let durability = DurabilityProof::new(10);
         let mut v3_proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1825,6 +1975,7 @@ mod tests {
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1846,6 +1997,7 @@ mod tests {
             doc_id: DocId(42),
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(100);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec(), b"k2".to_vec()],
@@ -1856,6 +2008,7 @@ mod tests {
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1875,6 +2028,7 @@ mod tests {
             verified_no_ghost_pointers: true,
             attested_at: 1700000000,
         }];
+        let durability = DurabilityProof::new(10);
         let proof = DeletionProof::create_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1886,6 +2040,7 @@ mod tests {
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &graph_repair,
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -1911,6 +2066,7 @@ mod tests {
             doc_id: DocId(42),
             tenant_id: TenantId::try_new(1).unwrap(),
         };
+        let durability = DurabilityProof::new(10);
         let proof = DeletionProof::create_with_wal_receipt_v3(
             scope,
             vec![b"k1".to_vec()],
@@ -1922,6 +2078,7 @@ mod tests {
             Some([0xABu8; 32]),
             1700000000,
             &[],
+            Some(&durability),
             keypair.signing_key(),
         )
         .unwrap();
@@ -2008,23 +2165,26 @@ mod tests {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
 
-        // v2 HMAC proof
-        let proof_v2 = DeletionProof::create(
-            scope.clone(),
-            vec![b"k1".to_vec()],
-            TxId(10),
-            vec![],
-            vec![],
-            &test_key(),
-        )
-        .unwrap();
+        let proof_v2 = DeletionProof {
+            signature_version: 2,
+            scope: scope.clone(),
+            deleted_keys_hash: [0u8; 32],
+            deleted_after_tx: TxId(10),
+            timestamp: 0,
+            signature: vec![0u8; 32],
+            covered_layers: vec![],
+            excluded_scopes: vec![],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
         assert_eq!(proof_v2.signature_version, 2);
         assert!(matches!(
             proof_v2.verify_external(&keypair.verifying_key),
             Err(CryptoError::UnsupportedProofVersion(2))
         ));
 
-        // v1 HMAC proof
         let mut proof_v1 = proof_v2.clone();
         proof_v1.signature_version = 1;
         assert!(matches!(
