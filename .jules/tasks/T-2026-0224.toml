@@ -1,0 +1,17 @@
+id        = "T-2026-0224"
+title     = "Embedding: semantischer Kosinus-Sanity-Test mit echtem Modell"
+crate     = "contextra-infer-candle"
+tier      = 1
+risk      = "none"
+goal      = "Test prüft semantische Ordnung der Embeddings, wenn Modell vorhanden; kein stiller Skip."
+non_goals = ["Keine CI-Änderung", "Keine Änderung am Inferenzcode"]
+scope     = ["crates/contextra-infer-candle/tests/embedding_semantic_sanity.rs", ".jules/tasks/T-2026-0224.toml"]
+forbidden = [".github/**", "xtask/**", "justfile", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Kein stiller Dummy-Fallback"]
+acceptance = ["cargo test -p contextra-infer-candle --test embedding_semantic_sanity", "cargo clippy -p contextra-infer-candle --all-targets -- -D warnings"]
+evidence_required = ["Testlauf mit Modell im PR, falls verfügbar; sonst Begründung"]
+
+[budget]
+files      = 2
+lines      = 150
+iterations = 4
