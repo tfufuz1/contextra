@@ -1,0 +1,17 @@
+id        = "T-2026-0205"
+title     = "Loom: zwei unverdrahtete Modelle prüfen, Inventar erstellen"
+crate     = "contextra-store"
+tier      = 1
+risk      = "concurrency"
+goal      = "Zwei Loom-Modelle außerhalb der CI laufen lassen; Bericht über alle Loom-Dateien und ihre CI-Verdrahtung."
+non_goals = ["Keine CI-Änderung", "Keine Produktionscode-Änderung", "Keine mvcc-Dateien"]
+scope     = ["crates/contextra-store/tests/loom_commit_flush_visibility.rs", "crates/contextra-crypto/tests/loom_eviction_worker_shutdown_race.rs", "docs/audits/loom-coverage-2026-10.md", ".jules/tasks/T-2026-0205.toml"]
+forbidden = [".github/**", "xtask/**", "justfile", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock", "Cargo.toml"]
+invariants = ["Zero-Panic", "Loom-Modelle deterministisch"]
+acceptance = ["cargo test -p contextra-store --test loom_commit_flush_visibility --release", "cargo test -p contextra-crypto --test loom_eviction_worker_shutdown_race --release"]
+evidence_required = ["Lauf-Ausgabe beider Modelle", "Vollständige Inventartabelle"]
+
+[budget]
+files      = 4
+lines      = 300
+iterations = 6
