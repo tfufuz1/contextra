@@ -225,11 +225,11 @@ impl HnswIndexCore {
                     Ok(VectorData::F32(v))
                 };
             }
-            return Ok(ctx.nodes[idx - ctx.mmap_node_count].vector.clone());
-        }
-
-        if idx < ctx.nodes.len() {
-            return Ok(ctx.nodes[idx].vector.clone());
+            if let Some(node) = ctx.nodes.get(idx - ctx.mmap_node_count) {
+                return Ok(node.vector.clone());
+            }
+        } else if let Some(node) = ctx.nodes.get(idx) {
+            return Ok(node.vector.clone());
         }
 
         Err(ContextraError::Index(format!(
@@ -247,20 +247,26 @@ impl HnswIndexCore {
         pending_vector: &VectorData,
         prior_prepared: &[PreparedInsert],
     ) -> Result<f32> {
-        let data_a = self.resolve_vector_data_with_batch(
+        let data_a = match self.resolve_vector_data_with_batch(
             idx_a,
             ctx,
             pending_idx,
             pending_vector,
             prior_prepared,
-        )?;
-        let data_b = self.resolve_vector_data_with_batch(
+        ) {
+            Ok(d) => d,
+            Err(_) => return Ok(f32::MAX),
+        };
+        let data_b = match self.resolve_vector_data_with_batch(
             idx_b,
             ctx,
             pending_idx,
             pending_vector,
             prior_prepared,
-        )?;
+        ) {
+            Ok(d) => d,
+            Err(_) => return Ok(f32::MAX),
+        };
         self.compute_symmetric_distance(&data_a, &data_b)
     }
 
@@ -344,105 +350,130 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
-    pub(super) fn do_delete(&self, id: DocId) -> Result<()> {
-        let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
-        if let Some(idx) = node_idx {
-            self.cold.deleted_nodes.write().insert(idx as u64);
-            self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
+    /// Deletes a document by removing its DocId mapping and recording a tombstone.
+    ///
+    /// If `is_safe_to_free` is true (i.e., no active snapshot pin requires the node's retention sequence),
+    /// the node's vector memory in process RAM (`nodes[ram_idx].vector`) is overwritten with zeros
+    /// (best-effort in process memory; no guarantees regarding hardware registers, OS swap, or underlying SSD storage)
+    /// prior to returning `ram_idx` to the arena free-list.
+    ///
+    /// Note: Memory-mapped bytes (`mmap_index`) remain read-only and unchanged; therefore, zeroing RAM vector slots
+    /// does NOT constitute a cryptographic deletion proof for `contextra_types::DeletionLayer::HnswIndex`.
+    pub(super) fn do_delete_node_idx(&self, idx: usize, id: DocId) -> Result<()> {
+        self.cold.deleted_nodes.write().insert(idx as u64);
+        self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
 
-            let mmap_node_count = self
-                .cold
-                .mmap_index
-                .read()
+        let mmap_node_count = self
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        if idx >= mmap_node_count {
+            let ram_idx = idx - mmap_node_count;
+            let seq_log = self.cold.seq_log.read();
+            let is_safe_to_free = match (seq_log.min_retention_seq(), seq_log.deletion_seq(id)) {
+                (Some(min_seq), Some(del_seq)) => del_seq < min_seq,
+                (None, _) => true,
+                _ => false,
+            };
+            if is_safe_to_free {
+                {
+                    let mut nodes = self.hot.nodes.write();
+                    if let Some(node) = nodes.get_mut(ram_idx) {
+                        match &mut node.vector {
+                            VectorData::F32(v) => v.fill(0.0),
+                            VectorData::U8(v) => v.fill(0),
+                        }
+                    }
+                }
+                self.hot.arena.free_node(ram_idx);
+            }
+        }
+
+        let ep_val = self.hot.get_entry_point();
+        let ram_ep_val = self.hot.get_ram_entry_point();
+
+        if ep_val == Some(idx) || ram_ep_val == Some(idx) {
+            let nodes = self.hot.nodes.read();
+            let mmap_guard = self.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            if idx >= mmap_node_count {
-                let ram_idx = idx - mmap_node_count;
-                let seq_log = self.cold.seq_log.read();
-                let is_safe_to_free = match (seq_log.min_retention_seq(), seq_log.deletion_seq(id))
-                {
-                    (Some(min_seq), Some(del_seq)) => del_seq < min_seq,
-                    (None, _) => true,
-                    _ => false,
-                };
-                if is_safe_to_free {
-                    self.hot.arena.free_node(ram_idx);
-                }
-            }
+            let deleted = self.cold.deleted_nodes.read();
 
-            let ep_val = self.hot.get_entry_point();
-            let ram_ep_val = self.hot.get_ram_entry_point();
+            let mut best_node = None;
+            let mut best_ram_node = None;
+            let mut max_layer = 0;
+            let mut max_ram_layer = 0;
 
-            if ep_val == Some(idx) || ram_ep_val == Some(idx) {
-                let nodes = self.hot.nodes.read();
-                let mmap_guard = self.cold.mmap_index.read();
-                let mmap_node_count = mmap_guard
-                    .as_ref()
-                    .map(|m| m.header.node_count() as usize)
-                    .unwrap_or(0);
-                let deleted = self.cold.deleted_nodes.read();
-
-                let mut best_node = None;
-                let mut best_ram_node = None;
-                let mut max_layer = 0;
-                let mut max_ram_layer = 0;
-
-                if let Some(mmap) = mmap_guard.as_ref() {
-                    for i in 0..mmap_node_count {
-                        if i != idx && !deleted.contains(i as u64) {
-                            let record = match mmap.get_node_record(i) {
-                                Ok(r) => r,
-                                Err(_) => continue,
-                            };
-                            if record.max_layer as usize >= max_layer {
-                                max_layer = record.max_layer as usize;
-                                best_node = Some(i);
-                            }
-                        }
-                    }
-                }
-
-                for (i, node) in nodes.iter().enumerate() {
-                    let global_idx = mmap_node_count + i;
-                    if global_idx != idx && !deleted.contains(global_idx as u64) {
-                        if node.max_layer >= max_layer {
-                            max_layer = node.max_layer;
-                            best_node = Some(global_idx);
-                        }
-                        if node.max_layer >= max_ram_layer {
-                            max_ram_layer = node.max_layer;
-                            best_ram_node = Some(global_idx);
-                        }
-                    }
-                }
-
-                if ep_val == Some(idx) {
-                    self.hot.set_entry_point(best_node);
-                    if let Some(new_idx) = best_node {
-                        let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
-                            if new_idx < mmap_node_count {
-                                mmap.get_node_record(new_idx)
-                                    .map(|r| r.max_layer as usize)
-                                    .unwrap_or(0)
-                            } else {
-                                nodes[new_idx - mmap_node_count].max_layer
-                            }
-                        } else {
-                            nodes[new_idx].max_layer
+            if let Some(mmap) = mmap_guard.as_ref() {
+                for i in 0..mmap_node_count {
+                    if i != idx && !deleted.contains(i as u64) {
+                        let record = match mmap.get_node_record(i) {
+                            Ok(r) => r,
+                            Err(_) => continue,
                         };
-                        self.hot
-                            .max_layer
-                            .store(node_max_layer as u64, Ordering::SeqCst);
-                    } else {
-                        self.hot.max_layer.store(0, Ordering::SeqCst);
+                        if record.max_layer as usize >= max_layer {
+                            max_layer = record.max_layer as usize;
+                            best_node = Some(i);
+                        }
                     }
                 }
+            }
 
-                if ram_ep_val == Some(idx) {
-                    self.hot.set_ram_entry_point(best_ram_node);
+            for (i, node) in nodes.iter().enumerate() {
+                let global_idx = mmap_node_count + i;
+                if global_idx != idx && !deleted.contains(global_idx as u64) {
+                    if node.max_layer >= max_layer {
+                        max_layer = node.max_layer;
+                        best_node = Some(global_idx);
+                    }
+                    if node.max_layer >= max_ram_layer {
+                        max_ram_layer = node.max_layer;
+                        best_ram_node = Some(global_idx);
+                    }
                 }
             }
+
+            if ep_val == Some(idx) {
+                self.hot.set_entry_point(best_node);
+                if let Some(new_idx) = best_node {
+                    let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
+                        if new_idx < mmap_node_count {
+                            mmap.get_node_record(new_idx)
+                                .map(|r| r.max_layer as usize)
+                                .unwrap_or(0)
+                        } else {
+                            nodes
+                                .get(new_idx - mmap_node_count)
+                                .map(|n| n.max_layer)
+                                .unwrap_or(0)
+                        }
+                    } else {
+                        nodes.get(new_idx).map(|n| n.max_layer).unwrap_or(0)
+                    };
+                    self.hot
+                        .max_layer
+                        .store(node_max_layer as u64, Ordering::SeqCst);
+                } else {
+                    self.hot.max_layer.store(0, Ordering::SeqCst);
+                }
+            }
+
+            if ram_ep_val == Some(idx) {
+                self.hot.set_ram_entry_point(best_ram_node);
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn do_delete(&self, id: DocId) -> Result<()> {
+        let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
+        if let Some(idx) = node_idx {
+            self.do_delete_node_idx(idx, id)?;
         }
         Ok(())
     }
