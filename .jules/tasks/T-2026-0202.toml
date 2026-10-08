@@ -1,0 +1,17 @@
+id        = "T-2026-0202"
+title     = "Candle: config.json laden, kein stiller Dummy-Fallback"
+crate     = "contextra-infer-candle"
+tier      = 1
+risk      = "none"
+goal      = "Produktionspfad lädt config.json und scheitert ohne Gewichte statt Dummy-Vektoren zu liefern."
+non_goals = ["Kein Umbau des Inferenzpfads", "Keine Cargo-Änderung", "Keine Änderung an contextra-ports"]
+scope     = ["crates/contextra-infer-candle/src/embedding.rs", "crates/contextra-infer-candle/tests/embedding_normalization_proptest.rs", "crates/contextra-infer-candle/tests/embedding_config_loading.rs", ".jules/tasks/T-2026-0202.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock", "Cargo.toml"]
+invariants = ["Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-infer-candle --test embedding_config_loading", "cargo clippy -p contextra-infer-candle --all-targets -- -D warnings"]
+evidence_required = ["Rot-Lauf vor dem Fix, grün danach", "Nachweis, dass from_dir ohne Gewichte Err liefert"]
+
+[budget]
+files      = 4
+lines      = 300
+iterations = 6
