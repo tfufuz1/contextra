@@ -331,13 +331,17 @@ impl VectorIndex for HnswIndex {
                 }
 
                 if train_data.len() >= 50 {
-                    let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
+                    let training_refs: Vec<&[f32]> =
+                        train_data.iter().map(|v| v.as_slice()).collect();
                     let q = crate::quantize::ScalarQuantizer::try_train(
                         &training_refs,
                         self.inner.cold.config.dimension,
                     )?;
-                    let bias =
-                        Sq8Bias::calibrate(&training_refs, &q, self.inner.cold.config.distance_metric);
+                    let bias = Sq8Bias::calibrate(
+                        &training_refs,
+                        &q,
+                        self.inner.cold.config.distance_metric,
+                    );
                     *self.inner.cold.quantizer.write() = Some(q.clone());
                     *self.inner.cold.sq8_bias.write() = bias;
 
@@ -360,7 +364,13 @@ impl VectorIndex for HnswIndex {
                 };
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        if self.inner.hot.doc_to_node.read().contains_key(&doc_id.inner()) {
+                        if self
+                            .inner
+                            .hot
+                            .doc_to_node
+                            .read()
+                            .contains_key(&doc_id.inner())
+                        {
                             deletes_to_apply.push(*doc_id);
                         }
                         let prepared = self.inner.compute_insert_with_context(

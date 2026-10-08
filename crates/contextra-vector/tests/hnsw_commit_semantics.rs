@@ -125,17 +125,13 @@ async fn test_commit_error_preparation_restages_ops() -> Result<()> {
 
     let tx1 = TxId::new(1);
     // Stage op directly with invalid vector dimension
-    index
-        .inner_core()
-        .cold
-        .tx_buffer
-        .stage(
-            tx1,
-            IndexOp::Insert {
-                doc_id: doc1,
-                data: invalid_vec,
-            },
-        )?;
+    index.inner_core().cold.tx_buffer.stage(
+        tx1,
+        IndexOp::Insert {
+            doc_id: doc1,
+            data: invalid_vec,
+        },
+    )?;
 
     let commit_res = index.commit(tx1).await;
     assert!(
