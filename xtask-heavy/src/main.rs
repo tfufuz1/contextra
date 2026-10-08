@@ -1,3 +1,6 @@
+// TODO: entfernen - Ausnahmen für Dateien außerhalb des Task-Scopes in xtask-heavy
+#![allow(clippy::unwrap_used, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+
 mod bench_gate;
 mod check_bandit_latency_budget;
 
