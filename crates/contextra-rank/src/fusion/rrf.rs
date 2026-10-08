@@ -218,8 +218,7 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
     // --- Phase 1: Lightweight scoring across all candidates ---
     for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
         let weight = modulated_weights[idx];
-        if !weight.is_finite() || weight <= 0.0 {
-            // NAN-CHECK-OK
+        if !weight.is_finite() || weight <= 0.0 { // NAN-CHECK-OK
             tracing::warn!(
                 signal = %signal_name,
                 weight,
@@ -292,8 +291,7 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
     // --- Phase 2: Materialize FusedEntry strictly for Top-K candidates ---
     for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
         let weight = modulated_weights[idx];
-        if !weight.is_finite() || weight <= 0.0 {
-            // NAN-CHECK-OK
+        if !weight.is_finite() || weight <= 0.0 { // NAN-CHECK-OK
             continue;
         }
         let sig_key = SignalKey::from_name(signal_name);
@@ -651,8 +649,7 @@ pub fn fuse_search_results_with_signal_strategies(
 
     for (signal_name, result_set, weight) in &result_sets {
         let weight = *weight;
-        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
-            // NAN-CHECK-OK
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() { // NAN-CHECK-OK
             norm_ranges.push(None);
             continue;
         }
@@ -755,7 +752,7 @@ pub fn fuse_search_results_with_signal_strategies(
     // --- Phase 2: Materialize FusedEntry strictly for Top-K candidates ---
     for (sig_idx, (signal_name, result_set, weight)) in result_sets.iter().enumerate() {
         let weight = *weight;
-        if !(weight > 0.0) || result_set.is_empty() {
+        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
             continue;
         }
         let sig_key = SignalKey::from_name(signal_name);

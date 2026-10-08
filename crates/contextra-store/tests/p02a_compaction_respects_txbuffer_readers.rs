@@ -28,11 +28,12 @@ async fn test_compaction_respects_txbuffer_active_reader() {
         ..Default::default()
     };
 
-    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> = Arc::new(GcFloor::new(
-        Arc::clone(&snapshot_registry),
-        Arc::clone(&tx_buffer),
-        Arc::new(std::sync::atomic::AtomicU64::new(100)),
-    ));
+    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> =
+        Arc::new(GcFloor::new(
+            Arc::clone(&snapshot_registry),
+            Arc::clone(&tx_buffer),
+            Arc::new(std::sync::atomic::AtomicU64::new(100)),
+        ));
 
     let engine = CompactionEngine::new(
         comp_config,
@@ -132,11 +133,12 @@ async fn test_compaction_without_active_readers_purges_tombstone() {
         ..Default::default()
     };
 
-    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> = Arc::new(GcFloor::new(
-        Arc::clone(&snapshot_registry),
-        Arc::clone(&tx_buffer),
-        Arc::new(std::sync::atomic::AtomicU64::new(100)),
-    ));
+    let gc_floor: Arc<dyn contextra_mvcc::snapshot::SnapshotFloor> =
+        Arc::new(GcFloor::new(
+            Arc::clone(&snapshot_registry),
+            Arc::clone(&tx_buffer),
+            Arc::new(std::sync::atomic::AtomicU64::new(100)),
+        ));
 
     let engine = CompactionEngine::new(
         comp_config,

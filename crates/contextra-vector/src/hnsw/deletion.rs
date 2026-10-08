@@ -781,9 +781,15 @@ mod tests {
         fake_mmap[201..205].copy_from_slice(&1u32.to_le_bytes()); // len 1
         fake_mmap[205..209].copy_from_slice(&999u32.to_le_bytes()); // conn 999
 
+        let file = match tempfile::tempfile() {
+            Ok(f) => f,
+            Err(_) => return Ok(()),
+        };
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap.make_read_only().unwrap()),
+            file_handle: std::sync::Arc::new(mmap_file.reopen().unwrap()),
             header,
+            file_handle: std::sync::Arc::new(file),
         };
         *mut_index.inner.cold.mmap_index.write() = Some(mmap_index);
 
@@ -812,9 +818,15 @@ mod tests {
             .make_read_only()
             .unwrap();
 
+        let file = match tempfile::tempfile() {
+            Ok(f) => f,
+            Err(_) => return Ok(()),
+        };
         let mmap_index = crate::persistence::MmapIndex {
             mmap: std::sync::Arc::new(fake_mmap),
+            file_handle: std::sync::Arc::new(mmap_file.reopen().unwrap()),
             header,
+            file_handle: std::sync::Arc::new(file),
         };
 
         *index.inner.cold.mmap_index.write() = Some(mmap_index);

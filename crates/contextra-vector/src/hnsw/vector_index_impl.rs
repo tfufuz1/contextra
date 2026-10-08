@@ -180,7 +180,10 @@ impl VectorIndex for HnswIndex {
                     }
                 }
             }
-            let doc_id = self.inner.resolve_doc_id(c.index, &ctx)?;
+            let doc_id = match self.inner.resolve_doc_id(c.index, &ctx) {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
 
             let final_dist = if self.inner.cold.config.quantize {
                 self.inner.resolve_dist(c.index, query, None, &ctx)?
@@ -306,7 +309,7 @@ impl VectorIndex for HnswIndex {
         }
 
         // Phase 2: Quantizer Training (if needed) & Preparation of Inserts / Deletes
-        let prep_res: Result<(Vec<PreparedInsert>, Vec<DocId>)> = (|| {
+        let prep_res: Result<(Vec<PreparedInsert>, Vec<(usize, DocId)>)> = (|| {
             if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
                 let mut train_data = Vec::with_capacity(256.min(doc_order.len()));
                 for doc_id in &doc_order {
@@ -364,14 +367,10 @@ impl VectorIndex for HnswIndex {
                 };
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        if self
-                            .inner
-                            .hot
-                            .doc_to_node
-                            .read()
-                            .contains_key(&doc_id.inner())
+                        if let Some(&old_idx) =
+                            self.inner.hot.doc_to_node.read().get(&doc_id.inner())
                         {
-                            deletes_to_apply.push(*doc_id);
+                            deletes_to_apply.push((old_idx, *doc_id));
                         }
                         let prepared = self.inner.compute_insert_with_context(
                             *doc_id,
@@ -383,7 +382,11 @@ impl VectorIndex for HnswIndex {
                         prepared_inserts.push(prepared);
                     }
                     IndexOp::Delete { doc_id, .. } => {
-                        deletes_to_apply.push(*doc_id);
+                        if let Some(&old_idx) =
+                            self.inner.hot.doc_to_node.read().get(&doc_id.inner())
+                        {
+                            deletes_to_apply.push((old_idx, *doc_id));
+                        }
                     }
                     _ => unreachable!(),
                 }
@@ -408,15 +411,23 @@ impl VectorIndex for HnswIndex {
         };
 
         // Phase 3: Apply Mutations (Atomic execution once preparation succeeded)
-        for doc_id in deletes_to_apply {
-            self.inner.do_delete(doc_id)?;
-        }
-
         let seq = tx.inner();
         let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
         for prepared in prepared_inserts {
             inserted_doc_ids.push(prepared.doc_id);
             self.inner.apply_insert(prepared, seq)?;
+        }
+
+        let mut doc_map = self.inner.hot.doc_to_node.write();
+        for (old_idx, doc_id) in &deletes_to_apply {
+            if doc_map.get(&doc_id.inner()) == Some(old_idx) {
+                doc_map.remove(&doc_id.inner());
+            }
+        }
+        drop(doc_map);
+
+        for (old_idx, doc_id) in deletes_to_apply {
+            self.inner.do_delete_node_idx(old_idx, doc_id)?;
         }
 
         let mut seq_log = self.inner.cold.seq_log.write();
