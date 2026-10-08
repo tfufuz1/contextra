@@ -63,7 +63,7 @@ pub struct EmbeddingConfig {
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
-            provider: "mock".to_string(),
+            provider: String::new(),
             ollama_url: "http://localhost:11434".to_string(),
             embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
@@ -77,7 +77,7 @@ impl EmbeddingConfig {
     pub fn from_env() -> Self {
         let prefixed = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER").ok();
         let unprefixed = std::env::var("EMBEDDING_PROVIDER").ok();
-        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "");
 
         if resolved.used_unprefixed_fallback {
             EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
@@ -133,6 +133,9 @@ pub fn create_embedding_provider(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match provider_type.to_lowercase().trim() {
+        "" => Err(ContextraError::InvalidInput(
+            "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string(),
+        )),
         #[cfg(feature = "ollama")]
         "ollama" => {
             let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
@@ -191,6 +194,7 @@ pub fn create_embedding_provider(
             })
         }
         "mock" => {
+            tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
@@ -413,19 +417,42 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_setting_default() {
-        let res = resolve_provider_setting(None, None, "mock");
-        assert_eq!(res.value, "mock");
+        let res = resolve_provider_setting(None, None, "");
+        assert_eq!(res.value, "");
         assert!(!res.used_unprefixed_fallback);
     }
 
     #[test]
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
-        assert_eq!(config.provider, "mock");
+        assert_eq!(config.provider, "");
         assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.embed_model, "nomic-embed-text");
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
+    }
+
+    #[test]
+    fn test_create_embedding_provider_unconfigured_error() {
+        let res = create_embedding_provider(
+            "",
+            "http://localhost:11434",
+            "nomic-embed-text",
+            None,
+            None,
+        );
+        match res {
+            Err(ContextraError::InvalidInput(msg)) => {
+                assert!(msg.contains("CONTEXTRA_EMBEDDING_PROVIDER"));
+                assert!(msg.contains("EMBEDDING_PROVIDER"));
+                assert!(msg.contains("ollama"));
+                assert!(msg.contains("onnx"));
+                assert!(msg.contains("candle"));
+                assert!(msg.contains("mock"));
+            }
+            Err(other) => panic!("Expected ContextraError::InvalidInput, got: {other}"),
+            Ok(_) => panic!("Expected create_embedding_provider to fail when unconfigured"),
+        }
     }
 
     #[test]
