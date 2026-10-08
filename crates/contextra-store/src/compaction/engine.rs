@@ -726,8 +726,12 @@ impl CompactionEngine {
                                     acc_val = bytes::Bytes::from(merged_bytes);
                                     // Pop next_item from heap and advance its stream
                                     if let Some(popped) = heap.pop() {
-                                        Self::fetch_next_entry(popped.source_idx, &mut streams, &mut heap)
-                                            .await?;
+                                        Self::fetch_next_entry(
+                                            popped.source_idx,
+                                            &mut streams,
+                                            &mut heap,
+                                        )
+                                        .await?;
                                     }
                                 }
                                 Err(err) => {
@@ -748,14 +752,16 @@ impl CompactionEngine {
                         // Without MergeOperator, newest value (current_item) replaces all older versions;
                         // consume older versions without merging
                         if let Some(popped) = heap.pop() {
-                            Self::fetch_next_entry(popped.source_idx, &mut streams, &mut heap).await?;
+                            Self::fetch_next_entry(popped.source_idx, &mut streams, &mut heap)
+                                .await?;
                         }
                     }
                 }
 
                 // Write the resulting folded floor entry
-                let should_gc_tombstone =
-                    is_acc_tombstone && is_full_compaction && (acc_seq & !TOMBSTONE_BIT) < min_snapshot_seq;
+                let should_gc_tombstone = is_acc_tombstone
+                    && is_full_compaction
+                    && (acc_seq & !TOMBSTONE_BIT) < min_snapshot_seq;
                 if !should_gc_tombstone {
                     self.write_entry_with_rate_limit(
                         &mut builder,

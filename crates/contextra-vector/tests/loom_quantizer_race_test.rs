@@ -27,7 +27,6 @@ mod loom_tests {
             let index = Arc::new(HnswIndex::try_new(config).expect("valid index"));
 
             let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
                 .build()
                 .unwrap();
 
@@ -68,7 +67,6 @@ mod loom_tests {
             }
 
             let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
                 .build()
                 .unwrap();
 

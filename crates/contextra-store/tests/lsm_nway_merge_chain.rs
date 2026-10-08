@@ -74,9 +74,14 @@ async fn test_nway_merge_n4_and_n5_counter() {
         let path = dir.path().join(format!("sst_n4_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"key_n4", &val.to_le_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"key_n4", &val.to_le_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let engine = CompactionEngine::new(
@@ -118,9 +123,14 @@ async fn test_nway_merge_n4_and_n5_counter() {
         let path = dir.path().join(format!("sst_n5_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"key_n5", &val.to_le_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"key_n5", &val.to_le_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers_5.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers_5.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let out_path_5 = dir.path().join("compacted_n5.sst");
@@ -129,7 +139,11 @@ async fn test_nway_merge_n4_and_n5_counter() {
         .await
         .unwrap();
 
-    let reader_5 = Arc::new(SstableReader::open(&out_path_5, cache.clone()).await.unwrap());
+    let reader_5 = Arc::new(
+        SstableReader::open(&out_path_5, cache.clone())
+            .await
+            .unwrap(),
+    );
     let mut stream_5 = reader_5.stream().await.unwrap();
     let mut entries_5: Vec<Entry> = Vec::new();
     while let Some(e) = stream_5.next_entry().await.unwrap() {
@@ -158,9 +172,14 @@ async fn test_nway_merge_non_commutative_order() {
         let path = dir.path().join(format!("sst_concat_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"strkey", val.as_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"strkey", val.as_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let engine = CompactionEngine::new(
@@ -205,7 +224,10 @@ async fn test_nway_merge_tombstone_in_middle() {
     // seq 1: Put "10"
     let path1 = dir.path().join("sst1.sst");
     let mut builder1 = SstableBuilder::create(&path1).await.unwrap();
-    builder1.add(b"key_tomb", &10u64.to_le_bytes(), 1, 1).await.unwrap();
+    builder1
+        .add(b"key_tomb", &10u64.to_le_bytes(), 1, 1)
+        .await
+        .unwrap();
     builder1.finish().await.unwrap();
 
     // seq 2: Tombstone (seq = 2 | TOMBSTONE_BIT)
@@ -220,7 +242,10 @@ async fn test_nway_merge_tombstone_in_middle() {
     // seq 3: Put "30"
     let path3 = dir.path().join("sst3.sst");
     let mut builder3 = SstableBuilder::create(&path3).await.unwrap();
-    builder3.add(b"key_tomb", &30u64.to_le_bytes(), 3, 3).await.unwrap();
+    builder3
+        .add(b"key_tomb", &30u64.to_le_bytes(), 3, 3)
+        .await
+        .unwrap();
     builder3.finish().await.unwrap();
 
     let readers = vec![
@@ -279,9 +304,14 @@ async fn test_nway_merge_exact_min_snapshot_seq() {
         let path = dir.path().join(format!("sst_exact_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"exactkey", &val.to_le_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"exactkey", &val.to_le_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let engine = CompactionEngine::new(
@@ -333,9 +363,14 @@ async fn test_nway_merge_with_active_snapshot_floor() {
         let path = dir.path().join(format!("sst_snap_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"snapkey", &val.to_le_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"snapkey", &val.to_le_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let engine = CompactionEngine::new(
@@ -393,9 +428,14 @@ async fn test_nway_merge_error_mid_chain_failsafe() {
         let path = dir.path().join(format!("sst_err_{idx}.sst"));
         let mut builder = SstableBuilder::create(&path).await.unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"errkey", val.as_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"errkey", val.as_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
-        readers.push(Arc::new(SstableReader::open(&path, cache.clone()).await.unwrap()));
+        readers.push(Arc::new(
+            SstableReader::open(&path, cache.clone()).await.unwrap(),
+        ));
     }
 
     let engine = CompactionEngine::new(
@@ -438,17 +478,21 @@ async fn test_nway_merge_key_manager_bypasses_merge_op() {
     let dir = tempdir().unwrap();
     let cache = Arc::new(BlockCache::new(1024 * 1024));
     let snapshot_reg = Arc::new(SnapshotRegistry::new());
-    let km = Arc::new(KeyManager::try_new("test_passphrase_for_compaction_test", b"salt12345678").unwrap());
+    let km = Arc::new(
+        KeyManager::try_new("test_passphrase_for_compaction_test", b"salt12345678").unwrap(),
+    );
 
     let mut readers = Vec::new();
     for (idx, val) in [10u64, 20, 30].iter().enumerate() {
         let path = dir.path().join(format!("sst_enc_{idx}.sst"));
-        let mut builder =
-            SstableBuilder::create_with_key_manager(&path, Some(km.clone()))
-                .await
-                .unwrap();
+        let mut builder = SstableBuilder::create_with_key_manager(&path, Some(km.clone()))
+            .await
+            .unwrap();
         let seq = (idx + 1) as u64;
-        builder.add(b"enckey", &val.to_le_bytes(), seq, seq).await.unwrap();
+        builder
+            .add(b"enckey", &val.to_le_bytes(), seq, seq)
+            .await
+            .unwrap();
         builder.finish().await.unwrap();
         readers.push(Arc::new(
             SstableReader::open_with_key_manager(&path, cache.clone(), Some(km.clone()))
@@ -475,9 +519,11 @@ async fn test_nway_merge_key_manager_bypasses_merge_op() {
         .await
         .unwrap();
 
-    let reader = Arc::new(SstableReader::open_with_key_manager(&out_path, cache.clone(), Some(km.clone()))
-        .await
-        .unwrap());
+    let reader = Arc::new(
+        SstableReader::open_with_key_manager(&out_path, cache.clone(), Some(km.clone()))
+            .await
+            .unwrap(),
+    );
     let mut stream = reader.stream().await.unwrap();
     let mut entries: Vec<Entry> = Vec::new();
     while let Some(e) = stream.next_entry().await.unwrap() {
