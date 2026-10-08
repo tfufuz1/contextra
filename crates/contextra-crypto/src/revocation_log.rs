@@ -151,7 +151,7 @@ pub fn marker_path_for(log_path: &Path) -> PathBuf {
 }
 
 fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = path.parent().unwrap_or(Path::new("."));
     let parent = if parent.as_os_str().is_empty() {
         Path::new(".")
     } else {
@@ -186,21 +186,24 @@ fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
     };
 
     if let Err(err) = write_tmp() {
-        let _ = std::fs::remove_file(&tmp_path);
+        std::fs::remove_file(&tmp_path).ok();
         return Err(err);
     }
 
     if let Err(e) = std::fs::rename(&tmp_path, path) {
-        let _ = std::fs::remove_file(&tmp_path);
+        std::fs::remove_file(&tmp_path).ok();
         return Err(CryptoError::Crypto(format!(
             "Failed to rename temp file: {e}"
         )));
     }
 
-    if let Ok(dir_file) = File::open(parent) {
-        dir_file
-            .sync_all()
-            .map_err(|e| CryptoError::Crypto(format!("Failed to sync parent directory: {e}")))?;
+    match File::open(parent) {
+        Ok(dir_file) => {
+            dir_file.sync_all().map_err(|e| {
+                CryptoError::Crypto(format!("Failed to sync parent directory: {e}"))
+            })?;
+        }
+        Err(_) => {}
     }
 
     Ok(())
