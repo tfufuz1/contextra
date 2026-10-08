@@ -258,8 +258,9 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                                         if span.get("is_primary").and_then(|b| b.as_bool())
                                             == Some(true)
                                         {
-                                            if let Some(file_name) =
-                                                span.get("file_name").and_then(|f| f.as_str())
+                                            if let Some(file_name) = span
+                                                .get("file_name")
+                                                .and_then(|f| f.as_str())
                                             {
                                                 let norm_file = file_name.replace('\\', "/");
                                                 *missing_safety_counts
