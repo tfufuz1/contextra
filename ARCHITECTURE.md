@@ -305,8 +305,59 @@ collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embed
 ```
 
 * **Sperren-Reihenfolge**: Wenn mehrere Locks akquiriert werden müssen, geschieht dies ausnahmslos von links nach rechts.
-* **Key-Granulares Locking (`KvKeyLocks`)**: Schreibzugriffe auf Schlüsselebene nutzen Sharded Locks (`RwLock<()>`). Bei Mehrschlüssel-Operationen (`acquire_multi_sorted`) werden die Shard-Indizes zwingend **aufsteigend sortiert** akquiriert, um Zyklen im Wait-For-Graph auszuschließen.
+* **Key-Granulares Locking (`KvKeyLocks`)**: Schreibzugriffe auf Schlüsselebene nutzen Sharded Locks (`tokio::sync::Mutex<()>`). Die Shards serialisieren Schreibzugriffe pro Schlüssel-Shard. Bei Mehrschlüssel-Operationen (`lock_many_sorted` / `acquire_multi_sorted`) werden die Shard-Indizes zwingend **aufsteigend sortiert** akquiriert, um Zyklen im Wait-For-Graph auszuschließen.
 * **Kein Async unter Sync-Locks**: Kein `.await`-Aufruf darf gehalten werden, während ein synchroner Mutex/RwLock-Guard existiert.
+
+#### Verifizierte Lock-Felder in `contextra-engine`
+
+Die folgenden Struct-Felder in `contextra-engine` halten Mutex- oder RwLock-Instanzen:
+
+1. **`ContextraEngine` (`crates/contextra-engine/src/lib.rs`):**
+   - `collections`: `tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>`
+   - `tenant_collections`: `tokio::sync::RwLock<TenantCollectionMap>`
+   - `embedder`: `parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>`
+   - `router`: `parking_lot::RwLock<Option<std::sync::Weak<dyn DriftStatusProvider>>>`
+   - `calibrator`: `parking_lot::RwLock<Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>>`
+   - `pid_controller`: `parking_lot::RwLock<Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>>`
+   - `kv_eviction_worker`: `parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>`
+   - `metrics_sink`: `parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>`
+   - `kv_hooks`: `parking_lot::RwLock<Option<Arc<dyn contextra_ports::KvLifecycleHooks>>>`
+
+2. **`Collection` & `KvKeyLocks` (`crates/contextra-engine/src/collection/`):**
+   - `kv_locks.shards`: `[tokio::sync::Mutex<()>; 16]` (`kv_lock.rs`)
+   - `embedder`: `parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>` (`mod.rs`)
+   - `consolidation_guard`: `Arc<tokio::sync::Mutex<()>>` (`mod.rs`)
+   - `kv_hooks`: `parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>` (`mod.rs`)
+   - `config`: `parking_lot::RwLock<CollectionConfig>` (`mod.rs`)
+   - `pressure_rx`: `parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>` (`mod.rs`)
+   - `clock`: `parking_lot::RwLock<Arc<dyn Clock>>` (`mod.rs`)
+   - `metrics`: `parking_lot::RwLock<Arc<dyn MetricsSink>>` (`mod.rs`)
+
+3. **`DbTransaction` (`crates/contextra-engine/src/transaction/db_transaction.rs`):**
+   - `staged_forward_keys`: `std::sync::Mutex<Vec<StagedKeyOp>>`
+   - `staged_reverse_keys`: `std::sync::Mutex<Vec<StagedKeyOp>>`
+   - `staged_doc_ids`: `std::sync::Mutex<Arc<Vec<DocId>>>`
+   - `staged_text_ops`: `std::sync::Mutex<Vec<(DocId, String)>>`
+   - `staged_text_deletes`: `std::sync::Mutex<Vec<DocId>>`
+   - `staged_graph_entities`: `std::sync::Mutex<Vec<Entity>>`
+   - `staged_graph_edges`: `std::sync::Mutex<Vec<Edge>>`
+   - `staged_graph_entity_deletes`: `std::sync::Mutex<Vec<EntityId>>`
+   - `staged_graph_edge_deletes`: `std::sync::Mutex<Vec<(EntityId, EntityId)>>`
+   - `staged_hyperedges`: `std::sync::Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>`
+
+4. **`AccessCounterAttentionExporter` (`crates/contextra-engine/src/kv_cache_integration/mod.rs`):**
+   - `access_counts`: `parking_lot::RwLock<HashMap<RequestId, u64>>`
+
+5. **`HyperEdgeMaintenanceQueue` (`crates/contextra-engine/src/background_workers/hyperedge_worker.rs`):**
+   - `inner`: `tokio::sync::Mutex<VecDeque<HyperEdgeId>>`
+
+6. **`HybridQueryBuilder` (`crates/contextra-engine/src/collection/query_builder/builder.rs`):**
+   - `pid_controller`: `Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>`
+
+7. **Auto-Extraction Reentrancy-Guard (`crates/contextra-engine/src/collection/crud/auto_extraction.rs`):**
+   - `GLOBAL_REENTRANCY_GUARD`: `parking_lot::RwLock<ahash::AHashMap<...>>`
+
+Für alle Locks außerhalb der Hauptachse (`collections` → `kv_locks` → `embedder`) gilt: keine dokumentierte Ordnung, nicht verschachteln.
 
 ---
 
