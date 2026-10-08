@@ -1,0 +1,17 @@
+id        = "T-2026-0201"
+title     = "MCP: Embedding-Provider ohne Konfiguration fail-closed"
+crate     = "contextra-mcp"
+tier      = 1
+risk      = "none"
+goal      = "Ohne explizite Providerwahl kein stiller Mock-Start; Mock nur explizit und mit Warnung."
+non_goals = ["Kein LLM-Provider-Umbau", "Keine Änderung an contextra-ports", "Keine neuen Dependencies"]
+scope     = ["crates/contextra-mcp/src/config.rs", "crates/contextra-mcp/tests/embedding_provider_default.rs", ".jules/tasks/T-2026-0201.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock"]
+invariants = ["Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-mcp --test embedding_provider_default", "cargo clippy -p contextra-mcp --all-targets -- -D warnings"]
+evidence_required = ["Rot-Lauf vor dem Fix (Meldung zitieren), grün danach"]
+
+[budget]
+files      = 3
+lines      = 250
+iterations = 5
