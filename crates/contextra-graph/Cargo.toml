@@ -40,7 +40,7 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "sync", "macros", "time", "test-util"] }
 contextra-store = { workspace = true }
 contextra-testkit = { workspace = true }
 tempfile = { workspace = true }

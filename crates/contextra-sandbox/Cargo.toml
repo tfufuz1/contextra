@@ -19,9 +19,9 @@ wasmtime = { version = "25", default-features = false, features = ["async", "cra
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 anyhow = "1"
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "macros", "time"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
 wat = "1"
