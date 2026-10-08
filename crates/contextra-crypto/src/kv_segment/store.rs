@@ -167,7 +167,7 @@ impl TenantIsolatedKvStore {
     /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
     #[inline]
     fn shard_idx(&self, tenant: TenantId) -> usize {
-        usize::try_from(tenant.inner() & (self.shard_count as u64 - 1)).unwrap_or(0)
+        (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
     /// Fügt ein Segment für einen bestimmten Tenant ein.

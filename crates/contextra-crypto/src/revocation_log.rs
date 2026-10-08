@@ -197,13 +197,10 @@ fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
         )));
     }
 
-    match File::open(parent) {
-        Ok(dir_file) => {
-            dir_file.sync_all().map_err(|e| {
-                CryptoError::Crypto(format!("Failed to sync parent directory: {e}"))
-            })?;
-        }
-        Err(_) => {}
+    if let Ok(dir_file) = File::open(parent) {
+        dir_file.sync_all().map_err(|e| {
+            CryptoError::Crypto(format!("Failed to sync parent directory: {e}"))
+        })?;
     }
 
     Ok(())
@@ -475,12 +472,15 @@ impl RevocationLog {
             return Err(CryptoError::IntegrityViolation);
         }
 
-        // If log_count == marker.count and count > 0, verify head hash match
-        if log_count == marker.count && marker.count > 0 {
-            if let Some(last) = parsed_entries.last() {
-                if last.entry_hash != marker.head_hash {
-                    return Err(CryptoError::IntegrityViolation);
-                }
+        if marker.count == 0 {
+            if marker.head_hash != [0u8; 32] {
+                return Err(CryptoError::IntegrityViolation);
+            }
+        } else {
+            let target_idx = usize::try_from(marker.count - 1)
+                .map_err(|_| CryptoError::IntegrityViolation)?;
+            if parsed_entries[target_idx].entry_hash != marker.head_hash {
+                return Err(CryptoError::IntegrityViolation);
             }
         }
 
@@ -643,10 +643,10 @@ impl RevocationLog {
             CryptoError::Crypto("Signing key not configured for RevocationLog append".to_string())
         })?;
 
-        let entries_guard = self.entries.read();
+        let mut entries_write_guard = self.entries.write();
 
-        let sequence_number = entries_guard.len() as u64;
-        let prev_hash = entries_guard
+        let sequence_number = entries_write_guard.len() as u64;
+        let prev_hash = entries_write_guard
             .last()
             .map(|e| e.entry_hash)
             .unwrap_or([0u8; 32]);
@@ -664,9 +664,8 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut candidate_entries = entries_guard.clone();
+        let mut candidate_entries = entries_write_guard.clone();
         candidate_entries.push(new_entry.clone());
-        drop(entries_guard);
 
         if let Some(ref path) = self.file_path {
             let serialized_log = bincode::serialize(&candidate_entries).map_err(|e| {
@@ -685,7 +684,6 @@ impl RevocationLog {
             write_atomic_file(&m_path, &serialized_marker)?;
         }
 
-        let mut entries_write_guard = self.entries.write();
         let mut revoked_write_guard = self.revoked_targets.write();
 
         entries_write_guard.push(new_entry.clone());

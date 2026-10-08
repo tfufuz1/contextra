@@ -276,17 +276,14 @@ impl IntegrityVerifier {
         if entry.op_type == 0 {
             // Put
             mac.update(&[0u8]);
-            let k_len = u32::try_from(entry.key.len()).unwrap_or(u32::MAX);
-            mac.update(&k_len.to_le_bytes());
+            mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
-            let v_len = u32::try_from(entry.value.len()).unwrap_or(u32::MAX);
-            mac.update(&v_len.to_le_bytes());
+            mac.update(&(entry.value.len() as u32).to_le_bytes());
             mac.update(&entry.value);
         } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
-            let k_len = u32::try_from(entry.key.len()).unwrap_or(u32::MAX);
-            mac.update(&k_len.to_le_bytes());
+            mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd
