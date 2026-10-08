@@ -1,0 +1,27 @@
+id                = "T-2026-0006"
+title             = "P06: Persistent Key Shredding & DeletionProof Durability"
+crate             = "contextra-crypto"
+tier              = 1
+risk              = "low"
+goal              = "Durhafter und fail-closed Widerruf-Zustand (Shredding) und DeletionProof mit Durability-Nachweis."
+non_goals         = ["Salt-Änderung", "Verschlüsselungsalgorithmen-Änderung"]
+protected_change  = "P06 hardening key shredding persistence and deletion proof durability"
+scope             = [
+  "crates/contextra-crypto/src/**",
+  "crates/contextra-crypto/tests/**",
+  "crates/contextra-mcp/src/routing.rs",
+  "crates/contextra-mvcc/src/snapshot.rs",
+  ".jules/tasks/P06.toml"
+]
+forbidden         = [".github/**", "xtask/**", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants        = ["Zero-Panic", "Unsafe Islands Only", "P28", "INV-DELETION-1/2", "INV-DURABILITY-RING"]
+acceptance        = [
+  "cargo test -p contextra-crypto --locked",
+  "cargo test -p contextra-mcp --locked"
+]
+evidence_required = ["Tests in crates/contextra-crypto/tests/"]
+
+[budget]
+files      = 15
+lines      = 600
+iterations = 10

@@ -256,7 +256,7 @@ fn bench_aead_encryption_overhead_per_mb(c: &mut Criterion) {
     let payload_1mb = vec![0x5a_u8; 1_024_1024]; // 1 MB payload
     let km = KeyManager::try_new("benchmark-secret-passphrase", b"salt-1234")
         .expect("KeyManager init failed");
-    let cipher = KvSegmentCipher::new(km);
+    let cipher = KvSegmentCipher::ephemeral(km);
     let tenant_id = TenantId::try_new(42).unwrap();
     let model_fp = sample_prefix_key().model;
 

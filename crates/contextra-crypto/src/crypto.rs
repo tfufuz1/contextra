@@ -320,6 +320,16 @@ impl KeyManager {
         self.derive_kv_key(*expected_tenant_id, &dummy_fp)
     }
 
+    /// Derives a deterministic Ed25519 signing key for the `RevocationLog` bound to this master key.
+    pub fn derive_revocation_signing_key(&self) -> Result<ed25519_dalek::SigningKey> {
+        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
+            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
+        let mut key_bytes = [0u8; 32];
+        hk.expand(b"contextra-revocation-log-signing-key-v1", &mut key_bytes)
+            .map_err(|e| CryptoError::Crypto(format!("HKDF revocation key expansion failed: {e}")))?;
+        Ok(ed25519_dalek::SigningKey::from_bytes(&key_bytes))
+    }
+
     /// Derives an integrity key for HMAC-SHA256.
     pub fn integrity_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
@@ -362,6 +372,7 @@ impl KeyManager {
         attested_at: i64,
         graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
     ) -> Result<crate::deletion_proof::DeletionProof> {
+        let durability = crate::deletion_proof::DurabilityProof::new(deleted_after_tx.0);
         crate::deletion_proof::DeletionProof::create_v3(
             scope,
             deleted_keys,
@@ -370,6 +381,7 @@ impl KeyManager {
             excluded_scopes,
             attested_at,
             graph_repair,
+            Some(&durability),
             keypair.signing_key(),
         )
         .map_err(|e| CryptoError::Crypto(e.to_string()))
@@ -567,6 +579,18 @@ mod tests {
 
         // Ensure key is zero after wipe
         assert_eq!(km.inspect_key_bytes_for_test(), &[0u8; 32]);
+    }
+
+    #[test]
+    fn test_derive_revocation_signing_key_deterministic() {
+        let km1 = KeyManager::try_new("master-passphrase", b"salt1").unwrap();
+        let km2 = KeyManager::try_new("master-passphrase", b"salt1").unwrap();
+
+        let sk1 = km1.derive_revocation_signing_key().unwrap();
+        let sk2 = km2.derive_revocation_signing_key().unwrap();
+
+        assert_eq!(sk1.to_bytes(), sk2.to_bytes());
+        assert_eq!(sk1.verifying_key(), sk2.verifying_key());
     }
 
     #[test]
