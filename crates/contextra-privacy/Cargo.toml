@@ -23,7 +23,7 @@ rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 parking_lot = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "macros", "time"] }
 scc = "2"
 blake3 = { workspace = true }
 regex = { workspace = true }
@@ -31,4 +31,4 @@ regex = { workspace = true }
 [dev-dependencies]
 contextra-crypto = { workspace = true, features = ["test-utils"] }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }

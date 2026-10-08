@@ -44,7 +44,7 @@ cloud-egress-guard = []
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "sync", "time", "test-util"] }
 proptest = "1.4"
 criterion = { workspace = true }
 loom = "0.7"

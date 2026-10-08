@@ -31,7 +31,7 @@ contextra-adapt = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "macros", "time"] }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
 tokio-util = { version = "0.7.18", features = ["rt"] }
@@ -40,7 +40,7 @@ thiserror = { workspace = true }
 
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
