@@ -185,7 +185,36 @@ pub fn setup_kv_bridge(
         }
     };
 
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
+    let db_dir = db
+        .config()
+        .orphan_registry_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("./contextra_data"));
+
+    let log_path = db_dir.join("kv_revocation.log");
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let sk = match master_km.derive_revocation_signing_key() {
+        Ok(sk) => sk,
+        Err(e) => {
+            tracing::warn!("KvBridgeAdapter: Failed to derive revocation signing key: {e}");
+            return None;
+        }
+    };
+    let vk = sk.verifying_key();
+
+    let log = match contextra_crypto::RevocationLog::open_or_create(&log_path, clock, Some(sk), vk) {
+        Ok(l) => Arc::new(l),
+        Err(e) => {
+            tracing::warn!(
+                "KvBridgeAdapter: Failed to open revocation log at {}: {e}",
+                log_path.display()
+            );
+            return None;
+        }
+    };
+
+    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km, log));
 
     let col_res = match tokio::runtime::Handle::try_current() {
         Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),

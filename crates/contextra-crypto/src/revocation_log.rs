@@ -28,13 +28,8 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,57 +63,8 @@ pub fn marker_path_for(log_path: &Path) -> PathBuf {
 }
 
 fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let parent = if parent.as_os_str().is_empty() {
-        Path::new(".")
-    } else {
-        parent
-    };
-
-    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-    let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp_path = parent.join(format!(
-        "{}.tmp-{}-{}",
-        file_name,
-        std::process::id(),
-        count
-    ));
-
-    let write_tmp = || -> Result<()> {
-        let mut tmp_file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp_path)
-            .map_err(|e| CryptoError::Crypto(format!("Failed to create temp file: {e}")))?;
-
-        tmp_file
-            .write_all(content)
-            .map_err(|e| CryptoError::Crypto(format!("Failed to write temp file: {e}")))?;
-
-        tmp_file
-            .sync_all()
-            .map_err(|e| CryptoError::Crypto(format!("Failed to sync temp file: {e}")))?;
-
-        Ok(())
-    };
-
-    if let Err(err) = write_tmp() {
-        let _ = std::fs::remove_file(&tmp_path);
-        return Err(err);
-    }
-
-    if let Err(e) = std::fs::rename(&tmp_path, path) {
-        let _ = std::fs::remove_file(&tmp_path);
-        return Err(CryptoError::Crypto(format!(
-            "Failed to rename temp file: {e}"
-        )));
-    }
-
-    if let Ok(dir_file) = File::open(parent) {
-        let _ = dir_file.sync_all();
-    }
-
-    Ok(())
+    contextra_durable_fs::atomic_replace(path, content)
+        .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))
 }
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
@@ -479,11 +425,11 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        entries_guard.push(new_entry.clone());
-        revoked_guard.insert(target);
+        let mut prospective_entries = entries_guard.clone();
+        prospective_entries.push(new_entry.clone());
 
         if let Some(ref path) = self.file_path {
-            let serialized = bincode::serialize(&*entries_guard).map_err(|e| {
+            let serialized = bincode::serialize(&prospective_entries).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
@@ -491,7 +437,7 @@ impl RevocationLog {
 
             let m_path = marker_path_for(path);
             let marker = RevocationMarker {
-                count: entries_guard.len() as u64,
+                count: prospective_entries.len() as u64,
                 head_hash: new_entry.entry_hash,
             };
             let serialized_marker = bincode::serialize(&marker).map_err(|e| {
@@ -500,6 +446,9 @@ impl RevocationLog {
 
             write_atomic_file(&m_path, &serialized_marker)?;
         }
+
+        entries_guard.push(new_entry.clone());
+        revoked_guard.insert(target);
 
         drop(entries_guard);
         drop(revoked_guard);
