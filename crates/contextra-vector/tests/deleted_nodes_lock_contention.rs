@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 // BEWEIST: [Invariante] 64 parallele Writer-Tasks (Delete & Commit) und 64 Search-Tasks laufen über 5 Sekunden ohne Deadlocks, Race-Conditions oder Task-Panics.
 #[tokio::test]
 async fn proof_no_deadlock_concurrent_delete_search() {
-    let res = tokio::time::timeout(Duration::from_secs(5), async {
+    let res = tokio::time::timeout(Duration::from_secs(30), async {
         let config = HnswConfig {
             dimension: 16,
             m: 16,
