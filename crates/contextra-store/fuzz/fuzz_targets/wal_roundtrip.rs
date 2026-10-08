@@ -24,11 +24,9 @@ fuzz_target!(|data: &[u8]| {
             return;
         }
 
-        let config = WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            min_wal_version: WalVersion::V1,
-            ..Default::default()
-        };
+        // FIX(2026-10-07): Use public builder method for WalConfig to avoid private field access error
+        let mut config = WalConfig::default().with_legacy_fallback(true);
+        config.min_wal_version = WalVersion::V1;
 
         match Wal::open_with_config(&wal_path, config).await {
             Ok(wal) => {

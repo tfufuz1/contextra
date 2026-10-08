@@ -6,7 +6,7 @@ use bytes::Bytes;
 use contextra_store::memtable::MemTable;
 
 #[test]
-#[ignore = "J-15-F02: debug_assert panic in MemTable::put when raw_seq < last_raw_seq"]
+// FIX(2026-10-07): Verify out-of-order sequence number handling in MemTable::put
 fn campaign_fuzzregress_memtable_concurrent_out_of_order_seq() {
     let mt = MemTable::new();
     // Fuzz artifact input: 25 bytes decoded

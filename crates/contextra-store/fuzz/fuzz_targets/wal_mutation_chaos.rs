@@ -165,11 +165,9 @@ fuzz_target!(|input: FuzzInput| {
         };
         let wal_path = dir.path().join("fuzz_mutation.wal");
 
-        let config = WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            min_wal_version: WalVersion::V1,
-            ..Default::default()
-        };
+        // FIX(2026-10-07): Use public builder method for WalConfig to avoid private field access error
+        let mut config = WalConfig::default().with_legacy_fallback(true);
+        config.min_wal_version = WalVersion::V1;
 
         let (valid_count, is_compound) = match &input {
             FuzzInput::Single(s) => (s.valid_count, false),

@@ -223,16 +223,11 @@ impl MemTable {
         let mut entries = self.shards[shard_idx].entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
-        #[cfg(debug_assertions)]
-        if let Some((last_seq, _, _)) = versions.last() {
-            let raw_seq = seq_no & !TOMBSTONE_BIT;
-            let last_raw_seq = last_seq & !TOMBSTONE_BIT;
-            debug_assert!(
-                raw_seq >= last_raw_seq,
-                "Sequence numbers for a key in memtable must be monotonically non-decreasing: raw_seq {raw_seq} < last_raw_seq {last_raw_seq}"
-            );
-        }
-        versions.push((seq_no, value, tx_id));
+        // FIX(2026-10-07): Insert versions in sorted order by raw_seq to avoid debug_assert panics
+        // and maintain strict sequence ordering required for binary_search_by_key in get_at_seq.
+        let raw_seq = seq_no & !TOMBSTONE_BIT;
+        let insert_pos = versions.partition_point(|(s, _, _)| (*s & !TOMBSTONE_BIT) <= raw_seq);
+        versions.insert(insert_pos, (seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)
         self.size.fetch_add(additional_size, Ordering::Relaxed);
