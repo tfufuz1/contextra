@@ -1,0 +1,59 @@
+[occurrences]
+"crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:117:registry.min_active_seqno()," = true
+"crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:131:registry.min_active_seqno()," = true
+"crates/contextra-core/tests/integration_core.rs:49:assert_eq!(registry.min_active_seqno(), 101);" = true
+"crates/contextra-core/tests/integration_core.rs:51:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-core/tests/robustness.rs:87:assert!(r.min_active_seqno() <= seq);" = true
+"crates/contextra-core/tests/robustness.rs:97:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-engine/tests/wasm_merge_operator.rs:281:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-engine/tests/wasm_merge_operator.rs:357:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-mvcc/benches/mvcc_bench.rs:24:b.iter(|| black_box(reg.min_active_seqno()));" = true
+"crates/contextra-mvcc/src/snapshot.rs:232:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:236:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:239:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:249:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:252:assert_eq!(registry.min_active_seqno(), 200);" = true
+"crates/contextra-mvcc/src/snapshot.rs:259:assert_eq!(registry.min_active_seqno(), 50);" = true
+"crates/contextra-mvcc/src/snapshot.rs:262:assert_eq!(registry.min_active_seqno(), 50);" = true
+"crates/contextra-mvcc/src/snapshot.rs:265:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:268:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:279:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:288:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:291:assert_eq!(registry.min_active_seqno(), 100);" = true
+"crates/contextra-mvcc/src/snapshot.rs:294:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:302:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:308:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:311:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:320:assert_eq!(registry.min_active_seqno(), 42);" = true
+"crates/contextra-mvcc/src/snapshot.rs:325:registry.min_active_seqno()," = true
+"crates/contextra-mvcc/src/snapshot.rs:333:registry.min_active_seqno()," = true
+"crates/contextra-mvcc/src/snapshot.rs:352:prop_assert_eq!(registry.min_active_seqno(), min_expected);" = true
+"crates/contextra-mvcc/src/snapshot.rs:358:prop_assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/src/snapshot.rs:361:prop_assert_eq!(registry.min_active_seqno(), remaining_min);" = true
+"crates/contextra-mvcc/src/snapshot.rs:390:prop_assert_eq!(registry.min_active_seqno(), active_seqs[0]);" = true
+"crates/contextra-mvcc/src/snapshot.rs:413:registry.min_active_seqno()," = true
+"crates/contextra-mvcc/src/snapshot.rs:451:prop_assert_eq!(registry.min_active_seqno(), expected_min);" = true
+"crates/contextra-mvcc/src/snapshot.rs:465:prop_assert_eq!(registry.min_active_seqno(), expected_min2);" = true
+"crates/contextra-mvcc/src/snapshot.rs:469:prop_assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:70:let min = r1.min_active_seqno();" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:77:let min = r2.min_active_seqno();" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:85:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:99:let min = r1.min_active_seqno();" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:106:let min = r2.min_active_seqno();" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:114:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:146:let min = reg.min_active_seqno();" = true
+"crates/contextra-mvcc/tests/loom_snapshot_registry.rs:158:assert_eq!(registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-store/src/compaction/engine.rs:133:let registry_min = self.snapshot_registry.min_active_seqno();" = true
+"crates/contextra-store/src/lsm/ops/compaction.rs:94:let floor_seq = storage.snapshot_registry.min_active_seqno();" = true
+"crates/contextra-store/src/lsm/ops/compaction.rs:230:.min(storage.snapshot_registry.min_active_seqno());" = true
+"crates/contextra-store/src/lsm/tests/flush_tests.rs:126:assert_eq!(storage.snapshot_registry.min_active_seqno(), seq1);" = true
+"crates/contextra-store/src/lsm/tests/flush_tests.rs:129:assert_eq!(storage.snapshot_registry.min_active_seqno(), u64::MAX);" = true
+"crates/contextra-store/tests/adaptive_compaction_tombstone.rs:36:let min_active = storage.snapshot_registry.min_active_seqno();" = true
+"crates/contextra-store/tests/campaign_deepresearch_merge_overlap.rs:101:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:92:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:145:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:216:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:287:let min_seq = snapshot_reg.min_active_seqno(); // min_seq = 2" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:364:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:443:let min_seq = snapshot_reg.min_active_seqno();" = true
+"crates/contextra-store/tests/compaction_merge_operator.rs:524:let min_seq = snapshot_reg.min_active_seqno();" = true

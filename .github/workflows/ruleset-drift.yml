@@ -1,0 +1,185 @@
+# Workflow: Ruleset Drift Check & Audit
+#
+# Prerequisite Secret:
+#   RULESET_AUDIT_TOKEN: Fine-grained Personal Access Token (PAT) with "Administration: read"
+#   repository permission. Required to fetch repository rulesets from the GitHub REST API.
+#   If missing, the job outputs a warning and exits cleanly (exit 0).
+#
+# Required Permissions:
+#   contents: read
+#   pull-requests: read
+
+name: Ruleset Drift
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/rulesets/**"
+
+concurrency:
+  group: ruleset-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruleset-drift:
+    name: Ruleset Drift
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check Live Ruleset Drift
+        env:
+          RULESET_AUDIT_TOKEN: ${{ secrets.RULESET_AUDIT_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          if [ -z "$RULESET_AUDIT_TOKEN" ]; then
+            echo "::warning::RULESET_AUDIT_TOKEN secret is missing or empty. Ruleset drift check skipped."
+            exit 0
+          fi
+
+          LOCAL_FILE=".github/rulesets/protect-main.json"
+          if [ ! -f "$LOCAL_FILE" ]; then
+            echo "::error::Local ruleset file $LOCAL_FILE not found."
+            exit 1
+          fi
+
+          JQ_FILTER='{
+            name: .name,
+            target: .target,
+            enforcement: .enforcement,
+            conditions: .conditions,
+            bypass_actors: (.bypass_actors // []),
+            rules: [
+              .rules[]? | {
+                type: .type,
+                parameters: (
+                  if .parameters == null then null
+                  elif .parameters.required_status_checks != null then
+                    .parameters + {
+                      required_status_checks: (.parameters.required_status_checks | sort_by(.context))
+                    }
+                  else
+                    .parameters
+                  end
+                )
+              } | del(.parameters | select(. == null))
+            ] | sort_by(.type)
+          }'
+
+          jq -S "$JQ_FILTER" "$LOCAL_FILE" > local_normalized.json
+
+          LIVE_RULESETS=$(GH_TOKEN="$RULESET_AUDIT_TOKEN" gh api "repos/${REPO_NAME}/rulesets" 2>/dev/null || true)
+
+          if [ -z "$LIVE_RULESETS" ] || [ "$LIVE_RULESETS" = "[]" ]; then
+            echo "## ❌ Ruleset Drift Failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "Failed to fetch live rulesets or no rulesets returned for repository \`${REPO_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          RULESET_ID=$(echo "$LIVE_RULESETS" | jq -r '.[] | select(.name == "protect-main") | .id')
+
+          if [ -z "$RULESET_ID" ] || [ "$RULESET_ID" = "null" ]; then
+            echo "## ❌ Ruleset Drift Failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "Live ruleset named \`protect-main\` was not found in repository \`${REPO_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          LIVE_RULESET_DETAIL=$(GH_TOKEN="$RULESET_AUDIT_TOKEN" gh api "repos/${REPO_NAME}/rulesets/${RULESET_ID}")
+
+          echo "$LIVE_RULESET_DETAIL" | jq -S "$JQ_FILTER" > live_normalized.json
+
+          DIFF_OUTPUT=$(diff -u local_normalized.json live_normalized.json || true)
+
+          HAS_ERRORS=0
+
+          if [ -n "$DIFF_OUTPUT" ]; then
+            HAS_ERRORS=1
+            echo "### ⚠️ Drift Detected between Local Repo File and Live GitHub Ruleset" >> "$GITHUB_STEP_SUMMARY"
+            echo '```diff' >> "$GITHUB_STEP_SUMMARY"
+            echo "$DIFF_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          ENFORCEMENT=$(jq -r '.enforcement' live_normalized.json)
+          BYPASS_ACTORS_COUNT=$(jq -r '.bypass_actors | length' live_normalized.json)
+          HAS_VERDICT=$(jq -r '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context' live_normalized.json | grep -xc "verdict" || true)
+
+          LOCAL_CHECKS_FILE=$(mktemp)
+          LIVE_CHECKS_FILE=$(mktemp)
+          jq -r '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context' local_normalized.json | sort > "$LOCAL_CHECKS_FILE"
+          jq -r '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context' live_normalized.json | sort > "$LIVE_CHECKS_FILE"
+          CHECKS_DIFF=$(diff -u "$LOCAL_CHECKS_FILE" "$LIVE_CHECKS_FILE" || true)
+          rm -f "$LOCAL_CHECKS_FILE" "$LIVE_CHECKS_FILE"
+
+          if [ "$ENFORCEMENT" != "active" ]; then
+            HAS_ERRORS=1
+            echo "❌ **Enforcement Failure**: Live ruleset enforcement is \`$ENFORCEMENT\` (expected \`active\`)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$BYPASS_ACTORS_COUNT" -ne 0 ]; then
+            HAS_ERRORS=1
+            echo "❌ **Bypass Actors Failure**: Live ruleset has $BYPASS_ACTORS_COUNT bypass actor(s) (expected 0 / empty)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$HAS_VERDICT" -lt 1 ]; then
+            HAS_ERRORS=1
+            echo "❌ **Status Check Failure**: Live ruleset required status checks do not contain \`verdict\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -n "$CHECKS_DIFF" ]; then
+            HAS_ERRORS=1
+            echo "❌ **Status Check Mismatch**: Live ruleset required status checks do not match repo file:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```diff' >> "$GITHUB_STEP_SUMMARY"
+            echo "$CHECKS_DIFF" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$HAS_ERRORS" -ne 0 ]; then
+            echo "Ruleset drift or explicit policy check failure detected."
+            exit 1
+          fi
+
+          echo "## ✅ Ruleset Drift Check Passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Live ruleset matches repo file and passes all policy checks." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Audit Recent Merged PRs for 'verdict' Check
+        if: always() && !cancelled()
+        env:
+          GH_TOKEN: ${{ secrets.RULESET_AUDIT_TOKEN || secrets.GITHUB_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          PR_LIST=$(gh pr list --state merged --base main --limit 20 --json number,mergedAt,statusCheckRollup --repo "$REPO_NAME" 2>/dev/null || true)
+
+          if [ -z "$PR_LIST" ] || [ "$PR_LIST" = "[]" ]; then
+            echo "No merged PRs found or unable to fetch PR list."
+            exit 0
+          fi
+
+          echo "$PR_LIST" | jq -c '.[]' | while read -r pr_json; do
+            PR_NUM=$(echo "$pr_json" | jq -r '.number')
+            MERGED_AT=$(echo "$pr_json" | jq -r '.mergedAt')
+
+            HAS_VERDICT=$(echo "$pr_json" | jq -r '
+              [
+                (.statusCheckRollup[]? | select(
+                  .context == "verdict" or
+                  .name == "verdict" or
+                  .workflowName == "verdict"
+                ))
+              ] | length
+            ')
+
+            if [ "$HAS_VERDICT" -eq 0 ]; then
+              echo "::warning::Merged PR #${PR_NUM} (merged at ${MERGED_AT}) is missing the required status check 'verdict'."
+            fi
+          done

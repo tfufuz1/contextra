@@ -281,3 +281,81 @@ fn test_s3_overflow_behavior() {
     let huge_dot = dot_product_distance(&huge_a, &huge_b).unwrap();
     assert!(huge_dot.is_infinite());
 }
+
+#[test]
+fn test_all_available_kernels_pairwise_against_scalar() {
+    use contextra_simd::dispatch::{
+        cosine_distance_with_features, dot_product_distance_with_features,
+        euclidean_distance_with_features, CpuFeatures,
+    };
+
+    let a: Vec<f32> = (0..128).map(|i| (i as f32 * 0.1) - 6.4).collect();
+    let b: Vec<f32> = (0..128).map(|i| (i as f32 * 0.05) - 3.2).collect();
+
+    let scalar_cos = cosine_distance_scalar(&a, &b);
+    let scalar_euc = euclidean_distance_scalar(&a, &b);
+    let scalar_dot = dot_product_scalar(&a, &b);
+
+    let hw_features = CpuFeatures::detect();
+
+    // Test forced scalar
+    std::env::set_var("CONTEXTRA_SIMD_FORCE", "scalar");
+    let forced_scalar_features = CpuFeatures::detect();
+    let forced_cos = cosine_distance_with_features(&a, &b, &forced_scalar_features).unwrap();
+    let forced_euc = euclidean_distance_with_features(&a, &b, &forced_scalar_features).unwrap();
+    let forced_dot = dot_product_distance_with_features(&a, &b, &forced_scalar_features).unwrap();
+    assert!((scalar_cos - forced_cos).abs() < 1e-4);
+    assert!((scalar_euc - forced_euc).abs() < 1e-3);
+    assert!((scalar_dot - forced_dot).abs() < 1e-3);
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            std::env::set_var("CONTEXTRA_SIMD_FORCE", "avx2");
+            let avx2_features = CpuFeatures::detect();
+            let avx2_cos = cosine_distance_with_features(&a, &b, &avx2_features).unwrap();
+            let avx2_euc = euclidean_distance_with_features(&a, &b, &avx2_features).unwrap();
+            let avx2_dot = dot_product_distance_with_features(&a, &b, &avx2_features).unwrap();
+
+            assert!((scalar_cos - avx2_cos).abs() < 1e-4);
+            assert!((scalar_euc - avx2_euc).abs() < 1e-3);
+            assert!((scalar_dot - avx2_dot).abs() < 1e-3);
+        } else {
+            eprintln!("SKIPPED pairwise test: AVX2/FMA not supported on host CPU");
+        }
+
+        if is_x86_feature_detected!("avx512f") {
+            std::env::set_var("CONTEXTRA_SIMD_FORCE", "avx512");
+            let avx512_features = CpuFeatures::detect();
+            let avx512_cos = cosine_distance_with_features(&a, &b, &avx512_features).unwrap();
+            let avx512_euc = euclidean_distance_with_features(&a, &b, &avx512_features).unwrap();
+            let avx512_dot = dot_product_distance_with_features(&a, &b, &avx512_features).unwrap();
+
+            assert!((scalar_cos - avx512_cos).abs() < 1e-4);
+            assert!((scalar_euc - avx512_euc).abs() < 1e-3);
+            assert!((scalar_dot - avx512_dot).abs() < 1e-3);
+        } else {
+            eprintln!("SKIPPED pairwise test: AVX-512F not supported on host CPU");
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            std::env::set_var("CONTEXTRA_SIMD_FORCE", "neon");
+            let neon_features = CpuFeatures::detect();
+            let neon_cos = cosine_distance_with_features(&a, &b, &neon_features).unwrap();
+            let neon_euc = euclidean_distance_with_features(&a, &b, &neon_features).unwrap();
+            let neon_dot = dot_product_distance_with_features(&a, &b, &neon_features).unwrap();
+
+            assert!((scalar_cos - neon_cos).abs() < 1e-4);
+            assert!((scalar_euc - neon_euc).abs() < 1e-3);
+            assert!((scalar_dot - neon_dot).abs() < 1e-3);
+        } else {
+            eprintln!("SKIPPED pairwise test: NEON not supported on host CPU");
+        }
+    }
+
+    std::env::remove_var("CONTEXTRA_SIMD_FORCE");
+    let _ = hw_features;
+}

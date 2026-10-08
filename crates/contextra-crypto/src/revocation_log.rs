@@ -20,6 +20,12 @@
 //! # Abgrenzung zu Prompt 12 (Audit-Hash-Kette)
 //! Prompt 12 regelt die globale Audit-Hash-Kette von Contextra. Der Widerrufslog dient der
 //! Audit-Kette als optionale Eingabequelle, bleibt aber als eigenständiges, isoliertes Artefakt bestehen.
+//!
+//! # Limitierung Rollback-Schutz
+//! Ein simultaner Rollback sowohl der Logdatei als auch der Marker-Datei auf ein älteres,
+//! in sich konsistentes und gültiges Paar bleibt lokal unerkannt, da beide Dateien die
+//! gültige Signatur des jeweiligen Standes tragen. Für vollständigen Rollback-Schutz
+//! über Prozess-Neustarts hinweg ist ein externer Anker erforderlich (z. B. AuditChain-Anchor).
 
 use crate::error::{CryptoError, Result};
 use contextra_ports::Clock;
@@ -38,6 +44,80 @@ pub struct RevocationMarker {
     pub count: u64,
     /// Head hash of the latest log entry (`[0u8; 32]` if count == 0).
     pub head_hash: [u8; 32],
+}
+
+/// Helper to serialize a signed marker file.
+fn serialize_signed_marker(
+    count: u64,
+    head_hash: [u8; 32],
+    signing_key: Option<&SigningKey>,
+) -> Vec<u8> {
+    if let Some(sk) = signing_key {
+        let mut msg = Vec::with_capacity(40);
+        msg.extend_from_slice(&count.to_le_bytes());
+        msg.extend_from_slice(&head_hash);
+        let sig = sk.sign(&msg);
+
+        let mut buf = Vec::with_capacity(4 + 1 + 8 + 32 + 64);
+        buf.extend_from_slice(MARKER_MAGIC);
+        buf.push(MARKER_VERSION_1);
+        buf.extend_from_slice(&count.to_le_bytes());
+        buf.extend_from_slice(&head_hash);
+        buf.extend_from_slice(&sig.to_bytes());
+        buf
+    } else {
+        let marker = RevocationMarker { count, head_hash };
+        bincode::serialize(&marker).unwrap_or_default()
+    }
+}
+
+/// Helper to deserialize and verify a marker file.
+fn parse_and_verify_marker(
+    marker_bytes: &[u8],
+    verifying_key: &VerifyingKey,
+) -> Result<RevocationMarker> {
+    if marker_bytes.starts_with(MARKER_MAGIC) {
+        if marker_bytes.len() < 4 + 1 + 8 + 32 + 64 {
+            return Err(CryptoError::IntegrityViolation);
+        }
+        let version = marker_bytes[4];
+        if version != MARKER_VERSION_1 {
+            return Err(CryptoError::IntegrityViolation);
+        }
+
+        let mut count_bytes = [0u8; 8];
+        count_bytes.copy_from_slice(&marker_bytes[5..13]);
+        let count = u64::from_le_bytes(count_bytes);
+
+        let mut head_hash = [0u8; 32];
+        head_hash.copy_from_slice(&marker_bytes[13..45]);
+
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(&marker_bytes[45..109]);
+
+        let mut msg = Vec::with_capacity(40);
+        msg.extend_from_slice(&count_bytes);
+        msg.extend_from_slice(&head_hash);
+
+        let sig = Signature::from_bytes(&sig_bytes);
+        verifying_key
+            .verify(&msg, &sig)
+            .map_err(|_| CryptoError::IntegrityViolation)?;
+
+        Ok(RevocationMarker { count, head_hash })
+    } else {
+        let marker: RevocationMarker =
+            bincode::deserialize(marker_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
+        tracing::warn!("Loaded legacy unsigned revocation marker; will upgrade on next write");
+        Ok(marker)
+    }
+}
+
+/// Cursor for amortized incremental verification of log entries.
+#[derive(Debug, Clone, Copy)]
+struct VerifiedCursor {
+    verified_len: usize,
+    last_verified_hash: [u8; 32],
 }
 
 /// Mode for initializing or opening a `RevocationLog`.
@@ -154,6 +234,7 @@ pub struct RevocationLog {
     clock: Arc<dyn Clock>,
     entries: RwLock<Vec<RevocationEntry>>,
     revoked_targets: RwLock<HashSet<RevocationTarget>>,
+    verified_cursor: RwLock<VerifiedCursor>,
 }
 
 impl RevocationLog {
@@ -170,6 +251,10 @@ impl RevocationLog {
             clock,
             entries: RwLock::new(Vec::new()),
             revoked_targets: RwLock::new(HashSet::new()),
+            verified_cursor: RwLock::new(VerifiedCursor {
+                verified_len: 0,
+                last_verified_hash: [0u8; 32],
+            }),
         }
     }
 
@@ -202,6 +287,11 @@ impl RevocationLog {
     }
 
     /// Abwärtskompatibles Öffnen oder Erzeugen unter `path` (nutzt `InitMode::OpenOrCreateIfFresh`).
+    ///
+    /// # Warnung / Security Note
+    /// Diese Methode setzt fest `has_existing_keys: false` ein, was den Rollback-Schutz
+    /// bei Neu-Initialisierung über einem gelöschten Log abschwächt.
+    /// Produktionscode MUSS `open_or_create_if_fresh` mit korrekter Flag-Übergabe nutzen!
     pub fn open_or_create(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
@@ -276,7 +366,7 @@ impl RevocationLog {
                 } else if log_exists && marker_exists {
                     InitMode::OpenExisting
                 } else {
-                    // One exists but the other does not (e.g. marker exists but log deleted, or log has content but marker deleted) -> Fail Closed!
+                    // One exists but the other does not -> Fail Closed!
                     return Err(CryptoError::IntegrityViolation);
                 }
             }
@@ -290,13 +380,7 @@ impl RevocationLog {
             })?;
             write_atomic_file(&path_buf, &serialized_empty)?;
 
-            let marker = RevocationMarker {
-                count: 0,
-                head_hash: [0u8; 32],
-            };
-            let serialized_marker = bincode::serialize(&marker).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to serialize revocation marker: {e}"))
-            })?;
+            let serialized_marker = serialize_signed_marker(0, [0u8; 32], signing_key.as_ref());
             write_atomic_file(&m_path, &serialized_marker)?;
 
             return Ok(Self {
@@ -306,13 +390,16 @@ impl RevocationLog {
                 clock,
                 entries: RwLock::new(Vec::new()),
                 revoked_targets: RwLock::new(HashSet::new()),
+                verified_cursor: RwLock::new(VerifiedCursor {
+                    verified_len: 0,
+                    last_verified_hash: [0u8; 32],
+                }),
             });
         }
 
         // Open existing path
         let marker_bytes = std::fs::read(&m_path).map_err(|_| CryptoError::IntegrityViolation)?;
-        let marker: RevocationMarker =
-            bincode::deserialize(&marker_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
+        let marker = parse_and_verify_marker(&marker_bytes, &verifying_key)?;
 
         let log_bytes = std::fs::read(&path_buf).map_err(|_| CryptoError::IntegrityViolation)?;
         let parsed_entries: Vec<RevocationEntry> =
@@ -326,12 +413,15 @@ impl RevocationLog {
             return Err(CryptoError::IntegrityViolation);
         }
 
-        // If log_count == marker.count and count > 0, verify head hash match
-        if log_count == marker.count && marker.count > 0 {
-            if let Some(last) = parsed_entries.last() {
-                if last.entry_hash != marker.head_hash {
-                    return Err(CryptoError::IntegrityViolation);
-                }
+        if marker.count == 0 {
+            if marker.head_hash != [0u8; 32] {
+                return Err(CryptoError::IntegrityViolation);
+            }
+        } else {
+            let target_idx = usize::try_from(marker.count - 1)
+                .map_err(|_| CryptoError::IntegrityViolation)?;
+            if parsed_entries[target_idx].entry_hash != marker.head_hash {
+                return Err(CryptoError::IntegrityViolation);
             }
         }
 
@@ -340,31 +430,121 @@ impl RevocationLog {
             revoked_targets.insert(entry.target.clone());
         }
 
+        let last_verified_hash = parsed_entries
+            .last()
+            .map(|e| e.entry_hash)
+            .unwrap_or([0u8; 32]);
+
         Ok(Self {
             file_path: Some(path_buf),
             signing_key,
             verifying_key,
             clock,
-            entries: RwLock::new(parsed_entries),
+            entries: RwLock::new(parsed_entries.clone()),
             revoked_targets: RwLock::new(revoked_targets),
+            verified_cursor: RwLock::new(VerifiedCursor {
+                verified_len: parsed_entries.len(),
+                last_verified_hash,
+            }),
         })
     }
 
-    /// Verifiziert die Integrität der gesamten Logeinträge-Kette (Sequenz, Hashes, Ed25519-Signaturen).
-    pub fn verify_integrity(&self) -> Result<()> {
-        let guard = self.entries.read();
-        Self::verify_chain_entries(&guard, &self.verifying_key)
+    /// Gibt `true` zurück, wenn dieser Log datei-persistiert ist (`file_path` gesetzt ist).
+    pub fn is_durable(&self) -> bool {
+        self.file_path.is_some()
     }
 
-    /// Hilfsfunktion zur Verifikation einer Liste von Eintrags-Ketten.
+    /// Verifiziert inkrementell die Integrität unverifizierter neuer Einträge im Log.
+    pub fn verify_integrity(&self) -> Result<()> {
+        let entries_guard = self.entries.read();
+        let cursor = *self.verified_cursor.read();
+
+        let total_len = entries_guard.len();
+        if cursor.verified_len > total_len {
+            return Err(CryptoError::IntegrityViolation);
+        }
+
+        if cursor.verified_len == total_len {
+            if total_len == 0 {
+                return Ok(());
+            }
+            if entries_guard[total_len - 1].entry_hash != cursor.last_verified_hash {
+                return Err(CryptoError::IntegrityViolation);
+            }
+            return Ok(());
+        }
+
+        let unverified_slice = &entries_guard[cursor.verified_len..total_len];
+        let initial_prev_hash = if cursor.verified_len == 0 {
+            [0u8; 32]
+        } else {
+            if entries_guard[cursor.verified_len - 1].entry_hash != cursor.last_verified_hash {
+                return Err(CryptoError::IntegrityViolation);
+            }
+            cursor.last_verified_hash
+        };
+
+        Self::verify_chain_slice(
+            unverified_slice,
+            cursor.verified_len as u64,
+            initial_prev_hash,
+            &self.verifying_key,
+        )?;
+
+        let new_last_hash = unverified_slice
+            .last()
+            .map(|e| e.entry_hash)
+            .unwrap_or(initial_prev_hash);
+
+        drop(entries_guard);
+
+        let mut cursor_guard = self.verified_cursor.write();
+        if total_len > cursor_guard.verified_len {
+            cursor_guard.verified_len = total_len;
+            cursor_guard.last_verified_hash = new_last_hash;
+        }
+
+        Ok(())
+    }
+
+    /// Verifiziert bedingungslos die gesamte Eintrags-Kette neu von Index 0 an.
+    pub fn verify_integrity_full(&self) -> Result<()> {
+        let entries_guard = self.entries.read();
+        Self::verify_chain_entries(&entries_guard, &self.verifying_key)?;
+
+        let total_len = entries_guard.len();
+        let last_hash = entries_guard
+            .last()
+            .map(|e| e.entry_hash)
+            .unwrap_or([0u8; 32]);
+
+        drop(entries_guard);
+
+        let mut cursor_guard = self.verified_cursor.write();
+        cursor_guard.verified_len = total_len;
+        cursor_guard.last_verified_hash = last_hash;
+
+        Ok(())
+    }
+
+    /// Hilfsfunktion zur Verifikation einer Liste von Eintrags-Ketten ab Index 0.
     fn verify_chain_entries(
         entries: &[RevocationEntry],
         verifying_key: &VerifyingKey,
     ) -> Result<()> {
-        let mut expected_prev_hash = [0u8; 32];
+        Self::verify_chain_slice(entries, 0, [0u8; 32], verifying_key)
+    }
 
-        for (idx, entry) in entries.iter().enumerate() {
-            if entry.sequence_number != idx as u64 {
+    /// Hilfsfunktion zur Verifikation eines Slice von Eintrags-Ketten ab `start_seq`.
+    fn verify_chain_slice(
+        slice: &[RevocationEntry],
+        start_seq: u64,
+        mut expected_prev_hash: [u8; 32],
+        verifying_key: &VerifyingKey,
+    ) -> Result<()> {
+        for (offset, entry) in slice.iter().enumerate() {
+            let expected_seq = start_seq + offset as u64;
+            if entry.sequence_number != expected_seq {
                 return Err(CryptoError::IntegrityViolation);
             }
 
@@ -396,18 +576,18 @@ impl RevocationLog {
 
     /// Fügt einen neuen Widerrufs-Eintrag für `target` an den Log an.
     ///
-    /// Nutzt den injizierten Clock-Port zur Generierung des Zeitstempels und den Signierschlüssel
-    /// zur Erstellung der Ed25519-Signatur. Persistiert die aktualisierte Kette sofort auf Disk.
+    /// PERSIST-BEFORE-MUTATE: Serialisiert und schreibt die neue Logdatei und den signierten Marker
+    /// vor der Mutation des RAM-Zustands (`entries`, `revoked_targets`). Bei Fehler bleibt der
+    /// RAM-Zustand exakt unberührt.
     pub fn append(&self, target: RevocationTarget) -> Result<RevocationEntry> {
         let signing_key = self.signing_key.as_ref().ok_or_else(|| {
             CryptoError::Crypto("Signing key not configured for RevocationLog append".to_string())
         })?;
 
-        let mut entries_guard = self.entries.write();
-        let mut revoked_guard = self.revoked_targets.write();
+        let mut entries_write_guard = self.entries.write();
 
-        let sequence_number = entries_guard.len() as u64;
-        let prev_hash = entries_guard
+        let sequence_number = entries_write_guard.len() as u64;
+        let prev_hash = entries_write_guard
             .last()
             .map(|e| e.entry_hash)
             .unwrap_or([0u8; 32]);
@@ -433,7 +613,7 @@ impl RevocationLog {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            write_atomic_file(path, &serialized)?;
+            write_atomic_file(path, &serialized_log)?;
 
             let m_path = marker_path_for(path);
             let marker = RevocationMarker {
@@ -453,7 +633,8 @@ impl RevocationLog {
         drop(entries_guard);
         drop(revoked_guard);
 
-        self.verify_integrity()?;
+        drop(entries_write_guard);
+        drop(revoked_write_guard);
 
         Ok(new_entry)
     }
@@ -481,6 +662,7 @@ impl std::fmt::Debug for RevocationLog {
             .field("file_path", &self.file_path)
             .field("verifying_key", &self.verifying_key)
             .field("entries_count", &self.entries.read().len())
+            .field("is_durable", &self.is_durable())
             .finish()
     }
 }
@@ -522,6 +704,7 @@ mod tests {
 
         assert_eq!(log.len(), 2);
         assert!(log.verify_integrity().is_ok());
+        assert!(log.verify_integrity_full().is_ok());
         Ok(())
     }
 

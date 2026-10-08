@@ -5,6 +5,9 @@ pub mod docs;
 pub mod jules;
 pub mod misc;
 
+#[path = "../wiring_check/mod.rs"]
+pub mod wiring_check;
+
 pub type CmdFn = fn(&[String]) -> i32;
 
 pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
@@ -236,6 +239,10 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
         crate::cli::checks::run_check_result_dropped_io,
     ),
     (
+        "gc-floor-single-source",
+        crate::cli::checks::run_gc_floor_single_source,
+    ),
+    (
         "check-coverage-gate",
         crate::cli::checks::run_check_coverage_gate,
     ),
@@ -275,5 +282,9 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
         "check-veto-deadlines",
         crate::cli::checks::run_check_veto_deadlines,
+    ),
+    (
+        "wiring-check",
+        crate::cli::wiring_check::run_wiring_check_cli,
     ),
 ];

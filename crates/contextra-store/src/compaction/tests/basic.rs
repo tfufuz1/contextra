@@ -1,4 +1,5 @@
 use super::*;
+use contextra_mvcc::snapshot::SnapshotFloor;
 
 use crate::sstable::{create_block_cache, SstableBuilder};
 use tempfile::TempDir;
@@ -138,7 +139,7 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -150,10 +151,15 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     );
 
     // Create older SSTable with many entries (large file size) but small max_seq (seq=10)
-    let mut large_entries = Vec::new();
+    let pad_keys: Vec<String> = (0..100).map(|i| format!("pad_{:03}", i)).collect();
+    let mut large_entries: Vec<(&[u8], &[u8], u64)> = Vec::new();
     large_entries.push((b"key-1".as_ref(), b"old_val".as_ref(), 10u64));
-    for _ in 0..100 {
-        large_entries.push((b"pad", b"large_padding_data_to_increase_file_size", 10u64));
+    for k in &pad_keys {
+        large_entries.push((
+            k.as_bytes(),
+            b"large_padding_data_to_increase_file_size",
+            10u64,
+        ));
     }
     let sst_old_large = create_test_sstable(
         tmp.path(),
@@ -214,7 +220,7 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -546,7 +552,7 @@ async fn test_maybe_compact_full_cycle() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         Arc::new(contextra_core::ResourceTracker::new(
@@ -815,9 +821,11 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
     .await;
 
     // SSTable C (non-input, intermediate seq, larger size so it is in a separate size tier): key "k1" -> "v_inter", seq 15
-    let mut entries_c = vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
-    for _ in 0..100 {
-        entries_c.push((b"padding_key", b"padding_value_large_file", 15u64));
+    let pad_keys_c: Vec<String> = (0..100).map(|i| format!("padding_key_{:03}", i)).collect();
+    let mut entries_c: Vec<(&[u8], &[u8], u64)> =
+        vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
+    for k in &pad_keys_c {
+        entries_c.push((k.as_bytes(), b"padding_value_large_file", 15u64));
     }
     let sst_c = create_test_sstable(tmp.path(), "sst_c.sst", &entries_c, Arc::clone(&bc)).await;
 
@@ -1035,7 +1043,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
 
     let engine = CompactionEngine::new(
         config,
-        registry,
+        registry as Arc<dyn SnapshotFloor>,
         Arc::clone(&bc),
         None,
         exhausted_tracker,
@@ -1077,7 +1085,7 @@ fn test_generate_sst_path_uniqueness() {
     let tmp = TempDir::new().expect("temp dir"); // expect
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        Arc::new(SnapshotRegistry::new()),
+        Arc::new(SnapshotRegistry::new()) as Arc<dyn SnapshotFloor>,
         create_block_cache(1),
         None,
         Arc::new(contextra_core::ResourceTracker::new(

@@ -11,7 +11,7 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 1. **Beweisbarkeit statt Zusage:** Das Löschen einer Collection (`drop_collection`) erzeugt einen signierten `DeletionProof` (HMAC-SHA256, Signaturversion 2), der das logische Entfernen des LSM-Schlüsselraums testiert. Externe Verifizierung ohne Contextra-Zugriff ist für Ed25519-Beweise (v3) auf API-Ebene möglich (`DeletionProof::create_v3`, `DeletionProof::verify_external`).
 2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers.
 3. **Pure Rust Inferenz (Candle):** Lokale GGUF-Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen.
-4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, per CI-Ratchet auf 502 `unwrap` und 242 `expect` reduziert) und injizierter Determinismus (P28).
+4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, per CI-Ratchet auf 786 Panic-Einträge Stand 08.10.2026 reduziert) und injizierter Determinismus (P28).
 5. **Drei abgestufte Feature-Ringe:**
    - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Candle-Inferenz, Bandit-Routing.
    - **Ring `sovereign`:** Quelloffener Krypto-Code (Löschbeweis, Privacy-Gateway, Zero-Net-Traffic).

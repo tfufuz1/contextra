@@ -223,16 +223,23 @@ impl MemTable {
         let mut entries = self.shards[shard_idx].entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
-        #[cfg(debug_assertions)]
-        if let Some((last_seq, _, _)) = versions.last() {
-            let raw_seq = seq_no & !TOMBSTONE_BIT;
-            let last_raw_seq = last_seq & !TOMBSTONE_BIT;
-            debug_assert!(
-                raw_seq >= last_raw_seq,
-                "Sequence numbers for a key in memtable must be monotonically non-decreasing: raw_seq {raw_seq} < last_raw_seq {last_raw_seq}"
-            );
+        let raw_seq = seq_no & !TOMBSTONE_BIT;
+        // FIX(2026-10-07): Fast-path push for in-order sequence numbers; binary search insert for out-of-order sequence numbers to maintain sorted order for get_at_seq.
+        if versions.last().map_or(true, |(last_seq, _, _)| (last_seq & !TOMBSTONE_BIT) <= raw_seq) {
+            versions.push((seq_no, value, tx_id));
+        } else {
+            let insert_idx = match versions.binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT) {
+                Ok(idx) => {
+                    let mut pos = idx + 1;
+                    while pos < versions.len() && (versions[pos].0 & !TOMBSTONE_BIT) == raw_seq {
+                        pos += 1;
+                    }
+                    pos
+                }
+                Err(idx) => idx,
+            };
+            versions.insert(insert_idx, (seq_no, value, tx_id));
         }
-        versions.push((seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)
         self.size.fetch_add(additional_size, Ordering::Relaxed);
@@ -1022,5 +1029,27 @@ mod tests {
 
         writer_handle.join().expect("writer finished"); // #[cfg(test)]
         scanner_handle.join().expect("scanner finished"); // #[cfg(test)]
+    }
+
+    #[test]
+    fn test_out_of_order_seq_no_binary_search_sorted() {
+        let mt = MemTable::new();
+        let key = Bytes::from("ooo_key");
+
+        // Insert seq 100 first, then seq 10 out of order
+        mt.put(key.clone(), Bytes::from("val_100"), 100, 10);
+        mt.put(key.clone(), Bytes::from("val_10"), 10, 1);
+
+        // get_at_seq at 15 should return val_10
+        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("should find val_10");
+        assert_eq!(val.as_ref(), b"val_10");
+        assert_eq!(seq, 10);
+        assert_eq!(tx, 1);
+
+        // get_at_seq at 120 should return val_100
+        let (val, seq, tx) = mt.get_at_seq(&key, 120, u64::MAX).expect("should find val_100");
+        assert_eq!(val.as_ref(), b"val_100");
+        assert_eq!(seq, 100);
+        assert_eq!(tx, 10);
     }
 }

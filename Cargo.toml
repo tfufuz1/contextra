@@ -192,6 +192,10 @@ unreachable = "deny"
 cast_possible_truncation = "deny"
 cast_sign_loss = "deny"
 
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
 [profile.release]
 panic = "unwind"
 opt-level = 3

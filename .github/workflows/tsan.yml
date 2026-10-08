@@ -9,64 +9,88 @@ on:
       - 'crates/contextra-store/**'
       - 'crates/contextra-vector/**'
       - 'crates/contextra-graph/**'
+      - 'crates/contextra-mvcc/**'
+
+concurrency:
+  group: tsan-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  NIGHTLY: nightly-2026-10-06
 
 jobs:
   tsan:
     name: ThreadSanitizer — Race-Condition Detection
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
+          toolchain: ${{ env.NIGHTLY }}
+          targets: x86_64-unknown-linux-gnu
           components: rust-src
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
-      - name: Install nightly toolchain
-        run: rustup target add x86_64-unknown-linux-gnu
-
       - name: TSan — TOCTOU put_if_absent (B-1)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
+          RUSTFLAGS: "-Z sanitizer=thread"
         run: |
-          cargo +nightly test -p contextra-store \
+          cargo +${{ env.NIGHTLY }} test -p contextra-store \
             --test toctou_put_if_absent \
             --target x86_64-unknown-linux-gnu \
+            -Zbuild-std \
             -- --test-threads=1 --nocapture
         timeout-minutes: 10
 
       - name: TSan — deleted_nodes Lock-Contention (B-8)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
+          RUSTFLAGS: "-Z sanitizer=thread"
         run: |
-          cargo +nightly test -p contextra-vector \
+          cargo +${{ env.NIGHTLY }} test -p contextra-vector \
             --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu \
+            -Zbuild-std \
             -- --test-threads=1 --nocapture
         timeout-minutes: 10
 
       - name: TSan — WAL Concurrent Flush+Truncate (B-7)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
+          RUSTFLAGS: "-Z sanitizer=thread"
         run: |
-          cargo +nightly test -p contextra-store \
+          cargo +${{ env.NIGHTLY }} test -p contextra-store \
             --test wal_truncate_ordering \
             --target x86_64-unknown-linux-gnu \
+            -Zbuild-std \
             -- --test-threads=1 --nocapture
         timeout-minutes: 10
 
       - name: TSan — CSR Concurrent Insert+Query
         env:
-          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
+          RUSTFLAGS: "-Z sanitizer=thread"
         run: |
-          cargo +nightly test -p contextra-graph \
+          cargo +${{ env.NIGHTLY }} test -p contextra-graph \
             --test stress_dag \
             --target x86_64-unknown-linux-gnu \
+            -Zbuild-std \
             -- --test-threads=1 --nocapture
         timeout-minutes: 15
+
+      - name: TSan — MVCC SSI Hardening & Pruning
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread"
+        run: |
+          cargo +${{ env.NIGHTLY }} test -p contextra-mvcc \
+            --test ssi_hardening \
+            --target x86_64-unknown-linux-gnu \
+            -Zbuild-std \
+            -- --test-threads=1 --nocapture
+        timeout-minutes: 10
 
       - name: Report TSan Failure
         if: failure()

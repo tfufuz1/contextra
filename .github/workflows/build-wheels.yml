@@ -18,13 +18,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64
             manylinux: auto
           - os: ubuntu-24.04-arm
             target: aarch64
             manylinux: auto
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64
           - os: macos-14
             target: aarch64
@@ -61,7 +61,7 @@ jobs:
 
   build-sdist:
     name: Build Source Distribution
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

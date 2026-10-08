@@ -74,10 +74,7 @@ pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         )
     })?;
 
-    let file_stem = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("tmp");
+    let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
 
     let count = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();

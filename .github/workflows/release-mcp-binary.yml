@@ -18,13 +18,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             archive_ext: tar.gz
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             archive_ext: tar.gz
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             archive_ext: tar.gz
           - os: macos-14
@@ -38,8 +38,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.89.0
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
+          toolchain: 1.89.0
           targets: ${{ matrix.target }}
 
       - name: Cache cargo
@@ -72,7 +73,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: build-binary
     permissions:

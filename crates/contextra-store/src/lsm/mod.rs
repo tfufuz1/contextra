@@ -74,6 +74,7 @@ pub(super) use std::sync::atomic::Ordering;
 
 pub mod config;
 mod engine;
+pub mod gc_floor;
 mod guard;
 pub mod observer;
 mod validate;
@@ -91,6 +92,7 @@ pub mod ops;
 
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::{LsmStorage, StorageHealth};
+pub use gc_floor::GcFloor;
 
 pub(super) use guard::{CommitGuard, LsmState};
 pub use observer::{

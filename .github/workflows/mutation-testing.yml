@@ -16,7 +16,7 @@ on:
       - 'crates/contextra-checkpoint/**'
       - 'crates/contextra-crypto/**'
       - 'crates/contextra-store/**'
-      - 'crates/contextra-candle/**'
+      - 'crates/contextra-infer-candle/**'
       - 'crates/contextra-db/**'
       - 'crates/contextra-vector/**'
       - 'crates/contextra-text/**'
@@ -30,74 +30,104 @@ env:
 jobs:
   mutation-testing:
     name: Cargo Mutants Runner
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
+        with:
+          toolchain: '1.89.0'
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@400e7407cfd7a091e5fbb6afec01ec146c432b7c # v2.7.7
 
       - name: Install cargo-mutants
-        uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-mutants
+        uses: taiki-e/install-action@f87f9990b09867202953bff9aa0c80e23ee16bb7 # cargo-mutants
 
-      - name: Determine Target Crates
+      - name: Determine & Validate Target Crates
         id: target
+        env:
+          INPUT_CRATE: ${{ inputs.crate || github.event.inputs.crate }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "crates=${{ github.event.inputs.crate }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "crates=contextra-crypto contextra-checkpoint contextra-store contextra-candle contextra-db contextra-vector contextra-text contextra-graph contextra-rank" >> "$GITHUB_OUTPUT"
+          WORKSPACE_PACKAGES=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name')
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if ! [[ "$INPUT_CRATE" =~ ^[a-z0-9-]+$ ]]; then
+              echo "::error::Invalid crate name format: $INPUT_CRATE"
+              exit 1
+            fi
+            if ! echo "$WORKSPACE_PACKAGES" | grep -qx "$INPUT_CRATE"; then
+              echo "::error::Target crate '$INPUT_CRATE' is not a valid workspace package"
+              exit 1
+            fi
+            CRATES="$INPUT_CRATE"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            CRATES="contextra-crypto contextra-checkpoint contextra-store contextra-infer-candle contextra-db contextra-vector contextra-text contextra-graph contextra-rank"
           else
             CRATES=""
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-checkpoint/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-checkpoint/'; then
               CRATES="$CRATES contextra-checkpoint"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-crypto/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-crypto/'; then
               CRATES="$CRATES contextra-crypto"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-store/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-store/'; then
               CRATES="$CRATES contextra-store"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-candle/'; then
-              CRATES="$CRATES contextra-candle"
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-infer-candle/'; then
+              CRATES="$CRATES contextra-infer-candle"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-db/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-db/'; then
               CRATES="$CRATES contextra-db"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-vector/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-vector/'; then
               CRATES="$CRATES contextra-vector"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-text/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-text/'; then
               CRATES="$CRATES contextra-text"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-graph/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-graph/'; then
               CRATES="$CRATES contextra-graph"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-rank/'; then
+            if git diff --name-only origin/"$BASE_REF"...HEAD | grep -q '^crates/contextra-rank/'; then
               CRATES="$CRATES contextra-rank"
             fi
             if [ -z "$CRATES" ]; then
               CRATES="contextra-crypto"
             fi
-            echo "crates=$CRATES" >> "$GITHUB_OUTPUT"
           fi
+
+          for crate in $CRATES; do
+            if ! echo "$WORKSPACE_PACKAGES" | grep -qx "$crate"; then
+              echo "::error::Determined crate '$crate' does not exist in workspace packages!"
+              exit 1
+            fi
+          done
+
+          echo "crates=$CRATES" >> "$GITHUB_OUTPUT"
 
       - name: Run Mutation Tests & Record Scores
         run: |
+          FAILED_CRATES=""
           for crate in ${{ steps.target.outputs.crates }}; do
             echo "Running cargo mutants for crate: $crate"
-            OUTPUT=$(cargo mutants -p "$crate" --timeout 120 --minimum-test-timeout 30 --in-place 2>&1 | tee /dev/stderr)
+            OUTPUT=$(cargo mutants -p "$crate" --timeout 120 --minimum-test-timeout 30 --in-place 2>&1 | tee /dev/stderr) || {
+              echo "::error::cargo mutants command failed for crate $crate"
+              FAILED_CRATES="$FAILED_CRATES $crate"
+              continue
+            }
 
             SUMMARY_LINE=$(echo "$OUTPUT" | grep -E "^[0-9]+ mutants? tested" | tail -n 1)
             if [ -z "$SUMMARY_LINE" ]; then
               echo "::error::Could not parse summary line from cargo mutants output for $crate"
-              exit 1
+              FAILED_CRATES="$FAILED_CRATES $crate"
+              continue
             fi
 
             TOTAL=$(echo "$SUMMARY_LINE" | sed -nE "s/^([0-9]+) mutants? tested.*/\1/p")
@@ -108,15 +138,64 @@ jobs:
 
             if [ -z "$TOTAL" ]; then
               echo "::error::Failed to parse mutant count numbers from summary line: \"$SUMMARY_LINE\""
-              exit 1
+              FAILED_CRATES="$FAILED_CRATES $crate"
+              continue
             fi
 
             echo "Recording mutation score for $crate: total=$TOTAL, caught=$CAUGHT"
-            cargo run -p xtask -- mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT"
+            cargo run -p xtask -- mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT" || {
+              echo "::error::Failed to record mutation score for $crate"
+              FAILED_CRATES="$FAILED_CRATES $crate"
+              continue
+            }
+
+            echo "Enforcing mutation score gate for crate: $crate"
+            cargo run -p xtask -- check-mutation-score-gate --crate "$crate" || {
+              echo "::error::Mutation score gate failed for $crate"
+              FAILED_CRATES="$FAILED_CRATES $crate"
+            }
           done
 
+          if [ -n "$FAILED_CRATES" ]; then
+            echo "::error::Mutation testing failed for the following crates:$FAILED_CRATES"
+            exit 1
+          fi
+
+      - name: Run Guarantee Mutation Tests (G1-G3)
+        timeout-minutes: 30
+        run: |
+          echo "Running G1 (Crash/WAL) guarantee mutation tests..."
+          cargo mutants --config mutants-guarantees.toml -p contextra-store \
+            -f "crates/contextra-store/src/wal/**" \
+            -f "crates/contextra-store/src/lsm/recovery.rs" \
+            -f "crates/contextra-store/src/lsm/ops/write.rs" \
+            -f "crates/contextra-store/src/lsm/group_commit.rs" \
+            -o target/mutants-g1
+
+          echo "Running G2 (Loeschung/Krypto) guarantee mutation tests..."
+          cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+            -f "crates/contextra-crypto/src/kv_shredding.rs" \
+            -f "crates/contextra-crypto/src/kv_cipher.rs" \
+            -f "crates/contextra-crypto/src/deletion_proof.rs" \
+            -f "crates/contextra-crypto/src/ed25519_proof.rs" \
+            -f "crates/contextra-crypto/src/kdf.rs" \
+            -o target/mutants-g2
+
+          echo "Running G3 (Audit) guarantee mutation tests..."
+          cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+            -f "crates/contextra-crypto/src/audit_chain.rs" \
+            -f "crates/contextra-crypto/src/wal_crypto.rs" \
+            -f "crates/contextra-crypto/src/wal_completeness.rs" \
+            -o target/mutants-g3
+
+      # Schema for docs/mutation_score_history.jsonl (one JSON object per line, no header):
+      # {"date": "YYYY-MM-DD", "commit": "git-sha", "crate": "crate-name", "total_mutants": N, "caught": N, "missed": N, "score_pct": float}
       - name: Commit and Push Mutation Score History
         if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -125,34 +204,31 @@ jobs:
             echo "ℹ️ Keine Änderungen in docs/mutation_score_history.jsonl."
           else
             git commit -m "chore(mutation): update mutation score history [skip ci]"
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              git push
+            if [ "$EVENT_NAME" = "pull_request" ]; then
+              git fetch origin "$HEAD_REF" || true
+              git rebase "origin/$HEAD_REF" || git rebase --abort || true
+              git push origin "HEAD:$HEAD_REF" || git push origin "HEAD:$HEAD_REF" --force-with-lease
             else
+              git fetch origin gate-status || true
               git checkout -B gate-status
-              git push origin HEAD:gate-status
+              if git rev-parse --verify origin/gate-status >/dev/null 2>&1; then
+                git rebase origin/gate-status || (git rebase --abort && git push origin HEAD:gate-status --force-with-lease)
+              fi
+              git push origin HEAD:gate-status || git push origin HEAD:gate-status --force-with-lease
             fi
             echo "✅ Mutation score history erfolgreich ge-pusht."
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Mutation Score History Artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: mutation-score-history
           path: docs/mutation_score_history.jsonl
 
-      - name: Enforce Mutation Score Gate
-        run: |
-          for crate in ${{ steps.target.outputs.crates }}; do
-            echo "Enforcing mutation score gate for crate: $crate"
-            cargo run -p xtask -- check-mutation-score-gate --crate "$crate"
-          done
-
       - name: Report Failure
         if: failure()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             core.setFailed("Mutation testing failed.");

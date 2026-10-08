@@ -1,6 +1,13 @@
 # verdict-required.toml
 # Governance configuration for the verdict harness module.
 # Defines required status check gates and whether they are blocking for PR merge verdict.
+#
+# GATE NAMING SCHEMA:
+# Configured gate names can be specified either with or without the optional "gate-" prefix
+# (e.g., "gate-determinism-check" or "determinism-check").
+# The verdict engine normalizes gate names dynamically by stripping an optional "gate-" prefix
+# when searching for artifact files ("<name>.json" or "gate-<name>.json") and matching the "gate"
+# field inside the report JSON.
 
 # Harness gate commands (Session 2, Session 3, Session 5, Session 6, Session 7, Session 9)
 [[gate]]

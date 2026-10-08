@@ -474,6 +474,15 @@ impl KeyManager {
         self.nonce_counter.store(0, Ordering::SeqCst);
     }
 
+    /// Provides access to raw key bytes for crate-internal key derivations.
+    pub(crate) fn raw_key_bytes(&self) -> &[u8; 32] {
+        if let Ok(array_ref) = <&[u8; 32]>::try_from(self.key.as_bytes()) {
+            array_ref
+        } else {
+            &[0u8; 32]
+        }
+    }
+
     /// Provides access to the key bytes ONLY during testing.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] {

@@ -20,7 +20,8 @@
 // INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
 use crate::error::{ContextraError, Result};
-use crate::snapshot::{SnapshotLease, SnapshotRegistry};
+use crate::lease::SnapshotLease;
+use crate::snapshot::SnapshotRegistry;
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;

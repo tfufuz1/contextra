@@ -1,0 +1,22 @@
+id        = "T-2026-9105"
+title     = "HNSW commit(): Op-Normalisierung, Fehleratomarität, RAM-Vektor-Löschung beim Freigeben"
+crate     = "contextra-vector"
+tier      = 1
+risk      = "concurrency"
+goal      = "insert(A); delete(A) im selben Tx ergibt Netto-Delete; Fehler vor der ersten Mutation verlieren keine Ops; freigegebene RAM-Slots enthalten keine alten Vektordaten mehr."
+non_goals = ["Kein Overlay (Paket W1-04)", "Keine Änderungen an deletion.rs, types.rs, batch.rs, core_insert.rs, arena.rs, mod.rs", "Keine Änderung der Entry-Point-Neuwahl", "Kein neues Dependency (kein zeroize), keine Cargo.toml-Änderung"]
+scope     = ["crates/contextra-vector/src/hnsw/vector_index_impl.rs", "crates/contextra-vector/src/hnsw/core_rebuild.rs", "crates/contextra-vector/tests/hnsw_commit_semantics.rs", ".jules/tasks/W1-05.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "VETO-F10", "Snapshot-Isolation", "Keine Locks über .await"]
+acceptance = [
+  "cargo test -p contextra-vector --test hnsw_commit_semantics",
+  "cargo test -p contextra-vector",
+  "cargo clippy -p contextra-vector --all-targets -- -D warnings",
+  "cargo xtask check-nan-hot-loop",
+  "cargo xtask jules check"
+]
+evidence_required = ["Roter Test für insert(A); delete(A) vor dem Fix", "Test, der belegt, dass ein freigegebener RAM-Slot genullt ist, ein noch von einem Snapshot benötigter dagegen nicht"]
+[budget]
+files      = 4
+lines      = 600
+iterations = 8

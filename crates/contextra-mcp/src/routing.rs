@@ -240,10 +240,15 @@ pub fn setup_kv_bridge(
             }
         }
         Err(e) => {
-            tracing::warn!("KvBridgeAdapter: Failed to acquire default collection: {e}");
-            Arc::new(contextra_crypto::TenantIsolatedKvStore::new())
+            tracing::error!(
+                "KvBridgeAdapter: Failed to open durable RevocationLog at {}: {e}",
+                log_path.display()
+            );
+            return None;
         }
     };
+
+    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
 
     Some(Arc::new(contextra_infer_candle::KvBridgeAdapter::new(
         store, cipher,
@@ -357,5 +362,33 @@ mod tests {
         assert!(window.chunks.is_empty());
         assert_eq!(window.total_tokens, 0);
         assert!(window.truncated);
+    }
+
+    #[cfg(feature = "kv-bridge")]
+    #[tokio::test]
+    async fn test_setup_kv_bridge_unwritable_log_path_returns_none() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let log_dir_blocker = temp_dir.path().join("kv-revocation.log");
+        std::fs::create_dir_all(&log_dir_blocker).expect("create dir blocker");
+
+        let orphan_file = temp_dir.path().join(".orphan_registry.json");
+        let config = contextra::ContextraConfig {
+            encryption_passphrase: Some("valid-passphrase-123".to_string()),
+            orphan_registry_path: Some(orphan_file),
+            ..Default::default()
+        };
+
+        let db = Arc::new(
+            contextra::Contextra::open_with_config(temp_dir.path(), config)
+                .await
+                .expect("open db"),
+        );
+
+        let bridge = setup_kv_bridge(&db);
+
+        assert!(
+            bridge.is_none(),
+            "setup_kv_bridge MUST return None when log path is unwritable / blocked"
+        );
     }
 }

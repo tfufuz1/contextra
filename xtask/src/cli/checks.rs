@@ -584,6 +584,11 @@ pub fn run_check_nan_hot_loop(args: &[String]) -> i32 {
     0
 }
 
+pub fn run_gc_floor_single_source(args: &[String]) -> i32 {
+    let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+    crate::harness::gc_floor_single_source::run_gc_floor_single_source(extra_args)
+}
+
 pub fn run_check_result_dropped_io(args: &[String]) -> i32 {
     let root = crate::find_root_dir();
     let include_tests = args.iter().any(|arg| arg == "--include-tests");
