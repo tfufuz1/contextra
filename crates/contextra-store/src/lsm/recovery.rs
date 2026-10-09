@@ -657,18 +657,47 @@ impl LsmStorage {
             };
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
-                    if let Err(e) = tokio::fs::remove_file(old_wal_path).await {
-                        tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
-                    } else {
-                        tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
-                        let uuid_sidecar =
-                            PathBuf::from(format!("{}.uuid", old_wal_path.display()));
-                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
-                            tracing::debug!(
-                                "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
-                                uuid_sidecar,
-                                e
-                            );
+                    let p = old_wal_path.clone();
+                    let remove_res =
+                        tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
+                            .await;
+                    match remove_res {
+                        Ok(Err(e)) => {
+                            if e.kind() != std::io::ErrorKind::NotFound {
+                                tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
+                            }
+                        }
+                        Err(join_err) => {
+                            tracing::warn!("Join error removing old WAL file {:?}: {}", old_wal_path, join_err);
+                        }
+                        Ok(Ok(())) => {
+                            tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
+                            let uuid_sidecar =
+                                PathBuf::from(format!("{}.uuid", old_wal_path.display()));
+                            let sidecar = uuid_sidecar.clone();
+                            let sidecar_res = tokio::task::spawn_blocking(move || {
+                                contextra_durable_fs::durable_remove(&sidecar)
+                            })
+                            .await;
+                            match sidecar_res {
+                                Ok(Err(e)) => {
+                                    if e.kind() != std::io::ErrorKind::NotFound {
+                                        tracing::debug!(
+                                            "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
+                                            uuid_sidecar,
+                                            e
+                                        );
+                                    }
+                                }
+                                Err(join_err) => {
+                                    tracing::debug!(
+                                        "Join error removing WAL UUID sidecar {:?}: {} (non-critical)",
+                                        uuid_sidecar,
+                                        join_err
+                                    );
+                                }
+                                Ok(Ok(())) => {}
+                            }
                         }
                     }
                 }
@@ -912,6 +941,98 @@ impl LsmStorage {
             max_seq,
             target_offset
         );
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn recovery_removes_old_wal_via_durable_remove() -> Result<()> {
+        let tmp = TempDir::new().map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let db_path = tmp.path().to_path_buf();
+
+        let old_wal_path = db_path.join("wal-00000000000000000001.log");
+        let active_wal_path = db_path.join("wal-00000000000000000002.log");
+        let old_sidecar_path = std::path::PathBuf::from(format!("{}.uuid", old_wal_path.display()));
+        let active_sidecar_path =
+            std::path::PathBuf::from(format!("{}.uuid", active_wal_path.display()));
+
+        {
+            let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
+            old_wal
+                .append_put(b"key1", b"val1", contextra_core::TxId::new(1))
+                .await?;
+            old_wal
+                .append_tx_end(contextra_core::TxId::new(1), true)
+                .await?;
+
+            let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
+            active_wal
+                .append_put(b"key2", b"val2", contextra_core::TxId::new(2))
+                .await?;
+            active_wal
+                .append_tx_end(contextra_core::TxId::new(2), true)
+                .await?;
+        }
+
+        tokio::fs::write(&old_sidecar_path, b"old-uuid-data")
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        tokio::fs::write(&active_sidecar_path, b"active-uuid-data")
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+        assert!(old_wal_path.exists());
+        assert!(old_sidecar_path.exists());
+        assert!(active_wal_path.exists());
+
+        let dir_mtime_before = std::fs::metadata(&db_path)
+            .and_then(|m| m.modified())
+            .ok();
+
+        let config = LsmConfig {
+            path: db_path.clone(),
+            ..Default::default()
+        };
+
+        let storage = LsmStorage::new(config).await?;
+
+        assert!(
+            !old_wal_path.exists(),
+            "Old WAL file {:?} should be removed after recovery",
+            old_wal_path
+        );
+        assert!(
+            !old_sidecar_path.exists(),
+            "Old WAL UUID sidecar {:?} should be removed after recovery",
+            old_sidecar_path
+        );
+
+        assert!(
+            active_wal_path.exists(),
+            "Active WAL file {:?} must be preserved",
+            active_wal_path
+        );
+
+        let val1 = storage.get(b"key1").await?;
+        assert_eq!(val1, Some(Bytes::from("val1")));
+        let val2 = storage.get(b"key2").await?;
+        assert_eq!(val2, Some(Bytes::from("val2")));
+
+        let dir_mtime_after = std::fs::metadata(&db_path)
+            .and_then(|m| m.modified())
+            .ok();
+        if let (Some(before), Some(after)) = (dir_mtime_before, dir_mtime_after) {
+            assert!(
+                after >= before,
+                "Directory modification time updated after durable_remove and sync"
+            );
+        }
 
         Ok(())
     }
