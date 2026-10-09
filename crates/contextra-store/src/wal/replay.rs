@@ -85,6 +85,14 @@ impl Wal {
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
+        let (entries, _) = self.replay_stream_with_version().await?;
+        Ok(entries)
+    }
+
+    /// Replays the WAL using the stream reader (`BufReader`), returning entries and detected version.
+    pub async fn replay_stream_with_version(
+        &self,
+    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let metadata = crate::wal::fs::metadata(&self.path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
@@ -95,8 +103,7 @@ impl Wal {
                 true
             })
             .await?;
-        let _ = version;
-        Ok(entries)
+        Ok((entries, version))
     }
 
     /// Replays the WAL and returns all entries with seq_no > since_seq_no.
@@ -130,8 +137,7 @@ impl Wal {
                     self.path,
                     e
                 );
-                let entries = self.replay_stream().await?;
-                Ok((entries, WalVersion::V3))
+                self.replay_stream_with_version().await
             }
         }
     }
@@ -177,11 +183,11 @@ impl Wal {
                     error = %e,
                     "WAL mmap replay failed, falling back to stream reader"
                 );
-                let entries = self.replay_stream().await?;
+                let (entries, version) = self.replay_stream_with_version().await?;
                 for (seq, _, _) in &entries {
                     sink.on_entry_replayed(*seq, None);
                 }
-                Ok((entries, WalVersion::V3))
+                Ok((entries, version))
             }
         }
     }
@@ -378,7 +384,7 @@ impl Wal {
             .allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::SeqCst);
         if version < self.min_wal_version || (version != WalVersion::V3 && !allow_legacy_fallback) {
-            return Err(ContextraError::Storage(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
                 version, self.min_wal_version, allow_legacy_fallback
             )));

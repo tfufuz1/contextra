@@ -34,3 +34,33 @@ async fn test_direct_wal_open_with_v1_payload_fails_closed() {
         "Directly opening V1 WAL via Wal::open MUST fail closed under default WalConfig"
     );
 }
+
+#[tokio::test]
+async fn test_direct_wal_open_with_v2_payload_fails_closed() {
+    let dir = tempdir().expect("create tempdir");
+    let wal_path = dir.path().join("v2_payload.wal");
+
+    let op = WalOp::Put {
+        tx_id: TxId::new(2),
+        key: b"v2_direct_key".to_vec(),
+        value: b"v2_direct_val".to_vec(),
+    };
+    let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32])
+        .expect("create v2 entry");
+    let entry_bytes = entry.to_bytes().expect("serialize entry");
+
+    let mut payload = Vec::new();
+    payload.extend_from_slice(b"MFW2");
+    payload.extend_from_slice(&entry_bytes);
+
+    fs::write(&wal_path, &payload)
+        .await
+        .expect("write v2 wal");
+
+    let open_res = Wal::open(&wal_path).await;
+
+    assert!(
+        open_res.is_err(),
+        "Directly opening V2 WAL via Wal::open MUST fail closed under default WalConfig"
+    );
+}

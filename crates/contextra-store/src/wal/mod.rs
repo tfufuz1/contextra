@@ -484,6 +484,18 @@ impl Wal {
             return Ok(false);
         }
 
+        if self
+            .was_legacy_rekeyed
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            Self::write_migration_marker_atomically(&self.path).await?;
+            self.allow_legacy_integrity_key_fallback
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            self.legacy_key_used
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            return Ok(true);
+        }
+
         if !self
             .legacy_key_used
             .load(std::sync::atomic::Ordering::SeqCst)
@@ -732,12 +744,15 @@ impl Wal {
             // If file is not empty, find the last valid HMAC to continue the chain
             if metadata.len() > 0 {
                 let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
-                if version < config.min_wal_version {
+                if version < config.min_wal_version
+                    || (version != WalVersion::V3 && !allow_legacy_fallback)
+                {
                     return Err(ContextraError::invalid_input(format!(
-                        "Configuration error: WAL version {:?} is below min_wal_version {:?}",
-                        version, config.min_wal_version
+                        "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
+                        version, config.min_wal_version, allow_legacy_fallback
                     )));
                 }
+
                 if version != WalVersion::V3 {
                     tracing::info!(
                         "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
@@ -772,25 +787,22 @@ impl Wal {
                     let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
                     if copy_res.is_err() || rewrite_res.is_err() {
-                        if config.min_wal_version > WalVersion::V1
-                            || version < config.min_wal_version
-                        {
-                            let err_msg = match (copy_res, rewrite_res) {
-                                (Err(e), _) => {
-                                    format!("Failed to create backup copy {:?}: {}", bak_path, e)
-                                }
-                                (_, Err(e)) => format!("Failed to rewrite WAL as V3: {}", e),
-                                (Ok(_), Ok(_)) => {
-                                    "Unexpected state during backup and rewrite".to_string()
-                                }
-                            };
-                            return Err(ContextraError::invalid_input(format!(
+                        let err_msg = match (copy_res, rewrite_res) {
+                            (Err(e), _) => {
+                                format!("Failed to create backup copy {:?}: {}", bak_path, e)
+                            }
+                            (_, Err(e)) => format!("Failed to rewrite WAL as V3: {}", e),
+                            (Ok(_), Ok(_)) => {
+                                "Unexpected state during backup and rewrite".to_string()
+                            }
+                        };
+                        return Err(ContextraError::invalid_input(format!(
                             "Configuration error: WAL version {:?} is below min_wal_version {:?} and migration failed: {}",
                             version, config.min_wal_version, err_msg
                         )));
-                        } else {
-                            rewrite_res?;
-                        }
+                    } else {
+                        wal.was_legacy_rekeyed
+                            .store(true, std::sync::atomic::Ordering::SeqCst);
                     }
                 } else {
                     // TODO(Implementer): [P01 / F-02 / HIGH / JULES-P01-02]
