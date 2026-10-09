@@ -1,0 +1,17 @@
+id        = "T-2026-0232"
+title     = "Compaction: durable_remove statt tokio::fs::remove_file"
+crate     = "contextra-store"
+tier      = 1
+risk      = "crash"
+goal      = "Alle Datei-Entfernungen in Compaction/WAL-Truncate laufen über durable_remove (Verzeichnis-fsync)."
+non_goals = ["Kein Secure-Scrub", "Keine Änderung an contextra-durable-fs", "Keine Änderung der Compaction-Logik oder -Reihenfolge"]
+scope     = ["crates/contextra-store/src/compaction/engine.rs", "crates/contextra-store/src/lsm/ops/compaction.rs", ".jules/tasks/T-2026-0232.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**", "crates/contextra-durable-fs/**", "crates/contextra-store/src/wal/**"]
+invariants = ["Zero-Panic", "Manifest-Update vor Datei-Entfernung", "Entfernungsfehler bleiben nicht-fatal"]
+acceptance = ["cargo test -p contextra-store", "cargo clippy -p contextra-store --all-targets -- -D warnings"]
+evidence_required = ["Grep-Beleg ohne verbleibendes fs::remove_file", "Test (a)-(c) rot->grün bzw. begründet nicht rot-testbar"]
+
+[budget]
+files      = 3
+lines      = 200
+iterations = 5
