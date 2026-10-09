@@ -1,5 +1,6 @@
 use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
+use std::sync::atomic::Ordering;
 
 /// Helper function to count stale incoming ghost edges across all nodes and layers in RAM.
 ///
@@ -25,6 +26,7 @@ fn count_incoming_ghost_edges_for_slot(index: &HnswIndex, target_slot: usize) ->
     let m = index.inner_core().cold.config.m;
 
     let target_ram_idx = target_slot.saturating_sub(mmap_count);
+    let index_max_layer = index.inner_core().hot.max_layer.load(Ordering::SeqCst) as usize;
 
     let mut ghost_edges = 0usize;
 
@@ -33,14 +35,7 @@ fn count_incoming_ghost_edges_for_slot(index: &HnswIndex, target_slot: usize) ->
             continue;
         }
 
-        let max_layer = if i < mmap_count {
-            0
-        } else {
-            let ram_i = i - mmap_count;
-            nodes.get(ram_i).map(|n| n.max_layer).unwrap_or(0)
-        };
-
-        for layer in 0..=max_layer {
+        for layer in 0..=index_max_layer {
             let conns = if i < mmap_count {
                 index
                     .inner_core()
@@ -94,6 +89,7 @@ fn count_total_inbound_edges_for_slot(index: &HnswIndex, target_slot: usize) -> 
     let nodes = index.inner_core().hot.nodes.read();
     let total_nodes = mmap_count + nodes.len();
     let m = index.inner_core().cold.config.m;
+    let index_max_layer = index.inner_core().hot.max_layer.load(Ordering::SeqCst) as usize;
 
     let mut inbound = 0usize;
 
@@ -102,14 +98,7 @@ fn count_total_inbound_edges_for_slot(index: &HnswIndex, target_slot: usize) -> 
             continue;
         }
 
-        let max_layer = if i < mmap_count {
-            0
-        } else {
-            let ram_i = i - mmap_count;
-            nodes.get(ram_i).map(|n| n.max_layer).unwrap_or(0)
-        };
-
-        for layer in 0..=max_layer {
+        for layer in 0..=index_max_layer {
             let conns = if i < mmap_count {
                 index
                     .inner_core()
@@ -133,8 +122,16 @@ fn count_total_inbound_edges_for_slot(index: &HnswIndex, target_slot: usize) -> 
     inbound
 }
 
+fn generate_distinct_vector(i: usize, dim: usize) -> Vec<f32> {
+    let mut vec = vec![0.0f32; dim];
+    vec[i % dim] = 1.0;
+    vec[(i + 1) % dim] = (i as f32) / 60.0;
+    vec
+}
+
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dim = 8;
     let config = HnswConfig {
         dimension: dim,
@@ -145,10 +142,10 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 
     let mut index = HnswIndex::try_new(config)?;
 
-    // Insert 60 nodes
+    // Insert 60 nodes with distinct vector directions
     for i in 1..=60 {
         let doc_id = DocId::new(i as u64);
-        let vector = vec![(i as f32) / 60.0; dim];
+        let vector = generate_distinct_vector(i, dim);
         index.insert(TxId::new(i as u64), doc_id, &vector).await?;
         index.commit(TxId::new(i as u64)).await?;
     }
@@ -164,7 +161,9 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 
     // VOR dem Neu-Insert: Prüfen, dass keine Verbindungsliste mehr den alten Slot enthält
     let inbound_before_reinsert = count_total_inbound_edges_for_slot(&index, target_slot);
-    println!("[Path A - remove_with_graph_repair] Stale inbound edges VOR Neu-Insert: {inbound_before_reinsert}");
+    println!(
+        "[Path A - remove_with_graph_repair] Stale inbound edges VOR Neu-Insert: {inbound_before_reinsert}"
+    );
     assert_eq!(
         inbound_before_reinsert, 0,
         "PFAD A BEFUND (VOR Neu-Insert): Es existieren noch {inbound_before_reinsert} eingehende Kanten auf den gelöschten Slot {target_slot}"
@@ -185,7 +184,7 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 
     // Neu-Insert: doc_id 1000
     let new_doc = DocId::new(1000);
-    let new_vec = vec![0.25f32; dim];
+    let new_vec = generate_distinct_vector(25, dim);
     index.insert(TxId::new(1000), new_doc, &new_vec).await?;
     index.commit(TxId::new(1000)).await?;
 
@@ -201,17 +200,28 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 
     // NACH dem Neu-Insert: Prüfen, dass nur symmetrische Kanten existieren, die zum neuen Knoten gehören
     let ghost_edges_after = count_incoming_ghost_edges_for_slot(&index, target_slot);
-    println!("[Path A - remove_with_graph_repair] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}");
+    println!(
+        "[Path A - remove_with_graph_repair] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}"
+    );
     assert_eq!(
         ghost_edges_after, 0,
         "PFAD A BEFUND (NACH Neu-Insert): Es wurden {ghost_edges_after} Geisterkanten auf den wiederverwendeten Slot {target_slot} gefunden!"
+    );
+
+    // Direct search verification: search must never return the deleted target_doc (25)
+    let search_res = index.search(&new_vec, 10).await?;
+    let found_docs: Vec<DocId> = search_res.into_iter().map(|doc| doc.doc_id).collect();
+    assert!(
+        !found_docs.contains(&target_doc),
+        "Search must never return the deleted doc_id"
     );
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_slot_reuse_ghost_edges_path_b_commit_deletion(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dim = 8;
     let config = HnswConfig {
         dimension: dim,
@@ -222,10 +232,10 @@ async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<
 
     let index = HnswIndex::try_new(config)?;
 
-    // Insert 60 nodes
+    // Insert 60 nodes with distinct vector directions
     for i in 1..=60 {
         let doc_id = DocId::new(i as u64);
-        let vector = vec![(i as f32) / 60.0; dim];
+        let vector = generate_distinct_vector(i, dim);
         index.insert(TxId::new(i as u64), doc_id, &vector).await?;
         index.commit(TxId::new(i as u64)).await?;
     }
@@ -241,7 +251,9 @@ async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<
 
     // VOR dem Neu-Insert: Prüfen, dass vor Neu-Insert eingehende Kanten für Path B erfasst werden
     let inbound_before_reinsert = count_total_inbound_edges_for_slot(&index, target_slot);
-    println!("[Path B - commit deletion] Inbound edges VOR Neu-Insert: {inbound_before_reinsert}");
+    println!(
+        "[Path B - commit deletion] Inbound edges VOR Neu-Insert: {inbound_before_reinsert}"
+    );
 
     // Verify free_list contains target_slot for slot reuse
     let free_list_has_slot = index
@@ -258,7 +270,7 @@ async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<
 
     // Neu-Insert: doc_id 2000
     let new_doc = DocId::new(2000);
-    let new_vec = vec![0.30f32; dim];
+    let new_vec = generate_distinct_vector(30, dim);
     let ins_tx = TxId::new(101);
     index.insert(ins_tx, new_doc, &new_vec).await?;
     index.commit(ins_tx).await?;
@@ -275,10 +287,20 @@ async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<
 
     // NACH dem Neu-Insert: Prüfen, dass nur symmetrische Kanten existieren
     let ghost_edges_after = count_incoming_ghost_edges_for_slot(&index, target_slot);
-    println!("[Path B - commit deletion] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}");
+    println!(
+        "[Path B - commit deletion] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}"
+    );
     assert_eq!(
         ghost_edges_after, 0,
         "PFAD B BEFUND (NACH Neu-Insert): Es wurden {ghost_edges_after} Geisterkanten auf den wiederverwendeten Slot {target_slot} gefunden!"
+    );
+
+    // Direct search verification: search must never return the deleted target_doc (30)
+    let search_res = index.search(&new_vec, 10).await?;
+    let found_docs: Vec<DocId> = search_res.into_iter().map(|doc| doc.doc_id).collect();
+    assert!(
+        !found_docs.contains(&target_doc),
+        "Search must never return the deleted doc_id"
     );
 
     Ok(())
