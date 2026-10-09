@@ -1,0 +1,17 @@
+id        = "T-2026-0230"
+title     = "WAL: Resurrection- und Tail-Korruptionstests aus A-02 implementieren"
+crate     = "contextra-store"
+tier      = 1
+risk      = "sec"
+goal      = "Die in A-02 beschriebenen drei Testfaelle als Code verifizieren."
+non_goals = ["Kein Fix an wal/mod.rs oder recovery.rs", "Keine Aenderung an Migrationsfunktionen"]
+scope     = ["crates/contextra-store/tests/wal_resurrection_manifest_anchor.rs", "crates/contextra-store/tests/wal_tail_corruption_midfile.rs", "crates/contextra-store/tests/wal_v1_direct_open_fail_closed.rs", ".jules/tasks/T-2026-0230.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "crates/contextra-store/src/**", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["INV-WAL-TRUNCATION-1", "Keine Testanpassung zur kuenstlichen Gruenfaerbung bei Sicherheitsbefund"]
+acceptance = ["cargo test -p contextra-store --test wal_resurrection_manifest_anchor", "cargo test -p contextra-store --test wal_tail_corruption_midfile", "cargo test -p contextra-store --test wal_v1_direct_open_fail_closed", "cargo clippy -p contextra-store --all-targets -- -D warnings"]
+evidence_required = ["Testausgabe aller drei Tests", "Abgleich mit Audit-Vorhersage, Abweichungen explizit benannt"]
+
+[budget]
+files      = 4
+lines      = 350
+iterations = 6
