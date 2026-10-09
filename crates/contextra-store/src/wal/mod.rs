@@ -732,12 +732,18 @@ impl Wal {
             // If file is not empty, find the last valid HMAC to continue the chain
             if metadata.len() > 0 {
                 let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
-                if version < config.min_wal_version || version != WalVersion::V3 {
+                if version < config.min_wal_version {
+                    return Err(ContextraError::invalid_input(format!(
+                        "Configuration error: WAL version {:?} is below min_wal_version {:?}",
+                        version, config.min_wal_version
+                    )));
+                }
+                if version != WalVersion::V3 {
                     tracing::info!(
-                    "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
-                    version,
-                    wal.path
-                );
+                        "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
+                        version,
+                        wal.path
+                    );
                     let bak_suffix = match version {
                         WalVersion::V1 => "v1.bak",
                         WalVersion::V2 => "v2.bak",

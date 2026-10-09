@@ -372,7 +372,6 @@ impl KeyManager {
         attested_at: i64,
         graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
     ) -> Result<crate::deletion_proof::DeletionProof> {
-        let durability = crate::deletion_proof::DurabilityProof::new(deleted_after_tx.0);
         crate::deletion_proof::DeletionProof::create_v3(
             scope,
             deleted_keys,
@@ -381,7 +380,6 @@ impl KeyManager {
             excluded_scopes,
             attested_at,
             graph_repair,
-            Some(&durability),
             keypair.signing_key(),
         )
         .map_err(|e| CryptoError::Crypto(e.to_string()))
