@@ -35,7 +35,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for Embedding<'a> {
             type Inner = Embedding<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -49,7 +48,6 @@ pub mod contextra {
             pub const VT_METRIC: flatbuffers::VOffsetT = 8;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 Embedding { _tab: table }
             }
@@ -79,7 +77,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, f32>>>(
@@ -93,7 +90,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
@@ -107,8 +103,7 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
-                unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap_or_default() }
+                unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }
             }
         }
 
@@ -211,7 +206,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for ScoredDocument<'a> {
             type Inner = ScoredDocument<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -226,7 +220,6 @@ pub mod contextra {
             pub const VT_EMBEDDING: flatbuffers::VOffsetT = 10;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 ScoredDocument { _tab: table }
             }
@@ -259,7 +252,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)
@@ -270,11 +262,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<f32>(ScoredDocument::VT_SCORE, Some(0.0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -282,7 +273,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
                         ScoredDocument::VT_METADATA,
@@ -295,7 +285,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<Embedding>>(
                         ScoredDocument::VT_EMBEDDING,
@@ -414,7 +403,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for SearchResponse<'a> {
             type Inner = SearchResponse<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -428,7 +416,6 @@ pub mod contextra {
             pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 8;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 SearchResponse { _tab: table }
             }
@@ -459,7 +446,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<
                         flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ScoredDocument>>,
@@ -471,11 +457,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -483,11 +468,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
         }
@@ -595,7 +579,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for VectorIndexUpdate<'a> {
             type Inner = VectorIndexUpdate<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -609,7 +592,6 @@ pub mod contextra {
             pub const VT_METADATA: flatbuffers::VOffsetT = 8;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 VectorIndexUpdate { _tab: table }
             }
@@ -641,7 +623,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<flatbuffers::ForwardsUOffset<&str>>(VectorIndexUpdate::VT_ID, None)
@@ -652,7 +633,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<Embedding>>(
                         VectorIndexUpdate::VT_EMBEDDING,
@@ -665,7 +645,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
                         VectorIndexUpdate::VT_METADATA,
@@ -775,7 +754,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for RoleId<'a> {
             type Inner = RoleId<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -787,7 +765,6 @@ pub mod contextra {
             pub const VT_ID: flatbuffers::VOffsetT = 4;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 RoleId { _tab: table }
             }
@@ -811,8 +788,7 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
-                unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default() }
+                unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }
             }
         }
 
@@ -882,7 +858,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for HyperEdgeId<'a> {
             type Inner = HyperEdgeId<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -894,7 +869,6 @@ pub mod contextra {
             pub const VT_ID: flatbuffers::VOffsetT = 4;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 HyperEdgeId { _tab: table }
             }
@@ -918,8 +892,7 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
-                unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap_or_default() }
+                unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }
             }
         }
 
@@ -989,7 +962,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for RoleBinding<'a> {
             type Inner = RoleBinding<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -1002,7 +974,6 @@ pub mod contextra {
             pub const VT_ENTITY: flatbuffers::VOffsetT = 6;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 RoleBinding { _tab: table }
             }
@@ -1027,19 +998,17 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
-                unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap_or_default() }
+                unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }
             }
             #[inline]
             pub fn entity(&self) -> u64 {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u64>(RoleBinding::VT_ENTITY, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
         }
@@ -1118,7 +1087,6 @@ pub mod contextra {
         impl<'a> flatbuffers::Follow<'a> for HyperEdge<'a> {
             type Inner = HyperEdge<'a>;
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
                 Self {
                     _tab: flatbuffers::Table::new(buf, loc),
@@ -1139,7 +1107,6 @@ pub mod contextra {
             pub const VT_CHILD_EDGE_IDS: flatbuffers::VOffsetT = 22;
 
             #[inline]
-            // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
                 HyperEdge { _tab: table }
             }
@@ -1176,19 +1143,17 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
-                unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap_or_default() }
+                unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }
             }
             #[inline]
             pub fn predicate(&self) -> u8 {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u8>(HyperEdge::VT_PREDICATE, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1199,7 +1164,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab.get::<flatbuffers::ForwardsUOffset<
                         flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RoleBinding>>,
@@ -1211,11 +1175,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1223,11 +1186,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1235,11 +1197,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1247,11 +1208,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1259,11 +1219,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1271,11 +1230,10 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0))
-                        .unwrap_or_default()
+                        .unwrap()
                 }
             }
             #[inline]
@@ -1283,7 +1241,6 @@ pub mod contextra {
                 // Safety:
                 // Created from valid Table for this object
                 // which contains a valid value in this slot
-                // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
                 unsafe {
                     self._tab
                         .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u64>>>(
@@ -1512,7 +1469,6 @@ pub mod contextra {
         /// Assumes, without verification, that a buffer of bytes contains a SearchResponse and returns it.
         /// # Safety
         /// Callers must trust the given bytes do indeed contain a valid `SearchResponse`.
-        // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
         pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {
             flatbuffers::root_unchecked::<SearchResponse>(buf)
         }
@@ -1520,7 +1476,6 @@ pub mod contextra {
         /// Assumes, without verification, that a buffer of bytes contains a size prefixed SearchResponse and returns it.
         /// # Safety
         /// Callers must trust the given bytes do indeed contain a valid size prefixed `SearchResponse`.
-        // SAFETY: Der Tabellenzugriff ist durch den FlatBuffers-Verifier und den Vertrag von init_from_table gedeckt.
         pub unsafe fn size_prefixed_root_as_search_response_unchecked(
             buf: &[u8],
         ) -> SearchResponse {
