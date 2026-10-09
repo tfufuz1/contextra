@@ -86,7 +86,11 @@ async fn test_slot_reuse_path_a_remove_with_graph_repair() -> contextra_core::Re
         *doc_map.get(&target_doc.inner()).expect("doc 25 exists") as u32
     };
 
-    let max_layer = index.inner_core().hot.max_layer.load(std::sync::atomic::Ordering::Relaxed) as usize;
+    let max_layer = index
+        .inner_core()
+        .hot
+        .max_layer
+        .load(std::sync::atomic::Ordering::Relaxed) as usize;
 
     let pre_incoming = count_incoming_edges(&index, target_idx, max_layer);
     assert!(
@@ -110,7 +114,9 @@ async fn test_slot_reuse_path_a_remove_with_graph_repair() -> contextra_core::Re
     // Insert new document 100 to force slot reuse
     let new_doc = DocId::new(100);
     let new_vector = vec![0.5f32; dim];
-    mut_index.insert(TxId::new(100), new_doc, &new_vector).await?;
+    mut_index
+        .insert(TxId::new(100), new_doc, &new_vector)
+        .await?;
     mut_index.commit(TxId::new(100)).await?;
 
     let reused_idx = {
@@ -161,7 +167,11 @@ async fn test_slot_reuse_path_b_commit_deletion() -> contextra_core::Result<()> 
         *doc_map.get(&target_doc.inner()).expect("doc 25 exists") as u32
     };
 
-    let max_layer = index.inner_core().hot.max_layer.load(std::sync::atomic::Ordering::Relaxed) as usize;
+    let max_layer = index
+        .inner_core()
+        .hot
+        .max_layer
+        .load(std::sync::atomic::Ordering::Relaxed) as usize;
 
     let pre_incoming = count_incoming_edges(&index, target_idx, max_layer);
     assert!(
