@@ -187,7 +187,9 @@ pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
         let mut remaining = len;
 
         while remaining > 0 {
-            let chunk_size = usize::try_from(remaining).unwrap_or(zeros.len()).min(zeros.len());
+            let chunk_size = usize::try_from(remaining)
+                .unwrap_or(zeros.len())
+                .min(zeros.len());
             file.write_all(&zeros[..chunk_size])?;
             remaining -= chunk_size as u64;
         }
@@ -197,5 +199,7 @@ pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
 
     durable_remove(path)?;
 
-    Ok(ScrubReceipt { bytes_scrubbed: len })
+    Ok(ScrubReceipt {
+        bytes_scrubbed: len,
+    })
 }
