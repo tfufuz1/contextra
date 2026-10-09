@@ -1,0 +1,17 @@
+id = "T-2026-0234"
+title = "HNSW: Ghost-Kanten bei Slot-Wiederverwendung testen und beheben"
+crate = "contextra-vector"
+tier = 1
+risk = "concurrency"
+goal = "Nachweis, dass wiederverwendete Slots keine veralteten eingehenden Kanten erben; Fix bei Befund."
+non_goals = ["Kein mmap-Zero-Overlay", "Keine Persistenz des Overlays", "Keine Entry-Point-Optimierung (A-04)", "Keine Änderung der Free-List-Strategie"]
+scope = ["crates/contextra-vector/tests/hnsw_slot_reuse_ghost_edges.rs", "crates/contextra-vector/src/hnsw/arena.rs", "crates/contextra-vector/src/hnsw/core_insert.rs", ".jules/tasks/T-2026-0234.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/", "docs/decisions/", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "INV-DELETION-2", "Recall nicht schlechter"]
+acceptance = ["cargo test -p contextra-vector --test hnsw_slot_reuse_ghost_edges", "cargo test -p contextra-vector", "cargo clippy -p contextra-vector --all-targets -- -D warnings"]
+evidence_required = ["Testergebnis je Löschpfad (grün/rot mit Zahl)", "Recall-Vergleich vor/nach Fix, falls Fix nötig"]
+
+[budget]
+files = 4
+lines = 300
+iterations = 6

@@ -60,6 +60,7 @@ pub struct HnswArena {
     pub counts: RwLock<Vec<u8>>,
     pub free_list: RwLock<Vec<usize>>,
     pub total_allocated: AtomicU64,
+    pub m: std::sync::atomic::AtomicUsize,
 }
 
 impl Default for HnswArena {
@@ -79,6 +80,7 @@ impl HnswArena {
             counts: RwLock::new(Vec::new()),
             free_list: RwLock::new(Vec::new()),
             total_allocated: AtomicU64::new(0),
+            m: std::sync::atomic::AtomicUsize::new(16),
         }
     }
 
@@ -129,6 +131,8 @@ impl HnswArena {
             ContextraError::invalid_input("Capacity overflow calculating 64-byte alignment")
         })?;
 
+        self.m.store(m, Ordering::Relaxed);
+
         let mut offsets = self.offsets.write();
         let mut capacities = self.capacities.write();
         let mut count_offsets = self.count_offsets.write();
@@ -150,6 +154,16 @@ impl HnswArena {
             let start = offsets.get(reused_idx).copied().ok_or_else(|| {
                 ContextraError::Index(format!("Invalid offset index {reused_idx} in free list"))
             })?;
+            // Clear any lingering connections or stale count entries in reused slot
+            if let Some(&c_offset) = count_offsets.get(reused_idx) {
+                let count_len = count_offsets
+                    .get(reused_idx + 1)
+                    .copied()
+                    .unwrap_or_else(|| counts.len());
+                for c_idx in c_offset..count_len.min(counts.len()) {
+                    counts[c_idx] = 0;
+                }
+            }
             (reused_idx, start)
         } else {
             // Align start offset to 64-byte boundary (16 x u32 elements)
@@ -377,12 +391,69 @@ impl HnswArena {
         false
     }
 
-    /// Marks a node's slot as free for future slot reuse.
+    /// Marks a node's slot as free for future slot reuse and purges stale backlinks to it.
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();
         if ram_idx < offsets.len() {
             self.free_list.write().push(ram_idx);
             self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+
+            let m = self.m.load(Ordering::Relaxed);
+            if m > 0 {
+                self.remove_incoming_edges_to_slot(ram_idx, m);
+            }
+        }
+    }
+
+    fn remove_incoming_edges_to_slot(&self, freed_ram_idx: usize, m: usize) {
+        let target_u32 = freed_ram_idx as u32;
+        let offsets = self.offsets.read();
+        let count_offsets = self.count_offsets.read();
+        let mut counts = self.counts.write();
+        let mut arena = self.arena.write();
+
+        for i in 0..offsets.len() {
+            if i == freed_ram_idx {
+                continue;
+            }
+            let node_offset = offsets[i];
+            let count_start = match count_offsets.get(i) {
+                Some(&c) => c,
+                None => continue,
+            };
+            let count_end = count_offsets
+                .get(i + 1)
+                .copied()
+                .unwrap_or_else(|| counts.len());
+
+            let num_layers = count_end.saturating_sub(count_start);
+            for layer in 0..num_layers {
+                let count_idx = count_start + layer;
+                if count_idx >= counts.len() {
+                    break;
+                }
+                let len = counts[count_idx] as usize;
+                if len == 0 {
+                    continue;
+                }
+                let l_offset = Self::layer_offset(node_offset, layer, m);
+                if l_offset + len > arena.len() {
+                    continue;
+                }
+
+                let slice = &arena[l_offset..l_offset + len];
+                if slice.contains(&target_u32) {
+                    let mut kept = Vec::with_capacity(len);
+                    for &c in slice {
+                        if c != target_u32 {
+                            kept.push(c);
+                        }
+                    }
+                    let new_len = kept.len();
+                    arena[l_offset..l_offset + new_len].copy_from_slice(&kept);
+                    counts[count_idx] = new_len as u8;
+                }
+            }
         }
     }
 }
