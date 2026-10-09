@@ -372,7 +372,6 @@ impl KeyManager {
         attested_at: i64,
         graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
     ) -> Result<crate::deletion_proof::DeletionProof> {
-        let durability = crate::deletion_proof::DurabilityProof::new(deleted_after_tx.0);
         crate::deletion_proof::DeletionProof::create_v3(
             scope,
             deleted_keys,
@@ -381,7 +380,6 @@ impl KeyManager {
             excluded_scopes,
             attested_at,
             graph_repair,
-            Some(&durability),
             keypair.signing_key(),
         )
         .map_err(|e| CryptoError::Crypto(e.to_string()))
@@ -475,6 +473,7 @@ impl KeyManager {
     }
 
     /// Provides access to raw key bytes for crate-internal key derivations.
+    #[allow(dead_code)]
     pub(crate) fn raw_key_bytes(&self) -> &[u8; 32] {
         if let Ok(array_ref) = <&[u8; 32]>::try_from(self.key.as_bytes()) {
             array_ref

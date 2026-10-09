@@ -8,7 +8,7 @@
 use ahash::AHashMap;
 use contextra_core::{ContextraError, Result};
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 /// Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
 pub const ARENA_ALIGNMENT_BYTES: usize = 64;
@@ -60,6 +60,7 @@ pub struct HnswArena {
     pub counts: RwLock<Vec<u8>>,
     pub free_list: RwLock<Vec<usize>>,
     pub total_allocated: AtomicU64,
+    pub m: AtomicUsize,
 }
 
 impl Default for HnswArena {
@@ -79,6 +80,7 @@ impl HnswArena {
             counts: RwLock::new(Vec::new()),
             free_list: RwLock::new(Vec::new()),
             total_allocated: AtomicU64::new(0),
+            m: AtomicUsize::new(0),
         }
     }
 
@@ -128,6 +130,8 @@ impl HnswArena {
         let node_capacity = Self::align_capacity(raw_capacity).ok_or_else(|| {
             ContextraError::invalid_input("Capacity overflow calculating 64-byte alignment")
         })?;
+
+        self.m.store(m, Ordering::Relaxed);
 
         let mut offsets = self.offsets.write();
         let mut capacities = self.capacities.write();
@@ -377,12 +381,65 @@ impl HnswArena {
         false
     }
 
-    /// Marks a node's slot as free for future slot reuse.
+    /// Marks a node's slot as free for future slot reuse and cleans up incoming edges.
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();
         if ram_idx < offsets.len() {
             self.free_list.write().push(ram_idx);
             self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+
+            let m = self.m.load(Ordering::Relaxed);
+            if m > 0 {
+                let target_u32 = ram_idx as u32;
+                let count_offsets = self.count_offsets.read();
+                let mut counts = self.counts.write();
+                let mut arena = self.arena.write();
+
+                let total_nodes = offsets.len();
+                for other_idx in 0..total_nodes {
+                    if other_idx == ram_idx {
+                        continue;
+                    }
+                    if other_idx >= count_offsets.len() {
+                        continue;
+                    }
+                    let count_start = count_offsets[other_idx];
+                    let count_end = if other_idx + 1 < count_offsets.len() {
+                        count_offsets[other_idx + 1]
+                    } else {
+                        counts.len()
+                    };
+
+                    let node_offset = offsets[other_idx];
+                    let num_layers = count_end.saturating_sub(count_start);
+
+                    for layer in 0..num_layers {
+                        let count_idx = count_start + layer;
+                        if count_idx >= counts.len() {
+                            break;
+                        }
+                        let len = counts[count_idx] as usize;
+                        if len == 0 {
+                            continue;
+                        }
+                        let l_offset = Self::layer_offset(node_offset, layer, m);
+                        if l_offset + len <= arena.len() {
+                            let slice = &arena[l_offset..l_offset + len];
+                            if slice.contains(&target_u32) {
+                                let mut kept = Vec::with_capacity(len);
+                                for &conn in slice {
+                                    if conn != target_u32 {
+                                        kept.push(conn);
+                                    }
+                                }
+                                let new_len = kept.len();
+                                arena[l_offset..l_offset + new_len].copy_from_slice(&kept);
+                                counts[count_idx] = new_len as u8;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
