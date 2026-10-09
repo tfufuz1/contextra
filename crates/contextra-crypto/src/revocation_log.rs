@@ -37,9 +37,6 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-pub const MARKER_MAGIC: &[u8; 4] = b"RVMK";
-pub const MARKER_VERSION_1: u8 = 1;
-
 /// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RevocationMarker {
@@ -608,11 +605,11 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut prospective_entries = entries_write_guard.clone();
+        let mut prospective_entries = entries_guard.clone();
         prospective_entries.push(new_entry.clone());
 
         if let Some(ref path) = self.file_path {
-            let serialized_log = bincode::serialize(&prospective_entries).map_err(|e| {
+            let serialized = bincode::serialize(&prospective_entries).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
@@ -630,9 +627,14 @@ impl RevocationLog {
             write_atomic_file(&m_path, &serialized_marker)?;
         }
 
-        entries_write_guard.push(new_entry.clone());
-        let mut revoked_guard = self.revoked_targets.write();
+        entries_guard.push(new_entry.clone());
         revoked_guard.insert(target);
+
+        drop(entries_guard);
+        drop(revoked_guard);
+
+        drop(entries_write_guard);
+        drop(revoked_write_guard);
 
         Ok(new_entry)
     }
