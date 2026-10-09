@@ -112,8 +112,9 @@ impl EmbeddingConfig {
             .or_else(|_| std::env::var("CANDLE_QUANTIZATION"))
             .unwrap_or_else(|_| "Q4KM".to_string());
 
-        let candle_quantization = contextra_infer_candle::model_registry::CandleQuantization::from_str(&quantization_str)
-            .unwrap_or(contextra_infer_candle::model_registry::CandleQuantization::Q4KM);
+        let candle_quantization =
+            contextra_infer_candle::model_registry::CandleQuantization::from_str(&quantization_str)
+                .unwrap_or(contextra_infer_candle::model_registry::CandleQuantization::Q4KM);
 
         Self {
             provider,
@@ -137,16 +138,23 @@ impl EmbeddingConfig {
         let mut backend = EmbeddingBackend::from_str(trimmed_provider)?;
 
         match &mut backend {
-            EmbeddingBackend::Candle { model_dir, quantization } => {
+            EmbeddingBackend::Candle {
+                model_dir,
+                quantization,
+            } => {
                 let dir = self.candle_model_dir.clone().ok_or_else(|| {
                     ContextraError::InvalidInput(
-                        "candle_model_dir is required when embedding provider is 'candle'".to_string(),
+                        "candle_model_dir is required when embedding provider is 'candle'"
+                            .to_string(),
                     )
                 })?;
                 *model_dir = dir;
                 *quantization = self.candle_quantization;
             }
-            EmbeddingBackend::Onnx { model_name, cache_dir: _ } => {
+            EmbeddingBackend::Onnx {
+                model_name,
+                cache_dir: _,
+            } => {
                 let path = self.onnx_model_path.clone().ok_or_else(|| {
                     ContextraError::InvalidInput(
                         "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
@@ -188,9 +196,8 @@ pub fn create_embedding_provider(
         #[cfg(not(feature = "onnx"))]
         EmbeddingBackend::Onnx { .. } => Err(ContextraError::CapabilityUnsupported {
             capability: "onnx".to_string(),
-            reason:
-                "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
-                    .to_string(),
+            reason: "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
+                .to_string(),
         }),
         #[cfg(feature = "candle")]
         EmbeddingBackend::Candle {
