@@ -1,0 +1,17 @@
+id        = "T-2026-0248"
+title     = "HNSW Zero Overlay Data Structure"
+crate     = "contextra-vector"
+tier      = 1
+risk      = "none"
+goal      = "Implement in-memory MmapZeroOverlay data structure for logically zeroed mmap vector indices."
+non_goals = ["Read path integration in vector index", "WAL persistence for zero overlay"]
+scope     = ["crates/contextra-vector/src/hnsw/zero_overlay.rs", "crates/contextra-vector/src/hnsw/mod.rs", ".jules/tasks/T-2026-0248.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock"]
+invariants = ["Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-vector hnsw::zero_overlay", "cargo clippy -p contextra-vector --all-targets -- -D warnings"]
+evidence_required = ["Tests and clippy output pass cleanly"]
+
+[budget]
+files      = 3
+lines      = 250
+iterations = 5
