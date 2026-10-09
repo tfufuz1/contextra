@@ -30,13 +30,13 @@ pub struct Cleaned;
 /// use contextra_types::{DocId, TenantId, TxId};
 ///
 /// # fn example() -> contextra_types::Result<()> {
-/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?;
-/// let sst_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?;
-/// let hnsw_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?;
-/// let wal_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::WalAllSegments { seq_after: 10 }, 0)?;
-/// let csr_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::CsrGraph, 0)?;
-/// let kv_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0)?;
-/// let emb_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0)?;
+/// let lsm_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))?;
+/// let sst_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::SsTableAllLevels, || Ok(true))?;
+/// let hnsw_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true))?;
+/// let wal_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::WalAllSegments { seq_after: 10 }, || Ok(true))?;
+/// let csr_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::CsrGraph, || Ok(true))?;
+/// let kv_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::KvCacheSegments, || Ok(true))?;
+/// let emb_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::EmbeddingCache, || Ok(true))?;
 ///
 /// let proof = DeletionProofBuilder::new(
 ///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
@@ -330,23 +330,23 @@ mod tests {
         let key = test_proof_key();
 
         let lsm_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap();
         let sst_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::SsTableAllLevels, || Ok(true))
                 .unwrap();
         let hnsw_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap();
         let wal_proof = LayerCleanupProof::new_after_verified_empty(
             DeletionLayer::WalAllSegments { seq_after: 50 },
             0,
         )
         .unwrap();
         let csr_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::CsrGraph, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::CsrGraph, || Ok(true)).unwrap();
         let kv_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::KvCacheSegments, || Ok(true)).unwrap();
         let emb_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::EmbeddingCache, || Ok(true)).unwrap();
 
         // Direct creation reference
         let expected_proof = DeletionProof::create_with_wal_receipt(
@@ -394,7 +394,7 @@ mod tests {
         };
 
         let wrong_proof =
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap();
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap();
 
         let _ = DeletionProofBuilder::new(scope, vec![], TxId(1), vec![], test_proof_key())
             .with_lsm_memtable_cleanup(wrong_proof);

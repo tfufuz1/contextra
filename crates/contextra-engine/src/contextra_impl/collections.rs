@@ -381,9 +381,10 @@ impl Contextra {
         // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
         // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
         // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
-        let layer_proofs = vec![LayerCleanupProof::new_after_verified_empty(
+        let remaining_count = remaining_col_data.len() + remaining_txt_data.len();
+        let layer_proofs = vec![LayerCleanupProof::verify_and_create(
             DeletionLayer::LsmMemtable,
-            remaining_col_data.len() + remaining_txt_data.len(),
+            || Ok(remaining_count == 0),
         )]
         .into_iter()
         .collect::<Result<Vec<_>>>()

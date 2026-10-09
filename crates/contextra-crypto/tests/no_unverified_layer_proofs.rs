@@ -262,7 +262,7 @@ fn test_no_unverified_layer_proofs() -> Result<(), Box<dyn std::error::Error>> {
 fn test_fixture_literal_zero_detected() {
     let fixture = r#"
 pub fn do_something() {
-    LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
+    /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true));
 }
 "#;
     let violations = find_unverified_layer_proof_violations(fixture);
@@ -316,8 +316,8 @@ pub fn do_something() {
 fn test_fixture_call_inside_comment_ignored() {
     let fixture = r#"
 pub fn do_something() {
-    // LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
-    /// LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
+    // /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true));
+    /// /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true));
 }
 "#;
     let violations = find_unverified_layer_proof_violations(fixture);
@@ -334,7 +334,7 @@ pub fn do_something() {
 #[cfg(test)]
 mod tests {
     fn test_foo() {
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true));
     }
 }
 "#;

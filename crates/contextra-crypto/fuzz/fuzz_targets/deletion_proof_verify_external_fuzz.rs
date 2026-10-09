@@ -89,7 +89,7 @@ fuzz_target!(|input: VerifyExternalFuzzInput| {
 
     // Strategy 3: Construct valid v3 (Ed25519) and v2 (HMAC) proofs, then verify against arbitrary/mutated key bytes
     let keypair = DeletionProofKeyPair::generate();
-    let layer_proof = match LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0) {
+    let layer_proof = match /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)) {
         Ok(p) => p,
         Err(_) => return,
     };

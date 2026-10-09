@@ -160,7 +160,7 @@ impl LayerCleanupProof {
     ///
     /// # Errors
     /// Gibt `ContextraError::Internal` zurück, wenn `remaining_live_entries != 0`.
-    pub fn new_after_verified_empty(
+    pub(crate) fn new_after_verified_empty(
         layer: DeletionLayer,
         remaining_live_entries: usize,
     ) -> Result<Self> {
@@ -192,10 +192,7 @@ impl LayerCleanupProof {
         F: FnOnce() -> Result<bool>,
     {
         if verification()? {
-            Ok(Self {
-                layer,
-                _private: (),
-            })
+            Self::new_after_verified_empty(layer, 0)
         } else {
             Err(ContextraError::Internal(format!(
                 "INV-DELETION-1 violation: physical cleanup verification \

@@ -42,7 +42,7 @@ fn test_wire_derive_deletion_proof_key_via_create_deletion_proof() {
 
     let cleanup_proofs =
         vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+            /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))
                 .expect("LayerCleanupProof"),
         ];
 

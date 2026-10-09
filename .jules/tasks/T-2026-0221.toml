@@ -1,0 +1,17 @@
+id        = "T-2026-0221"
+title     = "Löschbeweis: LayerCleanupProof-Konstruktor verengen"
+crate     = "contextra-crypto"
+tier      = 2
+risk      = "sec"
+goal      = "new_after_verified_empty nur noch pub(crate); öffentliche Erzeugung über verify_and_create mit echter Post-Condition."
+non_goals = ["Kein Zeugen-Typ aus dem Store (eigene ADR)", "Keine Modularisierung von deletion_proof.rs (W2-05)"]
+scope     = ["crates/contextra-crypto/src/deletion_proof.rs", "crates/contextra-crypto/src/deletion_proof_typestate.rs", "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs", "crates/contextra-engine/src/contextra_impl/collections.rs", "crates/contextra-db/examples/verify_deletion_proof_external.rs", ".jules/tasks/T-2026-0221.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock", "Cargo.toml", "docs/decisions/**"]
+invariants = ["INV-DELETION-1", "INV-DELETION-2", "Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-crypto", "cargo test -p contextra-engine", "cargo clippy -p contextra-crypto -p contextra-engine -p contextra-db --all-targets -- -D warnings"]
+evidence_required = ["Liste der geänderten Aufrufer", "Hinweis auf Restschuld Zeugen-Typ"]
+
+[budget]
+files      = 25
+lines      = 900
+iterations = 10

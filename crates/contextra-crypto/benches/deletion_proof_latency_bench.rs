@@ -36,9 +36,11 @@ fn bench_deletion_proof_creation_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+                    // Test-Fixture, keine Produktion
+                    LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))
                         .unwrap(),
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)
+                    // Test-Fixture, keine Produktion
+                    LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true))
                         .unwrap(),
                 ];
                 DeletionProof::create_with_wal_receipt(
@@ -79,8 +81,10 @@ fn bench_deletion_proof_verification_latency(c: &mut Criterion) {
         }
 
         let cleanup_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+            // Test-Fixture, keine Produktion
+            LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap(),
+            // Test-Fixture, keine Produktion
+            LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap(),
         ];
         let proof = DeletionProof::create_with_wal_receipt(
             scope.clone(),
@@ -126,9 +130,11 @@ fn bench_deletion_proof_full_issuance_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+                    // Test-Fixture, keine Produktion
+                    LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))
                         .unwrap(),
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)
+                    // Test-Fixture, keine Produktion
+                    LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true))
                         .unwrap(),
                 ];
                 let proof = DeletionProof::create_with_wal_receipt(

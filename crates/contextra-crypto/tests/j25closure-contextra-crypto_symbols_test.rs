@@ -57,7 +57,7 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
     // 3. create_v3_with_audit_position in DeletionProof
     let tenant_id = TenantId::try_new(1).expect("valid tenant_id");
     let scope = DeletionScope::Document { doc_id, tenant_id };
-    let cleanup_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+    let cleanup_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))
         .expect("valid cleanup proof");
     let audit_position = Some(head_sig.chain_index);
 

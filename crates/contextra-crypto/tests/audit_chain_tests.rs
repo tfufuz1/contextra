@@ -186,8 +186,8 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
     };
 
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::SsTableAllLevels, || Ok(true)).unwrap(),
     ];
 
     let proof = DeletionProof::create_v3_with_audit_position(
@@ -214,9 +214,9 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
 
 #[test]
 fn test_inv_deletion_1_physical_cleanup_enforced() {
-    // LayerCleanupProof fails if remaining live entries exist (> 0)
+    // LayerCleanupProof fails if verification closure returns false or error
     let incomplete_cleanup =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 1);
+        LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(false));
     assert!(incomplete_cleanup.is_err());
 
     // Verification closure returning false fails

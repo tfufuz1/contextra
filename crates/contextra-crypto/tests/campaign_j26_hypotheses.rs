@@ -576,8 +576,8 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         attested_at: 1700000000,
     }];
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap(),
     ];
 
     let proof_x = DeletionProof::create_v3(
@@ -637,8 +637,8 @@ fn test_h6_deletion_proof_v3_validation_suite() {
 
     // (e) LayerCleanupProof non-empty rejection
     assert!(
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 5).is_err(),
-        "LayerCleanupProof MUST reject remaining live entries > 0"
+        LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(false)).is_err(),
+        "LayerCleanupProof MUST reject when verification returns false"
     );
 
     // (f) WAL delete receipt compute & verify roundtrip + tampering

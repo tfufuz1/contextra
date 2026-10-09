@@ -44,7 +44,7 @@ fuzz_target!(|input: DeletionProofTamperInput| {
         doc_id: DocId::new(500),
         tenant_id,
     };
-    let layer_proof = match LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0) {
+    let layer_proof = match /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)) {
         Ok(p) => p,
         Err(_) => return,
     };
@@ -95,7 +95,7 @@ fuzz_target!(|input: DeletionProofTamperInput| {
     let _ = version_manipulated.verify(&keypair.verifying_key);
 
     // 3. Random 64-byte signature candidate against v3 proof path
-    let v3_layer_proof = match LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0) {
+    let v3_layer_proof = match /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)) {
         Ok(p) => p,
         Err(_) => return,
     };

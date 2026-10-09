@@ -16,8 +16,8 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
     };
 
     let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap(),
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap(),
     ];
 
     // Attempt to create v3 proof with empty graph_repair slice when HnswIndex is covered
@@ -60,7 +60,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
     };
 
     let layer_proofs =
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap()];
+        vec![/* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true)).unwrap()];
 
     let graph_repair = vec![GraphRepairAttestation {
         doc_id: DocId::new(42),
@@ -101,7 +101,7 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
     };
 
     let layer_proofs =
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+        vec![/* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap()];
 
     // 1. Create a valid Ed25519 Version 3 proof
     let valid_v3_proof = DeletionProof::create_v3(

@@ -14,7 +14,7 @@ fn verify_external_accepts_valid_proof() {
         tenant_id,
     };
     let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap();
 
     let proof = DeletionProof::create_v3(
         scope,
@@ -44,7 +44,7 @@ fn verify_external_rejects_tampered_timestamp() {
         tenant_id,
     };
     let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap();
 
     let mut proof = DeletionProof::create_v3(
         scope,
@@ -78,7 +78,7 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         tenant_id,
     };
     let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+        /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap();
 
     let mut proof = DeletionProof::create_v3(
         scope,

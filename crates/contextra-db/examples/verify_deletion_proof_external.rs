@@ -109,9 +109,12 @@ async fn run_operator_role(
     };
 
     let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
+        // Test-Fixture, keine Produktion
+        LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))?,
+        // Test-Fixture, keine Produktion
+        LayerCleanupProof::verify_and_create(DeletionLayer::SsTableAllLevels, || Ok(true))?,
+        // Test-Fixture, keine Produktion
+        LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true))?,
     ];
 
     let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {

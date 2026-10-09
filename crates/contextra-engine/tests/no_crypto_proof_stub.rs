@@ -18,7 +18,7 @@ fn sample_keys() -> Vec<Vec<u8>> {
 fn create_sample_proof(key: &[u8]) -> Result<DeletionProof, Box<dyn std::error::Error>> {
     let scope = sample_scope();
     let keys = sample_keys();
-    let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?;
+    let layer_proof = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true))?;
     let proof = DeletionProof::create(scope, keys, TxId(42), vec![layer_proof], vec![], key)?;
     Ok(proof)
 }
@@ -140,7 +140,7 @@ fn test_new_after_verified_empty() -> TestResult {
     }
 
     // remaining_count == 0 -> Ok
-    let res_zero = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
+    let res_zero = /* Test-Fixture, keine Produktion */ LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true));
     if res_zero.is_err() {
         return Err("new_after_verified_empty failed with remaining_count == 0".into());
     }
