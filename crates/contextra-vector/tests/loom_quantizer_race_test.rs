@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für AGT-INDEX-b2c3d4e5.
-//! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-vector --test loom_quantizer_race_test
+//! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-index -- loom
 //!
-//! Testziel: Kein Datenverlust und keine Panik bei parallelen insert()-Aufrufen
+//! Testziel: Kein Datenverlust und keine Panik bei 4 parallelen insert()-Aufrufen
 //! auf demselben HnswIndex mit aktiviertem SQ8-Quantizer.
 
 #[cfg(loom)]
@@ -12,9 +12,6 @@ mod loom_tests {
     use contextra_vector::{HnswConfig, HnswIndex};
     use loom::sync::Arc;
     use loom::thread;
-
-    // APM-LOOM-STATE-EXPLOSION: Maximal 2 Threads pro loom::model()-Aufruf,
-    // um State-Explosion im Loom-Searchspace zu vermeiden.
 
     #[test]
     fn test_sq8_quantizer_write_lock_no_race() {
@@ -30,6 +27,7 @@ mod loom_tests {
             let index = Arc::new(HnswIndex::try_new(config).expect("valid index"));
 
             let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
                 .build()
                 .unwrap();
 
@@ -45,7 +43,7 @@ mod loom_tests {
 
             let mut handles = Vec::new();
 
-            for i in 1..=2 {
+            for i in 1..=4 {
                 let index_clone = Arc::clone(&index);
                 let handle = thread::spawn(move || {
                     let rt = tokio::runtime::Builder::new_current_thread()
@@ -70,11 +68,12 @@ mod loom_tests {
             }
 
             let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
                 .build()
                 .unwrap();
 
             rt.block_on(async {
-                assert_eq!(index.len().await, 3);
+                assert_eq!(index.len().await, 5);
             });
         });
     }
