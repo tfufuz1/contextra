@@ -100,7 +100,7 @@ where
     if version < min_wal_version
         || (version != WalVersion::V3 && !allow_legacy_integrity_key_fallback)
     {
-        return Err(ContextraError::Storage(format!(
+        return Err(ContextraError::invalid_input(format!(
             "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
             version, min_wal_version, allow_legacy_integrity_key_fallback
         )));
