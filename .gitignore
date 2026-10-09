@@ -1,6 +1,8 @@
 target/
 **/target/
 *.swp
+*.kate-swp
+*~
 *.swo
 .idea/
 .vscode/
