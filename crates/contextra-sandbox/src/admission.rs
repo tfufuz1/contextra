@@ -51,3 +51,52 @@ pub trait ModuleVerifier {
     /// Returns [`AdmissionError`] if verification fails (e.g., unsigned module, invalid signature, or digest mismatch).
     fn verify(&self, bytes: &[u8]) -> Result<AdmittedModule, AdmissionError>;
 }
+
+/// Concrete implementation of [`ModuleVerifier`] that validates WASM binaries against
+/// basic WASM magic header bytes (`\0asm`) and constructs an [`AdmittedModule`].
+#[derive(Debug, Clone, Default)]
+pub struct DefaultModuleVerifier {
+    expected_digest: Option<[u8; 32]>,
+}
+
+impl DefaultModuleVerifier {
+    /// Constructs a new [`DefaultModuleVerifier`] with no pinned hash digest.
+    pub fn new() -> Self {
+        Self {
+            expected_digest: None,
+        }
+    }
+
+    /// Constructs a new [`DefaultModuleVerifier`] pinned to an expected 32-byte digest.
+    pub fn with_expected_digest(digest: [u8; 32]) -> Self {
+        Self {
+            expected_digest: Some(digest),
+        }
+    }
+}
+
+impl ModuleVerifier for DefaultModuleVerifier {
+    fn verify(&self, bytes: &[u8]) -> Result<AdmittedModule, AdmissionError> {
+        if bytes.len() < 8 || &bytes[0..4] != b"\0asm" {
+            return Err(AdmissionError::InvalidModule(
+                "Missing WASM magic header '\\0asm'".to_string(),
+            ));
+        }
+
+        let mut computed_digest = [0u8; 32];
+        for (i, &byte) in bytes.iter().enumerate() {
+            computed_digest[i % 32] ^= byte;
+        }
+
+        if let Some(expected) = self.expected_digest {
+            if expected != computed_digest {
+                return Err(AdmissionError::DigestMismatch {
+                    expected: format!("{:?}", expected),
+                    actual: format!("{:?}", computed_digest),
+                });
+            }
+        }
+
+        Ok(AdmittedModule::new(bytes.to_vec(), computed_digest))
+    }
+}

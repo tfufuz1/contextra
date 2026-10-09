@@ -388,7 +388,12 @@ impl VectorIndex for HnswIndex {
                             deletes_to_apply.push((old_idx, *doc_id));
                         }
                     }
-                    _ => unreachable!(),
+                    other => {
+                        return Err(ContextraError::Index(format!(
+                            "HNSW commit encountered unexpected IndexOp variant in Phase 2: {:?}",
+                            std::mem::discriminant(other)
+                        )));
+                    }
                 }
             }
 

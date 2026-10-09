@@ -20,6 +20,27 @@ pub trait KmsProvider {
     fn get_key(&self) -> Result<Vec<u8>>;
 }
 
+/// Concrete implementation of [`KmsProvider`] backed by an [`Arc<KeyManager>`].
+#[derive(Clone)]
+pub struct LocalKeyManagerKms {
+    key_manager: std::sync::Arc<KeyManager>,
+}
+
+impl LocalKeyManagerKms {
+    /// Constructs a new [`LocalKeyManagerKms`] with the given [`KeyManager`].
+    pub fn new(key_manager: KeyManager) -> Self {
+        Self {
+            key_manager: std::sync::Arc::new(key_manager),
+        }
+    }
+}
+
+impl KmsProvider for LocalKeyManagerKms {
+    fn get_key(&self) -> Result<Vec<u8>> {
+        Ok(self.key_manager.raw_key_bytes().to_vec())
+    }
+}
+
 /// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
 ///
 /// # Invariants
