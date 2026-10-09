@@ -35,6 +35,8 @@ pub mod checkpoint;
 pub mod clock;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
+/// Automated sanity checks for embedding providers.
+pub mod embedding_sanity;
 /// Graph mutation and CSR traversal port traits.
 pub mod graph;
 /// Graph index traits and CSR statistics.
