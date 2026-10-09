@@ -1,5 +1,7 @@
 //! Integration tests for `MockEmbedder::with_fixed_output` and `ContextSegment::with_rope_offset`.
 
+#![allow(clippy::unwrap_used)]
+
 use contextra_ports::embedding::{
     ContextSegment, EmbeddingProvider, LlmTextGenerator, MockEmbedder, TextEmbeddingEngine,
 };
