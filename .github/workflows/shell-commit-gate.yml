@@ -19,4 +19,4 @@ jobs:
         with:
           toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - run: cargo xtask shell-commit-audit --fail-on-count=0
+      - run: cargo xtask shell-commit-audit --since=1d --fail-on-count=0

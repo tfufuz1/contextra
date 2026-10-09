@@ -12,7 +12,6 @@ pub mod deletion;
 pub mod durable_fs;
 pub mod sq8_bias;
 pub mod verify;
-pub mod zero_overlay;
 
 mod acorn_filtered;
 mod batch;
@@ -25,7 +24,6 @@ mod types;
 mod vector_index_impl;
 
 pub use connections::MmapBacklinkOverlay;
-pub use zero_overlay::MmapZeroOverlay;
 
 #[cfg(test)]
 mod tests;
