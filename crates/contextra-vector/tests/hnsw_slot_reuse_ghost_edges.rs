@@ -1,54 +1,144 @@
-use contextra_core::{DocId, Result, TxId, VectorIndex};
-use contextra_vector::hnsw::deletion::GhostFreeVectorIndex;
-use contextra_vector::{HnswConfig, HnswIndex};
+use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
 
-fn check_ghost_edges_for_slot(
-    index: &HnswIndex,
-    target_slot: usize,
-    new_node_connections: &[Vec<u32>],
-) -> (usize, usize) {
-    let inner = index.inner_core();
-    let total_nodes = inner.hot.nodes.read().len();
+/// Helper function to count stale incoming ghost edges across all nodes and layers in RAM.
+///
+/// A "ghost edge" to target slot `slot_idx` occurs when node `A` (where `A != slot_idx`)
+/// has `slot_idx` in its connection list at layer `L`, BUT node `slot_idx` does NOT have `A`
+/// in its connection list at layer `L` (or when slot `slot_idx` is considered a new node that
+/// did not generate `A` in its `final_connections`).
+///
+/// Specifically, we check for any node `A` pointing to `target_slot` where `target_slot`'s connection
+/// list at that layer does NOT contain `A`.
+fn count_incoming_ghost_edges_for_slot(index: &HnswIndex, target_slot: usize) -> usize {
+    let mmap_count = index
+        .inner_core()
+        .cold
+        .mmap_index
+        .read()
+        .as_ref()
+        .map(|m| m.header.node_count() as usize)
+        .unwrap_or(0);
 
-    let mut inbound_before_new_insert = 0usize;
-    let mut ghost_edges_after_new_insert = 0usize;
+    let nodes = index.inner_core().hot.nodes.read();
+    let total_nodes = mmap_count + nodes.len();
+    let m = index.inner_core().cold.config.m;
+
+    let target_ram_idx = target_slot.saturating_sub(mmap_count);
+
+    let mut ghost_edges = 0usize;
 
     for i in 0..total_nodes {
-        if inner.cold.deleted_nodes.read().contains(i as u64) {
+        if i == target_slot {
             continue;
         }
-        let mut max_layer = 0;
-        while inner.get_node_connections(i, max_layer + 1).is_ok()
-            && !inner.get_node_connections(i, max_layer + 1).unwrap().is_empty()
-        {
-            max_layer += 1;
-        }
+
+        let max_layer = if i < mmap_count {
+            0
+        } else {
+            let ram_i = i - mmap_count;
+            nodes.get(ram_i).map(|n| n.max_layer).unwrap_or(0)
+        };
+
         for layer in 0..=max_layer {
-            let conns = inner.get_node_connections(i, layer).unwrap_or_default();
+            let conns = if i < mmap_count {
+                index
+                    .inner_core()
+                    .get_node_connections(i, layer)
+                    .unwrap_or_default()
+            } else {
+                let ram_i = i - mmap_count;
+                index
+                    .inner_core()
+                    .hot
+                    .arena
+                    .get_ram_node_connections(ram_i, layer, m)
+            };
+
             if conns.contains(&(target_slot as u32)) {
-                inbound_before_new_insert += 1;
-                let is_known_by_new_node = if layer < new_node_connections.len() {
-                    new_node_connections[layer].contains(&(i as u32))
+                // Check if target_slot points back to i at this layer
+                let target_conns = if target_slot < mmap_count {
+                    index
+                        .inner_core()
+                        .get_node_connections(target_slot, layer)
+                        .unwrap_or_default()
                 } else {
-                    false
+                    index
+                        .inner_core()
+                        .hot
+                        .arena
+                        .get_ram_node_connections(target_ram_idx, layer, m)
                 };
-                if !is_known_by_new_node {
-                    ghost_edges_after_new_insert += 1;
+
+                if !target_conns.contains(&(i as u32)) {
+                    ghost_edges += 1;
                 }
             }
         }
     }
 
-    (inbound_before_new_insert, ghost_edges_after_new_insert)
+    ghost_edges
+}
+
+/// Helper to count any node pointing to `target_slot` regardless of backlinks (total inbound edges).
+fn count_total_inbound_edges_for_slot(index: &HnswIndex, target_slot: usize) -> usize {
+    let mmap_count = index
+        .inner_core()
+        .cold
+        .mmap_index
+        .read()
+        .as_ref()
+        .map(|m| m.header.node_count() as usize)
+        .unwrap_or(0);
+
+    let nodes = index.inner_core().hot.nodes.read();
+    let total_nodes = mmap_count + nodes.len();
+    let m = index.inner_core().cold.config.m;
+
+    let mut inbound = 0usize;
+
+    for i in 0..total_nodes {
+        if i == target_slot {
+            continue;
+        }
+
+        let max_layer = if i < mmap_count {
+            0
+        } else {
+            let ram_i = i - mmap_count;
+            nodes.get(ram_i).map(|n| n.max_layer).unwrap_or(0)
+        };
+
+        for layer in 0..=max_layer {
+            let conns = if i < mmap_count {
+                index
+                    .inner_core()
+                    .get_node_connections(i, layer)
+                    .unwrap_or_default()
+            } else {
+                let ram_i = i - mmap_count;
+                index
+                    .inner_core()
+                    .hot
+                    .arena
+                    .get_ram_node_connections(ram_i, layer, m)
+            };
+
+            if conns.contains(&(target_slot as u32)) {
+                inbound += 1;
+            }
+        }
+    }
+
+    inbound
 }
 
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_a_graph_repair() -> Result<()> {
-    let dimension = 8;
-    let m = 8;
+async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result<(), Box<dyn std::error::Error>> {
+    let dim = 8;
     let config = HnswConfig {
-        dimension,
-        m,
+        dimension: dim,
+        m: 8,
         ef_construction: 32,
         ..Default::default()
     };
@@ -58,90 +148,74 @@ async fn test_slot_reuse_ghost_edges_path_a_graph_repair() -> Result<()> {
     // Insert 60 nodes
     for i in 1..=60 {
         let doc_id = DocId::new(i as u64);
-        let vec = vec![(i as f32) / 60.0; dimension];
-        index.insert(TxId::new(i as u64), doc_id, &vec).await?;
+        let vector = vec![(i as f32) / 60.0; dim];
+        index.insert(TxId::new(i as u64), doc_id, &vector).await?;
         index.commit(TxId::new(i as u64)).await?;
     }
 
-    // Target node to delete: doc 15
-    let delete_doc = DocId::new(15);
-    let target_slot = {
-        let doc_map = index.inner_core().hot.doc_to_node.read();
-        doc_map
-            .get(&delete_doc.inner())
-            .copied()
-            .expect("doc 15 exists") as usize
-    };
+    // Node to delete: doc_id 25 (RAM slot 24)
+    let target_doc = DocId::new(25);
+    let target_slot = 24usize;
 
-    // Delete via path (a) remove_with_graph_repair
-    let stats = index.remove_with_graph_repair(delete_doc)?;
-    assert_eq!(stats.doc_id, delete_doc);
+    // Perform path (a) deletion: remove_with_graph_repair
+    let stats = index.remove_with_graph_repair(target_doc)?;
+    assert_eq!(stats.doc_id, target_doc);
     assert!(stats.verified_no_ghost_pointers);
 
-    // Verify slot is in free_list
-    {
-        let free_list = index.inner_core().hot.arena.free_list.read();
-        assert!(
-            free_list.contains(&target_slot),
-            "Freed slot {target_slot} must be in free_list"
-        );
-    }
-
-    // Check inbound edges before new insert
-    let (inbound_before, _) = check_ghost_edges_for_slot(&index, target_slot, &[]);
-    println!(
-        "[Path A] Inbound edges pointing to slot {target_slot} after remove_with_graph_repair: {inbound_before}"
+    // VOR dem Neu-Insert: Prüfen, dass keine Verbindungsliste mehr den alten Slot enthält
+    let inbound_before_reinsert = count_total_inbound_edges_for_slot(&index, target_slot);
+    println!("[Path A - remove_with_graph_repair] Stale inbound edges VOR Neu-Insert: {inbound_before_reinsert}");
+    assert_eq!(
+        inbound_before_reinsert, 0,
+        "PFAD A BEFUND (VOR Neu-Insert): Es existieren noch {inbound_before_reinsert} eingehende Kanten auf den gelöschten Slot {target_slot}"
     );
 
-    // Force slot reuse by inserting new node 1001 with vector close to doc 15's old position
-    let new_doc = DocId::new(1001);
-    let new_vec = vec![15.0 / 60.0; dimension];
-    index.insert(TxId::new(1001), new_doc, &new_vec).await?;
-    index.commit(TxId::new(1001)).await?;
+    // Verify free_list contains target_slot for slot reuse
+    let free_list_has_slot = index
+        .inner_core()
+        .hot
+        .arena
+        .free_list
+        .read()
+        .contains(&target_slot);
+    assert!(
+        free_list_has_slot,
+        "Expected free_list to contain slot {target_slot}"
+    );
 
+    // Neu-Insert: doc_id 1000
+    let new_doc = DocId::new(1000);
+    let new_vec = vec![0.25f32; dim];
+    index.insert(TxId::new(1000), new_doc, &new_vec).await?;
+    index.commit(TxId::new(1000)).await?;
+
+    // Verify slot reuse: new_doc should occupy target_slot (RAM index 24)
     let reused_slot = {
         let doc_map = index.inner_core().hot.doc_to_node.read();
-        doc_map
-            .get(&new_doc.inner())
-            .copied()
-            .expect("new doc exists") as usize
+        *doc_map.get(&1000).expect("new_doc mapped in doc_to_node") as usize
     };
-
     assert_eq!(
         reused_slot, target_slot,
-        "Slot {target_slot} should have been reused by new insert"
+        "Expected slot reuse for RAM slot {target_slot}, got {reused_slot}"
     );
 
-    // Get new node's outgoing connections
-    let mut new_node_max_layer = 0;
-    while index.inner_core().get_node_connections(reused_slot, new_node_max_layer + 1).is_ok()
-        && !index.inner_core().get_node_connections(reused_slot, new_node_max_layer + 1).unwrap().is_empty()
-    {
-        new_node_max_layer += 1;
-    }
-    let mut new_node_conns = Vec::new();
-    for l in 0..=new_node_max_layer {
-        new_node_conns.push(index.inner_core().get_node_connections(reused_slot, l)?);
-    }
-
-    let (_, ghost_edges) = check_ghost_edges_for_slot(&index, reused_slot, &new_node_conns);
-    println!("[Path A] Stale/Ghost incoming edges after slot reuse: {ghost_edges}");
-
+    // NACH dem Neu-Insert: Prüfen, dass nur symmetrische Kanten existieren, die zum neuen Knoten gehören
+    let ghost_edges_after = count_incoming_ghost_edges_for_slot(&index, target_slot);
+    println!("[Path A - remove_with_graph_repair] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}");
     assert_eq!(
-        ghost_edges, 0,
-        "Path A: Reused slot {reused_slot} must have 0 ghost edges"
+        ghost_edges_after, 0,
+        "PFAD A BEFUND (NACH Neu-Insert): Es wurden {ghost_edges_after} Geisterkanten auf den wiederverwendeten Slot {target_slot} gefunden!"
     );
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<()> {
-    let dimension = 8;
-    let m = 8;
+async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<dyn std::error::Error>> {
+    let dim = 8;
     let config = HnswConfig {
-        dimension,
-        m,
+        dimension: dim,
+        m: 8,
         ef_construction: 32,
         ..Default::default()
     };
@@ -151,77 +225,60 @@ async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<()> {
     // Insert 60 nodes
     for i in 1..=60 {
         let doc_id = DocId::new(i as u64);
-        let vec = vec![(i as f32) / 60.0; dimension];
-        index.insert(TxId::new(i as u64), doc_id, &vec).await?;
+        let vector = vec![(i as f32) / 60.0; dim];
+        index.insert(TxId::new(i as u64), doc_id, &vector).await?;
         index.commit(TxId::new(i as u64)).await?;
     }
 
-    // Target node to delete: doc 25
-    let delete_doc = DocId::new(25);
-    let target_slot = {
-        let doc_map = index.inner_core().hot.doc_to_node.read();
-        doc_map
-            .get(&delete_doc.inner())
-            .copied()
-            .expect("doc 25 exists") as usize
-    };
+    // Node to delete: doc_id 30 (RAM slot 29)
+    let target_doc = DocId::new(30);
+    let target_slot = 29usize;
 
-    // Delete via path (b) do_delete (standard commit deletion path)
-    index.delete(TxId::new(9999), delete_doc).await?;
-    index.commit(TxId::new(9999)).await?;
+    // Perform path (b) deletion: delete(tx, doc_id) and commit(tx)
+    let del_tx = TxId::new(100);
+    index.delete(del_tx, target_doc).await?;
+    index.commit(del_tx).await?;
 
-    // Check if slot was placed in free_list (if no retention pin is holding it)
-    {
-        let free_list = index.inner_core().hot.arena.free_list.read();
-        assert!(
-            free_list.contains(&target_slot),
-            "Freed slot {target_slot} must be in free_list"
-        );
-    }
+    // VOR dem Neu-Insert: Prüfen, dass vor Neu-Insert eingehende Kanten für Path B erfasst werden
+    let inbound_before_reinsert = count_total_inbound_edges_for_slot(&index, target_slot);
+    println!("[Path B - commit deletion] Inbound edges VOR Neu-Insert: {inbound_before_reinsert}");
 
-    // Check inbound edges before new insert
-    let (inbound_before, _) = check_ghost_edges_for_slot(&index, target_slot, &[]);
-    println!(
-        "[Path B] Inbound edges pointing to slot {target_slot} after do_delete: {inbound_before}"
+    // Verify free_list contains target_slot for slot reuse
+    let free_list_has_slot = index
+        .inner_core()
+        .hot
+        .arena
+        .free_list
+        .read()
+        .contains(&target_slot);
+    assert!(
+        free_list_has_slot,
+        "Expected free_list to contain slot {target_slot}"
     );
 
-    // Force slot reuse by inserting new node 2001
-    let new_doc = DocId::new(2001);
-    let new_vec = vec![25.0 / 60.0; dimension];
-    index.insert(TxId::new(2001), new_doc, &new_vec).await?;
-    index.commit(TxId::new(2001)).await?;
+    // Neu-Insert: doc_id 2000
+    let new_doc = DocId::new(2000);
+    let new_vec = vec![0.30f32; dim];
+    let ins_tx = TxId::new(101);
+    index.insert(ins_tx, new_doc, &new_vec).await?;
+    index.commit(ins_tx).await?;
 
+    // Verify slot reuse: new_doc should occupy target_slot (RAM index 29)
     let reused_slot = {
         let doc_map = index.inner_core().hot.doc_to_node.read();
-        doc_map
-            .get(&new_doc.inner())
-            .copied()
-            .expect("new doc exists") as usize
+        *doc_map.get(&2000).expect("new_doc mapped in doc_to_node") as usize
     };
-
     assert_eq!(
         reused_slot, target_slot,
-        "Slot {target_slot} should have been reused by new insert"
+        "Expected slot reuse for RAM slot {target_slot}, got {reused_slot}"
     );
 
-    // Get new node's outgoing connections
-    let mut new_node_max_layer = 0;
-    while index.inner_core().get_node_connections(reused_slot, new_node_max_layer + 1).is_ok()
-        && !index.inner_core().get_node_connections(reused_slot, new_node_max_layer + 1).unwrap().is_empty()
-    {
-        new_node_max_layer += 1;
-    }
-    let mut new_node_conns = Vec::new();
-    for l in 0..=new_node_max_layer {
-        new_node_conns.push(index.inner_core().get_node_connections(reused_slot, l)?);
-    }
-
-    let (_, ghost_edges) = check_ghost_edges_for_slot(&index, reused_slot, &new_node_conns);
-    println!("[Path B] Stale/Ghost incoming edges after slot reuse: {ghost_edges}");
-
+    // NACH dem Neu-Insert: Prüfen, dass nur symmetrische Kanten existieren
+    let ghost_edges_after = count_incoming_ghost_edges_for_slot(&index, target_slot);
+    println!("[Path B - commit deletion] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}");
     assert_eq!(
-        ghost_edges, 0,
-        "Path B: Reused slot {reused_slot} must have 0 ghost edges"
+        ghost_edges_after, 0,
+        "PFAD B BEFUND (NACH Neu-Insert): Es wurden {ghost_edges_after} Geisterkanten auf den wiederverwendeten Slot {target_slot} gefunden!"
     );
 
     Ok(())
