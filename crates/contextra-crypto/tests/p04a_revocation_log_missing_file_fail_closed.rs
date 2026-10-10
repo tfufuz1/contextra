@@ -35,7 +35,7 @@ fn test_missing_revocation_log_fails_closed_on_reopen() -> Result<()> {
             Some(sk.clone()),
             vk,
         )?);
-        let registry = KeyRegistry::new().with_revocation_log(log.clone());
+        let registry = KeyRegistry::new_for_test(log.clone());
 
         let (ct, nonce) = registry.encrypt_with_group(&km, group_id, b"sensitive data")?;
         let decrypted = registry.decrypt_with_group(group_id, &ct, &nonce)?;

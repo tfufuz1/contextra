@@ -11,6 +11,7 @@ use contextra_crypto::deletion_proof::{
     ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::kv_shredding::KeyRegistry;
+use contextra_crypto::RevocationLog;
 use contextra_ports::SystemClock;
 use contextra_types::{DocId, TenantId, TxId};
 use std::sync::Arc;
@@ -135,11 +136,12 @@ fn test_j25_key_registry_envelope_and_revocation_log_wiring() {
     let clock = Arc::new(SystemClock::new());
 
     // Tests KeyRegistry::new_in_memory and RevocationLog::new_in_memory
-    let registry = KeyRegistry::new_in_memory(
+    let log = Arc::new(RevocationLog::new_in_memory(
         clock,
         Some(keypair.signing_key().clone()),
         keypair.verifying_key,
-    );
+    ));
+    let registry = KeyRegistry::new_for_test(log.clone());
 
     let group_id = 500;
     let record_id = 1;
@@ -183,7 +185,6 @@ fn test_j25_key_registry_envelope_and_revocation_log_wiring() {
     assert!(registry.get_wrapped_kek(group_id).is_none());
 
     // Verify revocation log integrity via verify_integrity
-    let log = registry.revocation_log.as_ref().expect("revocation log");
     assert!(
         log.verify_integrity().is_ok(),
         "RevocationLog integrity check must pass"

@@ -115,12 +115,11 @@ pub trait GroupRevocationListener: Send + Sync {
 }
 
 /// In-memory thread-safe registry for envelope KV crypto-shredding keys.
-#[derive(Default)]
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
     ever_registered_groups: RwLock<HashSet<u64>>,
-    pub revocation_log: Option<Arc<RevocationLog>>,
+    revocation_log: Arc<RevocationLog>,
     listeners: Vec<Arc<dyn GroupRevocationListener>>,
     durable: bool,
 }
@@ -139,15 +138,36 @@ impl std::fmt::Debug for KeyRegistry {
 }
 
 impl KeyRegistry {
-    /// Creates a new empty `KeyRegistry` (in-memory, non-durable; intended primarily for tests or transient use).
-    pub fn new() -> Self {
+    /// Creates a new `KeyRegistry` with mandatory `RevocationLog`.
+    ///
+    /// Debug-asserts that `log.is_durable()` in production builds to prevent accidental non-durable log usage.
+    pub fn new(log: Arc<RevocationLog>) -> Self {
+        debug_assert!(
+            log.is_durable(),
+            "KeyRegistry requires a durable (file-backed) RevocationLog in production code"
+        );
+        let durable = log.is_durable();
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
-            revocation_log: None,
+            revocation_log: log,
             listeners: Vec::new(),
-            durable: false,
+            durable,
+        }
+    }
+
+    /// Helper constructor for tests using any `RevocationLog` (durable or in-memory).
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn new_for_test(log: Arc<RevocationLog>) -> Self {
+        let durable = log.is_durable();
+        Self {
+            groups: RwLock::new(HashMap::new()),
+            revoked_groups: RwLock::new(HashSet::new()),
+            ever_registered_groups: RwLock::new(HashSet::new()),
+            revocation_log: log,
+            listeners: Vec::new(),
+            durable,
         }
     }
 
@@ -166,14 +186,7 @@ impl KeyRegistry {
             verifying_key,
             has_existing_keys,
         )?;
-        Ok(Self {
-            groups: RwLock::new(HashMap::new()),
-            revoked_groups: RwLock::new(HashSet::new()),
-            ever_registered_groups: RwLock::new(HashSet::new()),
-            revocation_log: Some(Arc::new(log)),
-            listeners: Vec::new(),
-            durable: true,
-        })
+        Ok(Self::new(Arc::new(log)))
     }
 
     /// Returns `true` if this `KeyRegistry` is backed by a durable, file-based `RevocationLog`.
@@ -194,22 +207,25 @@ impl KeyRegistry {
         .join();
     }
 
-    /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog`.
+    /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog` (intended for tests).
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_in_memory(
         clock: Arc<dyn contextra_ports::Clock>,
         signing_key: Option<ed25519_dalek::SigningKey>,
         verifying_key: ed25519_dalek::VerifyingKey,
     ) -> Self {
-        Self::new().with_revocation_log(Arc::new(RevocationLog::new_in_memory(
+        Self::new_for_test(Arc::new(RevocationLog::new_in_memory(
             clock,
             signing_key,
             verifying_key,
         )))
     }
 
-    /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
+    /// Attaches or overrides the `RevocationLog` on this `KeyRegistry` (intended for tests).
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
-        self.revocation_log = Some(log);
+        self.durable = log.is_durable();
+        self.revocation_log = log;
         self
     }
 
@@ -250,13 +266,11 @@ impl KeyRegistry {
     // 2. Phase D Optimierung: Lock-freie Prüfung per `ArcSwap<HashSet<u64>>` oder Atomic-Bitset erwägen,
     //    um RwLock-Contention im heißen Lesepfad von `is_group_revoked` zu eliminieren.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
-        if let Some(ref log) = self.revocation_log {
-            if log.is_revoked(&RevocationTarget::Group(group_id)) {
-                return true;
-            }
-            if log.verify_integrity().is_err() {
-                return true;
-            }
+        if self.revocation_log.is_revoked(&RevocationTarget::Group(group_id)) {
+            return true;
+        }
+        if self.revocation_log.verify_integrity().is_err() {
+            return true;
         }
         if let Ok(guard) = self.revoked_groups.read() {
             guard.contains(&group_id)
@@ -333,10 +347,9 @@ impl KeyRegistry {
     /// Returns `true` if the group was active and is now revoked.
     /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
     pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
-        if let Some(ref log) = self.revocation_log {
-            log.append(RevocationTarget::Group(group_id))
-                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        }
+        self.revocation_log
+            .append(RevocationTarget::Group(group_id))
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
 
         let mut revoked_guard = self.revoked_groups.write().map_err(|_| {
             CryptoError::Crypto("KeyRegistry revoked_groups write lock poisoned".to_string())
@@ -413,10 +426,9 @@ impl KeyRegistry {
 
         drop(groups_guard);
 
-        if let Some(ref log) = self.revocation_log {
-            log.append(RevocationTarget::Record(format!("{group_id}:{record_id}")))
-                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        }
+        self.revocation_log
+            .append(RevocationTarget::Record(format!("{group_id}:{record_id}")))
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
 
         Ok(true)
     }
@@ -629,10 +641,17 @@ impl KeyRegistry {
 mod tests {
     use super::*;
 
+    fn test_log() -> Arc<RevocationLog> {
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+        let vk = sk.verifying_key();
+        Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk))
+    }
+
     #[test]
     fn test_envelope_single_record_deletion_64_records() -> Result<()> {
         let km = KeyManager::try_new("test-passphrase-envelope", b"salt1")?;
-        let registry = KeyRegistry::new();
+        let registry = KeyRegistry::new_for_test(test_log());
         let group_id = 42;
 
         let mut payloads = Vec::with_capacity(64);
@@ -676,7 +695,7 @@ mod tests {
     #[test]
     fn test_envelope_group_deletion_and_attack_simulation() -> Result<()> {
         let km = KeyManager::try_new("test-passphrase-envelope", b"salt1")?;
-        let registry = KeyRegistry::new();
+        let registry = KeyRegistry::new_for_test(test_log());
         let group_id = 100;
 
         let payload =
@@ -741,7 +760,7 @@ mod tests {
     fn test_group_revocation_listener_first_and_second_revocation() -> Result<()> {
         let km = KeyManager::try_new("test-passphrase-listener", b"salt1")?;
         let listener = Arc::new(TestListener::new());
-        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
+        let registry = KeyRegistry::new_for_test(test_log()).with_revocation_listener(listener.clone());
 
         let group_id = 200;
         let _subkey = registry.get_or_derive(&km, group_id)?;
@@ -775,7 +794,7 @@ mod tests {
     #[test]
     fn test_group_revocation_listener_unknown_group_id() -> Result<()> {
         let listener = Arc::new(TestListener::new());
-        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
+        let registry = KeyRegistry::new_for_test(test_log()).with_revocation_listener(listener.clone());
 
         let unknown_group_id = 999;
         assert!(!registry.was_group_ever_registered(unknown_group_id));

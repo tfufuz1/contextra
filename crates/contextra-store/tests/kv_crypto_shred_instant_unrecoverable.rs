@@ -10,7 +10,13 @@ fn test_kv_crypto_shred_instant_unrecoverable() {
     let master_key = CryptoKey::try_new("master-passphrase-shred-test", b"salt-shred-123")
         .expect("master key init");
 
-    let registry = KeyRegistry::new();
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let registry = KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    );
     let group_id = 42;
     let original_plaintext = b"TOP SECRET: Sensitive User PII Record Data Payload";
 

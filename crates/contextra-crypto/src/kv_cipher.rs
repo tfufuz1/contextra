@@ -106,7 +106,7 @@ pub struct KvSegmentCipher {
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager` and mandatory `RevocationLog`.
     pub fn new(key_manager: KeyManager, log: Arc<RevocationLog>) -> Self {
-        let registry = KeyRegistry::new().with_revocation_log(log);
+        let registry = KeyRegistry::new(log);
         Self {
             key_manager,
             registry,
@@ -114,14 +114,28 @@ impl KvSegmentCipher {
     }
 
     /// Creates an ephemeral in-memory `KvSegmentCipher` without persistent disk storage (primarily for tests and temporary caches).
+    ///
+    /// # Warning / Security Note
+    /// This method uses an in-memory `KeyRegistry` and `RevocationLog` without persistent disk backing.
+    /// It must NOT be used for production persistent storage where key revocations need to survive restarts!
+    #[doc(hidden)]
     pub fn ephemeral(key_manager: KeyManager) -> Self {
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+        let vk = sk.verifying_key();
+        let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
+        #[cfg(any(test, feature = "test-utils"))]
+        let registry = KeyRegistry::new_for_test(log);
+        #[cfg(not(any(test, feature = "test-utils")))]
+        let registry = KeyRegistry::new(log);
         Self {
             key_manager,
-            registry: KeyRegistry::new(),
+            registry,
         }
     }
 
-    /// Attaches or overrides the `RevocationLog` on the underlying `KeyRegistry`.
+    /// Attaches or overrides the `RevocationLog` on the underlying `KeyRegistry` (intended for tests).
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         self.registry = self.registry.with_revocation_log(log);
         self

@@ -10,11 +10,17 @@ use std::sync::Arc;
 
 #[test]
 fn test_crypto_shred_revoke_subkey_read_fails() {
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let master_key = Arc::new(
         KeyManager::try_new("test-passphrase-shred", b"salt-1234")
             .expect("master key initialization"),
     );
-    let registry = Arc::new(KeyRegistry::new());
 
     let config = KvSegmentConfig {
         delete_mode: KvDeleteMode::CryptoShred,
@@ -57,7 +63,13 @@ fn test_crypto_shred_revoke_subkey_read_fails() {
 
 #[test]
 fn test_tombstone_only_deletion_proof_fails_with_kv_delete_mode_config() {
-    let registry = Arc::new(KeyRegistry::new());
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let config = KvSegmentConfig {
         delete_mode: KvDeleteMode::TombstoneOnly,
     };
@@ -79,11 +91,17 @@ fn test_tombstone_only_deletion_proof_fails_with_kv_delete_mode_config() {
 
 #[test]
 fn test_default_config_crypto_shred_end_to_end() {
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let master_key = Arc::new(
         KeyManager::try_new("test-passphrase-default", b"salt-5678")
             .expect("master key initialization"),
     );
-    let registry = Arc::new(KeyRegistry::new());
 
     // Default configuration uses KvDeleteMode::CryptoShred
     let config = KvSegmentConfig::default();

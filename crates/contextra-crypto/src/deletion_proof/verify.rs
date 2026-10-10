@@ -34,7 +34,7 @@ impl DeletionProof {
         match version {
             SignatureVersion::V1 => {
                 let proof_key = match key {
-                    VerificationKey::Hmac(k) => k,
+                    VerificationKey::Hmac(k) | VerificationKey::HmacV1(k) | VerificationKey::HmacV2(k) => k,
                     VerificationKey::Ed25519(_) => {
                         return Err(ContextraError::Internal(
                             "Ed25519 key provided for HMAC signature_version 1 proof".to_string(),
@@ -50,7 +50,7 @@ impl DeletionProof {
             }
             SignatureVersion::V2 => {
                 let proof_key = match key {
-                    VerificationKey::Hmac(k) => k,
+                    VerificationKey::Hmac(k) | VerificationKey::HmacV1(k) | VerificationKey::HmacV2(k) => k,
                     VerificationKey::Ed25519(_) => {
                         return Err(ContextraError::Internal(
                             "Ed25519 key provided for HMAC signature_version 2 proof".to_string(),
@@ -91,7 +91,7 @@ impl DeletionProof {
             SignatureVersion::V3 => {
                 let verifying_key = match key {
                     VerificationKey::Ed25519(vk) => vk,
-                    VerificationKey::Hmac(_) => {
+                    VerificationKey::Hmac(_) | VerificationKey::HmacV1(_) | VerificationKey::HmacV2(_) => {
                         return Err(ContextraError::Internal(
                             "HMAC key provided for Ed25519 signature_version 3 proof".to_string(),
                         ))

@@ -53,6 +53,10 @@ impl Drop for DeletionProofKeyPair {
 pub enum VerificationKey<'a> {
     /// Key for HMAC-SHA256 signature verification (version 1 and 2).
     Hmac(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (legacy version 1 alias).
+    HmacV1(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (legacy version 2 alias).
+    HmacV2(&'a [u8]),
     /// Key for Ed25519 signature verification (version 3).
     Ed25519(&'a ed25519_dalek::VerifyingKey),
 }

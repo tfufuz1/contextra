@@ -83,7 +83,13 @@ impl WalObserver for SlowWalObserver {
 
 #[tokio::test]
 async fn test_kv_segment_manager_symbols() {
-    let registry = Arc::new(KeyRegistry::new());
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let salt = [0u8; 32];
     let master_km = Arc::new(KeyManager::try_new("passphrase-j07", &salt).unwrap());
 

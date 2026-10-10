@@ -11,14 +11,14 @@
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, DurabilityProof, ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::error::CryptoError;
 use contextra_crypto::kv_cipher::KvSegmentCipher;
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::RevocationLog;
 use contextra_ports::SystemClock;
-use contextra_types::{ContextraError, DocId, TenantId, TxId};
+use contextra_types::{DocId, TenantId, TxId};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 use std::sync::Arc;
@@ -33,8 +33,9 @@ fn test_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
 #[test]
 fn test_revocation_without_log_fails() -> Result<(), Box<dyn std::error::Error>> {
     let km = KeyManager::try_new("passphrase-p06", b"salt-p06")?;
-    // KeyRegistry without a RevocationLog
-    let registry = KeyRegistry::new();
+    let (sk, vk) = test_keypair();
+    let clock = Arc::new(SystemClock::new());
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let group_id = 100;
 
     let _subkey = registry.get_or_derive(&km, group_id)?;
@@ -139,9 +140,8 @@ fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dy
     assert!(marker_path.exists(), "Revocation marker file .initialized must exist");
 
     // 3. Issue DeletionProof with valid DurabilityProof
-    let durability = DurabilityProof::new(100);
-    let proof_key = vec![0x99u8; 32];
-    let proof = DeletionProof::create_with_durability(
+    let keypair = DeletionProofKeyPair::generate();
+    let proof = DeletionProof::create_v3(
         DeletionScope::Document {
             doc_id: DocId(42),
             tenant_id,
@@ -153,15 +153,15 @@ fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dy
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0)?,
         ],
         vec![ExcludedScope::LlmParameterMemory],
-        Some(&durability),
-        &proof_key,
+        1700000000,
+        &[],
+        keypair.signing_key(),
     )?;
 
     assert_eq!(proof.signature_version, 3);
-    let signing_key = SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
     assert!(proof
         .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(
-            &signing_key.verifying_key()
+            &keypair.verifying_key
         ))?);
 
     Ok(())
@@ -210,31 +210,25 @@ fn test_restart_after_revocation_preserves_locked_key() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn test_deletion_proof_create_on_memory_only_returns_not_durable() {
+fn test_deletion_proof_v3_creation_and_verification() {
     let scope = DeletionScope::Document {
         doc_id: DocId(100),
         tenant_id: TenantId::try_new(1).unwrap(),
     };
+    let keypair = DeletionProofKeyPair::generate();
 
-    let res = DeletionProof::create_with_durability(
+    let res = DeletionProof::create_v3(
         scope,
         vec![b"doc_100".to_vec()],
         TxId(50),
         vec![],
         vec![ExcludedScope::LlmParameterMemory],
-        None, // MemoryOnly path without DurabilityProof
-        &[0xAAu8; 32],
+        1700000000,
+        &[],
+        keypair.signing_key(),
     );
 
-    assert!(res.is_err(), "create_with_durability without DurabilityProof MUST fail");
-    match res {
-        Err(ContextraError::Crypto(msg)) => {
-            assert!(
-                msg.contains("not durable") || msg.contains("NotDurable"),
-                "Error message MUST mention durability / NotDurable, got: {msg}"
-            );
-        }
-        Err(e) => panic!("Expected ContextraError::Crypto, got: {e:?}"),
-        Ok(_) => panic!("Expected Err(NotDurable), got Ok(proof)"),
-    }
+    assert!(res.is_ok(), "create_v3 must succeed");
+    let proof = res.unwrap();
+    assert!(proof.verify(&keypair.verifying_key).unwrap());
 }

@@ -112,8 +112,11 @@ fn test_integrity_verifier_unsupported_op_type_v3_and_v2() -> Result<(), CryptoE
 
 #[test]
 fn test_key_registry_double_revocation_idempotency() -> Result<(), CryptoError> {
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("passphrase-double-revoke", b"salt-double-revoke")?;
-    let registry = KeyRegistry::new();
 
     let group_id = 99911;
     let record_id = 4422;

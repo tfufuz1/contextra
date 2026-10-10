@@ -1,17 +1,17 @@
 id        = "T-2026-0237"
-title     = "KeyRegistry: RevocationLog Pflicht; open_or_create nur für Tests"
+title     = "KeyRegistry: RevocationLog Pflicht; open_or_create nur für Tests (Retry mit erweitertem Scope)"
 crate     = "contextra-crypto"
 tier      = 1
 risk      = "sec"
-goal      = "Typsystem erzwingt ein datei-gestütztes RevocationLog für jede produktive KeyRegistry."
-non_goals = ["Keine Hotpath-Optimierung (W4-04)", "Keine Änderung der Log-Dateiformate", "Keine Änderung an anderen Crates"]
-scope     = ["crates/contextra-crypto/src/kv_shredding.rs", "crates/contextra-crypto/src/kv_cipher.rs", "crates/contextra-crypto/src/revocation_log.rs", "crates/contextra-crypto/src/kv_segment/segment.rs", "crates/contextra-crypto/tests/**", ".jules/tasks/T-2026-0237.toml"]
+goal      = "Typsystem erzwingt ein datei-gestütztes RevocationLog für jede produktive KeyRegistry, inkl. aller Aufrufer workspace-weit."
+non_goals = ["Keine Hotpath-Optimierung (W4-04)", "Keine Änderung der Log-Dateiformate", "Keine Produktionslogik-Änderung außerhalb contextra-crypto"]
+scope     = ["crates/contextra-crypto/src/**", "crates/contextra-crypto/tests/**", "crates/contextra-store/src/**", "crates/contextra-store/tests/**", "crates/contextra-store/benches/**", "crates/contextra-infer-candle/tests/**", "crates/contextra-infer-candle/benches/**", "crates/contextra-bench/**", "crates/contextra-mcp/src/tests.rs", "crates/contextra-mcp/tests/**", "crates/contextra-kvcache/tests/**", "crates/contextra-kvcache/benches/**", ".jules/tasks/T-2026-0237.toml"]
 forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "Persist-before-Mutate", "Kein Produktionspfad ohne durables Log"]
-acceptance = ["cargo test -p contextra-crypto", "cargo test -p contextra-crypto --features test-utils", "cargo check --workspace --all-targets", "cargo clippy -p contextra-crypto --all-targets -- -D warnings"]
-evidence_required = ["Aufrufer-Inventar (Produktion/Test)", "Workspace-Check grün", "Liste migrierter Testdateien"]
+acceptance = ["cargo test -p contextra-crypto", "cargo test -p contextra-crypto --features test-utils", "cargo check --workspace --all-targets", "cargo clippy --workspace --all-targets -- -D warnings"]
+evidence_required = ["Bestätigtes/erweitertes Aufrufer-Inventar", "Workspace-Check grün", "Liste migrierter Dateien je Crate"]
 
 [budget]
-files      = 14
-lines      = 450
-iterations = 7
+files      = 30
+lines      = 700
+iterations = 9

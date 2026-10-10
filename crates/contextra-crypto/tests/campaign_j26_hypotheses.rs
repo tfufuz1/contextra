@@ -49,7 +49,7 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     );
 
     let km = KeyManager::try_new("test-passphrase-h1", b"salt-h1").expect("keymanager");
-    let registry = KeyRegistry::new().with_revocation_log(rev_log.clone());
+    let registry = KeyRegistry::new_for_test(rev_log.clone());
     let group_id = 999;
 
     // Derive KEK
@@ -72,7 +72,7 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     let reloaded_log = Arc::new(
         RevocationLog::open_or_create(&log_path, clock, None, vk).expect("reload revocation log"),
     );
-    let new_registry = KeyRegistry::new().with_revocation_log(reloaded_log.clone());
+    let new_registry = KeyRegistry::new_for_test(reloaded_log.clone());
 
     // EXPECTATION: The revocation SHOULD be reconstructed from the log after crash.
     // DEFECT: KeyRegistry::revoke_group never calls revocation_log.append(), so log is empty
@@ -95,7 +95,7 @@ fn test_h1_demonstrate_decoupling_between_registry_and_revocation_log() {
     );
 
     let km = KeyManager::try_new("test-passphrase-h1-demo", b"salt-h1").expect("keymanager");
-    let registry = KeyRegistry::new().with_revocation_log(rev_log.clone());
+    let registry = KeyRegistry::new_for_test(rev_log.clone());
     let group_id = 888;
 
     let _subkey = registry.get_or_derive(&km, group_id).expect("derive");
@@ -115,8 +115,10 @@ fn test_h1_demonstrate_decoupling_between_registry_and_revocation_log() {
 
 #[test]
 fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
+    let (sk, vk) = test_ed25519_keypair();
+    let clock = Arc::new(SystemClock::new());
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("test-passphrase-h2", b"salt-h2").expect("keymanager");
-    let registry = KeyRegistry::new();
 
     let group_1 = 101;
     let group_2 = 102;
@@ -507,8 +509,10 @@ fn test_h5_record_commitment_binding_hiding_and_encrypted_salt() {
     }
 
     // 4. EncryptedCommitmentSalt Roundtrip & Manipulation
+    let (sk, vk) = test_ed25519_keypair();
+    let clock = Arc::new(SystemClock::new());
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("test-passphrase-h5", b"salt-h5").expect("keymanager");
-    let registry = KeyRegistry::new();
     let group_id = 555;
 
     let enc_salt = EncryptedCommitmentSalt::encrypt(&registry, &km, group_id, secret_salt)
@@ -672,8 +676,10 @@ fn test_h6_deletion_proof_v3_validation_suite() {
 
 #[test]
 fn test_h9_post_revocation_read_path_and_emergency_wipe() {
+    let (sk, vk) = test_ed25519_keypair();
+    let clock = Arc::new(SystemClock::new());
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("test-passphrase-h9", b"salt-h9").expect("keymanager");
-    let registry = KeyRegistry::new();
     let group_id = 700;
 
     let (ct, nonce) = registry

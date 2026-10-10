@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 #[test]
 fn test_unregistered_group_returns_error() {
-    let registry = Arc::new(KeyRegistry::new());
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let config = KvSegmentConfig {
         delete_mode: KvDeleteMode::CryptoShred,
     };
@@ -28,10 +34,16 @@ fn test_unregistered_group_returns_error() {
 
 #[test]
 fn test_registered_then_revoked_group_returns_ok_true() {
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let master_km = Arc::new(
         KeyManager::try_new("test-passphrase", b"test-salt").expect("Failed to create KeyManager"),
     );
-    let registry = Arc::new(KeyRegistry::new());
     let config = KvSegmentConfig {
         delete_mode: KvDeleteMode::CryptoShred,
     };

@@ -1,4 +1,4 @@
-use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, Result};
+use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, RevocationLog, Result};
 use contextra_ports::SystemClock;
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
@@ -83,8 +83,11 @@ fn test_deleted_log_or_marker_fails_open_durable() -> Result<()> {
 
 #[test]
 fn test_poisoned_locks_return_error() -> Result<()> {
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = Arc::new(KeyRegistry::new_in_memory(clock, Some(sk), vk));
     let km = KeyManager::try_new("passphrase", b"salt1")?;
-    let registry = Arc::new(KeyRegistry::new());
 
     // Populate group 1 (record 10) and group 2 (record 20) in registry
     let _payload1 = registry.encrypt_record(&km, 1, 10, b"rec1")?;
@@ -116,26 +119,19 @@ fn test_revoke_record_for_unknown_record_does_not_append_log() -> Result<()> {
     let clock = Arc::new(SystemClock::new());
     let km = KeyManager::try_new("passphrase", b"salt1")?;
 
-    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
+    let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
+    let registry = KeyRegistry::new_for_test(log.clone());
 
     // Populate group 1 with record 10
     let _payload = registry.encrypt_record(&km, 1, 10, b"record 10 content")?;
 
-    let initial_log_len = registry
-        .revocation_log
-        .as_ref()
-        .map(|l| l.len())
-        .unwrap_or(0);
+    let initial_log_len = log.len();
 
     // Attempting to revoke an UNKNOWN record 999 in group 1
     let revoked = registry.revoke_record(1, 999)?;
     assert!(!revoked, "Revoking unknown record must return Ok(false)");
 
-    let log_len_after = registry
-        .revocation_log
-        .as_ref()
-        .map(|l| l.len())
-        .unwrap_or(0);
+    let log_len_after = log.len();
     assert_eq!(
         initial_log_len, log_len_after,
         "Log length MUST remain unchanged when revoking an unknown record"
@@ -148,11 +144,7 @@ fn test_revoke_record_for_unknown_record_does_not_append_log() -> Result<()> {
         "Revoking active record 10 must return Ok(true)"
     );
 
-    let log_len_final = registry
-        .revocation_log
-        .as_ref()
-        .map(|l| l.len())
-        .unwrap_or(0);
+    let log_len_final = log.len();
     assert_eq!(
         initial_log_len + 1,
         log_len_final,

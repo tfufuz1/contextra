@@ -99,9 +99,12 @@ fn test_scenario_1_tenant_shredding_and_isolation() {
     let (_rng, seed) = get_test_rng();
     println!("--- SCHRITT 1: Szenario Mandant A vs Mandant B Shredding --- (Seed: {seed})");
 
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let master_km = KeyManager::try_new("master-passphrase-shredding", b"master-salt-123")
         .expect("Master KeyManager initialization must succeed");
-    let registry = KeyRegistry::new();
 
     let tenant_a_group = 1001u64;
     let tenant_b_group = 2002u64;
@@ -204,9 +207,12 @@ fn test_scenario_2_key_derivation_boundary_and_reconstruction_check() {
      *    welche zufällige KEKs speichert und explizit vernichtet.
      */
 
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let master_km = KeyManager::try_new("master-passphrase-shredding", b"master-salt-123")
         .expect("Master KeyManager initialization must succeed");
-    let registry = KeyRegistry::new();
     let tenant_id = 999u64;
 
     // Erzeuge initialen Schlüssel für Tenant 999

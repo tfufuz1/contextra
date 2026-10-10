@@ -144,8 +144,11 @@ fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
 #[test]
 fn killer_test_key_registry_get_wrapped_kek_and_dek() {
     // Kills mutants in KeyRegistry::get_wrapped_kek & get_wrapped_dek
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("registry-passphrase", b"registry-salt").unwrap();
-    let registry = KeyRegistry::new();
     let group_id = 777;
     let record_id = 888;
 
@@ -192,8 +195,11 @@ fn killer_test_key_registry_get_wrapped_kek_and_dek() {
 #[test]
 fn killer_test_key_registry_is_group_active_logic() {
     // Kills mutant: replace && with || in KeyRegistry::is_group_active
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("registry-passphrase", b"registry-salt").unwrap();
-    let registry = KeyRegistry::new();
     let group_id = 999;
 
     // 1. Group not in registry and not revoked -> active must be FALSE

@@ -110,8 +110,11 @@ fn test_audit_chain_head_signature_verification() {
 
 #[test]
 fn test_commitment_shredding_and_dictionary_attack_resilience() {
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("master-passphrase-audit", b"audit-salt-1234").unwrap();
-    let registry = KeyRegistry::new();
     let group_id = 42;
 
     let real_salt = b"secret_random_salt_32_bytes_long!";

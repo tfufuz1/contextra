@@ -256,7 +256,13 @@ async fn test_h3_tenant_scoped_storage_isolation() {
 
 #[test]
 fn test_h4_kv_segment_deletion_proof_state_binding() {
-    let registry = Arc::new(KeyRegistry::new());
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let master_key = Arc::new(
         KeyManager::try_new("master-passphrase-shredding", b"master-salt-123").expect("KeyManager"),
     );

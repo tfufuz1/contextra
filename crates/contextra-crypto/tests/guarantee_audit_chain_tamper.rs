@@ -442,8 +442,11 @@ fn test_signature_verification_edge_cases() {
 
 #[test]
 fn test_encrypted_commitment_salt_security_and_tamper() {
+    let clock = std::sync::Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let km = KeyManager::try_new("audit-master-passphrase", b"salt-1234567890").unwrap();
-    let registry = KeyRegistry::new();
     let group_id = 100;
 
     let real_salt = b"random_commitment_salt_32bytes!";

@@ -34,7 +34,13 @@ impl MergeOperator for TestMergeOp {
 #[tokio::test]
 async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
     // 1–4. KV Segment symbols: delete_segment, generate_deletion_proof, read_segment, write_segment
-    let registry = Arc::new(KeyRegistry::new());
+    let kp = contextra_crypto::DeletionProofKeyPair::generate();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let registry = Arc::new(KeyRegistry::new_in_memory(
+        clock,
+        Some(kp.signing_key().clone()),
+        kp.verifying_key,
+    ));
     let master_km = Arc::new(KeyManager::try_new(
         "passphrase",
         b"01234567890123456789012345678901",

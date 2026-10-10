@@ -59,7 +59,10 @@ fn test_kv_segment_cipher_with_revocation_log_persistence() {
 
 #[test]
 fn test_unknown_group_id_remains_unregistered_after_revoke() {
-    let registry = KeyRegistry::new();
+    let clock = Arc::new(contextra_ports::SystemClock::new());
+    let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+    let vk = sk.verifying_key();
+    let registry = KeyRegistry::new_in_memory(clock, Some(sk), vk);
     let unknown_group_id = 12345;
 
     assert!(
