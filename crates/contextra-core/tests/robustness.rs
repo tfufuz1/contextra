@@ -83,7 +83,7 @@ fn test_snapshot_registry_robustness_and_concurrency() {
         handles.push(std::thread::spawn(move || {
             for j in 0..iterations {
                 let seq = (i * iterations + j) as u64;
-                let guard = r.register(seq);
+                let guard = r.acquire(|| seq);
                 assert!(r.min_active_seqno() <= seq);
                 drop(guard);
             }
