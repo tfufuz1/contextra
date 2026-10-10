@@ -47,6 +47,8 @@ jobs:
 
       - name: Install cargo-mutants
         uses: taiki-e/install-action@f87f9990b09867202953bff9aa0c80e23ee16bb7 # cargo-mutants
+        with:
+          tool: cargo-mutants
 
       - name: Determine & Validate Target Crates
         id: target

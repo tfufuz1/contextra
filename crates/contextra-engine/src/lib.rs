@@ -489,11 +489,27 @@ pub enum EmbeddingBackend {
     None,
 }
 
-impl Default for EmbeddingBackend {
-    fn default() -> Self {
-        Self::Onnx {
-            model_name: "nomic-embed-text".to_string(),
-            cache_dir: None,
+impl std::str::FromStr for EmbeddingBackend {
+    type Err = ContextraError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().trim() {
+            "candle" => Ok(Self::Candle {
+                model_dir: std::path::PathBuf::new(),
+                quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
+            }),
+            "onnx" => Ok(Self::Onnx {
+                model_name: "nomic-embed-text".to_string(),
+                cache_dir: None,
+            }),
+            "ollama" => Ok(Self::Ollama {
+                endpoint: "http://localhost:11434".to_string(),
+                model: "nomic-embed-text".to_string(),
+            }),
+            "none" | "mock" => Ok(Self::None),
+            other => Err(ContextraError::InvalidInput(format!(
+                "Unknown embedding backend '{other}'. Expected 'candle', 'onnx', 'ollama', 'none', or 'mock'."
+            ))),
         }
     }
 }
@@ -628,7 +644,7 @@ impl Default for ContextraConfig {
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
             community_detection: CommunityDetectionConfig::default(),
-            embedding_backend: EmbeddingBackend::default(),
+            embedding_backend: EmbeddingBackend::None,
             consolidation_enabled: true,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
@@ -794,5 +810,49 @@ impl SandboxBridge for Contextra {
                 None => Ok(None),
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod embedding_backend_tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_embedding_backend_from_str_table() {
+        let cases = vec![
+            ("Candle", true),
+            ("CANDLE", true),
+            ("candle", true),
+            ("onnx", true),
+            ("ONNX", true),
+            ("ollama", true),
+            ("Ollama", true),
+            ("none", true),
+            ("NONE", true),
+            ("mock", true),
+            ("MOCK", true),
+            ("unknown_backend", false),
+            ("", false),
+        ];
+
+        for (input, expected_ok) in cases {
+            let res = EmbeddingBackend::from_str(input);
+            if expected_ok {
+                assert!(res.is_ok(), "Expected '{input}' to parse successfully");
+                let backend = res.unwrap();
+                match input.to_ascii_lowercase().trim() {
+                    "candle" => assert!(matches!(backend, EmbeddingBackend::Candle { .. })),
+                    "onnx" => assert!(matches!(backend, EmbeddingBackend::Onnx { .. })),
+                    "ollama" => assert!(matches!(backend, EmbeddingBackend::Ollama { .. })),
+                    "none" | "mock" => assert!(matches!(backend, EmbeddingBackend::None)),
+                    _ => unreachable!(),
+                }
+            } else {
+                assert!(res.is_err(), "Expected '{input}' to return an error");
+                let err = res.unwrap_err();
+                assert!(matches!(err, ContextraError::InvalidInput(_)));
+            }
+        }
     }
 }
