@@ -5,37 +5,7 @@
     clippy::if_same_then_else,
     clippy::needless_range_loop,
     clippy::collapsible_if,
-    clippy::duplicate_mod,
-    // TODO: entfernen - Ausnahmen für Dateien außerhalb des Task-Scopes in xtask
-    clippy::unwrap_used,
-    // TODO: entfernen
-    clippy::expect_used,
-    // TODO: entfernen
-    clippy::panic,
-    // TODO: entfernen
-    clippy::cast_possible_truncation,
-    // TODO: entfernen
-    clippy::cast_sign_loss,
-    // TODO: entfernen
-    clippy::todo,
-    // TODO: entfernen
-    clippy::manual_strip,
-    // TODO: entfernen
-    clippy::should_implement_trait,
-    // TODO: entfernen
-    clippy::unnecessary_map_or,
-    // TODO: entfernen
-    clippy::match_like_matches_macro,
-    // TODO: entfernen
-    clippy::collapsible_match,
-    // TODO: entfernen
-    clippy::regex_creation_in_loops,
-    // TODO: entfernen
-    clippy::needless_borrows_for_generic_args,
-    // TODO: entfernen
-    clippy::useless_vec,
-    // TODO: entfernen
-    clippy::useless_format
+    clippy::duplicate_mod
 )]
 
 extern crate self as xtask;

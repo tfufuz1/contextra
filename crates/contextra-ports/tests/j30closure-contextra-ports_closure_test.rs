@@ -1,5 +1,7 @@
 //! Integration closure tests for `with_fixed_output`, `with_rope_offset`, and `activate_all`.
 
+#![allow(clippy::unwrap_used)]
+
 use std::sync::Arc;
 
 use contextra_ports::embedding::{

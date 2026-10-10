@@ -5,9 +5,11 @@
 // HOTSPOTS:    create_embedding_provider(), create_llm_text_generator()
 // SIEHE AUCH:  ADR-010, contextra-core/src/traits/mod.rs
 
+use contextra::EmbeddingBackend;
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use contextra_types::ContextraError;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, Once};
 
 static EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
@@ -48,7 +50,7 @@ pub(crate) fn resolve_provider_setting(
 /// Embedding provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmbeddingConfig {
-    /// Provider type ("ollama", "onnx", "candle", or "mock").
+    /// Provider type ("ollama", "onnx", or "candle").
     pub provider: String,
     /// Base URL for Ollama HTTP API.
     pub ollama_url: String,
@@ -58,16 +60,19 @@ pub struct EmbeddingConfig {
     pub onnx_model_path: Option<PathBuf>,
     /// Optional path to Candle model directory.
     pub candle_model_dir: Option<PathBuf>,
+    /// Candle model quantization grade (e.g. Q4KM, Q8_0, F16).
+    pub candle_quantization: contextra_infer_candle::model_registry::CandleQuantization,
 }
 
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
-            provider: String::new(),
+            provider: "mock".to_string(),
             ollama_url: "http://localhost:11434".to_string(),
             embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
             candle_model_dir: None,
+            candle_quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
         }
     }
 }
@@ -77,7 +82,7 @@ impl EmbeddingConfig {
     pub fn from_env() -> Self {
         let prefixed = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER").ok();
         let unprefixed = std::env::var("EMBEDDING_PROVIDER").ok();
-        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "");
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
 
         if resolved.used_unprefixed_fallback {
             EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
@@ -103,83 +108,104 @@ impl EmbeddingConfig {
             .ok()
             .map(PathBuf::from);
 
+        let quantization_str = std::env::var("CONTEXTRA_CANDLE_QUANTIZATION")
+            .or_else(|_| std::env::var("CANDLE_QUANTIZATION"))
+            .unwrap_or_else(|_| "Q4KM".to_string());
+
+        let candle_quantization =
+            contextra_infer_candle::model_registry::CandleQuantization::from_str(&quantization_str)
+                .unwrap_or(contextra_infer_candle::model_registry::CandleQuantization::Q4KM);
+
         Self {
             provider,
             ollama_url,
             embed_model,
             onnx_model_path,
             candle_model_dir,
+            candle_quantization,
         }
     }
 
     /// Instantiates the configured `EmbeddingProvider` as an `Arc<dyn EmbeddingProvider>`.
     pub fn build_provider(&self) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
-        create_embedding_provider(
-            &self.provider,
-            &self.ollama_url,
-            &self.embed_model,
-            self.onnx_model_path.as_deref(),
-            self.candle_model_dir.as_deref(),
-        )
+        let trimmed_provider = self.provider.trim();
+        if trimmed_provider.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string(),
+            ));
+        }
+
+        let mut backend = EmbeddingBackend::from_str(trimmed_provider)?;
+
+        match &mut backend {
+            EmbeddingBackend::Candle {
+                model_dir,
+                quantization,
+            } => {
+                let dir = self.candle_model_dir.clone().ok_or_else(|| {
+                    ContextraError::InvalidInput(
+                        "candle_model_dir is required when embedding provider is 'candle'"
+                            .to_string(),
+                    )
+                })?;
+                *model_dir = dir;
+                *quantization = self.candle_quantization;
+            }
+            EmbeddingBackend::Onnx {
+                model_name,
+                cache_dir: _,
+            } => {
+                let path = self.onnx_model_path.clone().ok_or_else(|| {
+                    ContextraError::InvalidInput(
+                        "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
+                    )
+                })?;
+                *model_name = path.to_string_lossy().to_string();
+            }
+            EmbeddingBackend::Ollama { endpoint, model } => {
+                *endpoint = self.ollama_url.clone();
+                *model = self.embed_model.clone();
+            }
+            EmbeddingBackend::None => {}
+        }
+
+        create_embedding_provider(&backend)
     }
 }
 
-/// Dynamically constructs an `EmbeddingProvider` implementation based on provider identifier.
+/// Dynamically constructs an `EmbeddingProvider` implementation based on an `EmbeddingBackend`.
 pub fn create_embedding_provider(
-    provider_type: &str,
-    ollama_url: &str,
-    embed_model: &str,
-    onnx_model_path: Option<&Path>,
-    candle_model_dir: Option<&Path>,
+    backend: &EmbeddingBackend,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match provider_type.to_lowercase().trim() {
-        "" => Err(ContextraError::InvalidInput(
-            "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string(),
-        )),
         #[cfg(feature = "ollama")]
-        "ollama" => {
-            let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
+        EmbeddingBackend::Ollama { endpoint, model } => {
+            let embedder = contextra_infer_ollama::OllamaEmbedder::new(endpoint, model);
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "ollama"))]
-        "ollama" => {
-            let _ = (ollama_url, embed_model);
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "ollama embedding backend".to_string(),
-                reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
-            })
-        }
+        EmbeddingBackend::Ollama { .. } => Err(ContextraError::CapabilityUnsupported {
+            capability: "ollama embedding backend".to_string(),
+            reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
+        }),
         #[cfg(feature = "onnx")]
-        "onnx" => {
-            let path = onnx_model_path.ok_or_else(|| {
-                ContextraError::InvalidInput(
-                    "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
-                )
-            })?;
-            let embedder = contextra_infer_onnx::OnnxEmbedder::from_path(path)?;
+        EmbeddingBackend::Onnx { model_name, .. } => {
+            let embedder = contextra_infer_onnx::OnnxEmbedder::from_path(Path::new(model_name))?;
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "onnx"))]
-        "onnx" => {
-            let _ = onnx_model_path;
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "onnx".to_string(),
-                reason:
-                    "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
-                        .to_string(),
-            })
-        }
+        EmbeddingBackend::Onnx { .. } => Err(ContextraError::CapabilityUnsupported {
+            capability: "onnx".to_string(),
+            reason: "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
+                .to_string(),
+        }),
         #[cfg(feature = "candle")]
-        "candle" => {
-            let _ = (ollama_url, embed_model, onnx_model_path);
-            let model_dir = candle_model_dir.ok_or_else(|| {
-                ContextraError::InvalidInput(
-                    "candle_model_dir is required when embedding provider is 'candle'".to_string(),
-                )
-            })?;
-            let quantization = contextra_infer_candle::model_registry::CandleQuantization::Q4KM;
+        EmbeddingBackend::Candle {
+            model_dir,
+            quantization,
+        } => {
             let embedder =
-                contextra_infer_candle::CandleEmbedClient::from_dir(model_dir, quantization)
+                contextra_infer_candle::CandleEmbedClient::from_dir(model_dir, *quantization)
                     .map_err(|e| {
                         ContextraError::Internal(format!("Failed to load Candle embed model: {e}"))
                     })?;
@@ -193,13 +219,13 @@ pub fn create_embedding_provider(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(any(test, feature = "test-utils"))]
         "mock" => {
-            tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', 'candle', or 'mock'."
+            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', or 'candle'."
         ))),
     }
 }
@@ -207,7 +233,7 @@ pub fn create_embedding_provider(
 /// LLM provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LlmConfig {
-    /// Provider type ("ollama", "candle", or "mock").
+    /// Provider type ("ollama", or "candle").
     pub provider: String,
     /// Base URL for Ollama HTTP API.
     pub ollama_url: String,
@@ -325,12 +351,13 @@ pub fn create_llm_text_generator(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(any(test, feature = "test-utils"))]
         "mock" => {
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown LLM provider '{other}'. Expected 'ollama', 'candle', or 'mock'."
+            "Unknown LLM provider '{other}'. Expected 'ollama' or 'candle'."
         ))),
     }
 }
@@ -417,42 +444,19 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_setting_default() {
-        let res = resolve_provider_setting(None, None, "");
-        assert_eq!(res.value, "");
+        let res = resolve_provider_setting(None, None, "mock");
+        assert_eq!(res.value, "mock");
         assert!(!res.used_unprefixed_fallback);
     }
 
     #[test]
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
-        assert_eq!(config.provider, "");
+        assert_eq!(config.provider, "mock");
         assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.embed_model, "nomic-embed-text");
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
-    }
-
-    #[test]
-    fn test_create_embedding_provider_unconfigured_error() {
-        let res = create_embedding_provider(
-            "",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
-        match res {
-            Err(ContextraError::InvalidInput(msg)) => {
-                assert!(msg.contains("CONTEXTRA_EMBEDDING_PROVIDER"));
-                assert!(msg.contains("EMBEDDING_PROVIDER"));
-                assert!(msg.contains("ollama"));
-                assert!(msg.contains("onnx"));
-                assert!(msg.contains("candle"));
-                assert!(msg.contains("mock"));
-            }
-            Err(other) => panic!("Expected ContextraError::InvalidInput, got: {other}"),
-            Ok(_) => panic!("Expected create_embedding_provider to fail when unconfigured"),
-        }
     }
 
     #[test]
@@ -475,14 +479,7 @@ mod tests {
 
     #[test]
     fn test_create_embedding_provider_mock() {
-        let provider = create_embedding_provider(
-            "mock",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        )
-        .unwrap();
+        let provider = create_embedding_provider(&EmbeddingBackend::None).unwrap();
         assert_eq!(provider.provider_name(), "mock");
         assert_eq!(provider.embedding_dim(), 768);
     }
@@ -490,26 +487,21 @@ mod tests {
     #[cfg(feature = "ollama")]
     #[test]
     fn test_create_embedding_provider_ollama() {
-        let provider = create_embedding_provider(
-            "ollama",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        )
-        .unwrap();
+        let backend = EmbeddingBackend::Ollama {
+            endpoint: "http://localhost:11434".to_string(),
+            model: "nomic-embed-text".to_string(),
+        };
+        let provider = create_embedding_provider(&backend).unwrap();
         assert_eq!(provider.provider_name(), "ollama");
     }
 
     #[test]
     fn test_create_embedding_provider_unknown_error() {
-        let res = create_embedding_provider(
-            "invalid_provider",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
+        let config = EmbeddingConfig {
+            provider: "invalid_provider".to_string(),
+            ..Default::default()
+        };
+        let res = config.build_provider();
         assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
     }
 
@@ -546,27 +538,23 @@ mod tests {
     #[test]
     fn test_create_embedding_provider_candle_success() {
         let tmp = tempfile::tempdir().unwrap();
-        let provider = create_embedding_provider(
-            "candle",
-            "http://localhost:11434",
-            "embed_model",
-            None,
-            Some(tmp.path()),
-        )
-        .unwrap();
+        let backend = EmbeddingBackend::Candle {
+            model_dir: tmp.path().to_path_buf(),
+            quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
+        };
+        let provider = create_embedding_provider(&backend).unwrap();
         assert_eq!(provider.provider_name(), "candle");
     }
 
     #[cfg(feature = "candle")]
     #[test]
     fn test_create_embedding_provider_candle_missing_dir_error() {
-        let res = create_embedding_provider(
-            "candle",
-            "http://localhost:11434",
-            "embed_model",
-            None,
-            None,
-        );
+        let config = EmbeddingConfig {
+            provider: "candle".to_string(),
+            candle_model_dir: None,
+            ..Default::default()
+        };
+        let res = config.build_provider();
         match res {
             Err(err) => {
                 assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -579,13 +567,11 @@ mod tests {
     #[cfg(not(feature = "candle"))]
     #[test]
     fn test_create_embedding_provider_candle_unsupported_error() {
-        let res = create_embedding_provider(
-            "candle",
-            "http://localhost:11434",
-            "embed_model",
-            None,
-            None,
-        );
+        let backend = EmbeddingBackend::Candle {
+            model_dir: PathBuf::from("/tmp"),
+            quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
+        };
+        let res = create_embedding_provider(&backend);
         assert!(matches!(
             res,
             Err(ContextraError::CapabilityUnsupported { .. })

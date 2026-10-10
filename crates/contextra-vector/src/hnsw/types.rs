@@ -85,7 +85,6 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
 }
 
 /// The HNSW (Hierarchical Navigable Small World) vector index.
-#[derive(Clone)]
 pub struct HnswIndex {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
 }
@@ -177,7 +176,6 @@ pub struct HnswColdCore {
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
-    pub mmap_backlink_overlay: super::connections::MmapBacklinkOverlay,
     pub seq_log: RwLock<contextra_core::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
@@ -246,7 +244,6 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
                     seq_log: RwLock::new(contextra_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
@@ -315,7 +312,6 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
                     seq_log: RwLock::new(contextra_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
@@ -402,18 +398,6 @@ impl HnswIndex {
 
     pub fn check_connectivity(&self) -> contextra_core::Result<()> {
         self.inner.check_connectivity()
-    }
-
-    /// Returns the number of active backlink overrides in the in-memory mmap overlay.
-    ///
-    /// # Important
-    /// Overrides stored in the mmap backlink overlay are **in-memory only** and are lost
-    /// whenever the index is reloaded via `load_mmap` / `load_mmap_from_instance` or upon restart.
-    /// After a restart without a full index rebuild, deleted node backlinks return from the read-only
-    /// mmap file into the active search graph. Therefore, a cryptographic or permanent deletion proof
-    /// for the HNSW layer cannot be derived from in-memory graph repair overrides alone.
-    pub fn mmap_overlay_len(&self) -> usize {
-        self.inner.cold.mmap_backlink_overlay.len()
     }
 
     pub fn is_rebuild_required(&self) -> bool {
@@ -530,7 +514,6 @@ impl HnswIndex {
         &self,
         mmap_index: crate::persistence::MmapIndex,
     ) -> Result<()> {
-        self.inner.cold.mmap_backlink_overlay.clear();
         let ep = if mmap_index.header.entry_point() >= 0 {
             Some(mmap_index.header.entry_point() as usize)
         } else {
@@ -612,17 +595,6 @@ impl HnswIndex {
                 total_queries: AtomicU64::new(0),
                 out_of_range_queries: AtomicU64::new(0),
             });
-        }
-
-        let node_count = mmap_index.header.node_count() as usize;
-        {
-            let mut doc_map = self.inner.hot.doc_to_node.write();
-            doc_map.clear();
-            for i in 0..node_count {
-                if let Ok(record) = mmap_index.get_node_record(i) {
-                    doc_map.insert(record.doc_id, i);
-                }
-            }
         }
 
         let mut guard = self.inner.cold.mmap_index.write();

@@ -34,9 +34,10 @@ impl HnswIndexCore {
             }
         }
 
-        if ctx.mmap.is_some() {
+        if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
-                return Ok(Cow::Owned(self.get_node_connections(idx, layer)?));
+                let record = mmap.get_node_record(idx)?;
+                return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
             }
             let ram_idx = idx - ctx.mmap_node_count;
             if let Some(bmap) = ctx.backlink_map {
@@ -246,7 +247,7 @@ impl HnswIndexCore {
             ep = neighbors.iter().map(|c| c.index).collect();
         }
 
-        let base_batch_idx = mmap_node_count + nodes_read.len();
+        let base_batch_idx = mmap_node_count + ram_nodes_count;
         let mut neighbor_backlinks = Vec::new();
 
         for layer in (0..=new_layer.min(current_max_layer)).rev() {
