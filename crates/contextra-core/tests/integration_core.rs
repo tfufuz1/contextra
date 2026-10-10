@@ -26,7 +26,7 @@ fn test_integration_tx_buffer_and_snapshots() {
     );
 
     // Take a snapshot
-    let guard = registry.register(101);
+    let guard = registry.acquire(|| 101);
 
     // Transaction 2
     let tx2 = TxId::new(102);

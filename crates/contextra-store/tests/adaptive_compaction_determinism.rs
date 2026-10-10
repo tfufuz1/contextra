@@ -1,7 +1,6 @@
-use contextra_core::{StorageEngine, TxId};
 use contextra_ports::StorageStats;
 use contextra_store::{
-    AdaptiveCompactionPlanner, CompactionStrategy, CostBasedAdaptivePlanner, WorkloadMetrics,
+    AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics,
 };
 
 #[test]

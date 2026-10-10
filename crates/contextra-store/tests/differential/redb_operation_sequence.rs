@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Shared differential test strategies and helpers for redb comparison
+
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use proptest::prelude::*;
