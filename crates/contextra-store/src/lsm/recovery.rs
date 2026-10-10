@@ -956,6 +956,10 @@ mod tests {
         let tmp = TempDir::new().map_err(|e| ContextraError::Storage(e.to_string()))?;
         let db_path = tmp.path().to_path_buf();
 
+        tokio::fs::write(db_path.join("SALT"), &[0u8; 32])
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+
         let old_wal_path = db_path.join("wal-00000000000000000001.log");
         let active_wal_path = db_path.join("wal-00000000000000000002.log");
         let old_sidecar_path = std::path::PathBuf::from(format!("{}.uuid", old_wal_path.display()));
@@ -964,32 +968,41 @@ mod tests {
 
         {
             let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
-            old_wal
-                .append_put(b"key1", b"val1", contextra_core::TxId::new(1))
-                .await?;
-            old_wal
-                .append_tx_end(contextra_core::TxId::new(1), true)
-                .await?;
+            let op_put1 = WalOp::Put {
+                tx_id: contextra_core::TxId::new(1),
+                key: b"key1".to_vec(),
+                value: b"val1".to_vec(),
+            };
+            let op_end1 = WalOp::TxEnd {
+                tx_id: contextra_core::TxId::new(1),
+                committed: true,
+            };
+            let (batch1, _) = old_wal.prepare_batch(vec![(op_put1, 1), (op_end1, 2)]).await?;
+            old_wal.append_batch(batch1).await?;
+            old_wal.close().await?;
 
             let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
-            active_wal
-                .append_put(b"key2", b"val2", contextra_core::TxId::new(2))
-                .await?;
-            active_wal
-                .append_tx_end(contextra_core::TxId::new(2), true)
-                .await?;
+            let op_put2 = WalOp::Put {
+                tx_id: contextra_core::TxId::new(2),
+                key: b"key2".to_vec(),
+                value: b"val2".to_vec(),
+            };
+            let op_end2 = WalOp::TxEnd {
+                tx_id: contextra_core::TxId::new(2),
+                committed: true,
+            };
+            let (batch2, _) = active_wal.prepare_batch(vec![(op_put2, 3), (op_end2, 4)]).await?;
+            active_wal.append_batch(batch2).await?;
+            active_wal.close().await?;
         }
 
-        tokio::fs::write(&old_sidecar_path, b"old-uuid-data")
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        tokio::fs::write(&active_sidecar_path, b"active-uuid-data")
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        Wal::load_or_create_wal_uuid(&old_wal_path).await?;
+        Wal::load_or_create_wal_uuid(&active_wal_path).await?;
 
         assert!(old_wal_path.exists());
         assert!(old_sidecar_path.exists());
         assert!(active_wal_path.exists());
+        assert!(active_sidecar_path.exists());
 
         let dir_mtime_before = std::fs::metadata(&db_path)
             .and_then(|m| m.modified())
@@ -1013,10 +1026,11 @@ mod tests {
             old_sidecar_path
         );
 
+        let current_active_wal_path = storage.wal.read().await.path().to_path_buf();
         assert!(
-            active_wal_path.exists(),
+            current_active_wal_path.exists(),
             "Active WAL file {:?} must be preserved",
-            active_wal_path
+            current_active_wal_path
         );
 
         let val1 = storage.get(b"key1").await?;
