@@ -292,6 +292,8 @@ impl RevocationLog {
     /// Diese Methode setzt fest `has_existing_keys: false` ein, was den Rollback-Schutz
     /// bei Neu-Initialisierung über einem gelöschten Log abschwächt.
     /// Produktionscode MUSS `open_or_create_if_fresh` mit korrekter Flag-Übergabe nutzen!
+    /// Seit diesem Commit ist diese Funktion nur noch in Tests und mit `feature = "test-utils"` erreichbar.
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn open_or_create(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
