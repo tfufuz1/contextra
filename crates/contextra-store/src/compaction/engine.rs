@@ -266,18 +266,12 @@ impl CompactionEngine {
                     "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
                      (concurrent flush or rollback detected)"
                 );
-                let p = output_path.clone();
-                let res =
-                    tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                        .await;
-                if let Ok(Err(e)) = res {
-                    if e.kind() != std::io::ErrorKind::NotFound {
-                        tracing::warn!(
-                            "Failed to clean up aborted compaction output {:?}: {}",
-                            output_path,
-                            e
-                        );
-                    }
+                if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                    tracing::warn!(
+                        "Failed to clean up aborted compaction output {:?}: {}",
+                        output_path,
+                        e
+                    );
                 }
                 return Ok(false);
             }
@@ -322,23 +316,12 @@ impl CompactionEngine {
 
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            let p = path.clone();
-            let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
-            if let Ok(Err(e)) = res {
-                if e.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
-                }
+            if let Err(e) = tokio::fs::remove_file(path).await {
+                tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
-            let sidecar = uuid_sidecar.clone();
-            let sidecar_res = tokio::task::spawn_blocking(move || {
-                contextra_durable_fs::durable_remove(&sidecar)
-            })
-            .await;
-            if let Ok(Err(e)) = sidecar_res {
-                if e.kind() != std::io::ErrorKind::NotFound {
+            if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {
+                if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
                     tracing::debug!(
                         "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
                         uuid_sidecar,
@@ -503,11 +486,7 @@ impl CompactionEngine {
             .await;
 
         if merge_res.is_err() {
-            let p = output_path.to_path_buf();
-            let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
-            if let Ok(Err(e)) = res {
+            if let Err(e) = tokio::fs::remove_file(output_path).await {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
@@ -877,96 +856,5 @@ impl CompactionEngine {
                 }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::sstable::create_block_cache;
-    use contextra_mvcc::snapshot::SnapshotFloor;
-    use tempfile::TempDir;
-
-    #[tokio::test]
-    async fn test_durable_remove_compaction_resilience_and_manifest_integrity() -> Result<()> {
-        let tmp = TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
-        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
-        let bc = create_block_cache(1);
-        let manifest_path = tmp.path().join("MANIFEST-000001");
-        let manifest = Arc::new(crate::manifest::Manifest::create(&manifest_path).await?);
-
-        let config = CompactionConfig {
-            min_sstables_per_tier: 2,
-            ..Default::default()
-        };
-
-        let engine = CompactionEngine::new(
-            config,
-            registry as Arc<dyn SnapshotFloor>,
-            Arc::clone(&bc),
-            None,
-            Arc::new(contextra_core::ResourceTracker::new(
-                contextra_core::ResourceBudget {
-                    memory_limit: 1024 * 1024,
-                },
-            )),
-            Some(manifest),
-        );
-
-        // Create 2 input SSTables with UUID sidecars
-        let sstables = Arc::new(RwLock::new(Vec::new()));
-        let mut old_sst_paths = Vec::new();
-        let mut sidecar_paths = Vec::new();
-
-        for i in 0..2u8 {
-            let sst_name = format!("sst-{i}.sst");
-            let sst_path = tmp.path().join(&sst_name);
-            let mut builder = crate::sstable::SstableBuilder::create(&sst_path).await?;
-            builder
-                .add(format!("key-{i}").as_bytes(), b"val", i as u64 + 1, i as u64 + 1)
-                .await?;
-            builder.finish().await?;
-
-            let reader = Arc::new(
-                SstableReader::open_with_key_manager(&sst_path, Arc::clone(&bc), None).await?,
-            );
-
-            let sidecar_path = PathBuf::from(format!("{}.uuid", sst_path.display()));
-            tokio::fs::write(&sidecar_path, b"uuid-data")
-                .await
-                .map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
-
-            old_sst_paths.push(sst_path);
-            sidecar_paths.push(sidecar_path);
-            sstables.write().await.push(reader);
-        }
-
-        // Simulate a deletion error prior to compaction (e.g. sidecar_paths[0] already removed/missing)
-        let s0 = sidecar_paths[0].clone();
-        let _ = tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&s0)).await;
-
-        // Execute compaction
-        let compacted = engine.maybe_compact(&sstables, tmp.path()).await?;
-        assert!(compacted, "Compaction should report success");
-
-        // (a) All replaced input SSTables and UUID sidecars should not exist
-        for sst_p in &old_sst_paths {
-            assert!(!sst_p.exists(), "Replaced SSTable {:?} should be removed", sst_p);
-        }
-        for sidecar_p in &sidecar_paths {
-            assert!(!sidecar_p.exists(), "UUID sidecar {:?} should be removed", sidecar_p);
-        }
-
-        // (b) No file referenced by the manifest should be removed
-        let ssts_guard = sstables.read().await;
-        assert_eq!(ssts_guard.len(), 1, "Compacted output SSTable present in list");
-        let active_sst_path = ssts_guard[0].file_path();
-        assert!(
-            active_sst_path.exists(),
-            "Output SSTable referenced by manifest {:?} must exist",
-            active_sst_path
-        );
-        assert!(manifest_path.exists(), "Manifest file must exist");
-        Ok(())
     }
 }

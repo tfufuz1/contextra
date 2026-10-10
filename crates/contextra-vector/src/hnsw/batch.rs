@@ -66,7 +66,12 @@ pub(super) fn get_neighbor_conns_in_batch(
     }
 
     if neighbor_idx < mmap_node_count {
-        return core.get_node_connections(neighbor_idx, layer);
+        let mmap_guard = core.cold.mmap_index.read();
+        if let Some(mmap) = mmap_guard.as_ref() {
+            let rec = mmap.get_node_record(neighbor_idx)?;
+            return mmap.get_connections(&rec, layer);
+        }
+        return Ok(Vec::new());
     }
 
     let neighbor_ram_idx = neighbor_idx - mmap_node_count;

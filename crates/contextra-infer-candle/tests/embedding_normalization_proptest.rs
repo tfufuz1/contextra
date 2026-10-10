@@ -3,12 +3,34 @@
 // ZWECK: Property-based tests for numerical normalization, finite outputs, and empty/whitespace input edge cases.
 // INVARIANTEN: No NaN or Inf in output vectors (is_finite true); no panics on arbitrary string lengths or empty inputs; proptest with 50 cases.
 
+use candle_core::Device;
+use contextra_infer_candle::embedding::{CandleEmbedInner, DefaultCandleEmbedModel};
+use contextra_infer_candle::model_registry::ModelFingerprint;
 use contextra_infer_candle::CandleEmbedClient;
 use contextra_ports::EmbeddingProvider;
 use proptest::prelude::*;
 
 fn create_test_client() -> CandleEmbedClient {
-    CandleEmbedClient::with_test_stub_model(384)
+    let mock_model = Box::new(DefaultCandleEmbedModel { dim: 384 });
+    let fp = ModelFingerprint {
+        hash: [9u8; 32],
+        model_id: "proptest_embed.gguf".to_string(),
+        quantization: "Q4_K_M".to_string(),
+    };
+    let tokenizer_bytes = r#"{
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+    }"#;
+    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
+
+    CandleEmbedClient::new(Device::Cpu, mock_model, fp, tokenizer)
 }
 
 proptest! {
@@ -22,7 +44,7 @@ proptest! {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            .unwrap();
 
         rt.block_on(async {
             let client = create_test_client();
@@ -59,14 +81,25 @@ proptest! {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            .unwrap();
 
         rt.block_on(async {
-            let client = CandleEmbedClient::with_test_stub_model(256);
-            let mut guard = client.model.lock().await;
+            let mut inner = DefaultCandleEmbedModel { dim: 256 };
+            let tokenizer_bytes = r#"{
+                "version": "1.0",
+                "truncation": null,
+                "padding": null,
+                "added_tokens": [],
+                "normalizer": null,
+                "pre_tokenizer": null,
+                "post_processor": null,
+                "decoder": null,
+                "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+            }"#;
+            let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
             // Inner embed execution MUST NEVER panic on empty, whitespace, or null-byte strings
-            let res = guard.embed(&input, &client.tokenizer, &client.device);
+            let res = inner.embed(&input, &tokenizer, &Device::Cpu);
 
             match res {
                 Ok(vec) => {

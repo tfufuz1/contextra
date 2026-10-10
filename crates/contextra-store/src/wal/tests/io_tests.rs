@@ -31,7 +31,6 @@ async fn test_wal_crash_consistency_write_without_fsync() {
             .open(&wal_path)
             .await
             .expect("open for append"); // expect
-        file.write_all(&WAL_V3_HEADER).await.expect("header");
         let bytes = entry.to_bytes().expect("to_bytes"); // expect
         file.write_all(&bytes).await.expect("write_all"); // expect
         file.flush().await.expect("flush"); // expect
@@ -98,7 +97,6 @@ async fn test_append_batch_partial_write_atomicity() {
 
     // Serialize all 3 entries into a single bytes payload
     let mut batch_bytes = Vec::new();
-    batch_bytes.extend_from_slice(&WAL_V3_HEADER);
     for e in entries.entries() {
         batch_bytes.extend_from_slice(&e.to_bytes().expect("to_bytes")); // expect
     }

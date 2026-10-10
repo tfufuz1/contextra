@@ -33,23 +33,23 @@ async fn test_integration_open_heal_torn_tail_recovery() -> Result<()> {
     let size_healed = wal.size();
     assert!(size_healed < truncated_len as u64);
 
-    // 4. Append entry 4 (with seq_no 3 following recovered entry 2)
+    // 4. Append entry 4
     let op4 = WalOp::Put {
         tx_id: TxId::new(4),
         key: b"k4".to_vec(),
         value: b"v4".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 3)]).await?;
+    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
     wal.append_batch(batch4).await?;
     drop(wal);
 
-    // 5. Reopen and verify replay yields 3 valid entries (1, 2, 3)
+    // 5. Reopen and verify replay yields 3 valid entries (1, 2, 4)
     let wal_reopened = Wal::open(&path).await?;
     let replayed = wal_reopened.replay().await?;
     assert_eq!(replayed.len(), 3);
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 3);
+    assert_eq!(replayed[2].1.seq_no, 4);
 
     Ok(())
 }
@@ -167,7 +167,7 @@ async fn test_integration_encrypted_wal_open_heal() -> Result<()> {
         key: b"k4".to_vec(),
         value: b"v4".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 3)]).await?;
+    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
     wal.append_batch(batch4).await?;
     drop(wal);
 
@@ -176,7 +176,7 @@ async fn test_integration_encrypted_wal_open_heal() -> Result<()> {
     assert_eq!(replayed.len(), 3);
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 3);
+    assert_eq!(replayed[2].1.seq_no, 4);
 
     Ok(())
 }

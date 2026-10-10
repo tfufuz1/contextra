@@ -155,33 +155,6 @@ pub async fn setup_routing(
     })))
 }
 
-/// Helper predicate checking if `db_dir` contains existing persistent DB or KV storage artifacts.
-///
-/// Ignores `.orphan_registry.json` (created automatically on DB init) as well as
-/// `kv_revocation.log` and `kv_revocation.log.initialized`.
-#[cfg(feature = "kv-bridge")]
-pub fn kv_bridge_has_existing_keys(db_dir: &std::path::Path) -> bool {
-    let read_dir = match std::fs::read_dir(db_dir) {
-        Ok(entries) => entries,
-        Err(_) => return false,
-    };
-
-    for entry in read_dir.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        if name_str == "kv_revocation.log"
-            || name_str == "kv_revocation.log.initialized"
-            || name_str == ".orphan_registry.json"
-        {
-            continue;
-        }
-
-        return true;
-    }
-
-    false
-}
-
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
 pub fn setup_kv_bridge(
@@ -212,44 +185,7 @@ pub fn setup_kv_bridge(
         }
     };
 
-    let db_dir = db
-        .config()
-        .orphan_registry_path
-        .as_ref()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("./contextra_data"));
-
-    let log_path = db_dir.join("kv_revocation.log");
-    let clock = Arc::new(contextra_ports::SystemClock::new());
-    let sk = match master_km.derive_revocation_signing_key() {
-        Ok(sk) => sk,
-        Err(e) => {
-            tracing::warn!("KvBridgeAdapter: Failed to derive revocation signing key: {e}");
-            return None;
-        }
-    };
-    let vk = sk.verifying_key();
-
-    let has_existing_keys = kv_bridge_has_existing_keys(&db_dir);
-
-    let log = match contextra_crypto::RevocationLog::open_or_create_if_fresh(
-        &log_path,
-        clock,
-        Some(sk),
-        vk,
-        has_existing_keys,
-    ) {
-        Ok(l) => Arc::new(l),
-        Err(e) => {
-            tracing::error!(
-                "KvBridgeAdapter: Failed to open revocation log at {}: {e}",
-                log_path.display()
-            );
-            return None;
-        }
-    };
-
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km, log));
+    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
 
     let col_res = match tokio::runtime::Handle::try_current() {
         Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),
@@ -275,15 +211,10 @@ pub fn setup_kv_bridge(
             }
         }
         Err(e) => {
-            tracing::error!(
-                "KvBridgeAdapter: Failed to open durable RevocationLog at {}: {e}",
-                log_path.display()
-            );
-            return None;
+            tracing::warn!("KvBridgeAdapter: Failed to acquire default collection: {e}");
+            Arc::new(contextra_crypto::TenantIsolatedKvStore::new())
         }
     };
-
-    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
 
     Some(Arc::new(contextra_infer_candle::KvBridgeAdapter::new(
         store, cipher,
@@ -397,178 +328,5 @@ mod tests {
         assert!(window.chunks.is_empty());
         assert_eq!(window.total_tokens, 0);
         assert!(window.truncated);
-    }
-
-    #[cfg(feature = "kv-bridge")]
-    #[tokio::test]
-    async fn test_setup_kv_bridge_unwritable_log_path_returns_none() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let log_dir_blocker = temp_dir.path().join("kv-revocation.log");
-        std::fs::create_dir_all(&log_dir_blocker).expect("create dir blocker");
-
-        let orphan_file = temp_dir.path().join(".orphan_registry.json");
-        let config = contextra::ContextraConfig {
-            encryption_passphrase: Some("valid-passphrase-123".to_string()),
-            orphan_registry_path: Some(orphan_file),
-            ..Default::default()
-        };
-
-        let db = Arc::new(
-            contextra::Contextra::open_with_config(temp_dir.path(), config)
-                .await
-                .expect("open db"),
-        );
-
-        let bridge = setup_kv_bridge(&db);
-
-        assert!(
-            bridge.is_none(),
-            "setup_kv_bridge MUST return None when log path is unwritable / blocked"
-        );
-    }
-
-    #[cfg(feature = "kv-bridge")]
-    #[tokio::test]
-    async fn test_setup_kv_bridge_scenario_a_fresh_directory() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let orphan_file = temp_dir.path().join(".orphan_registry.json");
-        let config = contextra::ContextraConfig {
-            encryption_passphrase: Some("valid-passphrase-scenario-a".to_string()),
-            orphan_registry_path: Some(orphan_file),
-            ..Default::default()
-        };
-
-        let db = Arc::new(
-            contextra::Contextra::open_with_config(temp_dir.path(), config)
-                .await
-                .expect("open db"),
-        );
-
-        // Before setup_kv_bridge, remove any log if created by DB lifecycle
-        let log_path = temp_dir.path().join("kv_revocation.log");
-        let marker_path = temp_dir.path().join("kv_revocation.log.initialized");
-        let _ = std::fs::remove_file(&log_path);
-        let _ = std::fs::remove_file(&marker_path);
-
-        // A fresh directory has no existing KV/DB artifacts before setup (or only fresh empty dir)
-        let fresh_dir = temp_dir.path().join("fresh_sub_dir");
-        std::fs::create_dir_all(&fresh_dir).expect("create fresh dir");
-        let orphan_fresh = fresh_dir.join(".orphan_registry.json");
-        let config_fresh = contextra::ContextraConfig {
-            encryption_passphrase: Some("valid-passphrase-scenario-a".to_string()),
-            orphan_registry_path: Some(orphan_fresh),
-            ..Default::default()
-        };
-        let db_fresh = Arc::new(
-            contextra::Contextra::open_with_config(&fresh_dir, config_fresh)
-                .await
-                .expect("open db fresh"),
-        );
-
-        let log_path_fresh = fresh_dir.join("kv_revocation.log");
-        let marker_path_fresh = fresh_dir.join("kv_revocation.log.initialized");
-        let _ = std::fs::remove_file(&log_path_fresh);
-        let _ = std::fs::remove_file(&marker_path_fresh);
-
-        // Scenario a): Fresh directory -> log is created, bridge starts
-        let bridge = setup_kv_bridge(&db_fresh);
-        assert!(bridge.is_some(), "Bridge MUST start on fresh directory");
-        assert!(
-            log_path_fresh.exists(),
-            "kv_revocation.log MUST be created"
-        );
-        assert!(
-            marker_path_fresh.exists(),
-            "kv_revocation.log.initialized MUST be created"
-        );
-    }
-
-    #[cfg(feature = "kv-bridge")]
-    #[tokio::test]
-    async fn test_setup_kv_bridge_scenario_b_existing_artifacts_missing_log() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let orphan_file = temp_dir.path().join(".orphan_registry.json");
-        let config = contextra::ContextraConfig {
-            encryption_passphrase: Some("valid-passphrase-scenario-b".to_string()),
-            orphan_registry_path: Some(orphan_file.clone()),
-            ..Default::default()
-        };
-
-        let db = Arc::new(
-            contextra::Contextra::open_with_config(temp_dir.path(), config)
-                .await
-                .expect("open db"),
-        );
-
-        // Create persistent storage artifact (e.g., wal.log or sst) to simulate existing KV/DB storage
-        let wal_artifact = temp_dir.path().join("wal.log");
-        std::fs::write(&wal_artifact, b"existing wal data").expect("write wal artifact");
-
-        // Delete revocation log and marker file to simulate log/marker deletion / rollback
-        let log_path = temp_dir.path().join("kv_revocation.log");
-        let marker_path = temp_dir.path().join("kv_revocation.log.initialized");
-        let _ = std::fs::remove_file(&log_path);
-        let _ = std::fs::remove_file(&marker_path);
-
-        // Scenario b): Existing artifacts present, but log & marker are missing.
-        // MUST fail closed: returns None and does NOT create kv_revocation.log!
-        let bridge = setup_kv_bridge(&db);
-
-        assert!(
-            bridge.is_none(),
-            "Scenario b): setup_kv_bridge MUST return None when log/marker are deleted while existing artifacts exist"
-        );
-        assert!(
-            !log_path.exists(),
-            "Scenario b): kv_revocation.log MUST NOT be created"
-        );
-    }
-
-    #[cfg(feature = "kv-bridge")]
-    #[tokio::test]
-    async fn test_setup_kv_bridge_scenario_c_normal_restart() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let orphan_file = temp_dir.path().join(".orphan_registry.json");
-        let config = contextra::ContextraConfig {
-            encryption_passphrase: Some("valid-passphrase-scenario-c".to_string()),
-            orphan_registry_path: Some(orphan_file),
-            ..Default::default()
-        };
-
-        let db = Arc::new(
-            contextra::Contextra::open_with_config(temp_dir.path(), config)
-                .await
-                .expect("open db"),
-        );
-
-        // First setup creates log and marker
-        let bridge1 = setup_kv_bridge(&db);
-        assert!(bridge1.is_some(), "Initial bridge setup MUST succeed");
-
-        let log_path = temp_dir.path().join("kv_revocation.log");
-        let marker_path = temp_dir.path().join("kv_revocation.log.initialized");
-        assert!(log_path.exists() && marker_path.exists());
-
-        // Append a revocation entry to cipher's revocation log
-        let group_target = contextra_crypto::RevocationTarget::Group(12345);
-        bridge1
-            .cipher
-            .revocation_log()
-            .expect("revocation log attached")
-            .append(group_target.clone())
-            .expect("append revocation");
-
-        assert!(bridge1.cipher.is_revoked(&group_target));
-
-        // Scenario c): Normal restart (log and marker exist) -> bridge starts and retains revocation
-        let bridge2 = setup_kv_bridge(&db);
-        assert!(
-            bridge2.is_some(),
-            "Scenario c): Bridge MUST start on normal restart when log and marker exist"
-        );
-        assert!(
-            bridge2.cipher.is_revoked(&group_target),
-            "Scenario c): Earlier revocations MUST remain effective on normal restart"
-        );
     }
 }

@@ -1,7 +1,6 @@
 // ZWECK: Integrationstests für Store-Level Legacy WAL Migration (`migrate_legacy_wal_keys`, `has_pending_legacy_wal_migration`)
 // INVARIANTEN: Regular open rejects legacy WAL without migration (INV-WAL-LEGACY-KEY-1); explicit migration rekeys & logs via Clock.
 
-#![cfg(feature = "legacy-wal-key")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_core::TxId;
