@@ -129,10 +129,7 @@ pub fn run_gc_floor_single_source(args: &[String]) -> i32 {
     };
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
     } else {
         println!("{}", summary);
         for f in &new_findings {

@@ -11,7 +11,6 @@ use contextra_store::wal::{Wal, WalOp};
 use tempfile::tempdir;
 
 #[tokio::test]
-#[cfg_attr(not(feature = "fault-injection"), ignore)]
 async fn test_wal_fsync_failure_truncates_page_cache() -> Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("fsync_truncation.wal");

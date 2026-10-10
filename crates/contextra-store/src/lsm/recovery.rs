@@ -1,6 +1,5 @@
 use super::*;
 use crate::compaction::{CompactionEngine, MergeOperator};
-use crate::lsm::gc_floor::GcFloor;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
@@ -11,6 +10,7 @@ use contextra_core::{
     TOMBSTONE_BIT,
 };
 use contextra_mvcc::snapshot::SnapshotFloor;
+use crate::lsm::gc_floor::GcFloor;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;

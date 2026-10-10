@@ -100,7 +100,6 @@ pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
 }
 
 #[cfg(not(feature = "legacy-wal-key"))]
-#[allow(dead_code)]
 pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
     Err(ContextraError::Storage(
         "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()

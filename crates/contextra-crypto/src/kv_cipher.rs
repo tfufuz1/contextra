@@ -104,24 +104,15 @@ pub struct KvSegmentCipher {
 }
 
 impl KvSegmentCipher {
-    /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager` and mandatory `RevocationLog`.
-    pub fn new(key_manager: KeyManager, log: Arc<RevocationLog>) -> Self {
-        let registry = KeyRegistry::new().with_revocation_log(log);
-        Self {
-            key_manager,
-            registry,
-        }
-    }
-
-    /// Creates an ephemeral in-memory `KvSegmentCipher` without persistent disk storage (primarily for tests and temporary caches).
-    pub fn ephemeral(key_manager: KeyManager) -> Self {
+    /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
+    pub fn new(key_manager: KeyManager) -> Self {
         Self {
             key_manager,
             registry: KeyRegistry::new(),
         }
     }
 
-    /// Attaches or overrides the `RevocationLog` on the underlying `KeyRegistry`.
+    /// Attaches a `RevocationLog` to the underlying `KeyRegistry`.
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         self.registry = self.registry.with_revocation_log(log);
         self
@@ -238,7 +229,7 @@ mod tests {
     #[test]
     fn test_kv_segment_cipher_encrypt_decrypt_roundtrip() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -255,7 +246,7 @@ mod tests {
     #[test]
     fn test_wrong_tenant_id_fails_decryption() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_a = TenantId::try_new(101).unwrap();
         let tenant_b = TenantId::try_new(202).unwrap();
@@ -276,7 +267,7 @@ mod tests {
     #[test]
     fn test_wrong_model_fingerprint_fails_decryption() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant = TenantId::try_new(101).unwrap();
         let fp_q4 = ModelFingerprint::new([0x11u8; 32], "llama-3", "Q4_K_M");
@@ -297,7 +288,7 @@ mod tests {
     #[test]
     fn test_nonce_freshness_identical_plaintext() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -319,7 +310,7 @@ mod tests {
     #[test]
     fn test_invalid_format_version_returns_version_mismatch_error() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -344,7 +335,7 @@ mod tests {
     #[test]
     fn test_format_version_mismatch_returns_specific_error() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
         let tenant = TenantId::try_new(1).unwrap();
         let fp = dummy_fingerprint("model-v1");
         let plaintext = b"test payload";
@@ -385,7 +376,7 @@ mod tests {
         let log_arc = Arc::new(log);
 
         let master_km1 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher1 = KvSegmentCipher::new(master_km1, log_arc.clone());
+        let cipher1 = KvSegmentCipher::new(master_km1).with_revocation_log(log_arc.clone());
 
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -412,7 +403,7 @@ mod tests {
         let reopened_log = RevocationLog::open_or_create(&log_path, clock, None, vk)
             .expect("Failed to reopen persistent revocation log");
         let master_km2 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher2 = KvSegmentCipher::new(master_km2, Arc::new(reopened_log));
+        let cipher2 = KvSegmentCipher::new(master_km2).with_revocation_log(Arc::new(reopened_log));
 
         // Assert group 888 is still revoked in the reconstructed cipher's registry
         assert!(
@@ -433,7 +424,7 @@ mod tests {
         // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
         // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
         let segment_id = 42;

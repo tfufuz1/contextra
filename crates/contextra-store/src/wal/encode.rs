@@ -1,5 +1,3 @@
-#![allow(clippy::cast_possible_truncation)]
-
 //! FILE-CONTEXT:
 //! STAND: 2026-10-06
 //! ZWECK: Format-Spezifikation (V1/V2/V3), `WalEntry`, `WalOp`, CRC32 & HMAC-Berechnung sowie Binär-Serialisierung.
