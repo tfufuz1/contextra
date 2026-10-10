@@ -189,6 +189,8 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
 cast_possible_truncation = "deny"
 cast_sign_loss = "deny"
 
