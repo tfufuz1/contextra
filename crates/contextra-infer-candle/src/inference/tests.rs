@@ -174,7 +174,7 @@ async fn test_generate_with_context_kv_bridge_consultation() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -230,7 +230,7 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -339,7 +339,7 @@ async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_h
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -636,7 +636,7 @@ async fn test_candle_llm_client_with_kv_bridge() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 

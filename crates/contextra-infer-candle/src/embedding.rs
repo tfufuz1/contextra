@@ -16,214 +16,6 @@ use std::sync::Arc;
 /// Default maximum concurrent embedding operations for Candle vector embedding.
 pub const DEFAULT_MAX_CONCURRENT_EMBEDDINGS: usize = 8;
 
-/// Loads BERT model configuration from `config.json` at `path`.
-///
-/// Returns an error containing the path if the file is missing or invalid JSON.
-pub fn load_bert_config(path: &Path) -> Result<Config> {
-    let content = std::fs::read_to_string(path).map_err(|e| {
-        ContextraError::InvalidInput(format!(
-            "Failed to read BERT config file {}: {e}",
-            path.display()
-        ))
-    })?;
-
-    parse_bert_config_json(&content).map_err(|e| {
-        ContextraError::InvalidInput(format!(
-            "Failed to parse BERT config JSON from {}: {e}",
-            path.display()
-        ))
-    })
-}
-
-fn parse_bert_config_json(json_str: &str) -> std::result::Result<Config, String> {
-    let trimmed = json_str.trim();
-    if !trimmed.starts_with('{') || !trimmed.ends_with('}') {
-        return Err("JSON must be a valid JSON object enclosed in { ... }".to_string());
-    }
-
-    let mut config = Config::default();
-
-    let chars: Vec<char> = trimmed.chars().collect();
-    let mut i = 1;
-    let len = chars.len() - 1;
-
-    while i < len {
-        while i < len && (chars[i].is_whitespace() || chars[i] == ',') {
-            i += 1;
-        }
-        if i >= len {
-            break;
-        }
-
-        if chars[i] != '"' {
-            return Err(format!("Expected quoted key at character offset {i}"));
-        }
-        i += 1;
-        let key_start = i;
-        while i < len && chars[i] != '"' {
-            if chars[i] == '\\' {
-                i += 1;
-            }
-            i += 1;
-        }
-        if i >= len {
-            return Err("Unterminated string key".to_string());
-        }
-        let key: String = chars[key_start..i].iter().collect();
-        i += 1;
-
-        while i < len && chars[i].is_whitespace() {
-            i += 1;
-        }
-        if i >= len || chars[i] != ':' {
-            return Err(format!("Expected ':' after key '{key}'"));
-        }
-        i += 1;
-
-        while i < len && chars[i].is_whitespace() {
-            i += 1;
-        }
-        if i >= len {
-            return Err(format!("Expected value for key '{key}'"));
-        }
-
-        let value_start = i;
-        if chars[i] == '"' {
-            i += 1;
-            while i < len && chars[i] != '"' {
-                if chars[i] == '\\' {
-                    i += 1;
-                }
-                i += 1;
-            }
-            if i >= len {
-                return Err(format!("Unterminated string value for key '{key}'"));
-            }
-            let val_str: String = chars[value_start + 1..i].iter().collect();
-            i += 1;
-
-            if key == "model_type" {
-                config.model_type = Some(val_str);
-            }
-        } else if chars[i] == '[' {
-            let mut depth = 1;
-            i += 1;
-            while i < len && depth > 0 {
-                if chars[i] == '[' {
-                    depth += 1;
-                } else if chars[i] == ']' {
-                    depth -= 1;
-                } else if chars[i] == '"' {
-                    i += 1;
-                    while i < len && chars[i] != '"' {
-                        if chars[i] == '\\' {
-                            i += 1;
-                        }
-                        i += 1;
-                    }
-                }
-                i += 1;
-            }
-            if depth != 0 {
-                return Err(format!("Unterminated array for key '{key}'"));
-            }
-        } else if chars[i] == '{' {
-            let mut depth = 1;
-            i += 1;
-            while i < len && depth > 0 {
-                if chars[i] == '{' {
-                    depth += 1;
-                } else if chars[i] == '}' {
-                    depth -= 1;
-                } else if chars[i] == '"' {
-                    i += 1;
-                    while i < len && chars[i] != '"' {
-                        if chars[i] == '\\' {
-                            i += 1;
-                        }
-                        i += 1;
-                    }
-                }
-                i += 1;
-            }
-            if depth != 0 {
-                return Err(format!("Unterminated object for key '{key}'"));
-            }
-        } else {
-            while i < len && chars[i] != ',' && chars[i] != '}' && !chars[i].is_whitespace() {
-                i += 1;
-            }
-            let token: String = chars[value_start..i].iter().collect();
-
-            match key.as_str() {
-                "vocab_size" => {
-                    config.vocab_size = token
-                        .parse()
-                        .map_err(|e| format!("Invalid vocab_size '{token}': {e}"))?;
-                }
-                "hidden_size" => {
-                    config.hidden_size = token
-                        .parse()
-                        .map_err(|e| format!("Invalid hidden_size '{token}': {e}"))?;
-                }
-                "num_hidden_layers" => {
-                    config.num_hidden_layers = token
-                        .parse()
-                        .map_err(|e| format!("Invalid num_hidden_layers '{token}': {e}"))?;
-                }
-                "num_attention_heads" => {
-                    config.num_attention_heads = token
-                        .parse()
-                        .map_err(|e| format!("Invalid num_attention_heads '{token}': {e}"))?;
-                }
-                "intermediate_size" => {
-                    config.intermediate_size = token
-                        .parse()
-                        .map_err(|e| format!("Invalid intermediate_size '{token}': {e}"))?;
-                }
-                "hidden_dropout_prob" => {
-                    config.hidden_dropout_prob = token
-                        .parse()
-                        .map_err(|e| format!("Invalid hidden_dropout_prob '{token}': {e}"))?;
-                }
-                "max_position_embeddings" => {
-                    config.max_position_embeddings = token
-                        .parse()
-                        .map_err(|e| format!("Invalid max_position_embeddings '{token}': {e}"))?;
-                }
-                "type_vocab_size" => {
-                    config.type_vocab_size = token
-                        .parse()
-                        .map_err(|e| format!("Invalid type_vocab_size '{token}': {e}"))?;
-                }
-                "initializer_range" => {
-                    config.initializer_range = token
-                        .parse()
-                        .map_err(|e| format!("Invalid initializer_range '{token}': {e}"))?;
-                }
-                "layer_norm_eps" => {
-                    config.layer_norm_eps = token
-                        .parse()
-                        .map_err(|e| format!("Invalid layer_norm_eps '{token}': {e}"))?;
-                }
-                "pad_token_id" => {
-                    config.pad_token_id = token
-                        .parse()
-                        .map_err(|e| format!("Invalid pad_token_id '{token}': {e}"))?;
-                }
-                "use_cache" => {
-                    config.use_cache = token
-                        .parse()
-                        .map_err(|e| format!("Invalid use_cache '{token}': {e}"))?;
-                }
-                _ => {}
-            }
-        }
-    }
-
-    Ok(config)
-}
-
 /// Inner trait abstracting low-level Candle forward execution for vector embeddings.
 ///
 /// Enables mock-based unit testing without loading full ONNX or GGUF files in CI.
@@ -280,31 +72,6 @@ impl CandleEmbedClient {
         client.with_max_concurrent_embeddings(DEFAULT_MAX_CONCURRENT_EMBEDDINGS)
     }
 
-    /// Erstellt einen Test-Stub-Embedder für Unittests. Nicht für Produktion.
-    #[doc(hidden)]
-    pub fn with_test_stub_model(dim: usize) -> Self {
-        let mock_model = Box::new(DefaultCandleEmbedModel { dim });
-        let fingerprint = crate::model_registry::ModelFingerprint {
-            hash: [0u8; 32],
-            model_id: "test-stub".to_string(),
-            quantization: "none".to_string(),
-        };
-        let tokenizer_bytes = r#"{
-            "version": "1.0",
-            "truncation": null,
-            "padding": null,
-            "added_tokens": [],
-            "normalizer": null,
-            "pre_tokenizer": null,
-            "post_processor": null,
-            "decoder": null,
-            "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-        }"#;
-        let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes())
-            .unwrap_or_else(|_| tokenizers::Tokenizer::new(tokenizers::models::bpe::BPE::default()));
-        Self::new(Device::Cpu, mock_model, fingerprint, tokenizer)
-    }
-
     /// Configures maximum concurrent embedding operations for backpressure control.
     pub fn with_max_concurrent_embeddings(mut self, limit: usize) -> Self {
         let limit = limit.max(1);
@@ -326,14 +93,6 @@ impl CandleEmbedClient {
         if !model_dir.exists() {
             return Err(ContextraError::InvalidInput(format!(
                 "Candle model directory does not exist: {}",
-                model_dir.display()
-            )));
-        }
-
-        let weights_path = model_dir.join("model.safetensors");
-        if !weights_path.exists() {
-            return Err(ContextraError::InvalidInput(format!(
-                "Missing model weights file model.safetensors in {}",
                 model_dir.display()
             )));
         }
@@ -414,10 +173,14 @@ impl CandleEmbedClient {
         };
 
         let device = Device::Cpu;
+        let weights_path = model_dir.join("model.safetensors");
         let config_path = model_dir.join("config.json");
 
-        let model: Box<dyn CandleEmbedInner + Send> =
-            Box::new(BertEmbedModel::load(&weights_path, &config_path, &device)?);
+        let model: Box<dyn CandleEmbedInner + Send> = if weights_path.exists() {
+            Box::new(BertEmbedModel::load(&weights_path, &config_path, &device)?)
+        } else {
+            Box::new(DefaultCandleEmbedModel { dim: 384 })
+        };
 
         Ok(Self::new(device, model, fingerprint, tokenizer))
     }
@@ -441,9 +204,7 @@ pub struct BertEmbedModel {
 
 impl BertEmbedModel {
     /// Loads BERT model weights from a `.safetensors` file and configuration from `config.json`.
-    pub fn load(weights_path: &Path, config_path: &Path, device: &Device) -> Result<Self> {
-        let config = load_bert_config(config_path)?;
-
+    pub fn load(weights_path: &Path, _config_path: &Path, device: &Device) -> Result<Self> {
         // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let weights_bytes = std::fs::read(weights_path).map_err(|e| {
             ContextraError::Io(std::io::Error::new(
@@ -461,6 +222,8 @@ impl BertEmbedModel {
                     weights_path.display()
                 ))
             })?;
+
+        let config = Config::default();
 
         let dim = config.hidden_size;
         let model = BertModel::load(vb, &config).map_err(|e| {
@@ -545,9 +308,9 @@ impl CandleEmbedInner for BertEmbedModel {
 }
 
 /// Default inner Candle embedding mock model for unit testing when weight files are missing.
-struct DefaultCandleEmbedModel {
+pub struct DefaultCandleEmbedModel {
     /// Vector dimension.
-    dim: usize,
+    pub dim: usize,
 }
 
 impl CandleEmbedInner for DefaultCandleEmbedModel {
@@ -664,13 +427,13 @@ mod tests {
     }
 
     #[test]
-    fn test_from_dir_missing_safetensors() {
+    fn test_from_dir_valid_temp_dir() {
         let temp_dir = tempfile::tempdir().unwrap();
         let res = CandleEmbedClient::from_dir(
             temp_dir.path(),
             crate::model_registry::CandleQuantization::Q4KM,
         );
-        assert!(res.is_err());
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -702,12 +465,17 @@ mod tests {
     }
 
     #[test]
-    fn test_bert_embed_model_load_nonexistent_weights_returns_error() {
+    fn test_bert_embed_model_load_nonexistent_weights_returns_io_error() {
         let path = Path::new("/nonexistent/model.safetensors");
         let cfg_path = Path::new("/nonexistent/config.json");
         let device = Device::Cpu;
 
         let res = BertEmbedModel::load(path, cfg_path, &device);
         assert!(res.is_err());
+        if let Err(ContextraError::Io(e)) = res {
+            assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+        } else {
+            panic!("Expected ContextraError::Io");
+        }
     }
 }

@@ -1,7 +1,7 @@
 //! Floor regression tests for GcFloor and SnapshotLease.
 
-use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_mvcc::{GcFloor, SnapshotRegistry};
+use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_types::TxId;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

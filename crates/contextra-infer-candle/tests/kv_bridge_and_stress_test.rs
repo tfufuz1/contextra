@@ -55,7 +55,7 @@ mod tests {
     fn create_test_kv_bridge() -> KvBridgeAdapter {
         let master_km =
             CryptoKey::try_new("test-passphrase-kv-stress", b"test-salt-99999").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         KvBridgeAdapter::new(store, cipher)
     }
@@ -80,7 +80,7 @@ mod tests {
 
         // Store invalid/corrupt bytes under key using another cipher (simulating decryption key mismatch)
         let wrong_km = CryptoKey::try_new("wrong-passphrase-kv", b"test-salt-99999").unwrap();
-        let wrong_cipher = Arc::new(KvSegmentCipher::ephemeral(wrong_km));
+        let wrong_cipher = Arc::new(KvSegmentCipher::new(wrong_km));
         let wrong_adapter = KvBridgeAdapter::new(Arc::clone(&adapter.store), wrong_cipher);
 
         let corrupt_key = KvCacheKey::new(8888, fp.clone(), None);

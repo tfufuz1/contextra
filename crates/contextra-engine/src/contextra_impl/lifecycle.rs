@@ -216,14 +216,6 @@ impl Contextra {
                     );
                 }
             }
-            EmbeddingBackend::Candle { model_dir } => {
-                let client = contextra_infer_candle::CandleEmbedClient::from_dir(
-                    model_dir,
-                    contextra_infer_candle::CandleQuantization::Q4KM,
-                )?;
-                let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(client);
-                self.set_embedder(embedder_arc).await?;
-            }
             EmbeddingBackend::None => {}
         }
         Ok(())

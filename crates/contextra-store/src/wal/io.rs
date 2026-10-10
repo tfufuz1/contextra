@@ -30,7 +30,6 @@ pub(crate) async fn do_scan_entries_with_callback<F>(
     _key_manager: Option<&super::KeyManager>,
     fallback_integrity_key: Option<[u8; 32]>,
     allow_legacy_integrity_key_fallback: bool,
-    min_wal_version: WalVersion,
     legacy_key_used: &std::sync::atomic::AtomicBool,
     mut callback: F,
 ) -> Result<WalVersion>
@@ -70,7 +69,6 @@ where
         path,
         fallback_integrity_key,
         allow_legacy_integrity_key_fallback,
-        legacy_key_used,
         &mut using_legacy_key,
     );
 
@@ -95,15 +93,6 @@ where
                 pos = 0;
             }
         }
-    }
-
-    if version < min_wal_version
-        || (version != WalVersion::V3 && !allow_legacy_integrity_key_fallback)
-    {
-        return Err(ContextraError::invalid_input(format!(
-            "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
-            version, min_wal_version, allow_legacy_integrity_key_fallback
-        )));
     }
 
     'scan_loop: while pos < file_size {
@@ -735,10 +724,7 @@ impl Wal {
         let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;
 
         let flusher_tx = {
-            let guard = match self.flusher_tx.read() {
-                Ok(g) => g,
-                Err(e) => e.into_inner(),
-            };
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
 
@@ -796,10 +782,7 @@ impl Wal {
         let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;
 
         let flusher_tx = {
-            let guard = match self.flusher_tx.read() {
-                Ok(g) => g,
-                Err(e) => e.into_inner(),
-            };
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
 
@@ -849,66 +832,36 @@ impl Wal {
         F: FnMut(u64, WalEntry, u64) -> bool,
     {
         let flusher_tx = {
-            let guard = match self.flusher_tx.read() {
-                Ok(g) => g,
-                Err(e) => e.into_inner(),
-            };
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
 
-        if let Some(tx) = flusher_tx {
-            let (item_tx, mut item_rx) = tokio::sync::mpsc::unbounded_channel();
-            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        let tx = flusher_tx
+            .ok_or_else(|| ContextraError::Storage("WAL flusher actor is not enabled".into()))?;
 
-            tx.send(WalCommand::Scan {
-                file_size,
-                item_tx,
-                ack: ack_tx,
-            })
-            .await
-            .map_err(|_| ContextraError::Storage("WAL flusher channel closed".into()))?;
+        let (item_tx, mut item_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
 
-            let mut stopped = false;
-            while let Some((seq, entry, pos)) = item_rx.recv().await {
-                if !stopped && !callback(seq, entry, pos) {
-                    stopped = true;
-                }
+        tx.send(WalCommand::Scan {
+            file_size,
+            item_tx,
+            ack: ack_tx,
+        })
+        .await
+        .map_err(|_| ContextraError::Storage("WAL flusher channel closed".into()))?;
+
+        let mut stopped = false;
+        while let Some((seq, entry, pos)) = item_rx.recv().await {
+            if !stopped && !callback(seq, entry, pos) {
+                stopped = true;
             }
-
-            let version = ack_rx
-                .await
-                .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
-
-            Ok(version)
-        } else {
-            let mut file = super::fs::OpenOptions::new()
-                .read(true)
-                .open(&self.path)
-                .await
-                .map_err(|e| {
-                    ContextraError::Storage(format!("Failed to open WAL for read_only scan: {e}"))
-                })?;
-
-            let key_manager = self.key_manager.as_deref();
-            let fallback_integrity_key = self.fallback_integrity_key;
-            let allow_legacy_fallback = self
-                .allow_legacy_integrity_key_fallback
-                .load(std::sync::atomic::Ordering::SeqCst);
-            let min_wal_version = self.min_wal_version;
-
-            do_scan_entries_with_callback(
-                &mut file,
-                file_size,
-                &self.path,
-                key_manager,
-                fallback_integrity_key,
-                allow_legacy_fallback,
-                min_wal_version,
-                &self.legacy_key_used,
-                callback,
-            )
-            .await
         }
+
+        let version = ack_rx
+            .await
+            .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
+
+        Ok(version)
     }
 
     /// Rewrites legacy V1 or V2 WAL files as V3.
@@ -919,17 +872,21 @@ impl Wal {
         let integrity_key = self.get_integrity_key()?;
 
         let flusher_tx = {
-            let guard = match self.flusher_tx.read() {
-                Ok(g) => g,
-                Err(e) => e.into_inner(),
-            };
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
 
-        // FIX(2026-10-07): Skip rewrite_as_v3 when flusher_tx is None (read-only Wal handle)
         let tx = match flusher_tx {
             Some(tx) => tx,
             None => {
+                if !replayed_entries.is_empty() {
+                    let ops: Vec<(WalOp, u64)> = replayed_entries
+                        .iter()
+                        .map(|(seq, entry, _)| (entry.op.clone(), *seq))
+                        .collect();
+                    let (batch, _) = self.prepare_batch(ops).await?;
+                    self.try_append_batch(batch).await?;
+                }
                 return Ok(());
             }
         };
@@ -961,10 +918,7 @@ impl Wal {
         }
 
         let flusher_tx = {
-            let guard = match self.flusher_tx.read() {
-                Ok(g) => g,
-                Err(e) => e.into_inner(),
-            };
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
         let tx = flusher_tx
@@ -1104,7 +1058,6 @@ mod tests {
             None,
             Some(fallback_key),
             false,
-            WalVersion::V3,
             &dummy_legacy_flag,
             |_seq, entry, _pos| {
                 scanned_entries.push(entry);

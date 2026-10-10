@@ -43,10 +43,10 @@ mod no_crypto_stubs {
         },
     }
 
-    #[derive(Debug, Clone, Serialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct LayerCleanupProof {
-        layer: DeletionLayer,
-        remaining_count: usize,
+        pub layer: DeletionLayer,
+        pub remaining_count: usize,
     }
 
     impl LayerCleanupProof {
@@ -81,10 +81,6 @@ mod no_crypto_stubs {
                 ))),
                 Err(e) => Err(e),
             }
-        }
-
-        pub fn layer(&self) -> DeletionLayer {
-            self.layer
         }
     }
 
@@ -211,7 +207,7 @@ mod no_crypto_stubs {
             let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
 
             let covered_layers: Vec<DeletionLayer> =
-                layer_proofs.into_iter().map(|p| p.layer()).collect();
+                layer_proofs.into_iter().map(|p| p.layer).collect();
             let excluded_scopes: Vec<ExcludedScope> = vec![];
 
             let payload = construct_hmac_payload(
@@ -489,9 +485,6 @@ pub enum EmbeddingBackend {
     Onnx {
         model_name: String,
         cache_dir: Option<std::path::PathBuf>,
-    },
-    Candle {
-        model_dir: std::path::PathBuf,
     },
     None,
 }

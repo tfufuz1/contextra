@@ -48,7 +48,7 @@ pub(crate) fn resolve_provider_setting(
 /// Embedding provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmbeddingConfig {
-    /// Provider type ("ollama", "onnx", "candle", or "mock").
+    /// Provider type ("ollama", "onnx", or "candle").
     pub provider: String,
     /// Base URL for Ollama HTTP API.
     pub ollama_url: String,
@@ -63,7 +63,7 @@ pub struct EmbeddingConfig {
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
-            provider: String::new(),
+            provider: "mock".to_string(),
             ollama_url: "http://localhost:11434".to_string(),
             embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
@@ -77,7 +77,7 @@ impl EmbeddingConfig {
     pub fn from_env() -> Self {
         let prefixed = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER").ok();
         let unprefixed = std::env::var("EMBEDDING_PROVIDER").ok();
-        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "");
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
 
         if resolved.used_unprefixed_fallback {
             EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
@@ -133,9 +133,6 @@ pub fn create_embedding_provider(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match provider_type.to_lowercase().trim() {
-        "" => Err(ContextraError::InvalidInput(
-            "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string(),
-        )),
         #[cfg(feature = "ollama")]
         "ollama" => {
             let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
@@ -193,13 +190,13 @@ pub fn create_embedding_provider(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(feature = "test-utils")]
         "mock" => {
-            tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', 'candle', or 'mock'."
+            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', or 'candle'."
         ))),
     }
 }
@@ -207,7 +204,7 @@ pub fn create_embedding_provider(
 /// LLM provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LlmConfig {
-    /// Provider type ("ollama", "candle", or "mock").
+    /// Provider type ("ollama", or "candle").
     pub provider: String,
     /// Base URL for Ollama HTTP API.
     pub ollama_url: String,
@@ -325,12 +322,13 @@ pub fn create_llm_text_generator(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(feature = "test-utils")]
         "mock" => {
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown LLM provider '{other}'. Expected 'ollama', 'candle', or 'mock'."
+            "Unknown LLM provider '{other}'. Expected 'ollama' or 'candle'."
         ))),
     }
 }
@@ -417,42 +415,19 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_setting_default() {
-        let res = resolve_provider_setting(None, None, "");
-        assert_eq!(res.value, "");
+        let res = resolve_provider_setting(None, None, "mock");
+        assert_eq!(res.value, "mock");
         assert!(!res.used_unprefixed_fallback);
     }
 
     #[test]
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
-        assert_eq!(config.provider, "");
+        assert_eq!(config.provider, "mock");
         assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.embed_model, "nomic-embed-text");
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
-    }
-
-    #[test]
-    fn test_create_embedding_provider_unconfigured_error() {
-        let res = create_embedding_provider(
-            "",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
-        match res {
-            Err(ContextraError::InvalidInput(msg)) => {
-                assert!(msg.contains("CONTEXTRA_EMBEDDING_PROVIDER"));
-                assert!(msg.contains("EMBEDDING_PROVIDER"));
-                assert!(msg.contains("ollama"));
-                assert!(msg.contains("onnx"));
-                assert!(msg.contains("candle"));
-                assert!(msg.contains("mock"));
-            }
-            Err(other) => panic!("Expected ContextraError::InvalidInput, got: {other}"),
-            Ok(_) => panic!("Expected create_embedding_provider to fail when unconfigured"),
-        }
     }
 
     #[test]
@@ -467,24 +442,39 @@ mod tests {
     #[test]
     fn test_llm_config_build_generator() {
         let config = LlmConfig::default();
-        let generator = config.build_generator().unwrap();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let response = rt.block_on(generator.generate("test prompt")).unwrap();
-        assert!(response.contains("[Mock LLM response for: test prompt]"));
+        let generator = config.build_generator();
+        #[cfg(feature = "test-utils")]
+        {
+            let generator = generator.unwrap();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let response = rt.block_on(generator.generate("test prompt")).unwrap();
+            assert!(response.contains("[Mock LLM response for: test prompt]"));
+        }
+        #[cfg(not(feature = "test-utils"))]
+        {
+            assert!(generator.is_err());
+        }
     }
 
     #[test]
     fn test_create_embedding_provider_mock() {
-        let provider = create_embedding_provider(
+        let res = create_embedding_provider(
             "mock",
             "http://localhost:11434",
             "nomic-embed-text",
             None,
             None,
-        )
-        .unwrap();
-        assert_eq!(provider.provider_name(), "mock");
-        assert_eq!(provider.embedding_dim(), 768);
+        );
+        #[cfg(feature = "test-utils")]
+        {
+            let provider = res.unwrap();
+            assert_eq!(provider.provider_name(), "mock");
+            assert_eq!(provider.embedding_dim(), 768);
+        }
+        #[cfg(not(feature = "test-utils"))]
+        {
+            assert!(res.is_err());
+        }
     }
 
     #[cfg(feature = "ollama")]
@@ -515,12 +505,19 @@ mod tests {
 
     #[test]
     fn test_create_llm_generator_mock() {
-        let generator =
-            create_llm_text_generator("mock", "http://localhost:11434", "llama3.2:3b", None)
-                .unwrap();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let response = rt.block_on(generator.generate("hello")).unwrap();
-        assert!(response.contains("[Mock LLM response for: hello]"));
+        let res =
+            create_llm_text_generator("mock", "http://localhost:11434", "llama3.2:3b", None);
+        #[cfg(feature = "test-utils")]
+        {
+            let generator = res.unwrap();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let response = rt.block_on(generator.generate("hello")).unwrap();
+            assert!(response.contains("[Mock LLM response for: hello]"));
+        }
+        #[cfg(not(feature = "test-utils"))]
+        {
+            assert!(res.is_err());
+        }
     }
 
     #[cfg(feature = "ollama")]

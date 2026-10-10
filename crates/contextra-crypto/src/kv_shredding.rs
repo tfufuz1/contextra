@@ -122,7 +122,6 @@ pub struct KeyRegistry {
     ever_registered_groups: RwLock<HashSet<u64>>,
     pub revocation_log: Option<Arc<RevocationLog>>,
     listeners: Vec<Arc<dyn GroupRevocationListener>>,
-    durable: bool,
 }
 
 impl std::fmt::Debug for KeyRegistry {
@@ -133,13 +132,12 @@ impl std::fmt::Debug for KeyRegistry {
             .field("ever_registered_groups", &self.ever_registered_groups)
             .field("revocation_log", &self.revocation_log)
             .field("listeners_count", &self.listeners.len())
-            .field("durable", &self.durable)
             .finish()
     }
 }
 
 impl KeyRegistry {
-    /// Creates a new empty `KeyRegistry` (in-memory, non-durable; intended primarily for tests or transient use).
+    /// Creates a new empty `KeyRegistry`.
     pub fn new() -> Self {
         Self {
             groups: RwLock::new(HashMap::new()),
@@ -147,51 +145,7 @@ impl KeyRegistry {
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
             listeners: Vec::new(),
-            durable: false,
         }
-    }
-
-    /// Opens or creates a durable `KeyRegistry` backed by a file-based `RevocationLog` at `path`.
-    pub fn open_durable(
-        path: impl AsRef<std::path::Path>,
-        clock: Arc<dyn contextra_ports::Clock>,
-        signing_key: Option<ed25519_dalek::SigningKey>,
-        verifying_key: ed25519_dalek::VerifyingKey,
-        has_existing_keys: bool,
-    ) -> Result<Self> {
-        let log = RevocationLog::open_or_create_if_fresh(
-            path,
-            clock,
-            signing_key,
-            verifying_key,
-            has_existing_keys,
-        )?;
-        Ok(Self {
-            groups: RwLock::new(HashMap::new()),
-            revoked_groups: RwLock::new(HashSet::new()),
-            ever_registered_groups: RwLock::new(HashSet::new()),
-            revocation_log: Some(Arc::new(log)),
-            listeners: Vec::new(),
-            durable: true,
-        })
-    }
-
-    /// Returns `true` if this `KeyRegistry` is backed by a durable, file-based `RevocationLog`.
-    pub fn is_durable(&self) -> bool {
-        self.durable
-    }
-
-    /// Helper for testing poisoned locks behavior.
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn poison_groups_lock_for_test(self: &Arc<Self>) {
-        let registry = Arc::clone(self);
-        let _ = std::thread::spawn(move || {
-            if let Ok(_guard) = registry.groups.write() {
-                let slice: &[u8] = &[0];
-                let _ = slice[1];
-            }
-        })
-        .join();
     }
 
     /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog`.
@@ -331,16 +285,16 @@ impl KeyRegistry {
 
     /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
     /// Returns `true` if the group was active and is now revoked.
-    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
     pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
         if let Some(ref log) = self.revocation_log {
             log.append(RevocationTarget::Group(group_id))
                 .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         }
 
-        let mut revoked_guard = self.revoked_groups.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry revoked_groups write lock poisoned".to_string())
-        })?;
+        let mut revoked_guard = match self.revoked_groups.write() {
+            Ok(g) => g,
+            Err(_) => return Ok(false),
+        };
 
         if revoked_guard.contains(&group_id) {
             return Ok(false);
@@ -348,25 +302,16 @@ impl KeyRegistry {
 
         revoked_guard.insert(group_id);
 
-        let mut groups_guard = match self.groups.write() {
-            Ok(g) => g,
-            Err(_) => {
-                // Group was inserted into revoked_groups above, so is_group_revoked remains true (fail-closed)
-                return Err(CryptoError::Crypto(
-                    "KeyRegistry groups write lock poisoned".to_string(),
-                ));
-            }
-        };
-
-        if let Some(mut entry) = groups_guard.remove(&group_id) {
-            entry.kek.0.zeroize();
-            entry.wrapped_kek.zeroize();
-            for (_, mut rec) in entry.record_deks.drain() {
-                rec.wrapped_dek.zeroize();
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(mut entry) = groups_guard.remove(&group_id) {
+                entry.kek.0.zeroize();
+                entry.wrapped_kek.zeroize();
+                for (_, mut rec) in entry.record_deks.drain() {
+                    rec.wrapped_dek.zeroize();
+                }
             }
         }
 
-        drop(groups_guard);
         drop(revoked_guard);
 
         for listener in &self.listeners {
@@ -383,42 +328,28 @@ impl KeyRegistry {
 
     /// Revokes (destroys) the DEK wrap for a single record within `group_id` (Single Record Deletion).
     /// Leaves neighbor records in the same group intact and decryptable.
-    /// Only logs to `RevocationLog` if the record exists and is active.
-    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
     pub fn revoke_record(&self, group_id: u64, record_id: u64) -> Result<bool> {
         if self.is_group_revoked(group_id) {
             return Ok(false);
         }
-
-        let mut groups_guard = self.groups.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry groups write lock poisoned".to_string())
-        })?;
-
-        let entry = match groups_guard.get_mut(&group_id) {
-            Some(e) => e,
-            None => return Ok(false),
-        };
-
-        let rec = match entry.record_deks.get_mut(&record_id) {
-            Some(r) => r,
-            None => return Ok(false),
-        };
-
-        if rec.revoked {
-            return Ok(false);
-        }
-
-        rec.revoked = true;
-        rec.wrapped_dek.zeroize();
-
-        drop(groups_guard);
 
         if let Some(ref log) = self.revocation_log {
             log.append(RevocationTarget::Record(format!("{group_id}:{record_id}")))
                 .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         }
 
-        Ok(true)
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(entry) = groups_guard.get_mut(&group_id) {
+                if let Some(rec) = entry.record_deks.get_mut(&record_id) {
+                    if !rec.revoked {
+                        rec.revoked = true;
+                        rec.wrapped_dek.zeroize();
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Returns `true` if `group_id` has an active KEK and is not revoked.

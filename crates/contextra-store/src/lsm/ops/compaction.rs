@@ -190,40 +190,25 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         }
                     }
 
-                    let p = wal_path.clone();
-                    let remove_res =
-                        tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                            .await;
-                    match remove_res {
-                        Ok(Err(e)) if e.kind() != std::io::ErrorKind::NotFound => {
-                            tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
-                        }
-                        Ok(Ok(())) => {
-                            let uuid_sidecar =
-                                std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
-                            let sidecar = uuid_sidecar.clone();
-                            let sidecar_res = tokio::task::spawn_blocking(move || {
-                                contextra_durable_fs::durable_remove(&sidecar)
-                            })
-                            .await;
-                            if let Ok(Err(e)) = sidecar_res {
-                                if e.kind() != std::io::ErrorKind::NotFound {
-                                    tracing::debug!(
-                                        "Could not delete sidecar {:?}: {}",
-                                        uuid_sidecar,
-                                        e
-                                    );
-                                }
+                    if let Err(e) = tokio::fs::remove_file(&wal_path).await {
+                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
+                    } else {
+                        let uuid_sidecar =
+                            std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
+                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+                            if e.kind() != std::io::ErrorKind::NotFound {
+                                tracing::debug!(
+                                    "Could not delete sidecar {:?}: {}",
+                                    uuid_sidecar,
+                                    e
+                                );
                             }
                         }
-                        _ => {}
                     }
                     drop(trunc_guard_opt);
                 }
             }
-            if let Err(e) = crate::util::fsync_parent_dir(&storage.config.path).await {
-                tracing::debug!("Parent directory fsync after WAL cleanup failed: {e}");
-            }
+            let _ = crate::util::fsync_parent_dir(&storage.config.path).await;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
@@ -248,17 +233,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     if let Err(ref e) = phase3_res {
         if sst_path.exists() {
-            let p = sst_path.clone();
-            let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
-            if let Ok(Err(rm_err)) = res {
-                if rm_err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
-                        path = ?sst_path,
-                        "Failed to remove partial SSTable after flush failure: {rm_err}"
-                    );
-                }
+            if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
+                tracing::warn!(
+                    path = ?sst_path,
+                    "Failed to remove partial SSTable after flush failure: {rm_err}"
+                );
             }
         }
 

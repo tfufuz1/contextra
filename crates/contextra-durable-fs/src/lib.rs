@@ -8,7 +8,6 @@
 //! - [`sync_dir`]: Synchronizes directory metadata entries to stable storage.
 //! - [`atomic_replace`]: Atomically replaces a target file with data and directory sync.
 //! - [`durable_remove`]: Removes a target file and synchronizes the parent directory.
-//! - [`scrub_and_remove`]: Overwrites file contents with zeros before durable removal.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -123,83 +122,4 @@ pub fn durable_remove(path: &Path) -> std::io::Result<()> {
     std::fs::remove_file(path)?;
     sync_dir(parent)?;
     Ok(())
-}
-
-/// Receipt returned upon successfully scrubbing and durably removing a file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScrubReceipt {
-    /// Total number of bytes overwritten with zeros prior to removal.
-    pub bytes_scrubbed: u64,
-}
-
-/// Overwrites file contents with zeros and durably removes the file.
-///
-/// Overwrites the file at `path` completely with zero bytes in 64-KiB chunks,
-/// flushes data to disk via `sync_all()`, and removes the file via [`durable_remove`].
-///
-/// # Security & Physical Storage Limitations (Non-Guarantees)
-///
-/// **Important Notice:** This function reduces residual risk by overwriting visible disk blocks,
-/// but **does NOT guarantee** complete physical data destruction or unrecoverability on modern hardware and storage systems.
-/// Specifically, physical media remnants may persist due to:
-/// - **SSD / Flash Wear-Leveling and Garbage Collection:** Flash controllers rewrite blocks to new physical locations.
-/// - **Copy-on-Write (CoW) Filesystems:** (e.g., ZFS, Btrfs, APFS) Overwrites allocate new blocks rather than in-place mutation.
-/// - **Journaling Filesystems & Metadata Logs:** Temporary or journaled copies may exist elsewhere on disk.
-/// - **Storage Snapshots & Backups:** Historical block snapshots or volume mirrors remain unaffected.
-///
-/// Do not rely on this function as an absolute physical data destruction mechanism.
-///
-/// # Behavior & Symlinks
-///
-/// - Symlinks are **never** followed. If `path` is a symlink or is not a regular file,
-///   an error of kind [`std::io::ErrorKind::InvalidInput`] is returned and no files are modified.
-/// - If `path` does not exist, [`std::io::ErrorKind::NotFound`] is returned directly.
-/// - Exact original byte length is determined prior to overwriting. Exactly `len` bytes are written
-///   with no pre-truncation or file extension.
-/// - An empty file (0 bytes) results in 0 bytes scrubbed and is durably removed.
-///
-/// # Concurrency & Async Callers
-///
-/// This operation is fully synchronous and performs blocking I/O (file overwriting, `sync_all`,
-/// and parent directory fsync). Async callers (such as `tokio` runtimes) must wrap calls to
-/// this function in blocking execution contexts (e.g., `spawn_blocking`).
-///
-/// # Errors
-///
-/// Returns an [`std::io::Error`] if metadata inspection, file opening, writing, flushing,
-/// or directory synchronization fails.
-pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
-    let metadata = path.symlink_metadata()?;
-    let file_type = metadata.file_type();
-
-    if file_type.is_symlink() || !file_type.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is a symlink or not a regular file",
-        ));
-    }
-
-    let len = metadata.len();
-    if len > 0 {
-        let mut file = OpenOptions::new().write(true).open(path)?;
-
-        let zeros = [0u8; 64 * 1024];
-        let mut remaining = len;
-
-        while remaining > 0 {
-            let chunk_size = usize::try_from(remaining)
-                .unwrap_or(zeros.len())
-                .min(zeros.len());
-            file.write_all(&zeros[..chunk_size])?;
-            remaining -= chunk_size as u64;
-        }
-
-        file.sync_all()?;
-    }
-
-    durable_remove(path)?;
-
-    Ok(ScrubReceipt {
-        bytes_scrubbed: len,
-    })
 }

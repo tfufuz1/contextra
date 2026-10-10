@@ -81,7 +81,6 @@ pub struct DeletionProofBuilder<
     deleted_after_tx: TxId,
     excluded_scopes: Vec<ExcludedScope>,
     wal_chain_receipt: Option<[u8; 32]>,
-    graph_repair: Vec<crate::deletion_proof::GraphRepairAttestation>,
     proof_key: Vec<u8>,
     covered_layers: Vec<LayerCleanupProof>,
     _marker: PhantomData<(Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb)>,
@@ -102,7 +101,6 @@ impl DeletionProofBuilder<Missing, Missing, Missing, Missing, Missing, Missing, 
             deleted_after_tx,
             excluded_scopes,
             wal_chain_receipt: None,
-            graph_repair: Vec::new(),
             proof_key,
             covered_layers: Vec::new(),
             _marker: PhantomData,
@@ -114,15 +112,6 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal
     /// Sets an optional WAL HMAC chain receipt.
     pub fn with_wal_chain_receipt(mut self, receipt: Option<[u8; 32]>) -> Self {
         self.wal_chain_receipt = receipt;
-        self
-    }
-
-    /// Sets graph repair attestations required for HNSW layer cleanup.
-    pub fn with_graph_repair(
-        mut self,
-        graph_repair: Vec<crate::deletion_proof::GraphRepairAttestation>,
-    ) -> Self {
-        self.graph_repair = graph_repair;
         self
     }
 }
@@ -145,7 +134,6 @@ impl<Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Missing, Sst, Hnsw, Wal,
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -171,7 +159,6 @@ impl<Lsm, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Missing, Hnsw, Wal,
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -197,7 +184,6 @@ impl<Lsm, Sst, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Missing, Wal, C
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -223,7 +209,6 @@ impl<Lsm, Sst, Hnsw, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Missing,
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -249,7 +234,6 @@ impl<Lsm, Sst, Hnsw, Wal, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Mis
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -275,7 +259,6 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Cs
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -301,7 +284,6 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr
             deleted_after_tx: self.deleted_after_tx,
             excluded_scopes: self.excluded_scopes,
             wal_chain_receipt: self.wal_chain_receipt,
-            graph_repair: self.graph_repair,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
@@ -314,29 +296,14 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
     ///
     /// This method is only available when all 7 storage layers have been marked as [`Cleaned`].
     pub fn finish(self) -> Result<DeletionProof> {
-        let durability = crate::deletion_proof::DurabilityProof::new(self.deleted_after_tx.0);
-        let signing_key = if self.proof_key.len() >= 32 {
-            let mut key_bytes = [0u8; 32];
-            key_bytes.copy_from_slice(&self.proof_key[..32]);
-            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
-        } else {
-            return Err(contextra_types::ContextraError::Internal(
-                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
-            ));
-        };
-
-        DeletionProof::create_full_v3(
+        DeletionProof::create_with_wal_receipt(
             self.scope,
             self.deleted_keys,
             self.deleted_after_tx,
             self.covered_layers,
             self.excluded_scopes,
             self.wal_chain_receipt,
-            None,
-            0,
-            &self.graph_repair,
-            Some(&durability),
-            &signing_key,
+            &self.proof_key,
         )
     }
 }
@@ -381,14 +348,8 @@ mod tests {
         let emb_proof =
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0).unwrap();
 
-        let graph_repair = vec![crate::deletion_proof::GraphRepairAttestation {
-            doc_id: DocId(42),
-            verified_no_ghost_pointers: true,
-            attested_at: 0,
-        }];
-
         // Direct creation reference
-        let expected_proof = DeletionProof::create_full_v3(
+        let expected_proof = DeletionProof::create_with_wal_receipt(
             scope.clone(),
             deleted_keys.clone(),
             tx_id,
@@ -403,11 +364,7 @@ mod tests {
             ],
             excluded.clone(),
             receipt,
-            None,
-            0,
-            &graph_repair,
-            Some(&crate::deletion_proof::DurabilityProof::new(100)),
-            &ed25519_dalek::SigningKey::from_bytes(key[..32].try_into().unwrap()),
+            &key,
         )
         .unwrap();
 
@@ -415,7 +372,6 @@ mod tests {
         let built_proof =
             DeletionProofBuilder::new(scope, deleted_keys, tx_id, excluded, key.clone())
                 .with_wal_chain_receipt(receipt)
-                .with_graph_repair(graph_repair)
                 .with_lsm_memtable_cleanup(lsm_proof)
                 .with_sstable_all_levels_cleanup(sst_proof)
                 .with_hnsw_index_cleanup(hnsw_proof)
@@ -426,11 +382,8 @@ mod tests {
                 .finish()
                 .unwrap();
 
-        let sk = ed25519_dalek::SigningKey::from_bytes(key[..32].try_into().unwrap());
-        let vk = sk.verifying_key();
-
         assert_eq!(built_proof, expected_proof);
-        assert!(built_proof.verify(crate::deletion_proof::VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(built_proof.verify(&key).unwrap());
     }
 
     #[test]
