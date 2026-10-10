@@ -131,7 +131,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
-            let _guard = snapshot_registry.register(seq_no);
+            let _guard = snapshot_registry.acquire(|| seq_no);
 
             // 2. Ensure target directory exists
             fs::create_dir_all(target_dir)

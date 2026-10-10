@@ -964,20 +964,48 @@ mod tests {
 
         {
             let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
-            old_wal
-                .append_put(b"key1", b"val1", contextra_core::TxId::new(1))
+            let (batch1, _) = old_wal
+                .prepare_batch(vec![
+                    (
+                        WalOp::Put {
+                            tx_id: contextra_core::TxId::new(1),
+                            key: b"key1".to_vec(),
+                            value: b"val1".to_vec(),
+                        },
+                        1,
+                    ),
+                    (
+                        WalOp::TxEnd {
+                            tx_id: contextra_core::TxId::new(1),
+                            committed: true,
+                        },
+                        2,
+                    ),
+                ])
                 .await?;
-            old_wal
-                .append_tx_end(contextra_core::TxId::new(1), true)
-                .await?;
+            old_wal.append_batch(batch1).await?;
 
             let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
-            active_wal
-                .append_put(b"key2", b"val2", contextra_core::TxId::new(2))
+            let (batch2, _) = active_wal
+                .prepare_batch(vec![
+                    (
+                        WalOp::Put {
+                            tx_id: contextra_core::TxId::new(2),
+                            key: b"key2".to_vec(),
+                            value: b"val2".to_vec(),
+                        },
+                        3,
+                    ),
+                    (
+                        WalOp::TxEnd {
+                            tx_id: contextra_core::TxId::new(2),
+                            committed: true,
+                        },
+                        4,
+                    ),
+                ])
                 .await?;
-            active_wal
-                .append_tx_end(contextra_core::TxId::new(2), true)
-                .await?;
+            active_wal.append_batch(batch2).await?;
         }
 
         tokio::fs::write(&old_sidecar_path, b"old-uuid-data")
