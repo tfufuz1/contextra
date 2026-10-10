@@ -1198,4 +1198,3 @@ pub fn finish_size_prefixed_search_response_buffer<'a, 'b>(fbb: &'b mut flatbuff
 }
 }  // pub mod IPC
 }  // pub mod Contextra
-
