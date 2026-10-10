@@ -51,8 +51,8 @@ impl<'a> Embedding<'a> {
     Embedding { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args EmbeddingArgs<'args>
   ) -> flatbuffers::WIPOffset<Embedding<'bldr>> {
     let mut builder = EmbeddingBuilder::new(_fbb);
@@ -82,7 +82,7 @@ impl<'a> Embedding<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}
   }
 }
 
@@ -116,11 +116,11 @@ impl<'a> Default for EmbeddingArgs<'a> {
   }
 }
 
-pub struct EmbeddingBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct EmbeddingBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> EmbeddingBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> EmbeddingBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_data(&mut self, data: flatbuffers::WIPOffset<flatbuffers::Vector<'b , f32>>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Embedding::VT_DATA, data);
@@ -134,7 +134,7 @@ impl<'a: 'b, 'b> EmbeddingBuilder<'a, 'b> {
     self.fbb_.push_slot::<i8>(Embedding::VT_METRIC, metric, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EmbeddingBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> EmbeddingBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     EmbeddingBuilder {
       fbb_: _fbb,
@@ -183,8 +183,8 @@ impl<'a> ScoredDocument<'a> {
     ScoredDocument { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args ScoredDocumentArgs<'args>
   ) -> flatbuffers::WIPOffset<ScoredDocument<'bldr>> {
     let mut builder = ScoredDocumentBuilder::new(_fbb);
@@ -208,7 +208,7 @@ impl<'a> ScoredDocument<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0)).unwrap()}
   }
   #[inline]
   pub fn metadata(&self) -> Option<&'a str> {
@@ -259,11 +259,11 @@ impl<'a> Default for ScoredDocumentArgs<'a> {
   }
 }
 
-pub struct ScoredDocumentBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct ScoredDocumentBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ScoredDocumentBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ScoredDocumentBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_id(&mut self, id: flatbuffers::WIPOffset<&'b  str>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(ScoredDocument::VT_ID, id);
@@ -281,7 +281,7 @@ impl<'a: 'b, 'b> ScoredDocumentBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Embedding>>(ScoredDocument::VT_EMBEDDING, embedding);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ScoredDocumentBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> ScoredDocumentBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     ScoredDocumentBuilder {
       fbb_: _fbb,
@@ -330,8 +330,8 @@ impl<'a> SearchResponse<'a> {
     SearchResponse { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args SearchResponseArgs<'args>
   ) -> flatbuffers::WIPOffset<SearchResponse<'bldr>> {
     let mut builder = SearchResponseBuilder::new(_fbb);
@@ -354,14 +354,14 @@ impl<'a> SearchResponse<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(SearchResponse::VT_TOTAL_HITS, Some(0)).unwrap()}
   }
   #[inline]
   pub fn processing_time_ms(&self) -> f32 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, Some(0.0)).unwrap()}
   }
 }
 
@@ -395,11 +395,11 @@ impl<'a> Default for SearchResponseArgs<'a> {
   }
 }
 
-pub struct SearchResponseBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct SearchResponseBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SearchResponseBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_results(&mut self, results: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<ScoredDocument<'b >>>>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SearchResponse::VT_RESULTS, results);
@@ -413,7 +413,7 @@ impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b> {
     self.fbb_.push_slot::<f32>(SearchResponse::VT_PROCESSING_TIME_MS, processing_time_ms, 0.0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SearchResponseBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> SearchResponseBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     SearchResponseBuilder {
       fbb_: _fbb,
@@ -461,8 +461,8 @@ impl<'a> VectorIndexUpdate<'a> {
     VectorIndexUpdate { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args VectorIndexUpdateArgs<'args>
   ) -> flatbuffers::WIPOffset<VectorIndexUpdate<'bldr>> {
     let mut builder = VectorIndexUpdateBuilder::new(_fbb);
@@ -526,11 +526,11 @@ impl<'a> Default for VectorIndexUpdateArgs<'a> {
   }
 }
 
-pub struct VectorIndexUpdateBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct VectorIndexUpdateBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> VectorIndexUpdateBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> VectorIndexUpdateBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_id(&mut self, id: flatbuffers::WIPOffset<&'b  str>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(VectorIndexUpdate::VT_ID, id);
@@ -544,7 +544,7 @@ impl<'a: 'b, 'b> VectorIndexUpdateBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(VectorIndexUpdate::VT_METADATA, metadata);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> VectorIndexUpdateBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> VectorIndexUpdateBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     VectorIndexUpdateBuilder {
       fbb_: _fbb,
@@ -590,8 +590,8 @@ impl<'a> RoleId<'a> {
     RoleId { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args RoleIdArgs
   ) -> flatbuffers::WIPOffset<RoleId<'bldr>> {
     let mut builder = RoleIdBuilder::new(_fbb);
@@ -605,7 +605,7 @@ impl<'a> RoleId<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap()}
   }
 }
 
@@ -633,17 +633,17 @@ impl<'a> Default for RoleIdArgs {
   }
 }
 
-pub struct RoleIdBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct RoleIdBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> RoleIdBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RoleIdBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_id(&mut self, id: u32) {
     self.fbb_.push_slot::<u32>(RoleId::VT_ID, id, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RoleIdBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> RoleIdBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     RoleIdBuilder {
       fbb_: _fbb,
@@ -687,8 +687,8 @@ impl<'a> HyperEdgeId<'a> {
     HyperEdgeId { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args HyperEdgeIdArgs
   ) -> flatbuffers::WIPOffset<HyperEdgeId<'bldr>> {
     let mut builder = HyperEdgeIdBuilder::new(_fbb);
@@ -702,7 +702,7 @@ impl<'a> HyperEdgeId<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap()}
   }
 }
 
@@ -730,17 +730,17 @@ impl<'a> Default for HyperEdgeIdArgs {
   }
 }
 
-pub struct HyperEdgeIdBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct HyperEdgeIdBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> HyperEdgeIdBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> HyperEdgeIdBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_id(&mut self, id: u64) {
     self.fbb_.push_slot::<u64>(HyperEdgeId::VT_ID, id, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HyperEdgeIdBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> HyperEdgeIdBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     HyperEdgeIdBuilder {
       fbb_: _fbb,
@@ -785,8 +785,8 @@ impl<'a> RoleBinding<'a> {
     RoleBinding { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args RoleBindingArgs
   ) -> flatbuffers::WIPOffset<RoleBinding<'bldr>> {
     let mut builder = RoleBindingBuilder::new(_fbb);
@@ -801,14 +801,14 @@ impl<'a> RoleBinding<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap()}
   }
   #[inline]
   pub fn entity(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(RoleBinding::VT_ENTITY, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(RoleBinding::VT_ENTITY, Some(0)).unwrap()}
   }
 }
 
@@ -839,11 +839,11 @@ impl<'a> Default for RoleBindingArgs {
   }
 }
 
-pub struct RoleBindingBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct RoleBindingBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> RoleBindingBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RoleBindingBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_role(&mut self, role: u32) {
     self.fbb_.push_slot::<u32>(RoleBinding::VT_ROLE, role, 0);
@@ -853,7 +853,7 @@ impl<'a: 'b, 'b> RoleBindingBuilder<'a, 'b> {
     self.fbb_.push_slot::<u64>(RoleBinding::VT_ENTITY, entity, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RoleBindingBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> RoleBindingBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     RoleBindingBuilder {
       fbb_: _fbb,
@@ -907,8 +907,8 @@ impl<'a> HyperEdge<'a> {
     HyperEdge { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args HyperEdgeArgs<'args>
   ) -> flatbuffers::WIPOffset<HyperEdge<'bldr>> {
     let mut builder = HyperEdgeBuilder::new(_fbb);
@@ -931,14 +931,14 @@ impl<'a> HyperEdge<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap()}
   }
   #[inline]
   pub fn predicate(&self) -> u8 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u8>(HyperEdge::VT_PREDICATE, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u8>(HyperEdge::VT_PREDICATE, Some(0)).unwrap()}
   }
   #[inline]
   pub fn participants(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RoleBinding<'a>>>> {
@@ -952,42 +952,42 @@ impl<'a> HyperEdge<'a> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0)).unwrap_or_default()}
+    unsafe { self._tab.get::<f32>(HyperEdge::VT_WEIGHT, Some(0.0)).unwrap()}
   }
   #[inline]
   pub fn tx_valid_from(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_FROM, Some(0)).unwrap()}
   }
   #[inline]
   pub fn tx_valid_to(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_TX_VALID_TO, Some(0)).unwrap()}
   }
   #[inline]
   pub fn business_valid_from(&self) -> i64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_FROM, Some(0)).unwrap()}
   }
   #[inline]
   pub fn business_valid_to(&self) -> i64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<i64>(HyperEdge::VT_BUSINESS_VALID_TO, Some(0)).unwrap()}
   }
   #[inline]
   pub fn source_doc_id(&self) -> u64 {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0)).unwrap_or_default()}
+    unsafe { self._tab.get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0)).unwrap()}
   }
   #[inline]
   pub fn child_edge_ids(&self) -> Option<flatbuffers::Vector<'a, u64>> {
@@ -1049,11 +1049,11 @@ impl<'a> Default for HyperEdgeArgs<'a> {
   }
 }
 
-pub struct HyperEdgeBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct HyperEdgeBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> HyperEdgeBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> HyperEdgeBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_id(&mut self, id: u64) {
     self.fbb_.push_slot::<u64>(HyperEdge::VT_ID, id, 0);
@@ -1095,7 +1095,7 @@ impl<'a: 'b, 'b> HyperEdgeBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(HyperEdge::VT_CHILD_EDGE_IDS, child_edge_ids);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HyperEdgeBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> HyperEdgeBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     HyperEdgeBuilder {
       fbb_: _fbb,
@@ -1186,16 +1186,15 @@ pub unsafe fn size_prefixed_root_as_search_response_unchecked(buf: &[u8]) -> Sea
   flatbuffers::size_prefixed_root_unchecked::<SearchResponse>(buf)
 }
 #[inline]
-pub fn finish_search_response_buffer<'a, 'b>(
-    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub fn finish_search_response_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(
+    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     root: flatbuffers::WIPOffset<SearchResponse<'a>>) {
   fbb.finish(root, None);
 }
 
 #[inline]
-pub fn finish_size_prefixed_search_response_buffer<'a, 'b>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<SearchResponse<'a>>) {
+pub fn finish_size_prefixed_search_response_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>, root: flatbuffers::WIPOffset<SearchResponse<'a>>) {
   fbb.finish_size_prefixed(root, None);
 }
 }  // pub mod IPC
 }  // pub mod Contextra
-
