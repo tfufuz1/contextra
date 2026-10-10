@@ -37,9 +37,6 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-const MARKER_MAGIC: &[u8; 4] = b"RVMK";
-const MARKER_VERSION_1: u8 = 1;
-
 /// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RevocationMarker {
@@ -292,10 +289,9 @@ impl RevocationLog {
     /// Abwärtskompatibles Öffnen oder Erzeugen unter `path` (nutzt `InitMode::OpenOrCreateIfFresh`).
     ///
     /// # Warnung / Security Note
-    /// Nur für Tests; Produktion nutzt `open_or_create_if_fresh` mit expliziter `has_existing_keys`-Flag!
     /// Diese Methode setzt fest `has_existing_keys: false` ein, was den Rollback-Schutz
     /// bei Neu-Initialisierung über einem gelöschten Log abschwächt.
-    #[cfg(any(test, feature = "test-utils"))]
+    /// Produktionscode MUSS `open_or_create_if_fresh` mit korrekter Flag-Übergabe nutzen!
     pub fn open_or_create(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
@@ -609,7 +605,7 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut prospective_entries = entries_write_guard.clone();
+        let mut prospective_entries = entries_guard.clone();
         prospective_entries.push(new_entry.clone());
 
         if let Some(ref path) = self.file_path {
@@ -617,22 +613,25 @@ impl RevocationLog {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            write_atomic_file(path, &serialized)?;
+            write_atomic_file(path, &serialized_log)?;
 
             let m_path = marker_path_for(path);
-            let serialized_marker = serialize_signed_marker(
-                prospective_entries.len() as u64,
-                new_entry.entry_hash,
-                Some(signing_key),
-            );
+            let marker = RevocationMarker {
+                count: prospective_entries.len() as u64,
+                head_hash: new_entry.entry_hash,
+            };
+            let serialized_marker = bincode::serialize(&marker).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to serialize revocation marker: {e}"))
+            })?;
 
             write_atomic_file(&m_path, &serialized_marker)?;
         }
 
-        let mut revoked_write_guard = self.revoked_targets.write();
+        entries_guard.push(new_entry.clone());
+        revoked_guard.insert(target);
 
-        entries_write_guard.push(new_entry.clone());
-        revoked_write_guard.insert(target);
+        drop(entries_guard);
+        drop(revoked_guard);
 
         drop(entries_write_guard);
         drop(revoked_write_guard);
@@ -744,7 +743,7 @@ mod tests {
         let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
 
         let master_km = KeyManager::try_new("master-passphrase", b"salt-123")?;
-        let registry = KeyRegistry::new_for_test(log.clone());
+        let registry = KeyRegistry::new().with_revocation_log(log.clone());
         let group_id = 777;
 
         // Precondition: key retrieval and encryption succeed before revocation

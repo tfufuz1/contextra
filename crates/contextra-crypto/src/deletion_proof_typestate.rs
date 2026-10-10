@@ -314,6 +314,7 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
     ///
     /// This method is only available when all 7 storage layers have been marked as [`Cleaned`].
     pub fn finish(self) -> Result<DeletionProof> {
+        let durability = crate::deletion_proof::DurabilityProof::new(self.deleted_after_tx.0);
         let signing_key = if self.proof_key.len() >= 32 {
             let mut key_bytes = [0u8; 32];
             key_bytes.copy_from_slice(&self.proof_key[..32]);
@@ -334,6 +335,7 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
             None,
             0,
             &self.graph_repair,
+            Some(&durability),
             &signing_key,
         )
     }
@@ -404,6 +406,7 @@ mod tests {
             None,
             0,
             &graph_repair,
+            Some(&crate::deletion_proof::DurabilityProof::new(100)),
             &ed25519_dalek::SigningKey::from_bytes(key[..32].try_into().unwrap()),
         )
         .unwrap();

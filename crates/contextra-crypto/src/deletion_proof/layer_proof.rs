@@ -7,20 +7,6 @@ use contextra_types::{ContextraError, Result};
 /// Kann NUR von den jeweiligen Bereinigungsfunktionen der Storage-Layer erzeugt werden
 /// (siehe `new_after_physical_cleanup`), niemals direkt frei durch Aufrufer von
 /// `DeletionProof::create()`.
-/// Proof of fsync durability for sequence number / transaction ID.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DurabilityProof {
-    /// Monotonically increasing sequence number or TxId confirmed durable by disk fsync.
-    pub confirmed_seq_no: u64,
-}
-
-impl DurabilityProof {
-    /// Constructs a new DurabilityProof for a confirmed fsynced sequence number.
-    pub fn new(confirmed_seq_no: u64) -> Self {
-        Self { confirmed_seq_no }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayerCleanupProof {
     pub(super) layer: DeletionLayer,
