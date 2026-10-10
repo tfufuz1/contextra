@@ -63,7 +63,7 @@ Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfü
 <!-- BEGIN GENERATED -->
 ## 2. Crate-Inventar (Ist-Zustand)
 
-Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeordnet in das Ring-Modell:
+Die folgende Tabelle führt alle 37 im Workspace definierten Crates auf, eingeordnet in das Ring-Modell:
 
 | Crate-Name | Ring | Verantwortlichkeit |
 |---|---|---|
@@ -72,6 +72,7 @@ Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeor
 | `contextra-avv-generator` | Ring 0 | AVV (Auftragsverarbeitungsvertrag) template generator referencing technical guarantees for Contextra |
 | `contextra-core` | Ring 0 | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for Contextra |
 | `contextra-crypto` | Ring 0 | Encryption at Rest and KV-Cache Security utilities for Contextra |
+| `contextra-durable-fs` | Ring 0 | Durable filesystem operations and synchronous disk flushing for Contextra |
 | `contextra-graph` | Ring 0 | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `contextra-mvcc` | Ring 0 | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra |
 | `contextra-ports` | Ring 0 | Canonical dyn-compatible port traits for Contextra subsystems |
@@ -102,6 +103,7 @@ Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeor
 | `contextra-bench` | Tooling | Contextra — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `contextra-testkit` | Tooling | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra |
 | `xtask` | Tooling | Keine Beschreibung |
+| `xtask-heavy` | Tooling | Keine Beschreibung |
 
 ---
 
@@ -111,6 +113,8 @@ Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwische
 
 ```mermaid
 graph TD
+    contextra[contextra] --> contextra_audit_export[contextra-audit-export]
+    contextra[contextra] --> contextra_avv_generator[contextra-avv-generator]
     contextra[contextra] --> contextra_core[contextra-core]
     contextra[contextra] --> contextra_crypto[contextra-crypto]
     contextra[contextra] --> contextra_db[contextra-db]
@@ -137,11 +141,16 @@ graph TD
     contextra_audit_export[contextra-audit-export] --> contextra_types[contextra-types]
     contextra_avv_generator[contextra-avv-generator] --> contextra_types[contextra-types]
     contextra_bench[contextra-bench] --> contextra_core[contextra-core]
+    contextra_bench[contextra-bench] --> contextra_crypto[contextra-crypto]
     contextra_bench[contextra-bench] --> contextra_db[contextra-db]
     contextra_bench[contextra-bench] --> contextra_graph[contextra-graph]
+    contextra_bench[contextra-bench] --> contextra_infer_candle[contextra-infer-candle]
     contextra_bench[contextra-bench] --> contextra_infer_onnx[contextra-infer-onnx]
+    contextra_bench[contextra-bench] --> contextra_kvcache[contextra-kvcache]
+    contextra_bench[contextra-bench] --> contextra_ports[contextra-ports]
     contextra_bench[contextra-bench] --> contextra_store[contextra-store]
     contextra_bench[contextra-bench] --> contextra_text[contextra-text]
+    contextra_bench[contextra-bench] --> contextra_types[contextra-types]
     contextra_bench[contextra-bench] --> contextra_vector[contextra-vector]
     contextra_checkpoint[contextra-checkpoint] --> contextra_core[contextra-core]
     contextra_checkpoint[contextra-checkpoint] --> contextra_ports[contextra-ports]
@@ -156,6 +165,8 @@ graph TD
     contextra_core[contextra-core] --> contextra_ports[contextra-ports]
     contextra_core[contextra-core] --> contextra_types[contextra-types]
     contextra_core[contextra-core] --> contextra_wire[contextra-wire]
+    contextra_crypto[contextra-crypto] --> contextra_durable_fs[contextra-durable-fs]
+    contextra_crypto[contextra-crypto] --> contextra_ports[contextra-ports]
     contextra_crypto[contextra-crypto] --> contextra_types[contextra-types]
     contextra_db[contextra-db] --> contextra_adapt[contextra-adapt]
     contextra_db[contextra-db] --> contextra_checkpoint[contextra-checkpoint]
@@ -170,13 +181,17 @@ graph TD
     contextra_db[contextra-db] --> contextra_text[contextra-text]
     contextra_db[contextra-db] --> contextra_types[contextra-types]
     contextra_db[contextra-db] --> contextra_vector[contextra-vector]
+    contextra_durable_fs[contextra-durable-fs]
     contextra_engine[contextra-engine] --> contextra_adapt[contextra-adapt]
     contextra_engine[contextra-engine] --> contextra_checkpoint[contextra-checkpoint]
     contextra_engine[contextra-engine] --> contextra_crypto[contextra-crypto]
     contextra_engine[contextra-engine] --> contextra_graph[contextra-graph]
+    contextra_engine[contextra-engine] --> contextra_infer_candle[contextra-infer-candle]
+    contextra_engine[contextra-engine] --> contextra_kvcache[contextra-kvcache]
     contextra_engine[contextra-engine] --> contextra_mvcc[contextra-mvcc]
     contextra_engine[contextra-engine] --> contextra_ports[contextra-ports]
     contextra_engine[contextra-engine] --> contextra_rank[contextra-rank]
+    contextra_engine[contextra-engine] --> contextra_sandbox[contextra-sandbox]
     contextra_engine[contextra-engine] --> contextra_store[contextra-store]
     contextra_engine[contextra-engine] --> contextra_sys[contextra-sys]
     contextra_engine[contextra-engine] --> contextra_text[contextra-text]
@@ -214,6 +229,7 @@ graph TD
     contextra_mcp[contextra-mcp] --> contextra_rank[contextra-rank]
     contextra_mcp[contextra-mcp] --> contextra_types[contextra-types]
     contextra_mcp[contextra-mcp] --> contextra_wire[contextra-wire]
+    contextra_mvcc[contextra-mvcc] --> contextra_ports[contextra-ports]
     contextra_mvcc[contextra-mvcc] --> contextra_types[contextra-types]
     contextra_ports[contextra-ports] --> contextra_types[contextra-types]
     contextra_privacy[contextra-privacy] --> contextra_ports[contextra-ports]
@@ -236,6 +252,7 @@ graph TD
     contextra_simd[contextra-simd] --> contextra_core[contextra-core]
     contextra_store[contextra-store] --> contextra_core[contextra-core]
     contextra_store[contextra-store] --> contextra_crypto[contextra-crypto]
+    contextra_store[contextra-store] --> contextra_durable_fs[contextra-durable-fs]
     contextra_store[contextra-store] --> contextra_mvcc[contextra-mvcc]
     contextra_store[contextra-store] --> contextra_ports[contextra-ports]
     contextra_store[contextra-store] --> contextra_sys[contextra-sys]
@@ -248,13 +265,15 @@ graph TD
     contextra_types[contextra-types]
     contextra_vector[contextra-vector] --> contextra_core[contextra-core]
     contextra_vector[contextra-vector] --> contextra_crypto[contextra-crypto]
+    contextra_vector[contextra-vector] --> contextra_durable_fs[contextra-durable-fs]
+    contextra_vector[contextra-vector] --> contextra_ports[contextra-ports]
     contextra_vector[contextra-vector] --> contextra_simd[contextra-simd]
     contextra_vector[contextra-vector] --> contextra_sys[contextra-sys]
     contextra_vector[contextra-vector] --> contextra_types[contextra-types]
     contextra_wire[contextra-wire]
-    xtask[xtask] --> contextra_bench[contextra-bench]
-    xtask[xtask] --> contextra_router[contextra-router]
     xtask[xtask] --> contextra_types[contextra-types]
+    xtask_heavy[xtask-heavy] --> contextra_bench[contextra-bench]
+    xtask_heavy[xtask-heavy] --> contextra_router[contextra-router]
 ```
 <!-- END GENERATED -->
 

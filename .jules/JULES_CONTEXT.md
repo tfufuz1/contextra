@@ -36,6 +36,7 @@
 | `contextra-core` | `crates/contextra-core/AGENTS.md` |
 | `contextra-crypto` | `crates/contextra-crypto/AGENTS.md` |
 | `contextra-db` | `crates/contextra-db/AGENTS.md` |
+| `contextra-durable-fs` | `crates/contextra-durable-fs/AGENTS.md` |
 | `contextra-engine` | `crates/contextra-engine/AGENTS.md` |
 | `contextra-graph` | `crates/contextra-graph/AGENTS.md` |
 | `contextra-infer-candle` | `crates/contextra-infer-candle/AGENTS.md` |
