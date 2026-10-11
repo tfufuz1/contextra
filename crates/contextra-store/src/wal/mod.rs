@@ -10,6 +10,9 @@ pub mod flusher;
 pub mod hmac;
 pub mod io;
 pub mod replay;
+pub mod replay_filter;
+pub mod retire;
+pub mod witness_scan;
 
 #[cfg(test)]
 mod tests;
@@ -22,6 +25,9 @@ pub use flusher::*;
 #[cfg(feature = "wal-integrity")]
 pub(crate) use hmac::*;
 pub use replay::*;
+pub use replay_filter::*;
+pub use retire::*;
+pub use witness_scan::*;
 
 #[cfg(not(loom))]
 pub(crate) mod fs {
