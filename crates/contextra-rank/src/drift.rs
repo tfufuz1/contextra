@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11T15:07:28Z (SESSION: 5aad92a6)
-// ZWECK: Score-Verteilungs- und Drift-Erkennung für Contextra Search Signals.
-// INVARIANTEN: P26-konform (rein synchron, 0 async/tokio), non-finite floats löschen keine bestehenden Messungen, Schwellenwerte sind stets positiv und endlich.
-// NICHT-OFFENSICHTLICH: analyse() erfordert mindestens window_size / 2 Beobachtungen und ein gesetztes Baseline-Mean.
-// SIEHE AUCH: crates/contextra-rank/AGENTS.md
+// STAND: 2026-10-11T00:00:00Z (SESSION: a9c85d1e)
+// ZWECK: Score-Verteilungs- und Ranking-Drift-Erkennung fuer Contextra-Suchsignale.
+// INVARIANTEN: Nicht-finite Score-Messungen (NaN/Inf) werden ignoriert; Fenstergroesse mindestens 5.
+// NICHT-OFFENSICHTLICH: Basiert auf gleitendem Mittelwert bezogen auf gesetzten Baseline-Wert.
+// SIEHE AUCH: crates/contextra-rank/src/lib.rs, crates/contextra-rank/AGENTS.md
 
 //! Score distribution and ranking drift detection for Contextra search signals.
 
@@ -129,6 +129,7 @@ impl DriftDetector {
     /// Records a new score observation and calculates updated drift status.
     /// Non-finite scores are ignored and do not alter recorded history.
     pub fn observe(&mut self, score: f32) -> DriftStatus {
+        // TODO(contextra-plan): Validate NaN score handling and tie-breaking cases for score drift tracking across 4-signal search fusion outputs [ref:eigenbau-rrf-fusion]
         if !score.is_finite() {
             return self.analyze();
         }
