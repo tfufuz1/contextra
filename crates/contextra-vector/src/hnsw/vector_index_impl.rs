@@ -388,14 +388,7 @@ impl VectorIndex for HnswIndex {
                             deletes_to_apply.push((old_idx, *doc_id));
                         }
                     }
-                    other => {
-                        return Err(ContextraError::Index(format!(
-                            "HNSW commit (phase 2) encountered an IndexOp variant that \
-                             was not rejected by phase 1 normalization: {:?}. \
-                             This is a bug — add a handler arm before enabling this operation.",
-                            std::mem::discriminant(other)
-                        )));
-                    }
+                    _ => unreachable!(),
                 }
             }
 

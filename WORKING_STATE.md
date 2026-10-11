@@ -15,7 +15,6 @@ Contextra ist eine hochperformante, einbettbare Vektor- und Graph-Engine für Ru
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `contextra-wire` | `crates/contextra-wire` | 0 | 1.5k | 🟢 stable | `Ring 0` | `stable` | FlatBuffers Wire-Protokolle und Serialisierungs-Formate |
 | `contextra-sys` | `crates/contextra-sys` | 0 | 632 | 🟢 stable | `Ring 0` | `stable` | Systemnahe Bindings, Low-Level I/O und Memory-Mapping |
-| `contextra-durable-fs` | `crates/contextra-durable-fs` | 0 | 205 | 🟢 stable | `Ring 0` | `stable` | Durable filesystem operations and synchronous disk flushing for Contextra |
 | `contextra-simd` | `crates/contextra-simd` | 4 | 1.2k | 🟢 stable | `Ring 0` | `stable` | SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen |
 | `contextra-core` | `crates/contextra-core` | 3 | 122 | 🟢 stable | `Ring 0` | `stable` | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
 | `contextra-store` | `crates/contextra-store` | 4 | 18.6k | 🟢 stable | `Ring 1` | `stable` | LSM-Tree Storage Engine, WAL Durability und Compaction Engine |
@@ -62,7 +61,6 @@ Contextra ist eine hochperformante, einbettbare Vektor- und Graph-Engine für Ru
 ### Layer 0 (Rang 0)
 - **`contextra-wire`** (Ring: `Ring 0`) -> Abhaengigkeiten: keine
 - **`contextra-sys`** (Ring: `Ring 0`) -> Abhaengigkeiten: keine
-- **`contextra-durable-fs`** (Ring: `Ring 0`) -> Abhaengigkeiten: keine
 - **`contextra-sandbox`** (Ring: `Ring 2`) -> Abhaengigkeiten: keine
 - **`contextra-types`** (Ring: `Ring 0`) -> Abhaengigkeiten: keine
 
@@ -72,7 +70,7 @@ Contextra ist eine hochperformante, einbettbare Vektor- und Graph-Engine für Ru
 
 ### Layer 2 (Rang 2)
 - **`contextra-text`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-ports, contextra-types
-- **`contextra-crypto`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-durable-fs, contextra-ports, contextra-types
+- **`contextra-crypto`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-ports, contextra-types
 - **`contextra-privacy`** (Ring: `Ring 3`) -> Abhaengigkeiten: contextra-ports, contextra-types
 - **`contextra-testkit`** (Ring: `Tooling`) -> Abhaengigkeiten: contextra-ports, contextra-types
 - **`contextra-mvcc`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-ports, contextra-types
@@ -91,12 +89,12 @@ Contextra ist eine hochperformante, einbettbare Vektor- und Graph-Engine für Ru
 
 ### Layer 4 (Rang 4)
 - **`contextra-simd`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-core
-- **`contextra-store`** (Ring: `Ring 1`) -> Abhaengigkeiten: contextra-core, contextra-crypto, contextra-durable-fs, contextra-mvcc, contextra-ports, contextra-sys, contextra-types
+- **`contextra-store`** (Ring: `Ring 1`) -> Abhaengigkeiten: contextra-core, contextra-crypto, contextra-mvcc, contextra-ports, contextra-sys, contextra-types
 - **`contextra-checkpoint`** (Ring: `Ring 1`) -> Abhaengigkeiten: contextra-core, contextra-ports, contextra-types
 - **`contextra-infer-onnx`** (Ring: `Ring 2`) -> Abhaengigkeiten: contextra-infer-candle, contextra-ports, contextra-rank, contextra-types
 
 ### Layer 5 (Rang 5)
-- **`contextra-vector`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-core, contextra-crypto, contextra-durable-fs, contextra-ports, contextra-simd, contextra-sys, contextra-types
+- **`contextra-vector`** (Ring: `Ring 0`) -> Abhaengigkeiten: contextra-core, contextra-crypto, contextra-ports, contextra-simd, contextra-sys, contextra-types
 
 ### Layer 6 (Rang 6)
 - **`contextra-engine`** (Ring: `Ring 3`) -> Abhaengigkeiten: contextra-adapt, contextra-checkpoint, contextra-crypto, contextra-graph, contextra-infer-candle, contextra-kvcache, contextra-mvcc, contextra-ports, contextra-rank, contextra-sandbox, contextra-store, contextra-sys, contextra-text, contextra-types, contextra-vector
