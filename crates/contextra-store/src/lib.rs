@@ -30,6 +30,8 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
+pub mod copy_registry;
+pub mod erasure_ledger;
 pub(crate) mod util;
 pub mod wal;
 

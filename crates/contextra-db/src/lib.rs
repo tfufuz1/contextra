@@ -2,6 +2,8 @@
 // ZWECK: Contextra Database Strangler Shell / Re-export Facade (Layer 3).
 // INVARIANTEN: Backward compatibility for all public types; re-exports from contextra-engine and contextra-cognition.
 
+// TODO(contextra-plan): Implement 2PC transactional synchronization between LSM storage engine and vector index, CheckpointPinGuard pinning, and atomic deletion split-brain protection [ref:eigenbau-index-store-sync]
+
 #![forbid(unsafe_code)]
 
 pub use contextra_cognition as cognition;

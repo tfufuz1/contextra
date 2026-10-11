@@ -181,8 +181,6 @@ struct GateResult {
 /// `fast_only = true`: Nur statische Regex-Gates (<10s Ziel).
 /// `fast_only = false`: Inkl. fmt, clippy, sync-docs, review-coverage, consistency.
 pub fn run_jules_preflight(fast_only: bool) -> bool {
-    eprintln!("⚠️  DEPRECATED: jules-preflight wird in einer zukünftigen Version entfernt.");
-    eprintln!("   Verwende stattdessen: cargo xtask jules check (oder cargo xtask jules run)");
     let total_start = Instant::now();
     let mode = if fast_only { "FAST" } else { "FULL" };
     println!("=== xtask jules-preflight ({}) ===", mode);

@@ -154,11 +154,6 @@ pub trait VectorIndex: Send + Sync + 'static {
 
     /// Triggers an asynchronous background rebuild of the index if supported.
     fn trigger_rebuild_async(&self) {}
-
-    /// Clears the in-memory vector index state.
-    fn clear(&self) -> impl Future<Output = Result<()>> + Send {
-        async { Ok(()) }
-    }
 }
 
 // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)

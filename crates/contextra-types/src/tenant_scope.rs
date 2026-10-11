@@ -61,37 +61,3 @@ pub enum TenantScopeViolation {
         actual: TenantId,
     },
 }
-
-/// Explicit storage partition scope for collections and deletion operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum StorageScope {
-    /// Global, untenanted storage partition (default MCP & single-tenant mode).
-    Untenanted,
-    /// Tenant-isolated storage partition bound to a specific [`TenantId`].
-    Tenant(TenantId),
-}
-
-impl StorageScope {
-    /// Returns the corresponding [`TenantId`].
-    /// For [`StorageScope::Untenanted`], returns [`TenantId::SYSTEM`].
-    #[inline]
-    pub fn tenant_id(&self) -> TenantId {
-        match self {
-            Self::Untenanted => TenantId::SYSTEM,
-            Self::Tenant(t) => *t,
-        }
-    }
-
-    /// Returns `true` if this scope represents an untenanted partition.
-    #[inline]
-    pub fn is_untenanted(&self) -> bool {
-        matches!(self, Self::Untenanted)
-    }
-}
-
-impl From<TenantId> for StorageScope {
-    #[inline]
-    fn from(id: TenantId) -> Self {
-        StorageScope::Tenant(id)
-    }
-}

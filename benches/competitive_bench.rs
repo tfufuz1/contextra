@@ -89,10 +89,10 @@ fn bench_write_throughput(c: &mut Criterion) {
                 let tmp = TempDir::new().unwrap();
                 let db = Contextra::open(tmp.path()).await.unwrap();
 
-                // Insert adaptively to stay safely within staging budget & transaction size limits
-                let mut batch_size = 10;
+                // Insert in batches of 10 to stay safely within staging budget & transaction size limits
+                let batch_size = 10;
                 for chunk in docs.chunks(batch_size) {
-                    insert_batch_adaptive(&db, chunk, &mut batch_size).await;
+                    db.insert_many(chunk).await.unwrap();
                 }
             });
         });
