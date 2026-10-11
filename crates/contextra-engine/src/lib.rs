@@ -5,13 +5,9 @@
 
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "encryption-at-rest")]
 pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
-
-#[cfg(not(feature = "encryption-at-rest"))]
-pub use no_crypto_stubs::*;
 
 /// Bewusster Fallback für Builds ohne `encryption-at-rest`.
 /// Die Methoden loggen statt zu werfen, weil die Signaturen `()` zurückgeben und Aufrufer nicht brechen dürfen.
@@ -349,6 +345,7 @@ pub mod chunker;
 pub mod collection;
 #[cfg(not(loom))]
 pub mod decay_controller;
+pub mod deletion;
 #[cfg(not(loom))]
 pub mod export;
 #[cfg(feature = "entity-extraction")]
