@@ -1,10 +1,12 @@
 # governance/gates.toml
-# Gate-Katalog für Contextra Qualitäts-Gates.
-# Definiert name, phase, required_local, required_ci, risk_class, owner, fixture, tier und covered_by für alle Gates.
+# Gate-Katalog für Contextra Qualitäts-Gates (Single Source of Truth).
+# Definiert name, phase, runner, max_duration_s, required_local, required_ci, risk_class, owner, fixture, tier und covered_by für alle Gates.
 
 [[gate]]
 name = "claim"
 phase = "start"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -15,6 +17,8 @@ tier = "agent"
 [[gate]]
 name = "context-pack"
 phase = "start"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "medium"
@@ -25,6 +29,8 @@ tier = "agent"
 [[gate]]
 name = "gate-guard"
 phase = "check"
+runner = "local-vm"
+max_duration_s = 60
 required_local = true
 required_ci = false
 risk_class = "high"
@@ -35,6 +41,8 @@ tier = "agent"
 [[gate]]
 name = "gc-floor-single-source"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 120
 required_local = false
 required_ci = true
 risk_class = "high"
@@ -45,6 +53,8 @@ tier = "ci"
 [[gate]]
 name = "gate-arch"
 phase = "verify"
+runner = "local-vm"
+max_duration_s = 120
 required_local = true
 required_ci = false
 risk_class = "high"
@@ -55,6 +65,8 @@ tier = "agent"
 [[gate]]
 name = "gate-integrity"
 phase = "submit"
+runner = "local-vm"
+max_duration_s = 120
 required_local = true
 required_ci = false
 risk_class = "high"
@@ -65,6 +77,8 @@ tier = "agent"
 [[gate]]
 name = "scope-guard"
 phase = "check"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -76,6 +90,8 @@ covered_by = "gate-guard"
 [[gate]]
 name = "protected-paths"
 phase = "check"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "critical"
@@ -87,6 +103,8 @@ covered_by = "gate-guard"
 [[gate]]
 name = "check-duplicate-symbols"
 phase = "check"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -98,6 +116,8 @@ covered_by = "gate-arch"
 [[gate]]
 name = "symbol-exists"
 phase = "check"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "medium"
@@ -108,6 +128,8 @@ tier = "agent"
 [[gate]]
 name = "check-dag"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -119,6 +141,8 @@ covered_by = "gate-arch"
 [[gate]]
 name = "check-ring-layering"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -130,6 +154,8 @@ covered_by = "gate-arch"
 [[gate]]
 name = "check-vetoes"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "critical"
@@ -141,6 +167,8 @@ covered_by = "gate-arch"
 [[gate]]
 name = "ratchet"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -152,6 +180,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "gate-weakening"
 phase = "submit"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "critical"
@@ -163,6 +193,8 @@ covered_by = "gate-guard"
 [[gate]]
 name = "test-integrity"
 phase = "submit"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -174,6 +206,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "session-report"
 phase = "submit"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "low"
@@ -184,6 +218,8 @@ tier = "agent"
 [[gate]]
 name = "doc-truth"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "medium"
@@ -194,6 +230,8 @@ tier = "agent"
 [[gate]]
 name = "registry-check"
 phase = "verify"
+runner = "both"
+max_duration_s = 60
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -204,6 +242,8 @@ tier = "agent"
 [[gate]]
 name = "diff-budget"
 phase = "submit"
+runner = "ci-only"
+max_duration_s = 60
 required_local = false
 required_ci = true
 risk_class = "medium"
@@ -215,6 +255,8 @@ covered_by = "gate-guard"
 [[gate]]
 name = "claims-in-pr"
 phase = "submit"
+runner = "ci-only"
+max_duration_s = 30
 required_local = false
 required_ci = true
 risk_class = "medium"
@@ -225,6 +267,8 @@ tier = "agent"
 [[gate]]
 name = "task-card"
 phase = "start"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "high"
@@ -235,6 +279,8 @@ tier = "agent"
 [[gate]]
 name = "ledger"
 phase = "submit"
+runner = "ci-only"
+max_duration_s = 30
 required_local = false
 required_ci = true
 risk_class = "high"
@@ -245,6 +291,8 @@ tier = "agent"
 [[gate]]
 name = "can-merge"
 phase = "submit"
+runner = "ci-only"
+max_duration_s = 30
 required_local = false
 required_ci = true
 risk_class = "critical"
@@ -255,6 +303,8 @@ tier = "agent"
 [[gate]]
 name = "gate-determinism-check"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 120
 required_local = false
 required_ci = true
 risk_class = "high"
@@ -266,6 +316,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "gate-unsafe-audit"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 120
 required_local = false
 required_ci = true
 risk_class = "critical"
@@ -277,6 +329,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "gate-lock-audit"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 120
 required_local = false
 required_ci = true
 risk_class = "high"
@@ -288,6 +342,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "gate-wal-replay-verify"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 120
 required_local = false
 required_ci = true
 risk_class = "critical"
@@ -299,6 +355,8 @@ covered_by = "gate-integrity"
 [[gate]]
 name = "fuzz-smoke"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 300
 required_local = false
 required_ci = false
 risk_class = "low"
@@ -309,6 +367,8 @@ tier = "nightly"
 [[gate]]
 name = "mutants-diff"
 phase = "verify"
+runner = "ci-only"
+max_duration_s = 2700
 required_local = false
 required_ci = false
 risk_class = "low"
@@ -319,6 +379,8 @@ tier = "nightly"
 [[gate]]
 name = "gates-catalog-sync"
 phase = "check"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "critical"
@@ -329,6 +391,8 @@ tier = "agent"
 [[gate]]
 name = "codeowners-coverage"
 phase = "check"
+runner = "both"
+max_duration_s = 30
 required_local = true
 required_ci = true
 risk_class = "high"

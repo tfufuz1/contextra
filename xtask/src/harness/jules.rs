@@ -562,10 +562,14 @@ pub fn run_jules(args: &[String]) -> i32 {
     let phase_name = match phase_opt {
         Some(p) => p,
         None => {
-            eprintln!("Usage: jules <start|check|verify|submit|stop> [args]");
+            eprintln!("Usage: jules <start|check|verify|submit|stop|run> [args]");
             return 2;
         }
     };
+
+    if phase_name == "run" {
+        return run_jules_full(&root, &extra_args, json_output);
+    }
 
     let (code, json_res) = jules_facade_execute_phase(&root, &phase_name, &extra_args, None);
 
@@ -586,4 +590,71 @@ pub fn run_jules(args: &[String]) -> i32 {
     }
 
     code
+}
+
+/// Führt alle Kernphasen (start -> check -> verify -> submit) sequentiell aus
+/// und bricht sofort beim ersten Fehlschlag ab.
+pub fn run_jules_full(root: &Path, extra_args: &[String], json_output: bool) -> i32 {
+    let phases = ["start", "check", "verify", "submit"];
+    let mut phase_results = Vec::new();
+
+    for p in &phases {
+        if !json_output {
+            println!("════════════════════════════════════════════════");
+            println!("▶️  Jules Phase: {}", p);
+            println!("════════════════════════════════════════════════");
+        }
+        let (code, json_res) = jules_facade_execute_phase(root, p, extra_args, None);
+        if !json_output {
+            let summary = json_res
+                .get("summary")
+                .and_then(|s| s.as_str())
+                .unwrap_or("");
+            if code == 0 {
+                println!("🟢 {}", summary);
+            } else if code == 1 {
+                println!("🟡 {}", summary);
+            } else {
+                eprintln!("🔴 {}", summary);
+            }
+        }
+        phase_results.push((*p, code, json_res));
+        if code != 0 {
+            if json_output {
+                let out = serde_json::json!({
+                    "gate": "jules-run",
+                    "status": "fail",
+                    "aborted_at_phase": p,
+                    "code": code,
+                    "phases": phase_results.into_iter().map(|(name, c, res)| {
+                        serde_json::json!({ "phase": name, "code": c, "result": res })
+                    }).collect::<Vec<_>>()
+                });
+                println!("{}", out);
+            } else {
+                eprintln!(
+                    "❌ Jules-Lebenszyklus in Phase '{}' abgebrochen (Exit-Code {}).",
+                    p, code
+                );
+            }
+            return code;
+        }
+    }
+
+    if json_output {
+        let out = serde_json::json!({
+            "gate": "jules-run",
+            "status": "pass",
+            "summary": "Alle 4 Jules-Phasen (start, check, verify, submit) erfolgreich durchlaufen.",
+            "phases": phase_results.into_iter().map(|(name, c, res)| {
+                serde_json::json!({ "phase": name, "code": c, "result": res })
+            }).collect::<Vec<_>>()
+        });
+        println!("{}", out);
+    } else {
+        println!("════════════════════════════════════════════════");
+        println!("✅ Jules-Lebenszyklus vollständig BESTANDEN!");
+        println!("════════════════════════════════════════════════");
+    }
+    0
 }

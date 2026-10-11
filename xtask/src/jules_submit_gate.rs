@@ -323,6 +323,8 @@ pub fn run_pre_push() -> bool {
 }
 
 pub fn run_jules_submit_gate(crate_name: Option<&str>) -> bool {
+    eprintln!("⚠️  DEPRECATED: jules-submit-gate wird in einer zukünftigen Version entfernt.");
+    eprintln!("   Verwende stattdessen: cargo xtask jules submit (oder cargo xtask jules run)");
     println!("=== Phase 6: Jules Pre-Submit Gate ===");
     let mut all_passed = true;
 

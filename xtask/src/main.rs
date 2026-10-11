@@ -43,6 +43,11 @@ fn main() {
         .iter()
         .map(|(name, _)| *name)
         .collect();
+    for (name, _) in xtask::harness::registered_commands() {
+        available_cmds.push(name);
+    }
+    available_cmds.push("harness-list");
+    available_cmds.push("harness-help");
     available_cmds.sort_unstable();
     available_cmds.dedup();
     eprintln!("Available commands: {}", available_cmds.join(", "));
