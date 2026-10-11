@@ -4,6 +4,7 @@ pub mod adaptive;
 mod config;
 mod engine;
 pub mod merge_operator;
+pub mod purge_filter;
 pub mod retention;
 
 #[cfg(test)]

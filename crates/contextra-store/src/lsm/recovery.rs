@@ -627,6 +627,7 @@ impl LsmStorage {
                     .with_metrics_sink(Arc::clone(&metrics_sink_container)),
             ),
             metrics_sink: metrics_sink_container,
+            erasure_fence: Arc::new(super::fence::ErasureFence::new()),
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
