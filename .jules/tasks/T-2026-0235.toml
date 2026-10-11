@@ -1,0 +1,20 @@
+# Task Card T-2026-0235
+# Hinweis: Fallback bei fehlendem `cargo xtask jules ...` im PR vermerken (z. B. cargo xtask jules-preflight / direkte Analysen)
+
+id        = "T-2026-0235"
+title     = "Analyse: DeletionProof-Semantik, Mindestabdeckung und Optionen für signierte Nicht-Abdeckung"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "none"
+goal      = "Entscheidungsgrundlage für ADR-4 (Nicht-Abdeckung im Proof)."
+non_goals = ["Keine Codeänderung", "Keine Empfehlung ohne Beleg"]
+scope     = ["docs/audits/deletion-proof-coverage-semantics-2026-10.md", ".jules/tasks/T-2026-0235.toml"]
+forbidden = ["crates/**", ".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**"]
+invariants = ["Keine Spekulation ohne Codebeleg"]
+acceptance = ["Alle sechs Fragen beantwortet, jede Aussage mit Datei:Zeile"]
+evidence_required = ["Datei:Zeile je Aussage", "Explizit markierte unbelegte Punkte"]
+
+[budget]
+files      = 2
+lines      = 300
+iterations = 4

@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation)]
+
 //! FILE-CONTEXT:
 //! STAND: 2026-10-06
 //! ZWECK: Implementierung von WAL-Replay, Mmap-/Stream-Scans, CRC/HMAC-Tail-Truncation und Bak-Recovery.
@@ -11,9 +13,10 @@ use contextra_core::{ContextraError, Result};
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
+#[cfg(feature = "wal-integrity")]
+use super::{legacy_integrity_key, WalOp};
 use super::{
-    legacy_integrity_key, Wal, WalEntry, WalOp, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE,
-    WAL_V2_HEADER, WAL_V3_HEADER,
+    Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
 
 pub type WalSeq = u64;
@@ -82,6 +85,14 @@ impl Wal {
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
+        let (entries, _) = self.replay_stream_with_version().await?;
+        Ok(entries)
+    }
+
+    /// Replays the WAL using the stream reader (`BufReader`), returning entries and detected version.
+    pub async fn replay_stream_with_version(
+        &self,
+    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let metadata = crate::wal::fs::metadata(&self.path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
@@ -92,8 +103,7 @@ impl Wal {
                 true
             })
             .await?;
-        let _ = version;
-        Ok(entries)
+        Ok((entries, version))
     }
 
     /// Replays the WAL and returns all entries with seq_no > since_seq_no.
@@ -106,7 +116,7 @@ impl Wal {
             .collect())
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(dead_code, clippy::type_complexity)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -114,7 +124,7 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(dead_code, clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
         _file_size: u64,
@@ -127,8 +137,7 @@ impl Wal {
                     self.path,
                     e
                 );
-                let entries = self.replay_stream().await?;
-                Ok((entries, WalVersion::V3))
+                self.replay_stream_with_version().await
             }
         }
     }
@@ -174,11 +183,11 @@ impl Wal {
                     error = %e,
                     "WAL mmap replay failed, falling back to stream reader"
                 );
-                let entries = self.replay_stream().await?;
+                let (entries, version) = self.replay_stream_with_version().await?;
                 for (seq, _, _) in &entries {
                     sink.on_entry_replayed(*seq, None);
                 }
-                Ok((entries, WalVersion::V3))
+                Ok((entries, version))
             }
         }
     }
@@ -353,6 +362,7 @@ impl Wal {
         let integrity_key = self.get_integrity_key()?;
         #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
+        #[cfg(feature = "wal-integrity")]
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -368,6 +378,16 @@ impl Wal {
                     pos = 0;
                 }
             }
+        }
+
+        let allow_legacy_fallback = self
+            .allow_legacy_integrity_key_fallback
+            .load(std::sync::atomic::Ordering::SeqCst);
+        if version < self.min_wal_version || (version != WalVersion::V3 && !allow_legacy_fallback) {
+            return Err(ContextraError::invalid_input(format!(
+                "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
+                version, self.min_wal_version, allow_legacy_fallback
+            )));
         }
 
         'scan_loop: loop {
@@ -728,6 +748,7 @@ impl Wal {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {
         let bak_path = PathBuf::from(format!("{}.{}", wal_path.display(), suffix));

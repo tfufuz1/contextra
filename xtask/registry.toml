@@ -760,6 +760,13 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "wiring-check"
+owner_tier = "ci-gate"
+summary = "Subcommand wiring-check"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
 name = "workspace-verify"
 owner_tier = "tool"
 summary = "Subcommand workspace-verify"

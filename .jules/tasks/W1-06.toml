@@ -1,0 +1,24 @@
+id        = "T-2026-9106"
+title     = "WAL: V1/V2-Replay nur im expliziten Migrationspfad, kein stilles HMAC-Überspringen"
+crate     = "contextra-store"
+tier      = 1
+risk      = "crash"
+goal      = "Mit Standard-WalConfig (min_wal_version = V3, kein Legacy-Fallback) wird ein WAL mit V1/V2-Header nie ohne HMAC-Prüfung repliziert und nie als V3 neu signiert; die Migrationspfade funktionieren unverändert."
+non_goals = ["Kein neues Dateiformat und kein authentifizierter Header (Folgearbeit)", "Kein compile_error! für fehlendes Feature wal-integrity (bricht CI)", "Keine Änderungen in lsm/**, manifest/**, Cargo.toml oder .github/**", "Legacy-Key nicht entfernen (Migration braucht ihn)"]
+scope     = ["crates/contextra-store/src/wal/**", "crates/contextra-store/tests/wal_v1_downgrade_rejected.rs", ".jules/tasks/W1-06.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "INV-WAL-LEGACY-KEY-1", "INV-WAL-TRUNCATION-1", "INV-DURABILITY-RING"]
+acceptance = [
+  "cargo test -p contextra-store --test wal_v1_downgrade_rejected",
+  "cargo test -p contextra-store wal",
+  "cargo check -p contextra-store --no-default-features",
+  "cargo clippy -p contextra-store --all-targets -- -D warnings",
+  "cargo xtask check-result-dropped-io",
+  "cargo xtask wal-replay-verify",
+  "cargo xtask jules check"
+]
+evidence_required = ["Roter Test: V1-Header mit manipuliertem Eintrag wird mit Standardkonfiguration akzeptiert und als V3 neu geschrieben", "Grüne bestehende Migrationstests (wal/tests/replay_tests.rs)"]
+[budget]
+files      = 8
+lines      = 700
+iterations = 10

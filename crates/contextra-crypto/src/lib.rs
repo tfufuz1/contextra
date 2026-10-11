@@ -23,6 +23,7 @@ pub mod audit_chain;
 pub mod crypto;
 pub mod deletion_proof;
 pub mod deletion_proof_typestate;
+pub mod deletion_witness;
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
@@ -43,6 +44,7 @@ pub use deletion_proof::{
     DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
     LayerCleanupProof,
 };
+pub use deletion_witness::{LayerWitness, WitnessEvidence};
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};

@@ -12,7 +12,7 @@ use std::sync::Arc;
 fn setup_test_cipher() -> Arc<KvSegmentCipher> {
     let master_km =
         CryptoKey::try_new("test-passphrase-roundtrip", b"test-salt-1234567890").unwrap();
-    Arc::new(KvSegmentCipher::new(master_km))
+    Arc::new(KvSegmentCipher::ephemeral(master_km))
 }
 
 fn test_fingerprint() -> ModelFingerprint {

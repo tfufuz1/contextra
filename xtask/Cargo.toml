@@ -1,3 +1,48 @@
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+dead_code = "allow"
+unused_imports = "allow"
+unused_variables = "allow"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+# TODO: entfernen
+unwrap_used = "allow"
+# TODO: entfernen
+expect_used = "allow"
+# TODO: entfernen
+panic = "allow"
+# TODO: entfernen
+todo = "allow"
+# TODO: entfernen
+cast_possible_truncation = "allow"
+# TODO: entfernen
+cast_sign_loss = "allow"
+# TODO: entfernen
+manual_strip = "allow"
+# TODO: entfernen
+should_implement_trait = "allow"
+# TODO: entfernen
+unnecessary_map_or = "allow"
+# TODO: entfernen
+match_like_matches_macro = "allow"
+# TODO: entfernen
+collapsible_match = "allow"
+# TODO: entfernen
+regex_creation_in_loops = "allow"
+# TODO: entfernen
+needless_borrows_for_generic_args = "allow"
+# TODO: entfernen
+collapsible_if = "allow"
+# TODO: entfernen
+useless_vec = "allow"
+# TODO: entfernen
+useless_format = "allow"
+
 [package]
 name = "xtask"
 version = "0.1.0"

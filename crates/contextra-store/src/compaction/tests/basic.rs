@@ -155,7 +155,11 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     let mut large_entries: Vec<(&[u8], &[u8], u64)> = Vec::new();
     large_entries.push((b"key-1".as_ref(), b"old_val".as_ref(), 10u64));
     for k in &pad_keys {
-        large_entries.push((k.as_bytes(), b"large_padding_data_to_increase_file_size", 10u64));
+        large_entries.push((
+            k.as_bytes(),
+            b"large_padding_data_to_increase_file_size",
+            10u64,
+        ));
     }
     let sst_old_large = create_test_sstable(
         tmp.path(),
@@ -818,7 +822,8 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
 
     // SSTable C (non-input, intermediate seq, larger size so it is in a separate size tier): key "k1" -> "v_inter", seq 15
     let pad_keys_c: Vec<String> = (0..100).map(|i| format!("padding_key_{:03}", i)).collect();
-    let mut entries_c: Vec<(&[u8], &[u8], u64)> = vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
+    let mut entries_c: Vec<(&[u8], &[u8], u64)> =
+        vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
     for k in &pad_keys_c {
         entries_c.push((k.as_bytes(), b"padding_value_large_file", 15u64));
     }

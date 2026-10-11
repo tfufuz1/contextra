@@ -7,30 +7,96 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs`, `xtask/src/cli/mod.rs`, and `xtask/src/harness/*.rs`.
+/// Helper function to strip line comments (`//...`) and block comments (`/*...*/`) from source text.
+pub fn strip_comments(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    let mut in_block_comment = false;
+
+    while let Some(c) = chars.next() {
+        if in_block_comment {
+            if c == '*' && chars.peek() == Some(&'/') {
+                chars.next();
+                in_block_comment = false;
+            }
+            continue;
+        }
+
+        if c == '/' {
+            if chars.peek() == Some(&'*') {
+                chars.next();
+                in_block_comment = true;
+                continue;
+            } else if chars.peek() == Some(&'/') {
+                // Skip line comment until newline
+                while let Some(&next) = chars.peek() {
+                    if next == '\n' {
+                        break;
+                    }
+                    chars.next();
+                }
+                continue;
+            }
+        }
+
+        output.push(c);
+    }
+
+    output
+}
+
+/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs` (match arms)
+/// and `xtask/src/cli/mod.rs` (`COMMAND_DISPATCH_TABLE`).
 pub fn extract_valid_subcommands(
     main_rs_content: &str,
     cli_mod_content: Option<&str>,
 ) -> HashSet<String> {
     let mut valid_commands = HashSet::new();
+
+    // 1. Extract match arms from main.rs (comment-free)
+    let clean_main = strip_comments(main_rs_content);
     let str_regex = Regex::new(r#""([a-z0-9_-]+)""#).expect("Valid regex");
 
-    for line in main_rs_content.lines() {
+    for line in clean_main.lines() {
         if let Some((patterns, _)) = line.split_once("=>") {
             for caps in str_regex.captures_iter(patterns) {
                 if let Some(cmd) = caps.get(1) {
-                    valid_commands.insert(cmd.as_str().to_string());
+                    let s = cmd.as_str();
+                    if !s.is_empty() {
+                        valid_commands.insert(s.to_string());
+                    }
                 }
             }
         }
     }
 
+    // 2. Extract COMMAND_DISPATCH_TABLE entries from cli/mod.rs (comment-free)
     if let Some(cli_content) = cli_mod_content {
-        for line in cli_content.lines() {
-            for caps in str_regex.captures_iter(line) {
-                if let Some(cmd) = caps.get(1) {
-                    valid_commands.insert(cmd.as_str().to_string());
+        let clean_cli = strip_comments(cli_content);
+        if let Some((_, after)) = clean_cli.split_once("COMMAND_DISPATCH_TABLE") {
+            let bytes = after.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                if bytes[i] == b'"' {
+                    let start = i + 1;
+                    i += 1;
+                    while i < bytes.len() && bytes[i] != b'"' {
+                        i += 1;
+                    }
+                    if i < bytes.len() {
+                        let candidate = &after[start..i];
+                        let rest = after[i + 1..].trim_start();
+                        if rest.starts_with(',')
+                            && !candidate.is_empty()
+                            && candidate
+                                .chars()
+                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+                        {
+                            valid_commands.insert(candidate.to_string());
+                        }
+                    }
                 }
+                i += 1;
             }
         }
     }
@@ -48,7 +114,7 @@ pub fn extract_harness_subcommands(harness_dir: &Path) -> HashSet<String> {
         if let Ok(entries) = fs::read_dir(harness_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.extension().map_or(false, |e| e == "rs") {
+                if path.is_file() && path.extension().is_some_and(|e| e == "rs") {
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         if stem != "mod" {
                             harness_cmds.insert(stem.replace('_', "-"));
@@ -271,6 +337,82 @@ jobs:
         fs::write(workflows_dir.join("test.yml"), workflow_content).expect("write workflow.yml");
 
         assert!(run_check_workflow_commands(root));
+    }
+
+    #[test]
+    fn test_command_in_comment_not_counted() {
+        let main_rs_content = r#"
+fn main() {
+    // "comment-only-cmd" => {}
+    /* "block-comment-cmd" => {} */
+    match subcommand {
+        "valid-cmd" => {}
+        _ => {}
+    }
+}
+"#;
+        let cli_mod_content = r#"
+// ("comment-registry-cmd", run_func),
+pub static COMMAND_DISPATCH_TABLE: &[(&str, fn(&[String]) -> i32)] = &[
+    ("valid-registry-cmd", run_func),
+];
+"#;
+        let valid = extract_valid_subcommands(main_rs_content, Some(cli_mod_content));
+        assert!(valid.contains("valid-cmd"));
+        assert!(valid.contains("valid-registry-cmd"));
+        assert!(!valid.contains("comment-only-cmd"));
+        assert!(!valid.contains("block-comment-cmd"));
+        assert!(!valid.contains("comment-registry-cmd"));
+    }
+
+    #[test]
+    fn test_command_in_match_arm_counted() {
+        let main_rs_content = r#"
+fn main() {
+    match cmd {
+        "match-arm-one" | "match-arm-two" => { do_something(); }
+        "match-arm-three" => { do_other(); }
+        _ => {}
+    }
+}
+"#;
+        let valid = extract_valid_subcommands(main_rs_content, None);
+        assert!(valid.contains("match-arm-one"));
+        assert!(valid.contains("match-arm-two"));
+        assert!(valid.contains("match-arm-three"));
+        assert_eq!(valid.len(), 3);
+    }
+
+    #[test]
+    fn test_unknown_command_fails() {
+        let dir = tempdir().expect("tempdir creation");
+        let root = dir.path();
+
+        let xtask_src = root.join("xtask/src");
+        fs::create_dir_all(&xtask_src).expect("create_dir_all");
+        let main_rs_content = r#"
+fn main() {
+    match subcommand {
+        "known-cmd" => {}
+        _ => {}
+    }
+}
+"#;
+        fs::write(xtask_src.join("main.rs"), main_rs_content).expect("write main.rs");
+
+        let workflows_dir = root.join(".github/workflows");
+        fs::create_dir_all(&workflows_dir).expect("create workflows dir");
+        let workflow_content = r#"
+name: Test Workflow
+jobs:
+  test:
+    steps:
+      - name: Step 1
+        run: cargo run -p xtask -- unknown-cmd
+"#;
+        fs::write(workflows_dir.join("test.yml"), workflow_content).expect("write workflow.yml");
+
+        assert!(!run_check_workflow_commands(root));
     }
 
     #[test]

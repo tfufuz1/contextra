@@ -1,0 +1,29 @@
+id        = "T-2026-9102"
+title     = "RevocationLog: inkrementelle Verifikation, Persist-before-Mutate, signierter Marker"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "sec"
+goal      = "RevocationLog::append mutiert den RAM-Zustand erst nach erfolgreicher Persistenz; verify_integrity ist amortisiert O(neue Einträge); der Marker ist signiert; das On-Disk-Format der Einträge bleibt kompatibel."
+non_goals = ["Kein append-only-Dateiformat (braucht ADR)", "Keine Änderung von Entry-Hash oder Signaturschema", "Keine Änderung in kv_shredding.rs oder kv_cipher.rs", "Kein externer Rollback-Anker"]
+scope     = [
+  "crates/contextra-crypto/src/revocation_log.rs",
+  "crates/contextra-crypto/src/kv_segment/store.rs",
+  "crates/contextra-crypto/src/wal_crypto.rs",
+  "crates/contextra-crypto/tests/revocation_log_hardening.rs",
+  "crates/contextra-crypto/tests/campaign_j26_hypotheses.rs",
+  ".jules/tasks/W1-02.toml"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "INV-VAULT-1/2/3", "Fail-Closed"]
+acceptance = [
+  "cargo test -p contextra-crypto --test revocation_log_hardening",
+  "cargo test -p contextra-crypto revocation",
+  "cargo test -p contextra-crypto",
+  "cargo clippy -p contextra-crypto --all-targets -- -D warnings",
+  "cargo xtask jules check"
+]
+evidence_required = ["Rote Tests vor dem Fix für Atomarität und Marker-Manipulation", "Beleg, dass verify_integrity() bei unveränderter Kette nicht erneut alle Signaturen prüft"]
+[budget]
+files      = 6
+lines      = 600
+iterations = 8

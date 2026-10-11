@@ -129,7 +129,7 @@ fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
     // Kills mutants in <impl KvCipher for KvSegmentCipher>::seal & open
     // Oracle: Decrypted payload MUST equal original plaintext
     let km = KeyManager::try_new("test-passphrase-kv-cipher", b"test-salt-kv-cipher").unwrap();
-    let cipher = KvSegmentCipher::new(km);
+    let cipher = KvSegmentCipher::ephemeral(km);
     let plaintext = b"exact plaintext payload for KvSegmentCipher seal open";
 
     let sealed = cipher

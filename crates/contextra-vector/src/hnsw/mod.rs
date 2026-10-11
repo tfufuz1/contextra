@@ -16,11 +16,14 @@ pub mod verify;
 mod acorn_filtered;
 mod batch;
 mod config;
+mod connections;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
 mod types;
 mod vector_index_impl;
+
+pub use connections::MmapBacklinkOverlay;
 
 #[cfg(test)]
 mod tests;

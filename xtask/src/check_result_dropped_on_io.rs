@@ -217,10 +217,9 @@ pub fn run_check_result_dropped_on_io_with_options(
     )
     .unwrap();
 
-    let if_let_ok_io_re = Regex::new(
-        r"\bif\s+let\s+Ok\s*\([^)]*\)\s*=\s*(File::|OpenOptions::|fs::|std::fs::)",
-    )
-    .unwrap();
+    let if_let_ok_io_re =
+        Regex::new(r"\bif\s+let\s+Ok\s*\([^)]*\)\s*=\s*(File::|OpenOptions::|fs::|std::fs::)")
+            .unwrap();
 
     let ok_ignored_re = Regex::new(
         r"\.(write|write_all|flush|set_len|fsync|sync_all|seek|truncate|remove_file|rename|create_dir_all)\s*\([^;]*\)\s*\.ok\s*\(\s*\)\s*;",
@@ -290,7 +289,11 @@ pub fn run_check_result_dropped_on_io_with_options(
                     }
 
                     // 4. unwrap_or_else(|_| ...) in Ring 0 and Ring 1, not in test code
-                    if !matched && is_ring0_or_1 && !is_test && unwrap_or_else_re.is_match(stripped_line) {
+                    if !matched
+                        && is_ring0_or_1
+                        && !is_test
+                        && unwrap_or_else_re.is_match(stripped_line)
+                    {
                         matched = true;
                     }
 

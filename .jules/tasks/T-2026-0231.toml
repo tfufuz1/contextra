@@ -1,0 +1,17 @@
+id        = "T-2026-0231"
+title     = "setup_kv_bridge: RevocationLog-Rollback fail-closed"
+crate     = "contextra-mcp"
+tier      = 1
+risk      = "sec"
+goal      = "Log+Marker-Löschung bei existierenden KV-Daten führt zu Fail-Closed statt zu stillem leerem Log."
+non_goals = ["Keine Änderung an contextra-crypto", "Keine Einschränkung von open_or_create (W4-02)", "Keine Änderung der Marker-Logik"]
+scope     = ["crates/contextra-mcp/src/routing.rs", ".jules/tasks/T-2026-0231.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**", "crates/contextra-crypto/**"]
+invariants = ["Zero-Panic", "Fail-Closed statt In-Memory-Fallback"]
+acceptance = ["cargo test -p contextra-mcp", "cargo clippy -p contextra-mcp --all-targets -- -D warnings"]
+evidence_required = ["Rote Tests vor dem Fix, grüne danach", "Begründung des gewählten Existenz-Prädikats"]
+
+[budget]
+files      = 2
+lines      = 200
+iterations = 5

@@ -274,7 +274,7 @@ mod tests {
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v0_legacy_backward_compatibility() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"legacy version 0 plaintext payload";
@@ -307,7 +307,7 @@ mod tests {
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_shredding_revocation() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"version 1 plaintext payload";
@@ -334,7 +334,7 @@ mod tests {
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_unsupported_version_error() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"unsupported version test payload";

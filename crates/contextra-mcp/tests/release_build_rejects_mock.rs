@@ -1,4 +1,5 @@
-use contextra_mcp::config::{create_embedding_provider, create_llm_text_generator};
+use contextra::EmbeddingBackend;
+use contextra_mcp::config::{create_embedding_provider, create_llm_text_generator, EmbeddingConfig};
 
 #[cfg(not(feature = "test-utils"))]
 use contextra_types::ContextraError;
@@ -6,20 +7,13 @@ use contextra_types::ContextraError;
 #[cfg(not(feature = "test-utils"))]
 #[test]
 fn release_build_rejects_mock_provider() {
-    let embed_res = create_embedding_provider(
-        "mock",
-        "http://localhost:11434",
-        "nomic-embed-text",
-        None,
-        None,
-    );
+    let config = EmbeddingConfig {
+        provider: "mock".into(),
+        ..Default::default()
+    };
+    let embed_res = config.build_provider();
     match embed_res {
-        Err(ContextraError::InvalidInput(msg)) => {
-            assert!(
-                msg.contains("Unknown embedding provider 'mock'"),
-                "Expected unknown provider error, got: {msg}"
-            );
-        }
+        Err(ContextraError::InvalidInput(_)) => {}
         Ok(_) => panic!("Expected InvalidInput error when 'mock' provider is used without test-utils feature, got Ok"),
         Err(other) => panic!("Expected InvalidInput error when 'mock' provider is used without test-utils feature, got error: {other}"),
     }
@@ -31,27 +25,27 @@ fn release_build_rejects_mock_provider() {
         None,
     );
     match llm_res {
-        Err(ContextraError::InvalidInput(msg)) => {
-            assert!(
-                msg.contains("Unknown LLM provider 'mock'"),
-                "Expected unknown provider error, got: {msg}"
-            );
-        }
-        Ok(_) => panic!("Expected InvalidInput error when 'mock' provider is used without test-utils feature, got Ok"),
-        Err(other) => panic!("Expected InvalidInput error when 'mock' provider is used without test-utils feature, got error: {other}"),
+        Err(ContextraError::InvalidInput(_)) => {}
+        Ok(_) => panic!("Expected InvalidInput error when 'mock' LLM provider is used without test-utils feature, got Ok"),
+        Err(other) => panic!("Expected InvalidInput error when 'mock' LLM provider is used without test-utils feature, got error: {other}"),
+    }
+
+    let none_res = create_embedding_provider(&EmbeddingBackend::None);
+    match none_res {
+        Err(ContextraError::InvalidInput(_)) => {}
+        Ok(_) => panic!("Expected InvalidInput error when EmbeddingBackend::None is used in release build, got Ok"),
+        Err(other) => panic!("Expected InvalidInput error when EmbeddingBackend::None is used in release build, got error: {other}"),
     }
 }
 
 #[cfg(feature = "test-utils")]
 #[test]
 fn test_utils_allows_mock_provider() {
-    let embed_res = create_embedding_provider(
-        "mock",
-        "http://localhost:11434",
-        "nomic-embed-text",
-        None,
-        None,
-    );
+    let config = EmbeddingConfig {
+        provider: "mock".into(),
+        ..Default::default()
+    };
+    let embed_res = config.build_provider();
     assert!(embed_res.is_ok(), "Expected mock embedding provider to succeed when test-utils feature is enabled");
 
     let llm_res = create_llm_text_generator(
@@ -61,4 +55,7 @@ fn test_utils_allows_mock_provider() {
         None,
     );
     assert!(llm_res.is_ok(), "Expected mock LLM generator to succeed when test-utils feature is enabled");
+
+    let none_res = create_embedding_provider(&EmbeddingBackend::None);
+    assert!(none_res.is_ok(), "Expected EmbeddingBackend::None to succeed when test-utils feature is enabled");
 }

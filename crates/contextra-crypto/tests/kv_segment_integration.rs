@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 fn setup_cipher() -> KvSegmentCipher {
     let master_km = CryptoKey::try_new("master-passphrase-kv-bridge", b"master-salt-kv-bridge")
         .expect("KeyManager creation should succeed");
-    KvSegmentCipher::new(master_km)
+    KvSegmentCipher::ephemeral(master_km)
 }
 
 fn dummy_fingerprint(model_id: &str) -> ModelFingerprint {

@@ -67,7 +67,7 @@ pub struct EmbeddingConfig {
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
-            provider: "mock".to_string(),
+            provider: String::new(),
             ollama_url: "http://localhost:11434".to_string(),
             embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
@@ -82,7 +82,7 @@ impl EmbeddingConfig {
     pub fn from_env() -> Self {
         let prefixed = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER").ok();
         let unprefixed = std::env::var("EMBEDDING_PROVIDER").ok();
-        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "mock");
+        let resolved = resolve_provider_setting(prefixed.as_deref(), unprefixed.as_deref(), "");
 
         if resolved.used_unprefixed_fallback {
             EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE.call_once(|| {
@@ -131,8 +131,15 @@ impl EmbeddingConfig {
         let trimmed_provider = self.provider.trim();
         if trimmed_provider.is_empty() {
             return Err(ContextraError::InvalidInput(
-                "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string(),
+                "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx' oder 'candle' setzen.".to_string(),
             ));
+        }
+
+        #[cfg(any(test, feature = "test-utils"))]
+        if trimmed_provider.eq_ignore_ascii_case("mock") {
+            tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
+            let embedder = contextra_ports::MockEmbedder::new(768);
+            return Ok(Arc::new(embedder));
         }
 
         let mut backend = EmbeddingBackend::from_str(trimmed_provider)?;
@@ -177,7 +184,7 @@ impl EmbeddingConfig {
 pub fn create_embedding_provider(
     backend: &EmbeddingBackend,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
-    match provider_type.to_lowercase().trim() {
+    match backend {
         #[cfg(feature = "ollama")]
         EmbeddingBackend::Ollama { endpoint, model } => {
             let embedder = contextra_infer_ollama::OllamaEmbedder::new(endpoint, model);
@@ -212,28 +219,27 @@ pub fn create_embedding_provider(
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "candle"))]
-        "candle" => {
-            let _ = (ollama_url, embed_model, onnx_model_path, candle_model_dir);
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "candle embedding backend".to_string(),
-                reason: "contextra-mcp was built without the 'candle' feature".to_string(),
-            })
-        }
+        EmbeddingBackend::Candle { .. } => Err(ContextraError::CapabilityUnsupported {
+            capability: "candle embedding backend".to_string(),
+            reason: "contextra-mcp was built without the 'candle' feature".to_string(),
+        }),
         #[cfg(any(test, feature = "test-utils"))]
-        "mock" => {
+        EmbeddingBackend::None => {
+            tracing::warn!("Embedding-Provider 'mock' / 'none' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
-        other => Err(ContextraError::InvalidInput(format!(
-            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', or 'candle'."
-        ))),
+        #[cfg(not(any(test, feature = "test-utils")))]
+        EmbeddingBackend::None => Err(ContextraError::InvalidInput(
+            "Kein Embedding-Backend konfiguriert".to_string(),
+        )),
     }
 }
 
 /// LLM provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LlmConfig {
-    /// Provider type ("ollama", or "candle").
+    /// Provider type ("ollama" or "candle").
     pub provider: String,
     /// Base URL for Ollama HTTP API.
     pub ollama_url: String,
@@ -356,6 +362,10 @@ pub fn create_llm_text_generator(
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
+        #[cfg(not(any(test, feature = "test-utils")))]
+        "mock" => Err(ContextraError::InvalidInput(
+            "LLM-Provider 'mock' ist in Release-Builds deaktiviert".to_string(),
+        )),
         other => Err(ContextraError::InvalidInput(format!(
             "Unknown LLM provider '{other}'. Expected 'ollama' or 'candle'."
         ))),
@@ -444,19 +454,39 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_setting_default() {
-        let res = resolve_provider_setting(None, None, "mock");
-        assert_eq!(res.value, "mock");
+        let res = resolve_provider_setting(None, None, "");
+        assert_eq!(res.value, "");
         assert!(!res.used_unprefixed_fallback);
     }
 
     #[test]
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
-        assert_eq!(config.provider, "mock");
+        assert_eq!(config.provider, "");
         assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.embed_model, "nomic-embed-text");
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
+    }
+
+    #[test]
+    fn test_create_embedding_provider_unconfigured_error() {
+        let config = EmbeddingConfig {
+            provider: "".to_string(),
+            ..Default::default()
+        };
+        let res = config.build_provider();
+        match res {
+            Err(ContextraError::InvalidInput(msg)) => {
+                assert!(msg.contains("CONTEXTRA_EMBEDDING_PROVIDER"));
+                assert!(msg.contains("EMBEDDING_PROVIDER"));
+                assert!(msg.contains("ollama"));
+                assert!(msg.contains("onnx"));
+                assert!(msg.contains("candle"));
+            }
+            Err(other) => panic!("Expected ContextraError::InvalidInput, got: {other}"),
+            Ok(_) => panic!("Expected create_embedding_provider to fail when unconfigured"),
+        }
     }
 
     #[test]

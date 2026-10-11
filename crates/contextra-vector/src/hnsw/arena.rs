@@ -150,6 +150,55 @@ impl HnswArena {
             let start = offsets.get(reused_idx).copied().ok_or_else(|| {
                 ContextraError::Index(format!("Invalid offset index {reused_idx} in free list"))
             })?;
+
+            // Clean stale inbound edges pointing to reused_idx from all other RAM nodes
+            let target_u32 = reused_idx as u32;
+            let num_nodes = offsets.len();
+            for other_idx in 0..num_nodes {
+                if other_idx == reused_idx {
+                    continue;
+                }
+                let other_offset = match offsets.get(other_idx) {
+                    Some(&off) => off,
+                    None => continue,
+                };
+                let count_start = match count_offsets.get(other_idx) {
+                    Some(&c) => c,
+                    None => continue,
+                };
+                let count_end = count_offsets
+                    .get(other_idx + 1)
+                    .copied()
+                    .unwrap_or_else(|| counts.len());
+
+                let num_layers = count_end.saturating_sub(count_start);
+                for layer in 0..num_layers {
+                    let count_idx = count_start + layer;
+                    if count_idx >= counts.len() {
+                        break;
+                    }
+                    let len = counts[count_idx] as usize;
+                    if len == 0 {
+                        continue;
+                    }
+                    let l_offset = Self::layer_offset(other_offset, layer, m);
+                    if l_offset + len <= arena.len() {
+                        let slice = &arena[l_offset..l_offset + len];
+                        if slice.contains(&target_u32) {
+                            let mut kept = Vec::with_capacity(len);
+                            for &conn in slice {
+                                if conn != target_u32 {
+                                    kept.push(conn);
+                                }
+                            }
+                            let new_len = kept.len();
+                            arena[l_offset..l_offset + new_len].copy_from_slice(&kept);
+                            counts[count_idx] = new_len as u8;
+                        }
+                    }
+                }
+            }
+
             (reused_idx, start)
         } else {
             // Align start offset to 64-byte boundary (16 x u32 elements)

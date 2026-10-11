@@ -43,10 +43,10 @@ mod no_crypto_stubs {
         },
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize)]
     pub struct LayerCleanupProof {
-        pub layer: DeletionLayer,
-        pub remaining_count: usize,
+        layer: DeletionLayer,
+        remaining_count: usize,
     }
 
     impl LayerCleanupProof {
@@ -81,6 +81,10 @@ mod no_crypto_stubs {
                 ))),
                 Err(e) => Err(e),
             }
+        }
+
+        pub fn layer(&self) -> DeletionLayer {
+            self.layer
         }
     }
 
@@ -207,7 +211,7 @@ mod no_crypto_stubs {
             let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
 
             let covered_layers: Vec<DeletionLayer> =
-                layer_proofs.into_iter().map(|p| p.layer).collect();
+                layer_proofs.into_iter().map(|p| p.layer()).collect();
             let excluded_scopes: Vec<ExcludedScope> = vec![];
 
             let payload = construct_hmac_payload(
@@ -331,7 +335,7 @@ pub use contextra_ports::VectorDeleteMode;
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
-use contextra_types::{CollectionId, DocId, TenantId};
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -486,6 +490,14 @@ pub enum EmbeddingBackend {
         model_name: String,
         cache_dir: Option<std::path::PathBuf>,
     },
+    Candle {
+        model_dir: std::path::PathBuf,
+        quantization: contextra_infer_candle::model_registry::CandleQuantization,
+    },
+    Ollama {
+        endpoint: String,
+        model: String,
+    },
     None,
 }
 
@@ -506,9 +518,9 @@ impl std::str::FromStr for EmbeddingBackend {
                 endpoint: "http://localhost:11434".to_string(),
                 model: "nomic-embed-text".to_string(),
             }),
-            "none" | "mock" => Ok(Self::None),
+            "none" => Ok(Self::None),
             other => Err(ContextraError::InvalidInput(format!(
-                "Unknown embedding backend '{other}'. Expected 'candle', 'onnx', 'ollama', 'none', or 'mock'."
+                "Unknown embedding backend '{other}'. Expected 'candle', 'onnx', 'ollama', or 'none'."
             ))),
         }
     }
@@ -830,8 +842,8 @@ mod embedding_backend_tests {
             ("Ollama", true),
             ("none", true),
             ("NONE", true),
-            ("mock", true),
-            ("MOCK", true),
+            ("mock", false),
+            ("MOCK", false),
             ("unknown_backend", false),
             ("", false),
         ];
@@ -845,7 +857,7 @@ mod embedding_backend_tests {
                     "candle" => assert!(matches!(backend, EmbeddingBackend::Candle { .. })),
                     "onnx" => assert!(matches!(backend, EmbeddingBackend::Onnx { .. })),
                     "ollama" => assert!(matches!(backend, EmbeddingBackend::Ollama { .. })),
-                    "none" | "mock" => assert!(matches!(backend, EmbeddingBackend::None)),
+                    "none" => assert!(matches!(backend, EmbeddingBackend::None)),
                     _ => unreachable!(),
                 }
             } else {

@@ -1,0 +1,17 @@
+id        = "T-2026-0204"
+title     = "Doku-Drift: KvKeyLocks-Typ und Sperrenhierarchie"
+crate     = "contextra-engine"
+tier      = 1
+risk      = "concurrency"
+goal      = "ARCHITECTURE.md nennt den tatsächlichen Shard-Lock-Typ; Typ im Code per Test fixiert; Sperrenhierarchie um verifizierte Felder ergänzt."
+non_goals = ["Keine Änderung der Locking-Logik", "Keine Änderung an generierten Doku-Blöcken"]
+scope     = ["ARCHITECTURE.md", "crates/contextra-engine/src/collection/kv_lock.rs", ".jules/tasks/T-2026-0204.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock", "Cargo.toml", "docs/decisions/**"]
+invariants = ["Zero-Panic", "Kein Async unter Sync-Locks", "INV-HASHER-SEEDS"]
+acceptance = ["cargo test -p contextra-engine kv_lock", "cargo clippy -p contextra-engine --all-targets -- -D warnings"]
+evidence_required = ["Rot-Lauf des Typtests bei RwLock-Annahme", "Liste der verifizierten Lock-Felder mit Fundstelle"]
+
+[budget]
+files      = 3
+lines      = 200
+iterations = 5

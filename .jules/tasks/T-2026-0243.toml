@@ -1,0 +1,17 @@
+id        = "T-2026-0243"
+title     = "contextra-store: SSTable-Witness über alle lebenden SSTables"
+crate     = "contextra-store"
+tier      = 1
+risk      = "sec"
+goal      = "Beleg, dass keine Nicht-Tombstone-Version des Scopes in lebenden SSTables liegt, TOCTOU-sicher."
+non_goals = ["Keine Compaction-Auslösung (W5-06)", "Keine Entfernung alter Dateien", "Keine WAL-Prüfung"]
+scope     = ["crates/contextra-store/src/lsm/witness.rs", "crates/contextra-store/src/lsm/mod.rs", "crates/contextra-store/src/sstable/reader_ext.rs", "crates/contextra-store/src/tenant_codec.rs", "crates/contextra-store/tests/sstable_witness.rs", ".jules/tasks/T-2026-0243.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "INV-DELETION-1", "Kein Ok bei lebendem Zielschlüssel"]
+acceptance = ["cargo test -p contextra-store", "cargo clippy -p contextra-store --all-targets -- -D warnings"]
+evidence_required = ["TOCTOU-Mechanik mit Fundstellen oder dokumentierter Stopp", "Nachweis Tombstone-Sichtbarkeit von scan_prefix"]
+
+[budget]
+files      = 6
+lines      = 500
+iterations = 8

@@ -216,6 +216,23 @@ impl Contextra {
                     );
                 }
             }
+            EmbeddingBackend::Candle {
+                model_dir,
+                quantization,
+            } => {
+                let client = contextra_infer_candle::CandleEmbedClient::from_dir(
+                    model_dir,
+                    *quantization,
+                )?;
+                let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(client);
+                self.set_embedder(embedder_arc).await?;
+            }
+            EmbeddingBackend::Ollama { .. } => {
+                return Err(contextra_types::ContextraError::CapabilityUnsupported {
+                    capability: "embedding-backend-ollama".to_string(),
+                    reason: "Ollama-Backend wird im MCP-Provider-Pfad aufgelöst, nicht in der Engine".to_string(),
+                });
+            }
             EmbeddingBackend::None => {}
         }
         Ok(())
