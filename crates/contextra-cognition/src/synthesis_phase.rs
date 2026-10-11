@@ -41,6 +41,7 @@ pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
 /// # Fehlerverhalten
 /// Einzelne Segment-Fehler werden übersprungen (`skipped_segments` inkrementiert),
 /// nie als Err propagiert. Globale Fehler (Trait-Fehler im Setup) propagieren als Err.
+// TODO(contextra-plan): Generative synthesis pass execution on segment level with synthesizer trait abstraction. [ref:eigenbau-consolidation-pass]
 pub async fn run_synthesis_pass(
     segments: &[TurnSegment],
     segment_texts: &[Vec<String>], // Texte der Turns pro Segment
