@@ -16,6 +16,7 @@
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
 use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
+use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_ports::{BoxFuture, Result, StorageEngine};
 use std::ops::Bound;
 use std::sync::Arc;
@@ -188,6 +189,12 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>>;
+    fn issue_memtable_witness_handle<'a>(
+        &'a self,
+        deleted_keys: &'a [Vec<u8>],
+        prefixes: &'a [Vec<u8>],
+        as_of_tx: TxId,
+    ) -> BoxFuture<'a, Result<LayerWitness>>;
 }
 
 impl StorageEngineHandle for LsmStorage {
@@ -331,25 +338,34 @@ impl StorageEngineHandle for LsmStorage {
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
         self.scan_bounded(start, end, limit, cursor)
     }
+    fn issue_memtable_witness_handle<'a>(
+        &'a self,
+        deleted_keys: &'a [Vec<u8>],
+        prefixes: &'a [Vec<u8>],
+        as_of_tx: TxId,
+    ) -> BoxFuture<'a, Result<LayerWitness>> {
+        Box::pin(self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx))
+    }
 }
 
-impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
+
+impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
     fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get(key)
+        (**self).get_handle(key)
     }
     fn get_at_seq_handle<'a>(
         &'a self,
         key: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq(key, seq_no)
+        (**self).get_at_seq_handle(key, seq_no)
     }
     fn get_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         key: &'a [u8],
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_tracked(tx_id, key)
+        (**self).get_tracked_handle(tx_id, key)
     }
     fn get_at_seq_tracked_handle<'a>(
         &'a self,
@@ -357,17 +373,17 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         seq: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_tracked(tx_id, key, seq)
+        (**self).get_at_seq_tracked_handle(tx_id, key, seq)
     }
     fn scan_prefix_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_tracked(tx_id, prefix)
+        (**self).scan_prefix_tracked_handle(tx_id, prefix)
     }
     fn supports_ssi_tracking_handle(&self) -> bool {
-        (**self).supports_ssi_tracking()
+        (**self).supports_ssi_tracking_handle()
     }
     fn put_handle<'a>(
         &'a self,
@@ -375,7 +391,7 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put(tx_id, key, value)
+        (**self).put_handle(tx_id, key, value)
     }
     fn put_if_absent_handle<'a>(
         &'a self,
@@ -383,64 +399,64 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
-        (**self).put_if_absent(tx_id, key, value)
+        (**self).put_if_absent_handle(tx_id, key, value)
     }
     fn put_batch_handle<'a>(
         &'a self,
         tx_id: TxId,
         entries: &'a [(Vec<u8>, Vec<u8>)],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_batch(tx_id, entries)
+        (**self).put_batch_handle(tx_id, entries)
     }
     fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        (**self).delete(tx_id, key)
+        (**self).delete_handle(tx_id, key)
     }
     fn delete_many_handle<'a>(
         &'a self,
         tx_id: TxId,
         keys: Vec<Vec<u8>>,
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_many(tx_id, keys)
+        (**self).delete_many_handle(tx_id, keys)
     }
     fn delete_prefix_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_prefix(tx_id, prefix)
+        (**self).delete_prefix_handle(tx_id, prefix)
     }
     fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).commit(tx_id)
+        (**self).commit_handle(tx_id)
     }
     fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback(tx_id)
+        (**self).rollback_handle(tx_id)
     }
     fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_to_tx(tx_id)
+        (**self).rollback_to_tx_handle(tx_id)
     }
     fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        (**self).flush()
+        (**self).flush_handle()
     }
     fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        (**self).stats()
+        (**self).stats_handle()
     }
     fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        (**self).last_seq_no()
+        (**self).last_seq_no_handle()
     }
     fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        (**self).last_tx_id()
+        (**self).last_tx_id_handle()
     }
     fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).pin_checkpoint(seq_no)
+        (**self).pin_checkpoint_handle(seq_no)
     }
     fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).unpin_checkpoint(seq_no)
+        (**self).unpin_checkpoint_handle(seq_no)
     }
     fn scan_prefix_handle<'a>(
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix(prefix)
+        (**self).scan_prefix_handle(prefix)
     }
     fn scan_prefix_bounded_handle<'a>(
         &'a self,
@@ -448,14 +464,14 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_prefix_bounded(prefix, limit, cursor)
+        (**self).scan_prefix_bounded_handle(prefix, limit, cursor)
     }
     fn scan_prefix_at_handle<'a>(
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_at(prefix, seq_no)
+        (**self).scan_prefix_at_handle(prefix, seq_no)
     }
     fn scan_handle<'a>(
         &'a self,
@@ -463,7 +479,7 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         end: Bound<&'a [u8]>,
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan(start, end, limit)
+        (**self).scan_handle(start, end, limit)
     }
     fn scan_bounded_handle<'a>(
         &'a self,
@@ -472,7 +488,15 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_bounded(start, end, limit, cursor)
+        (**self).scan_bounded_handle(start, end, limit, cursor)
+    }
+    fn issue_memtable_witness_handle<'a>(
+        &'a self,
+        deleted_keys: &'a [Vec<u8>],
+        prefixes: &'a [Vec<u8>],
+        as_of_tx: TxId,
+    ) -> BoxFuture<'a, Result<LayerWitness>> {
+        (**self).issue_memtable_witness_handle(deleted_keys, prefixes, as_of_tx)
     }
 }
 
@@ -494,6 +518,29 @@ impl<S> TenantScopedStorage<S> {
     /// Returns the immutable `TenantId` bound to this storage wrapper.
     pub fn tenant_id(&self) -> TenantId {
         self.codec.tenant_id
+    }
+
+    /// Issues a [`LayerWitness`] for memtables after encoding the unencoded target keys and prefixes with tenant prefix.
+    pub async fn issue_memtable_witness(
+        &self,
+        deleted_keys: &[Vec<u8>],
+        prefixes: &[Vec<u8>],
+        as_of_tx: TxId,
+    ) -> Result<LayerWitness>
+    where
+        S: StorageEngineHandle,
+    {
+        let physical_keys: Vec<Vec<u8>> = deleted_keys
+            .iter()
+            .map(|k| self.make_key(k))
+            .collect();
+        let physical_prefixes: Vec<Vec<u8>> = prefixes
+            .iter()
+            .map(|p| self.make_key(p))
+            .collect();
+        self.inner
+            .issue_memtable_witness_handle(&physical_keys, &physical_prefixes, as_of_tx)
+            .await
     }
 
     #[inline]
