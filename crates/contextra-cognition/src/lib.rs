@@ -1,4 +1,5 @@
 #![deny(dead_code)]
+// TODO(contextra-plan): Verify error propagation for consolidation and synthesis facade re-exports. [ref:eigenbau-consolidation-pass]
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.
