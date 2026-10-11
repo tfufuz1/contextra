@@ -96,7 +96,7 @@ async fn run_operator_role(
     println!("  [Betreiber] Collection '{col_name}' mit sensiblen Daten angelegt.");
 
     // 4. Physikalische Löschung der Collection ausführen
-    let proof_key_hmac = b"hmac-key-for-internal-drop";
+    let proof_key_hmac = b"hmac-key-for-internal-drop-32bytes!!";
     let _internal_proof = db
         .drop_collection(col_name, tenant_id, proof_key_hmac)
         .await?;
@@ -108,10 +108,14 @@ async fn run_operator_role(
         tenant_id,
     };
 
+    let create_example_layer_proof = |layer| -> contextra_types::Result<LayerCleanupProof> {
+        LayerCleanupProof::verify_and_create(layer, || Ok(true))
+    };
+
     let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
+        create_example_layer_proof(DeletionLayer::LsmMemtable)?,
+        create_example_layer_proof(DeletionLayer::SsTableAllLevels)?,
+        create_example_layer_proof(DeletionLayer::HnswIndex)?,
     ];
 
     let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {

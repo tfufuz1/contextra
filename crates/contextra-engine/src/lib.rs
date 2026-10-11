@@ -46,6 +46,36 @@ mod no_crypto_stubs {
     }
 
     impl LayerCleanupProof {
+        /// Dieser Konstruktor ist absichtlich auf `contextra-engine`-intern beschränkt,
+        /// weil er eine zählbasierte statt einer zeugenbasierten Prüfung darstellt (INV-WITNESS-MINT-1).
+        /// Produktionsreife Aufrufer außerhalb dieses Crates müssen künftig
+        /// `LayerWitness::issue_from_storage_layer` (WP-2.1/2.2) nutzen.
+        ///
+        /// Für Crate-interne Integrationstests (`tests/*.rs`) steht der Konstruktor unter `#[cfg(test)]` weiterhin als `pub` bereit.
+        #[cfg(not(test))]
+        pub(crate) fn new_after_verified_empty(
+            layer: DeletionLayer,
+            remaining_count: usize,
+        ) -> contextra_types::Result<Self> {
+            if remaining_count != 0 {
+                return Err(contextra_types::ContextraError::Internal(format!(
+                    "INV-DELETION-1 violation: layer {:?} cleanup verification failed with remaining_count={}",
+                    layer, remaining_count
+                )));
+            }
+            Ok(Self {
+                layer,
+                remaining_count,
+            })
+        }
+
+        /// Dieser Konstruktor ist absichtlich auf `contextra-engine`-intern beschränkt,
+        /// weil er eine zählbasierte statt einer zeugenbasierten Prüfung darstellt (INV-WITNESS-MINT-1).
+        /// Produktionsreife Aufrufer außerhalb dieses Crates müssen künftig
+        /// `LayerWitness::issue_from_storage_layer` (WP-2.1/2.2) nutzen.
+        ///
+        /// Für Crate-interne Integrationstests (`tests/*.rs`) steht der Konstruktor unter `#[cfg(test)]` weiterhin als `pub` bereit.
+        #[cfg(test)]
         pub fn new_after_verified_empty(
             layer: DeletionLayer,
             remaining_count: usize,
