@@ -55,7 +55,10 @@ mod tests {
         let file = File::open(&path)?;
         let mmap = mmap_readonly(&file)?;
         assert_eq!(&mmap[..], b"contextra mmap readonly test payload");
-        let _ = std::fs::remove_file(path);
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(_err) => {}
+        }
         Ok(())
     }
 
@@ -75,7 +78,10 @@ mod tests {
             Err(e) => assert_eq!(e.kind(), io::ErrorKind::InvalidInput),
             Ok(_) => return Err("expected error for empty file".into()),
         }
-        let _ = std::fs::remove_file(path);
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(_err) => {}
+        }
         Ok(())
     }
 }

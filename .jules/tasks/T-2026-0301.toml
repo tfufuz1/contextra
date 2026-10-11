@@ -30,6 +30,6 @@ evidence_required = [
 ]
 
 [budget]
-files = 25
-lines = 1000
+files = 30
+lines = 2500
 iterations = 12

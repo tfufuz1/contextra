@@ -178,7 +178,10 @@ fn os_fs_class(path: &Path) -> io::Result<FsClass> {
 fn os_fs_class(path: &Path) -> io::Result<FsClass> {
     use std::os::windows::ffi::OsStrExt;
 
-    let abs_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let abs_path = match std::fs::canonicalize(path) {
+        Ok(p) => p,
+        Err(_) => path.to_path_buf(),
+    };
     let root: Vec<u16> = abs_path
         .ancestors()
         .last()
@@ -414,7 +417,10 @@ mod tests {
         assert!(mock.flush_file(&file, FlushKind::DataAndMetadata).is_err());
 
         drop(file);
-        let _ = std::fs::remove_file(file_path);
+        match std::fs::remove_file(file_path) {
+            Ok(()) => {}
+            Err(_err) => {}
+        }
         Ok(())
     }
 
@@ -457,7 +463,10 @@ mod tests {
             FsClass::LocalSupported | FsClass::Unknown | FsClass::CloudSync
         ));
 
-        let _ = std::fs::remove_file(file_path);
+        match std::fs::remove_file(file_path) {
+            Ok(()) => {}
+            Err(_err) => {}
+        }
         Ok(())
     }
 }
