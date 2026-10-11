@@ -8,16 +8,19 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
-#[allow(clippy::all)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::expect_used)]
-#[allow(clippy::panic)]
-#[allow(clippy::undocumented_unsafe_blocks)]
-#[allow(missing_docs)]
-#[allow(unused_imports)]
-#[allow(unsafe_code)]
-#[allow(unsafe_op_in_unsafe_fn)]
-#[allow(mismatched_lifetime_syntaxes)]
+// Allows are scoped specifically to auto-generated FlatBuffers code in `contextra_generated`.
+#[allow(
+    clippy::all,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::undocumented_unsafe_blocks,
+    missing_docs,
+    unused_imports,
+    unsafe_code,
+    unsafe_op_in_unsafe_fn,
+    mismatched_lifetime_syntaxes
+)]
 pub mod contextra_generated;
 
 pub mod adapter;
