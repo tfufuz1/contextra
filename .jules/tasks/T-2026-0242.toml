@@ -1,0 +1,17 @@
+id        = "T-2026-0242"
+title     = "contextra-store: Memtable-Witness über alle Versionen (aktiv + immutable)"
+crate     = "contextra-store"
+tier      = 1
+risk      = "sec"
+goal      = "Unfälschbarer Beleg, dass keine Nicht-Tombstone-Version des Scopes in Memtables liegt."
+non_goals = ["Kein SSTable-Scan", "Keine Compaction-Änderung", "Kein Flush innerhalb des Scanners"]
+scope     = ["crates/contextra-store/src/lsm/witness.rs", "crates/contextra-store/src/lsm/mod.rs", "crates/contextra-store/src/lsm/engine.rs", "crates/contextra-store/src/memtable.rs", "crates/contextra-store/src/tenant_codec.rs", "crates/contextra-store/tests/memtable_witness.rs", ".jules/tasks/T-2026-0242.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "INV-DELETION-1", "Lock-Ordnung laut lsm/mod.rs", "Keine Schlüsselbytes im Log"]
+acceptance = ["cargo test -p contextra-store", "cargo clippy -p contextra-store --all-targets -- -D warnings"]
+evidence_required = ["Tests a)-g) rot->grün", "Lock-Ordnung im PR begründet"]
+
+[budget]
+files      = 6
+lines      = 450
+iterations = 7

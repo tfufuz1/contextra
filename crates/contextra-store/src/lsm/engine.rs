@@ -286,6 +286,12 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Returns the current `segment_counter` value for testing verification.
+    #[doc(hidden)]
+    pub fn segment_counter_for_test(&self) -> u64 {
+        self.segment_counter.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     #[doc(hidden)]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
