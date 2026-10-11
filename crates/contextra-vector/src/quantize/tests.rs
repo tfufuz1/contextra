@@ -29,9 +29,9 @@ fn test_percentile_clipping_in_try_train() {
         q.maxes()[0]
     );
 
-    // Outlier vectors should be flagged by check_drift
+    // Outlier vectors should be flagged by calculate_vector_drift
     let outlier_vec = vec![500.0, 0.5];
-    let drift = q.check_drift(&outlier_vec);
+    let drift = q.calculate_vector_drift(&outlier_vec);
     assert_eq!(drift, 0.5, "Outlier dimension 0 should register drift");
 }
 
@@ -135,11 +135,11 @@ fn test_check_drift() {
 
     // Vector within range [0, 10] -> 0 drift
     let in_range = vec![0.5, 5.0, 2.0, 9.9];
-    assert_eq!(q.check_drift(&in_range), 0.0);
+    assert_eq!(q.calculate_vector_drift(&in_range), 0.0);
 
     // 2 out of 4 dimensions out of range -> 0.5 drift
     let out_range = vec![-1.0, 5.0, 15.0, 3.0];
-    assert_eq!(q.check_drift(&out_range), 0.5);
+    assert_eq!(q.calculate_vector_drift(&out_range), 0.5);
 }
 
 #[test]

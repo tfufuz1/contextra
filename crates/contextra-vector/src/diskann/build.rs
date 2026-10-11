@@ -722,6 +722,7 @@ impl DiskAnnIndex {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[cfg(feature = "docid-128")]
