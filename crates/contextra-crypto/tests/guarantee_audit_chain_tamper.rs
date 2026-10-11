@@ -13,7 +13,11 @@
 // | Tail Appending (Gültiger Eigenhash) | Nein | Ja | Erweitere Kette 0..n+k ist lokal valide, aber publizierte Head-Signatur sichert nur den früheren Head-Hash/Index. |
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, AuditChainEntry, DataClass, DeletionProofKeyPair,

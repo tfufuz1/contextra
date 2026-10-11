@@ -589,7 +589,7 @@ impl RevocationLog {
             CryptoError::Crypto("Signing key not configured for RevocationLog append".to_string())
         })?;
 
-        let entries_write_guard = self.entries.write();
+        let mut entries_write_guard = self.entries.write();
 
         let sequence_number = entries_write_guard.len() as u64;
         let prev_hash = entries_write_guard
@@ -796,8 +796,15 @@ mod tests {
         let target = RevocationTarget::Group(99);
         let res = log.append(target.clone());
         assert!(res.is_err(), "append MUST fail when disk write fails");
-        assert_eq!(log.len(), 0, "RAM entries count MUST remain 0 on write failure");
-        assert!(!log.is_revoked(&target), "Target MUST NOT be marked revoked in RAM on write failure");
+        assert_eq!(
+            log.len(),
+            0,
+            "RAM entries count MUST remain 0 on write failure"
+        );
+        assert!(
+            !log.is_revoked(&target),
+            "Target MUST NOT be marked revoked in RAM on write failure"
+        );
 
         Ok(())
     }

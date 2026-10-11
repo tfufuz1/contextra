@@ -2,7 +2,13 @@
 // ZWECK: Concurrency Stress Test für TenantIsolatedKvStore und EvictionWorker unter hoher Parallellast.
 // STAND: TS:2026-09-09T16:15:00Z (SESSION: dafac391)
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 
 use contextra_crypto::kv_segment::{
     emergency_wipe, EvictionWorker, KvSegment, TenantIsolatedKvStore,
