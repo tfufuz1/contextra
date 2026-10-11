@@ -78,6 +78,7 @@ pub mod gc_floor;
 mod guard;
 pub mod observer;
 mod validate;
+pub mod witness;
 
 pub mod commit;
 pub mod flush;

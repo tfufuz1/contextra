@@ -17,7 +17,7 @@ impl DeletionProof {
     /// 1. Alle covered_layers physisch bereinigen
     /// 2. WAL-Commit mit Lösch-Intent (P3)
     /// 3. DeletionProof::create() aufrufen
-    pub fn create(
+    pub fn create_v2(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,
@@ -25,7 +25,7 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         proof_key: &[u8],
     ) -> Result<Self> {
-        Self::create_with_wal_receipt(
+        Self::create_v2_with_wal_receipt(
             scope,
             deleted_keys,
             deleted_after_tx,
@@ -62,7 +62,7 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 2) inklusive optionaler WAL-HMAC-Kettenquittung.
-    pub fn create_with_wal_receipt(
+    pub fn create_v2_with_wal_receipt(
         scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,

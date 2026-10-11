@@ -579,6 +579,39 @@ impl MemTable {
         results
     }
 
+    /// Counts non-tombstone versions for a specific exact key across all shards.
+    pub fn count_non_tombstone_key(&self, key: &[u8]) -> usize {
+        let shard_idx = Self::shard_for(key);
+        let entries = self.shards[shard_idx].entries.read();
+        if let Some(versions) = entries.get(key) {
+            versions
+                .iter()
+                .filter(|(seq, _, _)| !is_tombstone(*seq))
+                .count()
+        } else {
+            0
+        }
+    }
+
+    /// Counts non-tombstone versions for any key starting with `prefix` across target shards.
+    pub fn count_non_tombstone_prefix(&self, prefix: &[u8]) -> usize {
+        let shard_range = Self::shard_range_for_prefix(prefix);
+        let mut count = 0;
+        for shard_idx in shard_range {
+            let entries = self.shards[shard_idx].entries.read();
+            for (k, versions) in entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded)) {
+                if !k.starts_with(prefix) {
+                    break;
+                }
+                count += versions
+                    .iter()
+                    .filter(|(seq, _, _)| !is_tombstone(*seq))
+                    .count();
+            }
+        }
+        count
+    }
+
     /// Returns entry count for each shard (used for testing shard distribution).
     #[doc(hidden)]
     // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task

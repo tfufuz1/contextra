@@ -50,7 +50,7 @@ impl Drop for DeletionProofKeyPair {
     }
 }
 
-/// Key parameter for verification (either HMAC-SHA256 byte slice or Ed25519 VerifyingKey).
+/// Key parameter for verification coupled with its signature version.
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationKey<'a> {
     /// Key for HMAC-SHA256 signature verification (version 1).

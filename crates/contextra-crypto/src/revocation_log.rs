@@ -589,7 +589,7 @@ impl RevocationLog {
             CryptoError::Crypto("Signing key not configured for RevocationLog append".to_string())
         })?;
 
-        let mut entries_write_guard = self.entries.write();
+        let entries_write_guard = self.entries.write();
 
         let sequence_number = entries_write_guard.len() as u64;
         let prev_hash = entries_write_guard
@@ -771,6 +771,33 @@ mod tests {
         // Proof (c): decrypt_with_group fails with dedicated CryptoError::KeyRevoked
         let res_dec = registry.decrypt_with_group(group_id, &ct, &nonce);
         assert!(matches!(res_dec, Err(CryptoError::KeyRevoked(_))));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_append_write_failure_preserves_ram_state() -> Result<()> {
+        let (sk, vk) = test_keypair();
+        let clock = Arc::new(SystemClock::new());
+        let invalid_path = PathBuf::from("/nonexistent_dir_for_test_12345/revocation.log");
+        let log = RevocationLog {
+            file_path: Some(invalid_path),
+            signing_key: Some(sk),
+            verifying_key: vk,
+            clock,
+            entries: RwLock::new(Vec::new()),
+            revoked_targets: RwLock::new(HashSet::new()),
+            verified_cursor: RwLock::new(VerifiedCursor {
+                verified_len: 0,
+                last_verified_hash: [0u8; 32],
+            }),
+        };
+
+        let target = RevocationTarget::Group(99);
+        let res = log.append(target.clone());
+        assert!(res.is_err(), "append MUST fail when disk write fails");
+        assert_eq!(log.len(), 0, "RAM entries count MUST remain 0 on write failure");
+        assert!(!log.is_revoked(&target), "Target MUST NOT be marked revoked in RAM on write failure");
 
         Ok(())
     }

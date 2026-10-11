@@ -8,6 +8,12 @@
 // 5. DeletionProof creation on MemoryOnly / missing DurabilityProof yields Err(NotDurable).
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::permissions_set_readonly_false
+)]
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{

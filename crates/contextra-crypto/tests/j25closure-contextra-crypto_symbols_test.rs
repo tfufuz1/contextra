@@ -10,6 +10,8 @@
 // 8. new_in_memory (revocation_log.rs)
 // 9. verify_integrity (revocation_log.rs)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_crypto::audit_chain::{AuditChain, DataClass};
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{
@@ -60,6 +62,7 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
     let cleanup_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
         .expect("valid cleanup proof");
     let audit_position = Some(head_sig.chain_index);
+    let durability = DurabilityProof::new(tx_id.0);
 
     let durability = DurabilityProof::new(202);
     let proof = DeletionProof::create_v3_with_audit_position(

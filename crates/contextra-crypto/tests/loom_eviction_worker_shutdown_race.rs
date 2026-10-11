@@ -1,4 +1,4 @@
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für EvictionWorker Shutdown Race in `contextra-crypto`.
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-crypto --test loom_eviction_worker_shutdown_race -- --nocapture

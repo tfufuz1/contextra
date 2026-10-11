@@ -3,6 +3,7 @@
 // INVARIANTEN: Zero-Panic doctrine in non-test code, fail-closed revocation checks, length-prefixed deletion proof hashes, and Blake3 audit chain integrity.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation)]
 
 use contextra_crypto::{
     anti_tamper::VolatileEncryptionKey,

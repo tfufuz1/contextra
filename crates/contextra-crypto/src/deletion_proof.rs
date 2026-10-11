@@ -40,6 +40,7 @@ pub use types::*;
 pub use wal_receipt::*;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 mod tests {
     use super::*;
     use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
@@ -238,9 +239,35 @@ mod tests {
         assert!(res.is_err());
         match res {
             Err(ContextraError::Internal(msg)) => {
-                assert!(msg.contains("VerificationKey version mismatch"));
+                assert!(msg.contains("HMAC key provided for Ed25519 signature_version 3 proof"));
             }
             _ => panic!("Expected ContextraError::Internal"),
+        }
+    }
+
+    #[test]
+    fn test_v3_create_without_durability_proof_returns_not_durable_error() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let res = DeletionProof::create_v3(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![],
+            vec![],
+            1700000000,
+            &[],
+            None, // Missing durability proof
+            keypair.signing_key(),
+        );
+        assert!(res.is_err(), "create_v3 with None durability_proof MUST fail");
+        match res {
+            Err(ContextraError::Crypto(msg)) => {
+                assert!(msg.contains("not durable") || msg.contains("NotDurable"));
+            }
+            _ => panic!("Expected ContextraError::Crypto with NotDurable details"),
         }
     }
 

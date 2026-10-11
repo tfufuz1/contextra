@@ -165,6 +165,7 @@ impl TryFrom<u8> for SignatureVersion {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use rand::rngs::StdRng;

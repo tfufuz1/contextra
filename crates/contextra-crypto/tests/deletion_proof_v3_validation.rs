@@ -109,6 +109,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
 
     let durability = DurabilityProof::new(100);
     // 1. Create a valid Ed25519 Version 3 proof
+    let durability = DurabilityProof::new(100);
+
     let valid_v3_proof = DeletionProof::create_v3(
         scope.clone(),
         vec![b"key1".to_vec()],
@@ -161,8 +163,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
     }
 
     // 3. Test HMAC Version 2 proof with valid signature but unknown mutated version
-    let hmac_key = b"hmac_key_32_bytes_long_secret!!";
-    let valid_v2_proof = DeletionProof::create(
+    let hmac_key = b"hmac_key_32_bytes_long_secret!!1";
+    let valid_v2_proof = DeletionProof::create_v2(
         scope,
         vec![b"key1".to_vec()],
         TxId::new(100),

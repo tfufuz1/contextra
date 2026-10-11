@@ -3,6 +3,8 @@
 // INVARIANTEN: Roundtrip invariant: decrypt(encrypt(pt)) == pt. Authenticity invariant: 1-bit ciphertext flip must fail decryption.
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation)]
+
 use contextra_crypto::wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
 use contextra_types::TenantId;

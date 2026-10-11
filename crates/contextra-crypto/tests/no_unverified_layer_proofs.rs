@@ -1,5 +1,13 @@
 // NEW: crates/contextra-crypto/tests/no_unverified_layer_proofs.rs
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::if_same_then_else,
+    clippy::unnecessary_map_or
+)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

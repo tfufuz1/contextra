@@ -11,6 +11,101 @@ use crate::error::CryptoError;
 use contextra_types::{error::HnswDeletionError, ContextraError, Result, TxId};
 
 impl DeletionProof {
+    /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 nach Layer-Bereinigung.
+    pub fn create(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        let durability = DurabilityProof::new(deleted_after_tx.0);
+        Self::create_with_durability(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            Some(&durability),
+            proof_key,
+        )
+    }
+
+    /// Erstellt und signiert einen DeletionProof (Version 3) mit optionaler WAL-Löschquittung.
+    pub fn create_with_wal_receipt(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        wal_chain_receipt: Option<[u8; 32]>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        let durability = DurabilityProof::new(deleted_after_tx.0);
+        let signing_key = if proof_key.len() >= 32 {
+            let mut key_bytes = [0u8; 32];
+            key_bytes.copy_from_slice(&proof_key[..32]);
+            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
+        } else {
+            return Err(ContextraError::Internal(
+                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
+            ));
+        };
+
+        Self::create_with_wal_receipt_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            wal_chain_receipt,
+            0,
+            &[],
+            Some(&durability),
+            &signing_key,
+        )
+    }
+
+    /// Creates a DeletionProof with explicit DurabilityProof verification.
+    ///
+    /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    pub fn create_with_durability(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        durability_proof: Option<&DurabilityProof>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        if durability_proof.is_none() {
+            return Err(CryptoError::NotDurable.into());
+        }
+
+        let signing_key = if proof_key.len() >= 32 {
+            let mut key_bytes = [0u8; 32];
+            key_bytes.copy_from_slice(&proof_key[..32]);
+            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
+        } else {
+            return Err(ContextraError::Internal(
+                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
+            ));
+        };
+
+        Self::create_v3(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            0,
+            &[],
+            durability_proof,
+            &signing_key,
+        )
+    }
+
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
     #[allow(clippy::too_many_arguments)]
     pub fn create_v3(
