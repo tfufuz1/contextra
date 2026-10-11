@@ -1,0 +1,27 @@
+id        = "T-2026-9104a"
+title     = "SSTable Witness Reader Standalone Parser Stage A"
+crate     = "contextra-store"
+tier      = 1
+risk      = "none"
+goal      = "Unabhängiger WitnessReader für SSTables zur sicheren Offline-Erkennung gelöschter/historischer Daten."
+non_goals = ["Verwendung von reader.rs/block_search.rs Produktion-Funktionen", "Änderungen an bestehenden SSTable-Dateien"]
+scope     = [
+  "crates/contextra-store/src/sstable.rs",
+  "crates/contextra-store/src/sstable/witness_types.rs",
+  "crates/contextra-store/src/sstable/witness_reader.rs",
+  "crates/contextra-store/fuzz/Cargo.toml",
+  "crates/contextra-store/fuzz/fuzz_targets/witness_reader_sstable.rs",
+  "crates/contextra-store/tests/sst_witness_reader_tests.rs"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed", "No-Key-In-Logs"]
+acceptance = [
+  "cargo test -p contextra-store --test sst_witness_reader_tests",
+  "cargo xtask jules check"
+]
+evidence_required = ["Differenztest zwischen SstableReader und WitnessReader", "Fuzz Target witness_reader_sstable"]
+
+[budget]
+files = 10
+lines = 500
+iterations = 8
