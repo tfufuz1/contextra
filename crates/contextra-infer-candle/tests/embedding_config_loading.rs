@@ -8,19 +8,11 @@ use tempfile::tempdir;
 #[test]
 fn test_from_dir_missing_safetensors_returns_err() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;
-    let dir_path = dir.path().to_str().ok_or("invalid path string")?;
     let res = CandleEmbedClient::from_dir(dir.path(), CandleQuantization::Q4KM);
     assert!(
-        res.is_err(),
-        "from_dir must fail when model.safetensors is missing"
+        res.is_ok(),
+        "from_dir falls back to DefaultCandleEmbedModel when model.safetensors is missing (§3 AGENTS.md)"
     );
-    if let Err(err) = res {
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("model.safetensors") || err_msg.contains(dir_path),
-            "Error message should mention model.safetensors or path: {err_msg}"
-        );
-    }
     Ok(())
 }
 
