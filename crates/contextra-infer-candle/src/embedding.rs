@@ -5,6 +5,8 @@
 // NICHT-OFFENSICHTLICH: CandleEmbedInner trait enables mock-based unit testing without binary weights in CI.
 // Backpressure contract: max_concurrent_embeddings limits spawn_blocking calls.
 
+// TODO(contextra-plan): Plan for Candle ML embedding path: Ensure runtime dimension validation against ModelFingerprint and non-constant vector output proof across distinct inputs [ref:eigenbau-candle-tensor]
+
 use crate::model_registry::ModelFingerprint;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
