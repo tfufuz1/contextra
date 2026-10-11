@@ -24,20 +24,33 @@
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
 pub mod audit_export;
+pub mod builder;
+pub mod canon;
 pub mod keys;
+pub mod layer_ids;
 pub mod layer_proof;
+pub mod policy;
 pub mod proof;
+pub mod proof_store;
+pub mod proof_v4;
 pub mod proof_v2;
 pub mod proof_v3;
+pub mod signer;
 pub mod types;
 pub mod verify;
 pub mod wal_receipt;
 
-pub use keys::*;
-pub use layer_proof::*;
-pub use proof::*;
-pub use types::*;
-pub use wal_receipt::*;
+pub use self::builder::*;
+pub use self::canon::*;
+pub use self::keys::*;
+pub use self::layer_proof::*;
+pub use self::policy::*;
+pub use self::proof::*;
+pub use self::proof_store::*;
+pub use self::proof_v4::*;
+pub use self::signer::*;
+pub use self::types::*;
+pub use self::wal_receipt::*;
 
 #[cfg(test)]
 #[allow(
