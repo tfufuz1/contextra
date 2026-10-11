@@ -1,0 +1,86 @@
+# KEYFAMILIES.toml
+# Registry aller Key-Präfix-Familien für Löschpfade und Storage-Funktionen.
+
+[[family]]
+name = "CollectionDocData"
+prefix_pattern = "__col:{collection_name}:\x00"
+owner_crate = "contextra-engine"
+erase_unit = "Both"
+scanner = "TODO"
+contains_identifier = true
+
+# OFFENER PUNKT / KNOWN DISCREPANCY:
+# Für __col_idx: existiert eine bekannte Diskrepanz zwischen drop_collection (b"__col_idx:\x00", name)
+# und der tatsächlichen Key-Kodierung. Dies ist ein bekannter, noch ungeklärter offener Punkt
+# und wird in einem nachfolgenden Arbeitspaket adressiert, das den Produktionscode anpasst.
+[[family]]
+name = "CollectionIndex"
+prefix_pattern = "__col_idx:\x00{collection_name}"
+owner_crate = "contextra-engine"
+erase_unit = "PerCollection"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "TextIndex"
+prefix_pattern = "__txt:{collection_name}:"
+owner_crate = "contextra-engine"
+erase_unit = "Both"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "Relations"
+prefix_pattern = "__rel:"
+owner_crate = "contextra-engine"
+erase_unit = "PerDocument"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "DocIdMapping"
+prefix_pattern = "__docid:"
+owner_crate = "contextra-engine"
+erase_unit = "PerDocument"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "GraphData"
+prefix_pattern = "__graph:"
+owner_crate = "contextra-graph"
+erase_unit = "Both"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "TxIntent"
+prefix_pattern = "__tx_intent:"
+owner_crate = "contextra-engine"
+erase_unit = "PerTenant"
+scanner = "TODO"
+contains_identifier = false
+
+[[family]]
+name = "KvCache"
+prefix_pattern = "__kv_spill:"
+owner_crate = "contextra-kvcache"
+erase_unit = "PerTenant"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "SessionDag"
+prefix_pattern = "__session_dag:"
+owner_crate = "contextra-graph"
+erase_unit = "PerTenant"
+scanner = "TODO"
+contains_identifier = true
+
+[[family]]
+name = "MaintenanceIntent"
+prefix_pattern = "__maintenance_intent:"
+owner_crate = "contextra-cognition"
+erase_unit = "PerTenant"
+scanner = "TODO"
+contains_identifier = false
