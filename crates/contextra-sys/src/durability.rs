@@ -80,6 +80,19 @@ pub fn rename_durable(from: &Path, to: &Path) -> io::Result<()> {
     DEFAULT_BACKEND.rename_durable(from, to)
 }
 
+#[cfg(unix)]
+mod posix_ffi {
+    use std::os::raw::{c_char, c_int};
+
+    extern "C" {
+        pub fn fdatasync(fd: c_int) -> c_int;
+        pub fn fsync(fd: c_int) -> c_int;
+        #[allow(dead_code)]
+        pub fn fcntl(fd: c_int, cmd: c_int, arg: c_int) -> c_int;
+        pub fn statfs(path: *const c_char, buf: *mut libc::statfs) -> c_int;
+    }
+}
+
 #[cfg(windows)]
 mod win32_ffi {
     use std::ffi::c_void;
@@ -126,8 +139,8 @@ fn os_fs_class(path: &Path) -> io::Result<FsClass> {
 
     // SAFETY: `stat` is allocated on stack and zero-initialized.
     let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
-    // SAFETY: `c_path` is a valid NUL-terminated CString.
-    let res = unsafe { libc::statfs(c_path.as_ptr(), &mut stat) };
+    // SAFETY: `c_path` is a valid NUL-terminated CString and `stat` points to memory.
+    let res = unsafe { posix_ffi::statfs(c_path.as_ptr(), &mut stat) };
     if res != 0 {
         return Err(io::Error::last_os_error());
     }
@@ -156,8 +169,8 @@ fn os_fs_class(path: &Path) -> io::Result<FsClass> {
 
     // SAFETY: `stat` is allocated on stack and zero-initialized.
     let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
-    // SAFETY: `c_path` is a valid NUL-terminated CString.
-    let res = unsafe { libc::statfs(c_path.as_ptr(), &mut stat) };
+    // SAFETY: `c_path` is a valid NUL-terminated CString and `stat` points to memory.
+    let res = unsafe { posix_ffi::statfs(c_path.as_ptr(), &mut stat) };
     if res != 0 {
         return Err(io::Error::last_os_error());
     }
@@ -182,7 +195,17 @@ fn os_fs_class(path: &Path) -> io::Result<FsClass> {
         Ok(p) => p,
         Err(_) => path.to_path_buf(),
     };
-    let root: Vec<u16> = abs_path
+    let path_str = abs_path.to_string_lossy();
+    let clean_str = if let Some(stripped) = path_str.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{}", stripped)
+    } else if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
+        stripped.to_string()
+    } else {
+        path_str.to_string()
+    };
+
+    let clean_path = Path::new(&clean_str);
+    let root: Vec<u16> = clean_path
         .ancestors()
         .last()
         .map(|p| {
@@ -220,11 +243,11 @@ impl SyscallBackend for OsSyscallBackend {
             let res = match kind {
                 FlushKind::DataOnly => {
                     // SAFETY: `fd` is a valid open file descriptor from `file`.
-                    unsafe { libc::fdatasync(fd) }
+                    unsafe { posix_ffi::fdatasync(fd) }
                 }
                 FlushKind::DataAndMetadata => {
                     // SAFETY: `fd` is a valid open file descriptor from `file`.
-                    unsafe { libc::fsync(fd) }
+                    unsafe { posix_ffi::fsync(fd) }
                 }
             };
             if res == 0 {
@@ -238,9 +261,9 @@ impl SyscallBackend for OsSyscallBackend {
         {
             let _ = kind;
             let fd = file.as_raw_fd();
-            const F_FULLFSYNC: libc::c_int = 48;
+            const F_FULLFSYNC: std::os::raw::c_int = 48;
             // SAFETY: `fd` is a valid open file descriptor from `file`.
-            let res = unsafe { libc::fcntl(fd, F_FULLFSYNC, 0) };
+            let res = unsafe { posix_ffi::fcntl(fd, F_FULLFSYNC, 0) };
             if res == 0 {
                 Ok(())
             } else {
@@ -275,7 +298,7 @@ impl SyscallBackend for OsSyscallBackend {
             let file = File::open(dir)?;
             let fd = file.as_raw_fd();
             // SAFETY: `fd` is a valid open directory descriptor for `dir`.
-            let res = unsafe { libc::fsync(fd) };
+            let res = unsafe { posix_ffi::fsync(fd) };
             if res == 0 {
                 Ok(())
             } else {

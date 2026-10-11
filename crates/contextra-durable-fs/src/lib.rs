@@ -27,7 +27,6 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::SystemTime;
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -91,9 +90,38 @@ impl DurableHandle {
         }
     }
 
+    /// Returns a mutable reference to the underlying [`File`], or `None` if poisoned.
+    pub fn get_mut(&mut self) -> Option<&mut File> {
+        if self.is_poisoned {
+            None
+        } else {
+            self.file.as_mut()
+        }
+    }
+
     /// Explicitly poisons this handle.
     pub fn poison(&mut self) {
         self.is_poisoned = true;
+    }
+}
+
+impl Write for DurableHandle {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.is_poisoned {
+            return Err(std::io::Error::other(
+                "handle is poisoned due to a previous fsync failure",
+            ));
+        }
+
+        let Some(file) = self.file.as_mut() else {
+            return Err(std::io::Error::other("file handle has been closed"));
+        };
+
+        file.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        DurableHandle::flush(self, FlushKind::DataAndMetadata)
     }
 }
 
@@ -204,12 +232,8 @@ pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
     let count = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
-    let nanos = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
 
-    let tmp_filename = format!(".{}.tmp.{}.{}.{}", file_stem, pid, nanos, count);
+    let tmp_filename = format!(".{}.tmp.{}.{}", file_stem, pid, count);
     let tmp_path = parent.join(tmp_filename);
 
     let mut options = OpenOptions::new();
