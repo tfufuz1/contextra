@@ -5,7 +5,12 @@
 //         KeyManager::derive_kv_key_scoped, IntegrityVerifier::handoff_from (last_seq_no_snapshot & set_last_seq_no).
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionScope, ExcludedScope, LayerCleanupProof,

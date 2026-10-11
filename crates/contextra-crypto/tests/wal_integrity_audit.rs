@@ -2,7 +2,13 @@
 // ZWECK: Integrationstests und Audit-Regressionstests für WAL-Integrität, Sequence-Number-Zustandsmaschine, Nonce-Politik und V2/V3-Protokolle.
 // INVARIANTEN: Monotone Sequence-Nummern, verweigerte Replays/Lücken, Nonce-Eindeutigkeit, Zero-Panics.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation, clippy::bool_assert_comparison)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::bool_assert_comparison
+)]
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};

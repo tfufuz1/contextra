@@ -40,7 +40,13 @@ pub use types::*;
 pub use wal_receipt::*;
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 mod tests {
     use super::*;
     use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
@@ -262,7 +268,10 @@ mod tests {
             None, // Missing durability proof
             keypair.signing_key(),
         );
-        assert!(res.is_err(), "create_v3 with None durability_proof MUST fail");
+        assert!(
+            res.is_err(),
+            "create_v3 with None durability_proof MUST fail"
+        );
         match res {
             Err(ContextraError::Crypto(msg)) => {
                 assert!(msg.contains("not durable") || msg.contains("NotDurable"));
