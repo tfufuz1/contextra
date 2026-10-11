@@ -61,7 +61,11 @@ pub struct EmbeddingConfig {
     /// Optional path to Candle model directory.
     pub candle_model_dir: Option<PathBuf>,
     /// Candle model quantization grade (e.g. Q4KM, Q8_0, F16).
+    #[cfg(feature = "candle")]
     pub candle_quantization: contextra_infer_candle::model_registry::CandleQuantization,
+    /// Candle model quantization grade (e.g. Q4KM, Q8_0, F16).
+    #[cfg(not(feature = "candle"))]
+    pub candle_quantization: String,
 }
 
 impl Default for EmbeddingConfig {
@@ -72,7 +76,10 @@ impl Default for EmbeddingConfig {
             embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
             candle_model_dir: None,
+            #[cfg(feature = "candle")]
             candle_quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
+            #[cfg(not(feature = "candle"))]
+            candle_quantization: "Q4KM".to_string(),
         }
     }
 }
@@ -112,9 +119,13 @@ impl EmbeddingConfig {
             .or_else(|_| std::env::var("CANDLE_QUANTIZATION"))
             .unwrap_or_else(|_| "Q4KM".to_string());
 
+        #[cfg(feature = "candle")]
         let candle_quantization =
             contextra_infer_candle::model_registry::CandleQuantization::from_str(&quantization_str)
                 .unwrap_or(contextra_infer_candle::model_registry::CandleQuantization::Q4KM);
+
+        #[cfg(not(feature = "candle"))]
+        let candle_quantization = quantization_str;
 
         Self {
             provider,
@@ -145,6 +156,7 @@ impl EmbeddingConfig {
         let mut backend = EmbeddingBackend::from_str(trimmed_provider)?;
 
         match &mut backend {
+            #[cfg(feature = "candle")]
             EmbeddingBackend::Candle {
                 model_dir,
                 quantization,
@@ -157,6 +169,22 @@ impl EmbeddingConfig {
                 })?;
                 *model_dir = dir;
                 *quantization = self.candle_quantization;
+            }
+            #[cfg(not(feature = "candle"))]
+            EmbeddingBackend::Candle {
+                model_dir,
+                quantization,
+            } => {
+                let dir = self.candle_model_dir.clone().ok_or_else(|| {
+                    ContextraError::InvalidInput(
+                        "candle_model_dir is required when embedding provider is 'candle'"
+                            .to_string(),
+                    )
+                })?;
+                *model_dir = dir;
+                if let Ok(parsed) = std::str::FromStr::from_str(&self.candle_quantization) {
+                    *quantization = parsed;
+                }
             }
             EmbeddingBackend::Onnx {
                 model_name,
@@ -597,10 +625,7 @@ mod tests {
     #[cfg(not(feature = "candle"))]
     #[test]
     fn test_create_embedding_provider_candle_unsupported_error() {
-        let backend = EmbeddingBackend::Candle {
-            model_dir: PathBuf::from("/tmp"),
-            quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
-        };
+        let backend = EmbeddingBackend::from_str("candle").unwrap();
         let res = create_embedding_provider(&backend);
         assert!(matches!(
             res,

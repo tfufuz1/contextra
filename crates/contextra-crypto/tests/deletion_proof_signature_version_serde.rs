@@ -1,5 +1,5 @@
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionScope, DurabilityProof, ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::ed25519_proof::{DeletionProofError, DeletionProofKeyPair, SignatureVersion};
 use contextra_types::{DocId, TenantId, TxId};
@@ -118,6 +118,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
     // Golden JSON V3
     let mut rng = rand::rngs::OsRng;
     let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let durability = DurabilityProof::new(30);
     let proof_v3_orig = DeletionProof::create_v3(
         scope,
         vec![b"key_a".to_vec()],
@@ -126,6 +127,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();

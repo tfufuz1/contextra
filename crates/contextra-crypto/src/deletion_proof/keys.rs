@@ -1,5 +1,7 @@
 //! Key pair and verification key definitions for deletion proofs.
 
+use crate::ed25519_proof::SignatureVersion;
+
 /// KeyPair for Ed25519 signing and verification of DeletionProofs (version 3).
 pub struct DeletionProofKeyPair {
     pub(super) signing_key: ed25519_dalek::SigningKey,
@@ -51,10 +53,25 @@ impl Drop for DeletionProofKeyPair {
 /// Key parameter for verification (either HMAC-SHA256 byte slice or Ed25519 VerifyingKey).
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationKey<'a> {
-    /// Key for HMAC-SHA256 signature verification (version 1 and 2).
+    /// Key for HMAC-SHA256 signature verification (version 1).
+    HmacV1(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (version 2).
+    HmacV2(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification.
     Hmac(&'a [u8]),
     /// Key for Ed25519 signature verification (version 3).
     Ed25519(&'a ed25519_dalek::VerifyingKey),
+}
+
+impl<'a> VerificationKey<'a> {
+    /// Returns the associated signature version for this verification key.
+    pub fn version(&self) -> SignatureVersion {
+        match self {
+            Self::HmacV1(_) => SignatureVersion::V1,
+            Self::HmacV2(_) | Self::Hmac(_) => SignatureVersion::V2,
+            Self::Ed25519(_) => SignatureVersion::V3,
+        }
+    }
 }
 
 impl<'a> From<&'a [u8]> for VerificationKey<'a> {

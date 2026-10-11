@@ -3,6 +3,20 @@
 use contextra_types::{CollectionId, DocId, TenantId};
 use serde::{Deserialize, Serialize};
 
+/// Attestation confirming that physical layer sanitization and deletion logs have been flushed to durable storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DurabilityProof {
+    /// Monotonically increasing sequence number or TxId confirmed durable by disk fsync.
+    pub confirmed_seq_no: u64,
+}
+
+impl DurabilityProof {
+    /// Constructs a new DurabilityProof for a confirmed fsynced sequence number.
+    pub fn new(confirmed_seq_no: u64) -> Self {
+        Self { confirmed_seq_no }
+    }
+}
+
 /// Attestation confirming synchronous neighborhood graph repair for vector deletions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GraphRepairAttestation {

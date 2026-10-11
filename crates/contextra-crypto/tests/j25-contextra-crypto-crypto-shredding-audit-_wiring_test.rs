@@ -8,7 +8,7 @@ use contextra_crypto::audit_chain::{AuditChain, DataClass};
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{
     compute_wal_delete_receipt, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope,
-    ExcludedScope, LayerCleanupProof,
+    DurabilityProof, ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_ports::SystemClock;
@@ -67,6 +67,7 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
     let cleanup_proofs =
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
+    let durability = DurabilityProof::new(123);
     let proof_v3 = DeletionProof::create_v3(
         scope.clone(),
         vec![b"key_a".to_vec()],
@@ -75,6 +76,7 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("create_v3 must succeed");
@@ -91,6 +93,7 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         Some(42),
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("create_v3_with_audit_position must succeed");
@@ -117,6 +120,7 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         Some(receipt),
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("create_with_wal_receipt_v3");

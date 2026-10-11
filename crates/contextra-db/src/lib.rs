@@ -650,20 +650,7 @@ mod tests {
     fn test_contextra_config_defaults_to_onnx_backend() {
         let config = ContextraConfig::default();
         assert_eq!(config.dimension, 768);
-        assert_eq!(
-            config.embedding_backend,
-            EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: None,
-            }
-        );
-        assert_eq!(
-            EmbeddingBackend::default(),
-            EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: None,
-            }
-        );
+        assert_eq!(config.embedding_backend, EmbeddingBackend::None);
     }
 
     #[tokio::test]

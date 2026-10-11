@@ -893,7 +893,7 @@ mod tests {
         let registry = Arc::new(contextra_core::SnapshotRegistry::new());
         let bc = create_block_cache(1);
         let manifest_path = tmp.path().join("MANIFEST-000001");
-        let manifest = Arc::new(crate::manifest::Manifest::create(&manifest_path).await?);
+        let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
 
         let config = CompactionConfig {
             min_sstables_per_tier: 2,

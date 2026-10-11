@@ -31,7 +31,7 @@ pub enum VectorData {
 pub struct HnswNode {
     pub(super) doc_id: DocId,
     pub(super) vector: VectorData,
-    pub(super) max_layer: usize,
+    pub max_layer: usize,
     pub(super) committed_tx: u64,
 }
 

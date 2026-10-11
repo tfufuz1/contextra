@@ -1,6 +1,6 @@
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+    ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::CryptoError;
 use contextra_types::{DocId, TenantId, TxId};
@@ -16,6 +16,7 @@ fn verify_external_accepts_valid_proof() {
     let layer_proof =
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
+    let durability = DurabilityProof::new(100);
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec(), b"key2".to_vec()],
@@ -24,6 +25,7 @@ fn verify_external_accepts_valid_proof() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("Failed to create valid v3 proof");
@@ -46,6 +48,7 @@ fn verify_external_rejects_tampered_timestamp() {
     let layer_proof =
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
+    let durability = DurabilityProof::new(100);
     let mut proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -54,6 +57,7 @@ fn verify_external_rejects_tampered_timestamp() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("Failed to create v3 proof");
@@ -80,6 +84,7 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
     let layer_proof =
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
+    let durability = DurabilityProof::new(100);
     let mut proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -88,6 +93,7 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("Failed to create v3 proof");
@@ -110,6 +116,7 @@ fn verify_external_rejects_wrong_public_key() {
     let tenant_id = TenantId::try_new(1).unwrap();
     let scope = DeletionScope::Tenant { tenant_id };
 
+    let durability = DurabilityProof::new(100);
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -118,6 +125,7 @@ fn verify_external_rejects_wrong_public_key() {
         vec![],
         1700000000,
         &[],
+        Some(&durability),
         keypair1.signing_key(),
     )
     .expect("Failed to create v3 proof");
