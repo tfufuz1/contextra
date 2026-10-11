@@ -14,9 +14,10 @@ use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
 #[cfg(feature = "wal-integrity")]
-use super::{legacy_integrity_key, WalOp};
+use super::legacy_integrity_key;
 use super::{
-    Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
+    Wal, WalEntry, WalOp, WalParseError, WalReplayFilter, WalReplayReport, WalVersion,
+    MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
 
 pub type WalSeq = u64;
@@ -67,6 +68,45 @@ impl Wal {
     /// Falls back to stream replay if mmap or parsing fails.
     pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
         self.replay_with_sink(&NoopReplayProgressSink).await
+    }
+
+    /// Replays the WAL while filtering entries using the optional `WalReplayFilter`.
+    pub async fn replay_with_filter(
+        &self,
+        filter: Option<&dyn WalReplayFilter>,
+    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalReplayReport)> {
+        let all_entries = self.replay().await?;
+        let mut report = WalReplayReport::default();
+        let mut filtered = Vec::with_capacity(all_entries.len());
+
+        for (seq, entry, pos) in all_entries {
+            let drop = match &entry.op {
+                WalOp::Put { tx_id, key, .. } => {
+                    if let Some(f) = filter {
+                        f.drop_record(key, tx_id.inner())
+                    } else {
+                        false
+                    }
+                }
+                WalOp::Delete { tx_id, key } => {
+                    if let Some(f) = filter {
+                        f.drop_record(key, tx_id.inner())
+                    } else {
+                        false
+                    }
+                }
+                WalOp::TxEnd { .. } => false,
+            };
+
+            if drop {
+                report.records_dropped_by_filter += 1;
+            } else {
+                report.records_replayed += 1;
+                filtered.push((seq, entry, pos));
+            }
+        }
+
+        Ok((filtered, report))
     }
 
     /// Replays the WAL while notifying the provided `ReplayProgressSink` of progress.
