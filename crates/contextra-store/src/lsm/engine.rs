@@ -68,6 +68,7 @@ pub struct LsmStorage {
     pub(super) observer_registry: ObserverRegistry,
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    pub erasure_fence: Arc<super::fence::ErasureFence>,
 }
 
 impl Drop for LsmStorage {

@@ -1,5 +1,6 @@
 mod compaction;
 mod maintenance;
+pub mod purge;
 pub(super) mod read;
 mod write;
 
