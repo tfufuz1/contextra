@@ -27,6 +27,6 @@ pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use retrieval_strategy::RetrievalStrategy;
 pub use schema::{DocIdWidth, ManifestSchemaVersion};
-pub use tenant_scope::{StorageScope, TenantScopeViolation, TenantScoped};
+pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
