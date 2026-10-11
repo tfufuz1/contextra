@@ -48,10 +48,14 @@ impl Drop for DeletionProofKeyPair {
     }
 }
 
-/// Key parameter for verification (either HMAC-SHA256 byte slice or Ed25519 VerifyingKey).
+/// Key parameter for verification coupled with its signature version.
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationKey<'a> {
-    /// Key for HMAC-SHA256 signature verification (version 1 and 2).
+    /// Key for HMAC-SHA256 signature verification (version 1 legacy).
+    HmacV1(&'a [u8]),
+    /// Key for HMAC-SHA256 signature verification (version 2 legacy).
+    HmacV2(&'a [u8]),
+    /// Generic HMAC key for automatic version matching.
     Hmac(&'a [u8]),
     /// Key for Ed25519 signature verification (version 3).
     Ed25519(&'a ed25519_dalek::VerifyingKey),

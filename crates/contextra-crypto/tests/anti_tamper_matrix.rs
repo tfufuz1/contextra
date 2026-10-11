@@ -4,6 +4,8 @@
 // NICHT-OFFENSICHTLICH: Verifies subtle::ConstantTimeEq usage in IntegrityVerifier via code inspection / behavioral tests.
 // STAND: TS:2026-08-30T19:45:00Z (SESSION: 20260830)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation)]
+
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};
 
 fn create_valid_entry(

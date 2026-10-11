@@ -3,6 +3,8 @@
 // INVARIANTEN: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.
 // STAND: TS:2026-09-27T00:00:00Z
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
@@ -87,7 +89,7 @@ fn test_v2_hmac_proof_creation_and_verification_regression() {
     let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
         .expect("valid layer proof");
 
-    let proof = DeletionProof::create(
+    let proof = DeletionProof::create_v2(
         scope,
         vec![b"k1".to_vec(), b"k2".to_vec()],
         TxId::new(100),

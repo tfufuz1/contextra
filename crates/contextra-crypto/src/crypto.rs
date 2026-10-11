@@ -475,6 +475,7 @@ impl KeyManager {
     }
 
     /// Provides access to raw key bytes for crate-internal key derivations.
+    #[allow(dead_code)]
     pub(crate) fn raw_key_bytes(&self) -> &[u8; 32] {
         if let Ok(array_ref) = <&[u8; 32]>::try_from(self.key.as_bytes()) {
             array_ref

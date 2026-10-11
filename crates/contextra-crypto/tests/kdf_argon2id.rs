@@ -2,6 +2,8 @@
 // ZWECK: Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration.
 // INVARIANTEN: Zero Panics bei Fuzzing/ungültigen Header-Bytes. Determinismus bei gleichen Eingaben. Unveränderte HKDF-Referenzwerte.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::kdf::{
     derive_key_argon2id, KdfHeader, KdfParams, MIN_M_COST_KIB, MIN_P_COST, MIN_T_COST,

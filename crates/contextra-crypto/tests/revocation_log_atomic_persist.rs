@@ -4,6 +4,7 @@
 //! and verifies atomic persistence behavior under failure conditions.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_ports::SystemClock;
