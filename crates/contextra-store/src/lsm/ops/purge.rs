@@ -7,8 +7,9 @@ use crate::lsm::engine::LsmStorage;
 use contextra_core::StorageEngine;
 
 impl LsmStorage {
-    /// Executes a purge-compaction across SSTable levels for the specified `scope` up to transaction `as_of_tx`.
-    /// Fail-closed space checks and active snapshot pin verification are strictly enforced.
+    /// Führt Vorprüfungen (Active-Snapshot-Pin, Disk-Space, Memtable-Flush) durch
+    /// und bricht bewusst mit `Err(PurgeBlocked::Unimplemented)` ab, bis die reale
+    /// Compaction-basierte Purge-Implementierung (WP-1.3) bereitsteht.
     pub async fn purge_keys(
         &self,
         _scope: PurgeScope,
