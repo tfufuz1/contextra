@@ -14,18 +14,18 @@ use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
 static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
-static PROTECTED_REGEX: OnceLock<Regex> = OnceLock::new();
+static PROTECTED_REGEX: OnceLock<Option<Regex>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-fn get_protected_regex() -> &'static Regex {
-    PROTECTED_REGEX.get_or_init(|| {
-        Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
-            .or_else(|_| Regex::new(r"$^"))
-            .unwrap_or_else(|_| match Regex::new(r"") {
-                Ok(empty) => empty,
-                Err(_) => unreachable!(),
-            })
-    })
+fn get_protected_regex() -> Option<&'static Regex> {
+    PROTECTED_REGEX
+        .get_or_init(|| {
+            Regex::new(
+                r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+            )
+            .ok()
+        })
+        .as_ref()
 }
 
 fn get_shared_splitter() -> Arc<crate::morphology::GermanCompoundSplitter> {
@@ -53,7 +53,10 @@ enum TextSegment<'a> {
 }
 
 fn segment_text<'a>(text: &'a str) -> Vec<TextSegment<'a>> {
-    let re = get_protected_regex();
+    let re = match get_protected_regex() {
+        Some(re) => re,
+        None => return vec![TextSegment::Regular(text)],
+    };
     let mut segments = Vec::new();
     let mut last_idx = 0;
 

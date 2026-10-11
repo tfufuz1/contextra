@@ -102,6 +102,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: InitializeAcl initialises the allocated ACL buffer.
     if unsafe { InitializeAcl(p_acl, acl_size as u32, ACL_REVISION) } == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -111,6 +112,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: AddAccessAllowedAce populates the initialized ACL for owner_sid.
     if unsafe { AddAccessAllowedAce(p_acl, ACL_REVISION, GENERIC_ALL, owner_sid) } == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -218,6 +220,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     // SAFETY: GetSecurityDescriptorControl checks DACL inheritance protection.
     let status = unsafe { GetSecurityDescriptorControl(p_sec_desc, &mut control, &mut revision) };
     if status == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
