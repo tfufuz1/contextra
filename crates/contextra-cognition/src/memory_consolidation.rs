@@ -265,6 +265,7 @@ pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Ve
 /// Die Segmentierung und Near-Duplicate-Detection stützen sich auf die zeitliche Abfolge der Slice-Indizes.
 ///
 /// Führt KEINE LLM-API-Aufrufe durch (Structural Consolidation Pass ist rein strukturell/statistisch).
+// TODO(contextra-plan): Enforce pass separation invariant: structural consolidation pass must remain zero-LLM and zero-graph-dependency. [ref:eigenbau-consolidation-pass]
 pub fn run_consolidation_pass(
     turns: &[(DocId, Vec<f32>)],
     config: &ConsolidationConfig,
@@ -406,6 +407,7 @@ pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64 {
 /// Dies ist der DETERMINISTISCHE, LLM-FREIE Structural Consolidation Pass. Für den LLM-basierten Generative Synthesis Pass siehe `synthesis_phase::run_synthesis_pass()`.
 ///
 /// Führt den Generative Synthesis Pass (generative Wissenssynthese) über stabile Graph-Communities aus.
+// TODO(contextra-plan): Clarify Generative Synthesis pass boundary vs. structural pass. [ref:eigenbau-consolidation-pass]
 pub async fn run_structural_synthesis_pass(
     stable_communities: &[(u64, Vec<DocId>)],
     source_texts: &std::collections::HashMap<DocId, String>,
