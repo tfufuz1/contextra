@@ -11,6 +11,8 @@ pub mod fusion;
 #[cfg(feature = "dibud")]
 pub mod dibud;
 
+// TODO(contextra-plan): Export and ensure robust error propagation and zero-panic guarantees for 4-signal fusion, calibration (Isotonic/Platt), and drift detection [ref:eigenbau-rrf-fusion]
+
 pub use calibration::{
     AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
     PlattScaler,

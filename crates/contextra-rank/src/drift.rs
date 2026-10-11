@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-10-11T00:00:00Z (SESSION: a9c85d1e)
+// ZWECK: Score-Verteilungs- und Ranking-Drift-Erkennung fuer Contextra-Suchsignale.
+// INVARIANTEN: Nicht-finite Score-Messungen (NaN/Inf) werden ignoriert; Fenstergroesse mindestens 5.
+// NICHT-OFFENSICHTLICH: Basiert auf gleitendem Mittelwert bezogen auf gesetzten Baseline-Wert.
+// SIEHE AUCH: crates/contextra-rank/src/lib.rs, crates/contextra-rank/AGENTS.md
+
 //! Score distribution and ranking drift detection for Contextra search signals.
 
 use std::collections::VecDeque;
@@ -78,6 +85,7 @@ impl DriftDetector {
 
     /// Records a new score observation and calculates updated drift status.
     pub fn observe(&mut self, score: f32) -> DriftStatus {
+        // TODO(contextra-plan): Validate NaN score handling and tie-breaking cases for score drift tracking across 4-signal search fusion outputs [ref:eigenbau-rrf-fusion]
         if !score.is_finite() {
             return self.analyze();
         }
