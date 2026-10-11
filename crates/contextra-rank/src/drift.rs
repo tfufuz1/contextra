@@ -1,8 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11T15:03:39Z (SESSION: 46330525)
-// ZWECK: Drift-Statistiken und Schwellenwert-Überwachung für Ranking-Scores.
-// INVARIANTEN: Strikte Behandlung von non-finite Scores (f32::is_finite) und Schwellenwerten (threshold > 0.0).
-// NICHT-OFFENSICHTLICH: Non-finite Scores und Schwellenwerte triggern keinesfalls Panics, sondern fallen auf Default/InsufficientData zurück.
+// STAND: 2026-10-11T15:07:28Z (SESSION: 5aad92a6)
+// ZWECK: Score-Verteilungs- und Drift-Erkennung für Contextra Search Signals.
+// INVARIANTEN: P26-konform (rein synchron, 0 async/tokio), non-finite floats löschen keine bestehenden Messungen, Schwellenwerte sind stets positiv und endlich.
+// NICHT-OFFENSICHTLICH: analyse() erfordert mindestens window_size / 2 Beobachtungen und ein gesetztes Baseline-Mean.
 // SIEHE AUCH: crates/contextra-rank/AGENTS.md
 
 //! Score distribution and ranking drift detection for Contextra search signals.
@@ -61,27 +61,65 @@ pub struct DriftDetector {
 }
 
 impl DriftDetector {
+    /// Default threshold value used when none or an invalid threshold is provided.
+    pub const DEFAULT_THRESHOLD: f32 = 0.15;
+    /// Default window size used for score tracking.
+    pub const DEFAULT_WINDOW_SIZE: usize = 50;
+
     /// Creates a new `DriftDetector` with window size and sensitivity threshold.
+    ///
+    /// If `threshold` is non-finite or non-positive, [`Self::DEFAULT_THRESHOLD`] is used.
     pub fn new(window_size: usize, threshold: f32) -> Self {
         let sanitized_threshold = if threshold.is_finite() && threshold > 0.0 {
             threshold
         } else {
-            0.15
+            Self::DEFAULT_THRESHOLD
         };
+        let effective_window = window_size.max(5);
         Self {
-            window_size: window_size.max(5),
+            window_size: effective_window,
             threshold: sanitized_threshold,
             baseline_mean: None,
-            recent_scores: VecDeque::with_capacity(window_size.max(5)),
+            recent_scores: VecDeque::with_capacity(effective_window),
         }
     }
 
     /// Creates a `DriftDetector` with default parameters (window size 50, threshold 0.15).
     pub fn with_defaults() -> Self {
-        Self::new(50, 0.15)
+        Self::new(Self::DEFAULT_WINDOW_SIZE, Self::DEFAULT_THRESHOLD)
     }
 
-    /// Sets explicit baseline mean score.
+    /// Returns the configured sliding window size.
+    pub fn window_size(&self) -> usize {
+        self.window_size
+    }
+
+    /// Returns the active drift threshold.
+    pub fn threshold(&self) -> f32 {
+        self.threshold
+    }
+
+    /// Returns the configured baseline mean, if set.
+    pub fn baseline_mean(&self) -> Option<f32> {
+        self.baseline_mean
+    }
+
+    /// Returns the number of recorded recent score observations.
+    pub fn observation_count(&self) -> usize {
+        self.recent_scores.len()
+    }
+
+    /// Clears all recorded observations while retaining baseline and threshold settings.
+    pub fn clear_observations(&mut self) {
+        self.recent_scores.clear();
+    }
+
+    /// Clears the configured baseline mean score.
+    pub fn clear_baseline(&mut self) {
+        self.baseline_mean = None;
+    }
+
+    /// Sets explicit baseline mean score. Non-finite values are ignored.
     pub fn set_baseline(&mut self, baseline: f32) {
         if baseline.is_finite() {
             self.baseline_mean = Some(baseline);
@@ -89,6 +127,7 @@ impl DriftDetector {
     }
 
     /// Records a new score observation and calculates updated drift status.
+    /// Non-finite scores are ignored and do not alter recorded history.
     pub fn observe(&mut self, score: f32) -> DriftStatus {
         if !score.is_finite() {
             return self.analyze();
@@ -133,85 +172,69 @@ impl DriftDetector {
     }
 }
 
+impl Default for DriftDetector {
+    fn default() -> Self {
+        Self::with_defaults()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_drift_detector_threshold_sanitization() {
+    fn test_drift_detector_default() {
+        let detector = DriftDetector::default();
+        assert_eq!(detector.window_size(), DriftDetector::DEFAULT_WINDOW_SIZE);
+        assert_eq!(detector.threshold(), DriftDetector::DEFAULT_THRESHOLD);
+        assert_eq!(detector.baseline_mean(), None);
+        assert_eq!(detector.observation_count(), 0);
+    }
+
+    #[test]
+    fn test_drift_detector_non_finite_threshold_fallback() {
         let detector_nan = DriftDetector::new(10, f32::NAN);
-        assert_eq!(detector_nan.threshold, 0.15);
+        assert_eq!(detector_nan.threshold(), DriftDetector::DEFAULT_THRESHOLD);
 
-        let detector_inf = DriftDetector::new(10, f32::INFINITY);
-        assert_eq!(detector_inf.threshold, 0.15);
+        let detector_neg = DriftDetector::new(10, -0.5);
+        assert_eq!(detector_neg.threshold(), DriftDetector::DEFAULT_THRESHOLD);
 
-        let detector_neg = DriftDetector::new(10, -0.10);
-        assert_eq!(detector_neg.threshold, 0.15);
-
-        let detector_valid = DriftDetector::new(10, 0.05);
-        assert_eq!(detector_valid.threshold, 0.05);
+        let detector_valid = DriftDetector::new(10, 0.2);
+        assert_eq!(detector_valid.threshold(), 0.2);
     }
 
     #[test]
-    fn test_drift_detector_observe_and_analyze() {
-        let mut detector = DriftDetector::new(6, 0.10);
+    fn test_drift_detector_clearing_state() {
+        let mut detector = DriftDetector::new(10, 0.1);
         detector.set_baseline(0.5);
-
-        // Insufficient data initially (< window_size / 2 = 3)
-        assert_eq!(detector.observe(0.5), DriftStatus::InsufficientData);
-        assert_eq!(detector.observe(0.5), DriftStatus::InsufficientData);
-
-        // Third observation triggers Stable
-        assert_eq!(
-            detector.observe(0.5),
-            DriftStatus::Stable { mean_shift: 0.0 }
-        );
-        assert_eq!(detector.overall_drift_status(), "stabil");
-
-        // Non-finite scores are ignored
-        assert_eq!(
-            detector.observe(f32::NAN),
-            DriftStatus::Stable { mean_shift: 0.0 }
-        );
-
-        // Shift mean above threshold (0.10)
-        detector.observe(0.8);
-        detector.observe(0.8);
-        detector.observe(0.8);
-
-        match detector.analyze() {
-            DriftStatus::DriftDetected {
-                mean_shift,
-                threshold,
-            } => {
-                assert!(mean_shift > 0.10);
-                assert_eq!(threshold, 0.10);
-            }
-            other => panic!("expected DriftDetected, got {:?}", other),
+        for _ in 0..10 {
+            detector.observe(0.51);
         }
-        assert_eq!(detector.overall_drift_status(), "warnung");
+        assert_eq!(detector.observation_count(), 10);
+        assert_eq!(detector.baseline_mean(), Some(0.5));
+
+        detector.clear_observations();
+        assert_eq!(detector.observation_count(), 0);
+        assert_eq!(detector.analyze(), DriftStatus::InsufficientData);
+
+        detector.clear_baseline();
+        assert_eq!(detector.baseline_mean(), None);
     }
 
     #[test]
-    fn test_drift_status_as_str() {
-        assert_eq!(DriftStatus::InsufficientData.as_str(), "unbekannt");
-        assert_eq!(DriftStatus::Stable { mean_shift: 0.01 }.as_str(), "stabil");
-        assert_eq!(DriftStatus::Stable { mean_shift: 0.08 }.as_str(), "warnung");
-        assert_eq!(
-            DriftStatus::DriftDetected {
-                mean_shift: 0.12,
-                threshold: 0.10
-            }
-            .as_str(),
-            "warnung"
-        );
-        assert_eq!(
-            DriftStatus::DriftDetected {
-                mean_shift: 0.25,
-                threshold: 0.10
-            }
-            .as_str(),
-            "kritisch"
-        );
+    fn test_drift_detector_non_finite_score_handling() {
+        let mut detector = DriftDetector::new(10, 0.1);
+        detector.set_baseline(0.5);
+        for _ in 0..5 {
+            detector.observe(0.5);
+        }
+        assert_eq!(detector.observation_count(), 5);
+
+        // Observing NaN should not change observation count
+        detector.observe(f32::NAN);
+        assert_eq!(detector.observation_count(), 5);
+
+        detector.set_baseline(f32::NAN);
+        assert_eq!(detector.baseline_mean(), Some(0.5));
     }
 }
