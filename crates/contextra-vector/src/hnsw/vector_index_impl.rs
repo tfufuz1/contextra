@@ -388,10 +388,12 @@ impl VectorIndex for HnswIndex {
                             deletes_to_apply.push((old_idx, *doc_id));
                         }
                     }
-                    _ => {
-                        return Err(ContextraError::Internal(
-                            "Unsupported IndexOp encountered during commit".to_string(),
-                        ));
+                    other => {
+                        return Err(ContextraError::Index(format!(
+                            "HNSW commit (phase 2) encountered unsupported IndexOp variant: {:?}. \
+                             Add a handler arm before enabling this operation.",
+                            std::mem::discriminant(other)
+                        )));
                     }
                 }
             }
@@ -446,7 +448,12 @@ impl VectorIndex for HnswIndex {
                 IndexOp::Delete { doc_id, .. } => {
                     seq_log.record_delete(*doc_id, seq);
                 }
-                _ => {}
+                other => {
+                    tracing::warn!(
+                        "Unrecognized IndexOp variant during sequence log recording: {:?}",
+                        std::mem::discriminant(other)
+                    );
+                }
             }
         }
         drop(seq_log);
