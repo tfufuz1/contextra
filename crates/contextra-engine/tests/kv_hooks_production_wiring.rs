@@ -32,7 +32,7 @@ async fn test_eviction_worker_and_hooks_share_same_store() -> contextra_types::R
 
     let dir = tempdir().unwrap();
     let db = Contextra::open(dir.path()).await?;
-    let mut col = db.collection("default").await?;
+    let col = db.collection("default").await?;
 
     col.set_kv_hooks(store.clone());
 

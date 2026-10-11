@@ -24,7 +24,7 @@ async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_t
             .await?;
 
         // Vector search on t1 finds the doc
-        let results = col_t1.search(&vec_query, 5).await?;
+        let results = col_t1.query(&vec_query).limit(5).execute().await?;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "doc_t1");
 
@@ -38,7 +38,7 @@ async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_t
 
         // Tenant 1 reloads collection
         let col_t1 = db.collection_for_tenant("persistent_col", tenant_1).await?;
-        let results_t1 = col_t1.search(&vec_query, 5).await?;
+        let results_t1 = col_t1.query(&vec_query).limit(5).execute().await?;
         assert_eq!(
             results_t1.len(),
             1,
@@ -48,7 +48,7 @@ async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_t
 
         // Tenant 2 loads same collection name
         let col_t2 = db.collection_for_tenant("persistent_col", tenant_2).await?;
-        let results_t2 = col_t2.search(&vec_query, 5).await?;
+        let results_t2 = col_t2.query(&vec_query).limit(5).execute().await?;
         assert_eq!(
             results_t2.len(),
             0,

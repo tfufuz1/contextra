@@ -40,20 +40,7 @@ impl LsmStorage {
             .await
             .map_err(|_| PurgeBlocked::CompactionBusy)?;
 
-        // 4. Compact and purge keys from SSTable levels
-        let sstables = self.sstables.read().await;
-        let mut records_purged = 0u64;
-        let mut sstables_replaced = 0usize;
-
-        for _sst in sstables.iter() {
-            sstables_replaced += 1;
-            records_purged += 1;
-        }
-
-        Ok(PurgeReport {
-            records_purged,
-            bytes_reclaimed: records_purged * 128,
-            sstables_replaced,
-        })
+        // WP-0.1: Make purge_keys fail-closed until WP-1.3 (real compaction & footprint filter) is implemented.
+        Err(PurgeBlocked::Unimplemented)
     }
 }

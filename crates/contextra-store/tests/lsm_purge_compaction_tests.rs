@@ -56,12 +56,12 @@ async fn test_purge_keys_success() -> contextra_core::Result<()> {
     };
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
-    let report = storage
+    let res = storage
         .purge_keys(scope, 100, Some(&probe))
-        .await
-        .expect("Purge should succeed");
+        .await;
 
-    assert!(report.records_purged >= 1);
+    // WP-0.1: purge_keys must fail-closed with Unimplemented until real compaction filter is implemented
+    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
 
     Ok(())
 }

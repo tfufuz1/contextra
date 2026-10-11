@@ -28,38 +28,6 @@ fn generate_content(doc_idx: usize) -> String {
     )
 }
 
-fn insert_batch_adaptive<'a>(
-    db: &'a Contextra,
-    batch: &'a [(String, Vec<f32>, Option<serde_json::Value>)],
-    batch_size: &'a mut usize,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
-    Box::pin(async move {
-        if batch.is_empty() {
-            return;
-        }
-
-        match db.insert_many(batch).await {
-            Ok(_) => {}
-            Err(err) => {
-                let err_msg = err.to_string();
-                if err_msg.contains("staging budget exceeded") {
-                    if batch.len() == 1 {
-                        panic!(
-                            "Einzelnes Dokument überschreitet das Transaktionsbudget von 16 MiB: {}",
-                            err_msg
-                        );
-                    }
-                    let mid = batch.len() / 2;
-                    *batch_size = (*batch_size / 2).max(1);
-                    insert_batch_adaptive(db, &batch[..mid], batch_size).await;
-                    insert_batch_adaptive(db, &batch[mid..], batch_size).await;
-                } else {
-                    panic!("Unerwarteter Fehler bei insert_many: {}", err);
-                }
-            }
-        }
-    })
-}
 
 fn bench_write_throughput(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();

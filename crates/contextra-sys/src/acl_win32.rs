@@ -74,6 +74,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
         )
     };
     if res == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,

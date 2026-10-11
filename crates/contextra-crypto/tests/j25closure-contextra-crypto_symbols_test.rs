@@ -63,8 +63,6 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
         .expect("valid cleanup proof");
     let audit_position = Some(head_sig.chain_index);
     let durability = DurabilityProof::new(tx_id.0);
-
-    let durability = DurabilityProof::new(202);
     let proof = DeletionProof::create_v3_with_audit_position(
         scope,
         vec![b"key_1".to_vec(), b"key_2".to_vec()],

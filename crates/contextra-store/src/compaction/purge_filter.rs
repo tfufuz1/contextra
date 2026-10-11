@@ -50,6 +50,8 @@ pub enum PurgeBlocked {
     UnclassifiedFiles { count: usize },
     /// Secure deletion is unsupported on current filesystem/environment.
     SecureDeleteUnsupported { reason: String },
+    /// Purge compaction implementation is not yet active (fail-closed).
+    Unimplemented,
     /// Scan timeout occurred.
     ScanTimeout,
 }

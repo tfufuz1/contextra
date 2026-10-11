@@ -388,7 +388,11 @@ impl VectorIndex for HnswIndex {
                             deletes_to_apply.push((old_idx, *doc_id));
                         }
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(ContextraError::Internal(
+                            "Unsupported IndexOp encountered during commit".to_string(),
+                        ));
+                    }
                 }
             }
 
