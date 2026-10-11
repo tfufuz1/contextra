@@ -1,6 +1,11 @@
 // FILE-CONTEXT
+// STAND: 2026-10-11T15:02:08Z (SESSION: 1b322f26)
 // ZWECK: Contextra Database Strangler Shell / Re-export Facade (Layer 3).
 // INVARIANTEN: Backward compatibility for all public types; re-exports from contextra-engine and contextra-cognition.
+// NICHT-OFFENSICHTLICH: Keine eigenen Storage-Mutationen in contextra-db; delegiert an contextra-engine und contextra-cognition.
+// SIEHE AUCH: AGENTS.md, capabilities.toml
+
+// TODO(contextra-plan): Implement 2PC transactional synchronization between LSM storage engine and vector index, CheckpointPinGuard pinning, and atomic deletion split-brain protection [ref:eigenbau-index-store-sync]
 
 #![forbid(unsafe_code)]
 
