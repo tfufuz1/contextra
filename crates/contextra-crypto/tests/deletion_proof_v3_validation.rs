@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof, ExcludedScope,
     GraphRepairAttestation, LayerCleanupProof,
 };
 use contextra_types::{error::HnswDeletionError, ContextraError, DocId, TenantId, TxId};
@@ -20,6 +20,8 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
     ];
 
+    let durability = DurabilityProof::new(100);
+
     // Attempt to create v3 proof with empty graph_repair slice when HnswIndex is covered
     let res = DeletionProof::create_v3(
         scope,
@@ -29,6 +31,7 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[], // Empty graph_repair -> MUST FAIL
+        Some(&durability),
         keypair.signing_key(),
     );
 
@@ -68,6 +71,8 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         attested_at: 1700000000,
     }];
 
+    let durability = DurabilityProof::new(100);
+
     let res = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -76,6 +81,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &graph_repair,
+        Some(&durability),
         keypair.signing_key(),
     );
 
@@ -104,6 +110,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
     // 1. Create a valid Ed25519 Version 3 proof
+    let durability = DurabilityProof::new(100);
+
     let valid_v3_proof = DeletionProof::create_v3(
         scope.clone(),
         vec![b"key1".to_vec()],
@@ -112,6 +120,7 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();
@@ -155,8 +164,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
     }
 
     // 3. Test HMAC Version 2 proof with valid signature but unknown mutated version
-    let hmac_key = b"hmac_key_32_bytes_long_secret!!";
-    let valid_v2_proof = DeletionProof::create(
+    let hmac_key = b"hmac_key_32_bytes_long_secret!!1";
+    let valid_v2_proof = DeletionProof::create_v2(
         scope,
         vec![b"key1".to_vec()],
         TxId::new(100),

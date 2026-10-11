@@ -3,7 +3,7 @@
 // INVARIANTEN: Zero-Panic, Safe Rust (#![forbid(unsafe_code)]), Anti-Mirroring (R4), Unabhängige Orakel (R5)
 // STAND: TS:2026-10-04 (Kampagne J-25)
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
 use contextra_crypto::{
     anti_tamper::VolatileEncryptionKey,

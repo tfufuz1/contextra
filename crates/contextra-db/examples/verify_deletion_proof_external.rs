@@ -16,7 +16,7 @@
 #![allow(deprecated)]
 
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof, ExcludedScope,
     LayerCleanupProof,
 };
 use contextra_crypto::CryptoError;
@@ -120,6 +120,8 @@ async fn run_operator_role(
         attested_at: 1700000000,
     }];
 
+    let durability = DurabilityProof::new(105);
+
     let proof_v3 = DeletionProof::create_v3(
         scope,
         vec![
@@ -131,6 +133,7 @@ async fn run_operator_role(
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &graph_repair,
+        Some(&durability),
         keypair.signing_key(),
     )?;
 

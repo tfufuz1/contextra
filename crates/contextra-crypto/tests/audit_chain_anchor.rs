@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_crypto::audit_chain::{AuditChain, DataClass};
 use contextra_types::{DocId, TxId};

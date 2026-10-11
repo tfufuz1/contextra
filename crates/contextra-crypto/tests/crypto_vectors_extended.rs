@@ -3,7 +3,7 @@
 // INVARIANTEN: Keine selbst berechneten Soll-Werte; alle Erwartungswerte entstammen offiziellen Spezifikationen (RFC 8032, RFC 5869, RFC 4231, RFC 8452, RFC 9106, BLAKE3 specification).
 // HOTSPOTS: [Ed25519, HKDF-SHA256, HMAC-SHA256, AES-256-GCM-SIV, Argon2id, BLAKE3]
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 
 use aes_gcm_siv::{
     aead::{Aead, KeyInit as AeadKeyInit},

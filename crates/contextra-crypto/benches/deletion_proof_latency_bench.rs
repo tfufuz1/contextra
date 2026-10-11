@@ -4,7 +4,7 @@
 //              without storage physical cleanup overhead.
 // STAND: TS:2026-09-25T15:10:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::cast_sign_loss)]
 
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
