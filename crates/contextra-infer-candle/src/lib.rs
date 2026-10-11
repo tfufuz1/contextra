@@ -22,6 +22,12 @@
 // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-10-11T16:00:00Z) (SESSION: 5984fc0d) PRÜFER-KONTEXT: FRESH
 
+// TODO(contextra-plan): ARCHITEKTURPLAN KV-CACHE-BRIDGE (RETRIEVAL<->INFERENZ) [ref:eigenbau-kv-cache-bridge]
+// 1. Bridge Integration: Verbindet Retrieval-Search-Context-Hits (ContextSegment) direkt mit CandleInference via KvBridgeAdapter und KvCacheKey.
+// 2. Tenant- & Kryptographische Isolation: KV-Tensoren werden im TenantIsolatedKvStore verschluesselt (AES-256-GCM-SIV, HKDF pro Tenant + ModelFingerprint via KvSegmentCipher).
+// 3. Fail-Open & Fingerprint-Isolation: Cache-Miss, Fingerprint-Mismatch, RoPE-Offset-Mismatch oder Decrypt-Fehler fuehren transparent zu voller Prefill-Neuberechnung ohne Abbruch.
+// 4. Tier-2 LSM Fallback: Asynchroner Spill-Path in LSM (try_get_cached_segment_async) ueber KvBridgeStorage Port.
+
 pub mod attention_exporter;
 pub mod embedding;
 pub mod embedding_provider;

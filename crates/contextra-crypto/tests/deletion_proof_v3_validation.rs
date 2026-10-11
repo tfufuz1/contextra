@@ -107,6 +107,7 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
     let layer_proofs =
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
+    let durability = DurabilityProof::new(100);
     // 1. Create a valid Ed25519 Version 3 proof
     let durability = DurabilityProof::new(100);
 

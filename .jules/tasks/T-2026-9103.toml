@@ -1,0 +1,28 @@
+# Task-Karte Template
+# ID Format: T-YYYY-NNNN
+id        = "T-2026-9103"
+title     = "Erasure-Ledger und Copy-Registry"
+crate     = "contextra-store"
+tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
+risk      = "crash"      # sec | crash | simd | utf8 | fusion | concurrency | calib | none
+goal      = "Implementierung von Erasure-Ledger und Copy-Registry als fail-closed Bausteine im contextra-store"
+non_goals = ["Verdrahtung in WAL-Replay/Recovery/Compaction/Restore (Welle 2)"]
+scope     = [
+  "crates/contextra-store/src/lib.rs",
+  "crates/contextra-store/src/erasure_ledger",
+  "crates/contextra-store/src/copy_registry",
+  "crates/contextra-store/src/manifest",
+  "crates/contextra-store/tests"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "crates/contextra-store/src/wal", "crates/contextra-store/src/sstable", "crates/contextra-store/src/lsm", "crates/contextra-store/src/compaction", "crates/contextra-store/src/memtable.rs"]
+invariants = ["Zero-Panic", "Single Error Root", "INV-DURABILITY-RING"]
+acceptance = [
+  "cargo test -p contextra-store",
+  "cargo xtask jules check"
+]
+evidence_required = ["Tests fuer Erasure-Ledger und Copy-Registry"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

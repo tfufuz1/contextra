@@ -613,11 +613,8 @@ impl DiskAnnIndex {
 
 #[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
     use super::*;
-    #[allow(unused_imports)]
     use crate::diskann::config::DiskAnnConfig;
-    #[allow(unused_imports)]
     use contextra_core::{DistanceMetric, DocId};
 
     #[cfg(feature = "docid-128")]

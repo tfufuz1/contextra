@@ -30,6 +30,8 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
+pub mod copy_registry;
+pub mod erasure_ledger;
 pub(crate) mod util;
 pub mod wal;
 
@@ -37,6 +39,12 @@ pub mod wal;
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
 // Tracking-Issue: TODO(owner): Issue anlegen
 // INVARIANTE: LSM-Kern bleibt blind gegenüber Indexstrukturen.
+
+// TODO(contextra-plan): LSM/WAL Persistenz-Engine Architekturentwurf & Risikobetrachtung [ref:eigenbau-lsm-wal]
+// 1. Disk-Physik (fsync-Reihenfolge): Strikte Durchsetzung des atomaren Sequenzmusters `.tmp` Schreiben -> Datei `fsync` -> Atomares `rename` -> Parent Directory `fsync`. Verhindert TOCTOU-Races und unvollständige SSTable/Manifest-Dateien nach abrupten Crashs.
+// 2. Group-Commit Scope Reduction: `commit_mutex` wird nur während der Batch-Vorbereitung und Sequenzzuordnung gehalten, vor physischen Disk-I/O-Operationen (`wal.append_batch`) freigegeben und erst zur MemTable-Aktualisierung/Sichtbarkeits-Erweiterung erneut akquiriert. Reduziert Contention und Latenzspitzen unter hoher Schreiblast.
+// 3. HMAC-Chains: Fortlaufende V3 HMAC-Kettenverifizierung über WAL-Segmente hinweg in Kombination mit der Manifest High-Water-Mark. Bietet Schutz vor unbeabsichtigter WAL-Kürzung (INV-WAL-TRUNCATION-1) und Manipulationen.
+// 4. rollback_to_tx: Rollback-Mechanismus für uncommitted WAL- und MemTable-Einträge bei Abbruch oder Transaktionsfehlern, inklusive korrekter Speicherfreigabe im MemTable-Budget und Wiederherstellung des konsistenten LsmState.
 
 #[cfg(not(loom))]
 pub use compaction::{

@@ -1,0 +1,28 @@
+id        = "T-2026-9104b"
+title     = "SSTable Witness Scanner Inventory Injection Matrix and Orphan GC Stage B"
+crate     = "contextra-store"
+tier      = 1
+risk      = "none"
+goal      = "SSTable Witness Scanner mit Inventur, Injektionsmatrix 4-12 und Orphan-/Temp-GC."
+non_goals = ["Veränderung bestehender SSTable-Dateien im Scanner", "Löschen unklassifizierter Dateien"]
+scope     = [
+  "crates/contextra-store/src/sstable.rs",
+  "crates/contextra-store/src/sstable/witness_inventory.rs",
+  "crates/contextra-store/src/sstable/witness_scan.rs",
+  "crates/contextra-store/src/sstable/orphan_gc.rs",
+  "crates/contextra-store/tests/sst_witness_scan_tests.rs",
+  "crates/contextra-store/tests/sst_witness_orphan_gc_tests.rs"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed", "No-Key-In-Logs", "INV-DURABILITY-RING"]
+acceptance = [
+  "cargo test -p contextra-store --test sst_witness_scan_tests",
+  "cargo test -p contextra-store --test sst_witness_orphan_gc_tests",
+  "cargo xtask jules check"
+]
+evidence_required = ["Erfolgreiche Injektionsmatrix-Tests 4-12", "Orphan-Removal-Test mit simuliertem Abbruch"]
+
+[budget]
+files = 10
+lines = 500
+iterations = 8

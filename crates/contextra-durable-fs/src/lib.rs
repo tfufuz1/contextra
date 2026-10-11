@@ -9,6 +9,16 @@
 //! - [`atomic_replace`]: Atomically replaces a target file with data and directory sync.
 //! - [`durable_remove`]: Removes a target file and synchronizes the parent directory.
 //! - [`scrub_and_remove`]: Overwrites file contents with zeros before durable removal.
+//! - [`scrub_if_safe`]: Safely scrubs file contents with safety checks (CoW, hardlinks, reader active).
+
+/// Pending delete journal tracking files scheduled for removal across crashes.
+pub mod journal;
+
+/// Scrubbing utilities and safety check policies.
+pub mod scrub;
+
+pub use journal::PendingDeleteJournal;
+pub use scrub::{scrub_if_safe, ScrubOutcome, ScrubPolicy, ScrubRefusal};
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -133,6 +143,9 @@ pub struct ScrubReceipt {
 }
 
 /// Overwrites file contents with zeros and durably removes the file.
+///
+/// **WARNING:** Legacy unverified scrub helper. Prefer [`scrub_if_safe`] which performs
+/// mandatory safety checks for hardlinks, Copy-on-Write (CoW) filesystems, and active readers.
 ///
 /// Overwrites the file at `path` completely with zero bytes in 64-KiB chunks,
 /// flushes data to disk via `sync_all()`, and removes the file via [`durable_remove`].

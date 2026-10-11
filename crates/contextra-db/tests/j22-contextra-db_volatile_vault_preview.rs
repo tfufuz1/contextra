@@ -2,6 +2,8 @@
 // ZWECK: Integrationstest für VolatileContextVault-Produktionslebenszyklus (open -> ingest -> purge).
 // Belegt die Erreichbarkeit von preview_metadata() über den umschließenden Produktionspfad purge().
 
+#![cfg(feature = "volatile-vault")]
+
 use contextra_db::volatile_vault::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_types::{DocId, TxId};
 

@@ -579,6 +579,51 @@ impl MemTable {
         results
     }
 
+    /// Counts ALL versions (put/merge/tombstone) with `seq <= as_of_tx` for a specific key.
+    pub fn count_all_versions_key(&self, key: &[u8], as_of_tx: u64) -> (usize, usize) {
+        let shard_idx = Self::shard_for(key);
+        let entries = self.shards[shard_idx].entries.read();
+        if let Some(versions) = entries.get(key) {
+            let mut total = 0;
+            let mut tombstones = 0;
+            for (seq, _, tx) in versions {
+                if *tx <= as_of_tx || *tx >= TxId::INTERNAL_BASE {
+                    total += 1;
+                    if is_tombstone(*seq) {
+                        tombstones += 1;
+                    }
+                }
+            }
+            (total, tombstones)
+        } else {
+            (0, 0)
+        }
+    }
+
+    /// Counts ALL versions (put/merge/tombstone) with `seq <= as_of_tx` for keys starting with `prefix`.
+    pub fn count_all_versions_prefix(&self, prefix: &[u8], as_of_tx: u64) -> (usize, usize) {
+        let shard_range = Self::shard_range_for_prefix(prefix);
+        let mut total = 0;
+        let mut tombstones = 0;
+        for shard_idx in shard_range {
+            let entries = self.shards[shard_idx].entries.read();
+            for (k, versions) in entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded)) {
+                if !k.starts_with(prefix) {
+                    break;
+                }
+                for (seq, _, tx) in versions {
+                    if *tx <= as_of_tx || *tx >= TxId::INTERNAL_BASE {
+                        total += 1;
+                        if is_tombstone(*seq) {
+                            tombstones += 1;
+                        }
+                    }
+                }
+            }
+        }
+        (total, tombstones)
+    }
+
     /// Counts non-tombstone versions for a specific exact key across all shards.
     pub fn count_non_tombstone_key(&self, key: &[u8]) -> usize {
         let shard_idx = Self::shard_for(key);
