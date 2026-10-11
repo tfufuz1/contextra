@@ -191,9 +191,10 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                     }
 
                     let p = wal_path.clone();
-                    let remove_res =
-                        tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                            .await;
+                    let remove_res = tokio::task::spawn_blocking(move || {
+                        contextra_durable_fs::durable_remove(&p)
+                    })
+                    .await;
                     match remove_res {
                         Ok(Err(e)) if e.kind() != std::io::ErrorKind::NotFound => {
                             tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
@@ -250,8 +251,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         if sst_path.exists() {
             let p = sst_path.clone();
             let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
+                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p)).await;
             if let Ok(Err(rm_err)) = res {
                 if rm_err.kind() != std::io::ErrorKind::NotFound {
                     tracing::warn!(

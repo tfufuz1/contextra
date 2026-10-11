@@ -430,7 +430,9 @@ mod tests {
         let vk = sk.verifying_key();
 
         assert_eq!(built_proof, expected_proof);
-        assert!(built_proof.verify(crate::deletion_proof::VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(built_proof
+            .verify(crate::deletion_proof::VerificationKey::Ed25519(&vk))
+            .unwrap());
     }
 
     #[test]

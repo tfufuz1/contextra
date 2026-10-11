@@ -88,19 +88,17 @@ async fn test_open_for_legacy_migration_v2_works() {
         .await
         .expect("write integrity key");
 
-    let mut entry = WalEntry::try_new(op, 1, &integrity_key, [0u8; 32])
-        .expect("create v2 entry");
-    entry.checksum = WalEntry::compute_checksum_v2(&entry.op, entry.seq_no, &integrity_key, entry.prev_hmac)
-        .expect("compute v2 checksum");
+    let mut entry = WalEntry::try_new(op, 1, &integrity_key, [0u8; 32]).expect("create v2 entry");
+    entry.checksum =
+        WalEntry::compute_checksum_v2(&entry.op, entry.seq_no, &integrity_key, entry.prev_hmac)
+            .expect("compute v2 checksum");
     let entry_bytes = entry.to_bytes().expect("serialize entry");
 
     let mut payload = Vec::new();
     payload.extend_from_slice(b"MFW2");
     payload.extend_from_slice(&entry_bytes);
 
-    fs::write(&wal_path, &payload)
-        .await
-        .expect("write v2 wal");
+    fs::write(&wal_path, &payload).await.expect("write v2 wal");
 
     let wal = Wal::open_for_legacy_migration(&wal_path, None)
         .await

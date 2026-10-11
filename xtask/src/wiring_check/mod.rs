@@ -167,11 +167,7 @@ pub fn check1_yaml_validity(root: &Path) -> Vec<WiringFinding> {
     if actionlint_available {
         for wf in &workflow_files {
             let rel = rel_path(root, wf);
-            if let Ok(output) = Command::new("actionlint")
-                .arg("-oneline")
-                .arg(wf)
-                .output()
-            {
+            if let Ok(output) = Command::new("actionlint").arg("-oneline").arg(wf).output() {
                 if !output.status.success() {
                     let stderr_or_stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stderr_or_stdout.lines() {
@@ -236,7 +232,10 @@ pub fn check_yaml_content_fallback(file_rel: &str, content: &str) -> Vec<WiringF
             }
             if let Some(ref job) = current_job {
                 if line.starts_with("    ") || line.trim().is_empty() {
-                    job_lines.entry(job.clone()).or_default().push((line_num, line));
+                    job_lines
+                        .entry(job.clone())
+                        .or_default()
+                        .push((line_num, line));
                 } else if line.starts_with("  ") {
                     current_job = None;
                 }
@@ -383,10 +382,11 @@ pub fn check3_package_references(root: &Path) -> Vec<WiringFinding> {
     let ws_packages = get_workspace_package_names(root);
     let files = get_all_scannable_files(root);
 
-    let pkg_flag_regex = match regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)") {
-        Ok(re) => re,
-        Err(_) => return findings,
-    };
+    let pkg_flag_regex =
+        match regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)") {
+            Ok(re) => re,
+            Err(_) => return findings,
+        };
     let crate_ref_regex = match regex::Regex::new(r"\b(contextra-[a-zA-Z0-9_-]+)\b") {
         Ok(re) => re,
         Err(_) => return findings,
@@ -399,7 +399,11 @@ pub fn check3_package_references(root: &Path) -> Vec<WiringFinding> {
                 let line_num = idx + 1;
 
                 // Check 3.1: Explicit -p or --package flags on cargo invocations or justfile receipts
-                if line.contains("cargo ") || line.contains("cargo\t") || line.contains("just ") || rel == "justfile" {
+                if line.contains("cargo ")
+                    || line.contains("cargo\t")
+                    || line.contains("just ")
+                    || rel == "justfile"
+                {
                     for caps in pkg_flag_regex.captures_iter(line) {
                         if let Some(pkg_match) = caps.get(1) {
                             let pkg = pkg_match.as_str();
@@ -423,7 +427,11 @@ pub fn check3_package_references(root: &Path) -> Vec<WiringFinding> {
                 }
 
                 // Check 3.2: Literal contextra-* package references in shell loops/lists
-                if line.contains("for ") || line.contains("cargo ") || line.contains("CRATES=") || line.contains("crates=") {
+                if line.contains("for ")
+                    || line.contains("cargo ")
+                    || line.contains("CRATES=")
+                    || line.contains("crates=")
+                {
                     for caps in crate_ref_regex.captures_iter(line) {
                         if let Some(m) = caps.get(1) {
                             let pkg = m.as_str();
@@ -496,10 +504,11 @@ pub fn check4_feature_references(root: &Path) -> Vec<WiringFinding> {
     let pkg_features = get_workspace_package_features(root);
     let files = get_all_scannable_files(root);
 
-    let pkg_flag_regex = match regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)") {
-        Ok(re) => re,
-        Err(_) => return findings,
-    };
+    let pkg_flag_regex =
+        match regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)") {
+            Ok(re) => re,
+            Err(_) => return findings,
+        };
     let feats_regex = match regex::Regex::new(r#"--features(?:\s+|=)(["a-zA-Z0-9_,\s-]+)"#) {
         Ok(re) => re,
         Err(_) => return findings,
@@ -519,7 +528,8 @@ pub fn check4_feature_references(root: &Path) -> Vec<WiringFinding> {
 
                     if let Some(caps) = feats_regex.captures(line) {
                         if let Some(feats_match) = caps.get(1) {
-                            let raw_feats = feats_match.as_str().trim_matches('"').trim_matches('\'');
+                            let raw_feats =
+                                feats_match.as_str().trim_matches('"').trim_matches('\'');
                             let feats: Vec<&str> = raw_feats.split(',').map(|s| s.trim()).collect();
 
                             for pkg in &pkgs {
@@ -599,10 +609,11 @@ pub fn check5_fuzz_targets(root: &Path) -> Vec<WiringFinding> {
         scannable.push(justfile);
     }
 
-    let matrix_regex = match regex::Regex::new(r"crate:\s*([a-zA-Z0-9_-]+),\s*target:\s*([a-zA-Z0-9_-]+)") {
-        Ok(re) => re,
-        Err(_) => return findings,
-    };
+    let matrix_regex =
+        match regex::Regex::new(r"crate:\s*([a-zA-Z0-9_-]+),\s*target:\s*([a-zA-Z0-9_-]+)") {
+            Ok(re) => re,
+            Err(_) => return findings,
+        };
     let justfile_target_regex =
         match regex::Regex::new(r#""(contextra-[a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)""#) {
             Ok(re) => re,
@@ -947,7 +958,10 @@ pub fn check8_runner_labels(root: &Path) -> Vec<WiringFinding> {
                                 check: "check_8_runner_labels".to_string(),
                                 file: rel.clone(),
                                 line: line_num,
-                                message: format!("Forbidden runner label '{}' in workflow", forbidden),
+                                message: format!(
+                                    "Forbidden runner label '{}' in workflow",
+                                    forbidden
+                                ),
                                 severity: "error".to_string(),
                             });
                         }
@@ -972,10 +986,11 @@ pub fn check9_security_warnings(root: &Path) -> Vec<WiringFinding> {
         Ok(re) => re,
         Err(_) => return findings,
     };
-    let script_interp_regex = match regex::Regex::new(r"\$\{\{\s*(?:github\.event\.|github\.head_ref|inputs\.)") {
-        Ok(re) => re,
-        Err(_) => return findings,
-    };
+    let script_interp_regex =
+        match regex::Regex::new(r"\$\{\{\s*(?:github\.event\.|github\.head_ref|inputs\.)") {
+            Ok(re) => re,
+            Err(_) => return findings,
+        };
 
     for wf in &workflow_files {
         let rel = rel_path(root, wf);
@@ -1078,7 +1093,9 @@ jobs:
         fs::write(wf_dir.join("test.yml"), wf_content).expect("write");
 
         let findings = check2_xtask_commands(root);
-        assert!(findings.iter().any(|f| f.message.contains("invalid-nonexistent-command")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("invalid-nonexistent-command")));
     }
 
     #[test]
@@ -1098,7 +1115,9 @@ jobs:
         fs::write(wf_dir.join("test.yml"), wf_content).expect("write");
 
         let findings = check3_package_references(root);
-        assert!(findings.iter().any(|f| f.message.contains("contextra-nonexistent-crate")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("contextra-nonexistent-crate")));
     }
 
     #[test]
@@ -1123,7 +1142,8 @@ jobs:
         let pkg_features = get_workspace_package_features(&root);
         let files = get_all_scannable_files(temp_root);
 
-        let pkg_flag_regex = regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)").unwrap();
+        let pkg_flag_regex =
+            regex::Regex::new(r"(?:^|\s)(?:-p|--package)(?:\s+|=)([a-zA-Z0-9_-]+)").unwrap();
         let feats_regex = regex::Regex::new(r#"--features(?:\s+|=)(["a-zA-Z0-9_,\s-]+)"#).unwrap();
 
         let mut findings = Vec::new();
@@ -1162,7 +1182,9 @@ jobs:
             }
         }
 
-        assert!(findings.iter().any(|f| f.message.contains("non-existent-feature")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("non-existent-feature")));
     }
 
     #[test]
@@ -1192,7 +1214,9 @@ jobs:
         fs::write(wf_dir.join("fuzz.yml"), wf_content).expect("write");
 
         let findings = check5_fuzz_targets(root);
-        assert!(findings.iter().any(|f| f.message.contains("invalid_fuzz_target")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("invalid_fuzz_target")));
     }
 
     #[test]
@@ -1218,7 +1242,9 @@ jobs:
         fs::write(ruleset_dir.join("protect-main.json"), ruleset_content).expect("write");
 
         let findings = check6_required_checks(root);
-        assert!(findings.iter().any(|f| f.message.contains("Missing Required Job Name")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("Missing Required Job Name")));
     }
 
     #[test]
@@ -1236,7 +1262,9 @@ blocking = true
         fs::write(gov_dir.join("verdict-required.toml"), verdict_req).expect("write");
 
         let findings = check7_verdict_producers(root);
-        assert!(findings.iter().any(|f| f.message.contains("nonexistent-producer-gate")));
+        assert!(findings
+            .iter()
+            .any(|f| f.message.contains("nonexistent-producer-gate")));
     }
 
     #[test]

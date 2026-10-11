@@ -658,17 +658,26 @@ impl LsmStorage {
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
                     let p = old_wal_path.clone();
-                    let remove_res =
-                        tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                            .await;
+                    let remove_res = tokio::task::spawn_blocking(move || {
+                        contextra_durable_fs::durable_remove(&p)
+                    })
+                    .await;
                     match remove_res {
                         Ok(Err(e)) => {
                             if e.kind() != std::io::ErrorKind::NotFound {
-                                tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
+                                tracing::warn!(
+                                    "Failed to remove old WAL file {:?}: {}",
+                                    old_wal_path,
+                                    e
+                                );
                             }
                         }
                         Err(join_err) => {
-                            tracing::warn!("Join error removing old WAL file {:?}: {}", old_wal_path, join_err);
+                            tracing::warn!(
+                                "Join error removing old WAL file {:?}: {}",
+                                old_wal_path,
+                                join_err
+                            );
                         }
                         Ok(Ok(())) => {
                             tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
@@ -977,7 +986,9 @@ mod tests {
                 tx_id: contextra_core::TxId::new(1),
                 committed: true,
             };
-            let (batch1, _) = old_wal.prepare_batch(vec![(op_put1, 1), (op_end1, 2)]).await?;
+            let (batch1, _) = old_wal
+                .prepare_batch(vec![(op_put1, 1), (op_end1, 2)])
+                .await?;
             old_wal.append_batch(batch1).await?;
             old_wal.close().await?;
 
@@ -991,7 +1002,9 @@ mod tests {
                 tx_id: contextra_core::TxId::new(2),
                 committed: true,
             };
-            let (batch2, _) = active_wal.prepare_batch(vec![(op_put2, 3), (op_end2, 4)]).await?;
+            let (batch2, _) = active_wal
+                .prepare_batch(vec![(op_put2, 3), (op_end2, 4)])
+                .await?;
             active_wal.append_batch(batch2).await?;
             active_wal.close().await?;
         }
@@ -1004,9 +1017,7 @@ mod tests {
         assert!(active_wal_path.exists());
         assert!(active_sidecar_path.exists());
 
-        let dir_mtime_before = std::fs::metadata(&db_path)
-            .and_then(|m| m.modified())
-            .ok();
+        let dir_mtime_before = std::fs::metadata(&db_path).and_then(|m| m.modified()).ok();
 
         let config = LsmConfig {
             path: db_path.clone(),
@@ -1038,9 +1049,7 @@ mod tests {
         let val2 = storage.get(b"key2").await?;
         assert_eq!(val2, Some(Bytes::from("val2")));
 
-        let dir_mtime_after = std::fs::metadata(&db_path)
-            .and_then(|m| m.modified())
-            .ok();
+        let dir_mtime_after = std::fs::metadata(&db_path).and_then(|m| m.modified()).ok();
         if let (Some(before), Some(after)) = (dir_mtime_before, dir_mtime_after) {
             assert!(
                 after >= before,

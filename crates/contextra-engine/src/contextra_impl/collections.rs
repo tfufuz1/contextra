@@ -25,11 +25,10 @@ pub fn derive_collection_id(name: &str) -> Result<CollectionId> {
     let mut hasher = blake3::Hasher::new();
     hasher.update(name.as_bytes());
     let hash_bytes = hasher.finalize();
-    let col_id_u64 = u64::from_le_bytes(
-        hash_bytes.as_bytes()[0..8]
-            .try_into()
-            .map_err(|_| contextra_types::ContextraError::invalid_input("Hash truncation failed"))?,
-    );
+    let col_id_u64 =
+        u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().map_err(|_| {
+            contextra_types::ContextraError::invalid_input("Hash truncation failed")
+        })?);
     collection_id_from_hash_prefix(col_id_u64)
 }
 

@@ -301,7 +301,9 @@ impl CandleEmbedClient {
             "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
         }"#;
         let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes())
-            .unwrap_or_else(|_| tokenizers::Tokenizer::new(tokenizers::models::bpe::BPE::default()));
+            .unwrap_or_else(
+                |_| tokenizers::Tokenizer::new(tokenizers::models::bpe::BPE::default()),
+            );
         Self::new(Device::Cpu, mock_model, fingerprint, tokenizer)
     }
 

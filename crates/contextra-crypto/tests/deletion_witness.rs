@@ -2,9 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_crypto::deletion_proof::{
-    hash_deleted_keys_length_prefixed, DeletionLayer,
-};
+use contextra_crypto::deletion_proof::{hash_deleted_keys_length_prefixed, DeletionLayer};
 use contextra_crypto::deletion_witness::{LayerWitness, WitnessEvidence};
 use contextra_types::TxId;
 
@@ -101,7 +99,9 @@ fn test_layer_witness_rejection_for_non_scanner_layers() {
         DeletionLayer::KvCacheSegments,
         &keys,
         tx_id,
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     );
     assert!(res.is_err(), "KvCacheSegments layer must be rejected");
 
@@ -110,7 +110,9 @@ fn test_layer_witness_rejection_for_non_scanner_layers() {
         DeletionLayer::EmbeddingCache,
         &keys,
         tx_id,
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     );
     assert!(res.is_err(), "EmbeddingCache layer must be rejected");
 }
@@ -127,7 +129,10 @@ fn test_layer_witness_rejection_for_evidence_mismatch() {
         tx_id,
         WitnessEvidence::SstableScan { files_scanned: 5 },
     );
-    assert!(res.is_err(), "Memtable layer with SstableScan must be rejected");
+    assert!(
+        res.is_err(),
+        "Memtable layer with SstableScan must be rejected"
+    );
 
     // SsTableAllLevels with WalPurge -> Err
     let res = LayerWitness::issue_from_storage_layer(
@@ -146,7 +151,9 @@ fn test_layer_witness_rejection_for_evidence_mismatch() {
         DeletionLayer::WalAllSegments { seq_after: 1 },
         &keys,
         tx_id,
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     );
     assert!(res.is_err(), "Wal layer with MemtableScan must be rejected");
 }
@@ -160,7 +167,9 @@ fn test_layer_witness_rejection_for_empty_keys() {
         DeletionLayer::LsmMemtable,
         &empty_keys,
         tx_id,
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     );
     assert!(res.is_err(), "Empty keys array must be rejected");
 }
@@ -176,7 +185,9 @@ fn test_check_binding_validations() {
         DeletionLayer::LsmMemtable,
         &keys,
         scanned_tx,
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     )
     .unwrap();
 
@@ -204,7 +215,9 @@ fn test_no_code_dependency_on_revocation_log() {
         DeletionLayer::LsmMemtable,
         &keys,
         TxId(1),
-        WitnessEvidence::MemtableScan { memtables_scanned: 1 },
+        WitnessEvidence::MemtableScan {
+            memtables_scanned: 1,
+        },
     );
     assert!(witness.is_ok());
 }

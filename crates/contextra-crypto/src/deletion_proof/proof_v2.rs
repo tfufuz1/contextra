@@ -5,9 +5,9 @@ use super::proof::DeletionProof;
 use super::types::{
     hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope, DurabilityProof, ExcludedScope,
 };
-use crate::error::CryptoError;
 use super::wal_receipt::compute_hmac_sha256;
 use crate::ed25519_proof::SignatureVersion;
+use crate::error::CryptoError;
 use contextra_types::{ContextraError, Result, TxId};
 
 impl DeletionProof {

@@ -69,7 +69,10 @@ fn main() {
     modules.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Check for collisions with cli/mod.rs subcommands
-    let cli_mod_path = Path::new(&manifest_dir).join("src").join("cli").join("mod.rs");
+    let cli_mod_path = Path::new(&manifest_dir)
+        .join("src")
+        .join("cli")
+        .join("mod.rs");
     if cli_mod_path.exists() {
         let cli_content = fs::read_to_string(&cli_mod_path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", cli_mod_path.display(), e));
@@ -213,9 +216,9 @@ pub fn extract_cli_subcommands(cli_mod_content: &str) -> HashSet<String> {
                 let rest = table_str[i + 1..].trim_start();
                 if rest.starts_with(',')
                     && !candidate.is_empty()
-                    && candidate
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+                    && candidate.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                    })
                 {
                     cmds.insert(candidate.to_string());
                 }

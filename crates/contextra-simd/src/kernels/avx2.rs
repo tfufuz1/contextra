@@ -570,7 +570,11 @@ mod tests {
     struct XorShift64(u64);
     impl XorShift64 {
         fn new(seed: u64) -> Self {
-            Self(if seed == 0 { 0x1234_5678_9ABC_DEF0 } else { seed })
+            Self(if seed == 0 {
+                0x1234_5678_9ABC_DEF0
+            } else {
+                seed
+            })
         }
         fn next_u64(&mut self) -> u64 {
             let mut x = self.0;

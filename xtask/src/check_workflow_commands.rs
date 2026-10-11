@@ -88,9 +88,9 @@ pub fn extract_valid_subcommands(
                         let rest = after[i + 1..].trim_start();
                         if rest.starts_with(',')
                             && !candidate.is_empty()
-                            && candidate
-                                .chars()
-                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+                            && candidate.chars().all(|c| {
+                                c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                            })
                         {
                             valid_commands.insert(candidate.to_string());
                         }

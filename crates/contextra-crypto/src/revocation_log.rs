@@ -423,8 +423,8 @@ impl RevocationLog {
                 return Err(CryptoError::IntegrityViolation);
             }
         } else {
-            let target_idx = usize::try_from(marker.count - 1)
-                .map_err(|_| CryptoError::IntegrityViolation)?;
+            let target_idx =
+                usize::try_from(marker.count - 1).map_err(|_| CryptoError::IntegrityViolation)?;
             if parsed_entries[target_idx].entry_hash != marker.head_hash {
                 return Err(CryptoError::IntegrityViolation);
             }
