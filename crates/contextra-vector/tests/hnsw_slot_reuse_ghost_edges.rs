@@ -134,7 +134,8 @@ fn count_total_inbound_edges_for_slot(index: &HnswIndex, target_slot: usize) -> 
 }
 
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dim = 8;
     let config = HnswConfig {
         dimension: dim,
@@ -201,7 +202,9 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 
     // NACH dem Neu-Insert: Prüfen, dass nur symmetrische Kanten existieren, die zum neuen Knoten gehören
     let ghost_edges_after = count_incoming_ghost_edges_for_slot(&index, target_slot);
-    println!("[Path A - remove_with_graph_repair] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}");
+    println!(
+        "[Path A - remove_with_graph_repair] Ghost-Kanten NACH Neu-Insert: {ghost_edges_after}"
+    );
     assert_eq!(
         ghost_edges_after, 0,
         "PFAD A BEFUND (NACH Neu-Insert): Es wurden {ghost_edges_after} Geisterkanten auf den wiederverwendeten Slot {target_slot} gefunden!"
@@ -211,7 +214,8 @@ async fn test_slot_reuse_ghost_edges_path_a_remove_with_graph_repair() -> Result
 }
 
 #[tokio::test]
-async fn test_slot_reuse_ghost_edges_path_b_commit_deletion() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_slot_reuse_ghost_edges_path_b_commit_deletion(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dim = 8;
     let config = HnswConfig {
         dimension: dim,

@@ -118,7 +118,8 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         .unwrap());
 
     // Golden JSON V3
-    let keypair = DeletionProofKeyPair::generate(&mut rand::rngs::OsRng);
+    let mut rng = rand::rngs::OsRng;
+    let keypair = DeletionProofKeyPair::generate(&mut rng);
     let durability = DurabilityProof::new(30);
     let proof_v3_orig = DeletionProof::create_v3(
         scope,

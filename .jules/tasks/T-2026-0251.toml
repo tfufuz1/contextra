@@ -1,0 +1,17 @@
+id        = "T-2026-0251"
+title     = "Workspace kompilierbar nach Crypto-Reparatur"
+crate     = "workspace"
+tier      = 1
+risk      = "high"
+goal      = "cargo check --workspace --all-targets --locked fehlerfrei, ohne Semantikaenderung."
+non_goals = ["Keine Features", "Keine Assertion-Abschwaechung", "Kein Reparieren des G1-Tests"]
+scope     = ["vom Compiler gemeldete Dateien", ".jules/tasks/T-2026-0251.toml"]
+forbidden = [".github/**", "xtask/**", "Cargo.toml", "Cargo.lock", "deny.toml", "capabilities.toml", "AGENTS.md", "governance/**", "docs/decisions/**", "rust-toolchain.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Keine Semantikaenderung"]
+acceptance = ["cargo check --workspace --all-targets --locked", "cargo test --workspace --no-run --locked"]
+evidence_required = ["Rohausgabe check", "Liste geaenderter Dateien je Crate", "Rohausgabe G1-Test"]
+
+[budget]
+files      = 25
+lines      = 400
+iterations = 10

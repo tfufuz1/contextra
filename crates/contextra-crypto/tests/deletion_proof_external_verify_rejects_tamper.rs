@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof, ExcludedScope,
-    LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+    ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::CryptoError;
 use contextra_types::{DocId, TenantId, TxId};
@@ -19,7 +19,6 @@ fn verify_external_accepts_valid_proof() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
     let durability = DurabilityProof::new(100);
-
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec(), b"key2".to_vec()],
@@ -52,7 +51,6 @@ fn verify_external_rejects_tampered_timestamp() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
     let durability = DurabilityProof::new(100);
-
     let mut proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -89,7 +87,6 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
 
     let durability = DurabilityProof::new(100);
-
     let mut proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -122,7 +119,6 @@ fn verify_external_rejects_wrong_public_key() {
     let scope = DeletionScope::Tenant { tenant_id };
 
     let durability = DurabilityProof::new(100);
-
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],

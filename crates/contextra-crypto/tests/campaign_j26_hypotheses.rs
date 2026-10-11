@@ -11,8 +11,8 @@ use contextra_crypto::{
     crypto::KeyManager,
     deletion_proof::{
         compute_wal_delete_receipt, hash_deleted_keys_length_prefixed, verify_wal_delete_receipt,
-        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof, ExcludedScope,
-        GraphRepairAttestation, LayerCleanupProof,
+        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+        ExcludedScope, GraphRepairAttestation, LayerCleanupProof,
     },
     ed25519_proof::SignatureVersion,
     error::CryptoError,
@@ -582,7 +582,6 @@ fn test_h6_deletion_proof_v3_validation_suite() {
     ];
 
     let durability = DurabilityProof::new(50);
-
     let proof_x = DeletionProof::create_v3(
         scope_x.clone(),
         keys_1.clone(),

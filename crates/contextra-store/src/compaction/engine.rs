@@ -324,8 +324,7 @@ impl CompactionEngine {
         for path in &old_paths {
             let p = path.clone();
             let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
+                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p)).await;
             if let Ok(Err(e)) = res {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
@@ -333,10 +332,9 @@ impl CompactionEngine {
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
             let sidecar = uuid_sidecar.clone();
-            let sidecar_res = tokio::task::spawn_blocking(move || {
-                contextra_durable_fs::durable_remove(&sidecar)
-            })
-            .await;
+            let sidecar_res =
+                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&sidecar))
+                    .await;
             if let Ok(Err(e)) = sidecar_res {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::debug!(
@@ -505,8 +503,7 @@ impl CompactionEngine {
         if merge_res.is_err() {
             let p = output_path.to_path_buf();
             let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
-                    .await;
+                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p)).await;
             if let Ok(Err(e)) = res {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::warn!(
@@ -889,11 +886,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_durable_remove_compaction_resilience_and_manifest_integrity() -> Result<()> {
-        let tmp = TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
+        let tmp =
+            TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
         let registry = Arc::new(contextra_core::SnapshotRegistry::new());
         let bc = create_block_cache(1);
         let manifest_path = tmp.path().join("MANIFEST-000001");
-        let manifest = Arc::new(crate::manifest::Manifest::create(&manifest_path).await?);
+        let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
 
         let config = CompactionConfig {
             min_sstables_per_tier: 2,
@@ -923,7 +921,12 @@ mod tests {
             let sst_path = tmp.path().join(&sst_name);
             let mut builder = crate::sstable::SstableBuilder::create(&sst_path).await?;
             builder
-                .add(format!("key-{i}").as_bytes(), b"val", i as u64 + 1, i as u64 + 1)
+                .add(
+                    format!("key-{i}").as_bytes(),
+                    b"val",
+                    i as u64 + 1,
+                    i as u64 + 1,
+                )
                 .await?;
             builder.finish().await?;
 
@@ -943,7 +946,8 @@ mod tests {
 
         // Simulate a deletion error prior to compaction (e.g. sidecar_paths[0] already removed/missing)
         let s0 = sidecar_paths[0].clone();
-        let _ = tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&s0)).await;
+        let _ =
+            tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&s0)).await;
 
         // Execute compaction
         let compacted = engine.maybe_compact(&sstables, tmp.path()).await?;
@@ -951,15 +955,27 @@ mod tests {
 
         // (a) All replaced input SSTables and UUID sidecars should not exist
         for sst_p in &old_sst_paths {
-            assert!(!sst_p.exists(), "Replaced SSTable {:?} should be removed", sst_p);
+            assert!(
+                !sst_p.exists(),
+                "Replaced SSTable {:?} should be removed",
+                sst_p
+            );
         }
         for sidecar_p in &sidecar_paths {
-            assert!(!sidecar_p.exists(), "UUID sidecar {:?} should be removed", sidecar_p);
+            assert!(
+                !sidecar_p.exists(),
+                "UUID sidecar {:?} should be removed",
+                sidecar_p
+            );
         }
 
         // (b) No file referenced by the manifest should be removed
         let ssts_guard = sstables.read().await;
-        assert_eq!(ssts_guard.len(), 1, "Compacted output SSTable present in list");
+        assert_eq!(
+            ssts_guard.len(),
+            1,
+            "Compacted output SSTable present in list"
+        );
         let active_sst_path = ssts_guard[0].file_path();
         assert!(
             active_sst_path.exists(),

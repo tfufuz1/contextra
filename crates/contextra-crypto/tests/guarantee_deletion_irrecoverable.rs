@@ -256,7 +256,6 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
     ];
 
     let durability = DurabilityProof::new(500);
-
     let proof = DeletionProof::create_full_v3(
         scope,
         deleted_keys,
@@ -356,7 +355,6 @@ fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
     }];
 
     let durability = DurabilityProof::new(100);
-
     let proof = DeletionProof::create_full_v3(
         scope,
         vec![b"k1".to_vec()],
@@ -406,7 +404,6 @@ fn test_scenario_4_independent_external_verification_and_tempfile() {
     ];
 
     let durability = DurabilityProof::new(12345);
-
     let proof = DeletionProof::create_full_v3(
         scope,
         deleted_keys,
@@ -493,7 +490,6 @@ fn test_scenario_5_replay_cross_tenant_and_downgrade_attacks() {
     };
 
     let durability = DurabilityProof::new(10);
-
     let proof_a = DeletionProof::create_v3(
         scope_a,
         vec![b"key_a".to_vec()],

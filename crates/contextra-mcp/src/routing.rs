@@ -473,10 +473,7 @@ mod tests {
         // Scenario a): Fresh directory -> log is created, bridge starts
         let bridge = setup_kv_bridge(&db_fresh);
         assert!(bridge.is_some(), "Bridge MUST start on fresh directory");
-        assert!(
-            log_path_fresh.exists(),
-            "kv_revocation.log MUST be created"
-        );
+        assert!(log_path_fresh.exists(), "kv_revocation.log MUST be created");
         assert!(
             marker_path_fresh.exists(),
             "kv_revocation.log.initialized MUST be created"

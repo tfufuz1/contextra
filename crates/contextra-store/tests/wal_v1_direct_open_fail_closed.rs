@@ -53,9 +53,7 @@ async fn test_direct_wal_open_with_v2_payload_fails_closed() {
     payload.extend_from_slice(b"MFW2");
     payload.extend_from_slice(&entry_bytes);
 
-    fs::write(&wal_path, &payload)
-        .await
-        .expect("write v2 wal");
+    fs::write(&wal_path, &payload).await.expect("write v2 wal");
 
     let open_res = Wal::open(&wal_path).await;
 

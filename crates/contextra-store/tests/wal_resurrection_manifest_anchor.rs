@@ -36,7 +36,9 @@ async fn test_aead_tail_truncation_without_manifest_anchor_causes_resurrection()
         let mut read_dir = fs::read_dir(&path).await.expect("read dir");
         while let Some(entry) = read_dir.next_entry().await.expect("next entry") {
             let p = entry.path();
-            if p.extension().map_or(false, |ext| ext == "wal") || p.file_name().map_or(false, |name| name == "wal.log") {
+            if p.extension().map_or(false, |ext| ext == "wal")
+                || p.file_name().map_or(false, |name| name == "wal.log")
+            {
                 wal_file_path = Some(p);
                 break;
             }

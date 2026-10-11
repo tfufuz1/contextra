@@ -423,8 +423,8 @@ impl RevocationLog {
                 return Err(CryptoError::IntegrityViolation);
             }
         } else {
-            let target_idx = usize::try_from(marker.count - 1)
-                .map_err(|_| CryptoError::IntegrityViolation)?;
+            let target_idx =
+                usize::try_from(marker.count - 1).map_err(|_| CryptoError::IntegrityViolation)?;
             if parsed_entries[target_idx].entry_hash != marker.head_hash {
                 return Err(CryptoError::IntegrityViolation);
             }
@@ -610,11 +610,11 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut prospective_entries = entries_write_guard.clone();
-        prospective_entries.push(new_entry.clone());
+        let mut candidate_entries = entries_write_guard.clone();
+        candidate_entries.push(new_entry.clone());
 
         if let Some(ref path) = self.file_path {
-            let serialized_log = bincode::serialize(&prospective_entries).map_err(|e| {
+            let serialized_log = bincode::serialize(&candidate_entries).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
@@ -622,7 +622,7 @@ impl RevocationLog {
 
             let m_path = marker_path_for(path);
             let serialized_marker = serialize_signed_marker(
-                prospective_entries.len() as u64,
+                candidate_entries.len() as u64,
                 new_entry.entry_hash,
                 Some(signing_key),
             );
@@ -631,7 +631,6 @@ impl RevocationLog {
         }
 
         let mut revoked_write_guard = self.revoked_targets.write();
-        let mut entries_write_guard = entries_write_guard;
 
         entries_write_guard.push(new_entry.clone());
         revoked_write_guard.insert(target);

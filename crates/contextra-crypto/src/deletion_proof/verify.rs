@@ -31,21 +31,10 @@ impl DeletionProof {
             bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
-        match version {
-            SignatureVersion::V1 => {
-                let proof_key = match key {
-                    VerificationKey::HmacV1(k) | VerificationKey::Hmac(k) => k,
-                    VerificationKey::HmacV2(_) => {
-                        return Err(ContextraError::Internal(
-                            "VerificationKey version mismatch for signature_version 1 proof".to_string(),
-                        ))
-                    }
-                    VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
-                            "Ed25519 key provided for HMAC signature_version 1 proof".to_string(),
-                        ))
-                    }
-                };
+        match (version, key) {
+            (SignatureVersion::V1, VerificationKey::HmacV1(proof_key))
+            | (SignatureVersion::V1, VerificationKey::HmacV2(proof_key))
+            | (SignatureVersion::V1, VerificationKey::Hmac(proof_key)) => {
                 let expected = compute_hmac_sha256(
                     proof_key,
                     &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes],
@@ -53,20 +42,8 @@ impl DeletionProof {
                 use subtle::ConstantTimeEq;
                 Ok(expected.as_slice().ct_eq(&self.signature).into())
             }
-            SignatureVersion::V2 => {
-                let proof_key = match key {
-                    VerificationKey::HmacV2(k) | VerificationKey::Hmac(k) => k,
-                    VerificationKey::HmacV1(_) => {
-                        return Err(ContextraError::Internal(
-                            "VerificationKey version mismatch for signature_version 2 proof".to_string(),
-                        ))
-                    }
-                    VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
-                            "Ed25519 key provided for HMAC signature_version 2 proof".to_string(),
-                        ))
-                    }
-                };
+            (SignatureVersion::V2, VerificationKey::HmacV2(proof_key))
+            | (SignatureVersion::V2, VerificationKey::Hmac(proof_key)) => {
                 use subtle::ConstantTimeEq;
                 let full_payload = self.construct_v2_full_payload()?;
                 let expected_full = compute_hmac_sha256(proof_key, &[&full_payload])?;
@@ -98,15 +75,7 @@ impl DeletionProof {
                 )?;
                 Ok(expected_legacy.as_slice().ct_eq(&self.signature).into())
             }
-            SignatureVersion::V3 => {
-                let verifying_key = match key {
-                    VerificationKey::Ed25519(vk) => vk,
-                    VerificationKey::HmacV1(_) | VerificationKey::HmacV2(_) | VerificationKey::Hmac(_) => {
-                        return Err(ContextraError::Internal(
-                            "HMAC key provided for Ed25519 signature_version 3 proof".to_string(),
-                        ))
-                    }
-                };
+            (SignatureVersion::V3, VerificationKey::Ed25519(verifying_key)) => {
                 let payload = self
                     .construct_v3_payload()
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
@@ -119,6 +88,11 @@ impl DeletionProof {
 
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
+            _ => Err(ContextraError::Internal(format!(
+                "VerificationKey version mismatch: key version {:?} does not match DeletionProof signature_version {:?}",
+                key.version(),
+                version
+            ))),
         }
     }
 

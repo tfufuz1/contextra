@@ -7,8 +7,8 @@
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,
-    DeletionProofKeyPair, DeletionScope, DurabilityProof, EncryptedCommitmentSalt, ExcludedScope, KeyManager,
-    KeyRegistry, LayerCleanupProof,
+    DeletionProofKeyPair, DeletionScope, DurabilityProof, EncryptedCommitmentSalt, ExcludedScope,
+    KeyManager, KeyRegistry, LayerCleanupProof,
 };
 use contextra_types::{DocId, TenantId, TxId};
 
@@ -192,7 +192,6 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
     ];
 
     let durability = DurabilityProof::new(100);
-
     let proof = DeletionProof::create_v3_with_audit_position(
         scope,
         vec![b"doc_500_key".to_vec()],

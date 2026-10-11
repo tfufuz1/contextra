@@ -42,7 +42,9 @@ async fn test_aead_tail_corruption_mid_file_returns_wal_corruption_not_truncated
     // Flip bit in batch 2 (offset around middle of file)
     let mid_offset = initial_len / 2;
     data[mid_offset] ^= 0xFF;
-    fs::write(&wal_path, &data).await.expect("write corrupted wal");
+    fs::write(&wal_path, &data)
+        .await
+        .expect("write corrupted wal");
 
     // 3. Opening / replaying WAL must strictly return WalCorruption, not silent truncation!
     let reopen_res = Wal::open_with_key_manager(&wal_path, Some(km)).await;

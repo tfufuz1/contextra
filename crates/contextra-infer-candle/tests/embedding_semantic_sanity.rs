@@ -27,7 +27,9 @@ async fn test_embedding_semantic_sanity() -> Result<(), Box<dyn std::error::Erro
     let model_dir_env = match std::env::var("CONTEXTRA_EMBED_MODEL_DIR") {
         Ok(val) => val,
         Err(_) => {
-            eprintln!("CONTEXTRA_EMBED_MODEL_DIR not set; skipping test_embedding_semantic_sanity.");
+            eprintln!(
+                "CONTEXTRA_EMBED_MODEL_DIR not set; skipping test_embedding_semantic_sanity."
+            );
             return Ok(());
         }
     };

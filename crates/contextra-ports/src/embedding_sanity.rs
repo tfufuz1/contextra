@@ -52,7 +52,9 @@ pub enum EmbeddingSanityError {
         cosine_similarity: f32,
     },
     /// Provider failed basic semantic similarity tests.
-    #[error("Semantic check failed for pair {pair:?}: related={cos_related}, unrelated={cos_unrelated}")]
+    #[error(
+        "Semantic check failed for pair {pair:?}: related={cos_related}, unrelated={cos_unrelated}"
+    )]
     SemanticFailure {
         /// Identifiers of failing language pair/terms.
         pair: (&'static str, &'static str),
@@ -67,11 +69,12 @@ async fn embed_text(
     provider: &dyn EmbeddingProvider,
     text: &str,
 ) -> Result<Vec<f32>, EmbeddingSanityError> {
-    provider.embed(text).await.map_err(|e| {
-        EmbeddingSanityError::DegenerateVector {
+    provider
+        .embed(text)
+        .await
+        .map_err(|e| EmbeddingSanityError::DegenerateVector {
             reason: format!("Embedding generation error: {e}"),
-        }
-    })
+        })
 }
 
 fn dot_product(a: &[f32], b: &[f32]) -> f32 {
@@ -363,13 +366,7 @@ mod tests {
         assert!(report.test_norm > 0.0);
         assert!(report.determinism_cosine_diff < 1e-6);
         assert!(report.neutral_pair_cosine_similarity < 0.98);
-        assert!(
-            report.de_related_cosine_similarity
-                > report.de_unrelated_cosine_similarity + 0.05
-        );
-        assert!(
-            report.en_related_cosine_similarity
-                > report.en_unrelated_cosine_similarity + 0.05
-        );
+        assert!(report.de_related_cosine_similarity > report.de_unrelated_cosine_similarity + 0.05);
+        assert!(report.en_related_cosine_similarity > report.en_unrelated_cosine_similarity + 0.05);
     }
 }

@@ -2,8 +2,8 @@
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof, ExcludedScope,
-    LayerCleanupProof, VerificationKey,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+    ExcludedScope, LayerCleanupProof, VerificationKey,
 };
 use contextra_types::{DocId, TenantId, TxId};
 
@@ -210,7 +210,6 @@ fn test_downgrade_v3_tampered_version_and_hmac_key_rejected() {
     };
 
     let durability = DurabilityProof::new(100);
-
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],

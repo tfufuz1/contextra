@@ -225,10 +225,14 @@ impl MemTable {
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
         let raw_seq = seq_no & !TOMBSTONE_BIT;
         // FIX(2026-10-07): Fast-path push for in-order sequence numbers; binary search insert for out-of-order sequence numbers to maintain sorted order for get_at_seq.
-        if versions.last().map_or(true, |(last_seq, _, _)| (last_seq & !TOMBSTONE_BIT) <= raw_seq) {
+        if versions.last().map_or(true, |(last_seq, _, _)| {
+            (last_seq & !TOMBSTONE_BIT) <= raw_seq
+        }) {
             versions.push((seq_no, value, tx_id));
         } else {
-            let insert_idx = match versions.binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT) {
+            let insert_idx = match versions
+                .binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT)
+            {
                 Ok(idx) => {
                     let mut pos = idx + 1;
                     while pos < versions.len() && (versions[pos].0 & !TOMBSTONE_BIT) == raw_seq {
@@ -1074,13 +1078,17 @@ mod tests {
         mt.put(key.clone(), Bytes::from("val_10"), 10, 1);
 
         // get_at_seq at 15 should return val_10
-        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("should find val_10");
+        let (val, seq, tx) = mt
+            .get_at_seq(&key, 15, u64::MAX)
+            .expect("should find val_10");
         assert_eq!(val.as_ref(), b"val_10");
         assert_eq!(seq, 10);
         assert_eq!(tx, 1);
 
         // get_at_seq at 120 should return val_100
-        let (val, seq, tx) = mt.get_at_seq(&key, 120, u64::MAX).expect("should find val_100");
+        let (val, seq, tx) = mt
+            .get_at_seq(&key, 120, u64::MAX)
+            .expect("should find val_100");
         assert_eq!(val.as_ref(), b"val_100");
         assert_eq!(seq, 100);
         assert_eq!(tx, 10);

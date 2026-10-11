@@ -327,12 +327,16 @@ mod tests {
         proof_v2.signature = v2_sig.to_vec();
 
         assert_eq!(proof_v2.signature_version, 2);
-        assert!(proof_v2.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+        assert!(proof_v2
+            .verify(VerificationKey::HmacV2(&test_key()))
+            .unwrap());
 
         // v1 HMAC proof
-        let v1_signature =
-            wal_receipt::compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
-                .unwrap();
+        let v1_signature = wal_receipt::compute_hmac_sha256(
+            &test_key(),
+            &[&scope_bytes, &deleted_keys_hash, &tx_bytes],
+        )
+        .unwrap();
 
         let v1_proof = DeletionProof {
             signature_version: 1,
@@ -349,7 +353,9 @@ mod tests {
             integrity_warning: None,
         };
         assert_eq!(v1_proof.signature_version, 1);
-        assert!(v1_proof.verify(VerificationKey::HmacV1(&test_key())).unwrap());
+        assert!(v1_proof
+            .verify(VerificationKey::HmacV1(&test_key()))
+            .unwrap());
     }
 
     #[test]
@@ -398,8 +404,6 @@ mod tests {
         };
         let keys = vec![b"key1".to_vec(), b"key2".to_vec()];
         let proof_key = test_key();
-        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
-        let vk = sk.verifying_key();
 
         let proof = DeletionProof::create(
             scope,
@@ -413,8 +417,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(proof.signature_version, 3);
-        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert_eq!(proof.signature_version, 2);
+        assert!(proof.verify(VerificationKey::HmacV2(&proof_key)).unwrap());
     }
 
     #[test]
@@ -438,8 +442,8 @@ mod tests {
         let proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
 
-        let wrong_keypair = DeletionProofKeyPair::generate();
-        assert!(!proof.verify(VerificationKey::Ed25519(&wrong_keypair.verifying_key)).unwrap());
+        let wrong_key = vec![0xFFu8; 32];
+        assert!(!proof.verify(VerificationKey::HmacV2(&wrong_key)).unwrap());
     }
 
     #[test]
@@ -448,8 +452,6 @@ mod tests {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
         let proof_key = test_key();
-        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
-        let vk = sk.verifying_key();
 
         let proof = DeletionProof::create(
             scope,
@@ -466,22 +468,28 @@ mod tests {
         // Tamper with deleted_after_tx
         let mut tampered_tx = proof.clone();
         tampered_tx.deleted_after_tx = TxId(11);
-        assert!(!tampered_tx.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(!tampered_tx
+            .verify(VerificationKey::HmacV2(&proof_key))
+            .unwrap());
 
         // Tamper with deleted_keys_hash
         let mut tampered_hash = proof.clone();
         tampered_hash.deleted_keys_hash[0] ^= 0xFF;
-        assert!(!tampered_hash.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(!tampered_hash
+            .verify(VerificationKey::HmacV2(&proof_key))
+            .unwrap());
 
         // Tamper with scope
         let mut tampered_scope = proof.clone();
         tampered_scope.scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(2).unwrap(),
         };
-        assert!(!tampered_scope.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(!tampered_scope
+            .verify(VerificationKey::HmacV2(&proof_key))
+            .unwrap());
 
         // Untampered original must verify successfully
-        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(proof.verify(VerificationKey::HmacV2(&proof_key)).unwrap());
     }
 
     #[test]
@@ -572,8 +580,6 @@ mod tests {
             tenant_id: TenantId::try_new(100).unwrap(),
         };
         let proof_key = test_key();
-        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
-        let vk = sk.verifying_key();
 
         let cleanup_proofs = vec![
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
@@ -592,7 +598,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(proof.verify(VerificationKey::HmacV2(&proof_key)).unwrap());
         assert_eq!(
             proof.covered_layers,
             vec![
@@ -637,7 +643,9 @@ mod tests {
             .covered_layers
             .push(DeletionLayer::KvCacheSegments);
 
-        assert!(!tampered_layers.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+        assert!(!tampered_layers
+            .verify(VerificationKey::HmacV2(&test_key()))
+            .unwrap());
     }
 
     #[test]
@@ -675,7 +683,9 @@ mod tests {
         let mut tampered_scopes = proof.clone();
         tampered_scopes.excluded_scopes.pop();
 
-        assert!(!tampered_scopes.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+        assert!(!tampered_scopes
+            .verify(VerificationKey::HmacV2(&test_key()))
+            .unwrap());
     }
 
     #[test]
@@ -696,9 +706,11 @@ mod tests {
         let scope_bytes = bincode::serialize(&scope).unwrap();
         let tx_bytes = deleted_after_tx.0.to_le_bytes();
 
-        let v1_signature =
-            wal_receipt::compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
-                .unwrap();
+        let v1_signature = wal_receipt::compute_hmac_sha256(
+            &test_key(),
+            &[&scope_bytes, &deleted_keys_hash, &tx_bytes],
+        )
+        .unwrap();
 
         let v1_proof = DeletionProof {
             signature_version: 1,
@@ -755,9 +767,11 @@ mod tests {
         let scope_bytes = bincode::serialize(&scope).unwrap();
         let tx_bytes = deleted_after_tx.0.to_le_bytes();
 
-        let v1_signature =
-            wal_receipt::compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
-                .unwrap();
+        let v1_signature = wal_receipt::compute_hmac_sha256(
+            &test_key(),
+            &[&scope_bytes, &deleted_keys_hash, &tx_bytes],
+        )
+        .unwrap();
 
         let v1_proof = DeletionProof {
             signature_version: 1,
@@ -850,8 +864,6 @@ mod tests {
         let prev_hmac = [0x77u8; 32];
         let delete_event = b"doc_42_delete";
         let proof_key = test_key();
-        let sk = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
-        let vk = sk.verifying_key();
 
         let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();
 
@@ -869,12 +881,14 @@ mod tests {
         .unwrap();
 
         assert_eq!(proof.wal_chain_receipt, Some(receipt));
-        assert!(proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(proof.verify(VerificationKey::HmacV2(&proof_key)).unwrap());
 
         // Tamper with receipt
         let mut tampered_proof = proof.clone();
         tampered_proof.wal_chain_receipt = Some([0xFFu8; 32]);
-        assert!(!tampered_proof.verify(VerificationKey::Ed25519(&vk)).unwrap());
+        assert!(!tampered_proof
+            .verify(VerificationKey::HmacV2(&proof_key))
+            .unwrap());
     }
 
     #[test]
@@ -1008,9 +1022,11 @@ mod tests {
         let scope_bytes = bincode::serialize(&scope).unwrap();
         let deleted_keys_hash = [0u8; 32];
         let tx_bytes = TxId(10).0.to_le_bytes();
-        let v1_signature =
-            wal_receipt::compute_hmac_sha256(&test_key(), &[&scope_bytes, &deleted_keys_hash, &tx_bytes])
-                .unwrap();
+        let v1_signature = wal_receipt::compute_hmac_sha256(
+            &test_key(),
+            &[&scope_bytes, &deleted_keys_hash, &tx_bytes],
+        )
+        .unwrap();
 
         let mut v1_proof = DeletionProof {
             signature_version: 1,
@@ -1050,9 +1066,13 @@ mod tests {
         let mut v2_proof = stub_v2;
         v2_proof.signature = v2_sig.to_vec();
 
-        assert!(v2_proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+        assert!(v2_proof
+            .verify(VerificationKey::HmacV2(&test_key()))
+            .unwrap());
         v2_proof.signature[0] ^= 0x01; // Bit-flip
-        assert!(!v2_proof.verify(VerificationKey::HmacV2(&test_key())).unwrap());
+        assert!(!v2_proof
+            .verify(VerificationKey::HmacV2(&test_key()))
+            .unwrap());
 
         // --- Version 3 ---
         let keypair = DeletionProofKeyPair::generate();

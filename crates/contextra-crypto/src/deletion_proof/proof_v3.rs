@@ -3,8 +3,8 @@
 use super::layer_proof::LayerCleanupProof;
 use super::proof::DeletionProof;
 use super::types::{
-    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope, DurabilityProof, ExcludedScope,
-    GraphRepairAttestation,
+    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope, DurabilityProof,
+    ExcludedScope, GraphRepairAttestation,
 };
 use crate::ed25519_proof::SignatureVersion;
 use crate::error::CryptoError;
@@ -116,7 +116,7 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
-        durability_proof: Option<&DurabilityProof>,
+        durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_v3_with_audit_position(
@@ -128,7 +128,7 @@ impl DeletionProof {
             None,
             attested_at,
             graph_repair,
-            durability_proof,
+            durability,
             signing_key,
         )
     }
@@ -144,7 +144,7 @@ impl DeletionProof {
         audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
-        durability_proof: Option<&DurabilityProof>,
+        durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_full_v3(
@@ -157,7 +157,7 @@ impl DeletionProof {
             audit_chain_position,
             attested_at,
             graph_repair,
-            durability_proof,
+            durability,
             signing_key,
         )
     }
@@ -173,7 +173,7 @@ impl DeletionProof {
         wal_chain_receipt: Option<[u8; 32]>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
-        durability_proof: Option<&DurabilityProof>,
+        durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_full_v3(
@@ -186,7 +186,7 @@ impl DeletionProof {
             None,
             attested_at,
             graph_repair,
-            durability_proof,
+            durability,
             signing_key,
         )
     }
@@ -203,10 +203,10 @@ impl DeletionProof {
         audit_chain_position: Option<u64>,
         attested_at: i64,
         graph_repair: &[GraphRepairAttestation],
-        durability_proof: Option<&DurabilityProof>,
+        durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
-        if durability_proof.is_none() {
+        if durability.is_none() {
             return Err(CryptoError::NotDurable.into());
         }
         deleted_keys.sort();

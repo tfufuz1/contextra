@@ -74,7 +74,12 @@ fn test_simulated_fsync_log_failure_keeps_kek_intact() -> Result<(), Box<dyn std
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
 
-    let log = Arc::new(RevocationLog::open_or_create(&log_path, clock, Some(sk), vk)?);
+    let log = Arc::new(RevocationLog::open_or_create(
+        &log_path,
+        clock,
+        Some(sk),
+        vk,
+    )?);
     let km = KeyManager::try_new("passphrase-p06-fsync", b"salt-p06-fsync")?;
     let cipher = KvSegmentCipher::new(km.derive_file_key(b"sub")?, log);
 
@@ -115,13 +120,19 @@ fn test_simulated_fsync_log_failure_keeps_kek_intact() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dyn std::error::Error>> {
+fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dyn std::error::Error>>
+{
     let temp = tempdir()?;
     let log_path = temp.path().join("kv_revocation.log");
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
 
-    let log = Arc::new(RevocationLog::open_or_create(&log_path, clock, Some(sk), vk)?);
+    let log = Arc::new(RevocationLog::open_or_create(
+        &log_path,
+        clock,
+        Some(sk),
+        vk,
+    )?);
     let km = KeyManager::try_new("passphrase-p06-success", b"salt-p06-success")?;
     let cipher = KvSegmentCipher::new(km, log);
 
@@ -138,11 +149,17 @@ fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dy
 
     // 1. KEK in RAM is zeroized/destroyed
     let decrypt_res = cipher.decrypt_with_version(&encrypted, group_id, 1);
-    assert!(decrypt_res.is_err(), "Decryption must fail after KEK revocation");
+    assert!(
+        decrypt_res.is_err(),
+        "Decryption must fail after KEK revocation"
+    );
 
     // 2. Marker file exists and reflects updated count
     let marker_path = contextra_crypto::revocation_log::marker_path_for(&log_path);
-    assert!(marker_path.exists(), "Revocation marker file .initialized must exist");
+    assert!(
+        marker_path.exists(),
+        "Revocation marker file .initialized must exist"
+    );
 
     // 3. Issue DeletionProof with valid DurabilityProof
     let durability = DurabilityProof::new(100);
@@ -165,10 +182,11 @@ fn test_successful_revocation_sequence_and_deletion_proof() -> Result<(), Box<dy
 
     assert_eq!(proof.signature_version, 3);
     let signing_key = SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
-    assert!(proof
-        .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(
+    assert!(
+        proof.verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(
             &signing_key.verifying_key()
-        ))?);
+        ))?
+    );
 
     Ok(())
 }
@@ -183,11 +201,19 @@ fn test_restart_after_revocation_preserves_locked_key() -> Result<(), Box<dyn st
     let group_id = 400;
 
     {
-        let log = Arc::new(RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)?);
+        let log = Arc::new(RevocationLog::open_or_create(
+            &log_path,
+            clock.clone(),
+            Some(sk),
+            vk,
+        )?);
         let km = KeyManager::try_new("passphrase-p06-restart", b"salt-p06-restart")?;
         let cipher = KvSegmentCipher::new(km, log);
 
-        let _ = cipher.registry().get_or_derive(&KeyManager::try_new("passphrase-p06-restart", b"salt-p06-restart")?, group_id)?;
+        let _ = cipher.registry().get_or_derive(
+            &KeyManager::try_new("passphrase-p06-restart", b"salt-p06-restart")?,
+            group_id,
+        )?;
         cipher.registry().revoke_group(group_id)?;
         // Drop cipher and log simulating process shutdown
     }
@@ -203,9 +229,10 @@ fn test_restart_after_revocation_preserves_locked_key() -> Result<(), Box<dyn st
         "Group MUST remain revoked after process restart"
     );
 
-    let derive_res = cipher_reopened
-        .registry()
-        .get_or_derive(&KeyManager::try_new("passphrase-p06-restart", b"salt-p06-restart")?, group_id);
+    let derive_res = cipher_reopened.registry().get_or_derive(
+        &KeyManager::try_new("passphrase-p06-restart", b"salt-p06-restart")?,
+        group_id,
+    );
 
     assert!(
         matches!(derive_res, Err(CryptoError::KeyRevoked(_))),
@@ -232,7 +259,10 @@ fn test_deletion_proof_create_on_memory_only_returns_not_durable() {
         &[0xAAu8; 32],
     );
 
-    assert!(res.is_err(), "create_with_durability without DurabilityProof MUST fail");
+    assert!(
+        res.is_err(),
+        "create_with_durability without DurabilityProof MUST fail"
+    );
     match res {
         Err(ContextraError::Crypto(msg)) => {
             assert!(

@@ -20,11 +20,7 @@ fn test_derive_collection_id_determinism() -> contextra_types::Result<()> {
         id1, id3,
         "Unterschiedliche Collection-Namen muessen unterschiedliche CollectionIds erzeugen"
     );
-    assert_ne!(
-        id1.inner(),
-        0,
-        "Abgeleitete CollectionId darf nicht 0 sein"
-    );
+    assert_ne!(id1.inner(), 0, "Abgeleitete CollectionId darf nicht 0 sein");
 
     Ok(())
 }
@@ -66,9 +62,15 @@ async fn test_drop_collection_derivation_order_fail_closed() -> contextra_types:
     let proof_key = b"secret_proof_key_32bytes_1234567";
 
     // 1. Erstelle eine gueltige Collection und fuege Daten ein
-    let col = db.collection_for_tenant("test_order_col", tenant_id).await?;
-    col.insert("doc_1", &[0.1, 0.2, 0.3, 0.4], Some(json!({"text": "data"})))
+    let col = db
+        .collection_for_tenant("test_order_col", tenant_id)
         .await?;
+    col.insert(
+        "doc_1",
+        &[0.1, 0.2, 0.3, 0.4],
+        Some(json!({"text": "data"})),
+    )
+    .await?;
 
     // 2. Versuch, eine ungueltige Collection (z. B. leerer Name) zu droppen
     let drop_res = db.drop_collection("", tenant_id, proof_key).await;

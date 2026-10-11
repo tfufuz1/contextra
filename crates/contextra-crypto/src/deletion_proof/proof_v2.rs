@@ -2,9 +2,12 @@
 
 use super::layer_proof::LayerCleanupProof;
 use super::proof::DeletionProof;
-use super::types::{hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope, ExcludedScope};
+use super::types::{
+    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope, DurabilityProof, ExcludedScope,
+};
 use super::wal_receipt::compute_hmac_sha256;
 use crate::ed25519_proof::SignatureVersion;
+use crate::error::CryptoError;
 use contextra_types::{ContextraError, Result, TxId};
 
 impl DeletionProof {
@@ -29,6 +32,31 @@ impl DeletionProof {
             covered_layers,
             excluded_scopes,
             None,
+            proof_key,
+        )
+    }
+
+    /// Creates a DeletionProof with explicit DurabilityProof verification.
+    ///
+    /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    pub fn create_with_durability(
+        scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        durability_proof: Option<&DurabilityProof>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        if durability_proof.is_none() {
+            return Err(CryptoError::NotDurable.into());
+        }
+        Self::create(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
             proof_key,
         )
     }

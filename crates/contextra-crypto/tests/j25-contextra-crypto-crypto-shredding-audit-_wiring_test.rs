@@ -69,7 +69,6 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
     let durability = DurabilityProof::new(123);
-
     let proof_v3 = DeletionProof::create_v3(
         scope.clone(),
         vec![b"key_a".to_vec()],

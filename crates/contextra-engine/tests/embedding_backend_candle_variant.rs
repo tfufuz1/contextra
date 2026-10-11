@@ -17,7 +17,10 @@ async fn test_candle_embedding_backend_nonexistent_dir_fails() -> TestResult {
     };
 
     let res = Contextra::open_with_config(tmp.path(), config).await;
-    assert!(res.is_err(), "Expected error when candle model_dir does not exist");
+    assert!(
+        res.is_err(),
+        "Expected error when candle model_dir does not exist"
+    );
     Ok(())
 }
 

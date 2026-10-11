@@ -326,7 +326,9 @@ impl KeyManager {
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
         let mut key_bytes = [0u8; 32];
         hk.expand(b"contextra-revocation-log-signing-key-v1", &mut key_bytes)
-            .map_err(|e| CryptoError::Crypto(format!("HKDF revocation key expansion failed: {e}")))?;
+            .map_err(|e| {
+                CryptoError::Crypto(format!("HKDF revocation key expansion failed: {e}"))
+            })?;
         Ok(ed25519_dalek::SigningKey::from_bytes(&key_bytes))
     }
 
