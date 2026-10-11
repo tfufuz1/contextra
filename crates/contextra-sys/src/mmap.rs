@@ -71,8 +71,10 @@ mod tests {
         }
         let file = File::open(&path)?;
         let res = mmap_readonly(&file);
-        assert!(res.is_err());
-        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        match res {
+            Err(e) => assert_eq!(e.kind(), io::ErrorKind::InvalidInput),
+            Ok(_) => return Err("expected error for empty file".into()),
+        }
         let _ = std::fs::remove_file(path);
         Ok(())
     }

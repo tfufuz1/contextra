@@ -834,6 +834,7 @@ dependencies = [
 name = "contextra-durable-fs"
 version = "0.1.0"
 dependencies = [
+ "contextra-sys",
  "tempfile",
 ]
 

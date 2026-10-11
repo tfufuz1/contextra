@@ -10,6 +10,8 @@
 //! - [`durable_remove`]: Removes a target file and synchronizes the parent directory.
 //! - [`scrub_and_remove`]: Overwrites file contents with zeros before durable removal.
 //! - [`scrub_if_safe`]: Safely scrubs file contents with safety checks (CoW, hardlinks, reader active).
+//! - [`DurableHandle`]: File handle wrapper enforcing fsync poisoning semantics (INV-FSYNC-1).
+//! - [`DirLock`]: Directory lock guard enforcing filesystem classification rules (§7.3.1).
 
 /// Pending delete journal tracking files scheduled for removal across crashes.
 pub mod journal;
@@ -20,44 +22,167 @@ pub mod scrub;
 pub use journal::PendingDeleteJournal;
 pub use scrub::{scrub_if_safe, ScrubOutcome, ScrubPolicy, ScrubRefusal};
 
+use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FlushKind, FsClass};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// Synchronizes a directory and its metadata entries to stable storage.
+/// Marker type representing a handle poisoned by an fsync error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoisonedHandle;
+
+/// A wrapper around [`File`] that poisons the handle upon an fsync failure (INV-FSYNC-1).
 ///
-/// Opens the directory and calls `sync_all`. All errors are propagated.
-///
-/// # Platform Behavior
-/// - **Unix**: Opens directory via `File::open` and invokes `sync_all()`.
-/// - **Windows**: Directory fsync is not supported by the underlying OS kernel.
-///   Returns `Ok(())` with documented rationale.
-pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    #[cfg(not(windows))]
-    {
-        let file = File::open(dir)?;
-        file.sync_all()?;
-        Ok(())
+/// Ensures no further flush attempts occur on a corrupted or errored handle.
+#[derive(Debug)]
+pub struct DurableHandle {
+    file: Option<File>,
+    is_poisoned: bool,
+}
+
+impl DurableHandle {
+    /// Wraps an open [`File`] into a new [`DurableHandle`].
+    pub fn new(file: File) -> Self {
+        Self {
+            file: Some(file),
+            is_poisoned: false,
+        }
     }
-    #[cfg(windows)]
-    {
-        // Windows: Verzeichnis-fsync nicht verfügbar, siehe Dokumentation
-        // Feature-Flag-Hinweis: Dir-fsync wird unter Windows vom OS-Kernel nicht unterstützt.
-        if !dir.exists() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "directory not found",
+
+    /// Returns `true` if this handle has been poisoned due to a flush failure.
+    #[must_use]
+    pub fn is_poisoned(&self) -> bool {
+        self.is_poisoned
+    }
+
+    /// Flushes file contents using platform durability primitives.
+    ///
+    /// If the operation fails, the handle becomes poisoned and subsequent calls fail immediately.
+    pub fn flush(&mut self, kind: FlushKind) -> std::io::Result<()> {
+        if self.is_poisoned {
+            return Err(std::io::Error::other(
+                "handle is poisoned due to a previous fsync failure",
             ));
         }
-        Ok(())
+
+        let Some(file) = self.file.as_ref() else {
+            return Err(std::io::Error::other("file handle has been closed"));
+        };
+
+        if let Err(err) = flush_file(file, kind) {
+            self.is_poisoned = true;
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Returns a reference to the underlying [`File`], or `None` if poisoned.
+    #[must_use]
+    pub fn get_ref(&self) -> Option<&File> {
+        if self.is_poisoned {
+            None
+        } else {
+            self.file.as_ref()
+        }
+    }
+
+    /// Explicitly poisons this handle.
+    pub fn poison(&mut self) {
+        self.is_poisoned = true;
     }
 }
 
-/// Helper struct to ensure temporary file cleanup on failure.
+/// Locking mode for directory lock acquisition (§7.3.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LockMode {
+    /// Standard directory lock requiring local supported filesystem guarantees.
+    #[default]
+    Normal,
+    /// Memory-only directory lock mode bypassing filesystem persistence checks.
+    MemoryOnly,
+}
+
+/// Directory lock guard holding lock file ownership and enforcing filesystem safety.
+#[derive(Debug)]
+pub struct DirLock {
+    lock_path: PathBuf,
+    _file: Option<File>,
+    mode: LockMode,
+}
+
+impl DirLock {
+    /// Acquires a lock on `dir` according to `mode`.
+    ///
+    /// Rejects persistent locks on unsupported filesystems (`Network`, `Fuse`, `CloudSync`, `Unknown`)
+    /// unless `mode == LockMode::MemoryOnly`. Error messages omit path payloads (INV-LOG-1).
+    pub fn acquire(dir: &Path, mode: LockMode) -> std::io::Result<Self> {
+        let class = fs_class(dir)?;
+
+        if mode == LockMode::Normal && !class.is_supported_local() {
+            let class_str = match class {
+                FsClass::Network => "network",
+                FsClass::Fuse => "fuse",
+                FsClass::CloudSync => "cloud_sync",
+                _ => "unsupported_filesystem",
+            };
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                format!(
+                    "directory locking rejected for filesystem class: {}",
+                    class_str
+                ),
+            ));
+        }
+
+        let lock_path = dir.join(".dirlock");
+        let file = if mode == LockMode::Normal {
+            let mut options = OpenOptions::new();
+            options.write(true).create(true);
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::OpenOptionsExt;
+                // FILE_SHARE_READ (1) | FILE_SHARE_WRITE (2) | FILE_SHARE_DELETE (4)
+                options.share_access(7);
+            }
+            Some(options.open(&lock_path)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            lock_path,
+            _file: file,
+            mode,
+        })
+    }
+
+    /// Returns the [`LockMode`] of this lock.
+    #[must_use]
+    pub fn mode(&self) -> LockMode {
+        self.mode
+    }
+}
+
+impl Drop for DirLock {
+    fn drop(&mut self) {
+        if self.mode == LockMode::Normal {
+            let _file = self._file.take();
+            drop(_file);
+            let _ = std::fs::remove_file(&self.lock_path);
+        }
+    }
+}
+
+/// Synchronizes a directory and its metadata entries to stable storage.
+pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    flush_dir(dir)
+}
+
 struct TmpFileGuard<'a>(&'a Path);
 
 impl<'a> Drop for TmpFileGuard<'a> {
@@ -66,17 +191,7 @@ impl<'a> Drop for TmpFileGuard<'a> {
     }
 }
 
-/// Atomically replaces the file at `path` with `bytes`.
-///
-/// Sequence of operations:
-/// 1. Determines parent directory.
-/// 2. Creates a temporary file in the same directory with a unique name.
-/// 3. Writes `bytes` via `write_all`.
-/// 4. Flushes data to disk via `sync_all`.
-/// 5. Renames the temporary file over `path`.
-/// 6. Synchronizes parent directory via [`sync_dir`].
-///
-/// Every step propagates errors via `?`.
+/// Atomically replaces the file at `path` with `bytes` and flushes parent directory.
 pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
@@ -97,31 +212,28 @@ pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let tmp_filename = format!(".{}.tmp.{}.{}.{}", file_stem, pid, nanos, count);
     let tmp_path = parent.join(tmp_filename);
 
-    let mut tmp_file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&tmp_path)?;
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.share_access(7);
+    }
 
+    let mut tmp_file = options.open(&tmp_path)?;
     let guard = TmpFileGuard(&tmp_path);
 
     tmp_file.write_all(bytes)?;
-    tmp_file.sync_all()?;
+    flush_file(&tmp_file, FlushKind::DataAndMetadata)?;
     drop(tmp_file);
 
-    std::fs::rename(&tmp_path, path)?;
+    rename_durable(&tmp_path, path)?;
     std::mem::forget(guard);
 
-    sync_dir(parent)?;
     Ok(())
 }
 
 /// Durably removes a file at `path` and synchronizes the parent directory.
-///
-/// Sequence of operations:
-/// 1. Removes the file via `remove_file`.
-/// 2. Synchronizes parent directory via [`sync_dir`].
-///
-/// If the file does not exist, `std::io::ErrorKind::NotFound` is returned as an error and not ignored.
 pub fn durable_remove(path: &Path) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
@@ -131,7 +243,7 @@ pub fn durable_remove(path: &Path) -> std::io::Result<()> {
     })?;
 
     std::fs::remove_file(path)?;
-    sync_dir(parent)?;
+    flush_dir(parent)?;
     Ok(())
 }
 
@@ -143,44 +255,6 @@ pub struct ScrubReceipt {
 }
 
 /// Overwrites file contents with zeros and durably removes the file.
-///
-/// **WARNING:** Legacy unverified scrub helper. Prefer [`scrub_if_safe`] which performs
-/// mandatory safety checks for hardlinks, Copy-on-Write (CoW) filesystems, and active readers.
-///
-/// Overwrites the file at `path` completely with zero bytes in 64-KiB chunks,
-/// flushes data to disk via `sync_all()`, and removes the file via [`durable_remove`].
-///
-/// # Security & Physical Storage Limitations (Non-Guarantees)
-///
-/// **Important Notice:** This function reduces residual risk by overwriting visible disk blocks,
-/// but **does NOT guarantee** complete physical data destruction or unrecoverability on modern hardware and storage systems.
-/// Specifically, physical media remnants may persist due to:
-/// - **SSD / Flash Wear-Leveling and Garbage Collection:** Flash controllers rewrite blocks to new physical locations.
-/// - **Copy-on-Write (CoW) Filesystems:** (e.g., ZFS, Btrfs, APFS) Overwrites allocate new blocks rather than in-place mutation.
-/// - **Journaling Filesystems & Metadata Logs:** Temporary or journaled copies may exist elsewhere on disk.
-/// - **Storage Snapshots & Backups:** Historical block snapshots or volume mirrors remain unaffected.
-///
-/// Do not rely on this function as an absolute physical data destruction mechanism.
-///
-/// # Behavior & Symlinks
-///
-/// - Symlinks are **never** followed. If `path` is a symlink or is not a regular file,
-///   an error of kind [`std::io::ErrorKind::InvalidInput`] is returned and no files are modified.
-/// - If `path` does not exist, [`std::io::ErrorKind::NotFound`] is returned directly.
-/// - Exact original byte length is determined prior to overwriting. Exactly `len` bytes are written
-///   with no pre-truncation or file extension.
-/// - An empty file (0 bytes) results in 0 bytes scrubbed and is durably removed.
-///
-/// # Concurrency & Async Callers
-///
-/// This operation is fully synchronous and performs blocking I/O (file overwriting, `sync_all`,
-/// and parent directory fsync). Async callers (such as `tokio` runtimes) must wrap calls to
-/// this function in blocking execution contexts (e.g., `spawn_blocking`).
-///
-/// # Errors
-///
-/// Returns an [`std::io::Error`] if metadata inspection, file opening, writing, flushing,
-/// or directory synchronization fails.
 pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
     let metadata = path.symlink_metadata()?;
     let file_type = metadata.file_type();
@@ -194,7 +268,15 @@ pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
 
     let len = metadata.len();
     if len > 0 {
-        let mut file = OpenOptions::new().write(true).open(path)?;
+        let mut options = OpenOptions::new();
+        options.write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.share_access(7);
+        }
+
+        let mut file = options.open(path)?;
 
         let zeros = [0u8; 64 * 1024];
         let mut remaining = len;
@@ -207,7 +289,7 @@ pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
             remaining -= chunk_size as u64;
         }
 
-        file.sync_all()?;
+        flush_file(&file, FlushKind::DataAndMetadata)?;
     }
 
     durable_remove(path)?;
