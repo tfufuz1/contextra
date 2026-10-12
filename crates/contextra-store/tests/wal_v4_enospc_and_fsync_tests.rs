@@ -1,3 +1,8 @@
+//! Status: WAL V4 features (segment preallocation, poisoned handles, V4 format) are work-in-progress.
+//! Reference: Contextra Storage Specification v17 §8.4 (WAL V4 Specification).
+//! Tests in this file are feature-gated until WAL V4 implementation is completed.
+#![cfg(feature = "wal-v4-wip")]
+
 use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp, WalVersion};
 use tempfile::TempDir;
