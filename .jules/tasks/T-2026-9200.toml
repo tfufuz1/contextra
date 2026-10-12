@@ -1,0 +1,25 @@
+id        = "T-2026-9200"
+title     = "P00 Layer-/Exclusion-Erweiterung"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "sec"
+goal      = "DeletionLayer und ExcludedScope fur v4 Erweiterung in contextra-crypto ausbauen"
+non_goals = ["Keine Fremden Crates andern", "Kein Refactoring fremder Module"]
+scope     = [
+  "crates/contextra-crypto/src/deletion_proof/types.rs",
+  "crates/contextra-crypto/src/deletion_proof/layer_ids.rs",
+  "crates/contextra-crypto/tests/deletion_layer_extension.rs",
+  ".jules/tasks/T-2026-9200.toml"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root"]
+acceptance = [
+  "cargo test -p contextra-crypto",
+  "cargo clippy -p contextra-crypto --all-targets -- -D warnings"
+]
+evidence_required = ["Golden Test fur Serialization & layer_id / id roundtrip"]
+
+[budget]
+files = 8
+lines = 500
+iterations = 8
