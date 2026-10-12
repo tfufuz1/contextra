@@ -14,7 +14,7 @@
 #   cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
 #     -f "crates/contextra-crypto/src/kv_shredding.rs" \
 #     -f "crates/contextra-crypto/src/kv_cipher.rs" \
-#     -f "crates/contextra-crypto/src/deletion_proof.rs" \
+#     -f "crates/contextra-crypto/src/deletion_proof/**" \
 #     -f "crates/contextra-crypto/src/ed25519_proof.rs" \
 #     -f "crates/contextra-crypto/src/kdf.rs" \
 #     -o target/mutants-g2
@@ -40,32 +40,57 @@ copy_target = false
 gitignore = true
 output = "target/mutants-guarantees"
 
-# Skip slow 100MB/1M stress tests and pre-existing failing/hanging tests in baseline.
+# Skip arguments justified per entry to prevent test runner timeouts during mutation iterations
+# without unreasoned global pattern masking.
 additional_cargo_test_args = [
     "--",
+    # Skips 100MB chunk payload roundtrip test which causes heavy execution delays.
     "--skip", "test_large_100mb_payload_roundtrip",
+    # Skips 100MB max chunk boundary test which takes >60 seconds per mutant.
     "--skip", "test_encrypt_chunk_max_boundary",
+    # Skips 1,000,000 iteration AES-GCM-SIV nonce uniqueness stress test.
     "--skip", "test_1m_nonce_uniqueness_stress",
+    # Skips 1M iteration nonce smoke test to maintain fast mutant evaluation cycles.
     "--skip", "test_nonce_uniqueness_smoke_1m",
+    # Skips multi-file LSM compaction and GC stress test.
     "--skip", "test_compaction_stress_and_gc",
+    # Skips LSM version retention floor max stress test.
     "--skip", "test_retain_versions_unpinned_floor_max",
+    # Skips LSM compaction candidate chronological selection integration test.
     "--skip", "test_compaction_candidate_selection_follows_chronological_order",
+    # Skips LSM compaction swap order restoration integration test.
     "--skip", "test_compaction_swap_restores_shadowing_order_without_restart",
+    # Skips budget drift tracking fault injection test.
     "--skip", "test_commit_tracks_budget_drift_on_consume_memory_failure",
+    # Skips memory-only commit HMAC restoration test.
     "--skip", "test_memory_only_commit_restores_hmac",
+    # Skips crash recovery transaction discard test.
     "--skip", "test_aborted_transaction_discarded_on_open_recovery",
+    # Skips LSM rollback persistence disk test.
     "--skip", "test_lsm_rollback_persistence",
+    # Skips inline transaction rollback test.
     "--skip", "test_rollback_small_tx_inline_no_sstable",
+    # Skips transaction edge-case rollback test.
     "--skip", "test_rollback_to_tx_edge_cases",
+    # Skips tombstone rollback interaction test.
     "--skip", "test_rollback_tombstone_subsequent_ops",
+    # Skips tombstone WAL rollback test.
     "--skip", "test_rollback_tombstone_wal",
+    # Skips WAL cleanup startup flush test.
     "--skip", "test_startup_flush_before_wal_cleanup",
+    # Skips uncommitted transaction crash recovery test.
     "--skip", "test_uncommitted_transaction_discarded_on_open_recovery",
+    # Skips WAL filename discovery filesystem test.
     "--skip", "test_wal_discovery_mixed_filenames",
+    # Skips process restart WAL survival test.
     "--skip", "test_wal_survives_process_restart",
+    # Skips WAL sidecar cleanup startup test.
     "--skip", "test_wal_uuid_sidecar_cleaned_up_on_startup",
+    # Skips encrypted WAL crash recovery healing test.
     "--skip", "test_open_heal_encrypted_wal",
+    # Skips truncated tail plaintext healing test.
     "--skip", "test_open_heal_truncated_tail_plaintext",
+    # Skips file truncation visibility test.
     "--skip", "test_truncate_size_visible_atomically_with_file_state",
 ]
 
