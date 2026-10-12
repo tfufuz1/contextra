@@ -209,10 +209,10 @@ impl ProofStore {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
+    use super::super::types::DeletionScope;
     use super::*;
     use crate::deletion_proof::builder::ProofBuilder;
     use crate::deletion_proof::signer::ProofKeyPairSigner;
-    use super::super::types::DeletionScope;
     use contextra_types::{DocId, TenantId};
     use rand::rngs::OsRng;
     use tempfile::tempdir;
@@ -259,6 +259,12 @@ mod tests {
 
         let (_store, warnings) = ProofStore::open(dir.path()).expect("open failed");
         assert!(!warnings.is_empty());
-        assert!(warnings.iter().any(|w| matches!(w, ProofStoreWarning::ProofChainGap { expected_seq: 2, found_seq: 3 })));
+        assert!(warnings.iter().any(|w| matches!(
+            w,
+            ProofStoreWarning::ProofChainGap {
+                expected_seq: 2,
+                found_seq: 3
+            }
+        )));
     }
 }

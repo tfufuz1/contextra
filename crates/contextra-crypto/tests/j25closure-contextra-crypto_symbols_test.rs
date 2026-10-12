@@ -10,7 +10,7 @@
 // 8. new_in_memory (revocation_log.rs)
 // 9. verify_integrity (revocation_log.rs)
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::audit_chain::{AuditChain, DataClass};
 use contextra_crypto::crypto::KeyManager;

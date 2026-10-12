@@ -3,7 +3,7 @@
 // ORAKEL: Independent math/spec assertions and explicit boundary inputs (R4).
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::kdf::{KDF_HEADER_MAGIC, KDF_HEADER_VERSION_1, KDF_ID_ARGON2ID};
 use contextra_crypto::kv_shredding::{GroupKek, RecordDek};

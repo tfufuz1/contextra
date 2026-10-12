@@ -34,3 +34,15 @@ name = "deletion_proof_verify_external_fuzz"
 path = "fuzz_targets/deletion_proof_verify_external_fuzz.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "audit_chain_decode_fuzz"
+path = "fuzz_targets/audit_chain_decode_fuzz.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "revocation_log_decode_fuzz"
+path = "fuzz_targets/revocation_log_decode_fuzz.rs"
+test = false
+doc = false

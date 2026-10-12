@@ -5,7 +5,11 @@
 //! - Only uses `ed25519-dalek`, `blake3`, `serde_json`, `bincode`, `contextra-crypto`.
 //! - Compares independent verification verdict against crate verification verdict.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_crypto::deletion_proof::builder::ProofBuilder;
 use contextra_crypto::deletion_proof::policy::{verify_with_policy, ProofPolicy};
@@ -122,7 +126,10 @@ impl StandaloneTlvEncoder {
 }
 
 /// Independent verifier function implementing raw TLV and Ed25519 signature checks.
-fn independent_verify_proof_v4(proof: &ProofV4, public_key_bytes: &[u8; 32]) -> Result<bool, String> {
+fn independent_verify_proof_v4(
+    proof: &ProofV4,
+    public_key_bytes: &[u8; 32],
+) -> Result<bool, String> {
     // 1. Re-encode canonical payload manually via standalone encoder
     let mut enc = StandaloneTlvEncoder::new();
 
@@ -156,7 +163,9 @@ fn independent_verify_proof_v4(proof: &ProofV4, public_key_bytes: &[u8; 32]) -> 
         c_enc.add_field(0x0006, claim.evidence_tlv.clone());
         let c_bytes = c_enc.finish();
 
-        let len_bytes = u32::try_from(c_bytes.len()).unwrap_or(u32::MAX).to_be_bytes();
+        let len_bytes = u32::try_from(c_bytes.len())
+            .unwrap_or(u32::MAX)
+            .to_be_bytes();
         claims_tlv.extend_from_slice(&len_bytes);
         claims_tlv.extend_from_slice(&c_bytes);
     }
@@ -245,13 +254,21 @@ fn create_test_vector_files(dir: &Path) {
     let mut tampered_sig = valid_proof.clone();
     tampered_sig.signature[0] ^= 0xFF;
     let tampered_sig_json = serde_json::to_string_pretty(&tampered_sig).unwrap();
-    fs::write(dir.join("tampered_signature_vector.json"), tampered_sig_json).unwrap();
+    fs::write(
+        dir.join("tampered_signature_vector.json"),
+        tampered_sig_json,
+    )
+    .unwrap();
 
     // 3. Tampered payload vector
     let mut tampered_payload = valid_proof.clone();
     tampered_payload.deleted_after_tx = 101;
     let tampered_payload_json = serde_json::to_string_pretty(&tampered_payload).unwrap();
-    fs::write(dir.join("tampered_payload_vector.json"), tampered_payload_json).unwrap();
+    fs::write(
+        dir.join("tampered_payload_vector.json"),
+        tampered_payload_json,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -271,9 +288,15 @@ fn test_independent_verifier_matches_crate_verifier_on_all_vectors() {
             let json_str = fs::read_to_string(&path).unwrap();
             let proof: ProofV4 = serde_json::from_str(&json_str).unwrap();
 
-            let independent_result = independent_verify_proof_v4(&proof, &public_key).unwrap_or(false);
+            let independent_result =
+                independent_verify_proof_v4(&proof, &public_key).unwrap_or(false);
             let crate_report = verify_with_policy(&proof, &public_key, &policy);
-            let crate_result = crate_report.rule_results.iter().find(|r| r.rule_id == "R1").unwrap().passed;
+            let crate_result = crate_report
+                .rule_results
+                .iter()
+                .find(|r| r.rule_id == "R1")
+                .unwrap()
+                .passed;
 
             assert_eq!(
                 independent_result, crate_result,

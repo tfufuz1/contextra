@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::{
@@ -127,6 +127,7 @@ fn test_legacy_v1_v2_proofs_still_verify() {
         timestamp: 0,
         signature: legacy_signature.to_vec(),
         covered_layers,
+        uncovered_layers: vec![],
         excluded_scopes,
         graph_repair: vec![],
         wal_chain_receipt: None,
@@ -154,6 +155,7 @@ fn test_legacy_v1_v2_proofs_still_verify() {
         timestamp: 0,
         signature: v1_signature.to_vec(),
         covered_layers: vec![],
+        uncovered_layers: vec![],
         excluded_scopes: vec![],
         graph_repair: vec![],
         wal_chain_receipt: None,

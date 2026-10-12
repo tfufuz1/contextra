@@ -9,7 +9,7 @@
 //! filenames are identical across different namespaces/shards. Two WAL files
 //! named `wal-100.log` in different shards MUST NOT share encryption keys.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::crypto::KeyManager;
 

@@ -59,12 +59,21 @@ pub struct Cleaned;
 ///
 /// ## Compile Error Example
 /// Attempting to call `.finish()` before all 7 layers are transitioned to [`Cleaned`] will fail at compile time:
-/// ```ignore
-/// // COMPILE ERROR: method `finish` not found on `DeletionProofBuilder<Cleaned, Missing, Missing, Missing, Missing, Missing, Missing>`
-/// let proof = DeletionProofBuilder::new(...)
-///     .with_lsm_memtable_cleanup(lsm_proof)
-///     // missing other 6 storage layers!
-///     .finish();
+/// ```compile_fail
+/// use contextra_crypto::deletion_proof_typestate::DeletionProofBuilder;
+/// use contextra_crypto::deletion_proof::{DeletionLayer, DeletionScope, LayerCleanupProof};
+/// use contextra_types::{DocId, TenantId, TxId};
+///
+/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+/// let _ = DeletionProofBuilder::new(
+///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
+///     vec![],
+///     TxId(100),
+///     vec![],
+///     vec![0u8; 32],
+/// )
+/// .with_lsm_memtable_cleanup(lsm_proof)
+/// .finish(); // Compile fail: finish() not available until all 7 layers are Cleaned
 /// ```
 #[derive(Debug)]
 pub struct DeletionProofBuilder<

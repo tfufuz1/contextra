@@ -157,7 +157,10 @@ pub fn verify_with_policy(
         message: if r5_passed {
             "R5 PASS: Mandatory excluded scopes satisfied".to_string()
         } else {
-            format!("R5 FAIL: Missing mandatory excluded scopes: {:?}", missing_excl)
+            format!(
+                "R5 FAIL: Missing mandatory excluded scopes: {:?}",
+                missing_excl
+            )
         },
     });
 
@@ -222,7 +225,10 @@ pub fn verify_with_policy(
         message: if r9_passed {
             "R9 PASS: All claim_text_ids allowed by policy".to_string()
         } else {
-            format!("R9 FAIL: Unallowed claim_text_ids: {:?}", unallowed_text_ids)
+            format!(
+                "R9 FAIL: Unallowed claim_text_ids: {:?}",
+                unallowed_text_ids
+            )
         },
     });
 
@@ -292,11 +298,11 @@ pub fn verify_with_policy(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use super::*;
     use super::super::signer::ProofSigner;
+    use super::super::types::DeletionScope;
+    use super::*;
     use crate::deletion_proof::proof_v4::ProofChainLink;
     use crate::deletion_proof::signer::ProofKeyPairSigner;
-    use super::super::types::DeletionScope;
     use contextra_types::{DocId, TenantId};
     use rand::rngs::OsRng;
 
@@ -353,7 +359,11 @@ mod tests {
         };
 
         let report = verify_with_policy(&proof, &signer.public_key(), &policy);
-        assert!(report.is_valid, "Valid proof MUST pass all rules; report: {:?}", report);
+        assert!(
+            report.is_valid,
+            "Valid proof MUST pass all rules; report: {:?}",
+            report
+        );
         assert_eq!(report.rule_results.len(), 13);
     }
 
@@ -373,15 +383,33 @@ mod tests {
 
         let report = verify_with_policy(&empty_proof, &signer.public_key(), &policy);
 
-        assert!(!report.is_valid, "Empty proof without layers/keys MUST fail policy verification");
+        assert!(
+            !report.is_valid,
+            "Empty proof without layers/keys MUST fail policy verification"
+        );
 
-        let r1 = report.rule_results.iter().find(|r| r.rule_id == "R1").unwrap();
+        let r1 = report
+            .rule_results
+            .iter()
+            .find(|r| r.rule_id == "R1")
+            .unwrap();
         assert!(r1.passed, "R1 signature check MUST pass");
 
-        let r3 = report.rule_results.iter().find(|r| r.rule_id == "R3").unwrap();
+        let r3 = report
+            .rule_results
+            .iter()
+            .find(|r| r.rule_id == "R3")
+            .unwrap();
         assert!(!r3.passed, "R3 layer coverage MUST fail");
 
-        let r12 = report.rule_results.iter().find(|r| r.rule_id == "R12").unwrap();
-        assert!(!r12.passed, "R12 empty key hash without observed_empty MUST fail");
+        let r12 = report
+            .rule_results
+            .iter()
+            .find(|r| r.rule_id == "R12")
+            .unwrap();
+        assert!(
+            !r12.passed,
+            "R12 empty key hash without observed_empty MUST fail"
+        );
     }
 }

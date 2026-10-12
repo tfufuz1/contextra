@@ -145,7 +145,9 @@ impl ProofV4 {
         let mut claims_tlv = Vec::new();
         for claim in &self.claims {
             let claim_bytes = claim.to_canonical_tlv();
-            let len_bytes = u32::try_from(claim_bytes.len()).unwrap_or(u32::MAX).to_be_bytes();
+            let len_bytes = u32::try_from(claim_bytes.len())
+                .unwrap_or(u32::MAX)
+                .to_be_bytes();
             claims_tlv.extend_from_slice(&len_bytes);
             claims_tlv.extend_from_slice(&claim_bytes);
         }
@@ -246,8 +248,8 @@ impl ProofV4 {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use super::*;
     use super::super::canon::TlvField;
+    use super::*;
     use crate::deletion_proof::signer::ProofKeyPairSigner;
     use contextra_types::{DocId, TenantId};
     use rand::rngs::OsRng;
@@ -324,7 +326,10 @@ mod tests {
         p3.deleted_after_tx = 101;
         let bytes3 = p3.signed_bytes();
 
-        assert_ne!(bytes1, bytes3, "Mutation of deleted_after_tx MUST change signed_bytes");
+        assert_ne!(
+            bytes1, bytes3,
+            "Mutation of deleted_after_tx MUST change signed_bytes"
+        );
     }
 
     #[test]

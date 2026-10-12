@@ -60,7 +60,8 @@ mod tests {
         ];
 
         let encoded = bincode::serialize(&old_layers).expect("serialization failed");
-        let decoded: Vec<DeletionLayer> = bincode::deserialize(&encoded).expect("deserialization failed");
+        let decoded: Vec<DeletionLayer> =
+            bincode::deserialize(&encoded).expect("deserialization failed");
 
         assert_eq!(old_layers, decoded);
     }

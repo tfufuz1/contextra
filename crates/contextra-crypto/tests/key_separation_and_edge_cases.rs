@@ -9,7 +9,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    deprecated
 )]
 
 use contextra_crypto::wal_crypto::EncryptedWal;

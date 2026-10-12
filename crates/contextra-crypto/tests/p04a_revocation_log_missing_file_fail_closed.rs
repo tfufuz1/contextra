@@ -3,6 +3,7 @@
 // INVARIANTEN: Reopen eines gelöschten oder gekürzten RevocationLogs MUSS mit CryptoError::IntegrityViolation fehlschlagen.
 
 #![forbid(unsafe_code)]
+#![allow(deprecated)]
 
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, Result};

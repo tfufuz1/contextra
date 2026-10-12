@@ -27,6 +27,8 @@ pub mod deletion_witness;
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
+pub mod keystore;
+pub mod kms;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;

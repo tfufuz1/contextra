@@ -14,11 +14,8 @@
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
-/// Provides Key Management Strategy hooks.
-pub trait KmsProvider {
-    /// Retrieves the Data Encryption Key (DEK).
-    fn get_key(&self) -> Result<Vec<u8>>;
-}
+/// Re-export KMS Provider Trait nach Spec §20.2 (INV-KMS-1).
+pub use crate::kms::KmsProvider;
 
 /// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
 ///
@@ -413,7 +410,8 @@ impl IntegrityVerifier {
     clippy::expect_used,
     clippy::panic,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    deprecated
 )]
 mod tests {
     use super::*;

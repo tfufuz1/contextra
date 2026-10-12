@@ -68,6 +68,9 @@ impl KeyManager {
     /// Diese Funktion nutzt HKDF-SHA256 und setzt voraus, dass `passphrase` hochentropisches
     /// Schlüsselmaterial darstellt. Für menschliche Passphrasen MUSS [`KeyManager::try_new_with_kdf`]
     /// mit Argon2id verwendet werden.
+    #[deprecated(
+        note = "HKDF direkt auf Passphrase ist verboten (INV-KDF-1). Nutze KeyManager::try_new_strict oder KeyManager::try_new_with_kdf mit KdfHeader."
+    )]
     pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self> {
         if passphrase.is_empty() {
             return Err(CryptoError::InvalidInput(
@@ -104,6 +107,20 @@ impl KeyManager {
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
         })
+    }
+
+    /// Erzeugt einen neuen [`KeyManager`] unter strikter Durchsetzung der INV-KDF-1 Policy.
+    ///
+    /// Lehnt Header ab, die `header.meets_policy() == false` zurückgeben.
+    pub fn try_new_strict(passphrase: &str, header: &KdfHeader) -> Result<Self> {
+        if !header.meets_policy() {
+            return Err(CryptoError::InvalidInput(format!(
+                "KdfHeader erfüllt nicht die INV-KDF-1 Mindestanforderungen (m >= {}, t >= {})",
+                crate::kdf::MIN_M_COST_KIB,
+                crate::kdf::MIN_T_COST
+            )));
+        }
+        Self::try_new_with_kdf(passphrase, header)
     }
 
     /// Creates a new KeyManager using Argon2id password-based key derivation.
@@ -494,9 +511,20 @@ impl KeyManager {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_try_new_strict_policy_check() {
+        let (_valid_km, valid_header) = KeyManager::try_new_argon2id("strong-passphrase").unwrap();
+        assert!(KeyManager::try_new_strict("strong-passphrase", &valid_header).is_ok());
+
+        let invalid_params = crate::kdf::KdfParams::new_for_test(1024, 1, 1);
+        let invalid_header = crate::kdf::KdfHeader::new(invalid_params, vec![0u8; 16]).unwrap();
+        let res = KeyManager::try_new_strict("strong-passphrase", &invalid_header);
+        assert!(matches!(res, Err(CryptoError::InvalidInput(_))));
+    }
 
     #[test]
     fn test_encrypt_decrypt_roundtrip() {

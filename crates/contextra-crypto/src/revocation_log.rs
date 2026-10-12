@@ -674,6 +674,7 @@ impl std::fmt::Debug for RevocationLog {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
     use crate::crypto::KeyManager;

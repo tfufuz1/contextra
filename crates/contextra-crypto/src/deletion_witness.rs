@@ -39,7 +39,7 @@
 //! use contextra_crypto::deletion_witness::LayerWitness;
 //!
 //! fn test_clone(witness: &LayerWitness) {
-//!     let _ = witness.clone();
+//!     let _ = (*witness).clone();
 //! }
 //! ```
 

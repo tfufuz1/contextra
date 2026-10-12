@@ -1,7 +1,7 @@
 //! Integration tests for KvSegmentCipher and RevocationLog wiring in contextra-crypto.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::{
     crypto::KeyManager,
