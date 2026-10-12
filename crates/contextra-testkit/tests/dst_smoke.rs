@@ -3,6 +3,8 @@
 // ZWECK: DST Smoke test with seed reproducibility.
 // INVARIANTEN: Must pass with fixed seed or custom DST_SEED env var.
 
+#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_testkit::dst::DstScenario;
 use std::env;
 
