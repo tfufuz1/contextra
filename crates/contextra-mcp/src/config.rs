@@ -400,6 +400,63 @@ pub fn create_llm_text_generator(
     }
 }
 
+/// IPC and transport security configuration.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IpcConfig {
+    /// Custom path for the IPC socket or endpoint file.
+    pub endpoint_path: Option<PathBuf>,
+    /// Maximum line length for framing (default 8 MiB = 8 * 1024 * 1024).
+    pub max_line_bytes: usize,
+    /// Expected OS user ID for peer credential validation (if None, defaults to current process UID).
+    pub expected_uid: Option<u32>,
+}
+
+pub const DEFAULT_MAX_LINE_BYTES: usize = 8 * 1024 * 1024; // 8 MiB
+
+impl Default for IpcConfig {
+    fn default() -> Self {
+        Self {
+            endpoint_path: None,
+            max_line_bytes: DEFAULT_MAX_LINE_BYTES,
+            expected_uid: None,
+        }
+    }
+}
+
+impl IpcConfig {
+    /// Loads IPC configuration from environment variables.
+    pub fn from_env() -> Self {
+        let endpoint_path = std::env::var("CONTEXTRA_IPC_ENDPOINT")
+            .ok()
+            .map(PathBuf::from);
+
+        let max_line_bytes = std::env::var("CONTEXTRA_IPC_MAX_LINE_BYTES")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_MAX_LINE_BYTES);
+
+        let expected_uid = std::env::var("CONTEXTRA_IPC_EXPECTED_UID")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok());
+
+        Self {
+            endpoint_path,
+            max_line_bytes,
+            expected_uid,
+        }
+    }
+
+    /// Validates configuration parameters, failing closed on invalid values.
+    pub fn validate(&self) -> Result<(), ContextraError> {
+        if self.max_line_bytes == 0 {
+            return Err(ContextraError::InvalidInput(
+                "max_line_bytes must be strictly greater than 0".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Router configuration settings.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RouterConfig {
