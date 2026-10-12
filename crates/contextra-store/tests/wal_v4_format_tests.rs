@@ -1,3 +1,4 @@
+#![cfg(feature = "wal-v4-wip")]
 use contextra_core::TxId;
 use contextra_store::wal::{
     Wal, WalCdcEvent, WalConfig, WalEntry, WalOp, WalVersion, WAL_V4_HEADER,

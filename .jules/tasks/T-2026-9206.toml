@@ -1,0 +1,29 @@
+id        = "T-2026-9206"
+title     = "Purge-Orchestrator Kern crashsicherer Zustandsautomat"
+crate     = "contextra-store"
+tier      = 1            # 1, 2, 3
+risk      = "crash"      # sec | crash | simd | utf8 | fusion | concurrency | calib | none
+goal      = "Purge-Orchestrator in einen crashsicheren Zustandsautomaten umwandeln (C5.1/C5.6)"
+non_goals = ["Keine Compaction (A05)", "Kein Refactoring fremder Module"]
+scope     = [
+  "crates/contextra-store/src/lsm/purge/**",
+  "crates/contextra-durable-fs/src/**",
+  "crates/contextra-store/tests/**",
+  "crates/contextra-durable-fs/tests/**"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root"]
+acceptance = [
+  "cargo test -p contextra-store --features fault-injection --test purge_orchestrator_failpoints",
+  "cargo test -p contextra-store",
+  "cargo test -p contextra-durable-fs",
+  "cargo clippy -p contextra-store -p contextra-durable-fs --all-targets -- -D warnings",
+  "cargo xtask check-result-dropped-io",
+  "cargo xtask wal-replay-verify"
+]
+evidence_required = ["Neuer Test, der die Funktionalität absichert"]
+
+[budget]
+files = 16
+lines = 1000
+iterations = 12
