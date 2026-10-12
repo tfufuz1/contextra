@@ -54,6 +54,7 @@ pub use self::wal_receipt::*;
 
 #[cfg(test)]
 #[allow(
+    deprecated,
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
