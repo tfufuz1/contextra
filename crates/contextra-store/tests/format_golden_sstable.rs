@@ -1,7 +1,7 @@
 mod golden;
 
 use contextra_store::sstable::{BlockCache, SstableReader};
-use golden::generate::{golden_dir, generate_all, verify_file_hash};
+use golden::generate::{generate_all, golden_dir, verify_file_hash};
 use std::fs;
 use std::sync::Arc;
 
@@ -25,7 +25,10 @@ async fn test_format_golden_sstable() {
 
     // 2. Check binary trailer/header magic (MFSX)
     let bytes = fs::read(&sst_path).expect("read golden sstable");
-    assert!(bytes.len() > 54, "SSTable file must be larger than 54-byte trailer");
+    assert!(
+        bytes.len() > 54,
+        "SSTable file must be larger than 54-byte trailer"
+    );
     let trailer_magic = &bytes[bytes.len() - 4..];
     assert_eq!(
         trailer_magic, b"MFSX",
@@ -38,7 +41,10 @@ async fn test_format_golden_sstable() {
         .await
         .expect("open golden sstable");
 
-    assert_eq!(reader.format_version, 4, "Golden SSTable format version must be 4");
+    assert_eq!(
+        reader.format_version, 4,
+        "Golden SSTable format version must be 4"
+    );
 
     // 4. Verify record lookups
     for i in 1..=5 {
