@@ -1,349 +1,326 @@
-[[commands]]
-name = "--"
-owner_tier = "tool"
-summary = "Subcommand --"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "all"
-owner_tier = "tool"
-summary = "Subcommand all"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "ann-sift1m"
-owner_tier = "bench"
-summary = "Subcommand ann-sift1m"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "audit"
-owner_tier = "tool"
-summary = "Subcommand audit"
-blocking = true
-phase = "Phase 0"
+# Herleitung der xtask-Registry:
+# - summary: Aus //! Modulkommentaren bzw. repräsentativen einzeiligen Funktionsbeschreibungen.
+# - blocking: true NUR wenn in .jules/harness-phases.toml (required = true) oder in CI-Workflows / verdict-required.toml gefordert; sonst false.
+# - phase: Zuordnung gemäß Entwicklungszyklus (default 'Phase 0').
 
 [[commands]]
 name = "audit-integrity-check"
-owner_tier = "tool"
-summary = "Subcommand audit-integrity-check"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "beir"
-owner_tier = "bench"
-summary = "Subcommand beir"
+owner_tier = "ci-gate"
+summary = "Prüft Integrität von Audit-Protokollen."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "bench-compile"
 owner_tier = "bench"
-summary = "Subcommand bench-compile"
-blocking = true
+summary = "Misst Kompilierzeiten der Workspace-Crates."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "bench-download"
 owner_tier = "bench"
-summary = "Subcommand bench-download"
-blocking = true
+summary = "Misst Benchmark-Download-Zeiten."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "bench-gate"
-owner_tier = "bench"
-summary = "Subcommand bench-gate"
+owner_tier = "ci-gate"
+summary = "Prüft Benchmark-Ergebnisse gegen Performance-Gates."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "bench-trend"
 owner_tier = "bench"
-summary = "Subcommand bench-trend"
+summary = "Analysiert Performancetrends über historische Benchmark-Läufe."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "blast-radius"
+owner_tier = "tool"
+summary = "Harness Modul zur Berechnung des Auswirkungsbereichs (blast-radius)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "can-merge"
+owner_tier = "ci-gate"
+summary = "Harness Modul zur Merge-Entscheidungsfindung (can-merge)."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-action-pinning"
-owner_tier = "ci-gate"
-summary = "Subcommand check-action-pinning"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Pinning von GitHub Actions auf Commit-SHAs."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-adr-deadlines"
-owner_tier = "tool"
-summary = "Subcommand check-adr-deadlines"
+owner_tier = "ci-gate"
+summary = "Prüft Fristen und Ablaufdaten von Architecture Decision Records."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-agents-freshness"
-owner_tier = "report"
-summary = "Subcommand check-agents-freshness"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Frische und Gültigkeit von AGENTS.md Dokumenten."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-agents-integrity"
-owner_tier = "tool"
-summary = "Subcommand check-agents-integrity"
+owner_tier = "ci-gate"
+summary = "Validiert Format und Struktur von AGENTS.md Dateien."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-audit-duplication"
 owner_tier = "tool"
-summary = "Subcommand check-audit-duplication"
-blocking = true
+summary = "Prüft Audit-Protokolle auf doppelten Inhalt."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-audit-tool-evidence"
-owner_tier = "ci-gate"
-summary = "Subcommand check-audit-tool-evidence"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Nachweisbelege in Audit-Protokollen."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-audit-verdict-independence"
 owner_tier = "ci-gate"
-summary = "Subcommand check-audit-verdict-independence"
+summary = "Prüft Unabhängigkeit von Audit-Verdikt-Entscheidungen."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-bandit-latency-budget"
-owner_tier = "ci-gate"
-summary = "Subcommand check-bandit-latency-budget"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Latenzbudgets für Multi-Armed-Bandit-Routinen."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-branch-overlap"
-owner_tier = "ci-gate"
-summary = "Subcommand check-branch-overlap"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Git-Branches auf unzulässige Datei-Überschneidungen."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-commit-diff-integrity"
 owner_tier = "ci-gate"
-summary = "Subcommand check-commit-diff-integrity"
+summary = "Prüft Commit-Diff-Integrität auf leere Diffs mit Changelogs."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-commit-messages"
 owner_tier = "ci-gate"
-summary = "Subcommand check-commit-messages"
+summary = "Validiert Format und Konventionen von Commit-Nachrichten."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-compile"
-owner_tier = "tool"
-summary = "Subcommand check-compile"
+owner_tier = "ci-gate"
+summary = "Prüft Kompilierbarkeit aller Workspace-Crates und Features."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-consistency"
-owner_tier = "tool"
-summary = "Subcommand check-consistency"
+owner_tier = "ci-gate"
+summary = "Prüft Repository-weite Konsistenzregeln."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-coverage-gate"
 owner_tier = "ci-gate"
-summary = "Subcommand check-coverage-gate"
+summary = "Erzwingt minimale Testabdeckungs-Grenzwerte."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-crate-references"
 owner_tier = "tool"
-summary = "Subcommand check-crate-references"
-blocking = true
+summary = "Prüft Konsistenz interner Crate-Referenzen und Pfade."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-dag"
-owner_tier = "gate-constituent"
-summary = "Prüft DAG-Abhängigkeitsstruktur und verhindert Zyklen in der Crate-Hierarchie."
+owner_tier = "ci-gate"
+summary = "Prüft DAG-Abhängigkeitsstruktur und verhindert Zyklen."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-doc-references"
-owner_tier = "tool"
-summary = "Subcommand check-doc-references"
+owner_tier = "ci-gate"
+summary = "Validiert Links und Referenzen in Doku-Dateien."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-duplicate-core-primitives"
 owner_tier = "tool"
-summary = "Subcommand check-duplicate-core-primitives"
-blocking = true
+summary = "Scanner für doppelte Kern-Primitiven in Ring 0/1."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-duplicate-intent"
-owner_tier = "tool"
-summary = "Subcommand check-duplicate-intent"
+owner_tier = "ci-gate"
+summary = "Prüft auf redundante Code-Absichten und Dubletten."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-duplicate-symbols"
-owner_tier = "gate-constituent"
-summary = "Scanner für doppelte Funktions- und Struktursymbole über Dateigrenzen."
+owner_tier = "ci-gate"
+summary = "Scanner für doppelte Funktions- und Struktursymbole."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-duplicate-symbols-cross-file"
 owner_tier = "tool"
-summary = "Subcommand check-duplicate-symbols-cross-file"
-blocking = true
+summary = "Scanner für doppelte Symbole über Dateigrenzen."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-fbs-drift"
-owner_tier = "tool"
-summary = "Subcommand check-fbs-drift"
+owner_tier = "ci-gate"
+summary = "Alias für check-flatbuffers-drift."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-ffi-panic-boundary"
-owner_tier = "tool"
-summary = "Subcommand check-ffi-panic-boundary"
+owner_tier = "ci-gate"
+summary = "Erzwingt Paniksicherheit an FFI-Grenzen."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-flatbuffers-drift"
-owner_tier = "tool"
-summary = "Subcommand check-flatbuffers-drift"
+owner_tier = "ci-gate"
+summary = "Prüft Abweichungen zwischen FlatBuffers-Schema und Generat."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-jules-context-freshness"
-owner_tier = "report"
-summary = "Subcommand check-jules-context-freshness"
-blocking = true
+owner_tier = "tool"
+summary = "Prüft Frische des Agent-Kontexts."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-manifest-completeness"
 owner_tier = "tool"
-summary = "Subcommand check-manifest-completeness"
-blocking = true
+summary = "Prüft Vollständigkeit von Crate Cargo.toml Manifesten."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-marker-drift"
-owner_tier = "tool"
-summary = "Subcommand check-marker-drift"
+owner_tier = "ci-gate"
+summary = "Prüft Abweichungen von Marker-Kommentaren."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-max-results-unbound"
-owner_tier = "tool"
-summary = "Subcommand check-max-results-unbound"
+owner_tier = "ci-gate"
+summary = "Spürt unbegrenzte max_results Abfragen im Code auf."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-module-reachability"
-owner_tier = "tool"
-summary = "Subcommand check-module-reachability"
+owner_tier = "ci-gate"
+summary = "Prüft Erreichbarkeit aller deklarierten Rust-Module."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-mutation-score-gate"
 owner_tier = "ci-gate"
-summary = "Subcommand check-mutation-score-gate"
+summary = "Prüft Einhaltung des Mutations-Test-Score-Schwellenwerts."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-nan-hot-loop"
-owner_tier = "tool"
-summary = "Subcommand check-nan-hot-loop"
+owner_tier = "ci-gate"
+summary = "Prüft Hot-Loops auf unvollständige NaN-Gleitkomma-Handhabung."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-orphan-modules"
 owner_tier = "tool"
-summary = "Subcommand check-orphan-modules"
-blocking = true
+summary = "Findet nicht eingebundene Rust-Moduldateien."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-phantom-files"
-owner_tier = "tool"
-summary = "Subcommand check-phantom-files"
+owner_tier = "ci-gate"
+summary = "Prüft Repository auf nicht verfolgte Phantom-Dateien."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-placeholder-refs"
-owner_tier = "tool"
-summary = "Subcommand check-placeholder-refs"
+owner_tier = "ci-gate"
+summary = "Spürt verbliebene Platzhalter-Referenzen im Code auf."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-recall-stability"
-owner_tier = "tool"
-summary = "Subcommand check-recall-stability"
+owner_tier = "ci-gate"
+summary = "Prüft Stabilität von Retrieval-Recall-Metriken."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-result-dropped-io"
-owner_tier = "tool"
-summary = "Subcommand check-result-dropped-io"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "gc-floor-single-source"
 owner_tier = "ci-gate"
-summary = "Gate forbidding calls to min_active_seqno() outside GcFloor"
+summary = "Prüft auf verworfene I/O-Results im Codebase."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-review-coverage"
 owner_tier = "ci-gate"
-summary = "Subcommand check-review-coverage"
+summary = "Prüft Code-Review-Abdeckung von PRs."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-ring-capabilities-consistency"
-owner_tier = "gate-constituent"
+owner_tier = "tool"
 summary = "Validiert Konsistenz zwischen capabilities.toml und Ring-Layern."
-blocking = true
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-ring-layering"
-owner_tier = "gate-constituent"
+owner_tier = "ci-gate"
 summary = "Prüft Ring-Architektur-Layering (Ring 0 bis Ring 3) auf Schichtenverletzungen."
 blocking = true
 phase = "Phase 0"
@@ -351,162 +328,288 @@ phase = "Phase 0"
 [[commands]]
 name = "check-ring-layering-full"
 owner_tier = "tool"
-summary = "Subcommand check-ring-layering-full"
-blocking = true
+summary = "Vollständige Prüfung der Ring-Architektur-Layering-Grenzen."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-ring0-async-purity"
-owner_tier = "gate-constituent"
+owner_tier = "tool"
 summary = "Prüft Ring-0-Crates auf Freiheit von Async-Runtimes (tokio)."
-blocking = true
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-stale-tags"
-owner_tier = "report"
-summary = "Subcommand check-stale-tags"
-blocking = true
+owner_tier = "tool"
+summary = "Findet veraltete Status-Tags im Repository."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-toc-integrity"
 owner_tier = "tool"
-summary = "Subcommand check-toc-integrity"
-blocking = true
+summary = "Validiert Inhaltsverzeichnisse in Dokumentationsdateien."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-toctou-defaults"
-owner_tier = "tool"
-summary = "Subcommand check-toctou-defaults"
+owner_tier = "ci-gate"
+summary = "Prüft Defaults auf Time-of-check-to-time-of-use Lücken."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-type-registry"
 owner_tier = "tool"
-summary = "Subcommand check-type-registry"
-blocking = true
+summary = "Validiert Vollständigkeit der Typ-Registrierung."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-unsafe-islands"
-owner_tier = "gate-constituent"
+owner_tier = "ci-gate"
 summary = "Erzwingt Unsafe-Isolierung auf die erlaubten Unsafe-Inseln."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-veto-deadlines"
-owner_tier = "tool"
-summary = "Subcommand check-veto-deadlines"
+owner_tier = "ci-gate"
+summary = "Prüft Ablaufdaten aktiver Vetos."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "check-vetoes"
-owner_tier = "gate-constituent"
+owner_tier = "tool"
 summary = "Prüft aktive Veto-Sperren und Review-Fristen im Repository."
-blocking = true
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "check-workflow-commands"
-owner_tier = "tool"
-summary = "Subcommand check-workflow-commands"
+owner_tier = "ci-gate"
+summary = "Prüft Existenz aller in CI-Workflows verwendeten xtask-Befehle."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "claim"
 owner_tier = "agent-gate"
-summary = "Subcommand claim"
+summary = "Registriert oder gibt aktive Task-Claims frei."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "claims-in-pr"
+owner_tier = "ci-gate"
+summary = "Claims in PR Gate: Prüft PR-Text-Vollständigkeit, Phantom-Claims im Diff und Verifikationsbelege."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "codeowners-coverage"
+owner_tier = "tool"
+summary = "Codeowners coverage harness module verifying protected paths against CODEOWNERS rules and checking phantom entries."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "commit-health"
-owner_tier = "ci-gate"
-summary = "Subcommand commit-health"
-blocking = true
+owner_tier = "report"
+summary = "Bewertet Qualität und Integrität von Git-Commits."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "consolidate-adrs"
-owner_tier = "generator"
-summary = "Subcommand consolidate-adrs"
-blocking = true
+owner_tier = "tool"
+summary = "Konsolidiert und aktualisiert ADR-Indizes."
+blocking = false
 phase = "Phase 0"
+
+[[commands]]
+name = "context-card"
+owner_tier = "agent-gate"
+summary = "Erzeugt den kartenspezifischen Abschnitt des CONTEXT_PACK und prüft dessen Frische"
+blocking = false
+phase = "Phase 0"
+planned = true
 
 [[commands]]
 name = "context-pack"
 owner_tier = "agent-gate"
-summary = "Subcommand context-pack"
+summary = "Erzeugt das CONTEXT_PACK für Agent-Instanzen."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "context-tags"
 owner_tier = "report"
-summary = "Subcommand context-tags"
-blocking = true
+summary = "Extrahiert und prüft Kontext-Tags."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "crate-context"
 owner_tier = "report"
-summary = "Subcommand crate-context"
-blocking = true
+summary = "Extrahiert detaillierten Kontext zu einzelnen Crates."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "debt-audit"
+owner_tier = "tool"
+summary = "Analysiert technische Schulden und TODO-Kommentare im Repository."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "dependency-gate"
+owner_tier = "tool"
+summary = "Harness Modul zur Prüfung neuer Abhängigkeiten (dependency-gate)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "dependency-graph-audit"
+owner_tier = "tool"
+summary = "Harness Modul: Zyklenerkennung und Ring-Distanz-Report im Crate-Abhängigkeitsgraphen (dependency-graph-audit)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "determinism-check"
+owner_tier = "tool"
+summary = "Gate harness for verifying determinism across Ring 0 and Ring 1 crates."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "diff-budget"
 owner_tier = "ci-gate"
-summary = "Subcommand debt-audit"
+summary = "Diff Budget Gate: Prüft das Diff gegen Budget-Grenzen aus der Task-Karte oder Standard-Schwellenwerte."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "deprecated"
-owner_tier = "tool"
-summary = "Subcommand deprecated"
+name = "doc-truth"
+owner_tier = "ci-gate"
+summary = "Modul zur Überprüfung der Konsistenz und Wahrheit von Bootstrap-Dokumenten (doc-truth)."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "doctrine-scan"
+owner_tier = "tool"
+summary = "Harness Modul: konsolidierter Doktrin-Report (Zero-Panic, Unsafe-Inseln, Allow-Overrides, Status-Widerspruch) (doctrine-scan)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "env-attest"
+owner_tier = "tool"
+summary = "Environment attestation check for toolchain pinning and required build tools."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "env-validate"
 owner_tier = "tool"
-summary = "Subcommand env-validate"
-blocking = true
+summary = "Validiert Umgebungsvariablen und Werkzeuge."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
-name = "experimental"
+name = "explain"
 owner_tier = "tool"
-summary = "Subcommand experimental"
-blocking = true
+summary = "Harness Modul zur Erklaerung von Qualitätsgates und Invarianten."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
-name = "fast"
+name = "fast-diff-lint"
 owner_tier = "tool"
-summary = "Subcommand fast"
-blocking = true
+summary = "Harness Modul: build-freier Diff-Scope-Linter für die häufigsten Doktrin-Verstöße (fast-diff-lint)."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "feature-matrix"
 owner_tier = "tool"
-summary = "Subcommand feature-matrix"
+summary = "Analysiert Feature-Kombinationen auf Kompilierbarkeit."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "flake-report"
+owner_tier = "report"
+summary = "Harness Modul zur Erkennung von Test-Flakes (flake-report)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "forensic-test"
+owner_tier = "tool"
+summary = "Führt forensische Fehleranalysen und Regressionstests durch."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "fuzz-smoke"
+owner_tier = "tool"
+summary = "Gate harness for fuzz smoke execution over touched crates containing fuzz targets."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "gate-arch"
+owner_tier = "gate-constituent"
+summary = "Aggregate Gate Arch (check-dag, check-ring-layering, check-vetoes, check-duplicate-symbols, check-unsafe-islands, check-ring0-async-purity, check-ring-capabilities-consistency)."
 blocking = true
 phase = "Phase 0"
 
-
 [[commands]]
 name = "gate-check"
+owner_tier = "gate-constituent"
+summary = "Führt stufenweise Gate-Überprüfungen durch."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "gate-guard"
+owner_tier = "gate-constituent"
+summary = "Aggregate Gate Guard (scope-guard, protected-paths, gate-weakening, diff-budget)."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gate-integrity"
+owner_tier = "gate-constituent"
+summary = "Aggregate Gate Integrity (test-integrity, ratchet, determinism-check, unsafe-audit, lock-audit, wal-replay-verify)."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gate-weakening"
+owner_tier = "gate-constituent"
+summary = "Module analyzing git diffs for gate weakening practices."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gates-catalog-sync"
+owner_tier = "tool"
+summary = "Harness module verifying synchronization between `governance/gates.toml`, `.jules/harness-phases.toml`, and `governance/verdict-required.toml`."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "gc-floor-single-source"
 owner_tier = "ci-gate"
-summary = "Subcommand gate-check"
+summary = "Harness gate forbidding calls to `min_active_seqno()` outside `crates/contextra-mvcc/src/floor.rs`."
 blocking = true
 phase = "Phase 0"
 
@@ -514,261 +617,418 @@ phase = "Phase 0"
 name = "gen-arch-docs"
 owner_tier = "generator"
 summary = "Generiert Architektur-Dokumentation aus Crate-Metadaten."
-blocking = true
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "gen-feature-catalog"
 owner_tier = "generator"
-summary = "Subcommand gen-feature-catalog"
-blocking = true
+summary = "Generiert Feature-Katalog aus Crate Cargo.toml Feature-Flags."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "gen-prompter-data"
-owner_tier = "generator"
-summary = "Subcommand gen-prompter-data"
+owner_tier = "ci-gate"
+summary = "Generiert Datenstrukturen für das Prompting-System."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "gen-sbom"
 owner_tier = "generator"
-summary = "Subcommand gen-sbom"
-blocking = true
+summary = "Generiert Software Bill of Materials (SBOM) für das Workspace."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "generate-adr"
 owner_tier = "generator"
-summary = "Subcommand generate-adr"
-blocking = true
+summary = "Erstellt neue ADR-Vorlagen mit fortlaufender Nummerierung."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "generate-diagnostics"
 owner_tier = "generator"
-summary = "Subcommand generate-diagnostics"
-blocking = true
+summary = "Erzeugt Diagnose-Artefakte für Agent-Sessions."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "generate-markers"
 owner_tier = "generator"
-summary = "Subcommand generate-markers"
-blocking = true
+summary = "Generiert automatische Marker-Kommentare im Code."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
-name = "hardcoded-secret"
-owner_tier = "ci-gate"
-summary = "Subcommand hardcoded-secret"
-blocking = true
+name = "harness-help"
+owner_tier = "tool"
+summary = "Zeigt Hilfe zu einem bestimmten Harness-Kommando an."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "harness-list"
+owner_tier = "tool"
+summary = "Listet alle registrierten Harness-Kommandos auf."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "hotspot-report"
 owner_tier = "report"
-summary = "Subcommand hotspot-report"
+summary = "Generiert Hotspot-Analysen für gehäufte Code-Änderungen."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "init-audit-fix"
+owner_tier = "tool"
+summary = "Initialisiert Reparaturumgebung für Audit-Befunde."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "jules"
+owner_tier = "ci-gate"
+summary = "5-phase Jules facade orchestrator (`jules start|check|verify|submit|stop`)."
 blocking = true
 phase = "Phase 0"
 
-
 [[commands]]
-name = "json"
+name = "jules-dispatch"
 owner_tier = "tool"
-summary = "Subcommand json"
-blocking = true
+summary = "Jules REST API dispatcher gate and payload builder."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "jules-preflight"
-owner_tier = "tool"
-summary = "Subcommand jules-preflight"
+owner_tier = "ci-gate"
+summary = "Prüft Voraussetzungen vor Ausführung von Agenten-Tasks."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "jules-submit-gate"
-owner_tier = "ci-gate"
-summary = "Subcommand jules-submit-gate"
+owner_tier = "tool"
+summary = "Gating-Prüfung vor Einreichen von Agent-Änderungen."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "ledger"
+owner_tier = "gate-constituent"
+summary = "Hard-gate audit ledger management command for worktree verification."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "lint-unsafe-slices"
-owner_tier = "tool"
-summary = "Subcommand lint-unsafe-slices"
+owner_tier = "ci-gate"
+summary = "Prüft Erzeugung und Verwendung von Unsafe-Slices."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "lock-audit"
+owner_tier = "tool"
+summary = "Gate harness for auditing nested async locks, await holding lock lints, and lock hierarchy."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "loom-run"
 owner_tier = "tool"
-summary = "Subcommand loom-run"
-blocking = true
+summary = "Führt Nebenläufigkeitstests unter Loom-Model-Checker aus."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "loop-guard"
+owner_tier = "tool"
+summary = "Loop guard and escalation manager for iterative error prevention."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "migrate-docid-128"
 owner_tier = "tool"
-summary = "Subcommand migrate-docid-128"
-blocking = true
+summary = "Unterstützt Migration auf 128-Bit Dokument-IDs."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "mutants-diff"
+owner_tier = "tool"
+summary = "Gate harness for diff-scoped mutation testing score enforcement."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "mutation-score-record"
-owner_tier = "tool"
-summary = "Subcommand mutation-score-record"
+owner_tier = "ci-gate"
+summary = "Zeichnet Mutations-Test-Ergebnisse für History-Trends auf."
 blocking = true
 phase = "Phase 0"
 
-
 [[commands]]
 name = "orphan-symbols"
-owner_tier = "gate-constituent"
-summary = "Findet öffentliche Symbole, die workspace-weit nicht verwendet werden."
-blocking = true
+owner_tier = "tool"
+summary = "Harness-Modul: findet öffentliche Symbole, die workspace-weit nicht verwendet werden (orphan-symbols)."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "panic-inventory"
-owner_tier = "report"
-summary = "Subcommand panic-inventory"
+owner_tier = "ci-gate"
+summary = "Erfasst und kategorisiert alle Panic-Punkte im Codebase."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "plan-lint"
+owner_tier = "tool"
+summary = "Plan linting gate to validate Jules generated execution plans against task cards."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "post-merge-report"
-owner_tier = "report"
-summary = "Subcommand post-merge-report"
+owner_tier = "ci-gate"
+summary = "Erzeugt Zusammenfassungen nach erfolgten PR-Merges."
 blocking = true
 phase = "Phase 0"
 
+[[commands]]
+name = "postmortem"
+owner_tier = "tool"
+summary = "Harness Modul zur Verwaltung und Prüfung von Incident Postmortems (postmortem)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "pre-push"
+owner_tier = "tool"
+summary = "Führt lokale Pre-Push Verifikationsprüfungen durch."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "protected-paths"
+owner_tier = "ci-gate"
+summary = "Module enforcing protected paths restrictions on changed files."
+blocking = true
+phase = "Phase 0"
 
 [[commands]]
 name = "prune-branches"
 owner_tier = "tool"
-summary = "Subcommand prune-branches"
-blocking = true
+summary = "Bereinigt veraltete lokale Git-Branches."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "py-test"
 owner_tier = "tool"
-summary = "Subcommand py-test"
+summary = "Führt Python-Integrationstests aus."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "ratchet"
+owner_tier = "gate-constituent"
+summary = "Module implementing ratchet baseline checks, auto-tightening and show commands."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "regenerate-flatbuffers"
 owner_tier = "generator"
-summary = "Subcommand regenerate-flatbuffers"
+summary = "Kompiliert FlatBuffers-Schemata neu und post-prozessiert Generate."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "registry-check"
+owner_tier = "ci-gate"
+summary = "Prüft Vollständigkeit und Konsistenz von xtask-Kommandos gegen `xtask/registry.toml`."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "repo-doctor"
+owner_tier = "tool"
+summary = "Harness Modul: gebündeltes Session-Start-Dashboard (Git-Zustand, Workspace-Konsistenz, Unsafe/Panic-Kennzahlen, Branch-Überschneidung) (repo-doctor)."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "reproducible-build"
 owner_tier = "tool"
-summary = "Subcommand reproducible-build"
-blocking = true
+summary = "Führt reproduzierbaren Release-Build aus und generiert Artefakt-Hashes."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "reproducible-build-check"
 owner_tier = "tool"
-summary = "Subcommand reproducible-build-check"
-blocking = true
+summary = "Prüft Reproduzierbarkeit von Binärartefakten gegen gespeicherte Hashes."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "risk"
+owner_tier = "tool"
+summary = "Harness Modul zur Risikobewertung von Änderungen (risk)."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "run-community-detection"
-owner_tier = "legacy"
-summary = "Subcommand run-community-detection"
+owner_tier = "tool"
+summary = "Führt Graph-Community-Detection auf Wissensgraphen aus."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "scan-common"
+owner_tier = "tool"
+summary = "Shared scanning infrastructure and file classification for xtask tools."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "scope-guard"
+owner_tier = "ci-gate"
+summary = "Scope Guard Gate: Prüft ob geänderte Dateien im zugewiesenen Scope liegen und keine forbidden Pfade berühren."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "security-scan"
-owner_tier = "ci-gate"
-summary = "Subcommand security-scan"
-blocking = true
+owner_tier = "tool"
+summary = "Führt Sicherheits-Scans auf Abhängigkeiten und Code aus."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "session-init"
 owner_tier = "tool"
-summary = "Subcommand session-init"
+summary = "Initialisiert neue Arbeitssitzungen für Agenten."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "session-report"
+owner_tier = "ci-gate"
+summary = "Session report generator for PR body documentation."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "shell-commit-audit"
 owner_tier = "ci-gate"
-summary = "Subcommand shell-commit-audit"
+summary = "Prüft Shell-Befehle und Commits auf Sicherheitsmängel."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "shell-interpolation"
+name = "stub-impls"
+owner_tier = "tool"
+summary = "Harness Modul: findet verdächtige Stub-/Platzhalter-Methodenkörper in impl-Blöcken (stub-impls)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "symbol-exists"
 owner_tier = "ci-gate"
-summary = "Subcommand shell-interpolation"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "stable"
-owner_tier = "tool"
-summary = "Subcommand stable"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "std-fs-in-async"
-owner_tier = "tool"
-summary = "Subcommand std-fs-in-async"
+summary = "Symbol Exists Gate: Löste Pfade wie `contextra_store::wal::WalWriter` auf und verifiziert deren Existenz."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "sync-docs"
 owner_tier = "tool"
-summary = "Subcommand sync-docs"
-blocking = true
+summary = "Synchronisiert Dokumentations-Metadaten und Inhaltsverzeichnisse."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "tag-health"
 owner_tier = "report"
-summary = "Subcommand tag-health"
+summary = "Analysiert Stabilität und Gültigkeit von Repository-Tags."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "task-card"
+owner_tier = "ci-gate"
+summary = "Task-card management and validation gate for Jules agent tasks."
 blocking = true
 phase = "Phase 0"
 
+[[commands]]
+name = "test-integrity"
+owner_tier = "ci-gate"
+summary = "Test Integrity Gate: syn-basierte Prüfung geänderter/gelöschter Rust-Testdateien."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "unsafe-audit"
+owner_tier = "tool"
+summary = "Gate harness for auditing unsafe code and safety comments."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "unwired-ports"
+owner_tier = "tool"
+summary = "Harness Modul: findet pub traits ohne Implementierung oder ohne Verdrahtung in einem Composition-Root-Crate (unwired-ports)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "validate-pr-checklist"
+owner_tier = "tool"
+summary = "Prüft Erfüllung der PR-Checkliste."
+blocking = false
+phase = "Phase 0"
 
 [[commands]]
 name = "validate-tags"
-owner_tier = "tool"
-summary = "Subcommand validate-tags"
+owner_tier = "ci-gate"
+summary = "Validiert Tag-Syntax und Struktur in Dokumenten."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "scan-common"
-owner_tier = "tool"
-summary = "Gemeinsame Infrastruktur für Dateiklassifikation und Testmodul-Auflösung."
+name = "verdict"
+owner_tier = "gate-constituent"
+summary = "Single non-negotiable merge verdict engine."
 blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "wal-replay-verify"
+owner_tier = "tool"
+summary = "Gate harness for verifying WAL replay crash consistency."
+blocking = false
 phase = "Phase 0"
 
 [[commands]]
 name = "wiring-check"
 owner_tier = "ci-gate"
-summary = "Subcommand wiring-check"
+summary = "Prüft Architektur-Verdrahtung und Modul-Integrität."
 blocking = true
 phase = "Phase 0"
 
 [[commands]]
 name = "workspace-verify"
 owner_tier = "tool"
-summary = "Subcommand workspace-verify"
-blocking = true
+summary = "Führt umfassende Verifikation aller Workspace-Crates durch."
+blocking = false
 phase = "Phase 0"
