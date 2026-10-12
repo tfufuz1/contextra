@@ -12,6 +12,17 @@
 //! - [`scrub_if_safe`]: Safely scrubs file contents with safety checks (CoW, hardlinks, reader active).
 //! - [`DurableHandle`]: File handle wrapper enforcing fsync poisoning semantics (INV-FSYNC-1).
 //! - [`DirLock`]: Directory lock guard enforcing filesystem classification rules (§7.3.1).
+//! - [`FaultInjector`]: Trait providing injection points for storage faults (write, fsync, rename, dir-sync).
+//!
+//! ## Invariants
+//!
+//! - `INV-FSYNC-1`: File handles ([`DurableHandle`]) are poisoned upon any fsync or write failure,
+//!   preventing further flush or write attempts on corrupted handles.
+//! - `INV-ENOSPC-1`: Disk-full (`ENOSPC`) and storage I/O errors across write, fsync, rename,
+//!   and directory sync are fail-closed and deterministically propagated as [`std::io::Error`] without panics.
+
+/// Fault injection hooks for durable filesystem operations.
+pub mod fault_injector;
 
 /// Pending delete journal tracking files scheduled for removal across crashes.
 pub mod journal;
@@ -19,8 +30,11 @@ pub mod journal;
 /// Scrubbing utilities and safety check policies.
 pub mod scrub;
 
+pub use fault_injector::{FaultInjector, NoFault};
 pub use journal::PendingDeleteJournal;
-pub use scrub::{scrub_if_safe, ScrubOutcome, ScrubPolicy, ScrubRefusal};
+pub use scrub::{
+    scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
+};
 
 use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FlushKind, FsClass};
 use std::fs::{File, OpenOptions};
@@ -36,19 +50,40 @@ pub struct PoisonedHandle;
 
 /// A wrapper around [`File`] that poisons the handle upon an fsync failure (INV-FSYNC-1).
 ///
-/// Ensures no further flush attempts occur on a corrupted or errored handle.
+/// Ensures no further flush or write attempts occur on a corrupted or errored handle.
 #[derive(Debug)]
-pub struct DurableHandle {
+pub struct DurableHandle<F: FaultInjector = NoFault> {
     file: Option<File>,
     is_poisoned: bool,
+    injector: F,
+    path: Option<PathBuf>,
 }
 
-impl DurableHandle {
-    /// Wraps an open [`File`] into a new [`DurableHandle`].
+impl DurableHandle<NoFault> {
+    /// Wraps an open [`File`] into a new [`DurableHandle`] with default no-op fault injector.
     pub fn new(file: File) -> Self {
+        Self::new_with_injector(file, NoFault)
+    }
+}
+
+impl<F: FaultInjector> DurableHandle<F> {
+    /// Wraps an open [`File`] with a custom [`FaultInjector`].
+    pub fn new_with_injector(file: File, injector: F) -> Self {
         Self {
             file: Some(file),
             is_poisoned: false,
+            injector,
+            path: None,
+        }
+    }
+
+    /// Wraps an open [`File`] associated with `path` and a custom [`FaultInjector`].
+    pub fn new_with_path_and_injector(file: File, path: PathBuf, injector: F) -> Self {
+        Self {
+            file: Some(file),
+            is_poisoned: false,
+            injector,
+            path: Some(path),
         }
     }
 
@@ -58,9 +93,9 @@ impl DurableHandle {
         self.is_poisoned
     }
 
-    /// Flushes file contents using platform durability primitives.
+    /// Flushes file contents using platform durability primitives and executes fault injection hooks.
     ///
-    /// If the operation fails, the handle becomes poisoned and subsequent calls fail immediately.
+    /// If the operation or fault hook fails, the handle becomes poisoned and subsequent calls fail immediately (INV-FSYNC-1).
     pub fn flush(&mut self, kind: FlushKind) -> std::io::Result<()> {
         if self.is_poisoned {
             return Err(std::io::Error::other(
@@ -71,6 +106,11 @@ impl DurableHandle {
         let Some(file) = self.file.as_ref() else {
             return Err(std::io::Error::other("file handle has been closed"));
         };
+
+        if let Err(err) = self.injector.on_fsync(self.path.as_deref()) {
+            self.is_poisoned = true;
+            return Err(err);
+        }
 
         if let Err(err) = flush_file(file, kind) {
             self.is_poisoned = true;
@@ -105,7 +145,7 @@ impl DurableHandle {
     }
 }
 
-impl Write for DurableHandle {
+impl<F: FaultInjector> Write for DurableHandle<F> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if self.is_poisoned {
             return Err(std::io::Error::other(
@@ -116,6 +156,8 @@ impl Write for DurableHandle {
         let Some(file) = self.file.as_mut() else {
             return Err(std::io::Error::other("file handle has been closed"));
         };
+
+        self.injector.on_write(self.path.as_deref(), buf.len())?;
 
         file.write(buf)
     }
@@ -206,8 +248,14 @@ impl Drop for DirLock {
     }
 }
 
-/// Synchronizes a directory and its metadata entries to stable storage.
+/// Synchronizes a directory and its metadata entries to stable storage using a default no-op fault injector.
 pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    sync_dir_with_injector(dir, &NoFault)
+}
+
+/// Synchronizes a directory and its metadata entries to stable storage with a custom [`FaultInjector`].
+pub fn sync_dir_with_injector<F: FaultInjector>(dir: &Path, injector: &F) -> std::io::Result<()> {
+    injector.on_dir_fsync(dir)?;
     flush_dir(dir)
 }
 
@@ -219,8 +267,17 @@ impl<'a> Drop for TmpFileGuard<'a> {
     }
 }
 
-/// Atomically replaces the file at `path` with `bytes` and flushes parent directory.
+/// Atomically replaces the file at `path` with `bytes` and flushes parent directory using default no-op fault injector.
 pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    atomic_replace_with_injector(path, bytes, &NoFault)
+}
+
+/// Atomically replaces the file at `path` with `bytes` and flushes parent directory with a custom [`FaultInjector`].
+pub fn atomic_replace_with_injector<F: FaultInjector>(
+    path: &Path,
+    bytes: &[u8],
+    injector: &F,
+) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -247,18 +304,33 @@ pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut tmp_file = options.open(&tmp_path)?;
     let guard = TmpFileGuard(&tmp_path);
 
+    injector.on_write(Some(&tmp_path), bytes.len())?;
     tmp_file.write_all(bytes)?;
+
+    injector.on_fsync(Some(&tmp_path))?;
     flush_file(&tmp_file, FlushKind::DataAndMetadata)?;
     drop(tmp_file);
 
+    injector.on_rename(&tmp_path, path)?;
     rename_durable(&tmp_path, path)?;
+
+    injector.on_dir_fsync(parent)?;
+
     std::mem::forget(guard);
 
     Ok(())
 }
 
-/// Durably removes a file at `path` and synchronizes the parent directory.
+/// Durably removes a file at `path` and synchronizes the parent directory using default no-op fault injector.
 pub fn durable_remove(path: &Path) -> std::io::Result<()> {
+    durable_remove_with_injector(path, &NoFault)
+}
+
+/// Durably removes a file at `path` and synchronizes the parent directory with a custom [`FaultInjector`].
+pub fn durable_remove_with_injector<F: FaultInjector>(
+    path: &Path,
+    injector: &F,
+) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -267,6 +339,7 @@ pub fn durable_remove(path: &Path) -> std::io::Result<()> {
     })?;
 
     std::fs::remove_file(path)?;
+    injector.on_dir_fsync(parent)?;
     flush_dir(parent)?;
     Ok(())
 }
@@ -278,8 +351,16 @@ pub struct ScrubReceipt {
     pub bytes_scrubbed: u64,
 }
 
-/// Overwrites file contents with zeros and durably removes the file.
+/// Overwrites file contents with zeros and durably removes the file using default no-op fault injector.
 pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
+    scrub_and_remove_with_injector(path, &NoFault)
+}
+
+/// Overwrites file contents with zeros and durably removes the file with a custom [`FaultInjector`].
+pub fn scrub_and_remove_with_injector<F: FaultInjector>(
+    path: &Path,
+    injector: &F,
+) -> std::io::Result<ScrubReceipt> {
     let metadata = path.symlink_metadata()?;
     let file_type = metadata.file_type();
 
@@ -309,14 +390,16 @@ pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
             let chunk_size = usize::try_from(remaining)
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
+            injector.on_write(Some(path), chunk_size)?;
             file.write_all(&zeros[..chunk_size])?;
             remaining -= chunk_size as u64;
         }
 
+        injector.on_fsync(Some(path))?;
         flush_file(&file, FlushKind::DataAndMetadata)?;
     }
 
-    durable_remove(path)?;
+    durable_remove_with_injector(path, injector)?;
 
     Ok(ScrubReceipt {
         bytes_scrubbed: len,
