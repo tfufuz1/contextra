@@ -7,7 +7,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Line processing handler function signature.
 pub type LineHandlerFn = Arc<
@@ -67,7 +67,9 @@ impl IpcServer {
 
         // Clean up stale socket if present
         if self.endpoint_path.exists() {
-            let _ = tokio::fs::remove_file(&self.endpoint_path).await;
+            if let Err(err) = tokio::fs::remove_file(&self.endpoint_path).await {
+                debug!(err = %err, "Failed to remove existing stale endpoint file");
+            }
         }
 
         let listener = tokio::net::UnixListener::bind(&self.endpoint_path)?;

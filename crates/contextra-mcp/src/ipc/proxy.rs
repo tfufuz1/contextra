@@ -3,7 +3,7 @@
 use contextra_types::ContextraError;
 use std::path::Path;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Bounded bidirectional proxy runner forwarding line-by-line stdio <-> Primary IPC endpoint.
 pub struct IpcProxy {
@@ -114,8 +114,12 @@ impl IpcProxy {
                     Ok(0) => {
                         warn!("Primary IPC connection closed unexpectedly.");
                         let err_msg = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Primary process disconnected\"},\"id\":null}\n";
-                        let _ = stdout.write_all(err_msg.as_bytes()).await;
-                        let _ = stdout.flush().await;
+                        if let Err(write_err) = stdout.write_all(err_msg.as_bytes()).await {
+                            debug!(err = %write_err, "Failed to write disconnect message to stdout");
+                        }
+                        if let Err(flush_err) = stdout.flush().await {
+                            debug!(err = %flush_err, "Failed to flush stdout after disconnect message");
+                        }
                         break;
                     }
                     Ok(_) => {
@@ -137,8 +141,12 @@ impl IpcProxy {
                             "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-32603,\"message\":{}}},\"id\":null}}\n",
                             serde_json::to_string(&e.to_string()).unwrap_or_default()
                         );
-                        let _ = stdout.write_all(err_msg.as_bytes()).await;
-                        let _ = stdout.flush().await;
+                        if let Err(write_err) = stdout.write_all(err_msg.as_bytes()).await {
+                            debug!(err = %write_err, "Failed to write error message to stdout");
+                        }
+                        if let Err(flush_err) = stdout.flush().await {
+                            debug!(err = %flush_err, "Failed to flush stdout after error message");
+                        }
                         break;
                     }
                 }
