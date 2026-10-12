@@ -66,6 +66,56 @@ impl<T: Clock + ?Sized> Clock for Arc<T> {
     }
 }
 
+/// A thread-safe, manually advanceable clock implementation for deterministic testing.
+///
+/// Uses an [`AtomicU64`](std::sync::atomic::AtomicU64) to track nanoseconds elapsed since the Unix epoch
+/// or a deterministic monotonic baseline.
+#[derive(Debug)]
+pub struct ManualClock {
+    nanos: std::sync::atomic::AtomicU64,
+}
+
+impl ManualClock {
+    /// Creates a new [`ManualClock`] initialized to `initial_nanos`.
+    pub fn new(initial_nanos: u64) -> Self {
+        Self {
+            nanos: std::sync::atomic::AtomicU64::new(initial_nanos),
+        }
+    }
+
+    /// Advances the clock by the specified [`Duration`](std::time::Duration).
+    pub fn advance(&self, duration: std::time::Duration) {
+        let delta: u64 = duration.as_nanos().try_into().unwrap_or(u64::MAX);
+        self.nanos.fetch_add(delta, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Sets the clock nanoseconds directly to `nanos`.
+    pub fn set_nanos(&self, nanos: u64) {
+        self.nanos.store(nanos, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Returns the current clock nanoseconds.
+    pub fn now_nanos(&self) -> u64 {
+        self.nanos.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+impl Default for ManualClock {
+    fn default() -> Self {
+        Self::new(1_000_000_000)
+    }
+}
+
+impl Clock for ManualClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.now_nanos()
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.now_nanos()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,5 +143,21 @@ mod tests {
         let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
         _assert_dyn_clock(Some(clock.as_ref()));
         assert!(clock.now_unix_nanos() > 0);
+    }
+
+    #[test]
+    fn test_manual_clock_advance_and_set() {
+        let clock = ManualClock::new(100);
+        assert_eq!(clock.now_unix_nanos(), 100);
+
+        clock.advance(std::time::Duration::from_nanos(50));
+        assert_eq!(clock.now_unix_nanos(), 150);
+        assert_eq!(clock.monotonic_nanos(), 150);
+
+        clock.set_nanos(500);
+        assert_eq!(clock.now_nanos(), 500);
+
+        let default_clock = ManualClock::default();
+        assert_eq!(default_clock.now_nanos(), 1_000_000_000);
     }
 }

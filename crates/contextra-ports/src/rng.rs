@@ -115,6 +115,43 @@ impl<T: Rng + ?Sized> Rng for Arc<T> {
     }
 }
 
+/// Standard production non-cryptographic [`Rng`] implementation seeded from process/runtime entropy.
+///
+/// Wraps [`SeededRng`] initialized via [`SeededRng::from_entropy`].
+#[derive(Debug)]
+pub struct SystemRng {
+    inner: SeededRng,
+}
+
+impl SystemRng {
+    /// Creates a new [`SystemRng`] seeded from process/runtime entropy.
+    pub fn new() -> Self {
+        Self {
+            inner: SeededRng::from_entropy(),
+        }
+    }
+}
+
+impl Default for SystemRng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Rng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        self.inner.next_unit_f64()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +219,17 @@ mod tests {
         rng.fill_bytes(&mut buf);
         let f = rng.next_unit_f64();
         assert!((0.0..1.0).contains(&f));
+    }
+
+    #[test]
+    fn test_system_rng() {
+        let rng = SystemRng::default();
+        let _u = rng.next_u64();
+        let f = rng.next_unit_f64();
+        assert!((0.0..1.0).contains(&f));
+
+        let mut buf = [0u8; 16];
+        rng.fill_bytes(&mut buf);
+        assert_ne!(buf, [0u8; 16]);
     }
 }
