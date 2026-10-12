@@ -4,33 +4,100 @@
 name = "git"
 version_cmd = ["git", "--version"]
 required = true
+needed_by = ["version-control"]
 
 [[tool]]
 name = "rg"
 version_cmd = ["rg", "--version"]
 required = true
+needed_by = ["workspace-scan"]
 
 [[tool]]
 name = "jq"
 version_cmd = ["jq", "--version"]
 required = true
+needed_by = ["json-parsing"]
 
 [[tool]]
 name = "flatc"
 version_cmd = ["flatc", "--version"]
 required = false
+needed_by = ["fbs-drift"]
 
 [[tool]]
 name = "ast-grep"
 version_cmd = ["ast-grep", "--version"]
 required = false
+needed_by = ["doctrine-scan"]
 
 [[tool]]
 name = "cargo-nextest"
 version_cmd = ["cargo", "nextest", "--version"]
 required = false
+needed_by = ["test-runner"]
 
 [[tool]]
 name = "cargo-deny"
 version_cmd = ["cargo", "deny", "--version"]
 required = false
+needed_by = ["security-scan"]
+
+[[tool]]
+name = "nightly-toolchain"
+version_cmd = ["rustc", "+nightly", "--version"]
+required = true
+needed_by = ["fuzz-smoke", "loom-run"]
+
+[[tool]]
+name = "cargo-fuzz"
+version_cmd = ["cargo", "+nightly", "fuzz", "--version"]
+required = true
+needed_by = ["fuzz-smoke"]
+
+[[tool]]
+name = "cargo-mutants"
+version_cmd = ["cargo", "mutants", "--version"]
+required = true
+needed_by = ["mutants-diff"]
+
+[[tool]]
+name = "cargo-llvm-cov"
+version_cmd = ["cargo", "llvm-cov", "--version"]
+required = false
+needed_by = ["coverage"]
+
+[[tool]]
+name = "cargo-insta"
+version_cmd = ["cargo", "insta", "--version"]
+required = false
+needed_by = ["insta-test"]
+
+[[tool]]
+name = "cargo-hack"
+version_cmd = ["cargo", "hack", "--version"]
+required = false
+needed_by = ["feature-matrix"]
+
+[[tool]]
+name = "miri"
+version_cmd = ["cargo", "+nightly", "miri", "--version"]
+required = false
+needed_by = ["loom-run"]
+
+[[tool]]
+name = "maturin"
+version_cmd = ["maturin", "--version"]
+required = false
+needed_by = ["contextra-py"]
+
+[[tool]]
+name = "actionlint"
+version_cmd = ["actionlint", "-version"]
+required = false
+needed_by = ["workflow-check"]
+
+[[tool]]
+name = "curl"
+version_cmd = ["curl", "--version"]
+required = false
+needed_by = ["bench-download"]
