@@ -1,39 +1,35 @@
-# Contextra — Protokoll für Parallele Sitzungen & Konfliktvermeidung (PARALLEL_SESSIONS.md)
+# Contextra — Protokoll für Parallele Sessions (PARALLEL_SESSIONS.md)
 
-> Regeln zur Vermeidung von Kollisionen und Anker-Konflikten zwischen mehreren parallelen Jules-Agenten-Sitzungen.
+An Contextra arbeiten parallel mehrere isolierte Sessions gleichzeitig, jede in einer eigenen, nach Abschluss gelöschten VM. Die einzige gemeinsame Wahrheitsquelle zwischen ihnen ist der **Remote-Git-Zustand** (`origin`), nicht der lokale Dateizustand.
 
-## 1. Scope-Isolation & Branch-Overlap Check
+## 1. Vertragesdateien der Parallelsitzungen
+Folgende Dateien werden von den parallelen Skripten/Abläufen erzeugt bzw. referenziert (sie entstehen dynamisch):
+- `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte)
+- `.jules/context/SESSION_START.md` <!-- doc-ref-ignore --> (Session-Einstieg)
+- `REPO_STATE.md` <!-- doc-ref-ignore --> (Remote Git-Zustand)
+- `BASELINE.md` <!-- doc-ref-ignore --> (Baseline-Messungen)
+- `context-card` <!-- doc-ref-ignore --> (Task-Kontext-Referenz)
 
-Jede Task-Karte definiert im Feld `scope` die Liste der zulässigen Dateipfade.
-Vor jeder Bearbeitung und während der Phase `check` wird die Überschneidung aktiver Branches automatisch geprüft:
+## 2. Anchor- & Konflikt-Protokoll
 
+Jede Aufgabe ist datei-scoped auf die im `scope`-Feld der Task-Karte angegebenen Dateien beschränkt. Vor der ersten Änderung MUSS geprüft werden, ob eine andere Session denselben Bereich bereits bearbeitet.
+
+### Prüfbefehle vor Schritt 1:
 ```bash
+# Branch-Überschneidungen und Kollisionen prüfen
 cargo run -p xtask -- check-branch-overlap
+
+# Remote-Git-Zustand und Log prüfen:
+git fetch origin 2>&1 | tail -3
+git log origin/main --oneline -5 -- <FILE_HINT>
+git branch -r | grep -i "<CRATE>" || echo "Keine erkennbaren Remote-Branches"
+
+# IN-PROGRESS-ANCHOR eines anderen Agenten prüfen:
+grep -n "ANCHOR\[.*\] STATUS:IN-PROGRESS" <FILE_HINT> 2>/dev/null
 ```
 
-## 2. Anker- & Kollisions-Protokoll
-
-1. **Gleicher Anker / Exakte Kollision (Gleiche Datei & Gleiche Funktion/Zeile)**:
-   - Tritt eine Kollision mit einer anderen aktiven Sitzung oder einem parallelen PR auf, **überspringe die Aufgabe sofort**.
-   - Dokumentiere den Abbruch im Session-Log und breche sauber ab:
-     ```bash
-     cargo xtask jules stop --reason "Kollision mit paralleler Session auf <pfad>"
-     ```
-
-2. **Gleiches Crate, aber unterschiedliche Dateien/Funktionen**:
-   - Die Aufgabe darf fortgesetzt werden.
-   - Trage im PR-Body zwingend eine Referenz auf den parallelen PR / die parallele Session ein:
-     `Siehe auch #<NR>` bzw. `Kopplung mit PR #<NR> (Crate <crate_name>)`.
-
-## 3. Vertrag über parallele Verträge & Platzhalter-Namen
-
-In einer Multi-Agenten-Umgebung entstehen bestimmte Artefakte und Dokumente parallel durch andere Prompts.
-Folgende Pfade und Skripte sind vertraglich zugesichert und werden von `cargo xtask jules start` bereitgestellt:
-- Einstiegs-Protokoll: `.jules/context/SESSION_START.md`
-- Generiertes Kontextpaket: `.jules/context/CONTEXT_PACK.md`
-- Setup-Profil-Erkennung: `CONTEXTRA_SETUP_PROFILE=core|full`
-- Vorbereitende Setup-Skripte: `.jules/setup/install-fuzz-toolchain.sh`, `.jules/setup/install-bench-deps.sh`
-- Just-Rezepte: `jules-env-check`, `fuzz-smoke CRATE`, `bench-setup`, `jules-gates`
-- Regeldokumente: `rules/fuzzing.md`, `rules/benchmarking.md`, `rules/mutation-testing.md`, `rules/loom-miri.md`
-
-Verlinke diese Namen in Berichten; ihre physikalische Entstehung zur Laufzeit ist Gegenstand der Parallel-Sessions.
+### Konfliktbehandlung:
+- **Falls ein IN-PROGRESS-ANCHOR eines anderen Agenten in genau dieser Datei existiert:**
+  Aufgabe NICHT beginnen. Im Session-Log dokumentieren („Konflikt mit ANCHOR AGENT:N erkannt, Aufgabe übersprungen“) und mit der nächsten freien Aufgabe fortfahren. Ein doppelt bearbeiteter Scope erzeugt Merge-Konflikte.
+- **Falls ein Remote-Branch oder offener PR dieselbe Crate (aber eine andere Datei) betrifft:**
+  Fortfahren, aber im PR-Body MUSS auf den parallelen Branch/PR verwiesen werden (`Siehe auch #<NR>` bzw. Branch-Name), damit ein menschlicher Reviewer den Zusammenhang sieht.

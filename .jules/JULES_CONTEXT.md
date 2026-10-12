@@ -6,15 +6,15 @@
 > sind gemäß MECE-Prinzip (CONSTITUTION.md §Documentation Model) in folgenden Quellen verankert:
 > - **Code-Zustand & Non-Obvious Decisions**: siehe `AGENTS.md`
 > - **Dynamischer Projektstatus & Tag-Inventar**: siehe `WORKING_STATE.md`
-> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
+> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095) <!-- doc-ref-ignore -->
 
 ---
 
 ## 🎯 Kontext-Ladeordnung
 
-Lies NUR `.jules/context/CONTEXT_PACK.md` (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
+Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
 
-Das Kontextpaket (`.jules/context/CONTEXT_PACK.md`) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
+Das Kontextpaket (`.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
 
 ---
 
@@ -59,6 +59,25 @@ Das Kontextpaket (`.jules/context/CONTEXT_PACK.md`) wird von `cargo xtask jules 
 | `contextra-types` | `crates/contextra-types/AGENTS.md` |
 | `contextra-vector` | `crates/contextra-vector/AGENTS.md` |
 | `contextra-wire` | `crates/contextra-wire/AGENTS.md` |
+
+---
+
+## 🏷️ Kommentarsystem & Tag-Grammatik (rules/tag_taxonomy.md) <!-- doc-ref-ignore -->
+
+Jeder im Code platzierte Tag muss der Grammatik entsprechen:
+```rust
+// AI-TAG[KATEGORIE][SEVERITY] Kurzbeschreibung (ID: AGT-<CRATE>-<8-hex>) (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
+// BEFUND: Detaillierte Analyse.
+// RISIKO: Auswirkung.
+// EMPFEHLUNG: Konkrete Handlung.
+
+// ANCHOR[TYP:ID] STATUS:OPEN (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
+```
+
+---
+
+## 🔍 Review Pass Regel
+Bei Peer-Reviews oder Selbstkontrolle muss der Kommentar die explizite Markierung `PRÜFER-KONTEXT: FRESH` tragen.
 
 ---
 
