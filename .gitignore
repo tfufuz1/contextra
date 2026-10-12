@@ -61,3 +61,4 @@ results/
 /.jules/gate_ledger.json
 /.jules/session.env
 /.jules/local/
+mutants*.out
