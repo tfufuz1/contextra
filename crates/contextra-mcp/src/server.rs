@@ -8,9 +8,13 @@ use crate::protocol::JsonRpcResponse;
 use crate::routing::setup_kv_bridge;
 use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
+use crate::server_dispatch::cancellation::ConcurrencyGovernor;
+use crate::server_dispatch::forget_guard::ForgetGuard;
+use crate::server_dispatch::recall_truncator::RecallTruncator;
 use crate::validation::is_write_allowed_by_env;
 use contextra::Contextra;
 use contextra_ports::EmbeddingProvider;
+use contextra_ports::SystemClock;
 use contextra_types::ContextraError;
 use serde_json::Value;
 use std::sync::Arc;
@@ -27,6 +31,9 @@ pub struct McpServer {
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     #[cfg(feature = "kv-bridge")]
     pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
+    pub forget_guard: Arc<ForgetGuard>,
+    pub concurrency_governor: Arc<ConcurrencyGovernor>,
+    pub recall_truncator: Arc<RecallTruncator>,
 }
 
 impl McpServer {
@@ -87,6 +94,7 @@ impl McpServer {
         #[cfg(feature = "kv-bridge")]
         let kv_bridge = setup_kv_bridge(&db);
 
+        let clock = Arc::new(SystemClock::new());
         Self {
             db,
             embedder,
@@ -98,6 +106,9 @@ impl McpServer {
             plugin_registry: None,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
+            forget_guard: Arc::new(ForgetGuard::new(10, clock)),
+            concurrency_governor: Arc::new(ConcurrencyGovernor::new(8)),
+            recall_truncator: Arc::new(RecallTruncator::new(4000)),
         }
     }
 
