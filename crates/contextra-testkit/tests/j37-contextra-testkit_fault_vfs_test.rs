@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_testkit::{FaultConfig, FaultVfs};
 use std::io::ErrorKind;
 use std::path::Path;
