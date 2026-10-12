@@ -107,6 +107,7 @@ mod dyn_safety {
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
+    fn _assert_dyn_id_generator(_: Option<&dyn IdGenerator>) {}
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
@@ -125,6 +126,7 @@ mod dyn_safety {
         _assert_dyn_clock(None);
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
+        _assert_dyn_id_generator(None);
         _assert_dyn_license_gate(None);
         _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
