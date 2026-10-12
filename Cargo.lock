@@ -772,7 +772,6 @@ dependencies = [
  "bincode",
  "blake3",
  "contextra-crypto",
- "contextra-durable-fs",
  "contextra-ports",
  "contextra-types",
  "criterion",

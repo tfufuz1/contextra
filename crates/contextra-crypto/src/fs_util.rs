@@ -34,7 +34,7 @@ struct TmpFileGuard<'a>(&'a Path);
 
 impl<'a> Drop for TmpFileGuard<'a> {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(self.0);
+        let _ = std::fs::remove_file(self.0); // INTENTIONAL-DROP
     }
 }
 
