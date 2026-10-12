@@ -1,0 +1,36 @@
+crate = "contextra-store"
+tier = 1
+risk = "crash"
+invariants = ["INV-ATOMIC-IDX-1", "INV-FSYNC-1", "INV-ENOSPC-1", "INV-FORMAT-1", "Zero-Panic"]
+scope = ["crates/contextra-store/src/wal/**", "crates/contextra-store/tests/wal_v4_*.rs"]
+forbidden = [
+    "crates/contextra-store/src/lsm/**",
+    "crates/contextra-store/src/manifest/**",
+    "crates/contextra-store/src/sstable/**",
+    "crates/contextra-store/src/lib.rs",
+    "crates/contextra-store/Cargo.toml",
+    ".github/**",
+    "xtask/**",
+    "justfile",
+    "capabilities.toml",
+    "governance/**",
+    "AGENTS.md",
+    "rust-toolchain.toml",
+    "deny.toml",
+    ".jules/setup/**",
+    "Cargo.toml",
+    "Cargo.lock",
+    "docs/TYPE_REGISTRY.md",
+    "docs/CHANGELOG.md",
+    "WORKING_STATE.md",
+    "docs/generated/**"
+]
+acceptance = [
+    "cargo test -p contextra-store wal",
+    "cargo xtask wal-replay-verify"
+]
+
+[budget]
+files = 25
+lines = 3000
+iterations = 12
