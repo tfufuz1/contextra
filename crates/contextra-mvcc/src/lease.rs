@@ -1,9 +1,9 @@
 //! RAII `SnapshotLease` guard for active snapshot read isolation.
 
-use std::sync::Arc;
 use std::time::Instant;
 
 use crate::snapshot::SnapshotRegistry;
+use crate::sync::Arc;
 
 /// Move-only RAII lease guard for an active snapshot.
 ///

@@ -193,11 +193,16 @@ impl LsmStorage {
             }
         };
 
-        let key_manager = config
-            .encryption_passphrase
-            .as_ref()
-            .map(|p| KeyManager::try_new(p, &salt).map(Arc::new))
-            .transpose()?;
+        let key_manager = match &config.encryption_passphrase {
+            Some(p) => {
+                let header = contextra_crypto::KdfHeader::new(
+                    contextra_crypto::KdfParams::default(),
+                    salt.clone(),
+                )?;
+                Some(Arc::new(KeyManager::try_new_strict(p, &header)?))
+            }
+            None => None,
+        };
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();

@@ -13,13 +13,6 @@ impl DeletionLayer {
             Self::CsrGraph => 5,
             Self::KvCacheSegments => 6,
             Self::EmbeddingCache => 7,
-            Self::TextIndex => 20,
-            Self::Relations => 21,
-            Self::Manifest => 22,
-            Self::CheckpointClones => 23,
-            Self::ProcessCaches => 24,
-            Self::Keyring => 25,
-            Self::ErasureLedger => 26,
         }
     }
 }
@@ -38,13 +31,6 @@ mod tests {
         assert_eq!(DeletionLayer::CsrGraph.layer_id(), 5);
         assert_eq!(DeletionLayer::KvCacheSegments.layer_id(), 6);
         assert_eq!(DeletionLayer::EmbeddingCache.layer_id(), 7);
-        assert_eq!(DeletionLayer::TextIndex.layer_id(), 20);
-        assert_eq!(DeletionLayer::Relations.layer_id(), 21);
-        assert_eq!(DeletionLayer::Manifest.layer_id(), 22);
-        assert_eq!(DeletionLayer::CheckpointClones.layer_id(), 23);
-        assert_eq!(DeletionLayer::ProcessCaches.layer_id(), 24);
-        assert_eq!(DeletionLayer::Keyring.layer_id(), 25);
-        assert_eq!(DeletionLayer::ErasureLedger.layer_id(), 26);
     }
 
     #[test]

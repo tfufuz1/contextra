@@ -67,32 +67,3 @@ Messergebnisse von `cargo bench -p contextra-mvcc`:
 ## 5. VERDICT & EVIDENCE
 
 ```
-================================================================================
-VERDICT: PASSED WITH MAJOR FINDINGS
-================================================================================
-Die MVCC-Kernalgorithmen in `crates/contextra-mvcc/src/` erfüllen die strikten
-Invarianten bezüglich Sichtbarkeit, O(1)-Komplexität, Lock-freier Min-Seqno-
-Ermittlung und P28-Determinismus.
-
-Befund-Übersicht:
-- P1 Sichtbarkeitsformel: PASS (delete_seq > as_of exakt)
-- P2 O(1) Visibility: PASS (1.37 ns)
-- P3 SnapshotRegistry: PASS (Lock-free Acquire/Release, O(1) Reads)
-- P4 Kein Lost-Update: PASS (insert_seq unveränderlich)
-- P5 P28-Determinismus: PASS (Port-Injektion via _at-Methoden)
-- P6 Concurrency-Test: PASS (Loom & Multi-Thread Stress-Test)
-- P7 Lock-Enforcement: [MAJOR] Nur Kommentar-Spezifikation für Multi-Shard Locks
-- P8 Orphaned Snapshots: [MAJOR] Unpinned Snapshots blockieren Compaction dauerhaft
-
-[EVIDENCE: P1_VISIBILITY_FORMULA_OK]
-[EVIDENCE: P2_O1_VISIBILITY_BENCHMARK_1.37NS]
-[EVIDENCE: P3_SNAPSHOT_REGISTRY_ATOMIC_O1]
-[EVIDENCE: P4_INSERT_SEQ_IMMUTABLE]
-[EVIDENCE: P5_DETERMINISTIC_TIME_INJECTION_OK]
-[EVIDENCE: P6_LOOM_STRESS_TEST_PASSED]
-[EVIDENCE: P7_SHARD_LOCK_HIERARCHY_COMMENT_ONLY_MAJOR]
-[EVIDENCE: P8_UNPINNED_SNAPSHOT_COMPACTION_BLOCK_MAJOR]
-[EVIDENCE: PROPTEST_10K_CASES_PASSED]
-[EVIDENCE: CLIPPY_MVCC_ZERO_WARNINGS]
-================================================================================
-```

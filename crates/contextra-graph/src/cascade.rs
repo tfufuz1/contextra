@@ -73,15 +73,17 @@ pub enum CascadeStatus {
     Pending,
     /// Invalidation task is currently processing.
     InFlight,
-    /// Invalidation completed successfully with a deletion proof.
+    /// Invalidation completed successfully with a cascade tombstone record.
     Completed,
     /// Invalidation failed.
     Failed,
 }
 
-/// Proof of edge / hyperedge deletion during cascade invalidation (§6.8).
+/// Tombstone record for tracking edge / hyperedge deletion count during cascade invalidation (§6.8).
+///
+/// **Hinweis:** Dieser Typ ist kein Löschnachweis, siehe `contextra-crypto`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct DeletionProof {
+pub struct CascadeTombstone {
     pub doc_id: DocId,
     pub tombstoned_count: usize,
     pub wal_seq: u64,
@@ -93,7 +95,7 @@ pub struct CascadeTicket {
     pub id: u64,
     pub doc_id: DocId,
     pub status: CascadeStatus,
-    pub proof: Option<DeletionProof>,
+    pub tombstone: Option<CascadeTombstone>,
 }
 
 /// Garbage collection trait for sweeping orphaned hyperedge references (Anhang B §B.5.1.7).
@@ -1055,5 +1057,40 @@ mod tests {
             res.is_ok(),
             "Cycle in child_edge_ids must terminate safely without hanging"
         );
+    }
+
+    #[test]
+    fn test_cascade_tombstone_and_ticket_types() {
+        let doc_id = DocId::from_key("doc-tombstone-test").unwrap();
+        let tombstone = CascadeTombstone {
+            doc_id,
+            tombstoned_count: 42,
+            wal_seq: 100,
+        };
+
+        assert_eq!(tombstone.doc_id, doc_id);
+        assert_eq!(tombstone.tombstoned_count, 42);
+        assert_eq!(tombstone.wal_seq, 100);
+
+        let ticket = CascadeTicket {
+            id: 1,
+            doc_id,
+            status: CascadeStatus::Completed,
+            tombstone: Some(tombstone.clone()),
+        };
+
+        assert_eq!(ticket.id, 1);
+        assert_eq!(ticket.status, CascadeStatus::Completed);
+        assert_eq!(ticket.tombstone, Some(tombstone.clone()));
+
+        // Serde roundtrip verification
+        let serialized_tombstone = serde_json::to_string(&tombstone).unwrap();
+        let deserialized_tombstone: CascadeTombstone =
+            serde_json::from_str(&serialized_tombstone).unwrap();
+        assert_eq!(deserialized_tombstone, tombstone);
+
+        let serialized_ticket = serde_json::to_string(&ticket).unwrap();
+        let deserialized_ticket: CascadeTicket = serde_json::from_str(&serialized_ticket).unwrap();
+        assert_eq!(deserialized_ticket, ticket);
     }
 }

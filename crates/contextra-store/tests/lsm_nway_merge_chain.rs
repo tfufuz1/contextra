@@ -478,8 +478,13 @@ async fn test_nway_merge_key_manager_bypasses_merge_op() {
     let dir = tempdir().unwrap();
     let cache = Arc::new(BlockCache::new(1024 * 1024));
     let snapshot_reg = Arc::new(SnapshotRegistry::new());
+    let header = contextra_crypto::KdfHeader::new(
+        contextra_crypto::KdfParams::default(),
+        b"salt1234567812345678".to_vec(),
+    )
+    .unwrap();
     let km = Arc::new(
-        KeyManager::try_new("test_passphrase_for_compaction_test", b"salt12345678").unwrap(),
+        KeyManager::try_new_strict("test_passphrase_for_compaction_test", &header).unwrap(),
     );
 
     let mut readers = Vec::new();

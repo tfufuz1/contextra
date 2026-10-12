@@ -12,6 +12,12 @@ use contextra_types::{error::HnswDeletionError, ContextraError, Result, TxId};
 
 impl DeletionProof {
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 nach Layer-Bereinigung.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -21,6 +27,7 @@ impl DeletionProof {
         proof_key: &[u8],
     ) -> Result<Self> {
         let durability = DurabilityProof::new(deleted_after_tx.0);
+        #[allow(deprecated)]
         Self::create_with_durability(
             scope,
             deleted_keys,
@@ -33,6 +40,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit optionaler WAL-Löschquittung.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create_with_wal_receipt(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -53,6 +66,7 @@ impl DeletionProof {
             ));
         };
 
+        #[allow(deprecated)]
         Self::create_with_wal_receipt_v3(
             scope,
             deleted_keys,
@@ -70,6 +84,12 @@ impl DeletionProof {
     /// Creates a DeletionProof with explicit DurabilityProof verification.
     ///
     /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create_with_durability(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -93,6 +113,7 @@ impl DeletionProof {
             ));
         };
 
+        #[allow(deprecated)]
         Self::create_v3(
             scope,
             deleted_keys,
@@ -107,6 +128,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     #[allow(clippy::too_many_arguments)]
     pub fn create_v3(
         scope: DeletionScope,
@@ -119,6 +146,7 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
+        #[allow(deprecated)]
         Self::create_v3_with_audit_position(
             scope,
             deleted_keys,
@@ -134,6 +162,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     #[allow(clippy::too_many_arguments)]
     pub fn create_v3_with_audit_position(
         scope: DeletionScope,
@@ -147,6 +181,7 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
+        #[allow(deprecated)]
         Self::create_full_v3(
             scope,
             deleted_keys,
@@ -163,6 +198,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_wal_receipt_v3(
         scope: DeletionScope,
@@ -176,6 +217,7 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
+        #[allow(deprecated)]
         Self::create_full_v3(
             scope,
             deleted_keys,
@@ -192,6 +234,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     #[allow(clippy::too_many_arguments)]
     pub fn create_full_v3(
         scope: DeletionScope,
@@ -260,6 +308,118 @@ impl DeletionProof {
         proof.signature = sig.to_bytes().to_vec();
 
         Ok(proof)
+    }
+
+    /// Erstellt und signiert einen DeletionProof (Version 4, Ed25519) mit allen 7-Schichten-Anforderungen.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn create_v4_internal(
+        scope: DeletionScope,
+        mut deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        wal_chain_receipt: Option<[u8; 32]>,
+        audit_chain_position: Option<u64>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
+        durability: Option<&DurabilityProof>,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        let durability_proof = durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
+        if durability_proof.confirmed_seq_no < deleted_after_tx.0 {
+            return Err(CryptoError::NotDurable.into());
+        }
+        deleted_keys.sort();
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
+
+        let covered_layers: Vec<DeletionLayer> =
+            covered_layers.into_iter().map(|p| p.layer).collect();
+
+        if covered_layers.contains(&DeletionLayer::HnswIndex) && graph_repair.is_empty() {
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::VerificationFailed {
+                    remaining_pointers: 1,
+                },
+            ));
+        }
+
+        let timestamp = if attested_at >= 0 {
+            #[allow(clippy::cast_sign_loss)]
+            {
+                attested_at as u64
+            }
+        } else {
+            0u64
+        };
+
+        let proof_stub = Self {
+            signature_version: SignatureVersion::V4.as_u8(),
+            scope,
+            deleted_keys_hash,
+            deleted_after_tx,
+            timestamp,
+            signature: Vec::new(),
+            covered_layers,
+            uncovered_layers: Vec::new(),
+            excluded_scopes,
+            graph_repair: graph_repair.to_vec(),
+            wal_chain_receipt,
+            audit_chain_position,
+            integrity_warning: None,
+        };
+
+        let payload = proof_stub
+            .construct_v4_payload()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+        use ed25519_dalek::Signer;
+        let sig = signing_key.sign(&payload);
+
+        let mut proof = proof_stub;
+        proof.signature = sig.to_bytes().to_vec();
+
+        Ok(proof)
+    }
+
+    /// Helper to construct the signed payload for signature version 4 (Ed25519, 7-layer coverage).
+    pub(super) fn construct_v4_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
+        let mut payload = Vec::with_capacity(128);
+        payload.extend_from_slice(b"contextra/deletion-proof/v4\0");
+        let scope_bytes =
+            bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let graph_repair_bytes = bincode::serialize(&self.graph_repair)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+        let receipt_part = if self.wal_chain_receipt.is_some() {
+            receipt_bytes.as_slice()
+        } else {
+            &[]
+        };
+
+        let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
+        let audit_pos_part = if let Some(ref pos_b) = audit_pos_bytes {
+            pos_b.as_slice()
+        } else {
+            &[]
+        };
+
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(&self.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+        payload.extend_from_slice(&graph_repair_bytes);
+        payload.extend_from_slice(receipt_part);
+        payload.extend_from_slice(audit_pos_part);
+
+        Ok(payload)
     }
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).

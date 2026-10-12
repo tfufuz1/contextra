@@ -111,14 +111,7 @@ impl LayerWitness {
             DeletionLayer::HnswIndex
             | DeletionLayer::CsrGraph
             | DeletionLayer::KvCacheSegments
-            | DeletionLayer::EmbeddingCache
-            | DeletionLayer::TextIndex
-            | DeletionLayer::Relations
-            | DeletionLayer::Manifest
-            | DeletionLayer::CheckpointClones
-            | DeletionLayer::ProcessCaches
-            | DeletionLayer::Keyring
-            | DeletionLayer::ErasureLedger => {
+            | DeletionLayer::EmbeddingCache => {
                 return Err(ContextraError::InvalidInput(format!(
                     "LayerWitness creation rejected: layer {:?} does not support scanner-based witness creation",
                     layer
