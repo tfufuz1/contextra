@@ -67,20 +67,6 @@ pub enum DeletionLayer {
     KvCacheSegments,
     /// In-memory vector embedding cache cleared.
     EmbeddingCache,
-    /// Text index structures purged.
-    TextIndex,
-    /// Graph relation edges purged.
-    Relations,
-    /// System manifest state purged.
-    Manifest,
-    /// Checkpoint clones purged.
-    CheckpointClones,
-    /// In-process transient caches purged.
-    ProcessCaches,
-    /// Keyring cryptographic material destroyed.
-    Keyring,
-    /// Erasure ledger entries purged.
-    ErasureLedger,
 }
 
 /// Explizite Nicht-Abdeckung — maschinenlesbar für Audit-Systeme.

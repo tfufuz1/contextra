@@ -11,3 +11,6 @@ Das Verzeichnis `docs/decisions/` ist die einzige kanonische Quelle (Single Sour
 
 ## Befehle
 - Mit `just adr list` (geplant) können alle vorhandenen ADRs übersichtlich aufgelistet werden.
+
+## Neueste Entscheidungen
+- [ADR-SCOPE-FREEZE-2026-10](ADR-SCOPE-FREEZE-2026-10.md): Scope Freeze & Crate-Klassifizierung (Kern, Rand, Experimentell)

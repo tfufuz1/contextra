@@ -27,8 +27,8 @@ use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use crate::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use crate::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Single canonical constant for overhead calculation per staged entry (32 bytes).
@@ -326,7 +326,7 @@ impl<T: Clone> TxBuffer<T> {
     pub fn begin_at(&self, tx: TxId, at: Instant) {
         let lease = self.snapshot_registry.as_ref().map(|reg| {
             let la = self.last_applied.as_ref();
-            reg.acquire_at(|| la.map_or(0, |a| a.load(Ordering::Acquire)), at)
+            SnapshotRegistry::acquire_at(reg, || la.map_or(0, |a| a.load(Ordering::Acquire)), at)
         });
 
         let shard_idx = self.shard_idx(tx);
@@ -352,7 +352,7 @@ impl<T: Clone> TxBuffer<T> {
         let lease = self
             .snapshot_registry
             .as_ref()
-            .map(|reg| reg.acquire_at(|| seq_no, at));
+            .map(|reg| SnapshotRegistry::acquire_at(reg, || seq_no, at));
 
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
@@ -907,7 +907,7 @@ impl<T: Clone> Default for TxBuffer<T> {
 mod tests {
     use super::*;
     use proptest::{prop_assert, prop_assert_eq};
-    use std::sync::Arc;
+    use crate::sync::Arc;
 
     #[test]
     fn test_tx_buffer_read_set_tracking() {

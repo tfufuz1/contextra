@@ -340,11 +340,22 @@ impl Contextra {
         tenant_id: TenantId,
         proof_key: &[u8],
     ) -> Result<DeletionProof> {
-        if name == "default" {
-            return Err(contextra_types::ContextraError::invalid_input(
-                "Cannot drop default collection",
+        #[cfg(not(feature = "encryption-at-rest"))]
+        {
+            let _ = (name, tenant_id, proof_key);
+            return Err(contextra_types::ContextraError::capability_unsupported(
+                "deletion_proof",
+                "encryption-at-rest feature is required for cryptographic deletion proof generation",
             ));
         }
+
+        #[cfg(feature = "encryption-at-rest")]
+        {
+            if name == "default" {
+                return Err(contextra_types::ContextraError::invalid_input(
+                    "Cannot drop default collection",
+                ));
+            }
 
         let collection_id = derive_collection_id(name)?;
 
@@ -448,6 +459,7 @@ impl Contextra {
             .remove(&(tenant_id, name.to_string()));
 
         Ok(proof)
+        }
     }
 
     /// Purges all cached KV segments and stored collection data for the given tenant across the engine.

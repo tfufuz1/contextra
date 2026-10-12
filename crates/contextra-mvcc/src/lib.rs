@@ -19,6 +19,7 @@ pub mod lease;
 pub mod seq_log;
 pub mod snapshot;
 pub mod ssi;
+pub mod sync;
 pub mod tx_buffer;
 
 // FIX(2026-10-07): Remove unused SnapshotFloor re-export removed in #4406
