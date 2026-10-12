@@ -254,7 +254,8 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
-        let durability_proof = durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
+        let durability_proof =
+            durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
         if durability_proof.confirmed_seq_no < deleted_after_tx.0 {
             return Err(CryptoError::NotDurable.into());
         }
@@ -325,7 +326,8 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
-        let durability_proof = durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
+        let durability_proof =
+            durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
         if durability_proof.confirmed_seq_no < deleted_after_tx.0 {
             return Err(CryptoError::NotDurable.into());
         }

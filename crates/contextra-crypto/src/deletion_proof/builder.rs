@@ -128,8 +128,22 @@ impl ProofBuilder {
         self
     }
 
-    /// Finishes building and signs the version 4 deletion proof.
-    pub fn finish(self, signer: &dyn ProofSigner) -> Result<ProofV4> {
+    /// Validates builder internal consistency, sorts/deduplicates claims and excluded scopes, and signs the proof.
+    pub fn finish_checked(mut self, signer: &dyn ProofSigner) -> Result<ProofV4> {
+        if self.chain_seq < 1 {
+            return Err(crate::error::CryptoError::Crypto(
+                "ProofBuilder: chain_seq must be >= 1".to_string(),
+            ));
+        }
+
+        // Sort claims by layer_id and deduplicate duplicate layer IDs
+        self.claims.sort_by_key(|c| c.layer_id);
+        self.claims.dedup_by_key(|c| c.layer_id);
+
+        // Sort and deduplicate excluded_scopes
+        self.excluded_scopes.sort();
+        self.excluded_scopes.dedup();
+
         let mut proof_id = self.proof_id.unwrap_or([0u8; 32]);
         if proof_id == [0u8; 32] {
             let mut hasher = blake3::Hasher::new();
@@ -168,6 +182,11 @@ impl ProofBuilder {
 
         proof.sign_with_signer(signer)?;
         Ok(proof)
+    }
+
+    /// Finishes building and signs the version 4 deletion proof.
+    pub fn finish(self, signer: &dyn ProofSigner) -> Result<ProofV4> {
+        self.finish_checked(signer)
     }
 }
 
