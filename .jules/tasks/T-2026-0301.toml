@@ -1,0 +1,35 @@
+id        = "T-2026-0301"
+title     = "Durability Primitives, Fsync Poisoning, Filesystem Classification, and DirLock Hardening"
+crate     = "contextra-sys"
+tier      = 1
+risk      = "crash"
+goal      = "Implement platform durability primitives in contextra-sys and integrate rename durability, fsync error semantics, filesystem classification, and DirLock hardening in contextra-durable-fs."
+non_goals = ["Modifications to contextra-store or testkit", "Adding external dependencies to sys or durable-fs"]
+scope     = ["crates/contextra-sys/**", "crates/contextra-durable-fs/**", ".jules/tasks/T-2026-0301.toml"]
+forbidden = [
+  "crates/contextra-store/**", "crates/contextra-testkit/**",
+  ".github/**", "xtask/**", "justfile", "capabilities.toml", "governance/**",
+  "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**",
+  "Cargo.toml", "docs/TYPE_REGISTRY.md", "docs/CHANGELOG.md",
+  "WORKING_STATE.md", "docs/generated/**"
+]
+invariants = ["INV-DURABILITY-PRIM-1", "INV-PLATFORM-1", "INV-FSYNC-1", "INV-FS-SAFE", "Zero-Panic", "Unsafe Islands Only"]
+acceptance = [
+  "cargo test -p contextra-sys -p contextra-durable-fs",
+  "cargo clippy -p contextra-sys -p contextra-durable-fs --all-targets -- -D warnings",
+  "cargo fmt --check -p contextra-sys -p contextra-durable-fs",
+  "cargo xtask jules check",
+  "cargo xtask jules verify"
+]
+evidence_required = [
+  "Platform specific cfg tests for durability primitives",
+  "Property/model test for atomic_replace crash consistency",
+  "Miri-friendly unit tests with SyscallBackend abstraction",
+  "Negative tests for fs_class injection",
+  "DirLock network/fuse/cloud refusal tests"
+]
+
+[budget]
+files = 30
+lines = 2500
+iterations = 12

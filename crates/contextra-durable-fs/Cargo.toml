@@ -13,6 +13,7 @@ description = "Durable filesystem operations and synchronous disk flushing for C
 ring = "0"
 
 [dependencies]
+contextra-sys = { path = "../contextra-sys", version = "0.1.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

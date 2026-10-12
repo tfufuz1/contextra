@@ -4,6 +4,7 @@
 // INVARIANTEN: Zero-Panic, pure safe Rust, I/O-Fehler werden als std::io::Result propagiert.
 
 use crate::{durable_remove, ScrubReceipt};
+use contextra_sys::{flush_file, FlushKind};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
@@ -46,15 +47,6 @@ pub enum ScrubOutcome {
 }
 
 /// Safely scrubs a file if environment and caller pre-conditions permit, otherwise refuses or falls back.
-///
-/// Pre-conditions checked in order:
-/// 1. `policy == Disabled` -> perform standard [`durable_remove`] and return [`ScrubOutcome::RemovedUnscrubbed`].
-/// 2. `reader_alive == true` -> return [`ScrubOutcome::Refused(ScrubRefusal::ReaderAlive)`].
-/// 3. `not_obsolete == true` -> return [`ScrubOutcome::Refused(ScrubRefusal::NotObsolete)`].
-/// 4. File metadata inspection: `nlink > 1` -> return [`ScrubOutcome::Refused(ScrubRefusal::MultipleHardlinks)`].
-/// 5. CoW filesystem check via `/proc/self/mountinfo` (Linux) -> return [`ScrubOutcome::Refused(ScrubRefusal::CopyOnWriteFilesystem)`]
-///    or [`ScrubOutcome::Refused(ScrubRefusal::Unsupported)`] if unparseable/non-Linux.
-/// 6. Perform zero-overwriting in 64-KiB blocks + `sync_all()` + [`durable_remove`].
 pub fn scrub_if_safe(
     path: &Path,
     policy: ScrubPolicy,
@@ -98,7 +90,15 @@ pub fn scrub_if_safe(
 
     let len = metadata.len();
     if len > 0 {
-        let mut file = OpenOptions::new().write(true).open(path)?;
+        let mut options = OpenOptions::new();
+        options.write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.share_access(7);
+        }
+
+        let mut file = options.open(path)?;
         let zeros = [0u8; 64 * 1024];
         let mut remaining = len;
 
@@ -110,7 +110,7 @@ pub fn scrub_if_safe(
             remaining -= chunk_size as u64;
         }
 
-        file.sync_all()?;
+        flush_file(&file, FlushKind::DataAndMetadata)?;
     }
 
     durable_remove(path)?;
@@ -139,7 +139,6 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
             Err(_) => path.to_path_buf(),
         };
 
-        // Parse mountinfo lines to find filesystem type for target path
         let mut best_match_len = 0;
         let mut best_match_fstype = String::new();
 
@@ -149,7 +148,6 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 Err(_) => continue,
             };
 
-            // Format: 36 35 98:0 / /mnt/point rw,relatime shared:1 - btrfs /dev/sda1 rw,space_cache
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() < 5 {
                 continue;
@@ -162,7 +160,6 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 let mlen = mount_point.len();
                 if mlen >= best_match_len {
                     best_match_len = mlen;
-                    // Find separator '-'
                     if let Some(dash_pos) = parts.iter().position(|&p| p == "-") {
                         if dash_pos + 1 < parts.len() {
                             best_match_fstype = parts[dash_pos + 1].to_lowercase();
