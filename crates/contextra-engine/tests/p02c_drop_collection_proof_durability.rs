@@ -4,6 +4,7 @@
 // INVARIANTEN: Deletion tombstones must be durable on disk prior to DeletionProof issuance. Upon crash/reopen without graceful shutdown, dropped keys must not reappear.
 
 #![cfg(not(loom))]
+#![cfg(feature = "encryption-at-rest")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_engine::{Contextra, ContextraConfig};
