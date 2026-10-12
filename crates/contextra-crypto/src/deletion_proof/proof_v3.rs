@@ -69,7 +69,10 @@ impl DeletionProof {
 
     /// Creates a DeletionProof with explicit DurabilityProof verification.
     ///
-    /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    /// # Durability Binding (INV-D6)
+    /// Enforces mandatory durability verification. Accepts `Option<&DurabilityProof>` for caller compatibility
+    /// and explicit non-durable rejection paths (e.g. MemoryOnly mode). If `durability_proof` is `None`,
+    /// this function returns `Err(CryptoError::NotDurable)`.
     pub fn create_with_durability(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -107,6 +110,10 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
+    ///
+    /// # Durability Binding (INV-D6)
+    /// Accepts `durability: Option<&DurabilityProof>` for caller compatibility across the workspace. Proof creation
+    /// fail-closed rejects `None` with `Err(CryptoError::NotDurable)` in [`Self::create_full_v3`].
     #[allow(clippy::too_many_arguments)]
     pub fn create_v3(
         scope: DeletionScope,
@@ -134,6 +141,10 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    ///
+    /// # Durability Binding (INV-D6)
+    /// Accepts `durability: Option<&DurabilityProof>` for caller compatibility across the workspace. Proof creation
+    /// fail-closed rejects `None` with `Err(CryptoError::NotDurable)` in [`Self::create_full_v3`].
     #[allow(clippy::too_many_arguments)]
     pub fn create_v3_with_audit_position(
         scope: DeletionScope,
@@ -163,6 +174,10 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
+    ///
+    /// # Durability Binding (INV-D6)
+    /// Accepts `durability: Option<&DurabilityProof>` for caller compatibility across the workspace. Proof creation
+    /// fail-closed rejects `None` with `Err(CryptoError::NotDurable)` in [`Self::create_full_v3`].
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_wal_receipt_v3(
         scope: DeletionScope,
@@ -192,6 +207,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    ///
+    /// # Durability Binding (INV-D6)
+    /// Mandatory durability proof enforcement per INV-D6.
+    /// - Rejects `None` durability with `Err(CryptoError::NotDurable)`.
+    /// - Rejects `durability.confirmed_seq_no < deleted_after_tx.0` with `Err(CryptoError::NotDurable)`.
+    /// - Binds `deleted_after_tx` (which matches `confirmed_seq_no`) directly into the signed payload.
     #[allow(clippy::too_many_arguments)]
     pub fn create_full_v3(
         scope: DeletionScope,
@@ -206,7 +227,8 @@ impl DeletionProof {
         durability: Option<&DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
-        if durability.is_none() {
+        let durability_proof = durability.ok_or_else(|| ContextraError::from(CryptoError::NotDurable))?;
+        if durability_proof.confirmed_seq_no < deleted_after_tx.0 {
             return Err(CryptoError::NotDurable.into());
         }
         deleted_keys.sort();
