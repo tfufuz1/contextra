@@ -32,9 +32,9 @@ pub mod layer_proof;
 pub mod policy;
 pub mod proof;
 pub mod proof_store;
-pub mod proof_v4;
 pub mod proof_v2;
 pub mod proof_v3;
+pub mod proof_v4;
 pub mod signer;
 pub mod types;
 pub mod verify;
@@ -45,7 +45,7 @@ pub use self::canon::*;
 pub use self::keys::*;
 pub use self::layer_proof::*;
 pub use self::policy::*;
-pub use self::proof::*;
+pub use self::proof::{Coverage, DeletionProof, UncoveredLayer, UncoveredReason};
 pub use self::proof_store::*;
 pub use self::proof_v4::*;
 pub use self::signer::*;
@@ -336,6 +336,7 @@ mod tests {
             timestamp: 0,
             signature: Vec::new(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -368,6 +369,7 @@ mod tests {
             timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -649,6 +651,7 @@ mod tests {
             timestamp: 0,
             signature: Vec::new(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -688,6 +691,7 @@ mod tests {
             timestamp: 0,
             signature: Vec::new(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![
                 ExcludedScope::LlmParameterMemory,
                 ExcludedScope::ConsolidatedAndDistilled,
@@ -746,6 +750,7 @@ mod tests {
             timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -807,6 +812,7 @@ mod tests {
             timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -841,6 +847,7 @@ mod tests {
             timestamp: 0,
             signature: vec![0u8; 32],
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -984,6 +991,7 @@ mod tests {
             timestamp: 0,
             signature: vec![0u8; 32],
             covered_layers: vec![],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -1003,7 +1011,7 @@ mod tests {
         let mut proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
 
-        for unknown_byte in [0x00, 0x04, 0xAA, 0xFF] {
+        for unknown_byte in [0x00, 0x05, 0xAA, 0xFF] {
             proof.signature_version = unknown_byte;
 
             // 1. signature_version_typed() MUST return DeletionProofError::UnsupportedVersion
@@ -1064,6 +1072,7 @@ mod tests {
             timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -1083,6 +1092,7 @@ mod tests {
             timestamp: 0,
             signature: Vec::new(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
             graph_repair: vec![],
             wal_chain_receipt: None,
@@ -1313,6 +1323,7 @@ mod tests {
             timestamp: 0,
             signature: vec![0u8; 32],
             covered_layers: vec![],
+            uncovered_layers: Vec::new(),
             excluded_scopes: vec![],
             graph_repair: vec![],
             wal_chain_receipt: None,

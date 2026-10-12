@@ -4,6 +4,32 @@ use super::types::{DeletionLayer, DeletionScope, ExcludedScope, GraphRepairAttes
 use contextra_types::{TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
+/// Grund für unbedeckte/nicht bereinigte Schichten nach §20.5.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UncoveredReason {
+    SsdPhysical,
+    Backups,
+    Swap,
+    ModelParameters,
+    KeystoreCopies,
+}
+
+/// Unbedeckte Schicht mit expliziter Begründung (§20.5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UncoveredLayer {
+    pub layer: DeletionLayer,
+    pub reason: UncoveredReason,
+}
+
+/// Abdeckungsbericht für einen Löschbeweis (§20.5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Coverage {
+    pub covered: Vec<DeletionLayer>,
+    pub uncovered: Vec<UncoveredLayer>,
+    pub coverage_known: bool,
+}
+
 /// Cryptographic proof of data deletion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 // AI-TAG[SMELL][RESOLVED] audit-R3-1: DeletionProof signature_version 2 erweitert Signatur-Payload um covered_layers & excluded_scopes zur Vermeidung von Cross-Context-Fälschungen.
@@ -39,6 +65,9 @@ pub struct DeletionProof {
     pub signature: Vec<u8>,
     /// List of physically sanitized storage layers.
     pub covered_layers: Vec<DeletionLayer>,
+    /// Uncovered/uncleaned layers with reasons (§20.5).
+    #[serde(default)]
+    pub uncovered_layers: Vec<UncoveredLayer>,
     /// Pflicht für DSGVO Art. 17-Compliance.
     pub excluded_scopes: Vec<ExcludedScope>,
     /// Attestierungen synchroner Nachbarschaftsreparaturen im HNSW-Graphen.
@@ -66,6 +95,23 @@ impl DeletionProof {
             DeletionScope::Document { tenant_id, .. } => *tenant_id,
             DeletionScope::Collection { tenant_id, .. } => *tenant_id,
             DeletionScope::Tenant { tenant_id } => *tenant_id,
+        }
+    }
+
+    /// Ermittelt die Abdeckung aller 7 gesetzlichen Löschschichten (§20.5).
+    pub fn coverage(&self) -> Coverage {
+        if self.signature_version < 4 {
+            Coverage {
+                covered: self.covered_layers.clone(),
+                uncovered: self.uncovered_layers.clone(),
+                coverage_known: false,
+            }
+        } else {
+            Coverage {
+                covered: self.covered_layers.clone(),
+                uncovered: self.uncovered_layers.clone(),
+                coverage_known: true,
+            }
         }
     }
 }

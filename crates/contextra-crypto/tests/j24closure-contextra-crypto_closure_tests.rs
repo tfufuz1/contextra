@@ -3,7 +3,7 @@
 // INVARIANTEN: Explicit calls to cipher_for_scoped, derive_deletion_proof_key, derive_kv_key_scoped, derive_segment_key, generate_default, last_seq_no_snapshot, set_last_seq_no.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::deletion_proof::DeletionScope;

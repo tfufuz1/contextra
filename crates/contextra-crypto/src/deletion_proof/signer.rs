@@ -82,8 +82,9 @@ impl ProofKeyPairSigner {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let metadata = std::fs::metadata(path)
-                .map_err(|e| CryptoError::Crypto(format!("Failed to read key file metadata: {e}")))?;
+            let metadata = std::fs::metadata(path).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to read key file metadata: {e}"))
+            })?;
             let mode = metadata.permissions().mode() & 0o777;
             if mode != 0o600 {
                 return Err(CryptoError::Crypto(format!(
@@ -172,8 +173,9 @@ impl ProofRotationAttestation {
         msg.extend_from_slice(&self.new_key_id);
 
         let sig = Signature::from_bytes(&self.signature);
-        vk.verify(&msg, &sig)
-            .map_err(|e| CryptoError::Crypto(format!("Invalid rotation attestation signature: {e}")))?;
+        vk.verify(&msg, &sig).map_err(|e| {
+            CryptoError::Crypto(format!("Invalid rotation attestation signature: {e}"))
+        })?;
 
         Ok(())
     }
@@ -219,7 +221,8 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("chmod failed");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))
+                .expect("chmod failed");
 
             let res = ProofKeyPairSigner::load_from_file(&path);
             assert!(res.is_err(), "load_from_file MUST fail on 0644 permissions");

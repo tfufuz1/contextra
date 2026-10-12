@@ -3,6 +3,7 @@
 // INVARIANTEN: Unsigned appends fail; tampered signatures reject; invalid op_type (>2) fail; double revocations are idempotent.
 
 #![forbid(unsafe_code)]
+#![allow(deprecated)]
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, RevocationLog, RevocationTarget};

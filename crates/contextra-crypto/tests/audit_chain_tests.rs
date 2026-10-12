@@ -3,7 +3,7 @@
 // INVARIANTEN: Tampering with any entry breaks chain verification. Shredded salt renders commitments indistinguishable under dictionary attacks. INV-DELETION-1 strictly enforced.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,

@@ -228,7 +228,7 @@ impl KvCipher for KvSegmentCipher {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
 

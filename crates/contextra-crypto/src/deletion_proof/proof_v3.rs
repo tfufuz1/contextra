@@ -240,6 +240,7 @@ impl DeletionProof {
             timestamp,
             signature: Vec::new(),
             covered_layers,
+            uncovered_layers: Vec::new(),
             excluded_scopes,
             graph_repair: graph_repair.to_vec(),
             wal_chain_receipt,

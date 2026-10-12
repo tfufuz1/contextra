@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, Result};
 use contextra_ports::SystemClock;
 use ed25519_dalek::SigningKey;

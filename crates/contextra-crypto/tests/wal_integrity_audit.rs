@@ -7,7 +7,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::cast_possible_truncation,
-    clippy::bool_assert_comparison
+    clippy::bool_assert_comparison,
+    deprecated
 )]
 
 use contextra_crypto::crypto::KeyManager;

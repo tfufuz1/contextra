@@ -61,6 +61,7 @@ impl DeletionProof {
             timestamp: 0,
             signature: Vec::new(),
             covered_layers,
+            uncovered_layers: Vec::new(),
             excluded_scopes,
             graph_repair: Vec::new(),
             wal_chain_receipt,

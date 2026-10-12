@@ -12,7 +12,8 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::permissions_set_readonly_false
+    clippy::permissions_set_readonly_false,
+    deprecated
 )]
 
 use contextra_crypto::crypto::KeyManager;

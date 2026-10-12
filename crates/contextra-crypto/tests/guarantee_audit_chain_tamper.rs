@@ -13,6 +13,7 @@
 // | Tail Appending (Gültiger Eigenhash) | Nein | Ja | Erweitere Kette 0..n+k ist lokal valide, aber publizierte Head-Signatur sichert nur den früheren Head-Hash/Index. |
 
 #![forbid(unsafe_code)]
+#![allow(deprecated)]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

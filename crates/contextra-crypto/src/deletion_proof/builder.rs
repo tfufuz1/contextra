@@ -197,6 +197,8 @@ mod tests {
         assert_eq!(proof.db_instance_id, "db-test");
         assert_eq!(proof.deleted_after_tx, 50);
         assert_eq!(proof.deleted_keys_hash, [0xAA; 32]);
-        assert!(proof.verify_signature(&signer.public_key()).expect("verify failed"));
+        assert!(proof
+            .verify_signature(&signer.public_key())
+            .expect("verify failed"));
     }
 }
