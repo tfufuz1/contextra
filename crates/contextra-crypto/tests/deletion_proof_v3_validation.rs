@@ -89,6 +89,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
     );
 
     let proof = res.unwrap();
+    assert_eq!(proof.deleted_after_tx, TxId::new(durability.confirmed_seq_no));
     assert!(proof.verify(&keypair.verifying_key).unwrap());
 }
 
@@ -125,6 +126,10 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
 
     // Verify original v3 proof is valid
     assert_eq!(valid_v3_proof.signature_version, 3);
+    assert_eq!(
+        valid_v3_proof.deleted_after_tx,
+        TxId::new(durability.confirmed_seq_no)
+    );
     assert_eq!(
         valid_v3_proof.signature_version_typed(),
         Ok(SignatureVersion::V3)
@@ -186,4 +191,52 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
             "verify() for HMAC proof MUST reject unknown version byte {unknown_byte} fail-closed"
         );
     }
+}
+
+#[test]
+fn test_create_v3_with_insufficient_or_missing_durability_fails() {
+    let keypair = DeletionProofKeyPair::generate();
+    let tenant_id = TenantId::try_new(1).unwrap();
+    let scope = DeletionScope::Document {
+        doc_id: DocId::new(42),
+        tenant_id,
+    };
+
+    let layer_proofs =
+        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+
+    // 1. Missing durability (None) MUST fail
+    let res_none = DeletionProof::create_v3(
+        scope.clone(),
+        vec![b"key1".to_vec()],
+        TxId::new(100),
+        layer_proofs.clone(),
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
+        None,
+        keypair.signing_key(),
+    );
+    assert!(
+        res_none.is_err(),
+        "create_v3 with None durability MUST return Err(NotDurable)"
+    );
+
+    // 2. Insufficient durability (confirmed_seq_no < deleted_after_tx.0) MUST fail
+    let insufficient_durability = DurabilityProof::new(50);
+    let res_insufficient = DeletionProof::create_v3(
+        scope,
+        vec![b"key1".to_vec()],
+        TxId::new(100),
+        layer_proofs,
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
+        Some(&insufficient_durability),
+        keypair.signing_key(),
+    );
+    assert!(
+        res_insufficient.is_err(),
+        "create_v3 with durability.confirmed_seq_no < deleted_after_tx MUST return Err(NotDurable)"
+    );
 }
