@@ -40,9 +40,13 @@ async fn setup_db(dim: usize) -> (Contextra, TempDir) {
 #[tokio::test]
 async fn test_drop_collection_frees_storage() {
     let (db, _tmp) = setup_db(3).await;
+    let tenant_id = TenantId::try_new(1).unwrap();
 
     // 1. Collection erstellen und Daten einfügen
-    let col = db.collection("to_drop").await.expect("create col");
+    let col = db
+        .collection_for_tenant("to_drop", tenant_id)
+        .await
+        .expect("create col");
     col.insert("doc1", &[1.0, 0.0, 0.0], Some(json!({"data": "important"})))
         .await
         .expect("insert doc1");
@@ -53,13 +57,15 @@ async fn test_drop_collection_frees_storage() {
     assert_eq!(col.len().await, 2, "Collection should have 2 documents");
 
     // 2. Collection droppen
-    let tenant_id = TenantId::try_new(1).unwrap();
     db.drop_collection("to_drop", tenant_id, &[0u8; 32])
         .await
         .expect("drop collection");
 
     // 3. Collection neu öffnen — muss leer sein
-    let col_new = db.collection("to_drop").await.expect("reopen col");
+    let col_new = db
+        .collection_for_tenant("to_drop", tenant_id)
+        .await
+        .expect("reopen col");
     assert_eq!(
         col_new.len().await,
         0,
@@ -92,10 +98,14 @@ async fn test_drop_default_collection_is_rejected() {
 #[tokio::test]
 async fn test_drop_collection_removes_all_data() {
     let (db, _tmp) = setup_db(3).await;
+    let tenant_id = TenantId::try_new(1).unwrap();
 
     // 1. Collection erstellen, mehrere Dokumente einfügen
     let name = "col_drop_test";
-    let col = db.collection(name).await.expect("create col");
+    let col = db
+        .collection_for_tenant(name, tenant_id)
+        .await
+        .expect("create col");
     col.insert("doc1", &[1.0, 0.0, 0.0], Some(json!({"key": "val1"})))
         .await
         .expect("insert doc1");
@@ -104,22 +114,23 @@ async fn test_drop_collection_removes_all_data() {
         .expect("insert doc2");
 
     let col_prefix = format!("__col:{}:", name);
-    let before = db
-        .inner_storage()
+    let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+        db.inner_storage(),
+        tenant_id,
+    );
+    let before = tenant_storage
         .scan_prefix(col_prefix.as_bytes())
         .await
         .expect("scan before");
     assert!(!before.is_empty(), "Data keys must exist before drop");
 
     // 2. drop_collection() aufrufen
-    let tenant_id = TenantId::try_new(1).unwrap();
     db.drop_collection(name, tenant_id, &[0u8; 32])
         .await
         .expect("drop collection");
 
     // 3. storage.scan_prefix("__col:<name>:") muss LEER sein
-    let after = db
-        .inner_storage()
+    let after = tenant_storage
         .scan_prefix(col_prefix.as_bytes())
         .await
         .expect("scan after");
@@ -128,11 +139,14 @@ async fn test_drop_collection_removes_all_data() {
         "storage.scan_prefix for collection prefix must be empty after drop"
     );
 
-    // 4. list_collections() darf den Namen nicht mehr enthalten
-    let list = db.list_collections().await.expect("list_collections");
+    // 4. list_collections_for_tenant() darf den Namen nicht mehr enthalten
+    let list = db
+        .list_collections_for_tenant(tenant_id)
+        .await
+        .expect("list_collections");
     assert!(
         !list.contains(&name.to_string()),
-        "list_collections must not contain dropped collection name"
+        "list_collections_for_tenant must not contain dropped collection name"
     );
 }
 
