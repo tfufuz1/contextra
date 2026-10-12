@@ -10,37 +10,30 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, valu
 undocumented_unsafe_blocks = "deny"
 unimplemented = "deny"
 unreachable = "deny"
-# TODO: entfernen
-unwrap_used = "allow"
-# TODO: entfernen
-expect_used = "allow"
-# TODO: entfernen
-panic = "allow"
-# TODO: entfernen
-todo = "allow"
-# TODO: entfernen
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+cast_sign_loss = "warn"
+should_implement_trait = "warn"
+collapsible_match = "warn"
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 cast_possible_truncation = "allow"
-# TODO: entfernen
-cast_sign_loss = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 manual_strip = "allow"
-# TODO: entfernen
-should_implement_trait = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 unnecessary_map_or = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 match_like_matches_macro = "allow"
-# TODO: entfernen
-collapsible_match = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 regex_creation_in_loops = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 needless_borrows_for_generic_args = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 collapsible_if = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 useless_vec = "allow"
-# TODO: entfernen
+# Ausnahmen für nicht überarbeitete Dateien außerhalb des Task-Scopes in xtask
 useless_format = "allow"
 
 [package]
