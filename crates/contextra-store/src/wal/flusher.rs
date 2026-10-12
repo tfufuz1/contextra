@@ -889,7 +889,9 @@ mod flusher_injector_tests {
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             key_manager: None,
             fallback_integrity_key: Some([1u8; 32]),
-            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                false,
+            )),
             min_wal_version: WalVersion::V3,
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -919,7 +921,13 @@ mod flusher_injector_tests {
         let batch = PreparedBatch(vec![entry]);
         let res = wal.append_batch(batch).await;
 
-        assert!(res.is_err(), "Append must return Err when fsync fails (no Ack without durability)");
-        assert!(wal.is_poisoned(), "Wal handle must be poisoned after fsync failure");
+        assert!(
+            res.is_err(),
+            "Append must return Err when fsync fails (no Ack without durability)"
+        );
+        assert!(
+            wal.is_poisoned(),
+            "Wal handle must be poisoned after fsync failure"
+        );
     }
 }

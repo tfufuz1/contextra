@@ -38,8 +38,7 @@ fn test_wal_v4_encode_decode_identity_all_ops() {
             .expect("create entry");
 
         let serialized = entry.to_bytes().expect("serialize entry");
-        let deserialized =
-            WalEntry::from_bytes_classified(&serialized).expect("deserialize entry");
+        let deserialized = WalEntry::from_bytes_classified(&serialized).expect("deserialize entry");
 
         assert_eq!(deserialized.seq_no, entry.seq_no);
         assert_eq!(deserialized.checksum, entry.checksum);

@@ -250,9 +250,7 @@ impl WalObserver for AsyncObserverAdapter {
     }
 
     fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId) {
-        let _ = self
-            .sender
-            .try_send((seq_no, tx_id, batch.origin));
+        let _ = self.sender.try_send((seq_no, tx_id, batch.origin));
     }
 
     fn on_commit_fail_closed(

@@ -20,7 +20,9 @@ impl WalObserver for FailingObserver {
         _seq_no: u64,
         _tx_id: TxId,
     ) -> Result<()> {
-        Err(ContextraError::Storage("Observer intentionally failed".into()))
+        Err(ContextraError::Storage(
+            "Observer intentionally failed".into(),
+        ))
     }
 }
 
@@ -168,7 +170,9 @@ async fn test_slow_observer_timeout_fails_commit() {
     match res {
         Err(ContextraError::Storage(msg)) => {
             assert!(
-                msg.contains("timed out") || msg.contains("exceeded") || msg.contains("WalObserver"),
+                msg.contains("timed out")
+                    || msg.contains("exceeded")
+                    || msg.contains("WalObserver"),
                 "Expected timeout message, got: {msg}"
             );
         }

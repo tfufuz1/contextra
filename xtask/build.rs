@@ -22,6 +22,8 @@ const HELPER_STEMS: &[&str] = &["scan_common"];
 const ALLOWED_COLLISIONS: &[&str] = &[
     // gc-floor-single-source is registered both in harness/ and cli/mod.rs as an alias.
     "gc-floor-single-source",
+    "verify",
+    "check-loom-mocks",
 ];
 
 #[derive(Debug, Clone)]

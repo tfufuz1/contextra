@@ -59,11 +59,7 @@ fn test_layer_id_mappings_no_duplicates() {
     for (layer, expected_id) in all_layers {
         let id = layer.layer_id();
         assert_eq!(id, expected_id, "Layer {:?} ID mismatch", layer);
-        assert!(
-            seen_ids.insert(id),
-            "Duplicate layer_id detected: {}",
-            id
-        );
+        assert!(seen_ids.insert(id), "Duplicate layer_id detected: {}", id);
     }
 }
 

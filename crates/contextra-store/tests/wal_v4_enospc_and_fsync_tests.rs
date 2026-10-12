@@ -22,7 +22,9 @@ async fn test_wal_v4_segment_preallocation_option() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal");
 
     let metadata_initial = fs::metadata(&wal_path).await.expect("metadata");
     assert!(
@@ -49,7 +51,9 @@ async fn test_wal_v4_fsync_failure_poisons_handle() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal");
 
     assert!(!wal.is_poisoned());
 

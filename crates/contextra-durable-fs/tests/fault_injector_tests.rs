@@ -102,9 +102,7 @@ fn test_no_fault_default_behavior() -> std::io::Result<()> {
     let no_fault = NoFault;
     assert!(no_fault.on_write(None, 100).is_ok());
     assert!(no_fault.on_fsync(None).is_ok());
-    assert!(no_fault
-        .on_rename(Path::new("a"), Path::new("b"))
-        .is_ok());
+    assert!(no_fault.on_rename(Path::new("a"), Path::new("b")).is_ok());
     assert!(no_fault.on_dir_fsync(Path::new(".")).is_ok());
     Ok(())
 }
@@ -172,7 +170,10 @@ fn test_durable_handle_fsync_failure_poisons_handle() -> std::io::Result<()> {
     let write_res = handle.write(b"data after poison");
     assert!(write_res.is_err());
     let err_msg = write_res.as_ref().err().map(|e| e.to_string());
-    assert!(err_msg.as_deref().unwrap_or("").contains("handle is poisoned"));
+    assert!(err_msg
+        .as_deref()
+        .unwrap_or("")
+        .contains("handle is poisoned"));
 
     let second_flush = handle.flush(FlushKind::DataAndMetadata);
     assert!(second_flush.is_err());
@@ -214,7 +215,10 @@ fn test_atomic_replace_rename_failure_propagation() -> std::io::Result<()> {
     };
 
     let res = atomic_replace_with_injector(&target, b"payload", &injector);
-    assert_eq!(res.err().map(|e| e.kind()), Some(ErrorKind::PermissionDenied));
+    assert_eq!(
+        res.err().map(|e| e.kind()),
+        Some(ErrorKind::PermissionDenied)
+    );
 
     Ok(())
 }
@@ -274,8 +278,13 @@ fn test_scrub_and_remove_injector_fault() -> std::io::Result<()> {
     let res = scrub_and_remove_with_injector(&target, &injector);
     assert!(res.is_err());
 
-    let res_safe =
-        scrub_if_safe_with_injector(&target, ScrubPolicy::OverwriteZeros, false, false, &injector);
+    let res_safe = scrub_if_safe_with_injector(
+        &target,
+        ScrubPolicy::OverwriteZeros,
+        false,
+        false,
+        &injector,
+    );
     assert!(res_safe.is_err());
 
     Ok(())

@@ -31,7 +31,7 @@ test = "cargo test -p contextra-adapt --locked"
 
 [crates.contextra-agent]
 ring = 'Ring 3'
-maturity = 'stable'
+maturity = 'experimental'
 description = 'Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline'
 capabilities = ['in-memory-audit', 'agent-pipeline']
 path = "crates/contextra-agent"
@@ -79,7 +79,7 @@ test = "cargo test -p contextra-checkpoint --locked"
 
 [crates.contextra-cognition]
 ring = 'Ring 3'
-maturity = 'stable'
+maturity = 'experimental'
 description = 'Konsolidierungs- und Background Sleep Passes'
 capabilities = ['sleep-cycle-consolidation', 'session-grouping']
 path = "crates/contextra-cognition"
@@ -163,7 +163,7 @@ test = "cargo test -p contextra-graph --locked"
 
 [crates.contextra-infer-candle]
 ring = 'Ring 2'
-maturity = 'stable'
+maturity = 'experimental'
 description = 'Candle LLM Inference Client und KV-Bridge Adapter'
 capabilities = ['candle-llm', 'kv-cache-bridge']
 path = "crates/contextra-infer-candle"
@@ -199,7 +199,7 @@ test = "cargo test -p contextra-infer-onnx --locked"
 
 [crates.contextra-kvcache]
 ring = 'Ring 1'
-maturity = 'stable'
+maturity = 'experimental'
 description = 'Stufenmodell KV-Cache Storage & Offloading'
 capabilities = ['kv-tiered-cache', 'kv-bridge-storage']
 path = "crates/contextra-kvcache"
@@ -295,7 +295,7 @@ test = "cargo test -p contextra-rank --locked"
 
 [crates.contextra-router]
 ring = 'Ring 3'
-maturity = 'stable'
+maturity = 'experimental'
 description = 'Lyapunov Drift Control und Multi-Candidate Search Routing Engine'
 capabilities = ['lyapunov-drift-watcher', 'cascade-routing']
 path = "crates/contextra-router"

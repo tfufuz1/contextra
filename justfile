@@ -50,15 +50,23 @@ agent-verify *ARGS:
 agent-submit *ARGS:
     cargo xtask jules submit {{ARGS}}
 
+# Executes kernel-tier verification pipeline
+verify *ARGS:
+    cargo xtask verify --tier kernel {{ARGS}}
+
+# Executes full-tier verification pipeline
+verify-full *ARGS:
+    cargo xtask verify --tier full {{ARGS}}
+
 # Checks environment toolchain attestations and optional cargo subcommands
 jules-env-check:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo xtask env-attest
-    cargo +nightly fuzz --version || echo "cargo-fuzz nicht in dieser VM installiert"
-    cargo mutants --version || echo "cargo-mutants nicht in dieser VM installiert"
-    cargo llvm-cov --version || echo "cargo-llvm-cov nicht in dieser VM installiert"
-    cargo insta --version || echo "cargo-insta nicht in dieser VM installiert"
+    cargo +nightly fuzz --version
+    cargo mutants --version
+    cargo llvm-cov --version
+    cargo insta --version
 
 # Runs a short fuzz smoke test for all targets in a crate
 fuzz-smoke CRATE SECONDS="5":

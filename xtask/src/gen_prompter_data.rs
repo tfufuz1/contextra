@@ -598,7 +598,10 @@ mod tests {
         // Determinismus-Test: Zwei Läufe liefern identische Ausgaben
         let json1 = serde_json::to_string_pretty(&data1).expect("Failed to serialize data1");
         let json2 = serde_json::to_string_pretty(&data2).expect("Failed to serialize data2");
-        assert_eq!(json1, json2, "Prompter data generation must be deterministic across calls");
+        assert_eq!(
+            json1, json2,
+            "Prompter data generation must be deterministic across calls"
+        );
 
         // Golden-Test: Alle Workspace Crates/Packages unter crates/ & benchmarks/ müssen enthalten sein
         let all_crates = get_workspace_crates();

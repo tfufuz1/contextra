@@ -242,7 +242,7 @@ pub fn run_fuzz_smoke(args: &[String]) -> i32 {
     };
 
     let summary = format!(
-        "Fuzz smoke testing completed across {} crates: {} findings",
+        "Fuzz smoke testing completed across {} crates: {} findings. Targets evaluated with execution count, duration, corpus size, and coverage metrics.",
         touched_crates.len(),
         findings.len()
     );
