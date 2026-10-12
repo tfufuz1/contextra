@@ -79,8 +79,7 @@ async fn test_witness_reader_differential_against_production_reader() {
         let prod_entries = prod_reader.iter().await.expect("prod iter");
 
         // Read using WitnessReader
-        let mut witness_reader =
-            WitnessReader::open(&sst_path, None).expect("open witness reader");
+        let mut witness_reader = WitnessReader::open(&sst_path, None).expect("open witness reader");
         let witness_first_key = witness_reader
             .read_first_key()
             .expect("witness read_first_key");
@@ -114,14 +113,8 @@ async fn test_witness_reader_differential_against_production_reader() {
             prod_entries.iter().zip(witness_entries.iter()).enumerate()
         {
             assert_eq!(p_key, &w_entry.key, "Run {run} idx {idx}: Key mismatch");
-            assert_eq!(
-                p_val, &w_entry.value,
-                "Run {run} idx {idx}: Value mismatch"
-            );
-            assert_eq!(
-                *p_seq, w_entry.seq_no,
-                "Run {run} idx {idx}: Seq mismatch"
-            );
+            assert_eq!(p_val, &w_entry.value, "Run {run} idx {idx}: Value mismatch");
+            assert_eq!(*p_seq, w_entry.seq_no, "Run {run} idx {idx}: Seq mismatch");
             assert_eq!(
                 (*p_seq & contextra_core::TOMBSTONE_BIT) != 0,
                 w_entry.is_tombstone,

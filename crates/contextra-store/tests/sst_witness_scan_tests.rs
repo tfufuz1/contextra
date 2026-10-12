@@ -2,9 +2,7 @@
 // STAND: 2026-10-08 (T-2026-9104)
 // ZWECK: Injektionsmatrix-Tests (Zeilen 4–12) für den SSTable Witness Scanner.
 
-use contextra_store::sstable::{
-    scan_sstables, SstableBuilder, SstScanInputs, SstScopeSpec,
-};
+use contextra_store::sstable::{scan_sstables, SstScanInputs, SstScopeSpec, SstableBuilder};
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -47,12 +45,7 @@ async fn test_matrix_line_5_older_value_in_ln_shadowed_by_tombstone_in_l0_contro
     let l0_path = dir.path().join("sst_l0.sst");
     let mut l0_builder = SstableBuilder::create(&l0_path).await.expect("l0 builder");
     l0_builder
-        .add(
-            b"user_2002",
-            b"",
-            20 | contextra_core::TOMBSTONE_BIT,
-            200,
-        )
+        .add(b"user_2002", b"", 20 | contextra_core::TOMBSTONE_BIT, 200)
         .await
         .expect("add tombstone");
     l0_builder.finish().await.expect("finish l0");
@@ -106,12 +99,7 @@ async fn test_matrix_line_6_only_tombstone() {
 
     let mut builder = SstableBuilder::create(&sst_path).await.expect("builder");
     builder
-        .add(
-            b"user_3003",
-            b"",
-            50 | contextra_core::TOMBSTONE_BIT,
-            500,
-        )
+        .add(b"user_3003", b"", 50 | contextra_core::TOMBSTONE_BIT, 500)
         .await
         .expect("add tombstone");
     builder.finish().await.expect("finish");
@@ -239,9 +227,12 @@ async fn test_matrix_line_10_old_manifest_file() {
     let dir = tempdir().expect("tempdir");
 
     let old_manifest_path = dir.path().join("MANIFEST.old");
-    tokio::fs::write(&old_manifest_path, b"header_data_prefix_secret_target_footer")
-        .await
-        .expect("write old manifest");
+    tokio::fs::write(
+        &old_manifest_path,
+        b"header_data_prefix_secret_target_footer",
+    )
+    .await
+    .expect("write old manifest");
 
     let scope = SstScopeSpec {
         explicit: vec![],
@@ -268,9 +259,12 @@ async fn test_matrix_line_11_corrupted_footer_file() {
     let dir = tempdir().expect("tempdir");
 
     let corrupt_sst_path = dir.path().join("corrupt.sst");
-    tokio::fs::write(&corrupt_sst_path, b"invalid_corrupt_sst_data_without_footer")
-        .await
-        .expect("write corrupt");
+    tokio::fs::write(
+        &corrupt_sst_path,
+        b"invalid_corrupt_sst_data_without_footer",
+    )
+    .await
+    .expect("write corrupt");
 
     let scope = SstScopeSpec {
         explicit: vec![b"any_key".to_vec()],
@@ -289,7 +283,10 @@ async fn test_matrix_line_11_corrupted_footer_file() {
     let evidence = scan_sstables(&scope, &inputs, None, || 1).expect("scan");
 
     assert_eq!(evidence.unclassified_files, 1);
-    assert!(evidence.invariant_violations().iter().any(|v| v.contains("Fail-closed")));
+    assert!(evidence
+        .invariant_violations()
+        .iter()
+        .any(|v| v.contains("Fail-closed")));
 }
 
 #[tokio::test]
@@ -318,5 +315,8 @@ async fn test_matrix_line_12_unknown_file_in_data_directory() {
     let evidence = scan_sstables(&scope, &inputs, None, || 1).expect("scan");
 
     assert_eq!(evidence.unclassified_files, 1);
-    assert!(evidence.invariant_violations().iter().any(|v| v.contains("Fail-closed")));
+    assert!(evidence
+        .invariant_violations()
+        .iter()
+        .any(|v| v.contains("Fail-closed")));
 }

@@ -11,7 +11,8 @@ use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_g15_wal_tail_delete_truncation_with_sstable_tombstone() -> Result<(), ContextraError> {
+async fn test_g15_wal_tail_delete_truncation_with_sstable_tombstone() -> Result<(), ContextraError>
+{
     let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

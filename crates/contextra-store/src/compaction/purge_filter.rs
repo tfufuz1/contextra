@@ -28,7 +28,9 @@ impl PurgeScope {
     pub fn matches_key(&self, key: &[u8]) -> bool {
         match self {
             PurgeScope::Keys(keys) => keys.iter().any(|k| k.as_slice() == key),
-            PurgeScope::Prefixes(prefixes) => prefixes.iter().any(|p| key.starts_with(p.as_slice())),
+            PurgeScope::Prefixes(prefixes) => {
+                prefixes.iter().any(|p| key.starts_with(p.as_slice()))
+            }
         }
     }
 }

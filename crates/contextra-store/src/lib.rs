@@ -21,9 +21,13 @@
 #![forbid(unsafe_code)]
 #![allow(unexpected_cfgs)]
 
+pub mod blob;
 #[cfg(not(loom))]
 pub mod compaction;
+pub mod copy_registry;
 pub mod engine;
+pub mod erasure_ledger;
+pub mod format;
 pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -37,8 +41,6 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
-pub mod copy_registry;
-pub mod erasure_ledger;
 pub(crate) mod util;
 pub mod wal;
 

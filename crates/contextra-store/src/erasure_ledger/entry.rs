@@ -43,11 +43,7 @@ impl Drop for LedgerKey {
 }
 
 /// Computes the keyed BLAKE3 pseudonym hash for a key or prefix under a storage scope.
-pub fn compute_keyed_hash(
-    key: &LedgerKey,
-    storage_scope: &[u8],
-    bytes: &[u8],
-) -> [u8; 32] {
+pub fn compute_keyed_hash(key: &LedgerKey, storage_scope: &[u8], bytes: &[u8]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new_keyed(key.as_bytes());
     hasher.update(ERASED_LEDGER_DOMAIN);
     hasher.update(storage_scope);
@@ -210,11 +206,7 @@ pub enum FrameReadResult {
 }
 
 /// Reads and validates a single frame from `bytes` starting at offset `0`.
-pub fn parse_frame(
-    key: &LedgerKey,
-    prev_mac: &[u8; 32],
-    bytes: &[u8],
-) -> FrameReadResult {
+pub fn parse_frame(key: &LedgerKey, prev_mac: &[u8; 32], bytes: &[u8]) -> FrameReadResult {
     if bytes.len() < 4 {
         return FrameReadResult::TruncatedTail {
             bytes_read: bytes.len(),
@@ -232,7 +224,10 @@ pub fn parse_frame(
 
     if len > MAX_LEDGER_PAYLOAD_SIZE {
         return FrameReadResult::Corrupt {
-            reason: format!("Frame payload length {} exceeds max allowed {}", len, MAX_LEDGER_PAYLOAD_SIZE),
+            reason: format!(
+                "Frame payload length {} exceeds max allowed {}",
+                len, MAX_LEDGER_PAYLOAD_SIZE
+            ),
         };
     }
 
@@ -243,7 +238,10 @@ pub fn parse_frame(
 
     if stored_crc != computed_crc {
         return FrameReadResult::Corrupt {
-            reason: format!("CRC mismatch: stored={:#010x}, computed={:#010x}", stored_crc, computed_crc),
+            reason: format!(
+                "CRC mismatch: stored={:#010x}, computed={:#010x}",
+                stored_crc, computed_crc
+            ),
         };
     }
 

@@ -11,9 +11,10 @@ async fn test_ledger_append_and_open() {
     let master_secret = [42u8; 32];
     let key = LedgerKey::derive_from_master_secret(&master_secret);
 
-    let (ledger_opt, status) = ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), false, None)
-        .await
-        .unwrap();
+    let (ledger_opt, status) =
+        ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), false, None)
+            .await
+            .unwrap();
 
     assert_eq!(status, LedgerOpenStatus::Fresh);
     let mut ledger = ledger_opt.unwrap();
@@ -34,12 +35,16 @@ async fn test_ledger_append_and_open() {
         proof_id: [2u8; 16],
     };
 
-    ledger.append(&[entry1.clone(), entry2.clone()]).await.unwrap();
-
-    // Reopen ledger
-    let (reopened_opt, status2) = ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
+    ledger
+        .append(&[entry1.clone(), entry2.clone()])
         .await
         .unwrap();
+
+    // Reopen ledger
+    let (reopened_opt, status2) =
+        ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
+            .await
+            .unwrap();
 
     assert_eq!(status2, LedgerOpenStatus::Ok);
     let reopened = reopened_opt.unwrap();
@@ -77,9 +82,10 @@ async fn test_torn_write_tail_truncation() {
     tokio::fs::write(&ledger_path, &file_bytes).await.unwrap();
 
     // Reopen - should heal tail truncation gracefully
-    let (healed_opt, status) = ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
-        .await
-        .unwrap();
+    let (healed_opt, status) =
+        ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
+            .await
+            .unwrap();
 
     assert_eq!(status, LedgerOpenStatus::Ok);
     let healed = healed_opt.unwrap();
@@ -120,9 +126,10 @@ async fn test_tampered_middle_frame_fails_closed() {
     tokio::fs::write(&ledger_path, &file_bytes).await.unwrap();
 
     // Reopen - should fail closed with Corrupt
-    let (corrupt_opt, status) = ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
-        .await
-        .unwrap();
+    let (corrupt_opt, status) =
+        ErasureLedger::open_or_fail_closed(dir.path(), key.clone(), true, None)
+            .await
+            .unwrap();
 
     assert!(corrupt_opt.is_none());
     match status {

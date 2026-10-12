@@ -5,9 +5,7 @@
 
 use super::witness_inventory::SstInventory;
 use super::witness_reader::WitnessReader;
-use super::witness_types::{
-    SstScanEvidence, SstScanInputs, SstScopeSpec, WitnessReadError,
-};
+use super::witness_types::{SstScanEvidence, SstScanInputs, SstScopeSpec, WitnessReadError};
 use crate::wal::KeyManager;
 use std::fs;
 use std::sync::Arc;
@@ -63,11 +61,7 @@ where
         let metadata = reader.metadata();
 
         // Step 3: Range Pruning
-        if !key_range_overlaps_scope(
-            &metadata.first_key,
-            &metadata.last_key,
-            scope,
-        ) {
+        if !key_range_overlaps_scope(&metadata.first_key, &metadata.last_key, scope) {
             evidence.files_pruned_with_verified_range += 1;
             continue;
         }
@@ -192,5 +186,7 @@ fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
     if needle.is_empty() || haystack.len() < needle.len() {
         return false;
     }
-    haystack.windows(needle.len()).any(|window| window == needle)
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
 }

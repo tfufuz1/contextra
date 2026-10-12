@@ -52,9 +52,8 @@ impl SstInventory {
                 continue;
             }
 
-            let entries = fs::read_dir(data_dir).map_err(|e| {
-                WitnessReadError::Io(format!("Failed to read data directory: {e}"))
-            })?;
+            let entries = fs::read_dir(data_dir)
+                .map_err(|e| WitnessReadError::Io(format!("Failed to read data directory: {e}")))?;
 
             for entry in entries {
                 let entry = entry.map_err(|e| {
@@ -89,7 +88,10 @@ impl SstInventory {
                     || file_name.starts_with("MANIFEST-")
                 {
                     inventory.old_manifest.push(path);
-                } else if file_name == "MANIFEST" || file_name.ends_with(".wal") || file_name.contains(".uuid") {
+                } else if file_name == "MANIFEST"
+                    || file_name.ends_with(".wal")
+                    || file_name.contains(".uuid")
+                {
                     // Active manifest or active WAL file - valid system files, not orphans or unknown
                     continue;
                 } else {

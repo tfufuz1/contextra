@@ -6,6 +6,7 @@ use super::bloom::BloomFilter;
 use super::builder::SstableMetadata;
 use super::io::pread_exact;
 use super::stream::SstableStream;
+use crate::format::{check_openable, FileKind, FormatHeader};
 use crate::wal::KeyManager;
 use bytes::Bytes;
 use contextra_core::{ContextraError, Result};
@@ -352,12 +353,20 @@ impl SstableReader {
             }
         }
 
-        // Unknown format version error check (supports versions up to v4)
-        if is_mfsx && format_version > 4 {
-            return Err(ContextraError::Storage(format!(
-                "Unsupported SSTable format version: {}",
-                format_version
-            )));
+        if is_mfsx {
+            let header = FormatHeader::new(*b"MFSX", format_version);
+            check_openable(FileKind::Sstable, &header, 4)?;
+
+            if let Some(parent) = path_buf.parent() {
+                let manifest_path = parent.join("MANIFEST");
+                if manifest_path.exists() {
+                    if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
+                        let tracker =
+                            crate::manifest::ManifestFormatTracker::from_entries(&entries);
+                        tracker.verify_file_version(FileKind::Sstable, format_version)?;
+                    }
+                }
+            }
         }
 
         let mut has_bloom = false;

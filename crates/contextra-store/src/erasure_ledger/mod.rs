@@ -360,9 +360,9 @@ impl ErasureLedger {
     }
 
     async fn read_head_marker(path: &Path) -> Result<([u8; 16], [u8; 32])> {
-        let bytes = tokio::fs::read(path).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to read head marker: {}", e))
-        })?;
+        let bytes = tokio::fs::read(path)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read head marker: {}", e)))?;
 
         if bytes.len() != 4 + 16 + 32 || &bytes[0..4] != b"ELDG" {
             return Err(ContextraError::Storage("Corrupt head marker".into()));

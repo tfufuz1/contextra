@@ -25,9 +25,7 @@ impl LsmStorage {
         }
 
         // 2. Space probe check
-        let free_space = space_probe
-            .and_then(|p| p.free_space_bytes())
-            .unwrap_or(0);
+        let free_space = space_probe.and_then(|p| p.free_space_bytes()).unwrap_or(0);
 
         if free_space == 0 {
             return Err(PurgeBlocked::InsufficientDiskSpace {

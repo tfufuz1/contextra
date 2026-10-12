@@ -7,9 +7,9 @@
 macro_rules! purge_failpoint {
     ($name:expr) => {
         if std::env::var(concat!("PURGE_FAILPOINT_", $name)).is_ok() {
-            return Err($crate::compaction::purge_filter::PurgeBlocked::UnclassifiedFiles {
-                count: 999,
-            });
+            return Err(
+                $crate::compaction::purge_filter::PurgeBlocked::UnclassifiedFiles { count: 999 },
+            );
         }
     };
 }

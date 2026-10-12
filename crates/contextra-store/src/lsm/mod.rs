@@ -82,9 +82,9 @@ pub mod witness;
 
 pub mod commit;
 pub mod fence;
-pub mod purge;
 pub mod flush;
 pub mod group_commit;
+pub mod purge;
 pub mod recovery;
 pub mod scan;
 

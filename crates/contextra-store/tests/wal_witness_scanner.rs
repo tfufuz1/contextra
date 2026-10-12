@@ -4,9 +4,7 @@
 //! 16 (archived segment), and a clean control scan.
 
 use contextra_core::{ContextraError, TxId};
-use contextra_store::wal::{
-    scan_wal_directory, Wal, WalOp, WalScanInputs, WalScopeSpec,
-};
+use contextra_store::wal::{scan_wal_directory, Wal, WalOp, WalScanInputs, WalScopeSpec};
 use std::time::Duration;
 use tempfile::tempdir;
 
@@ -43,7 +41,9 @@ async fn test_scanner_control_clean_wal() -> Result<(), ContextraError> {
         || evidence.frames_matching_scope != 0
         || !evidence.is_valid()
     {
-        return Err(ContextraError::Storage("scan_clean_wal evidence mismatch".into()));
+        return Err(ContextraError::Storage(
+            "scan_clean_wal evidence mismatch".into(),
+        ));
     }
 
     Ok(())
@@ -94,7 +94,8 @@ async fn test_scanner_injection_line_14_sealed_segment_with_scope() -> Result<()
 }
 
 #[tokio::test]
-async fn test_scanner_injection_line_15_marker_behind_logical_eof_cleartext() -> Result<(), ContextraError> {
+async fn test_scanner_injection_line_15_marker_behind_logical_eof_cleartext(
+) -> Result<(), ContextraError> {
     let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let wal_path = dir.path().join("tail_marker.wal");
 
@@ -141,7 +142,8 @@ async fn test_scanner_injection_line_15_marker_behind_logical_eof_cleartext() ->
 }
 
 #[tokio::test]
-async fn test_scanner_injection_line_16_archived_segment_with_scope() -> Result<(), ContextraError> {
+async fn test_scanner_injection_line_16_archived_segment_with_scope() -> Result<(), ContextraError>
+{
     let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let wal_path = dir.path().join("segment1.wal.archived");
 
@@ -167,10 +169,7 @@ async fn test_scanner_injection_line_16_archived_segment_with_scope() -> Result<
 
     let evidence = scan_wal_directory(&inputs).await?;
 
-    if evidence.segments_total != 1
-        || evidence.frames_matching_scope == 0
-        || evidence.is_valid()
-    {
+    if evidence.segments_total != 1 || evidence.frames_matching_scope == 0 || evidence.is_valid() {
         return Err(ContextraError::Storage("injection 16 mismatch".into()));
     }
 

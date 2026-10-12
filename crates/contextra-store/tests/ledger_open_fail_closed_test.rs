@@ -111,12 +111,15 @@ async fn test_replaced_older_ledger_fails_closed() {
     let head_after_e2 = ledger.last_chain_mac().clone();
 
     // Revert erasure.ledger to older_ledger_bytes (simulating rollback of ledger file)
-    tokio::fs::write(&ledger_path, &older_ledger_bytes).await.unwrap();
-
-    // Reopen expecting head_after_e2
-    let (reopened, status) = ErasureLedger::open_or_fail_closed(dir.path(), key, true, Some(head_after_e2))
+    tokio::fs::write(&ledger_path, &older_ledger_bytes)
         .await
         .unwrap();
+
+    // Reopen expecting head_after_e2
+    let (reopened, status) =
+        ErasureLedger::open_or_fail_closed(dir.path(), key, true, Some(head_after_e2))
+            .await
+            .unwrap();
 
     assert!(reopened.is_none());
     match status {

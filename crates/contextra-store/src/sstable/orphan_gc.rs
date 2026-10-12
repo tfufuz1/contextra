@@ -26,10 +26,7 @@ pub struct OrphanGcReceipt {
 /// Plans orphan and temp file removal, excluding any files associated with running operations.
 /// UNKNOWN files are NEVER included in the removal plan!
 pub fn plan_orphan_removal(inventory: &SstInventory, running_ops: &[PathBuf]) -> OrphanPlan {
-    let running_set: HashSet<PathBuf> = running_ops
-        .iter()
-        .map(|p| normalize_path(p))
-        .collect();
+    let running_set: HashSet<PathBuf> = running_ops.iter().map(|p| normalize_path(p)).collect();
 
     let mut files_to_remove = Vec::new();
 

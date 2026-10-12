@@ -348,7 +348,6 @@ impl StorageEngineHandle for LsmStorage {
     }
 }
 
-
 impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
     fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
         (**self).get_handle(key)
@@ -530,14 +529,8 @@ impl<S> TenantScopedStorage<S> {
     where
         S: StorageEngineHandle,
     {
-        let physical_keys: Vec<Vec<u8>> = deleted_keys
-            .iter()
-            .map(|k| self.make_key(k))
-            .collect();
-        let physical_prefixes: Vec<Vec<u8>> = prefixes
-            .iter()
-            .map(|p| self.make_key(p))
-            .collect();
+        let physical_keys: Vec<Vec<u8>> = deleted_keys.iter().map(|k| self.make_key(k)).collect();
+        let physical_prefixes: Vec<Vec<u8>> = prefixes.iter().map(|p| self.make_key(p)).collect();
         self.inner
             .issue_memtable_witness_handle(&physical_keys, &physical_prefixes, as_of_tx)
             .await
