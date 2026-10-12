@@ -28,7 +28,6 @@ fn generate_content(doc_idx: usize) -> String {
     )
 }
 
-
 fn bench_write_throughput(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let write_sizes = [100, 1_000, 10_000];
