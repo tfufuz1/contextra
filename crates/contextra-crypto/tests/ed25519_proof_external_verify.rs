@@ -11,7 +11,7 @@ use rand::{Rng, RngCore, SeedableRng};
 #[test]
 fn test_round_trip_external_verify() {
     let mut rng = StdRng::seed_from_u64(12345);
-    let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
 
     let verifying_key_bytes = keypair.verifying_key_bytes();
     let payload = b"canonical_proof_payload_for_external_auditor_v3";
@@ -29,7 +29,7 @@ fn test_round_trip_external_verify() {
 #[test]
 fn test_negative_tampered_payload_fails_verification() {
     let mut rng = StdRng::seed_from_u64(54321);
-    let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
 
     let verifying_key_bytes = keypair.verifying_key_bytes();
     let mut payload = b"canonical_proof_payload_for_external_auditor_v3".to_vec();
@@ -49,8 +49,8 @@ fn test_negative_tampered_payload_fails_verification() {
 #[test]
 fn test_negative_wrong_verifying_key_fails_verification() {
     let mut rng = StdRng::seed_from_u64(99999);
-    let keypair_signer = DeletionProofKeyPair::generate(&mut rng);
-    let keypair_other = DeletionProofKeyPair::generate(&mut rng);
+    let keypair_signer = DeletionProofKeyPair::generate_with_rng(&mut rng);
+    let keypair_other = DeletionProofKeyPair::generate_with_rng(&mut rng);
 
     let wrong_verifying_key_bytes = keypair_other.verifying_key_bytes();
     let payload = b"canonical_proof_payload_for_external_auditor_v3";
@@ -68,7 +68,7 @@ fn test_negative_wrong_verifying_key_fails_verification() {
 fn test_property_like_random_payloads_with_injected_rng() {
     // Contextra-Konvention P28: Injizierte RNGs, KEIN rand::thread_rng()
     let mut rng = StdRng::seed_from_u64(0xDEADBEEF);
-    let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
     let vk_bytes = keypair.verifying_key_bytes();
 
     for i in 0..10 {

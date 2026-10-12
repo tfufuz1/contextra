@@ -77,19 +77,39 @@ impl ProofKeyPairSigner {
         Ok(())
     }
 
-    /// Loads a keypair from a file, verifying strict 0600 permissions.
+    /// Loads a keypair from a file, verifying strict 0600 permissions and rejecting symlinks and wrong owners.
     pub fn load_from_file(path: &Path) -> Result<Self> {
+        let symlink_meta = std::fs::symlink_metadata(path)
+            .map_err(|e| CryptoError::Crypto(format!("Failed to read key file metadata: {e}")))?;
+
+        if symlink_meta.file_type().is_symlink() {
+            return Err(CryptoError::Crypto(
+                "Refusing to load key file: path is a symbolic link".to_string(),
+            ));
+        }
+
         #[cfg(unix)]
         {
+            use std::os::unix::fs::MetadataExt;
             use std::os::unix::fs::PermissionsExt;
-            let metadata = std::fs::metadata(path).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to read key file metadata: {e}"))
-            })?;
-            let mode = metadata.permissions().mode() & 0o777;
+
+            let mode = symlink_meta.permissions().mode() & 0o777;
             if mode != 0o600 {
                 return Err(CryptoError::Crypto(format!(
                     "Key file permissions too permissive (0{:o}); required 0600 fail-closed",
                     mode
+                )));
+            }
+
+            let file_uid = symlink_meta.uid();
+            let current_uid = std::env::var("USER_ID")
+                .ok()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1000);
+            if file_uid != current_uid && file_uid != 0 {
+                return Err(CryptoError::Crypto(format!(
+                    "Key file ownership mismatch: owned by UID {}, running as UID {}",
+                    file_uid, current_uid
                 )));
             }
         }
@@ -107,6 +127,33 @@ impl ProofKeyPairSigner {
         let mut secret = [0u8; 32];
         secret.copy_from_slice(&raw_bytes);
         Ok(Self::from_secret_bytes(secret))
+    }
+
+    /// Verifies a chain of key rotation attestations from `trusted_root_pubkey` down to the active key_id.
+    pub fn verify_rotation_chain(
+        attestations: &[ProofRotationAttestation],
+        trusted_root_pubkey: &[u8; 32],
+    ) -> Result<[u8; 32]> {
+        if attestations.is_empty() {
+            let root_key_id = *blake3::hash(trusted_root_pubkey).as_bytes();
+            return Ok(root_key_id);
+        }
+
+        let mut current_key_id = *blake3::hash(trusted_root_pubkey).as_bytes();
+
+        for att in attestations {
+            if att.old_key_id != current_key_id {
+                return Err(CryptoError::Crypto(format!(
+                    "Rotation chain broken: expected old_key_id {:?}, got {:?}",
+                    current_key_id, att.old_key_id
+                )));
+            }
+
+            att.verify(trusted_root_pubkey)?;
+            current_key_id = att.new_key_id;
+        }
+
+        Ok(current_key_id)
     }
 
     /// Attests the rotation to a new signer's `key_id`, signed by this signer.
