@@ -4,9 +4,9 @@
 **Status dieses Dokuments:** Es **ersetzt alle früheren Spezifikationen** (v4, v8, v9, v10, v11). Es enthält (1) den **IST-Zustand**, also alles, was im Quellcode implementiert ist, und (2) den **SOLL-Zustand**, also alles, was noch zu implementieren oder zu entscheiden ist. Befunde zu vorübergehenden Fehlern sind bewusst nicht enthalten. Wo früher ein Fehler stand, steht jetzt die Soll-Anforderung als Invariante.
 > **v15 (30.09.2026, vollständiges Inventar):** Neu sind **Teil K** (API- und Feature-Inventar aller 33 Crates, Tool- und Env-Verzeichnis, Aktualisierungen U-01…U-12 gegen HEAD `b564e830`) und **Teil L** (Verhaltensspezifikation bisher unbeschriebener Subsysteme). Die Teile 0–J bleiben unverändert; Widersprüche löst K.0.1.
 >
-> **v14 (30.09.2026, SOLL ergänzt):** Teil J spezifiziert den SOLL-Zustand aus `CONTEXTRA_SPEZIFIKATION_4_1_.md` und den offenen Punkten aus G/H/I, jeweils mit IST-Status gegen HEAD `81ab98a`.
+> **v14 (30.09.2026, SOLL ergänzt):** Teil J spezifiziert den SOLL-Zustand aus `CONTEXTRA_SPEZIFIKATION_4_1_.md` und den offenen Punkten aus G/H/I, jeweils mit IST-Status gegen HEAD `81ab98a`. <!-- doc-ref-ignore -->
 >
-> **v14 (30.09.2026):** Erweiterung von v13 um **Teil I** (Nachspezifikation der Funktionen aus `CONTEXTRA_SPEC_LUECKENLISTE.md`, geprüft gegen HEAD `81ab98a`). Korrigiert außerdem Aussagen des QA-Katalogs (I.0).
+> **v14 (30.09.2026):** Erweiterung von v13 um **Teil I** (Nachspezifikation der Funktionen aus `CONTEXTRA_SPEC_LUECKENLISTE.md`, geprüft gegen HEAD `81ab98a`). Korrigiert außerdem Aussagen des QA-Katalogs (I.0). <!-- doc-ref-ignore -->
 >
 > **v13 (30.09.2026):** Erweiterung von v12. Der Text der Teile 0–F bleibt erhalten; verifizierte Korrekturen stehen dort direkt im Text und gesammelt in **Teil G**. Neu sind **Teil G** (Erweiterungen und Korrekturen gegen HEAD `e4d84c9`) und **Teil H** (Stand: Status-Board, Plan-Abgleich, Termine). Teil C bleibt gegen HEAD `3f9d2df` abgeglichen (siehe G.1).
 
@@ -81,7 +81,7 @@ Framework-Adapter per PyO3 · Python-FFI als Kernbestandteil · externe HTTP-Inf
 - **F-02** (bedingt akzeptiert, Review fällig **2026-10-07**): nur Tombstone-Pruning, kein partielles HNSW-Rewiring. Spannung: Feature `partial-index-rebuild` existiert im Vector-Crate.
 - **F-10** (dauerhaft abgelehnt): keine mandantenübergreifenden Datenflüsse.
 - **OP-03** (bedingt, Review 2026-10-07): keine Realtime-Audio/STT/Voice-Funktionen.
-- **VETO-ADR:** Vetos/Isolationsgrenzen nur per ADR in `DECISIONS.md` umgehbar.
+- **VETO-ADR:** Vetos/Isolationsgrenzen nur per ADR in `DECISIONS.md` umgehbar. <!-- doc-ref-ignore -->
 
 Weitere Governance-Artefakte: `CONSTITUTION.md`, `governance/` (ratchet, determinism-baseline, protected-paths, unsafe-safety-baseline, verdict-required), `docs/gates`, `docs/decisions`, `supply-chain/`, `deny.toml`.
 
@@ -295,9 +295,9 @@ Hierarchical Navigable Small World, Eigenimplementierung.
 | WAL-Observer/CDC (C.4.2) | ✅ IST | `contextra-store::lsm::observer`: `WalObserver`, `WriteOrigin` (`UserWrite`, …), `register_observer/deregister_observer`, `DEFAULT_MAX_OBSERVER_LATENCY = 1 ms`; Konsument: `contextra-agent::event_source` (Polling mit `last_seen_seq`) **[V]** |
 | Merge-Operatoren (C.4.3.2) | 🟡 TEIL | `MergeOperator`-Trait (`merge(existing_val, new_val)`, Fail-Safe-Vorgabe: bei Fehler beide Versionen behalten) in `contextra-store`; `MergeOperatorCapabilities::pure()` in `contextra-sandbox` **[V]**. WASM-gestützte Operator-Implementierung im Compaction-Pfad: **[?]** |
 | TTL (C.4.3.1) | ✅ IST (anders als spezifiziert) | Entscheidung „Option B": `TtlMetadata` ist ein leerer Stub; TTL läuft **sequenzbasiert** über Metadatum `__expires_at_seq` und `start_expiry_cleanup_worker` (Engine). Nanosekunden-TTL in der Compaction wurde verworfen **[V]** |
-| `Checkpointer` mit direkter Systemzeit (INV-CHECKPOINT-DETERMINISM-1) | 🟡 TEIL (korrigiert in v14, siehe J.3) | `contextra-store/src/checkpoint.rs` existiert nicht mehr; Checkpointing liegt in `contextra-checkpoint` **[V]** |
+| `Checkpointer` mit direkter Systemzeit (INV-CHECKPOINT-DETERMINISM-1) | 🟡 TEIL (korrigiert in v14, siehe J.3) | `contextra-store/src/checkpoint.rs` existiert nicht mehr; Checkpointing liegt in `contextra-checkpoint` **[V]** | <!-- doc-ref-ignore -->
 | Legacy-HMAC-Schlüssel (INV-WAL-LEGACY-KEY-1) | 🟡 TEIL | Fallback per `allow_legacy_integrity_key_fallback` (Default `false`), einmalige Warnung bei Nutzung; der obfuskierte Legacy-Schlüssel ist noch im Code → Entfernung siehe D.2 **[V]** |
-| WAL-Truncation-Schutz per Manifest-High-Water-Mark (INV-WAL-TRUNCATION-1) | ✅ IST | `Manifest::extract_high_water_mark(entries) -> Option<[u8;32]>`, genutzt in `lsm/recovery.rs` **[V]** |
+| WAL-Truncation-Schutz per Manifest-High-Water-Mark (INV-WAL-TRUNCATION-1) | ✅ IST | `Manifest::extract_high_water_mark(entries) -> Option<[u8;32]>`, genutzt in `crates/contextra-store/src/lsm/recovery.rs` **[V]** |
 | SSI-Read-Set-Tracking (INV-MVCC-SSI-1) | ✅ IST | `contextra-mvcc::ssi::SequenceLogSsiValidator`, Test `ssi_write_skew.rs` **[V]** |
 | Egress-Audit-Trace (INV-EGRESS-AUDIT-1) | ✅ IST | `EgressClassifierTrace` in `contextra-privacy::audit_trace` **[V/D]** |
 | Einzige Definition von `hash_deleted_keys_length_prefixed` (INV-CRYPTO-DUPLICATE-1) | ✅ IST | genau eine Definition in `contextra-crypto/src/deletion_proof.rs` **[V]** |
@@ -306,7 +306,7 @@ Hierarchical Navigable Small World, Eigenimplementierung.
 | Transitivitäts-Veto (INV-DEDUP-TRANSITIVITY-1) | ✅ IST | `transitivity_veto::filter_candidates_with_transitivity_veto` **[V]** |
 | APPRH als Shadow-Kandidat | ✅ IST | Feature `apprh-diffusion`, `ApprhMode{Off,Shadow,Production}`, Gate-Monitor **[V]** |
 | Anti-Windup PID (INV-PID-ANTIWINDUP-1) | ✅ IST | `MAX_INTEGRAL = 10.0` Clamp **[V]** |
-| Engine-Invarianten-Tests | ✅ IST | `invariant_durability/isolation/determinism/tenant_isolation.rs` **[V]** |
+| Engine-Invarianten-Tests | ✅ IST | `invariant_durability/isolation/determinism/tenant_isolation.rs` **[V]** | <!-- doc-ref-ignore -->
 | Markenidentität bereinigt | ✅ IST | kein Vorkommen des Vorgängernamens in `.rs`-Dateien **[V]** |
 | Schlüssel-Env, `explain`-Tool, 15 MCP-Tools | ✅ IST | siehe B.9 |
 
@@ -344,7 +344,7 @@ Nach Abschluss der Migration alter WAL-Dateien wird `LEGACY_INTEGRITY_KEY_OBFUSC
 - 🔵 WASM-gestützter `MergeOperator` im Compaction-Pfad vollständig verdrahten: rein (kein I/O, keine `Clock`, kein `Rng`), `max_fuel` (Default 10.000.000) und Wall-Clock-Timeout; bei `FuelExhausted` beide Versionen behalten.
 - ⏸ Cursor-persistente CDC-Subscriber-API (überlebt Neustarts) und externer Kafka-artiger Export als Ring-4-Adapter.
 - ⏸ Copy-Fallback für Hardlink-Klone jenseits der Windows-Grenze (bewusst nicht implementiert; nur bei Bedarf).
-- 🔵 Dokumentationsauflage: asymmetrische Lock-Stärke (`write` vs. `read` auf `LsmState`) für `apply_mem_updates` zwischen Single- und Group-Commit-Pfad in `lsm/commit.rs` begründen oder angleichen.
+- 🔵 Dokumentationsauflage: asymmetrische Lock-Stärke (`write` vs. `read` auf `LsmState`) für `apply_mem_updates` zwischen Single- und Group-Commit-Pfad in `crates/contextra-store/src/lsm/commit.rs` begründen oder angleichen.
 - 🔵 Metrik `blocking_util` soll die Auslastung des Blocking-Pools messen (IST: Queue-Tiefe **[?]**).
 
 ## D.5 Retrieval (P2)
@@ -448,13 +448,13 @@ Belegmarker wie oben. Zusätzlich **[V-30.09]**: am 30.09.2026 im Klon von HEAD 
 | G1-1 | B.3.1: `partial-index-rebuild` sei Default-Feature | Falsch. `contextra-vector/Cargo.toml`: `default = []`; das Feature trägt den Kommentar zu F-02. Die Spannung F-02 ↔ Feature bleibt, aber als Opt-in | V-30.09 |
 | G1-2 | B.6: sieben `DeletionLayer` | Bestätigt: `LsmMemtable`, `SsTableAllLevels`, `HnswIndex`, `WalAllSegments{seq_after}`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`; `ExcludedScope`: `ConsolidatedAndDistilled`, `LlmParameterMemory` | V-30.09 |
 | G1-3 | D.7 / INV-MCP-CLASSIFY-1: `contextra_explain` nicht klassifiziert | **Weiter offen.** `classify_method` in `contextra-mcp/src/sandbox.rs` enthält kein `explain`; der Default-Zweig liefert `CodeExecution`. Bei `allow_code_execution=false` scheitert das gelistete Tool an `validate_tool_call` (`explain.rs`). Damit ist INV-MCP-CLASSIFY-1 keine Anforderung mit Test, sondern ein **reproduzierbarer Fehler** | V-30.09 |
-| G1-4 | Teil C: „SSI-Read-Set-Tracking ✅ IST“; der Prompter-Plan (Prompt 1) behauptet, die Leseseite sei nicht verdrahtet | Teilweise beides. Der Trait `StorageEngine` hat `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked` (Default: **ohne** Read-Set-Registrierung, Doc-Kommentar); `Collection` hat `get_tracked` und `get_at_seq_tracked` (`engine/collection/crud/read.rs`); Test `mvcc/tests/ssi_write_skew.rs` existiert. **In v14 nachgeprüft (J.13):** `LsmStorage` überschreibt alle drei Methoden (`store/src/lsm/ops.rs:21-46`), und die schreibenden Engine-Pfade nutzen sie. **Aber:** Sie registrieren Lesezugriffe mit `snapshot_seq = u64::MAX`, was die Konfliktprüfung für diese Schlüssel wirkungslos machen kann (Befund B-16) | V-30.09 |
+| G1-4 | Teil C: „SSI-Read-Set-Tracking ✅ IST“; der Prompter-Plan (Prompt 1) behauptet, die Leseseite sei nicht verdrahtet | Teilweise beides. Der Trait `StorageEngine` hat `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked` (Default: **ohne** Read-Set-Registrierung, Doc-Kommentar); `Collection` hat `get_tracked` und `get_at_seq_tracked` (`engine/collection/crud/read.rs`); Test `mvcc/tests/ssi_write_skew.rs` existiert. **In v14 nachgeprüft (J.13):** `LsmStorage` überschreibt alle drei Methoden (`store/src/lsm/ops.rs:21-46`), und die schreibenden Engine-Pfade nutzen sie. **Aber:** Sie registrieren Lesezugriffe mit `snapshot_seq = u64::MAX`, was die Konfliktprüfung für diese Schlüssel wirkungslos machen kann (Befund B-16) | V-30.09 | <!-- doc-ref-ignore -->
 | G1-5 | Prompter-Plan: zwölf Required Checks in `protect-main.json` | 13 Einträge (Compile, Format, Clippy, Test Suite, verdict, context-gates, Merge Gate, Duplicate Symbols Cross File, FlatBuffers Drift, Capability Marker Drift, cargo deny, Phantom Commit Protection, HyperEdge Schema Merge). Miri und Feature-Matrix stehen nicht darin | V-30.09 |
 | G1-6 | Prompter-Plan: mehrere Sicherheitsprüfungen seien `required = false` | `.jules/harness-phases.toml`: 25 Phasen-Einträge, **10 `required = true`, 15 `required = false`** (start 3 von 4, check 3 von 6, verify 4 von 8, submit 0 von 6, stop 0 von 1 sind required). Welche Namen im Einzelnen betroffen sind, habe ich nicht zugeordnet | V-30.09 (Zählung) |
 | G1-7 | Größen | `crates/` + `xtask/`: 1.192 `.rs`-Dateien, 289.058 Zeilen. Mit allen übrigen `.rs` (Benches, Beispiele) sind es 1.217 Dateien / 296.999 Zeilen (HEAD `8d62f28`). 40 `xtask check_*`-Module; 106 Einträge in `docs/decisions`, 41 in `docs/gates` (Verzeichniseinträge) | V-30.09 |
 | G1-8 | Benchmarks | `benchmarks/results/` enthält `ann_results.json`, `criterion-baseline.json`, `results.json`, `summary.md`. Die letzten Zeilen von `summary.md` zeigen Szenario A (Kontext-Präfix) und B (Reranking) mit **+0,0 %** Unterschied (Werte 80 % bzw. 60 %; Größe des Testsatzes nicht geprüft). Ein gemessener Lauf bei 100.000 Dokumenten ist dort nicht belegt | V-30.09 |
 
-**Korrektur an meiner eigenen Zwischenfassung:** In der `CONTEXTRA_GESAMTSPEZIFIKATION.md` stand, der `DeletionProof` kenne nur drei Layer und keinen KV-Cache-Layer. Das war falsch (meine Suche hatte nur drei der sieben Varianten getroffen). v12 und G1-2 sind richtig.
+**Korrektur an meiner eigenen Zwischenfassung:** In der `CONTEXTRA_GESAMTSPEZIFIKATION.md` stand, der `DeletionProof` kenne nur drei Layer und keinen KV-Cache-Layer. Das war falsch (meine Suche hatte nur drei der sieben Varianten getroffen). v12 und G1-2 sind richtig. <!-- doc-ref-ignore -->
 
 ## G.2 Zusätzliche IST-Funktionen (bisher in v12 nicht beschrieben)
 
@@ -462,13 +462,13 @@ Dateiexistenz am HEAD verifiziert, Algorithmus nicht Zeile für Zeile gelesen **
 
 | Funktion | Ort | Beschreibung (aus Doc-Kommentar/Katalog) |
 |---|---|---|
-| Lovász-Erweiterung für TL-HFD | `graph/src/tl_hfd/lovasz.rs`; Test `graph/tests/proptest_tl_hfd_lovasz.rs` | Lovász-Extension/Subgradienten für die submodulare Optimierung der Hyperkanten-Diffusion |
-| Budgetierte k-Path-Diffusion | `graph/src/path_rag/k_path.rs`; Test `graph/tests/budgeted_k_path_hub_entity.rs` | Bidirektionaler Dijkstra mit Budget; vermeidet Speicherexplosion bei Hub-Knoten |
-| Human-in-the-Loop-Freigabe | `sandbox/src/approval.rs` | `ApprovalRequest`, `ApprovalRisk`, `classify_risk` |
-| OpenIE-Triple-Extraktion | `engine/src/extraction/open_ie.rs` | `extract_triples()`, LLM-basiert; Grundlage der Auto-Extraktion |
-| Bloom-Filter je SSTable-Block | `store/src/sstable/bloom.rs`; Test `store/tests/sstable_block_bloom_fpr.rs` | Falsch-Positiv-Rate ist getestet |
-| Saga-artige Transaktionen | `engine/src/transaction/compensating_actions.rs`, `intent.rs`, `db_transaction_*.rs` | Kompensierende Rollbacks über mehrere Indizes |
-| BSI-Mapping | `audit-export/src/bsi_mapping.rs` | `BsiMappingEntry`, Markdown-Rendering |
+| Lovász-Erweiterung für TL-HFD | `graph/src/tl_hfd/lovasz.rs`; Test `graph/tests/proptest_tl_hfd_lovasz.rs` | Lovász-Extension/Subgradienten für die submodulare Optimierung der Hyperkanten-Diffusion | <!-- doc-ref-ignore -->
+| Budgetierte k-Path-Diffusion | `graph/src/path_rag/k_path.rs`; Test `graph/tests/budgeted_k_path_hub_entity.rs` | Bidirektionaler Dijkstra mit Budget; vermeidet Speicherexplosion bei Hub-Knoten | <!-- doc-ref-ignore -->
+| Human-in-the-Loop-Freigabe | `sandbox/src/approval.rs` | `ApprovalRequest`, `ApprovalRisk`, `classify_risk` | <!-- doc-ref-ignore -->
+| OpenIE-Triple-Extraktion | `engine/src/extraction/open_ie.rs` | `extract_triples()`, LLM-basiert; Grundlage der Auto-Extraktion | <!-- doc-ref-ignore -->
+| Bloom-Filter je SSTable-Block | `store/src/sstable/bloom.rs`; Test `store/tests/sstable_block_bloom_fpr.rs` | Falsch-Positiv-Rate ist getestet | <!-- doc-ref-ignore -->
+| Saga-artige Transaktionen | `engine/src/transaction/compensating_actions.rs`, `intent.rs`, `db_transaction_*.rs` | Kompensierende Rollbacks über mehrere Indizes | <!-- doc-ref-ignore -->
+| BSI-Mapping | `audit-export/src/bsi_mapping.rs` | `BsiMappingEntry`, Markdown-Rendering | <!-- doc-ref-ignore -->
 | Router-Konformitätsrekalibrierung | `router/src/profile.rs:338` `recalibrate_conformal(non_conformity_score)` | Konformalitätskonzept im Router, getrennt vom `ConformalCalibrator` in `rank` |
 | Fuzz-Targets | `crates/{crypto,mcp,text,db}/fuzz/` und weitere | Fuzzing-Infrastruktur je Crate (Anzahl der Targets nicht gezählt) |
 | SIEVE-Cache | Feature `sieve-cache` in `contextra-store` | Eine Datei mit `sieve` im Namen fand ich nicht; Implementierung vermutlich im Block-Cache-Modul **[?]** |
@@ -479,18 +479,18 @@ Zusätzlich zu Teil F sind im Code mit ID referenziert (Fundstelle = erster Tref
 
 | ID | Aussage | Ort |
 |---|---|---|
-| INV-KV-DELETE-1 | KV-Löschbeweis nur für `CryptoShred`-Segmente | `store/kv/segment.rs` |
-| INV-TENANT, INV-TENANT-2, INV-TENANT-A | Mandanten-Isolation (Key-Isolation, KV-Segmente) | `crypto/kv_segment/store.rs`, `engine/tests` |
-| INV-DAG-DEPS | Lock-Reihenfolge `collections` → `kv_locks` → `embedder` | `engine/collection/crud/internal.rs` |
-| INV-HASHER-SEEDS | Hasher-Seeds nie randomisieren | `engine/collection/kv_lock.rs` |
+| INV-KV-DELETE-1 | KV-Löschbeweis nur für `CryptoShred`-Segmente | `store/kv/segment.rs` | <!-- doc-ref-ignore -->
+| INV-TENANT, INV-TENANT-2, INV-TENANT-A | Mandanten-Isolation (Key-Isolation, KV-Segmente) | `crypto/kv_segment/store.rs`, `engine/tests` | <!-- doc-ref-ignore -->
+| INV-DAG-DEPS | Lock-Reihenfolge `collections` → `kv_locks` → `embedder` | `engine/collection/crud/internal.rs` | <!-- doc-ref-ignore -->
+| INV-HASHER-SEEDS | Hasher-Seeds nie randomisieren | `engine/collection/kv_lock.rs` | <!-- doc-ref-ignore -->
 | INV-PRESSURE-1, INV-DB-3 | Backpressure bei `Critical`; Rollback-Fehler beim Insert wird geloggt | `engine/collection/crud` |
-| INV-CONSOLIDATE-1/2 | Crash-Resilienz der Konsolidierungssession | `cognition/context_compaction/session.rs` |
+| INV-CONSOLIDATE-1/2 | Crash-Resilienz der Konsolidierungssession | `cognition/context_compaction/session.rs` | <!-- doc-ref-ignore -->
 | INV-PROV-1, INV-GRAPH-PROV-1 | Summe der Signalbeiträge = RRF-Score; `relate()` indiziert Kanten in `doc_edge_index` | `db` |
 | INV-CAL-1/2/3 | Kalibrierung (kein stiller Fallback vor Warmup, Fingerprint-Reset, Grounding-Feedback). `CAL-1` und `CAL-3` sind nur in Tests oder Testkommentaren referenziert | `rank`, `infer-candle` |
-| INV-ROUTER-1/2, INV-P8-1 | Quantil in [0,1]; deterministisches Routing; Invalidierung bei Fingerprint-Wechsel | `router/profile.rs` |
+| INV-ROUTER-1/2, INV-P8-1 | Quantil in [0,1]; deterministisches Routing; Invalidierung bei Fingerprint-Wechsel | `router/profile.rs` | <!-- doc-ref-ignore -->
 | INV-SBX-1/2/3/5 | Modul ≤ 10 MB, Tabellen ≤ 10.000, Fehlertyp bei Verstoß, kein Dateisystem/Netz per Default | `sandbox` |
-| INV-VAULT-1/2/3 | Purge zeroized, `ingest()` schreibt nie in Storage, Kapazitätsgrenze | `db/volatile_vault.rs` |
-| INV-KIVI-AEAD-ORDER | Erst quantisieren, dann verschlüsseln | `kvcache/segment.rs` |
+| INV-VAULT-1/2/3 | Purge zeroized, `ingest()` schreibt nie in Storage, Kapazitätsgrenze | `db/volatile_vault.rs` | <!-- doc-ref-ignore -->
+| INV-KIVI-AEAD-ORDER | Erst quantisieren, dann verschlüsseln | `kvcache/segment.rs` | <!-- doc-ref-ignore -->
 | INV-NUC-1, INV-DISKANN-1 | Partial-Rebuild ohne inkonsistenten Graphen; keine `.delta.tmp` nach `persist_delta()` | `vector` |
 | INV-COMPACTION-ADAPTIVE-1, INV-C1/C2 | Tombstones bleiben für aktive Snapshots | `store/compaction` |
 | INV-PLUGIN-DEPENDENCY, INV-TENANT-1 | Plugin-Abhängigkeiten; `TenantId(0)` reserviert | `ports`, `types` |
@@ -522,7 +522,7 @@ Laufzeit (V-30.09): `CONTEXTRA_WORKER_THREADS`, `CONTEXTRA_DELETION_PROOF_KEY`, 
 | B-11 | Zwei Env-Variablen für den Löschbeweis-Schlüssel | mittel | offen, V |
 | B-12 | `DeletionProofKeyPair`, `LayerCleanupProof` doppelt in `crypto` und `engine` | niedrig | offen, D |
 | B-13 | `INV-CAL-1/3` ohne Definitionsort im Produktivcode | niedrig | offen, V |
-| B-14 | Doc-Kommentar `types/saos.rs` nennt noch „Synthesized Agent Operating System“ (Datei enthält Query-/Fusionstypen); `deletion_proof.rs`-Kopf nennt noch HMAC | niedrig | offen, V/D |
+| B-14 | Doc-Kommentar `crates/contextra-types/src/types/saos.rs` nennt noch „Synthesized Agent Operating System“ (Datei enthält Query-/Fusionstypen); `deletion_proof.rs`-Kopf nennt noch HMAC | niedrig | offen, V/D |
 | B-15 | `blocking_util` misst Queue-Tiefe; Domänenvokabulare nur Stubs; `bm25f` nicht im Default | niedrig | offen |
 | B-16 | **SSI-Lesepfade der Engine mit `snapshot_seq = u64::MAX`.** `insert.rs:321/325`, `update.rs:63/67`, `delete.rs:42/46`, `links.rs:65/139` und `relate.rs:31` rufen `get_at_seq_tracked(tx, key, u64::MAX)`. `ReadSet::record_read` behält pro Schlüssel den **niedrigsten** `snapshot_seq`; die Validierung meldet einen Konflikt nur bei `commit_seq > snapshot_seq` (`mvcc/src/tx_buffer.rs:379`). Für einen Schlüssel, der in der Transaktion zuerst so gelesen wird, kann das nie zutreffen. Schützt nur, wenn derselbe Schlüssel vorher mit echtem Snapshot gelesen wurde (so im Test `write_skew_via_engine_api.rs`). **Nicht ausgeführt**, deshalb Verdacht, kein bewiesener Fehler | hoch (bis geprüft) | V (Code), ungetestet |
 
@@ -551,7 +551,7 @@ Laufzeit (V-30.09): `CONTEXTRA_WORKER_THREADS`, `CONTEXTRA_DELETION_PROOF_KEY`, 
 | CI-Gates (Miri, Feature-Matrix) | 🔵 | B-05 |
 | Harness-Gates scharf schalten | 🔵 | B-04 |
 
-## H.3 Abgleich mit dem Prompter-Plan (`CONTEXTRA_PROMPTER_UPDATE_UND_PLAN.md`)
+## H.3 Abgleich mit dem Prompter-Plan (`CONTEXTRA_PROMPTER_UPDATE_UND_PLAN.md`) <!-- doc-ref-ignore -->
 
 | Prompt | Thema | Abgleich mit dem Code | Empfehlung |
 |---|---|---|---|
@@ -580,7 +580,7 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 
 # TEIL I — Nachspezifikation der Lückenliste (neu in v14)
 
-**Quelle der Liste:** `CONTEXTRA_SPEC_LUECKENLISTE.md` (aus Commit-/PR-Titeln abgeleitet) und `QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md`. **Code-Basis:** Klon-HEAD `81ab98a` vom 30.09.2026 (`crates/`: 1.005 `.rs`-Dateien; mit `xtask` 290.708 Zeilen).
+**Quelle der Liste:** `CONTEXTRA_SPEC_LUECKENLISTE.md` (aus Commit-/PR-Titeln abgeleitet) und `QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md`. **Code-Basis:** Klon-HEAD `81ab98a` vom 30.09.2026 (`crates/`: 1.005 `.rs`-Dateien; mit `xtask` 290.708 Zeilen). <!-- doc-ref-ignore -->
 
 **Belegmarker:** **[V]** Enum, Konstante, Signatur oder Doc-Kommentar im Code gelesen · **[D]** nur Dateiexistenz oder Name bestätigt, Verhalten aus Lückenliste/PR-Titel · **[–]** im Code nicht gefunden, deshalb **nicht** als IST spezifiziert.
 
@@ -594,7 +594,7 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 | Lückenliste 4.7 (Extraktoren PDF, E-Mail, DOCX inkl. Zip-Bomb-Schutz) | In `engine`, `db`, `mcp` keine PDF-/DOCX-/E-Mail-Extraktoren. `engine/src/extraction/` enthält nur `open_ie.rs`, `types.rs`. Die Extraktoren gehörten zur Desktop-App | [–] |
 | Lückenliste 11.6 (Tauri-Desktop-App) | Seit ADR-077 deprecated, CI-Jobs entfernt (laut Liste). Keine Spezifikation als Produktbestandteil | [–] / Scope-Entscheidung |
 | Audit-Dokument: `TxId::new(origin, local)` mit Partialordnung und Panic bei Überlauf | nicht geprüft; v12 nennt `TxId::is_valid_origin()` (AGT-GRAPH-001) | [D] |
-| Lückenliste 10.14: `MemFuseErrorDto` | Heißt `ContextraErrorDto` (`types/src/error_dto.rs`), von `contextra-py` genutzt | V |
+| Lückenliste 10.14: `MemFuseErrorDto` | Heißt `ContextraErrorDto` (`types/src/error_dto.rs`), von `contextra-py` genutzt | V | <!-- doc-ref-ignore -->
 | Lückenliste 2.4/2.1/2.2: `PhysioScheduler`, Free-Energy-Thermostat, NREM/REM als eigene Symbole | Keine Dateien/Symbole mit diesen Namen gefunden. Die Aufgaben laufen im `MaintenanceScheduler` (I.2) | [–] |
 | v12 B.4: Replicator standardmäßig aus | Doc-Kommentar in `maintenance_config.rs` sagt `replicator_enabled` „Default: true“, Lernrate 0,05. Widerspruch, `Default`-Impl nicht gelesen | [D] |
 
@@ -602,7 +602,7 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 
 | Nr. | Feature | Spezifikation |
 |---|---|---|
-| 6.16 | `TombstoneSemanticsCheck`, `SeqBitTombstone` (`types/src/tombstone.rs`) | Trait mit `is_tombstone(seq: u64, flags: u8) -> bool` und `make_tombstone(seq) -> Vec<u8>`. `SeqBitTombstone`: Tombstone, wenn `seq & TOMBSTONE_BIT != 0` (Bit 63) **oder** `flags & 0x01 != 0`. `make_tombstone` liefert 8 Byte Little-Endian mit gesetztem Bit 63, idempotent bei bereits gesetztem Bit. Rein bitweise, ohne Panic **[V]** |
+| 6.16 | `TombstoneSemanticsCheck`, `SeqBitTombstone` (`types/src/tombstone.rs`) | Trait mit `is_tombstone(seq: u64, flags: u8) -> bool` und `make_tombstone(seq) -> Vec<u8>`. `SeqBitTombstone`: Tombstone, wenn `seq & TOMBSTONE_BIT != 0` (Bit 63) **oder** `flags & 0x01 != 0`. `make_tombstone` liefert 8 Byte Little-Endian mit gesetztem Bit 63, idempotent bei bereits gesetztem Bit. Rein bitweise, ohne Panic **[V]** | <!-- doc-ref-ignore -->
 | 9.5 | `CacheDirective` (`types/src/error.rs:70`) | `Pin{ttl: Option<Duration>}` (None = unbegrenzt), `NeverCache`, `Auto` (Default), `ReleaseAfterStep{step_id: StepId}`. `StepId` ist ein Newtype über `u64` mit `From<u64>` **[V]** |
 | 4.8 / 13.11 | `AutoExtractionMode` (`types/.../misc.rs:542`) | `Enabled`, `Disabled`; `is_enabled()`. `Default` hängt an Feature `auto-extraction-opt-out`: ohne das Feature `Enabled` (Code-Struktur `cfg(not(feature…))`), mit dem Feature vermutlich `Disabled` **[V/D]**. Tier-Defaults (#3950) nicht im Einzelnen gelesen |
 | 10.14 | `ContextraErrorDto` | Serialisierbares Fehler-DTO mit `with_details(...)`, erzeugt über `From<&ContextraError>`; Verwendung in `contextra-py/src/bindings/common.rs` **[V]** |
@@ -611,11 +611,11 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 
 ## I.2 Kognition, Lebenszyklus (Lückenliste Abschnitt 2)
 
-- **`MaintenanceScheduler<S, V = HnswIndex>`** (`cognition/src/maintenance_scheduler.rs`) führt je Tick aus: Decay-Eviction, Edge-Reinforcement-Flush, Perkolationsprüfung, Replikatordynamik-Update. `MaintenanceConfig`: `tick_interval_secs` 60, `decay_enabled`, `decay_config` (κ, `base_half_life_tx`, `eviction_threshold`), `edge_reinforcement` (η, δ, W_max, ρ, Q, α), `percolation_enabled`, `percolation` (`critical_threshold`, `rebonding_similarity`, `max_new_edges_per_pass`), `replicator_enabled`, `replicator_lr` **[V]**. Das deckt die Punkte 2.1 (adaptiver Decay), 2.5 (Kantenverstärkung), 2.6 (Perkolation/Re-Bonding) und 3.6 (Replicator, adaptive RRF-Gewichte) ab; eigene Symbole für „Free-Energy-Thermostat“, „NREM“, „REM“ und `PhysioScheduler` fehlen (I.0) **[–]**.
+- **`MaintenanceScheduler<S, V = HnswIndex>`** (`cognition/src/maintenance_scheduler.rs`) führt je Tick aus: Decay-Eviction, Edge-Reinforcement-Flush, Perkolationsprüfung, Replikatordynamik-Update. `MaintenanceConfig`: `tick_interval_secs` 60, `decay_enabled`, `decay_config` (κ, `base_half_life_tx`, `eviction_threshold`), `edge_reinforcement` (η, δ, W_max, ρ, Q, α), `percolation_enabled`, `percolation` (`critical_threshold`, `rebonding_similarity`, `max_new_edges_per_pass`), `replicator_enabled`, `replicator_lr` **[V]**. Das deckt die Punkte 2.1 (adaptiver Decay), 2.5 (Kantenverstärkung), 2.6 (Perkolation/Re-Bonding) und 3.6 (Replicator, adaptive RRF-Gewichte) ab; eigene Symbole für „Free-Energy-Thermostat“, „NREM“, „REM“ und `PhysioScheduler` fehlen (I.0) **[–]**. <!-- doc-ref-ignore -->
 - **2.13 `ConsolidationEngine`/`run_consolidation_pass`:** `consolidation_executor.rs`, `consolidation_locks.rs`, `memory_consolidation.rs`. Laufzeit über `spawn_blocking`; `ConsolidationNodesGuard` (RAII) laut Liste **[D]**.
 - **2.14–2.17:** `context_compaction/` (LLM-Konsolidierung, OCC-Retry, Startup-Cleanup), `transitivity_veto.rs`, `leanrag_input.rs`, `graph_sink.rs`, `aggregation_phase.rs` (siehe B.4, G.2) **[D]**.
 - **2.18 `semantic_aggregation_facade.rs`:** Facade für semantische Hyperkanten-Aggregation inklusive Co-Occurrence-Vorschlag mit LLM-Validierung **[D]**.
-- **2.21 Export v1:** `engine/src/export.rs`, `SCHEMA_VERSION_V1`; Typen `ExportCollectionV1`, `ExportDocumentV1`, `ExportMemoryV1` (inkl. Embedding und `MemoryType`), `ExportRelationV1` **[V]**.
+- **2.21 Export v1:** `engine/src/export.rs`, `SCHEMA_VERSION_V1`; Typen `ExportCollectionV1`, `ExportDocumentV1`, `ExportMemoryV1` (inkl. Embedding und `MemoryType`), `ExportRelationV1` **[V]**. <!-- doc-ref-ignore -->
 - **2.22 Observability:** `DriftStatusProvider`-Port, Live-Werte in `stats()` per `Weak`-Referenz (ADR-080) **[D]**.
 - **2.10/2.11/2.12/2.15/2.19/2.20:** Importance-Scoring, `MemoryType`, Zettelkasten-Links (`LinkRelation`), Kaskaden-Invalidierung bei `Supersedes`, `VolatileContextVault`, TTL-Reaper sind in v12 (B.1, B.4, B.9) bzw. G.3 beschrieben.
 
@@ -623,12 +623,12 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 
 | Nr. | Feature | Spezifikation |
 |---|---|---|
-| 3.19 | Kandidaten-Streams | `Bm25CandidateStream<'a, S: StorageEngine>` (`text/src/stream.rs`), `VectorCandidateStream<'a, V: VectorIndex>` (`vector/src/candidate_stream.rs`), `PprCandidateStream<'a, G: GraphIndex + ?Sized>` (`graph/src/ppr_stream.rs`). Sie liefern Kandidaten in Batches für die Fusion statt einer fertigen Liste **[V Namen/Signaturen]** |
-| 4.2 | Delta-Varint-Posting-Listen (`text/src/posting_list.rs`) | Serialisierung: Anzahl der Postings als Varint, je Posting Delta der Dokument-ID, `tf` und `doc_len` als Varint; Blockgröße 64 (B.3.2) **[V]** |
+| 3.19 | Kandidaten-Streams | `Bm25CandidateStream<'a, S: StorageEngine>` (`text/src/stream.rs`), `VectorCandidateStream<'a, V: VectorIndex>` (`vector/src/candidate_stream.rs`), `PprCandidateStream<'a, G: GraphIndex + ?Sized>` (`graph/src/ppr_stream.rs`). Sie liefern Kandidaten in Batches für die Fusion statt einer fertigen Liste **[V Namen/Signaturen]** | <!-- doc-ref-ignore -->
+| 4.2 | Delta-Varint-Posting-Listen (`text/src/posting_list.rs`) | Serialisierung: Anzahl der Postings als Varint, je Posting Delta der Dokument-ID, `tf` und `doc_len` als Varint; Blockgröße 64 (B.3.2) **[V]** | <!-- doc-ref-ignore -->
 | 3.7/3.8 | Wählbare Fusionsstrategie | Commit `8498430` macht `FusionStrategy` in `hybrid_search_with_strategy` konfigurierbar. **Damit ist v12 D.5 (RRF fest verdrahtet) für den HEAD veraltet**; der genaue Pfad ist nicht gelesen **[D]** |
 | 3.3/3.4/3.5 | Platt, Isotonic (PAVA mit Debounce), PID-Rerank-Pool (`RerankDeadline`) | siehe B.3.4, B.5 **[D]** |
 | 5.2 | `RebuildStatus` (`vector/src/hnsw/types.rs:178`) | `Idle`, `Running`, `Pending` **[V]**. Backoff/Alarm bei Rebuilds laut Liste **[D]** |
-| 5.6 | Ada-ef | `AdaptiveEfPolicy`, `AdaptiveEfStateMachine`, `AdaptiveEfStats` in `vector/src/hnsw/adaptive_ef.rs`, genutzt in `core_search.rs`; Parameter siehe B.3.1 **[V]** |
+| 5.6 | Ada-ef | `AdaptiveEfPolicy`, `AdaptiveEfStateMachine`, `AdaptiveEfStats` in `vector/src/hnsw/adaptive_ef.rs`, genutzt in `core_search.rs`; Parameter siehe B.3.1 **[V]** | <!-- doc-ref-ignore -->
 | 5.3–5.5 | DiskANN, RaBitQ, ACORN | siehe B.3.1 und G.2 **[D]** |
 | 3.11 | `_at`-Familie | `search_at`, `search_filtered_at`, `get_at_seq`, `scan_prefix_at` liefern Snapshot-Sicht zu einem `seq` (B.3.5) **[V/D]** |
 
@@ -638,10 +638,10 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 |---|---|---|
 | 6.9 | `DurabilityMode` | `Full` (Default), `WalNoHmac`, `MemoryOnly`, `#[non_exhaustive]`. Kompatibilitätsprüfung liefert `DurabilityConfigError::IncompatibleCombination{mode, feature, reason}`, konvertierbar in `ContextraError` **[V]** |
 | 6.1/6.2 | Block-Bloom, Block-Cache | `BloomFilter` mit Obergrenze `MAX_BITS = 128 MiB · 8`. Block-Cache: `BLOCK_CACHE_SHARDS = 64`, Trait `BlockCacheBackend` mit `LruBlockCacheBackend`, `QuickCacheBlockCacheBackend` und `SieveCacheBackend`; Einstieg `BlockCache`. SSTable-Magic `MFSX` = `0x5853464D`, Legacy `0x4D465354`. Formate v3/v4 (256-Bit-Block-Bloom, adaptiver Bloom) konnte ich in den Dateinamen nicht einzeln belegen **[V/D]** |
-| 6.4 | Compaction-Drosselung | `CompactionConfig.max_io_bytes_per_second: Option<..>`; in `compaction/engine.rs` wird bei gesetztem Limit gedrosselt. Weiteres siehe B.2.2 **[V]** |
+| 6.4 | Compaction-Drosselung | `CompactionConfig.max_io_bytes_per_second: Option<..>`; in `crates/contextra-store/src/compaction/engine.rs` wird bei gesetztem Limit gedrosselt. Weiteres siehe B.2.2 **[V]** |
 | 6.5 | `SystemPressureMonitor` | `wal_queue_depth` voll implementiert über Zähler der wartenden Group-Commit-Follower; `blocking_util` misst die globale Tokio-Queue-Tiefe (nicht den Blocking-Pool); `embedding_queue_depth` ist im Store `0/0`, weil der Store keine Embedding-Crates kennt. Bei `Critical` verzögert `Collection::insert` um `backpressure_delay` **[V]** |
 | 6.8 | `WalObserver` | `on_commit(&CommittedBatch, seq_no, tx_id)`; `requires_durability()` Default `false` (Observer erhält dann auch `MemoryOnly`-Commits). `WriteOrigin` ist `#[non_exhaustive]` mit Variante `UserWrite`. Ausführung über einen begrenzten, nicht blockierenden Dispatcher; `DEFAULT_MAX_OBSERVER_LATENCY = 1 ms`; bei Überschreitung werden Drop-Zähler erhöht und ein **Circuit-Breaker** öffnet (Zeitstempel `circuit_breaker_open_until_nanos`). Bausteine: `ObserverRegistry`, `AsyncObserverAdapter`. Fail-open: ein langsamer Observer blockiert den Commit nicht **[V]** |
-| 6.10 | Recovery | `lsm/recovery.rs` (Intent-Magic `MFRLBK\0\0`, WAL-Replay, High-Water-Mark-Prüfung), `DirLock`, Manifest `MFMN`. Engine: `repair_on_open()` (`engine/src/contextra_impl/lifecycle.rs:215`), beim Öffnen aufgerufen (Zeile 139); behandelt Crash-Fenster und „commit-uncertain“-Transaktionen laut Commits `027a73c`, `376b513` **[V Existenz/D Ablauf]** |
+| 6.10 | Recovery | `crates/contextra-store/src/lsm/recovery.rs` (Intent-Magic `MFRLBK\0\0`, WAL-Replay, High-Water-Mark-Prüfung), `DirLock`, Manifest `MFMN`. Engine: `repair_on_open()` (`engine/src/contextra_impl/lifecycle.rs:215`), beim Öffnen aufgerufen (Zeile 139); behandelt Crash-Fenster und „commit-uncertain“-Transaktionen laut Commits `027a73c`, `376b513` **[V Existenz/D Ablauf]** |
 | 6.14 | Mandanten-Isolation im KV | `TenantKeyCodec`: Schlüssel `t:{tenant_id}:{collection_id}:{doc_type}:{doc_id}`, festes Präfix `t:` gegen Legacy-Kollisionen. **INV-TENANT-2:** `scan_prefix(codec.scan_prefix())` liefert ausschließlich Schlüssel dieses Mandanten. `TenantScopedStorage<S>` umhüllt einen `StorageEngineHandle`. Engine: Tenant-Handle-Cache und `TenantPolicy`-Durchsetzung (E-01) **[V/D]** |
 | 6.19/6.7 | KV-Lock und Shards | `KV_LOCK_SHARDS = 16` mit vier festen Hasher-Seeds (`0x9E3779B97F4A7C15` u. a., **INV-HASHER-SEEDS**); `sorted_unique_shards` sichert die Sperrreihenfolge (Loom-getestet laut Liste) **[V/D]** |
 | 6.12/6.13/6.17 | `StorageEngine`-Erweiterungen, Zero-Copy, Pins mit TTL-Lease | `delete_prefix`, `delete_many`, `put_if_absent`, `scan_*_bounded`; Pins mit TTL-Lease (#3066) und `DEFAULT_MAX_PIN_DURATION = 300 s` (B.2.3). Konkrete Signaturen nicht gelesen **[D]** |
@@ -649,14 +649,14 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `deletion_proof.rs`-Enum, `st
 
 ## I.5 Graph (Abschnitt 7)
 
-- **7.1 CSR:** Persistenz, Delta-Buffer, asynchrone Compaction mit RCU-Snapshot-Swap (IP-08), Orphan-GC: `GraphIndex`-Methode `sweep_orphans(wal_tx: TxId) -> Result<usize>` (`graph/src/cascade.rs`) **[V Signatur]**.
+- **7.1 CSR:** Persistenz, Delta-Buffer, asynchrone Compaction mit RCU-Snapshot-Swap (IP-08), Orphan-GC: `GraphIndex`-Methode `sweep_orphans(wal_tx: TxId) -> Result<usize>` (`graph/src/cascade.rs`) **[V Signatur]**. <!-- doc-ref-ignore -->
 - **7.3 Session-DAG:** Branching mit Zyklenerkennung und Tiefenlimit 10.000 (B.3.3); Lock-Reihenfolge `nodes` → `edges` → `active_head` **[V/D]**.
 - **7.4 Hyperkanten-Löschung:** Kaskade synchron bis 1.000, Rest über `DeferredHyperedgeQueue` (B.3.3); rekursive Kaskade über `child_edge_ids` **[D]**.
 - **7.5 PPR-Numerik:** Masseerhaltung, Behandlung hängender Knoten, Hub-Begrenzung (`MAX_VISITED_NODES 10_000`) **[D]**.
 
 ## I.6 Adaptive Steuerung und Router (Abschnitt 8)
 
-**`SlmProfile`** (`router/src/profile.rs`) **[V]**: `name`, `mcp_endpoint`, `domain_communities: HashSet<u64>`, `token_budget: TokenBudget`, `min_relevance_score: f32`, `resource_cost_estimate: f32` (0,0 = unbestimmt, dann gilt `token_budget.limit`), `fingerprint: Option<ConfigFingerprint>`, `transport` (Default `StdioMcp`; Feature `cloud-egress-guard` schaltet `HttpCloud` frei), Bandit-Zustand (`None` = Kaskade aktiv). Methoden `with_fingerprint`, `with_resource_cost_estimate`, `estimated_cost`, `validate`, `try_new`.
+**`SlmProfile`** (`router/src/profile.rs`) **[V]**: `name`, `mcp_endpoint`, `domain_communities: HashSet<u64>`, `token_budget: TokenBudget`, `min_relevance_score: f32`, `resource_cost_estimate: f32` (0,0 = unbestimmt, dann gilt `token_budget.limit`), `fingerprint: Option<ConfigFingerprint>`, `transport` (Default `StdioMcp`; Feature `cloud-egress-guard` schaltet `HttpCloud` frei), Bandit-Zustand (`None` = Kaskade aktiv). Methoden `with_fingerprint`, `with_resource_cost_estimate`, `estimated_cost`, `validate`, `try_new`. <!-- doc-ref-ignore -->
 
 **Kalibrierte Kaskade mit Conformal-Schwelle** **[V]**
 - Conformal-Zustand: `new(alpha, gamma, initial_threshold)`, `update(non_conformity_score) -> bool`, `empirical_error_rate()`, `reset_window()`; Methode `recalibrate_conformal(score)` am Profil.
@@ -670,12 +670,12 @@ Bandit-Routing (LinUCB mit Vergessen, Sherman-Morrison, IPS), FC-TS, Sketched-Ba
 - **9.4 Streaming:** `LlmTextGeneratorStreaming: LlmTextGenerator` mit `generate_stream(&self, prompt, &ConfigFingerprint) -> BoxStream<Result<String>>` (`ports/src/embedding.rs:137`) **[V]**. Implementierungen in Candle und Ollama laut Liste **[D]**.
 - **Candle:** `DEFAULT_MAX_CONCURRENT_EMBEDDINGS = 8`, `DEFAULT_MAX_CONCURRENT_INFERENCES = 4`; `GaspValidator` mit `DEFAULT_GROUNDING_THRESHOLD = 0,70` (Grounding-Wert ≥ Schwelle gilt als gestützt), Kalibrierungs-Invalidierung bei Modellwechsel **[V]**.
 - **KV-Cache-Budgets:** `DEFAULT_BYTE_BUDGET_PER_TENANT = 256 MiB`, `DEFAULT_SHARD_COUNT = 32`, `DEFAULT_SEGMENT_CAPACITY_PER_TENANT = 256` **[V]**.
-- **KV-Bridge (1.1):** Feature `kv-bridge`; `KvBridgeAdapter`, `KvCacheKey`, Mandanten-Isolation, Rollback-Hooks, LSM-Spill (Tier 2), Prefix-Reuse mit Prefill-Skip (`inference/prefix_reuse.rs`). Verhalten je Komponente nicht gelesen **[D]**.
+- **KV-Bridge (1.1):** Feature `kv-bridge`; `KvBridgeAdapter`, `KvCacheKey`, Mandanten-Isolation, Rollback-Hooks, LSM-Spill (Tier 2), Prefix-Reuse mit Prefill-Skip (`crates/contextra-infer-candle/src/inference/prefix_reuse.rs`). Verhalten je Komponente nicht gelesen **[D]**.
 - **Ollama (9.7):** nativer `/api/embed`-Batch-Endpunkt mit Fallback, Retry mit Jitter, Dimensions-/Modellvalidierung, NDJSON-Streaming, `OllamaApi`-Trait mit Mock **[D]**; Timeouts siehe B.8.
 
 ## I.8 Sicherheit, MCP, Sandbox (Abschnitt 10)
 
-**Approval-Workflow** (`sandbox/src/approval.rs`) **[V]**
+**Approval-Workflow** (`sandbox/src/approval.rs`) **[V]** <!-- doc-ref-ignore -->
 - `ApprovalRisk` wird deterministisch aus `WasmCapabilities` abgeleitet: `High`, wenn `allow_network` oder `allow_cloud_egress`; `Elevated`, wenn nur `allow_filesystem`; sonst `Low`.
 - `ApprovalStatus`: `Pending`, `Approved`, `Rejected{reason}`, `Expired`; ungültige Übergänge liefern `ApprovalTransitionError`.
 
@@ -720,7 +720,7 @@ Von den Punkten der Lückenliste sind **mit gelesenem Code belegt**: 1.2 (teilwe
 
 # TEIL J — SOLL-Zustand, geprüft gegen den IST-Code (neu in v14)
 
-**Quelle:** `CONTEXTRA_SPEZIFIKATION_4_1_.md` (Teil C, C.4, D, X.10, X.11, Y, R.5) sowie die offenen Punkte aus Teil D, G, H und I dieses Dokuments. **Methode:** Für jeden SOLL-Punkt habe ich geprüft, ob der Code ihn schon umsetzt. Status: ✅ erledigt · 🟡 teilweise · 🔵 offen (spezifiziert) · ⏸ zurückgestellt. Marker **[V]** = im Code gelesen am HEAD `81ab98a`, **[D]** = aus Dokument übernommen.
+**Quelle:** `CONTEXTRA_SPEZIFIKATION_4_1_.md` (Teil C, C.4, D, X.10, X.11, Y, R.5) sowie die offenen Punkte aus Teil D, G, H und I dieses Dokuments. **Methode:** Für jeden SOLL-Punkt habe ich geprüft, ob der Code ihn schon umsetzt. Status: ✅ erledigt · 🟡 teilweise · 🔵 offen (spezifiziert) · ⏸ zurückgestellt. Marker **[V]** = im Code gelesen am HEAD `81ab98a`, **[D]** = aus Dokument übernommen. <!-- doc-ref-ignore -->
 
 ## J.0 Konsolidierte Matrix
 
@@ -747,7 +747,7 @@ Von den Punkten der Lückenliste sind **mit gelesenem Code belegt**: 1.2 (teilwe
 
 ## J.1 Lizenz: Installation-Bindung und Ring-Hierarchie (P1, 🟡)
 
-**IST [V]** (`license/src/signed_gate.rs`): `SignedLicenseGate::from_signed_payload[_with_clock]`, Zugriff `license_payload()`, `verifying_key()`, Testhelfer `create_test_signed_payload`. `LicensePayload{tenant_id, allowed_rings, expires_at, feature_flags}`. `check_ring(ring)`:
+**IST [V]** (`license/src/signed_gate.rs`): `SignedLicenseGate::from_signed_payload[_with_clock]`, Zugriff `license_payload()`, `verifying_key()`, Testhelfer `create_test_signed_payload`. `LicensePayload{tenant_id, allowed_rings, expires_at, feature_flags}`. `check_ring(ring)`: <!-- doc-ref-ignore -->
 1. `Fast` → `Ok` (INV-LICENSE-2).
 2. `ring` nicht in `allowed_rings` → `NotActivated(ring)`.
 3. `expires_at` gesetzt und `clock.now_unix_nanos()/1e9 >= expires_at` → `Expired(expires_at)`.
@@ -766,18 +766,18 @@ Von den Punkten der Lückenliste sind **mit gelesenem Code belegt**: 1.2 (teilwe
 
 ## J.2 Legacy-WAL-Schlüssel entfernen (P1, 🟡)
 
-**IST [V]:** `wal/hmac.rs` enthält noch `LEGACY_INTEGRITY_KEY_OBFUSCATED` (32 Byte, XOR-Maske) und `wal/io.rs` den Schalter `allow_legacy_integrity_key_fallback` (Default `false`, laut v12). Kommentarlage zu Migration und `.rekeyed`-Marker stammt aus Commit-Titeln (#3913, #3922, #3941) **[D]**.
+**IST [V]:** `crates/contextra-store/src/wal/hmac.rs` enthält noch `LEGACY_INTEGRITY_KEY_OBFUSCATED` (32 Byte, XOR-Maske) und `crates/contextra-store/src/wal/io.rs` den Schalter `allow_legacy_integrity_key_fallback` (Default `false`, laut v12). Kommentarlage zu Migration und `.rekeyed`-Marker stammt aus Commit-Titeln (#3913, #3922, #3941) **[D]**.
 **SOLL:** (1) Migration alter WAL-Dateien abschließen; Status maschinenlesbar abfragbar. (2) Danach `LEGACY_INTEGRITY_KEY_OBFUSCATED`, die Maske und den Fallback-Pfad löschen. (3) Bis dahin darf der Fallback nie implizit aktiv werden; jede Aktivierung ist explizit und wird einmal gewarnt. **Invariante INV-WAL-LEGACY-KEY-1.** **Abnahme:** Ein WAL mit V2-Legacy-Schlüssel wird ohne Flag abgelehnt; nach Entfernung existiert das Symbol im Workspace nicht mehr (`grep`-Test im `xtask`).
 
 ## J.3 Determinismus im Checkpoint-Crate (P1, 🟡) — Korrektur zu v12 Teil C
 
-**IST [V]:** `contextra-store/src/checkpoint.rs` existiert nicht mehr. **Aber** `contextra-checkpoint` ruft `SystemTime::now()` direkt auf: `guard.rs` (Zeilen 52, 128, 145) für `PinnedSeqNoOrphan.timestamp_ms` und `orphan.rs` (`monotonic_timestamp_ms()`, Zeile 45, und Zeile 84). Ein `Clock`-Import fehlt in diesen Dateien. Das verletzt P28 im Produktionscode.
+**IST [V]:** `contextra-store/src/checkpoint.rs` existiert nicht mehr. **Aber** `contextra-checkpoint` ruft `SystemTime::now()` direkt auf: `guard.rs` (Zeilen 52, 128, 145) für `PinnedSeqNoOrphan.timestamp_ms` und `orphan.rs` (`monotonic_timestamp_ms()`, Zeile 45, und Zeile 84). Ein `Clock`-Import fehlt in diesen Dateien. Das verletzt P28 im Produktionscode. <!-- doc-ref-ignore -->
 **SOLL:** Die Zeitquelle über den Port `Clock` injizieren (`Arc<dyn Clock>` in `CheckpointGuard`/Orphan-Registry); `monotonic_timestamp_ms()` durch einen `Clock`-basierten Aufruf ersetzen. Da ein `Drop` keinen Async-Kontext hat, wird der Zeitstempel beim Erzeugen des Guards gelesen, nicht im `Drop`. **Invariante INV-CHECKPOINT-DETERMINISM-1:** kein `SystemTime::now()` im Produktionscode des Crates. **Abnahme:** Test mit `ManualClock` erzeugt reproduzierbare Orphan-Zeitstempel; `xtask`-Check gegen `SystemTime::now` (Ausnahme: Schlüsselmaterial).
 **Nachgeprüft in v14 [V]:** Die Zeitstempel sind **nicht nur Diagnose.** `CheckpointStore::monotonic_timestamp_ms()` (`store.rs:362`) liest die Wandzeit über `orphan::monotonic_timestamp_ms()` und macht sie per `fetch_max` auf `checkpoint_counter` monoton. Das Ergebnis landet in `timestamp_ms` (`store.rs:373-376`) und in `created_at` (`store.rs:406`) der Checkpoint-Metadaten. Die Orphan-Zeitstempel (`guard.rs`, `orphan.rs`) werden in `PinnedSeqNoOrphan.timestamp_ms` gespeichert; in der Codesuche fand ich nur Zuweisungen und Tests, keinen Vergleich im Produktivpfad. **Folge:** Zwei Läufe mit identischer Eingabe erzeugen unterschiedliche Checkpoint-Metadaten, Replay ist dort nicht byte-deterministisch. Die monotone Zählung per `fetch_max` bleibt als Schutz gegen Zeitrückläufe sinnvoll und wird mit dem `Clock`-Port beibehalten. Ob die Metadaten persistiert werden, habe ich nicht geprüft.
 
 ## J.4 WASM-`MergeOperator` im Compaction-Pfad (P2, 🟡)
 
-**IST [V]:** `store/src/compaction/merge_operator.rs`: Trait `MergeOperator: Send + Sync` mit `merge` und Fail-Safe-Vorgabe (bei Fehler oder Fuel-Erschöpfung beide Versionen behalten, `trace`-Log). `sandbox/src/capabilities.rs:81`: `MergeOperatorCapabilities`. Im Store und in der Engine gibt es **keine** Verwendung des Traits außer Export: `CompactionEngine` ruft keinen `MergeOperator` auf, und es existiert keine `impl MergeOperator`.
+**IST [V]:** `store/src/compaction/merge_operator.rs`: Trait `MergeOperator: Send + Sync` mit `merge` und Fail-Safe-Vorgabe (bei Fehler oder Fuel-Erschöpfung beide Versionen behalten, `trace`-Log). `sandbox/src/capabilities.rs:81`: `MergeOperatorCapabilities`. Im Store und in der Engine gibt es **keine** Verwendung des Traits außer Export: `CompactionEngine` ruft keinen `MergeOperator` auf, und es existiert keine `impl MergeOperator`. <!-- doc-ref-ignore -->
 **SOLL (Spec 4 C.4.3.2):** Nutzerdefinierte Merge-Logik nur als WASM-Modul über `contextra-sandbox`. Schnittstelle: `merge(key, old, new) -> Result<Vec<u8>, SandboxError>`. Grenzen: `max_fuel` Default `10_000_000`, Wall-Clock-Timeout, `MergeOperatorCapabilities::pure()` (kein I/O, keine `Clock`, kein `Rng`). Verdrahtung: Die Engine (Ring 3) übergibt den Operator an `CompactionEngine`, der Store kennt die Sandbox nicht (Ring-Regel: `store` darf nicht von `sandbox` abhängen). **Invarianten:** deterministisch, rein; bei `FuelExhausted` Fail-Safe ohne Datenverlust. **Abnahme:** (1) Ein Zähler-Merge über zwei SSTable-Ebenen liefert die Summe. (2) Endlosschleife im Modul ⇒ beide Versionen bleiben. (3) Zwei Läufe mit gleichem Modul und Eingaben ⇒ byte-gleiches Ergebnis.
 
 ## J.5 TTL (✅, abweichend von Spec 4)
@@ -817,12 +817,12 @@ Kein Code. **Bedingung:** Benchmark auf Zielhardware; CPU-Overhead des Bit-Unpac
 ## J.13 SSI-Leseseite Ende-zu-Ende (P0, 🟡 — Befund B-16)
 
 **IST, in v14 nachgeprüft [V]:**
-- `StorageEngine` (`ports/src/storage.rs`) hat `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked`; die Trait-Defaults registrieren **nichts**.
-- `LsmStorage` überschreibt alle drei (`store/src/lsm/ops.rs`, Zeilen 21–46) und delegiert an `lsm/ops/read.rs`. `get_tracked` liest `snapshot_seq = last_applied_seq`, registriert den Schlüssel per `tx_buffer.register_read(tx, key, snapshot_seq)` und liest dann `get_at_seq`. `scan_prefix_tracked` registriert **jeden gescannten Schlüssel**, ruft aber `record_prefix` nicht auf. Der Doc-Kommentar in `lsm/engine.rs:177-181` sagt selbst: Nur getrackte Lesezugriffe erhalten SSI-Schutz, `get()` bleibt ungetrackt.
-- `ReadSet::record_read` behält je Schlüssel den niedrigsten `snapshot_seq`; `record_prefix` existiert für Phantomschutz. Validierung (`mvcc/src/tx_buffer.rs` ab Zeile 366): `snapshot_seq < pruned_through` ⇒ Fehler „snapshot too old“; Konflikt, wenn `commit_seq > snapshot_seq`.
+- `StorageEngine` (`ports/src/storage.rs`) hat `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked`; die Trait-Defaults registrieren **nichts**. <!-- doc-ref-ignore -->
+- `LsmStorage` überschreibt alle drei (`store/src/lsm/ops.rs`, Zeilen 21–46) und delegiert an `crates/contextra-store/src/lsm/ops/read.rs`. `get_tracked` liest `snapshot_seq = last_applied_seq`, registriert den Schlüssel per `tx_buffer.register_read(tx, key, snapshot_seq)` und liest dann `get_at_seq`. `scan_prefix_tracked` registriert **jeden gescannten Schlüssel**, ruft aber `record_prefix` nicht auf. Der Doc-Kommentar in `lsm/engine.rs:177-181` sagt selbst: Nur getrackte Lesezugriffe erhalten SSI-Schutz, `get()` bleibt ungetrackt. <!-- doc-ref-ignore -->
+- `ReadSet::record_read` behält je Schlüssel den niedrigsten `snapshot_seq`; `record_prefix` existiert für Phantomschutz. Validierung (`mvcc/src/tx_buffer.rs` ab Zeile 366): `snapshot_seq < pruned_through` ⇒ Fehler „snapshot too old“; Konflikt, wenn `commit_seq > snapshot_seq`. <!-- doc-ref-ignore -->
 - **Engine, getrackt:** `Collection::get_tracked`/`get_at_seq_tracked` (`crud/read.rs:271,282`), `check_doc_id_collision_tracked` (`insert.rs:261`), Schreibpfade in `insert.rs`, `update.rs`, `delete.rs`, `links.rs`, `relate.rs:31`, `maintenance.rs:651`.
 - **Engine, ungetrackt:** Suche und Hydration (`search/hydrate.rs:23,70`, `get_at_seq`), Wartung (`maintenance.rs`, `get`/`scan_prefix`). Suche ist lesend; ungetrackt heißt dort: keine Write-Skew-Validierung.
-- **Tests:** `mvcc/tests/ssi_write_skew.rs`, `engine/tests/write_skew_via_engine_api.rs` (Arzt-Szenario mit `get_tracked`, `update_op`, Commit-Konflikt), `engine/tests/ssi_write_skew_integration.rs`, `store/tests/ssi_tracked_reads_via_trait.rs`.
+- **Tests:** `mvcc/tests/ssi_write_skew.rs`, `engine/tests/write_skew_via_engine_api.rs` (Arzt-Szenario mit `get_tracked`, `update_op`, Commit-Konflikt), `engine/tests/ssi_write_skew_integration.rs`, `store/tests/ssi_tracked_reads_via_trait.rs`. <!-- doc-ref-ignore -->
 
 **Befund B-16 (Verdacht, nicht ausgeführt):** Die Schreibpfade lesen den Vorwert mit `get_at_seq_tracked(tx, key, u64::MAX)`. Wird ein Schlüssel in der Transaktion zuerst so gelesen, steht `snapshot_seq = u64::MAX` im `ReadSet`, und `commit_seq > u64::MAX` ist nie wahr. Der Test `write_skew_via_engine_api.rs` ist grün, weil er die Schlüssel vorher mit `get_tracked` (echter Snapshot) liest; der niedrigere Wert gewinnt. Ein Read-Modify-Write ohne vorheriges `get_tracked` ist damit vermutlich nicht gegen einen parallelen Commit auf denselben Schlüssel abgesichert.
 
@@ -879,7 +879,7 @@ Ein SOLL-Punkt gilt als umgesetzt, wenn (1) sein Status in dieser Tabelle auf �
 
 ## J.20 Belegtiefe von Teil J
 
-Gelesen: `signed_gate.rs` (Konstruktor, `check_ring`, Payload), `license.rs`, `merge_operator.rs`, `compaction.rs` (`TtlMetadata`), `checkpoint/guard.rs`, `orphan.rs`, `store.rs` (Zeitzugriffe), `wal/hmac.rs` und `wal/io.rs` (Legacy-Symbole), `store/lsm/ops/read.rs`, `ops.rs`, `engine.rs` (Tracked-Reads), `mvcc/ssi.rs` und `tx_buffer.rs` (ReadSet, Validierung), Engine-Schreibpfade, `Cargo.toml`-Abhängigkeiten. **Nicht gelesen:** Lock-Stärke in `commit.rs` (J.7), `.rekeyed`-Migration (J.2), Fusionspfad der Hybrid-Suche (J.12), ob die Engine einen Begin-Snapshot der Transaktion bereitstellt. **Nicht ausgeführt:** Build und Tests, insbesondere der Reproduktionstest für B-16.
+Gelesen: `signed_gate.rs` (Konstruktor, `check_ring`, Payload), `license.rs`, `merge_operator.rs`, `compaction.rs` (`TtlMetadata`), `checkpoint/guard.rs`, `orphan.rs`, `store.rs` (Zeitzugriffe), `crates/contextra-store/src/wal/hmac.rs` und `crates/contextra-store/src/wal/io.rs` (Legacy-Symbole), `store/lsm/ops/read.rs`, `ops.rs`, `engine.rs` (Tracked-Reads), `mvcc/ssi.rs` und `tx_buffer.rs` (ReadSet, Validierung), Engine-Schreibpfade, `Cargo.toml`-Abhängigkeiten. **Nicht gelesen:** Lock-Stärke in `commit.rs` (J.7), `.rekeyed`-Migration (J.2), Fusionspfad der Hybrid-Suche (J.12), ob die Engine einen Begin-Snapshot der Transaktion bereitstellt. **Nicht ausgeführt:** Build und Tests, insbesondere der Reproduktionstest für B-16. <!-- doc-ref-ignore -->
 
 ---
 
@@ -896,8 +896,8 @@ Gelesen: `signed_gate.rs` (Konstruktor, `check_ring`, Payload), `license.rs`, `m
 
 | Nr. | Bisherige Aussage | Befund am HEAD | Wirkung |
 |---|---|---|---|
-| U-01 | B-01 / G1-3 / J.14 / D.7: `contextra_explain` ist nicht klassifiziert, scheitert unter Default-Policy | **Behoben.** `contextra-mcp/src/sandbox.rs` enthält `TOOL_REGISTRY` (Tool, Kategorie, Beschreibung, Schema an einer Stelle); `classify_method` sucht dort. `contextra_explain` → `DatabaseRead`. Test in `mcp/src/tests.rs` (Assertion auf `DatabaseRead`). Commit #3949 | INV-MCP-CLASSIFY-1 ✅. **B-02 bleibt offen:** unbekannte Namen liefern weiter `CodeExecution` statt Fehler |
-| U-02 | B.3.5 Schritt 7 / D.5 / J.12(1): `hybrid_search_with_strategy` verwendet fest RRF | **Überholt.** Signatur hat den Parameter `fusion_strategy: Option<FusionStrategy>`. Die Methode ist `#[deprecated]` zugunsten `Collection::query()`. Der Builder kennt `SearchStrategy` (`query_builder/strategy.rs`) mit `Rrf` und `ScoreNormalized`. Der Community-Boost heißt `apply_community_boost_post_fusion` und wirkt nach beiden Strategien | D.5(1) ✅. Offen bleibt: Test für RRF-Fallback bei degradiertem Signal und PathRAG-Snapshot |
+| U-01 | B-01 / G1-3 / J.14 / D.7: `contextra_explain` ist nicht klassifiziert, scheitert unter Default-Policy | **Behoben.** `contextra-mcp/src/sandbox.rs` enthält `TOOL_REGISTRY` (Tool, Kategorie, Beschreibung, Schema an einer Stelle); `classify_method` sucht dort. `contextra_explain` → `DatabaseRead`. Test in `mcp/src/tests.rs` (Assertion auf `DatabaseRead`). Commit #3949 | INV-MCP-CLASSIFY-1 ✅. **B-02 bleibt offen:** unbekannte Namen liefern weiter `CodeExecution` statt Fehler | <!-- doc-ref-ignore -->
+| U-02 | B.3.5 Schritt 7 / D.5 / J.12(1): `hybrid_search_with_strategy` verwendet fest RRF | **Überholt.** Signatur hat den Parameter `fusion_strategy: Option<FusionStrategy>`. Die Methode ist `#[deprecated]` zugunsten `Collection::query()`. Der Builder kennt `SearchStrategy` (`crates/contextra-engine/src/collection/query_builder/strategy.rs`) mit `Rrf` und `ScoreNormalized`. Der Community-Boost heißt `apply_community_boost_post_fusion` und wirkt nach beiden Strategien | D.5(1) ✅. Offen bleibt: Test für RRF-Fallback bei degradiertem Signal und PathRAG-Snapshot |
 | U-03 | J.12(3): PathRAG nicht snapshot-fähig | **Unverändert.** `snapshot_unsupported_for_signal` wird in `search/hybrid/mod.rs:190` und `query.rs:292` geworfen | offen |
 | U-04 | B-16 / J.13: Schreibpfade registrieren Lesezugriffe mit `snapshot_seq = u64::MAX` | **Unverändert vorhanden.** Acht Aufrufstellen: `insert.rs:321,325`, `update.rs:63,67`, `delete.rs:42,46`, `links.rs:65,139`. `store/src/lsm/ops/read.rs:18-29` (`get_at_seq_tracked`) registriert `snapshot_seq` ungeklemmt per `tx_buffer.register_read`. Nicht ausgeführt | B-16 bleibt Verdacht, **P0** |
 | U-05 | I.0 / B.4: Widerspruch zum Replicator-Default | **Aufgelöst.** `MaintenanceConfig::default()` setzt `replicator_enabled: false`, `replicator_lr: 0.05`, `coherence_bonus_beta: 0.15`. Der Doc-Kommentar „Default: true“ am Feld ist falsch. B.4 ist korrekt | Doc-Kommentar korrigieren (P3) |
@@ -906,7 +906,7 @@ Gelesen: `signed_gate.rs` (Konstruktor, `check_ring`, Payload), `license.rs`, `m
 | U-08 | G.4: `LLAMA_GGUF_PATH`, `CANDLE_EMBED_MODEL_DIR`, `CANDLE_LLM_MODEL_DIR` als Laufzeitvariablen | Im Produktivcode von `crates/` und `xtask/` am HEAD **nicht gefunden** (Suche über alle `.rs` außerhalb `tests/`) | Vollständige Liste: K.35 |
 | U-09 | MCP-Schreibtools | `contextra_drop_collection` verlangt wie `contextra_forget` den Parameter `confirm: true` (Pflichtparameter im Schema) | siehe K.34, L.7 |
 | U-10 | Kopfzeile: HEAD `e4d84c9`, „33 Crates“ | HEAD `b564e830`. `docs/FEATURES_SPECIFICATION.md` spricht von „35 Crates“: Das sind die 35 Workspace-Mitglieder (33 Crates + `xtask` + `contextra-bench`), kein Widerspruch | Zählweise in A.1.1 beibehalten |
-| U-11 | Repo-Datei `docs/spec/CONTEXTRA_SPEZIFIKATION_v14.md` | Ältere Fassung von v14: ohne B-16, J.13-Nachprüfung und G1-4-Korrektur | Diese Datei ersetzt sie |
+| U-11 | Repo-Datei `docs/spec/CONTEXTRA_SPEZIFIKATION_v14.md` | Ältere Fassung von v14: ohne B-16, J.13-Nachprüfung und G1-4-Korrektur | Diese Datei ersetzt sie | <!-- doc-ref-ignore -->
 | U-12 | `DurabilityMode` | Drei Varianten `Full`, `WalNoHmac`, `MemoryOnly` bestätigt (`store/lsm/config.rs:8-10`). `WalNoHmac` + aktiver Löschbeweis wird in `config.rs:45` abgelehnt | I.0 bestätigt |
 
 ## K.0.2 Abdeckung nach Teil K
@@ -1053,7 +1053,7 @@ Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop
 | `context.rs` | 492 | — |
 | `dlq.rs` | 263 | — |
 | `engine.rs` | 832 | — |
-| `engine/condition.rs` | 146 | — |
+| `crates/contextra-agent/src/engine/condition.rs` | 146 | — |
 | `event_source.rs` | 290 | — |
 | `graph.rs` | 234 | — |
 | `step.rs` | 95 | — |
@@ -1090,7 +1090,7 @@ Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop
 - `const MAX_WORKFLOW_STEPS: u64 = 10_000` — Maximum allowed steps in a single workflow execution to prevent unbounded loops.
 - `struct OrchestratorEngine` { tools, checkpoint_store, dead_letter_queue } — Async executor engine applying nodes in Sequence. · Methoden: try_new, try_from_db, new, from_db, try_register_tool, recover_orphans, run, replay_from, checkpoint, run_event_loop
 
-**`engine/condition.rs`**
+**`crates/contextra-agent/src/engine/condition.rs`**
 
 - `fn evaluate_condition_expr(expr: &str, ctx: &AgentContext) -> bool` — Evaluates a declarative condition expression against the provided [`AgentContext`].
 
@@ -1267,10 +1267,10 @@ Contextra — Memory consolidation, compaction, and context management
 | `consolidation_executor.rs` | 985 | — |
 | `consolidation_locks.rs` | 105 | — |
 | `context.rs` | 554 | — |
-| `context_compaction/cleanup.rs` | 40 | — |
-| `context_compaction/compactor.rs` | 257 | — |
-| `context_compaction/session.rs` | 306 | — |
-| `context_compaction/types.rs` | 42 | — |
+| `crates/contextra-cognition/src/context_compaction/cleanup.rs` | 40 | — |
+| `crates/contextra-cognition/src/context_compaction/compactor.rs` | 257 | — |
+| `crates/contextra-cognition/src/context_compaction/session.rs` | 306 | — |
+| `crates/contextra-cognition/src/context_compaction/types.rs` | 42 | — |
 | `graph_sink.rs` | 91 | Graph-Sink Implementation (`CsrGraphSuperEdgeSink`) for LeanRAG Stage 3 Aggregation (§21.4). |
 | `leanrag_input.rs` | 113 | — |
 | `maintenance_config.rs` | 93 | — |
@@ -1314,19 +1314,19 @@ Contextra — Memory consolidation, compaction, and context management
 - `struct ContextManager` — Manages autonomous context preparation for LLM consumption. · Methoden: new, with_defaults, set_relevance_threshold, relevance_threshold, prepare_context, estimate_tokens
 - `struct SpatialFence` { region, field_name } — Spatial fencing for geographically constrained context (optional). · Methoden: new, matches
 
-**`context_compaction/cleanup.rs`**
+**`crates/contextra-cognition/src/context_compaction/cleanup.rs`**
 
 - `fn cleanup_orphaned_consolidation_intents( storage: &S, next_tx: &std::sync::atomic::AtomicU64, ) -> Result<usize>` — Aufgerufen beim Öffnen einer Collection / DB.
 
-**`context_compaction/compactor.rs`**
+**`crates/contextra-cognition/src/context_compaction/compactor.rs`**
 
 - `struct ContextCompactor` — Context Compaction Engine. · Methoden: new, compact, consolidate_via_llm, consolidate_with_retry
 
-**`context_compaction/session.rs`**
+**`crates/contextra-cognition/src/context_compaction/session.rs`**
 
 - `struct ConsolidationSession` { collection, source_docs, intent_key, target_id, base_tx } — Optimistic Concurrency Control (OCC) Consolidation Session for Sleep-Cycle Memory Compaction. · Methoden: start, validate_occ, refresh, abort, execute, commit, commit_ref
 
-**`context_compaction/types.rs`**
+**`crates/contextra-cognition/src/context_compaction/types.rs`**
 
 - `enum CompactionStrategy` ∈ {Truncate, Summarize, StatusToken, LlmSummarize} — Strategie für Context Compaction.
 - `struct CompactedContext` { retained_chunks, status_tokens, tokens_used, source_doc_ids } — Kompaktierter Kontext für LLM-Übergabe.
@@ -1412,9 +1412,9 @@ Encryption at Rest and KV-Cache Security utilities for Contextra
 | `error.rs` | 128 | Error types for `contextra-crypto`. |
 | `kdf.rs` | 279 | — |
 | `kv_cipher.rs` | 391 | — |
-| `kv_segment/eviction_worker.rs` | 211 | — |
-| `kv_segment/segment.rs` | 352 | — |
-| `kv_segment/store.rs` | 841 | — |
+| `crates/contextra-crypto/src/kv_segment/eviction_worker.rs` | 211 | — |
+| `crates/contextra-crypto/src/kv_segment/segment.rs` | 352 | — |
+| `crates/contextra-crypto/src/kv_segment/store.rs` | 841 | — |
 | `kv_shredding.rs` | 210 | — |
 | `wal_completeness.rs` | 58 | — |
 | `wal_crypto.rs` | 810 | — |
@@ -1478,18 +1478,18 @@ Encryption at Rest and KV-Cache Security utilities for Contextra
 - `trait KvCipher` (seal, open) — Abstract cipher trait for KV block encryption and seal/open operations.
 - `struct KvSegmentCipher` — High-level cipher engine for KV-cache segment encryption and decryption. · Methoden: new, encrypt, decrypt, derive_key_for_segment, encrypt_with_version, decrypt_with_version · impl: KvCipher
 
-**`kv_segment/eviction_worker.rs`**
+**`crates/contextra-crypto/src/kv_segment/eviction_worker.rs`**
 
 - `struct EvictionWorker` · Methoden: spawn, trigger_eviction, shutdown
 - `fn emergency_wipe(store: &TenantIsolatedKvStore)` — SEPARATER Pfad für Notfall-Löschung (z.B Prozess-Shutdown, expliziter Sicherheits-Trigger).
 
-**`kv_segment/segment.rs`**
+**`crates/contextra-crypto/src/kv_segment/segment.rs`**
 
 - `const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1` — Aktuelle Version der KV-Segment-Schlüsselableitung.
 - `struct EncryptedSegmentPayload` { layer } *[feature: kv-encryption]* — Encrypted layer representation stored inside a KvSegment when encryption is active.
 - `struct KvSegment` { tenant_id, segment_id, key_derivation_version, encrypted, model_fingerprint, rope_offset } — Ein KV-Cache-Segment. · Methoden: new, new_with_metadata, new_encrypted, decrypt_data, to_spill_bytes, as_bytes, len, is_empty
 
-**`kv_segment/store.rs`**
+**`crates/contextra-crypto/src/kv_segment/store.rs`**
 
 - `type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>` — Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
 - `struct TenantIsolatedKvStore` — Tenant-isolierter KV-Segment-Store. · Methoden: new, with_shard_count, with_capacity, set_spill_handler, insert_segment, on_rollback, remove_segments_for_rollback, remove_segment, get_segment_bytes, insert_encrypted_segment, get_segments, get_decrypted_segment, get_tenant_segment_len, evict_lru_fair…
@@ -1554,42 +1554,42 @@ Contextra — Core storage, index, and transaction orchestrator engine
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `background_workers/config.rs` | 64 | — |
-| `background_workers/expiry_workers.rs` | 114 | — |
-| `background_workers/hyperedge_worker.rs` | 103 | — |
-| `background_workers/orphan_workers.rs` | 177 | — |
+| `crates/contextra-engine/src/background_workers/config.rs` | 64 | — |
+| `crates/contextra-engine/src/background_workers/expiry_workers.rs` | 114 | — |
+| `crates/contextra-engine/src/background_workers/hyperedge_worker.rs` | 103 | — |
+| `crates/contextra-engine/src/background_workers/orphan_workers.rs` | 177 | — |
 | `chunker.rs` | 682 | — |
-| `collection/crud/auto_extraction.rs` | 202 | — |
-| `collection/crud/read.rs` | 297 | — |
-| `collection/kv_lock.rs` | 224 | — |
-| `collection/maintenance.rs` | 926 | — |
-| `collection/mod.rs` | 698 | — |
-| `collection/query_builder/builder.rs` | 285 | — |
-| `collection/query_builder/scope.rs` | 59 | — |
-| `collection/query_builder/strategy.rs` | 76 | — |
-| `collection/query_builder/weights.rs` | 41 | — |
-| `collection/search/checkpoint.rs` | 101 | — |
+| `crates/contextra-engine/src/collection/crud/auto_extraction.rs` | 202 | — |
+| `crates/contextra-engine/src/collection/crud/read.rs` | 297 | — |
+| `crates/contextra-engine/src/collection/kv_lock.rs` | 224 | — |
+| `crates/contextra-engine/src/collection/maintenance.rs` | 926 | — |
+| `crates/contextra-engine/src/collection/mod.rs` | 698 | — |
+| `crates/contextra-engine/src/collection/query_builder/builder.rs` | 285 | — |
+| `crates/contextra-engine/src/collection/query_builder/scope.rs` | 59 | — |
+| `crates/contextra-engine/src/collection/query_builder/strategy.rs` | 76 | — |
+| `crates/contextra-engine/src/collection/query_builder/weights.rs` | 41 | — |
+| `crates/contextra-engine/src/collection/search/checkpoint.rs` | 101 | — |
 | `decay_controller.rs` | 205 | Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (F-01). |
 | `export.rs` | 389 | — |
-| `extraction/open_ie.rs` | 123 | — |
-| `extraction/types.rs` | 45 | — |
+| `crates/contextra-engine/src/extraction/open_ie.rs` | 123 | — |
+| `crates/contextra-engine/src/extraction/types.rs` | 45 | — |
 | `filter.rs` | 323 | — |
 | `fusion.rs` | 41 | Hybrid Search Signal Fusion implementations (Reciprocal Rank Fusion & Score Normalization). |
 | `import.rs` | 127 | — |
 | `lib.rs` | 607 | — |
 | `temporal_filter.rs` | 353 | — |
-| `transaction/cleanup.rs` | 90 | — |
-| `transaction/compensating_actions.rs` | 336 | — |
-| `transaction/db_transaction.rs` | 173 | — |
-| `transaction/intent.rs` | 35 | — |
+| `crates/contextra-engine/src/transaction/cleanup.rs` | 90 | — |
+| `crates/contextra-engine/src/transaction/compensating_actions.rs` | 336 | — |
+| `crates/contextra-engine/src/transaction/db_transaction.rs` | 173 | — |
+| `crates/contextra-engine/src/transaction/intent.rs` | 35 | — |
 
-**`background_workers/config.rs`**
+**`crates/contextra-engine/src/background_workers/config.rs`**
 
 - `struct OrphanCleanupBackoffConfig` { base_delay, max_delay, alert_threshold } — Configuration parameters for HNSW index rebuild backoff and failure escalation.
 - `fn calculate_rebuild_cooldown( consecutive_failures: u32, base_delay: Duration, max_delay: Duration, ) -> Duration` — Helper calculating exponential backoff cooldown given consecutive failures.
 - `trait OrphanCleanupIndex` (check_connectivity, rebuild) — Abstraction trait over vector indexes capable of connectivity check and rebuild.
 
-**`background_workers/expiry_workers.rs`**
+**`crates/contextra-engine/src/background_workers/expiry_workers.rs`**
 
 - `const MAX_EXPIRED_PER_TICK: usize = 100` — Maximum number of expired documents processed in a single expiry cleanup tick.
 - `fn start_expiry_cleanup_worker( collection: Arc<Collection<S>>, interval: Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>` — Starts a background task to periodically clean up expired documents with TTL.
@@ -1597,13 +1597,13 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `fn start_decay_cleanup_worker( collection: Arc<Collection<S, V>>, decay_config: DecayControllerConfig, interval: Duration, cancel_token: tokio_util::sync::CancellationTok` *[feature: background-maintenance]* — Starts a background task for decay-controller-driven importance-score eviction.
 - `fn start_thermostat_reaper( collection: Arc<Collection<S, V>>, decay_config: DecayControllerConfig, interval: Duration, cancel_token: tokio_util::sync::CancellationToken,` *[feature: background-maintenance]* — Deprecated legacy alias for `start_decay_cleanup_worker`.
 
-**`background_workers/hyperedge_worker.rs`**
+**`crates/contextra-engine/src/background_workers/hyperedge_worker.rs`**
 
 - `const MAX_DEFERRED_HYPEREDGES_PER_TICK: usize = 1_000` — Maximum number of deferred hyperedges processed in a single worker tick.
 - `struct DeferredHyperedgeQueue` — Thread-safe FIFO queue for storing hyperedges whose cascade invalidation was deferred to the background worker due to fan-out limits (H5 / AK-6). · Methoden: new, enqueue, drain_up_to
 - `fn start_hyperedge_cascade_deferred_worker( collection: Arc<Collection<S>>, queue: Arc<DeferredHyperedgeQueue>, interval: Duration, cancel_token: tokio_util::sync::Cancel` — Starts a background task to process deferred hyperedge tombstones.
 
-**`background_workers/orphan_workers.rs`**
+**`crates/contextra-engine/src/background_workers/orphan_workers.rs`**
 
 - `const MAX_ORPHANS_PER_TICK: usize = 100` — Maximum number of orphan transactions processed in a single worker tick to avoid starving foreground operations.
 - `fn start_orphan_cleanup_worker_with_config( buffer: Arc<TxBuffer<T>>, hnsw_index: Arc<I>, interval: Duration, backoff_config: OrphanCleanupBackoffConfig, cancel_token: to` — Starts a background task to periodically clean up orphan transactions and manage HNSW rebuilds with exponential backoff.
@@ -1618,26 +1618,26 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<&str>`
 - `fn chunk_text(text: &str, chunk_size: usize) -> Vec<&str>`
 
-**`collection/crud/auto_extraction.rs`**
+**`crates/contextra-engine/src/collection/crud/auto_extraction.rs`**
 
 - `struct EntityExtractionConfig` { enabled, max_llm_calls_per_cycle, min_confidence }
 - `struct AutoExtractionConfig` { mode, enabled, entity_config } — Konfiguration fuer die automatische Entitaetsextraktion beim Einfuegen von Dokumenten. · Methoden: new, with_mode, is_enabled
 
-**`collection/crud/read.rs`**
+**`crates/contextra-engine/src/collection/crud/read.rs`**
 
 - `const DEFAULT_SCAN_LIMIT: usize = 10_000` — Harte Obergrenze für scan()/scan_prefix()-Ergebnisse, falls kein explizites `limit` übergeben wird.
 - `const HARD_SCAN_CEILING: usize = 100_000` — Harte Obergrenze für den maximal erlaubten `limit`-Parameter in scan() und scan_prefix().
 - `const MAX_SCAN_RESULTS: usize = DEFAULT_SCAN_LIMIT` — Alias for backwards compatibility with earlier MAX_SCAN_RESULTS references.
 
-**`collection/kv_lock.rs`**
+**`crates/contextra-engine/src/collection/kv_lock.rs`**
 
 - `fn sorted_unique_shards( keys: impl IntoIterator<Item = &'a str>, shard_count: usize, hasher: &ahash::RandomState, ) -> Vec<usize>` — Pure, synchronous function to map string keys to unique shard indices in ascending order.
 
-**`collection/maintenance.rs`**
+**`crates/contextra-engine/src/collection/maintenance.rs`**
 
 - `struct PercolationResult` { health, rebonding_triggered, new_edges_added } *[feature: graph-connectivity-health]*
 
-**`collection/mod.rs`**
+**`crates/contextra-engine/src/collection/mod.rs`**
 
 - `struct CollectionConfig` { backpressure_delay_ms } — Configuration for a collection.
 - `struct StoredDocument` { id, embedding, metadata }
@@ -1648,25 +1648,25 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `fn extract_effective_importance(metadata: &Option<serde_json::Value>, now_tx: TxId) -> f32` — Extracts the effective importance score of a document at a given transaction ID.
 - `struct Collection` { consolidation_guard } — # Concurrency & Lock Hierarchy Lock acquisition within `Collection` follows strict ordering to prevent deadlocks: · Methoden: with_auto_extraction, set_auto_extraction, auto_extraction_config, delete, delete_op, insert_text_only, upsert_text_only, insert_with_ttl, insert_typed, insert, insert_op, insert_many, upsert, upsert_many…
 
-**`collection/query_builder/builder.rs`**
+**`crates/contextra-engine/src/collection/query_builder/builder.rs`**
 
 - `const DEFAULT_RERANK_POOL_MULTIPLIER: usize = 10` — Default candidate pool expansion multiplier for Cross-Encoder reranking (10x requested k).
 - `const DEFAULT_RERANK_POOL_MAX: usize = 200` — Default upper cap for pre-reranking candidate pool expansion (200 candidates).
 - `struct HybridQueryBuilder` — Fluent query builder for unifying vector, text, graph, and hybrid search operations. · Methoden: new, text, embedding, vector, k, weights, fusion_weights, fusion_strategy, filter, metadata_filter, strategy, anchor_entities, anchors, same_community_as…
 
-**`collection/query_builder/scope.rs`**
+**`crates/contextra-engine/src/collection/query_builder/scope.rs`**
 
 - `struct ScopeConstraint` { allowed_doc_ids, gamma } — Scoping constraint defining an explicit hard-boundary set of allowed document IDs for predicate-agnostic vector search (ACORN-Hard-Boundary, Spec §5.3, §8.5). · Methoden: new, from_allowed_ids
 
-**`collection/query_builder/strategy.rs`**
+**`crates/contextra-engine/src/collection/query_builder/strategy.rs`**
 
 - `enum SearchStrategy` ∈ {Rrf, ScoreNormalized, Hops, PersonalizedPageRank, PathRag} — Strategy for hybrid search and graph signal traversal. · Methoden: to_graph_strategy, to_fusion_strategy
 
-**`collection/query_builder/weights.rs`**
+**`crates/contextra-engine/src/collection/query_builder/weights.rs`**
 
 - `struct SignalWeights` { vector, text, graph } — Custom weights for vector, text, and graph signals in hybrid search. · Methoden: new
 
-**`collection/search/checkpoint.rs`**
+**`crates/contextra-engine/src/collection/search/checkpoint.rs`**
 
 - `struct CheckpointPinGuard` — RAII Guard for pinning snapshot checkpoints during search/scan operations. · Methoden: new, new_at_latest, release
 - `fn with_pinned_checkpoint(storage: &S, seq: u64, f: F) -> Result<T>` — Higher-order function wrapping an async block with a pinned checkpoint guard, ensuring `release()` is ALWAYS called even on error paths.
@@ -1686,11 +1686,11 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `struct ExportMemoryV1` { id, memory_type, content, embedding, embedding_model, created_at, importance_score, metadata, links } — Export-Repräsentation eines einzelnen Memory-Eintrags.
 - `struct ExportRelationV1` { from, to, label } — Export-Repräsentation einer Graph-Beziehung.
 
-**`extraction/open_ie.rs`**
+**`crates/contextra-engine/src/extraction/open_ie.rs`**
 
 - `fn extract_triples( text: &str, generator: &dyn LlmTextGenerator, config: &EntityExtractionConfig, ) -> Result<Vec<ExtractedTriple>>` — Extrahiert Wissens-Tripel (Subjekt, Prädikat, Objekt) aus dem gegebenen Text mittels LLM.
 
-**`extraction/types.rs`**
+**`crates/contextra-engine/src/extraction/types.rs`**
 
 - `struct ExtractedTriple` { subject, predicate, object, confidence, source_span } — Ein aus dem Text extrahiertes Wissens-Tripel (Subject, Predicate, Object).
 - `struct EntityExtractionConfig` { enabled, max_llm_calls_per_cycle, min_confidence } — Konfiguration für die automatische Entitätsextraktion.
@@ -1739,12 +1739,12 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `fn apply_temporal_validity_filter( results: Vec<crate::SearchResult>, current_tx: TxId, query_timestamp: Option<u64>, ) -> Vec<crate::SearchResult>` — Applies bi-temporal validity filtering to candidates post-RRF fusion.
 - `fn apply_temporal_validity_filter_at( results: Vec<crate::SearchResult>, as_of_timestamp: u64, ) -> Vec<crate::SearchResult>` — Applies historical "as-of" bi-temporal validity filtering to candidates post-RRF fusion.
 
-**`transaction/cleanup.rs`**
+**`crates/contextra-engine/src/transaction/cleanup.rs`**
 
 - `fn cleanup_orphaned_consolidation_intents( storage: &S, next_tx: &std::sync::atomic::AtomicU64, ) -> Result<usize>` — Aufgerufen beim Öffnen einer Collection / DB.
 - `fn recover_pending_intents( storage: &S, next_tx: &std::sync::atomic::AtomicU64, ) -> Result<usize>` — Recovers or reconciles any pending transaction intents found in storage.
 
-**`transaction/compensating_actions.rs`**
+**`crates/contextra-engine/src/transaction/compensating_actions.rs`**
 
 - `trait CompensatingAction` (execute) — Trait representing an undo operation to be executed during transaction rollback/compensation.
 - `struct CommitLedger` — A ledger of compensating actions collected during 2PC, executed in reverse order (LIFO) on failure. · Methoden: new, push, execute_rollback
@@ -1754,11 +1754,11 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `struct CompensateTextAction` · Methoden: new · impl: CompensatingAction
 - `struct RollbackStagedAction` · Methoden: new · impl: CompensatingAction
 
-**`transaction/db_transaction.rs`**
+**`crates/contextra-engine/src/transaction/db_transaction.rs`**
 
 - `struct DbTransaction` { tx_id } — A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index. · Methoden: new, record_keys, record_keys_with_old_values, stage_text_insert, stage_text_delete, stage_graph_entity, stage_graph_edge, stage_graph_entity_delete, stage_graph_edge_delete, stage_hyperedge, commit, rollback
 
-**`transaction/intent.rs`**
+**`crates/contextra-engine/src/transaction/intent.rs`**
 
 - `enum CommitIntent` ∈ {Pending, Committed, Aborted, Consolidation, Failed} — Status of a multi-index transaction during the 2-phase commit.
 
@@ -1772,76 +1772,76 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `apprh/diffusion.rs` | 176 | Core diffusion operator for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
-| `apprh/error.rs` | 26 | Error types for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
-| `apprh/gate_monitor.rs` | 260 | — |
-| `apprh/mod.rs` | 98 | Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
-| `apprh/params.rs` | 113 | Configuration parameters for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
-| `apprh/selector.rs` | 206 | — |
-| `apprh/shadow.rs` | 138 | Shadow comparison module comparing Forward-Push PPR against APPRH. |
+| `crates/contextra-graph/src/apprh/diffusion.rs` | 176 | Core diffusion operator for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
+| `crates/contextra-graph/src/apprh/error.rs` | 26 | Error types for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
+| `crates/contextra-graph/src/apprh/gate_monitor.rs` | 260 | — |
+| `crates/contextra-graph/src/apprh/mod.rs` | 98 | Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
+| `crates/contextra-graph/src/apprh/params.rs` | 113 | Configuration parameters for Averaging-based Personalized PageRank for Hypergraphs (APPRH). |
+| `crates/contextra-graph/src/apprh/selector.rs` | 206 | — |
+| `crates/contextra-graph/src/apprh/shadow.rs` | 138 | Shadow comparison module comparing Forward-Push PPR against APPRH. |
 | `arc_slice.rs` | 158 | Generic zero-copy sub-slice backed by an `Arc<[T]>`. |
 | `cascade.rs` | 1060 | — |
 | `community.rs` | 630 | Leiden Community Detection algorithm for CsrGraph. |
 | `consistency_enforcement.rs` | 453 | Consistency Enforcement / Konflikterkennungs-Register (Feature F-04). |
 | `csr.rs` | 24 | CSR-Graph-Implementierung für Entity-Relation-Traversal. |
-| `csr/graph_persist.rs` | 269 | Persistenz-Hilfsmethoden für CsrGraph. |
-| `csr/graph_write.rs` | 925 | — |
-| `csr/inner.rs` | 815 | — |
-| `csr/types.rs` | 114 | — |
-| `csr/visibility.rs` | 80 | — |
+| `crates/contextra-graph/src/csr/graph_persist.rs` | 269 | Persistenz-Hilfsmethoden für CsrGraph. |
+| `crates/contextra-graph/src/csr/graph_write.rs` | 925 | — |
+| `crates/contextra-graph/src/csr/inner.rs` | 815 | — |
+| `crates/contextra-graph/src/csr/types.rs` | 114 | — |
+| `crates/contextra-graph/src/csr/visibility.rs` | 80 | — |
 | `edge_reinforcement.rs` | 182 | F-03: Co-Occurrence- und Traversal-basierte Kantenverstärkung (Edge Weight Reinforcement Learning). |
 | `edge_reinforcement_buffer.rs` | 202 | — |
 | `error.rs` | 111 | Graph mutation error taxonomy for Contextra Graph. |
 | `hyperedge.rs` | 825 | Hyperkanten-Kerndatenmodell (`HyperEdge`, `RoleBinding`, `RoleId`, `HyperEdgeId`, `RoleInterner`). |
 | `hyperedge_suggest.rs` | 180 | Hyperedge suggestion and LLM validation module (Spec §13, Part 2). |
 | `lib.rs` | 127 | Contextra Graph — CSR-Graph for Entity-Relation Traversal & Session DAG. |
-| `path_rag/k_path.rs` | 322 | Budgeted k-Path Diffusion for PathRAG Engine. |
-| `path_rag/mod.rs` | 459 | PathRAG Engine — Graph-basiertes Retrieval via bidirektionaler Dijkstra. |
+| `crates/contextra-graph/src/path_rag/k_path.rs` | 322 | Budgeted k-Path Diffusion for PathRAG Engine. |
+| `crates/contextra-graph/src/path_rag/mod.rs` | 459 | PathRAG Engine — Graph-basiertes Retrieval via bidirektionaler Dijkstra. |
 | `percolation.rs` | 313 | F-06: Perkolations-Gesundheitsmonitor. |
 | `ppr.rs` | 1045 | Personalized PageRank (PPR) power iteration implementation for `CsrGraph`. |
-| `ppr/shadow_hook.rs` | 94 | Shadow mode hook for comparing TL-HFD PPR scores against baseline PPR scores (§12). |
-| `ppr/snapshot.rs` | 142 | Snapshot-isolated Personalized PageRank (PPR) power iteration support. |
+| `crates/contextra-graph/src/ppr/shadow_hook.rs` | 94 | Shadow mode hook for comparing TL-HFD PPR scores against baseline PPR scores (§12). |
+| `crates/contextra-graph/src/ppr/snapshot.rs` | 142 | Snapshot-isolated Personalized PageRank (PPR) power iteration support. |
 | `ppr_stream.rs` | 152 | Candidate stream for Personalized PageRank (PPR) graph retrieval (DiBud / Spec §21.2 / AK-17). |
 | `provenance.rs` | 176 | — |
 | `session_dag.rs` | 980 | Session-DAG for Agent State Branching (Contextra Session-DAG Pattern). |
-| `tl_hfd/diffusion.rs` | 245 | Core diffusion loop and active region management for TL-HFD (Spec §21.1). |
-| `tl_hfd/error.rs` | 22 | Error types for Thresholded Local Hyper-Flow Diffusion (TL-HFD). |
-| `tl_hfd/lovasz.rs` | 194 | Lovász extension and subgradient calculations for TL-HFD (Spec §21.1). |
-| `tl_hfd/mod.rs` | 54 | Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1). |
-| `tl_hfd/params.rs` | 136 | Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1). |
-| `tl_hfd/shadow.rs` | 153 | Shadow comparison module comparing Forward-Push PPR against TL-HFD (AK-16). |
+| `crates/contextra-graph/src/tl_hfd/diffusion.rs` | 245 | Core diffusion loop and active region management for TL-HFD (Spec §21.1). |
+| `crates/contextra-graph/src/tl_hfd/error.rs` | 22 | Error types for Thresholded Local Hyper-Flow Diffusion (TL-HFD). |
+| `crates/contextra-graph/src/tl_hfd/lovasz.rs` | 194 | Lovász extension and subgradient calculations for TL-HFD (Spec §21.1). |
+| `crates/contextra-graph/src/tl_hfd/mod.rs` | 54 | Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1). |
+| `crates/contextra-graph/src/tl_hfd/params.rs` | 136 | Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1). |
+| `crates/contextra-graph/src/tl_hfd/shadow.rs` | 153 | Shadow comparison module comparing Forward-Push PPR against TL-HFD (AK-16). |
 
-**`apprh/diffusion.rs`**
+**`crates/contextra-graph/src/apprh/diffusion.rs`**
 
 - `fn run_apprh_push( graph: &G, seeds: &[EntityId], params: &ApprhParams, ) -> Result<AHashMap<EntityId, f32>, ApprhError>` — Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-**`apprh/error.rs`**
+**`crates/contextra-graph/src/apprh/error.rs`**
 
 - `enum ApprhError` ∈ {InvalidParameter, EmptySeeds, NonFinite} — Error type for APPRH operations and parameter validations.
 
-**`apprh/gate_monitor.rs`**
+**`crates/contextra-graph/src/apprh/gate_monitor.rs`**
 
 - `struct ApprhGateMonitorConfig` { window_size, required_consecutive_passes } — Configuration for [`ApprhGateMonitor`]. · Methoden: validate
 - `struct ApprhObservationRecord` { max_abs_diff, top_k_overlap, discrepancy, passed } — Historical observation record stored within the sliding window of [`ApprhGateMonitor`].
 - `struct ApprhGateMonitorSnapshot` { total_observations, current_streak, last_overlap, max_abs_diff_in_window, min_overlap_in_window, discrepancy_count_in_window, production_ready } — Telemetry snapshot from [`ApprhGateMonitor`].
 - `struct ApprhGateMonitor` — Independent, thread-safe monitor evaluating a series of APPRH shadow mode comparisons for production readiness (P1.3). · Methoden: new, with_gate, observe, production_ready, snapshot, reset, config
 
-**`apprh/mod.rs`**
+**`crates/contextra-graph/src/apprh/mod.rs`**
 
 - `fn apprh_local( graph: &G, seeds: &[EntityId], params: &ApprhParams, ) -> Result<AHashMap<EntityId, f32>, ApprhError>` — Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH) over a generic [`PathGraph`].
 - `fn forward_push_apprh( graph: &G, seeds: &[EntityId], params: &PprParams, hyperedge_decay_factor: f32, ) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraErro` — Spec-compliant additive APPRH operator (Spec Y.1.2).
 
-**`apprh/params.rs`**
+**`crates/contextra-graph/src/apprh/params.rs`**
 
 - `struct ApprhParams` { ppr, hyperedge_decay_factor, max_iterations } — Configuration parameters for Averaging-based Personalized PageRank for Hypergraphs (APPRH). · Methoden: validate
 
-**`apprh/selector.rs`**
+**`crates/contextra-graph/src/apprh/selector.rs`**
 
 - `enum ApprhMode` ∈ {Off, Shadow, Production} — Operating mode for [`ApprhSelector`].
 - `struct ApprhSelectorConfig` { sample_interval, max_seeds, shadow_top_k } — Configuration parameters for [`ApprhSelector`].
 - `struct ApprhSelector` — Instance-level selector managing APPRH shadow-mode evaluation and production switching (P1.3). · Methoden: new, with_default_monitor, mode, set_mode, promote_to_production, demote_to_shadow, monitor, evaluate_and_run
 
-**`apprh/shadow.rs`**
+**`crates/contextra-graph/src/apprh/shadow.rs`**
 
 - `trait ApprhFlipGate` (should_flip) — Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.
 - `struct DefaultApprhFlipGate` — Standard default flip gate evaluator for APPRH. · impl: ApprhFlipGate
@@ -1886,16 +1886,16 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 - `struct ExactPredicateConflictDetector` — Referenzimplementierung für exakten Prädikats-Konflikt: · impl: ContradictionDetector
 - `struct ConsistencyEnforcer` — Consistency-Enforcement-Register zur Verwaltung registrierter Konfliktmuster. · Methoden: new, check_before_insert, detect_contradiction, record_contradiction, is_suppressed, active_patterns, get_pattern, suppression_threshold, suggest_tombstone_candidates
 
-**`csr/graph_write.rs`**
+**`crates/contextra-graph/src/csr/graph_write.rs`**
 
 - `struct CsrGraph` { config, inner, write_state, storage, last_tx_id, consistency_enforcer, doc_edge_index, cascade_queue } — Compressed Sparse Row graph for entity-relation traversal. · Methoden: apprh_diffusion, apprh_shadow_compare, persist_entity, persist_edge, delete_edge_persistence, load_from_storage, compact, compact_async, set_communities_batch, get_communities_batch, neighbors, pagerank, get_deleted_node_indices, deleted_view… · impl: GraphGarbageCollection, GraphIndexExt, GraphIndex, PathGraph
 
-**`csr/inner.rs`**
+**`crates/contextra-graph/src/csr/inner.rs`**
 
 - `struct GraphInner` — Inner state of the CsrGraph to manage contiguous storage. · Methoden: new, get_or_create_index, compact · impl: PathGraph
 - `struct MemoryEstimate` { shared_payload_bytes, private_bytes } — Detailed memory estimate separating shared payloads from private structural allocations (§6.3). · Methoden: total_bytes
 
-**`csr/types.rs`**
+**`crates/contextra-graph/src/csr/types.rs`**
 
 - `enum EdgeType` ∈ {Default} — Edge type representation for CSR edges.
 - `struct Edge` { target, weight, edge_type, cooccurrence_weight, traversal_weight } — Edge structure in CSR graph representation. · Methoden: new
@@ -1905,7 +1905,7 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 - `const MAX_VISITED_NODES: usize = 10_000` — Maximum visited nodes limit during BFS traversal to prevent intermediate hub-node memory explosion.
 - `struct CsrGraphConfig` { rebuild_threshold, max_compaction_peak_memory_mb, resource_tracker }
 
-**`csr/visibility.rs`**
+**`crates/contextra-graph/src/csr/visibility.rs`**
 
 - `const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000` — Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 - `fn is_suspicious_tx_id(tx: TxId) -> bool` — Prüft, ob `tx` aus einem verdächtigen (wall-clock-ähnlichen) Bereich stammt.
@@ -1958,13 +1958,13 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 
 - `trait GraphIndexExt` (remove_entity) — Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
 
-**`path_rag/k_path.rs`**
+**`crates/contextra-graph/src/path_rag/k_path.rs`**
 
 - `struct KPathConfig` { k, max_visited_nodes, max_hops } — Configuration parameters for [`KPathDiffusion`].
 - `struct KPathResult` { paths, budget_exhausted } — Result returned by [`KPathDiffusion::find_k_paths`].
 - `trait KPathDiffusion` (find_k_paths) — Trait for budgeted k-path diffusion search over entity graphs.
 
-**`path_rag/mod.rs`**
+**`crates/contextra-graph/src/path_rag/mod.rs`**
 
 - `struct GraphPath` { nodes, edge_weights, confidence, total_flow } — Ein gefundener Pfad zwischen zwei Knoten.
 - `trait PathGraph` (neighbors_with_weights, predecessors_with_weights, hyperedges_for_entity, get_hyperedge, hyperedge_participants) — Trait für Graphen die PathRAG konsumieren kann.
@@ -1987,7 +1987,7 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 - `struct PprContext` — Reusable scratch buffers for Personalized PageRank (PPR) power iteration. · Methoden: new
 - `fn compute_ppr_with_apprh_selector( inner: &GraphInner, seed_nodes: &[EntityId], config: &PprConfig, deleted_nodes: &DeletedView, ctx: &mut PprContext, selector: &crate::` *[feature: apprh-diffusion]* — Calculates Personalized PageRank using APPRH selector routing and hysteresis gate evaluation (P1.3).
 
-**`ppr/shadow_hook.rs`**
+**`crates/contextra-graph/src/ppr/shadow_hook.rs`**
 
 - `fn log_tl_hfd_vs_baseline_discrepancy( baseline: &AHashMap<EntityId, f32>, candidate: &AHashMap<EntityId, f32>, context_id: u64, sink: &dyn ShadowSink<f64>, )` — Protokolliert die mittlere absolute Differenz (MAE) zwischen den Baseline- und TL-HFD-Kandidaten-PPR-Score-Maps über die gegebene Diskrepanz-Senke.
 
@@ -2013,28 +2013,28 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 - `struct SessionDagStepOptions` { prompt, response, snapshot_tx_id, tool_outputs, label } — Options for creating or branching a new step in the Session-DAG.
 - `struct SessionBranchTree` — Session-DAG for a single agent conversation tree. · Methoden: new, lock_nodes, lock_nodes_write, append_step, branch_from, set_active_head, path_to_head, children_of, active_head, node_count, get_node, save, load
 
-**`tl_hfd/diffusion.rs`**
+**`crates/contextra-graph/src/tl_hfd/diffusion.rs`**
 
 - `fn run_diffusion( graph: &G, seeds: &[EntityId], params: &TlHfdParams, ) -> Result<AHashMap<EntityId, f32>, TlHfdError>` — Runs Thresholded Local Hyper-Flow Diffusion over a generic [`PathGraph`].
 
-**`tl_hfd/error.rs`**
+**`crates/contextra-graph/src/tl_hfd/error.rs`**
 
 - `enum TlHfdError` ∈ {InvalidParameter, NonFinite} — Error type for TL-HFD operations and parameter validations.
 
-**`tl_hfd/lovasz.rs`**
+**`crates/contextra-graph/src/tl_hfd/lovasz.rs`**
 
 - `fn truncate_participants( participants: &[EntityId], get_x: impl Fn(EntityId) -> f32, max_sort_size: usize, ) -> Vec<EntityId>` — Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.
 - `fn compute_lovasz_extension( participants: &[EntityId], get_x: impl Fn(EntityId) -> f32, ) -> (f32, Option<EntityId>, Option<EntityId>)` — Evaluates Lovász extension $f_e(x) = \max_{u \in e} x_u - \min_{u \in e} x_u$ and subgradient $s_{e, u}(x)$ for participants.
 
-**`tl_hfd/mod.rs`**
+**`crates/contextra-graph/src/tl_hfd/mod.rs`**
 
 - `fn tl_hfd_local( graph: &G, seeds: &[EntityId], params: &TlHfdParams, ) -> Result<AHashMap<EntityId, f32>, TlHfdError>` — Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 
-**`tl_hfd/params.rs`**
+**`crates/contextra-graph/src/tl_hfd/params.rs`**
 
 - `struct TlHfdParams` { sigma, delta, gamma, max_iterations, max_top_k_expansion, max_hyperedge_sort_size } — Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD). · Methoden: validate
 
-**`tl_hfd/shadow.rs`**
+**`crates/contextra-graph/src/tl_hfd/shadow.rs`**
 
 - `const MIN_SHADOW_SAMPLES: u64 = 10_000` — Minimum required sample count for shadow mode default flip evaluation.
 - `const MIN_AGREEMENT_THRESHOLD: f32 = 0.85` — Minimum required mean top-k Jaccard agreement threshold for shadow mode default flip evaluation.
@@ -2059,11 +2059,11 @@ Native Candle GGUF ML inference backend for Contextra
 | `embedding_provider.rs` | 98 | — |
 | `gasp.rs` | 664 | — |
 | `gguf_loader.rs` | 95 | — |
-| `inference/core.rs` | 979 | — |
-| `inference/prefix_reuse.rs` | 91 | — |
+| `crates/contextra-infer-candle/src/inference/core.rs` | 979 | — |
+| `crates/contextra-infer-candle/src/inference/prefix_reuse.rs` | 91 | — |
 | `kv_bridge.rs` | 695 | — |
 | `kv_state.rs` | 319 | — |
-| `model/quantized_llama.rs` | 560 | — |
+| `crates/contextra-infer-candle/src/model/quantized_llama.rs` | 560 | — |
 | `model_registry.rs` | 143 | — |
 
 **`attention_exporter.rs`**
@@ -2094,7 +2094,7 @@ Native Candle GGUF ML inference backend for Contextra
 - `struct GgufMetadata` { architecture, tensor_count, metadata_keys } — Metadata extracted from a GGUF model container.
 - `fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, ContextraError>` — Inspects a GGUF model file and extracts its architecture and metadata header keys.
 
-**`inference/core.rs`**
+**`crates/contextra-infer-candle/src/inference/core.rs`**
 
 - `trait CandleModelInner` (generate, generate_stream, kv_layout, generate_stream_with_prefix) — Inner trait abstracting low-level Candle forward/text-generation execution.
 - `const DEFAULT_MAX_CONCURRENT_INFERENCES: usize = 4` — Default maximum concurrent inference operations for Candle LLM text generation.
@@ -2102,7 +2102,7 @@ Native Candle GGUF ML inference backend for Contextra
 - `struct QuantizedLlamaModel` — Real quantized Llama / GGUF model execution wrapper. · Methoden: load · impl: CandleModelInner
 - `struct DefaultCandleLlmModel` — Default inner Candle LLM mock model for unit tests when binary weights are absent. · impl: CandleModelInner
 
-**`inference/prefix_reuse.rs`**
+**`crates/contextra-infer-candle/src/inference/prefix_reuse.rs`**
 
 - `struct PrefixSeed` { matched_len, state } — Seed state for executing prompt generation with an imported KV cache prefix.
 - `struct PrefixRun` { output, prompt_tokens, reused_tokens, exported_prefix } — Execution result of a prefix-assisted generation run.
@@ -2120,7 +2120,7 @@ Native Candle GGUF ML inference backend for Contextra
 - `struct LayerKv` { k, v } — Represents the key (`k`) and value (`v`) tensors for a single transformer layer. · Methoden: new
 - `struct KvState` { layers, pos } — Explicit KV-Cache state holding layer-wise tensors and current sequence length position. · Methoden: new, is_empty, pos, layer_count, truncate, export_block, import_block, import_block_at
 
-**`model/quantized_llama.rs`**
+**`crates/contextra-infer-candle/src/model/quantized_llama.rs`**
 
 - `const MAX_SEQ_LEN: usize = 4096`
 - `struct QuantizedMatMul`
@@ -2138,16 +2138,16 @@ Native Candle GGUF ML inference backend for Contextra
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `client/config.rs` | 45 | — |
-| `client/core.rs` | 984 | — |
-| `client/errors.rs` | 49 | — |
-| `client/validation.rs` | 63 | — |
+| `crates/contextra-infer-ollama/src/client/config.rs` | 45 | — |
+| `crates/contextra-infer-ollama/src/client/core.rs` | 984 | — |
+| `crates/contextra-infer-ollama/src/client/errors.rs` | 49 | — |
+| `crates/contextra-infer-ollama/src/client/validation.rs` | 63 | — |
 | `context_prefixer.rs` | 443 | — |
 | `embedding.rs` | 317 | — |
 | `importance.rs` | 627 | — |
 | `model_info.rs` | 325 | — |
 
-**`client/config.rs`**
+**`crates/contextra-infer-ollama/src/client/config.rs`**
 
 - `const DEFAULT_BASE_URL: &str = "http://localhost:11434"` — Standard Ollama base URL
 - `const DEFAULT_EMBED_MODEL: &str = "nomic-embed-text"` — Standard embedding model for SME usage (multilingual support for German)
@@ -2156,17 +2156,17 @@ Native Candle GGUF ML inference backend for Contextra
 - `const MAX_TEXT_BYTES: usize = 10_000_000` — Maximum allowed text length in bytes (10 MB) to prevent OOM or DoS
 - `struct OllamaConfig` { base_url, model, request_timeout, connect_timeout, max_retries } — Configuration options for the Ollama HTTP client.
 
-**`client/core.rs`**
+**`crates/contextra-infer-ollama/src/client/core.rs`**
 
 - `struct OllamaClient` — HTTP client for interacting with a local Ollama instance. · Methoden: new, with_config, is_available, check_availability, with_defaults, base_url, config, embed_batch, try_embed_batch, list_models, is_model_available, generate_text, generate_text_stream, try_generate_text… · impl: LlmTextGenerator, LlmTextGeneratorStreaming, SegmentSynthesizer
 
-**`client/errors.rs`**
+**`crates/contextra-infer-ollama/src/client/errors.rs`**
 
 - `fn is_transient_network_error(err: &reqwest::Error) -> bool` — Helper to check if a reqwest error is a transient network error (timeout or connection error).
 - `fn classify_reqwest_error(e: reqwest::Error, base_url: &str, context: &str) -> ContextraError` — Classifies a `reqwest::Error` into structured `ContextraError` variants (`Io` for connection refused or timeouts, `Storage` otherwise).
 - `fn is_transient_error(e: &ContextraError) -> bool` — Helper to classify transient network errors for retry.
 
-**`client/validation.rs`**
+**`crates/contextra-infer-ollama/src/client/validation.rs`**
 
 - `fn xml_escape(input: &str) -> String` — Escapes XML special characters in string inputs to prevent tag injection.
 - `fn build_rag_prompt(system_context: &str, rag_context: &str, user_query: &str) -> String` — Halluzinationsprävention bei lokalen 7B-Modellen ohne Guard:
@@ -2210,8 +2210,8 @@ Native Candle GGUF ML inference backend for Contextra
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
 | `lib.rs` | 857 | — |
-| `reranker/config.rs` | 59 | — |
-| `reranker/cross_encoder.rs` | 205 | — |
+| `crates/contextra-infer-onnx/src/reranker/config.rs` | 59 | — |
+| `crates/contextra-infer-onnx/src/reranker/cross_encoder.rs` | 205 | — |
 
 **`lib.rs`**
 
@@ -2224,12 +2224,12 @@ Native Candle GGUF ML inference backend for Contextra
 - `type OnnxEmbedder = TextEmbedder` *[feature: onnx]*
 - `struct TextEmbedder` *[feature: onnx]* — Handles text tokenization and ONNX model inference. · Methoden: from_path, new, load, load_with_config, session_load_count, with_expected_dimension, embed_async · impl: EmbeddingProvider
 
-**`reranker/config.rs`**
+**`crates/contextra-infer-onnx/src/reranker/config.rs`**
 
 - `const MAX_CANDIDATES: usize = 10_000` — Maximale Anzahl von Kandidaten pro Reranking-Aufruf zur Vermeidung unbegrenzter Allokationen.
 - `struct RerankConfig` { model_path, tokenizer_path, max_length, batch_size, calibration, calibration_warmup, rerank_deadline_ms, simulate_delay_ms } — Konfiguration für Cross-Encoder Reranking. · Methoden: with_calibration
 
-**`reranker/cross_encoder.rs`**
+**`crates/contextra-infer-onnx/src/reranker/cross_encoder.rs`**
 
 - `struct CrossEncoderReranker` — Unified public `CrossEncoderReranker` struct independent of active feature flags. · Methoden: record_implicit_feedback, is_calibrated, calibration_observation_count, record_outcome, calibrate, invalidate_calibration, fitted_calibration, passthrough, passthrough_with_config, config, with_calibration, new, rerank · impl: Reranker
 
@@ -2340,9 +2340,9 @@ License and activation enforcement gate layer for Contextra feature rings
 | `io.rs` | 83 | — |
 | `lib.rs` | 58 | Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010. |
 | `plugin_status.rs` | 44 | — |
-| `prompt_injection/audit.rs` | 68 | — |
-| `prompt_injection/guard.rs` | 613 | — |
-| `prompt_injection/policy.rs` | 62 | — |
+| `crates/contextra-mcp/src/prompt_injection/audit.rs` | 68 | — |
+| `crates/contextra-mcp/src/prompt_injection/guard.rs` | 613 | — |
+| `crates/contextra-mcp/src/prompt_injection/policy.rs` | 62 | — |
 | `protocol.rs` | 88 | — |
 | `routing.rs` | 138 | — |
 | `sandbox.rs` | 776 | — |
@@ -2382,17 +2382,17 @@ License and activation enforcement gate layer for Contextra feature rings
 - `struct PluginStatusEntry` { name, version, ring, feature_ring_required } — Status entry describing an active plugin.
 - `fn handle_plugin_status( registry: &contextra_ports::plugin::PluginRegistry, ) -> Result<PluginStatusResponse, McpError>` — Handler for the `contextra_plugin_status` MCP tool call.
 
-**`prompt_injection/audit.rs`**
+**`crates/contextra-mcp/src/prompt_injection/audit.rs`**
 
 - `struct SecurityAuditRecord` { timestamp, event_type, doc_id, collection, pattern_matched, action_taken } — Struktur für Sicherheits-Audit-Logeinträge bei Auslösung des `Escalate`-Modus.
 - `struct SecurityAuditLogger` — Separater Audit-Logger für Sicherheitsvorfälle (vollständig isoliert vom Vektor-Index). · Methoden: new, log_event, get_recorded_events
 
-**`prompt_injection/guard.rs`**
+**`crates/contextra-mcp/src/prompt_injection/guard.rs`**
 
 - `struct NormalizedPattern` { original, collapsed, no_ws } — Vornormalisiertes Injection-Pattern zur Performance-Optimierung.
 - `struct PromptInjectionGuard` { redaction_placeholder } — Signatur- und phrasenbasierter Prompt-Injection-Erkennungsfilter. · Methoden: new, default_patterns, policy, patterns, audit_logger, load_from_file, from_env, is_zero_width, skeletonize_char, normalize_text, collapse_whitespace, strip_whitespace, decode_base64, extract_base64_candidates… · impl: InjectionDetector
 
-**`prompt_injection/policy.rs`**
+**`crates/contextra-mcp/src/prompt_injection/policy.rs`**
 
 - `const DEFAULT_REDACTION_PLACEHOLDER: &str = "[REDACTED: potenzielle Prompt-Injection erkannt, Originaltext zur Sic` — Neutraler Standard-Platzhalter für als verdächtig erkannten Text im Strict/Escalate-Modus.
 - `enum QuarantinePolicy` ∈ {Strict, FlagOnly, Escalate} — Konfigurierbare Quarantäne-Policy für die Prompt-Injection-Behandlung. · Methoden: from_env
@@ -2747,24 +2747,24 @@ Python bindings for Contextra using PyO3
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `bindings/collection.rs` | 90 | — |
-| `bindings/common.rs` | 369 | — |
-| `bindings/db.rs` | 189 | — |
-| `bindings/db_stats.rs` | 41 | — |
-| `bindings/document.rs` | 18 | — |
-| `bindings/functions.rs` | 118 | — |
-| `bindings/hyperedge.rs` | 154 | — |
-| `bindings/runtime_state.rs` | 78 | — |
-| `bindings/search_result.rs` | 20 | — |
-| `bindings/storage_stats.rs` | 24 | — |
-| `bindings/vector_index_stats.rs` | 24 | — |
+| `crates/contextra-py/src/bindings/collection.rs` | 90 | — |
+| `crates/contextra-py/src/bindings/common.rs` | 369 | — |
+| `crates/contextra-py/src/bindings/db.rs` | 189 | — |
+| `crates/contextra-py/src/bindings/db_stats.rs` | 41 | — |
+| `crates/contextra-py/src/bindings/document.rs` | 18 | — |
+| `crates/contextra-py/src/bindings/functions.rs` | 118 | — |
+| `crates/contextra-py/src/bindings/hyperedge.rs` | 154 | — |
+| `crates/contextra-py/src/bindings/runtime_state.rs` | 78 | — |
+| `crates/contextra-py/src/bindings/search_result.rs` | 20 | — |
+| `crates/contextra-py/src/bindings/storage_stats.rs` | 24 | — |
+| `crates/contextra-py/src/bindings/vector_index_stats.rs` | 24 | — |
 | `kv_links.rs` | 210 | — |
 
-**`bindings/collection.rs`**
+**`crates/contextra-py/src/bindings/collection.rs`**
 
 - `struct PyCollection` · Methoden: new, is_poisoned, _trigger_panic_for_test, stats, len, is_empty, relate_n_ary, put_kv, put_kv_if_absent, get_kv, relate_bidirectional, link_memories, get_links
 
-**`bindings/common.rs`**
+**`crates/contextra-py/src/bindings/common.rs`**
 
 - `const MIN_WORKER_THREADS: usize = 1` — Minimum allowed worker threads for Tokio multi-thread runtime.
 - `const MAX_WORKER_THREADS: usize = 256` — Maximum allowed worker threads for Tokio multi-thread runtime.
@@ -2788,42 +2788,42 @@ Python bindings for Contextra using PyO3
 - `fn results_to_py( py: Python<'_>, results: Vec<contextra_db::SearchResult>, ) -> PyResult<Vec<PySearchResult>>` — Converts a Vec of SearchResult to Vec of PySearchResult.
 - `fn contextra_err(e: contextra_core::ContextraError) -> PyErr` — Maps a ContextraError into a structured Python PyErr with `kind`, `message`, and `details` attributes.
 
-**`bindings/db.rs`**
+**`crates/contextra-py/src/bindings/db.rs`**
 
 - `struct PyContextra` · Methoden: new, worker_threads, is_poisoned, _trigger_panic_for_test, collection, list_collections, drop_collection, flush, stats, len, is_empty
 
-**`bindings/db_stats.rs`**
+**`crates/contextra-py/src/bindings/db_stats.rs`**
 
 - `struct PyDbStats` { drift_status, calibration_ece, last_calibration_at, active_memory_count, pid_pool_size, index_stats, storage_stats } — Overall database statistics and system observability.
 
-**`bindings/document.rs`**
+**`crates/contextra-py/src/bindings/document.rs`**
 
 - `struct PyDocument` { id, metadata } — A document retrieved from Contextra.
 
-**`bindings/functions.rs`**
+**`crates/contextra-py/src/bindings/functions.rs`**
 
 - `fn open( py: Python<'_>, path: &str, dimension: usize, max_elements: Option<usize>, encryption_passphrase: Option<String>, distance_metric: Option<String>, ) -> PyResult<` — Opens or creates a Contextra database at the given path.
 - `fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()>` — Internal Python binding function for testing FFI panic isolation.
 
-**`bindings/hyperedge.rs`**
+**`crates/contextra-py/src/bindings/hyperedge.rs`**
 
 - `fn validate_hyperedge_args( predicate: &str, participants: &[(&str, &str)], source_doc_id: Option<&str>, ) -> PyResult<()>` — Validates arguments for creating an n-ary hyperedge.
 
-**`bindings/runtime_state.rs`**
+**`crates/contextra-py/src/bindings/runtime_state.rs`**
 
 - `fn parse_worker_threads_env() -> usize` — Parses and clamps `CONTEXTRA_WORKER_THREADS` environment variable to `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
 - `struct PyRuntimeState` { runtime, worker_threads } — Holds the per-interpreter/per-module Tokio runtime state and worker thread configuration.
 - `fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>>` — Retrieves or initializes the per-interpreter Tokio runtime attached to the `_contextra` module state.
 
-**`bindings/search_result.rs`**
+**`crates/contextra-py/src/bindings/search_result.rs`**
 
 - `struct PySearchResult` { id, score, metadata } — A single search result from Contextra.
 
-**`bindings/storage_stats.rs`**
+**`crates/contextra-py/src/bindings/storage_stats.rs`**
 
 - `struct PyStorageStats` { num_segments, total_size_bytes, memtable_size_bytes } — Statistics for the storage engine.
 
-**`bindings/vector_index_stats.rs`**
+**`crates/contextra-py/src/bindings/vector_index_stats.rs`**
 
 - `struct PyVectorIndexStats` { num_vectors, memory_usage_bytes, num_layers } — Statistics for a vector index.
 
@@ -2841,52 +2841,52 @@ Python bindings for Contextra using PyO3
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `calibration/conformal.rs` | 218 | Conformal Calibration and Adaptive Conformal Prediction with Propensity Weighting. |
-| `calibration/isotonic.rs` | 253 | Isotonic Calibration via PAVA (Pool-Adjacent Violators Algorithm). |
-| `calibration/mod.rs` | 10 | Score calibration submodules (Conformal + Isotonic + Platt scaling). |
-| `calibration/platt.rs` | 152 | Platt-Scaling (Logistic Calibration): |
-| `dibud/driver.rs` | 63 | Synchronous and std-only asynchronous drivers for DiBud fusion state machine. |
-| `dibud/mod.rs` | 10 | DiBud (Dynamic Budgeted RRF) fusion state machine, drivers, and types. |
-| `dibud/state.rs` | 297 | State machine for DiBud (Dynamic Budgeted RRF) fusion. |
-| `dibud/types.rs` | 119 | Types for DiBud (Dynamic Budgeted RRF) fusion. |
+| `crates/contextra-rank/src/calibration/conformal.rs` | 218 | Conformal Calibration and Adaptive Conformal Prediction with Propensity Weighting. |
+| `crates/contextra-rank/src/calibration/isotonic.rs` | 253 | Isotonic Calibration via PAVA (Pool-Adjacent Violators Algorithm). |
+| `crates/contextra-rank/src/calibration/mod.rs` | 10 | Score calibration submodules (Conformal + Isotonic + Platt scaling). |
+| `crates/contextra-rank/src/calibration/platt.rs` | 152 | Platt-Scaling (Logistic Calibration): |
+| `crates/contextra-rank/src/dibud/driver.rs` | 63 | Synchronous and std-only asynchronous drivers for DiBud fusion state machine. |
+| `crates/contextra-rank/src/dibud/mod.rs` | 10 | DiBud (Dynamic Budgeted RRF) fusion state machine, drivers, and types. |
+| `crates/contextra-rank/src/dibud/state.rs` | 297 | State machine for DiBud (Dynamic Budgeted RRF) fusion. |
+| `crates/contextra-rank/src/dibud/types.rs` | 119 | Types for DiBud (Dynamic Budgeted RRF) fusion. |
 | `drift.rs` | 123 | Score distribution and ranking drift detection for Contextra search signals. |
 | `explain.rs` | 421 | Provenance explanation module converting machine-readable search provenance into structured explanation objects and German human-readable text. |
-| `fusion/global.rs` | 212 | Global Fusion Strategy for Corpus-Wide Topic Retrieval (§B.3.4). |
-| `fusion/mod.rs` | 24 | Hybrid Search Signal Fusion implementations (Reciprocal Rank Fusion & Score Normalization). |
-| `fusion/normalized.rs` | 284 | — |
-| `fusion/provenance.rs` | 296 | — |
-| `fusion/resonance.rs` | 81 | — |
-| `fusion/rrf.rs` | 413 | — |
-| `fusion/signal.rs` | 136 | — |
-| `fusion/topk.rs` | 86 | — |
-| `fusion/types.rs` | 132 | — |
+| `crates/contextra-rank/src/fusion/global.rs` | 212 | Global Fusion Strategy for Corpus-Wide Topic Retrieval (§B.3.4). |
+| `crates/contextra-rank/src/fusion/mod.rs` | 24 | Hybrid Search Signal Fusion implementations (Reciprocal Rank Fusion & Score Normalization). |
+| `crates/contextra-rank/src/fusion/normalized.rs` | 284 | — |
+| `crates/contextra-rank/src/fusion/provenance.rs` | 296 | — |
+| `crates/contextra-rank/src/fusion/resonance.rs` | 81 | — |
+| `crates/contextra-rank/src/fusion/rrf.rs` | 413 | — |
+| `crates/contextra-rank/src/fusion/signal.rs` | 136 | — |
+| `crates/contextra-rank/src/fusion/topk.rs` | 86 | — |
+| `crates/contextra-rank/src/fusion/types.rs` | 132 | — |
 | `lib.rs` | 33 | `contextra-rank`: |
 
-**`calibration/conformal.rs`**
+**`crates/contextra-rank/src/calibration/conformal.rs`**
 
 - `enum ConformalError` ∈ {InvalidAlpha, InvalidPropensityWeight, InvalidNonConformityScore, InvalidThreshold, InvalidLearningRate} — Error type for conformal calibration and threshold updates.
 - `trait ConformalCalibrator` (update, threshold) — Trait for deterministic, online conformal calibration and threshold estimation.
 - `struct AdaptiveConformalCalibrator` — Adaptive Conformal Calibrator for quantile-based online threshold estimation under covariate shift. · Methoden: new, with_params, with_bounds, alpha, learning_rate, observation_count, invalidate_on_config_change · impl: ConformalCalibrator
 
-**`calibration/isotonic.rs`**
+**`crates/contextra-rank/src/calibration/isotonic.rs`**
 
 - `struct IsotonicCalibrator` — Isotonic Calibrator using Pool-Adjacent Violators Algorithm. · Methoden: new, with_defaults, record_outcome, observation_count, is_calibrated, last_calibration_at, cached_ece, calibrated_probability, force_rebuild, invalidate_on_config_change, expected_calibration_error
 
-**`calibration/platt.rs`**
+**`crates/contextra-rank/src/calibration/platt.rs`**
 
 - `struct PlattScaler` — Platt Scaler for parametric logit/score calibration. · Methoden: new, identity, is_identity, is_fitted, params, predict, apply, transform, invalidate_on_config_change, fit
 
-**`dibud/driver.rs`**
+**`crates/contextra-rank/src/dibud/driver.rs`**
 
 - `fn fuse_exact_prefix( mut state: DiBudFusionState, vector: &mut I1, text: &mut I2, graph: &mut I3, edge_reinforcement: impl Fn(DocId) -> f32, budget: &FusionBudget, ) -> ` — Synchronously executes DiBud fusion using three channel iterators.
 - `fn fuse_exact_prefix_async( mut state: DiBudFusionState, mut poll: P, edge_reinforcement: impl Fn(DocId) -> f32, budget: &FusionBudget, ) -> Result<DiBudOutcome, Contextr` — Asynchronously executes DiBud fusion using a channel poll closure returning a std `Future`.
 
-**`dibud/state.rs`**
+**`crates/contextra-rank/src/dibud/state.rs`**
 
 - `enum DiBudStep` ∈ {Poll, Done} — Represents the step action requested by `DiBudFusionState::next_request`.
 - `struct DiBudFusionState` — Core state machine tracking channel depths, observed document scores, and prefix certification. · Methoden: new, channel_depths, exhausted, accesses, provenance_of, feed, next_request
 
-**`dibud/types.rs`**
+**`crates/contextra-rank/src/dibud/types.rs`**
 
 - `enum BudgetedChannel` ∈ {Vector, Text, Graph} — Identifies the channels managed by DiBud fusion budget. · Methoden: index, from_index
 - `struct FusionBudget` { max_total_accesses, min_certified_results, edge_reinforcement_weight, channel_weights, edge_reinforcement_upper_bound } — Dynamic budget configuration for DiBud fusion. · Methoden: validate
@@ -2904,27 +2904,27 @@ Python bindings for Contextra using PyO3
 - `struct RetrievalExplanation` { entries, dominant_signal, coherence_bonus, source_collection } — Structured explanation detailing why a document was retrieved with its given rank. · Methoden: to_human_readable_de
 - `fn explain(record: &ProvenanceRecord) -> RetrievalExplanation` — Generates a structured `RetrievalExplanation` from a `ProvenanceRecord`.
 
-**`fusion/global.rs`**
+**`crates/contextra-rank/src/fusion/global.rs`**
 
 - `struct GlobalFusionConfig` { max_community_nodes, min_community_size, k_rrf } — Configuration for `GlobalFusionStrategy`.
 - `struct GlobalFusionStrategy` — Community-aware fusion strategy for corpus-wide topic retrieval (LeanRAG-backed). · Methoden: new, config, fuse
 
-**`fusion/normalized.rs`**
+**`crates/contextra-rank/src/fusion/normalized.rs`**
 
 - `fn score_normalized_fusion_with_options( mut result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, priority: MetadataMergePriority, include_provenance: ` — Score-normalized fusion (CombSUM with MinMax normalization).
 - `fn weights_to_signal_factors( weights: Option<&contextra_types::FusionWeights>, ) -> (f32, f32, f32)` — Converts optional `FusionWeights` into (vector, text, graph) weight tuple.
 
-**`fusion/provenance.rs`**
+**`crates/contextra-rank/src/fusion/provenance.rs`**
 
 - `struct ProvenanceBuilder` — Fluent builder for constructing `ProvenanceRecord` instances. · Methoden: new, vector, bm25, graph, rerank_score, source_collection, index_type, expected_total, build, explain_human_readable
 
-**`fusion/resonance.rs`**
+**`crates/contextra-rank/src/fusion/resonance.rs`**
 
 - `struct ResonanceConfig` { beta, gamma } — Configuration for Resonance Coherence Bonus.
 - `fn fuse_signals( result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, ) -> Vec<FusedScore>` — Convenience API to fuse multi-signal search results.
 - `fn apply_resonance_bonus( results: Vec<SearchResult>, valid_signal_count: usize, config: &ResonanceConfig, ) -> Vec<SearchResult>` — Applies Resonance Coherence Bonus to fused search results.
 
-**`fusion/rrf.rs`**
+**`crates/contextra-rank/src/fusion/rrf.rs`**
 
 - `fn reciprocal_rank_fusion( result_sets: Vec<Vec<SearchResult>>, max_results: usize, ) -> Vec<SearchResult>` — Fuses multiple sets of ranked search results into a single ranked list using Reciprocal Rank Fusion (RRF).
 - `fn weighted_reciprocal_rank_fusion( result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, ) -> Vec<SearchResult>` — Weighted Reciprocal Rank Fusion with default signal metadata priority (`VectorFirst`).
@@ -2932,16 +2932,16 @@ Python bindings for Contextra using PyO3
 - `fn weighted_reciprocal_rank_fusion_with_options( mut result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, priority: MetadataMergePriority, include_prov` — Weighted Reciprocal Rank Fusion with options.
 - `fn fuse_search_results_with_strategy( result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, priority: MetadataMergePriority, include_provenance: bool, r` — Fuses search result sets using the specified `FusionStrategy`.
 
-**`fusion/signal.rs`**
+**`crates/contextra-rank/src/fusion/signal.rs`**
 
 - `enum SignalKind` ∈ {Vector, Text, Graph, EdgeReinforcement} — Identifies the kind of search signal used during fusion.
 - `enum MetadataMergePriority` ∈ {VectorFirst, TextFirst, GraphFirst, Custom} — Configures signal priority order for metadata merging during Reciprocal Rank Fusion. · Methoden: signal_rank
 
-**`fusion/topk.rs`**
+**`crates/contextra-rank/src/fusion/topk.rs`**
 
 - `struct BoundedTopK` — Size-bounded min-heap for Top-K candidate selection during Reciprocal Rank Fusion. · Methoden: new, capacity, len, is_empty, push, into_sorted_vec
 
-**`fusion/types.rs`**
+**`crates/contextra-rank/src/fusion/types.rs`**
 
 - `struct ProvenanceRecord` { vector_distance, bm25_score, graph_score, rerank_score, signal_ranks, source_collection, index_type, signal_contributions, coherence_bonus } — Provenance record for fused search result. · Methoden: explain_human_readable, explain_human_readable_with_params, synthesized_from
 - `struct SignalContribution` { raw_score, rank, rrf_contribution } — Signal contribution details.
@@ -2962,7 +2962,7 @@ Python bindings for Contextra using PyO3
 | `outcome.rs` | 142 | — |
 | `ports_local.rs` | 25 | Deprecated: |
 | `profile.rs` | 490 | — |
-| `router/mod.rs` | 328 | — |
+| `crates/contextra-router/src/router/mod.rs` | 328 | — |
 | `routing_strategy.rs` | 48 | Routing-Strategie-Enum (§4.14, §13.1). |
 | `serde_helpers.rs` | 23 | — |
 | `transport.rs` | 56 | MCP-Transport-Abstraktion (§4.14). |
@@ -2997,7 +2997,7 @@ Python bindings for Contextra using PyO3
 - `serde_sorted_u64_set::fn serialize(set: &HashSet<u64>, s: S) -> Result<S::Ok, S::Error>`
 - `serde_sorted_u64_set::fn deserialize(d: D) -> Result<HashSet<u64>, D::Error>`
 
-**`router/mod.rs`**
+**`crates/contextra-router/src/router/mod.rs`**
 
 - `struct ConfidenceMetrics` { score_lower, score_upper, calibrated, quantile_threshold, non_conformity_score, selection_margin } — Calibrated confidence metrics for a routing decision.
 - `struct RoutingDecision` { profile, context, confidence, decision_id, drift_status } — Result of a routing operation containing the selected profile, prepared context, confidence, and decision ID.
@@ -3072,10 +3072,10 @@ Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
 | `dispatch.rs` | 235 | — |
-| `kernels/avx2.rs` | 384 | — |
-| `kernels/avx512.rs` | 368 | — |
-| `kernels/neon.rs` | 109 | — |
-| `kernels/scalar.rs` | 213 | — |
+| `crates/contextra-simd/src/kernels/avx2.rs` | 384 | — |
+| `crates/contextra-simd/src/kernels/avx512.rs` | 368 | — |
+| `crates/contextra-simd/src/kernels/neon.rs` | 109 | — |
+| `crates/contextra-simd/src/kernels/scalar.rs` | 213 | — |
 | `lib.rs` | 80 | — |
 
 **`dispatch.rs`**
@@ -3090,7 +3090,7 @@ Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)
 - `fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError>`
 - `fn cosine_similarity_parts_u8( a: &[u8], b: &[u8], ) -> Result<CosineSimilarityPartsU8, ContextraError>`
 
-**`kernels/avx2.rs`**
+**`crates/contextra-simd/src/kernels/avx2.rs`**
 
 - `fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32`
 - `fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32`
@@ -3104,7 +3104,7 @@ Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)
 - `fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
 - `fn hsum256_epi32_avx2(v: __m256i) -> i32`
 
-**`kernels/avx512.rs`**
+**`crates/contextra-simd/src/kernels/avx512.rs`**
 
 - `fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32`
 - `fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32`
@@ -3118,13 +3118,13 @@ Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)
 - `fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
 - `fn hsum512_epi32_avx512(v: __m512i) -> i32`
 
-**`kernels/neon.rs`**
+**`crates/contextra-simd/src/kernels/neon.rs`**
 
 - `fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32`
 - `fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32`
 - `fn dot_product_neon(a: &[f32], b: &[f32]) -> f32`
 
-**`kernels/scalar.rs`**
+**`crates/contextra-simd/src/kernels/scalar.rs`**
 
 - `struct CosineSimilarityPartsU8` { dot, norm_a_sq, norm_b_sq }
 - `struct CosineSimilarityPartsF32U8` { dot, norm_a_sq, norm_b_sq }
@@ -3160,44 +3160,44 @@ LSM-Tree storage engine for Contextra
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
 | `compaction.rs` | 21 | Background compaction engine for the LSM-Tree. |
-| `compaction/adaptive.rs` | 325 | — |
-| `compaction/config.rs` | 86 | — |
-| `compaction/engine.rs` | 776 | — |
-| `compaction/merge_operator.rs` | 17 | Merge Operator trait abstraction for two-way SSTable value merging (§4.12). |
-| `compaction/retention.rs` | 81 | — |
-| `kv/delete_mode.rs` | 47 | — |
-| `kv/segment.rs` | 170 | — |
+| `crates/contextra-store/src/compaction/adaptive.rs` | 325 | — |
+| `crates/contextra-store/src/compaction/config.rs` | 86 | — |
+| `crates/contextra-store/src/compaction/engine.rs` | 776 | — |
+| `crates/contextra-store/src/compaction/merge_operator.rs` | 17 | Merge Operator trait abstraction for two-way SSTable value merging (§4.12). |
+| `crates/contextra-store/src/compaction/retention.rs` | 81 | — |
+| `crates/contextra-store/src/kv/delete_mode.rs` | 47 | — |
+| `crates/contextra-store/src/kv/segment.rs` | 170 | — |
 | `lib.rs` | 58 | `Contextra` Store — LSM-Tree based storage engine. |
-| `lsm/config.rs` | 115 | — |
-| `lsm/engine.rs` | 229 | — |
-| `lsm/guard.rs` | 14 | — |
-| `lsm/mod.rs` | 121 | LSM-Tree (Log-Structured Merge-Tree) storage engine. |
-| `lsm/observer.rs` | 487 | — |
-| `lsm/validate.rs` | 44 | — |
-| `manifest/core.rs` | 387 | — |
-| `manifest/entry.rs` | 347 | — |
-| `manifest/mod.rs` | 23 | SSTable Manifest for append-only tracking of active SSTable sets. |
+| `crates/contextra-store/src/lsm/config.rs` | 115 | — |
+| `crates/contextra-store/src/lsm/engine.rs` | 229 | — |
+| `crates/contextra-store/src/lsm/guard.rs` | 14 | — |
+| `crates/contextra-store/src/lsm/mod.rs` | 121 | LSM-Tree (Log-Structured Merge-Tree) storage engine. |
+| `crates/contextra-store/src/lsm/observer.rs` | 487 | — |
+| `crates/contextra-store/src/lsm/validate.rs` | 44 | — |
+| `crates/contextra-store/src/manifest/core.rs` | 387 | — |
+| `crates/contextra-store/src/manifest/entry.rs` | 347 | — |
+| `crates/contextra-store/src/manifest/mod.rs` | 23 | SSTable Manifest for append-only tracking of active SSTable sets. |
 | `memtable.rs` | 1011 | — |
 | `sstable.rs` | 21 | SSTable (Sorted String Table) implementation. |
-| `sstable/block_cache.rs` | 363 | — |
-| `sstable/block_search.rs` | 200 | — |
-| `sstable/bloom.rs` | 140 | — |
-| `sstable/builder.rs` | 469 | — |
-| `sstable/reader.rs` | 978 | — |
-| `sstable/stream.rs` | 114 | — |
+| `crates/contextra-store/src/sstable/block_cache.rs` | 363 | — |
+| `crates/contextra-store/src/sstable/block_search.rs` | 200 | — |
+| `crates/contextra-store/src/sstable/bloom.rs` | 140 | — |
+| `crates/contextra-store/src/sstable/builder.rs` | 469 | — |
+| `crates/contextra-store/src/sstable/reader.rs` | 978 | — |
+| `crates/contextra-store/src/sstable/stream.rs` | 114 | — |
 | `system_pressure.rs` | 224 | INTEGRATION GUIDE: |
 | `tenant_codec.rs` | 876 | — |
-| `wal/encode.rs` | 441 | — |
-| `wal/flusher.rs` | 579 | — |
-| `wal/hmac.rs` | 494 | — |
-| `wal/mod.rs` | 789 | Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining. |
-| `wal/replay.rs` | 759 | — |
+| `crates/contextra-store/src/wal/encode.rs` | 441 | — |
+| `crates/contextra-store/src/wal/flusher.rs` | 579 | — |
+| `crates/contextra-store/src/wal/hmac.rs` | 494 | — |
+| `crates/contextra-store/src/wal/mod.rs` | 789 | Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining. |
+| `crates/contextra-store/src/wal/replay.rs` | 759 | — |
 
 **`compaction.rs`**
 
 - `struct TtlMetadata` — Removed TTL feature stub per Decision Option B.
 
-**`compaction/adaptive.rs`**
+**`crates/contextra-store/src/compaction/adaptive.rs`**
 
 - `struct WorkloadMetrics` — Operational workload metrics captured deterministically without wall-clock time (P28 compliance). · Methoden: new, record_read, record_write, snapshot
 - `struct WorkloadMetricsSnapshot` { read_count, write_count, last_seq_no } — Point-in-time snapshot of operational workload metrics.
@@ -3206,49 +3206,49 @@ LSM-Tree storage engine for Contextra
 - `trait AdaptiveCompactionPlanner` (plan_compaction) — Trait defining adaptive compaction strategy selection.
 - `struct CostBasedAdaptivePlanner` — Reference implementation of cost-based adaptive compaction (EcoTune / ArceKV inspired). · Methoden: new, validate_tombstone_safety · impl: AdaptiveCompactionPlanner
 
-**`compaction/config.rs`**
+**`crates/contextra-store/src/compaction/config.rs`**
 
 - `struct CompactionConfig` { min_sstables_per_tier, size_ratio, check_interval, yield_threshold, max_memory_bytes, max_peak_memory_bytes, max_backpressure_wait, max_io_bytes_per_second, enable_adaptive_compaction, adaptive_read_ratio_threshold } — Configuration for the compaction engine.
 
-**`compaction/engine.rs`**
+**`crates/contextra-store/src/compaction/engine.rs`**
 
 - `struct CompactionEngine` · Methoden: new, with_pressure_rx, with_adaptive_planner, record_read_op, record_write_op, maybe_compact, maybe_compact_with_cancel, merge_sstables, merge_sstables_with_cancel, run_loop
 
-**`compaction/merge_operator.rs`**
+**`crates/contextra-store/src/compaction/merge_operator.rs`**
 
 - `trait MergeOperator` (merge) — Trait for merging two raw byte values (`existing_val` from older tier, `new_val` from newer tier) for the same key across different SSTable tiers.
 
-**`compaction/retention.rs`**
+**`crates/contextra-store/src/compaction/retention.rs`**
 
 - `fn retain_key_versions(entries: Vec<T>, get_seq: F, floor_seq: u64) -> Vec<T>` — Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING) according to MVCC retention rules given a `floor` sequence number.
 
-**`kv/delete_mode.rs`**
+**`crates/contextra-store/src/kv/delete_mode.rs`**
 
 - `enum KvDeleteMode` ∈ {TombstoneOnly, CryptoShred} — Mode specifying KV segment deletion behavior.
 
-**`kv/segment.rs`**
+**`crates/contextra-store/src/kv/segment.rs`**
 
 - `struct KvSegmentConfig` { delete_mode } — Configuration for KV segment storage and shredding behavior.
 - `struct KvSegmentPayload` { group_id, payload, nonce, is_encrypted } — Representation of a written KV segment (encrypted or raw payload with group_id and nonce).
 - `struct KvSegmentManager` — Manager for KV segment encryption, decryption, and crypto-shredding. · Methoden: new, delete_mode, write_segment, read_segment, delete_segment, generate_deletion_proof
 
-**`lsm/config.rs`**
+**`crates/contextra-store/src/lsm/config.rs`**
 
 - `enum DurabilityMode` ∈ {Full, WalNoHmac, MemoryOnly} · Methoden: validate_against_features
 - `enum DurabilityConfigError` ∈ {IncompatibleCombination}
 - `struct LsmConfig` { path, memtable_size_limit, max_ram_mb, tx_timeout, compaction, encryption_passphrase, group_commit_window_micros, block_cache_shards, durability_mode, ssi_max_tracked_keys } — Configuration for the LSM storage engine.
 
-**`lsm/engine.rs`**
+**`crates/contextra-store/src/lsm/engine.rs`**
 
 - `enum StorageHealth` ∈ {Healthy, FlushFailing} — Health status of the storage engine.
 - `struct LsmStorage` { snapshot_registry, ssi_validator } — LSM-Tree based storage engine. · Methoden: cleanup_intent_locks_where, clear_intent_locks_for_tx, clear_intent_locks_above_tx, open, pressure_receiver, shutdown, wait_shutdown, close, spawn_tracked, simulate_wal_append_failure_for_test, simulate_wal_append_failure_for_tx_for_test, restore_wal_file_handle_for_test, budget_tracking_drift_bytes, register_observer… · impl: StorageEngine, StorageEngineHandle
 
-**`lsm/guard.rs`**
+**`crates/contextra-store/src/lsm/guard.rs`**
 
 - `struct CommitGuard` — Proof that `commit_mutex` is currently held by the calling task.
 - `struct LsmState`
 
-**`lsm/mod.rs`**
+**`crates/contextra-store/src/lsm/mod.rs`**
 
 - `const MAX_KEY_SIZE: usize = 65_535` — Maximum key size allowed for LSM operations (65,535 bytes).
 - `const MAX_VALUE_SIZE: usize = 134_217_728` — Maximum value size allowed for LSM operations (128MB).
@@ -3257,7 +3257,7 @@ LSM-Tree storage engine for Contextra
 - `const MAX_GROUP_COMMIT_BATCH_SIZE: usize = 1_000` — Maximum batch size for group commits (1,000 transactions).
 - `const MIN_ENTRIES_FOR_SSTABLE_REBUILD: usize = 8` — Minimum surviving entry threshold required to rebuild a new SSTable during rollback.
 
-**`lsm/observer.rs`**
+**`crates/contextra-store/src/lsm/observer.rs`**
 
 - `const DEFAULT_MAX_OBSERVER_LATENCY: Duration = Duration::from_millis(1)` — Default maximum latency allowed for WAL observer callback execution (1 millisecond).
 - `enum WriteOrigin` ∈ {UserWrite} — Origin tag indicating where a committed batch originated from.
@@ -3268,24 +3268,24 @@ LSM-Tree storage engine for Contextra
 - `struct ObserverRegistry` — Configuration and handle for managing WAL observers with bounded delivery and circuit breaker. · Methoden: is_empty, new, register_observer, deregister_observer, set_max_observer_latency, max_observer_latency, set_clock, dropped_count, dropped_count_for, is_circuit_breaker_open, is_any_circuit_breaker_open, clear_circuit_breaker, notify_with_context, notify
 - `struct AsyncObserverAdapter` — Non-blocking, bounded async adapter wrapper for `WalObserver` implementations. · Methoden: new · impl: WalObserver
 
-**`lsm/validate.rs`**
+**`crates/contextra-store/src/lsm/validate.rs`**
 
 - `fn validate_key(key: &[u8]) -> Result<()>`
 - `fn derive_doc_id(key: &[u8]) -> DocId`
 - `fn derive_doc_id(key: &[u8]) -> DocId` *[feature: docid-128]*
 - `fn validate_value(value: &[u8]) -> Result<()>`
 
-**`manifest/core.rs`**
+**`crates/contextra-store/src/manifest/core.rs`**
 
 - `const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN"`
 - `const CURRENT_MANIFEST_VERSION: u8 = 1`
 - `struct Manifest` — Append-only Manifest file handle for recording active SSTable set transitions. · Methoden: open, append, append_batch, load, reconstruct_valid_sstables, reconstruct_dead_sstables, extract_high_water_mark, path, rollover, maybe_rollover
 
-**`manifest/entry.rs`**
+**`crates/contextra-store/src/manifest/entry.rs`**
 
 - `enum ManifestEntry` ∈ {Add, Remove, RollbackComplete, Replace, WalCheckpoint} — An entry in the SSTable manifest log. · Methoden: to_bytes, from_bytes
 
-**`manifest/mod.rs`**
+**`crates/contextra-store/src/manifest/mod.rs`**
 
 - `const MAX_MANIFEST_ENTRY_SIZE: u32 = 1024 * 1024` — Maximum allowed payload size for a single manifest entry (1 MB).
 - `const DEFAULT_ROLLOVER_THRESHOLD_BYTES: u64 = 64 * 1024` — Default file size threshold (64 KB) to trigger MANIFEST rollover.
@@ -3297,7 +3297,7 @@ LSM-Tree storage engine for Contextra
 - `const RESERVED_PREFIXES: &[&[u8]] = &[ b"__col:", b"__col_idx:", b"__meta:", b"__rel:", b"__idx:", b"__gra` — List of known reserved system key prefixes.
 - `struct MemTable` · Methoden: new, shard_for, put, tx_range, rollback, get, get_at_seq, size, is_empty, iter, scan_prefix_into, scan_prefix_into_matching, scan_range_into, scan_range_into_matching…
 
-**`sstable/block_cache.rs`**
+**`crates/contextra-store/src/sstable/block_cache.rs`**
 
 - `const BLOCK_CACHE_SHARDS: usize = 64` — Sharded block cache:
 - `struct SieveCacheBackend` — Trait abstraction for block cache backend implementations. · impl: BlockCacheBackend
@@ -3312,7 +3312,7 @@ LSM-Tree storage engine for Contextra
 - `fn create_block_cache(capacity_mb: usize) -> Arc<BlockCache>` — Creates a new block cache instance with default shard count.
 - `fn create_block_cache_with_shards(capacity_mb: usize, num_shards: usize) -> Arc<BlockCache>` — Creates a new block cache instance with configurable shard count.
 
-**`sstable/block_search.rs`**
+**`crates/contextra-store/src/sstable/block_search.rs`**
 
 - `fn get_entry_at_index( block_data: &[u8], offsets_start: usize, idx: usize, is_v3: bool, ) -> Result<(usize, usize)>` — Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.
 - `fn get_entry_key_at_index( block_data: &[u8], offsets_start: usize, idx: usize, is_v3: bool, ) -> Result<&[u8]>`
@@ -3321,21 +3321,21 @@ LSM-Tree storage engine for Contextra
 - `fn binary_search_entry_in_block( block_data: &[u8], offsets_start: usize, num_offsets: usize, key: &[u8], is_v3: bool, ) -> Result<Option<(usize, usize)>>`
 - `fn block_binary_search( block_data: &[u8], offsets_start: usize, num_offsets: usize, key: &[u8], is_v3: bool, ) -> Result<Option<usize>>`
 
-**`sstable/bloom.rs`**
+**`crates/contextra-store/src/sstable/bloom.rs`**
 
 - `struct BloomFilter` — SPECCED: Speichereffizienter Bloom-Filter für SSTable-Pre-Checks. · Methoden: new, insert, may_contain, hash_pair, to_bytes, from_bytes
 
-**`sstable/builder.rs`**
+**`crates/contextra-store/src/sstable/builder.rs`**
 
 - `struct BlockBuilder` — A builder for SSTable data blocks (Format v4 default, supports v3). · Methoden: new, new_with_version, add, current_size, is_empty, build
 - `struct SstableMetadata` { first_key, last_key, file_size, min_tx_id, max_tx_id, min_seq, max_seq } — Metadata for an SSTable.
 - `struct SstableBuilder` — A builder for creating new SSTables. · Methoden: create, create_with_key_manager, set_format_version, add, finish
 
-**`sstable/reader.rs`**
+**`crates/contextra-store/src/sstable/reader.rs`**
 
 - `struct SstableReader` { format_version } — A reader for existing SSTables. · Methoden: first_key, last_key, min_tx_id, max_tx_id, file_path, open, open_with_key_manager, get_at, get, lookup_metrics, metadata, stream, iter, scan_prefix…
 
-**`sstable/stream.rs`**
+**`crates/contextra-store/src/sstable/stream.rs`**
 
 - `struct SstableStream` · Methoden: next, next_entry
 
@@ -3355,7 +3355,7 @@ LSM-Tree storage engine for Contextra
 - `trait StorageEngineHandle` (get_handle, get_at_seq_handle, get_tracked_handle, get_at_seq_tracked_handle, scan_prefix_tracked_handle, supports_ssi_tracking_handle, put_handle, put_if_absent_handle, put_batch_handle, delete_handle, delete_many_handle, delete_prefix_handle, commit_handle, rollback_handle…) — Internal trait abstraction enabling `TenantScopedStorage` to wrap both `S:
 - `struct TenantScopedStorage` — Tenant-aware `StorageEngine` wrapper implementing strict key-level isolation (INV-TENANT-2). · Methoden: new, tenant_id · impl: StorageEngine
 
-**`wal/encode.rs`**
+**`crates/contextra-store/src/wal/encode.rs`**
 
 - `enum WalOp` ∈ {Put, Delete, TxEnd} · Methoden: tx_id
 - `const WAL_V2_HEADER: [u8; 4] = *b"MFW2"` — Magic header for V2 batch-encrypted WAL files (`b"MFW2"`).
@@ -3364,17 +3364,17 @@ LSM-Tree storage engine for Contextra
 - `struct PreparedBatch` — A batch of prepared WAL entries bound to a specific HMAC chain. · Methoden: is_empty, len, entries, into_inner, extend
 - `struct WalEntry` { op, seq_no, checksum, prev_hmac } — A single entry in the Write-Ahead Log. · Methoden: tx_id, try_new, compute_checksum_v3, compute_checksum_v2, compute_checksum, to_bytes, from_bytes
 
-**`wal/flusher.rs`**
+**`crates/contextra-store/src/wal/flusher.rs`**
 
 - `struct WalFlusherConfig` { batch_window_micros, queue_capacity } — Configuration for the WAL background flusher actor.
 
-**`wal/hmac.rs`**
+**`crates/contextra-store/src/wal/hmac.rs`**
 
 - `enum LegacyKeyStatus` ∈ {Standard, LegacyActive} — Status indicating whether a WAL segment or key configuration uses the obfuscated legacy key. · Methoden: is_legacy, is_standard
 - `fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]>` *[feature: legacy-wal-key]* — Migrates a legacy integrity key to a new 32-byte key material state.
 - `fn migrate_legacy_key(_legacy: &[u8], _new_key_material: &[u8]) -> Result<[u8; 32]>`
 
-**`wal/mod.rs`**
+**`crates/contextra-store/src/wal/mod.rs`**
 
 - `fs::fn read(path: P) -> std::io::Result<Vec<u8>>`
 - `fs::fn write( path: P, contents: C, ) -> std::io::Result<()>`
@@ -3402,7 +3402,7 @@ LSM-Tree storage engine for Contextra
 - `struct WalConfig` { key_manager, min_wal_version, flusher_config } · Methoden: with_legacy_fallback
 - `struct Wal` { truncate_lock } · Methoden: prepare_batch, integrity_key_for_test, legacy_integrity_key_for_test, append_batch, enqueue_append_batch_locked, append_batch_locked, try_append_batch, try_enqueue_append_batch_locked, try_append_batch_locked, scan_entries_with_callback, truncate, rotate_and_seal, find_tx_offset, last_hmac_snapshot…
 
-**`wal/replay.rs`**
+**`crates/contextra-store/src/wal/replay.rs`**
 
 - `type WalSeq = u64`
 - `trait ReplayProgressSink` (on_entry_replayed)
@@ -3489,18 +3489,18 @@ Contextra — Text processing and BM25 search for Hybrid Search
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
 | `bm25.rs` | 660 | — |
-| `domain/legal_de.rs` | 74 | — |
-| `domain/medical_de.rs` | 80 | — |
-| `domain/mod.rs` | 78 | Domänenspezifische Vokabularpakete für die erweiterte Morphologie. |
-| `inverted/index_struct.rs` | 666 | — |
-| `inverted/morph_index.rs` | 82 | — |
-| `inverted/types.rs` | 49 | — |
+| `crates/contextra-text/src/domain/legal_de.rs` | 74 | — |
+| `crates/contextra-text/src/domain/medical_de.rs` | 80 | — |
+| `crates/contextra-text/src/domain/mod.rs` | 78 | Domänenspezifische Vokabularpakete für die erweiterte Morphologie. |
+| `crates/contextra-text/src/inverted/index_struct.rs` | 666 | — |
+| `crates/contextra-text/src/inverted/morph_index.rs` | 82 | — |
+| `crates/contextra-text/src/inverted/types.rs` | 49 | — |
 | `lib.rs` | 267 | — |
-| `morphology/compound_splitter.rs` | 266 | — |
-| `morphology/metrics.rs` | 23 | — |
-| `morphology/passthrough.rs` | 24 | — |
-| `morphology/stopwords.rs` | 52 | — |
-| `morphology/trie.rs` | 57 | — |
+| `crates/contextra-text/src/morphology/compound_splitter.rs` | 266 | — |
+| `crates/contextra-text/src/morphology/metrics.rs` | 23 | — |
+| `crates/contextra-text/src/morphology/passthrough.rs` | 24 | — |
+| `crates/contextra-text/src/morphology/stopwords.rs` | 52 | — |
+| `crates/contextra-text/src/morphology/trie.rs` | 57 | — |
 | `posting_list.rs` | 506 | — |
 | `stream.rs` | 147 | — |
 | `tokenizer.rs` | 437 | — |
@@ -3518,31 +3518,31 @@ Contextra — Text processing and BM25 search for Hybrid Search
 - `struct BM25F` { k1, field_weights } — BM25F field-weighted scoring model configuration (§11.3). · Methoden: new, score_term
 - `fn score_term_bm25f( field_term_frequencies: &[(FieldId, u32, u32, f32)], field_weights: &[(FieldId, f32, f32)], k1: f32, df: u32, n: u32, ) -> f32` — Calculates the field-weighted BM25F score for a single term across document fields.
 
-**`domain/legal_de.rs`**
+**`crates/contextra-text/src/domain/legal_de.rs`**
 
 - `struct LegalDomainVocabulary` — German legal domain vocabulary (*Deutsches Juristisches Fachvokabular*). · impl: DomainVocabulary
 - `const LEGAL_COMPOUND_STEMS: &[&str] = &[ "Akte", "Antragsteller", "Anwalt", "Anwaltschaft", "Auflagenerteilu` — Domain-specific compound stems for German legal language.
 - `const LEGAL_PROTECTED_TERMS: &[&str] = &[ "Akte", "Eid", "Frist", "Gut", "Jura", "Klage", "Notar", "Recht", "` — Legal domain terms that must NOT be treated as stopwords.
 
-**`domain/medical_de.rs`**
+**`crates/contextra-text/src/domain/medical_de.rs`**
 
 - `struct MedicalDomainVocabulary` — German medical domain vocabulary (*Deutsches Medizinisches Fachvokabular*). · impl: DomainVocabulary
 - `const MEDICAL_COMPOUND_STEMS: &[&str] = &[ "Allergie", "Anamnese", "Arzt", "Attest", "Aufklärung", "Befund", "` — Domain-specific compound stems for German medical language.
 - `const MEDICAL_PROTECTED_TERMS: &[&str] = &[ "Arzt", "Dosis", "EKG", "Labor", "OP", "Reha", "Virus", "Wunde", ]` — Medical domain terms that must NOT be treated as stopwords.
 
-**`domain/mod.rs`**
+**`crates/contextra-text/src/domain/mod.rs`**
 
 - `trait DomainVocabulary` (compound_stems, protected_terms, domain_id) — Trait für domänenspezifische Vokabularpakete.
 
-**`inverted/index_struct.rs`**
+**`crates/contextra-text/src/inverted/index_struct.rs`**
 
 - `struct InvertedIndex` — An inverted index tied to a specific collection namespace. · Methoden: new_with_language, new, with_tokenizer, load_stats, upsert_document, resolve_tombstones, delete_document, search_bm25, search_bm25_at · impl: TextIndex
 
-**`inverted/morph_index.rs`**
+**`crates/contextra-text/src/inverted/morph_index.rs`**
 
 - `struct BM25MorphIndex` — An inverted index with morphological optimization. · Methoden: new, tokenizer · impl: TextIndex
 
-**`inverted/types.rs`**
+**`crates/contextra-text/src/inverted/types.rs`**
 
 - `enum Language` ∈ {English, German, Custom} — Supported tokenizer languages for BM25 text indexing. · Methoden: from_iso
 - `struct TextIndexMetadata` { total_docs, total_tokens, avg_doc_len_x1000 } — Consolidated metadata for the text index.
@@ -3551,26 +3551,26 @@ Contextra — Text processing and BM25 search for Hybrid Search
 
 - `struct Bm25Scorer` — Evaluates keyword weights and applies standard BM25 logic. · Methoden: new · impl: TextIndex
 
-**`morphology/compound_splitter.rs`**
+**`crates/contextra-text/src/morphology/compound_splitter.rs`**
 
 - `trait MorphologicalTokenizer` (decompose, language) — Trait for morphological tokenization.
 - `struct GermanCompoundSplitter` — German compound word splitter (*Komposita-Zerleger*). · Methoden: new, with_min_length, with_dictionary, min_component_len · impl: MorphologicalTokenizer
 
-**`morphology/metrics.rs`**
+**`crates/contextra-text/src/morphology/metrics.rs`**
 
 - `struct TokenReductionMetrics` { original_tokens, decomposed_tokens } — Metrics for measuring token reduction effectiveness. · Methoden: expansion_ratio
 
-**`morphology/passthrough.rs`**
+**`crates/contextra-text/src/morphology/passthrough.rs`**
 
 - `struct PassthroughTokenizer` — Passthrough tokenizer for languages without compound words. · Methoden: new · impl: MorphologicalTokenizer
 
-**`morphology/stopwords.rs`**
+**`crates/contextra-text/src/morphology/stopwords.rs`**
 
 - `fn get_german_stopwords() -> &'static HashSet<String>` — Returns the static German stopword list.
 - `fn is_german_stopword(word: &str) -> bool` — Checks if a normalized lowercased word is a German stopword.
 - `fn normalize_umlauts(input: &str) -> String` — Normalisiert deutsche Umlaute für robusten Suchabgleich.
 
-**`morphology/trie.rs`**
+**`crates/contextra-text/src/morphology/trie.rs`**
 
 - `struct TrieNode` { is_terminal, children } — A prefix trie node for fast lookup and prefix matching of German dictionary words.
 - `struct Trie` — A prefix trie data structure for dictionary lookup. · Methoden: new, insert, contains, starts_with
@@ -3621,14 +3621,14 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 | `tenant_scope.rs` | 64 | Type-level tenant scope binding and enforcement primitives. |
 | `tombstone.rs` | 132 | Trait and reference implementation for tombstone semantics checking in Contextra sequence logs and indexes. |
 | `types.rs` | 19 | Core domain, budget, filter, importance, and search query data types. |
-| `types/budget.rs` | 692 | Resource budget management for Contextra. |
-| `types/domain/document.rs` | 220 | — |
-| `types/domain/ids.rs` | 465 | — |
-| `types/domain/misc.rs` | 569 | — |
-| `types/domain/mod.rs` | 28 | Domain types for Contextra. |
-| `types/filter.rs` | 418 | Metadata filter expression DSL and evaluation engine. |
-| `types/importance.rs` | 311 | Memory Importance scoring and Recency-Decay functionality. |
-| `types/saos.rs` | 722 | SAOS (Synthesized Agent Operating System) types and query abstractions. |
+| `crates/contextra-types/src/types/budget.rs` | 692 | Resource budget management for Contextra. |
+| `crates/contextra-types/src/types/domain/document.rs` | 220 | — |
+| `crates/contextra-types/src/types/domain/ids.rs` | 465 | — |
+| `crates/contextra-types/src/types/domain/misc.rs` | 569 | — |
+| `crates/contextra-types/src/types/domain/mod.rs` | 28 | Domain types for Contextra. |
+| `crates/contextra-types/src/types/filter.rs` | 418 | Metadata filter expression DSL and evaluation engine. |
+| `crates/contextra-types/src/types/importance.rs` | 311 | Memory Importance scoring and Recency-Decay functionality. |
+| `crates/contextra-types/src/types/saos.rs` | 722 | SAOS (Synthesized Agent Operating System) types and query abstractions. |
 
 **`error.rs`**
 
@@ -3665,7 +3665,7 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 - `trait TombstoneSemanticsCheck` (is_tombstone, make_tombstone) — Trait defining tombstone semantics for index sequence numbers and key-value records.
 - `struct SeqBitTombstone` — Default reference implementation of [`TombstoneSemanticsCheck`]. · impl: TombstoneSemanticsCheck
 
-**`types/budget.rs`**
+**`crates/contextra-types/src/types/budget.rs`**
 
 - `enum BudgetStrategy` ∈ {Conservative, Aggressive, Exact} — Strategie für Token-Budget-Management.
 - `struct TokenBudget` { limit, strategy, reserved } — Token budget configuration for LLM context management. · Methoden: new, for_model, with_reserved, with_strategy, effective_limit, available, consume, reserve, try_reserve, refund, consumed
@@ -3673,14 +3673,14 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 - `struct ResourceBudget` { memory_limit } — Resource budget for memory management.
 - `struct ResourceTracker` — Tracks resource usage against a budget. · Methoden: new, consume_memory, release_memory, memory_used, budget, has_memory_capacity
 
-**`types/domain/document.rs`**
+**`crates/contextra-types/src/types/domain/document.rs`**
 
 - `enum DistanceMetric` ∈ {Cosine, Euclidean, DotProduct} — Distance metric for vector comparison. · Methoden: compute, compute_u8
 - `struct Embedding` { data } — Vector embedding representation. · Methoden: new, dim, as_slice, l2_norm, normalize
 - `struct RerankResult` { original_index, score } — Result from cross-encoder post-retrieval reranking.
 - `struct ScoredDocument` { doc_id, score } — A scored search result. · Methoden: new
 
-**`types/domain/ids.rs`**
+**`crates/contextra-types/src/types/domain/ids.rs`**
 
 - `struct TenantId` — LAYER-BEGRÜNDUNG: · Methoden: new, try_new, inner, as_u64, is_system · impl: TryFrom
 - `struct CollectionId` — Internal collection identifier. · Methoden: new, try_new, inner, as_u64
@@ -3689,7 +3689,7 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 - `struct EntityId` — Internal entity identifier for graph nodes. · Methoden: new, inner, as_u64, as_bytes, from_doc_id, from_key
 - `struct TxId` — Transaction identifier. · Methoden: new, inner, as_u64, internal, try_from_internal_offset, is_valid_origin
 
-**`types/domain/misc.rs`**
+**`crates/contextra-types/src/types/domain/misc.rs`**
 
 - `hex::fn serialize(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>`
 - `hex::fn deserialize(deserializer: D) -> Result<[u8; 32], D::Error>`
@@ -3709,17 +3709,17 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 - `struct ConfigFingerprint` { model_id, quantization, prompt_template_hash, temperature_bits, threshold_bits } — Konfigurations-Fingerabdruck für P8-Kalibrierungs-Integrität. · Methoden: new, with_threshold, threshold, temperature
 - `enum AutoExtractionMode` ∈ {Enabled, Disabled} — Mode for automatic OpenIE entity extraction during document ingestion. · Methoden: is_enabled
 
-**`types/filter.rs`**
+**`crates/contextra-types/src/types/filter.rs`**
 
 - `enum FilterExpr` ∈ {Eq, Ne, Gt, Gte, Lt, Lte, In, NotIn, Exists, And, Or, Not} — Metadata filter expressions for pre/post filtering. · Methoden: evaluate
 
-**`types/importance.rs`**
+**`crates/contextra-types/src/types/importance.rs`**
 
 - `struct ImportanceScore` — Scores the importance of a memory item on a normalized scale of `0.0` to `1.0`. · Methoden: new, value
 - `enum DecayFunction` ∈ {None, Exponential, StepFloor, WallClockExponential} — Recency-decay mathematical function for episodic relevance. · Methoden: decay_factor, decay_factor_wallclock
 - `struct MemoryImportance` { base_score, decay, created_at_tx } — Tracks the importance score and decay parameters of a document. · Methoden: new, effective_score
 
-**`types/saos.rs`**
+**`crates/contextra-types/src/types/saos.rs`**
 
 - `enum FusionStrategy` ∈ {Rrf, ScoreNormalized} — Strategy used for search result signal fusion.
 - `enum GraphTraversalStrategy` ∈ {Hops, PersonalizedPageRank, PathRag} — Strategy used for graph retrieval in hybrid search queries.
@@ -3741,37 +3741,37 @@ HNSW vector index with SIMD distance computation for Contextra
 
 | Datei | Zeilen | Zweck (Modul-Doc) |
 |---|---|---|
-| `acorn/gamma_augmentation.rs` | 54 | — |
-| `acorn/mod.rs` | 72 | — |
-| `acorn/naive_reference.rs` | 90 | — |
+| `crates/contextra-vector/src/acorn/gamma_augmentation.rs` | 54 | — |
+| `crates/contextra-vector/src/acorn/mod.rs` | 72 | — |
+| `crates/contextra-vector/src/acorn/naive_reference.rs` | 90 | — |
 | `candidate_stream.rs` | 170 | — |
 | `compute_pool.rs` | 166 | — |
-| `diskann/config.rs` | 79 | — |
-| `diskann/types.rs` | 142 | — |
-| `hnsw/adaptive_ef.rs` | 230 | — |
-| `hnsw/arena.rs` | 370 | — |
-| `hnsw/batch.rs` | 90 | — |
-| `hnsw/config.rs` | 184 | — |
-| `hnsw/deletion.rs` | 354 | — |
-| `hnsw/sq8_bias.rs` | 109 | — |
-| `hnsw/types.rs` | 727 | — |
+| `crates/contextra-vector/src/diskann/config.rs` | 79 | — |
+| `crates/contextra-vector/src/diskann/types.rs` | 142 | — |
+| `crates/contextra-vector/src/hnsw/adaptive_ef.rs` | 230 | — |
+| `crates/contextra-vector/src/hnsw/arena.rs` | 370 | — |
+| `crates/contextra-vector/src/hnsw/batch.rs` | 90 | — |
+| `crates/contextra-vector/src/hnsw/config.rs` | 184 | — |
+| `crates/contextra-vector/src/hnsw/deletion.rs` | 354 | — |
+| `crates/contextra-vector/src/hnsw/sq8_bias.rs` | 109 | — |
+| `crates/contextra-vector/src/hnsw/types.rs` | 727 | — |
 | `partial_rebuild.rs` | 364 | — |
-| `persistence/header.rs` | 438 | — |
-| `persistence/mmap.rs` | 219 | — |
-| `persistence/node.rs` | 83 | — |
-| `quantize/mod.rs` | 471 | — |
+| `crates/contextra-vector/src/persistence/header.rs` | 438 | — |
+| `crates/contextra-vector/src/persistence/mmap.rs` | 219 | — |
+| `crates/contextra-vector/src/persistence/node.rs` | 83 | — |
+| `crates/contextra-vector/src/quantize/mod.rs` | 471 | — |
 | `quantize_rabitq.rs` | 439 | — |
 
-**`acorn/gamma_augmentation.rs`**
+**`crates/contextra-vector/src/acorn/gamma_augmentation.rs`**
 
 - `fn compute_gamma_edge_budget(base_degree: usize, predicate_selectivity: f32) -> usize` — Computes the augmented edge budget factor $\gamma$ for graph expansion in ACORN search.
 
-**`acorn/mod.rs`**
+**`crates/contextra-vector/src/acorn/mod.rs`**
 
 - `trait FilteredIndex` (search_knn_acorn) — Prädikatsagnostischer Suchpfad (ACORN-Muster, Patel et al.
 - `enum AcornError` ∈ {DimensionMismatch, InvalidK, InvalidGamma, Internal} — Errors occurring during ACORN search or graph traversal operations. · impl: Error
 
-**`acorn/naive_reference.rs`**
+**`crates/contextra-vector/src/acorn/naive_reference.rs`**
 
 - `struct NaiveReferenceIndex` — Naive reference index performing brute-force search over all stored points. · Methoden: new, from_vectors, insert · impl: FilteredIndex
 
@@ -3785,22 +3785,22 @@ HNSW vector index with SIMD distance computation for Contextra
 - `struct TaskHandle` — Handle to await the outcome of a task submitted to [`ComputePool`]. · Methoden: join
 - `struct ComputePool` — Bounded compute thread pool for background index rebuilds and heavy CPU tasks. · Methoden: new, max_workers, active_jobs, execute, spawn
 
-**`diskann/config.rs`**
+**`crates/contextra-vector/src/diskann/config.rs`**
 
 - `enum DiskAnnFallbackPolicy` ∈ {UseHnswOnFailure, FailFast} — Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.
 - `struct DiskAnnConfig` { index_path, dimension, max_degree, beam_width, sector_size, memory_budget, distance_metric, quantize, fallback_policy, pending_flush_threshold… } — Configuration for DiskANN index.
 
-**`diskann/types.rs`**
+**`crates/contextra-vector/src/diskann/types.rs`**
 
 - `struct DiskAnnIndex` — DiskANN out-of-core vector index. · Methoden: recover_pending_delta, recover_pending_delta_sync, build_to_path_sync, build, build_sync, trigger_background_persist_delta, persist_delta, persist_delta_sync, load, load_sync, search_predicate_augmented, search_internal, try_new, len_sync · impl: VectorIndex
 
-**`hnsw/adaptive_ef.rs`**
+**`crates/contextra-vector/src/hnsw/adaptive_ef.rs`**
 
 - `struct AdaptiveEfPolicy` { min_ef, max_ef, growth_factor, convergence_window, stability_threshold } — Configuration policy for adaptive ef_search (Ada-ef). · Methoden: new, validate
 - `struct AdaptiveEfStats` { final_ef, rounds, converged } — Execution statistics for an adaptive search run.
 - `struct AdaptiveEfStateMachine` — Deterministic state machine managing Ada-ef expansion rounds. · Methoden: new, current_ef, round_count, is_terminated, stats, step
 
-**`hnsw/arena.rs`**
+**`crates/contextra-vector/src/hnsw/arena.rs`**
 
 - `const ARENA_ALIGNMENT_BYTES: usize = 64` — Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
 - `const ARENA_ALIGNMENT_U32: usize = ARENA_ALIGNMENT_BYTES / std::mem::size_of::<u32>()` — Alignment in u32 elements (64 bytes / 4 bytes = 16 u32 elements).
@@ -3808,27 +3808,27 @@ HNSW vector index with SIMD distance computation for Contextra
 - `struct BacklinkTable` { map } — Thread-safe $O(1)$ backlink connection table using `AHashMap`. · Methoden: new, get, insert, clear
 - `struct HnswArena` { arena, offsets, capacities, count_offsets, counts, free_list, total_allocated } — Contiguous 64-byte aligned arena allocator for HNSW node connections with free-list slot reuse. · Methoden: new, layer_offset, align_capacity, allocate_node, get_ram_node_connections, update_backlink, try_relink_pruned_neighbors, free_node
 
-**`hnsw/batch.rs`**
+**`crates/contextra-vector/src/hnsw/batch.rs`**
 
 - `struct PreparedInsert` { doc_id, vector_data, new_layer, new_idx, final_connections, neighbor_backlinks, should_update_entry_point, should_update_ram_entry_point }
 - `struct NeighborBacklink` { neighbor_ram_idx, layer, updated_connections } — Back-link connection update for a neighbor node at a specific layer.
 - `struct BatchContext` { running_max_layer, has_entry_point, has_ram_entry_point, backlink_map } — Batch tracking context for running state across multi-operation transaction commits. · Methoden: new
 
-**`hnsw/config.rs`**
+**`crates/contextra-vector/src/hnsw/config.rs`**
 
 - `struct HnswConfig` { dimension, max_elements, m, ef_construction, ef_search, distance_metric, rebuild_threshold, quantize, quantizer_recalibration_sample_size, quantizer_drift_threshold… } · Methoden: validate
 - `struct HnswConfigBuilder` — Builder for HnswConfig with resource limit enforcements to prevent OOM. · Methoden: new, max_elements, m, ef_construction, ef_search, distance_metric, quantize, quantizer_recalibration_sample_size, quantizer_drift_threshold, rebuild_threshold, partial_rebuild_config, build
 
-**`hnsw/deletion.rs`**
+**`crates/contextra-vector/src/hnsw/deletion.rs`**
 
 - `struct DeletionStats` { doc_id, repaired_edges, orphaned_replacements, verified_no_ghost_pointers } — Statistics returned after a ghost-free node deletion and neighborhood repair.
 - `trait GhostFreeVectorIndex` (remove_with_graph_repair) — Trait providing ghost-free vector index deletion with synchronous neighborhood graph repair.
 
-**`hnsw/sq8_bias.rs`**
+**`crates/contextra-vector/src/hnsw/sq8_bias.rs`**
 
 - `struct Sq8Bias` { mean_bias, variance_bias, sample_count } — Measured quantization bias and variance statistics for SQ8 distance calculations. · Methoden: new, calibrate
 
-**`hnsw/types.rs`**
+**`crates/contextra-vector/src/hnsw/types.rs`**
 
 - `const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX` — Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 - `const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10` — Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
@@ -3849,21 +3849,21 @@ HNSW vector index with SIMD distance computation for Contextra
 - `struct TraversalTracker` — Ringpuffer für besuchte HNSW-Knoten-IDs während ef_search-Traversierungen. · Methoden: new, record_traversal, find_oversaturated_regions, hot_path_nodes
 - `fn should_trigger_partial_rebuild( tracker: &TraversalTracker, tombstone_map: &HashMap<u64, bool>, global_tombstone_ratio: f32, config: &PartialRebuildConfig, ) -> Option` *[feature: partial-index-rebuild]* — Entscheidet ob ein lokaler Partial-Rebuild ausgelöst werden soll.
 
-**`persistence/header.rs`**
+**`crates/contextra-vector/src/persistence/header.rs`**
 
 - `const HNSW_MAGIC: u32 = 0x484E5357` — Magic number for HNSW files (0x484E5357 = "HNSW").
 - `const HNSW_VERSION: u16 = 2` — Current file format version.
 - `struct HnswHeader` — The header of an HNSW persistent file. · Methoden: new, new_v2, new_v2_with_bias, magic, version, m, metric, quantized, q_min, q_max, nodes_offset, connections_offset, set_connections_offset, node_count…
 
-**`persistence/mmap.rs`**
+**`crates/contextra-vector/src/persistence/mmap.rs`**
 
 - `struct MmapIndex` { mmap, header } — A reader for memory-mapped HNSW indices. · Methoden: open, open_async, get_node_record, get_vector, get_connections
 
-**`persistence/node.rs`**
+**`crates/contextra-vector/src/persistence/node.rs`**
 
 - `struct NodeRecord` { doc_id, doc_id, max_layer, vector_offset, connections_offset } — Represents a node's metadata in the flat file. · Methoden: from_bytes, to_bytes
 
-**`quantize/mod.rs`**
+**`crates/contextra-vector/src/quantize/mod.rs`**
 
 - `const DEFAULT_P_LOW: f32 = 0.005` — Default low percentile for quantization scaling (0.5%).
 - `const DEFAULT_P_HIGH: f32 = 0.995` — Default high percentile for quantization scaling (99.5%).
@@ -4009,7 +4009,7 @@ Kategorien: `DatabaseRead` (immer erlaubt), `DatabaseWrite` (Freigabe nötig, `C
 
 ## K.35 Umgebungsvariablen (Produktivcode und `xtask`, [V-Sig])
 
-Gefunden über `env::var`/`var_os`/`env!` außerhalb von Tests. Laufzeitrelevant sind die `CONTEXTRA_*`-Variablen der Crates `mcp`, `checkpoint`, `py`; `xtask`/CI/Agentenbetrieb sind `CONTEXTRA_CI*`, `CONTEXTRA_CLAIM_CRATE`, `CONTEXTRA_MAX_ACTIVE_CLAIMS`, `CONTEXTRA_PR_BODY`, `CONTEXTRA_SESSION_HASH`, `JULES_*`, `PR_*`, `GITHUB_*`. Offener Punkt B-11 (zwei Variablen für den Löschbeweis-Schlüssel, `CONTEXTRA_DELETION_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`) besteht weiter; beide werden in `mcp/src/server_tools.rs` und `tools_crud.rs` gelesen. Provider-Variablen sind teils ohne Präfix (`EMBEDDING_PROVIDER`, `LLM_PROVIDER`) neben `CONTEXTRA_EMBEDDING_PROVIDER`/`CONTEXTRA_LLM_PROVIDER` vorhanden.
+Gefunden über `env::var`/`var_os`/`env!` außerhalb von Tests. Laufzeitrelevant sind die `CONTEXTRA_*`-Variablen der Crates `mcp`, `checkpoint`, `py`; `xtask`/CI/Agentenbetrieb sind `CONTEXTRA_CI*`, `CONTEXTRA_CLAIM_CRATE`, `CONTEXTRA_MAX_ACTIVE_CLAIMS`, `CONTEXTRA_PR_BODY`, `CONTEXTRA_SESSION_HASH`, `JULES_*`, `PR_*`, `GITHUB_*`. Offener Punkt B-11 (zwei Variablen für den Löschbeweis-Schlüssel, `CONTEXTRA_DELETION_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`) besteht weiter; beide werden in `mcp/src/server_tools.rs` und `tools_crud.rs` gelesen. Provider-Variablen sind teils ohne Präfix (`EMBEDDING_PROVIDER`, `LLM_PROVIDER`) neben `CONTEXTRA_EMBEDDING_PROVIDER`/`CONTEXTRA_LLM_PROVIDER` vorhanden. <!-- doc-ref-ignore -->
 
 | Variable | Fundstelle(n) |
 |---|---|
@@ -4067,9 +4067,9 @@ Alle Abschnitte: Ablauf im Code gelesen am HEAD `b564e830` **[V]**, sofern nicht
 - `derive_subkey(master_key: &KeyManager, group_id: u64) -> Result<SubKey>`: HKDF-SHA256 (`Hkdf::from_prk` über die Master-Key-Bytes), `info = b"contextra-kv-shred-v1:" ‖ group_id.to_le_bytes()`, Ausgabe 32 Byte. <!-- crate-ref-ignore -->
 - `SubKey([u8;32])`: `ZeroizeOnDrop`; `Debug` gibt `***REDACTED***` aus; `Clone` kopiert die Bytes.
 - `KeyRegistry` (`RwLock<HashMap<u64, SubKey>>`, thread-sicher, nur im RAM): `get_or_derive(master, group_id)` liest unter Read-Lock, leitet bei Fehlen unter Write-Lock (Double-Check) ab und speichert. `revoke_subkey(group_id) -> bool` entfernt den Eintrag in **O(1)**; danach ist `is_key_active(group_id)` falsch. `encrypt_with_group` verschlüsselt mit dem Sub-Key der Gruppe (AES-256-GCM-SIV).
-- **Semantik der Löschung:** Nach `revoke_subkey` leitet ein erneutes `get_or_derive` aus dem Master-Key denselben Schlüssel wieder ab. Crypto-Shredding ist deshalb nur wirksam, wenn zusätzlich der Master-Key bzw. die Gruppenzuordnung vernichtet wird; die Registry allein ist kein unwiderruflicher Löschbeweis. **[V, Folgerung aus dem Code]** Anwender: `store/src/kv/segment.rs` (`revoke_subkey`), Layer `KvCacheSegments` im `DeletionProof` (B.6). INV-KV-DELETE-1 (G.3) gilt nur für `CryptoShred`-Segmente.
+- **Semantik der Löschung:** Nach `revoke_subkey` leitet ein erneutes `get_or_derive` aus dem Master-Key denselben Schlüssel wieder ab. Crypto-Shredding ist deshalb nur wirksam, wenn zusätzlich der Master-Key bzw. die Gruppenzuordnung vernichtet wird; die Registry allein ist kein unwiderruflicher Löschbeweis. **[V, Folgerung aus dem Code]** Anwender: `store/src/kv/segment.rs` (`revoke_subkey`), Layer `KvCacheSegments` im `DeletionProof` (B.6). INV-KV-DELETE-1 (G.3) gilt nur für `CryptoShred`-Segmente. <!-- doc-ref-ignore -->
 
-## L.2 Manifest und Schutz vor SSTable-Wiederauferstehung (`contextra-store/src/manifest/core.rs`, `lsm/recovery.rs`)
+## L.2 Manifest und Schutz vor SSTable-Wiederauferstehung (`contextra-store/src/manifest/core.rs`, `crates/contextra-store/src/lsm/recovery.rs`)
 
 - Datei: Magic `MFMN`, `CURRENT_MANIFEST_VERSION = 1`, append-only; `append` und `append_batch` schreiben, flushen und `fsync`en (Batch atomar).
 - `ManifestEntry`-Varianten: `Add`, `Remove{path}`, `Replace{removed, …}`, `RollbackComplete`, `WalCheckpoint` (trägt den WAL-High-Water-Mark-HMAC).
@@ -4135,7 +4135,7 @@ Standardgrenzen (`capabilities.rs`): `max_module_size_bytes` 10 MiB, `max_output
 
 ## L.11 Export-Format v1 (`contextra-engine/src/export.rs`, `docs/EXPORT_FORMAT.md`)
 
-`SCHEMA_VERSION_V1 = "1.0"`. `ExportDocumentV1{schema_version (MUSS "1.0"), exported_at (ISO-8601, optional), collections}` → `ExportCollectionV1{name, memories, relations}` → `ExportMemoryV1{id, memory_type ∈ episodic|semantic|procedural|working, Embedding, …}` und `ExportRelationV1`. Nur lesender Zugriff; Ziel: vollständige Memories und Relationen. Der Import liegt in `engine/src/import.rs`.
+`SCHEMA_VERSION_V1 = "1.0"`. `ExportDocumentV1{schema_version (MUSS "1.0"), exported_at (ISO-8601, optional), collections}` → `ExportCollectionV1{name, memories, relations}` → `ExportMemoryV1{id, memory_type ∈ episodic|semantic|procedural|working, Embedding, …}` und `ExportRelationV1`. Nur lesender Zugriff; Ziel: vollständige Memories und Relationen. Der Import liegt in `engine/src/import.rs`. <!-- doc-ref-ignore -->
 
 ## L.12 Agent: Budget und Dead-Letter-Queue (`contextra-agent`)
 
@@ -4158,7 +4158,7 @@ Dateien: `expiry_workers.rs`, `orphan_workers.rs`, `hyperedge_worker.rs`, `confi
 
 ## L.16 Noch nicht per Ablauf gelesen (Stand v15)
 
-Diese Bereiche sind in Teil K nur als **[V-Sig]** erfasst: Innenleben der Kognitions-Pipeline (`cognition/*_phase.rs`), `flow_thompson`, `offpolicy`, `lyapunov`, `pid*` in `adapt`, `persistence` im Vector-Crate, `morphology`/`tokenizer` im Text-Crate, `quantize_kivi`/`quantize_rabitq`, `kv_state` und KV-Bridge in `infer-candle`, `model_info` in `infer-ollama`, `plugin_status`, `processing_registry`, `tenant_codec`, `system_pressure`, `seq_log`, `edge_reinforcement_buffer`, `arc_slice`, `homeostat`, `decay_controller`, `kv_cipher`, `wal_crypto`, `server_dispatch`, `tools_crud`, `in_memory_store`/`fault_vfs`/`reference_model` im Testkit, `template` im AVV-Generator. Sie sind die Kandidaten für die nächste Leserunde (Reihenfolge nach Risiko: `wal_crypto`, `kv_cipher`, `tenant_codec`, `seq_log`, `persistence`, `server_dispatch`).
+Diese Bereiche sind in Teil K nur als **[V-Sig]** erfasst: Innenleben der Kognitions-Pipeline (`cognition/*_phase.rs`), `flow_thompson`, `offpolicy`, `lyapunov`, `pid*` in `adapt`, `persistence` im Vector-Crate, `morphology`/`tokenizer` im Text-Crate, `quantize_kivi`/`quantize_rabitq`, `kv_state` und KV-Bridge in `infer-candle`, `model_info` in `infer-ollama`, `plugin_status`, `processing_registry`, `tenant_codec`, `system_pressure`, `seq_log`, `edge_reinforcement_buffer`, `arc_slice`, `homeostat`, `decay_controller`, `kv_cipher`, `wal_crypto`, `server_dispatch`, `tools_crud`, `in_memory_store`/`fault_vfs`/`reference_model` im Testkit, `template` im AVV-Generator. Sie sind die Kandidaten für die nächste Leserunde (Reihenfolge nach Risiko: `wal_crypto`, `kv_cipher`, `tenant_codec`, `seq_log`, `persistence`, `server_dispatch`). <!-- doc-ref-ignore -->
 
 
 ---
