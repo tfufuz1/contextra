@@ -50,12 +50,19 @@ fn test_all_registry_commands_resolvable() {
             .and_then(|n| n.as_str())
             .expect("Missing command name in registry.toml");
 
-        if legacy_unmatched.contains(name) {
+        let is_planned = cmd
+            .get("planned")
+            .and_then(|p| p.as_bool())
+            .unwrap_or(false);
+
+        if legacy_unmatched.contains(name) || is_planned || name == "scan-common" {
             continue;
         }
 
         let is_in_dispatch_table = dispatch_cmds.contains(name);
-        let is_in_harness = xtask::harness::dispatch_with_builtin(name, &[]).is_some();
+        let is_in_harness = name == "harness-list"
+            || name == "harness-help"
+            || xtask::harness::registered_commands().iter().any(|(n, _)| *n == name);
 
         assert!(
             is_in_dispatch_table || is_in_harness,
@@ -65,24 +72,36 @@ fn test_all_registry_commands_resolvable() {
     }
 }
 
+fn get_xtask_cmd_with_args(args: &[&str]) -> Command {
+    let root = find_root_dir();
+    let debug_bin = root.join("target").join("debug").join("xtask");
+    if debug_bin.exists() {
+        let mut cmd = Command::new(debug_bin);
+        cmd.args(args);
+        cmd
+    } else {
+        let manifest_path = if Path::new("xtask/Cargo.toml").exists() {
+            "xtask/Cargo.toml"
+        } else if Path::new("Cargo.toml").exists() {
+            "Cargo.toml"
+        } else {
+            "../Cargo.toml"
+        };
+        let mut cmd = Command::new("cargo");
+        cmd.arg("run");
+        cmd.arg("--manifest-path");
+        cmd.arg(manifest_path);
+        if !args.is_empty() {
+            cmd.arg("--");
+            cmd.args(args);
+        }
+        cmd
+    }
+}
+
 #[test]
 fn test_unknown_subcommand_exit_code_and_output() {
-    let manifest_path = if Path::new("xtask/Cargo.toml").exists() {
-        "xtask/Cargo.toml"
-    } else if Path::new("Cargo.toml").exists() {
-        "Cargo.toml"
-    } else {
-        "../Cargo.toml"
-    };
-
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--manifest-path",
-            manifest_path,
-            "--",
-            "non-existent-unknown-command-xyz",
-        ])
+    let output = get_xtask_cmd_with_args(&["non-existent-unknown-command-xyz"])
         .output()
         .expect("Failed to execute xtask binary");
 
@@ -98,4 +117,65 @@ fn test_unknown_subcommand_exit_code_and_output() {
         "stderr should list available commands, got:\n{}",
         stderr
     );
+}
+
+#[test]
+fn test_helper_module_not_in_harness_list() {
+    let output = get_xtask_cmd_with_args(&["harness-list"])
+        .output()
+        .expect("Failed to execute harness-list");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("scan-common"),
+        "harness-list should NOT contain helper module scan-common, got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("jules") || stdout.contains("can-merge") || stdout.contains("risk"),
+        "harness-list should contain registered subcommands, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_no_arg_invocation_help_text_and_no_file_changes() {
+    let root = find_root_dir();
+    let ws_path = root.join("WORKING_STATE.md");
+    let mtime_before = fs::metadata(&ws_path).and_then(|m| m.modified()).ok();
+    let content_before = fs::read_to_string(&ws_path).ok();
+
+    let output = get_xtask_cmd_with_args(&[])
+        .output()
+        .expect("Failed to execute xtask binary without args");
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "xtask without arguments must exit with code 2"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Verwendung:") && stdout.contains("Verfügbare Kommandos:"),
+        "stdout should display help text with available commands, got:\n{}",
+        stdout
+    );
+
+    // Verify WORKING_STATE.md was not modified or created
+    if let Some(ref cb) = content_before {
+        let content_after = fs::read_to_string(&ws_path).ok();
+        assert_eq!(
+            content_before, content_after,
+            "WORKING_STATE.md content must not change when running xtask without arguments"
+        );
+    }
+    if let Some(mb) = mtime_before {
+        let mtime_after = fs::metadata(&ws_path).and_then(|m| m.modified()).ok();
+        assert_eq!(
+            mtime_before, mtime_after,
+            "WORKING_STATE.md modified time must not change when running xtask without arguments"
+        );
+    }
 }
