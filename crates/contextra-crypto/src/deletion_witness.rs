@@ -92,7 +92,7 @@ impl LayerWitness {
     /// # Errors
     /// Returns [`ContextraError::InvalidInput`] if:
     /// - `deleted_keys` is empty.
-    /// - `layer` is one of the four non-scanner layers (`HnswIndex`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`).
+    /// - `layer` is one of the non-scanner layers (`HnswIndex`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`, etc.).
     /// - `evidence` does not match the layer type (`LsmMemtable` -> `MemtableScan`, `SsTableAllLevels` -> `SstableScan`, `WalAllSegments` -> `WalPurge`).
     #[doc(hidden)]
     pub fn issue_from_storage_layer(
@@ -111,7 +111,14 @@ impl LayerWitness {
             DeletionLayer::HnswIndex
             | DeletionLayer::CsrGraph
             | DeletionLayer::KvCacheSegments
-            | DeletionLayer::EmbeddingCache => {
+            | DeletionLayer::EmbeddingCache
+            | DeletionLayer::TextIndex
+            | DeletionLayer::Relations
+            | DeletionLayer::Manifest
+            | DeletionLayer::CheckpointClones
+            | DeletionLayer::ProcessCaches
+            | DeletionLayer::Keyring
+            | DeletionLayer::ErasureLedger => {
                 return Err(ContextraError::InvalidInput(format!(
                     "LayerWitness creation rejected: layer {:?} does not support scanner-based witness creation",
                     layer
