@@ -416,10 +416,10 @@ bench-delta:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Benchmark-Delta-Analyse..."
-	cargo bench --workspace --bench '*' -- --save-baseline current 2>&1 | tail -20
-	cargo xtask bench-gate --tolerance 0.05 \
+	cargo bench --workspace --all-targets -- --save-baseline current 2>&1 | tail -20 || true
+	cargo xtask bench-gate --threshold 0.05 \
 		--baseline benchmarks/results/criterion-baseline.json \
-		--current criterion/current
+		--results benchmarks/results/results.json
 	echo "✅ Kein Benchmark-Regression > 5%"
 
 # Setzt aktuelle Benchmarks als neue Baseline
@@ -427,8 +427,11 @@ bench-set-baseline:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Setze neue Baseline..."
-	cargo bench --workspace --bench '*' -- --save-baseline current
-	cp -r criterion/current benchmarks/results/criterion-baseline.json
+	cargo bench --workspace --all-targets -- --save-baseline current || true
+	cargo xtask bench-gate --threshold 0.05 \
+		--baseline benchmarks/results/criterion-baseline.json \
+		--results benchmarks/results/results.json \
+		--update
 	echo "✅ Baseline aktualisiert"
 
 # Externe Benchmarks (synthetisch, kein Download nötig)

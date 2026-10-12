@@ -184,7 +184,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [compile-check]
-    continue-on-error: true  # Miri-Failures blockieren nicht den Merge, werden aber sichtbar
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
@@ -192,14 +191,27 @@ jobs:
           toolchain: nightly
           components: miri
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Run Miri on contextra-vector
+      - name: Run Miri on contextra-vector (Standard Stack Borrows)
         run: |
           # Nur Scalar-Pfad unter Miri (SIMD-Intrinsics werden von Miri nicht unterstützt)
           # Miri fängt OOB-Zugriffe im Scalar-Tail-Loop auf.
           MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test \
             -p contextra-vector \
             -- test_u8_distance_unequal_lengths_return_error \
-               test_scalar_u8_no_oob \
+               test_distances_match_scalar \
+               test_u8_metrics_exact_match \
+               test_public_compute_distance_api_sanity \
+               test_compute_distance_f32_bytes_equivalence \
+            2>&1
+      - name: Run Miri on contextra-vector (Tree Borrows)
+        run: |
+          MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tree-borrows" cargo +nightly miri test \
+            -p contextra-vector \
+            -- test_u8_distance_unequal_lengths_return_error \
+               test_distances_match_scalar \
+               test_u8_metrics_exact_match \
+               test_public_compute_distance_api_sanity \
+               test_compute_distance_f32_bytes_equivalence \
             2>&1
 
   cargo-hack-feature-check:
