@@ -28,6 +28,7 @@ fn test_search_response_standard_finish_buffer_roundtrip() {
     let resp_offset = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
+            version: 1,
             results: Some(results),
             total_hits: 42,
             processing_time_ms: 5.5,
@@ -66,6 +67,7 @@ fn test_search_response_size_prefixed_finish_buffer_roundtrip() {
     let resp_offset = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
+            version: 1,
             results: Some(results),
             total_hits: 100,
             processing_time_ms: 10.0,
