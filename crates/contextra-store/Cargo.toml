@@ -60,6 +60,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
+sha2 = "0.10"
 contextra-testkit = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }
