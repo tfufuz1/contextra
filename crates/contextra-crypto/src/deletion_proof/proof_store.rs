@@ -164,7 +164,7 @@ impl ProofStore {
                 .map_err(|e| CryptoError::Crypto(format!("Failed fsync json file: {e}")))?;
         }
 
-        contextra_durable_fs::sync_dir(&proofs_dir)
+        crate::fs_util::sync_dir(&proofs_dir)
             .map_err(|e| CryptoError::Crypto(format!("Failed fsync proofs dir: {e}")))?;
 
         // 3. Compute new chain hash
@@ -186,7 +186,7 @@ impl ProofStore {
                 .map_err(|e| CryptoError::Crypto(format!("Failed fsync chain.log: {e}")))?;
         }
 
-        contextra_durable_fs::sync_dir(&self.dir)
+        crate::fs_util::sync_dir(&self.dir)
             .map_err(|e| CryptoError::Crypto(format!("Failed fsync base dir: {e}")))?;
 
         self.last_seq = seq;

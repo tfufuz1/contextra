@@ -26,6 +26,7 @@ pub mod deletion_proof_typestate;
 pub mod deletion_witness;
 pub mod ed25519_proof;
 pub mod error;
+pub mod fs_util;
 pub mod kdf;
 pub mod keystore;
 pub mod kms;

@@ -146,7 +146,7 @@ pub fn marker_path_for(log_path: &Path) -> PathBuf {
 }
 
 fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
-    contextra_durable_fs::atomic_replace(path, content)
+    crate::fs_util::atomic_replace(path, content)
         .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))
 }
 

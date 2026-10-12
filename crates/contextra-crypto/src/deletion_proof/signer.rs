@@ -71,7 +71,7 @@ impl ProofKeyPairSigner {
         file.sync_all()
             .map_err(|e| CryptoError::Crypto(format!("Failed to fsync key file: {e}")))?;
 
-        contextra_durable_fs::sync_dir(parent)
+        crate::fs_util::sync_dir(parent)
             .map_err(|e| CryptoError::Crypto(format!("Failed to fsync key directory: {e}")))?;
 
         Ok(())
