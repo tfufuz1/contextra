@@ -16,6 +16,12 @@ impl DeletionProof {
     /// 1. Alle covered_layers physisch bereinigen
     /// 2. WAL-Commit mit Lösch-Intent (P3)
     /// 3. DeletionProof::create() aufrufen
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v2 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create_v2(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -24,6 +30,7 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         proof_key: &[u8],
     ) -> Result<Self> {
+        #[allow(deprecated)]
         Self::create_v2_with_wal_receipt(
             scope,
             deleted_keys,
@@ -36,6 +43,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 2) inklusive optionaler WAL-HMAC-Kettenquittung.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v2 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create_v2_with_wal_receipt(
         scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,

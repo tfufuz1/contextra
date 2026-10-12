@@ -342,7 +342,18 @@ impl Wal {
 
     pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {
         let marker = Self::migration_marker_path(wal_path);
-        super::fs::try_exists(&marker).await.unwrap_or(false)
+        if let Ok(bytes) = super::fs::read(&marker).await {
+            if bytes.is_empty() {
+                return false;
+            }
+            if let Ok(content) = std::str::from_utf8(&bytes) {
+                content.starts_with("rekeyed=v3:")
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 
     pub(crate) fn calculate_retirement_marker_hash(wal_path: &Path, new_key: &[u8; 32]) -> String {
@@ -537,5 +548,94 @@ impl Wal {
                 Err(_) => read_uuid_file(&uuid_path).await,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_types::TxId;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_downgrade_attack_manipulated_file_rejected_without_explicit_migration() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("manipulated_legacy.wal");
+
+        let legacy_key = Wal::legacy_integrity_key_for_test();
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"malicious_key".to_vec(),
+            value: b"malicious_val".to_vec(),
+        };
+        let entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry creation");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&entry.to_bytes().expect("entry bytes"));
+        tokio::fs::write(&wal_path, &bytes)
+            .await
+            .expect("write manipulated wal");
+
+        let open_res = Wal::open(&wal_path).await;
+        assert!(
+            open_res.is_err(),
+            "Standard Wal::open must reject manipulated file with legacy markings without explicit migration opt-in"
+        );
+        let err_msg = open_res.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("disallowed by configuration") || err_msg.contains("Explicit migration"),
+            "Unexpected error message: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_downgrade_attack_manipulated_file_with_rekeyed_marker_rejected() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("rekeyed_manipulated.wal");
+
+        let legacy_key = Wal::legacy_integrity_key_for_test();
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"forged_key".to_vec(),
+            value: b"forged_val".to_vec(),
+        };
+        let entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry creation");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&entry.to_bytes().expect("entry bytes"));
+        tokio::fs::write(&wal_path, &bytes).await.expect("write wal");
+
+        Wal::write_migration_marker_atomically(&wal_path)
+            .await
+            .expect("write retirement marker");
+
+        let mig_res = Wal::open_for_legacy_migration(&wal_path, None).await;
+        assert!(
+            mig_res.is_err(),
+            "open_for_legacy_migration must fail closed when a .rekeyed marker exists and payload uses legacy key"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_has_migration_marker_validates_header_content() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("test_marker.wal");
+        let marker_path = Wal::migration_marker_path(&wal_path);
+
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        tokio::fs::write(&marker_path, b"")
+            .await
+            .expect("write empty");
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        tokio::fs::write(&marker_path, b"invalid_marker_data")
+            .await
+            .expect("write invalid");
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        Wal::write_migration_marker_atomically(&wal_path)
+            .await
+            .expect("write valid marker");
+        assert!(Wal::has_migration_marker(&wal_path).await);
     }
 }

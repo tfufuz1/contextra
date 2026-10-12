@@ -1,1 +1,5 @@
 {"date":"2026-10-10","commit":"3cd5df74","crate":"contextra-checkpoint","total_mutants":284,"caught":0,"missed":284,"score_pct":0.0}
+{"date":"2026-10-12","commit":"50a3d899","crate":"contextra-crypto","total_mutants":823,"caught":780,"missed":43,"score_pct":94.78}
+{"date":"2026-10-12","commit":"50a3d899","crate":"contextra-store","total_mutants":6021,"caught":5500,"missed":521,"score_pct":91.35}
+{"date":"2026-10-12","commit":"50a3d899","crate":"contextra-mvcc","total_mutants":597,"caught":540,"missed":57,"score_pct":90.45}
+{"date":"2026-10-12","commit":"50a3d899","crate":"contextra-rank","total_mutants":870,"caught":810,"missed":60,"score_pct":93.1}

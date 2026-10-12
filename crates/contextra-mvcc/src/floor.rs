@@ -1,9 +1,8 @@
 //! `GcFloor` calculation for tombstone garbage collection watermark.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-
 use crate::snapshot::SnapshotRegistry;
+use crate::sync::atomic::{AtomicU64, Ordering};
+use crate::sync::Arc;
 use crate::tx_buffer::TxBuffer;
 
 /// Untergrenze für GC.

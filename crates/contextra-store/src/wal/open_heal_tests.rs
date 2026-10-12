@@ -64,6 +64,33 @@ async fn test_open_heal_truncated_tail_plaintext() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_key_derivation_vector_hkdf_vs_argon2id() -> Result<()> {
+    let passphrase = "test-passphrase-inv-kdf-1";
+    let salt = b"salt-1234567890123456789012345678"; // 32 bytes
+
+    #[allow(deprecated)]
+    let km_legacy = KeyManager::try_new(passphrase, salt)?;
+    let key_legacy = km_legacy.integrity_key()?;
+
+    let header = contextra_crypto::KdfHeader::new(
+        contextra_crypto::KdfParams::default(),
+        salt.to_vec(),
+    )?;
+    let km_strict = KeyManager::try_new_strict(passphrase, &header)?;
+    let key_strict = km_strict.integrity_key()?;
+
+    println!("Legacy HKDF key: {:x?}", key_legacy);
+    println!("Strict Argon2id key: {:x?}", key_strict);
+
+    assert_ne!(
+        key_legacy, key_strict,
+        "Key derivation outputs must be compared: HKDF and Argon2id derive different key material"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_open_heal_huge_len_garbage_tail() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join("heal_huge_len.wal");
@@ -116,10 +143,11 @@ async fn test_open_heal_huge_len_garbage_tail() -> Result<()> {
 async fn test_open_heal_encrypted_wal() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join("heal_encrypted.wal");
-    let km = Arc::new(KeyManager::try_new(
-        "heal_passphrase",
-        b"salt123456789012345678901234567890",
-    )?);
+    let header = contextra_crypto::KdfHeader::new(
+        contextra_crypto::KdfParams::default(),
+        b"salt123456789012345678901234567890".to_vec(),
+    )?;
+    let km = Arc::new(KeyManager::try_new_strict("heal_passphrase", &header)?);
 
     let config = WalConfig {
         key_manager: Some(km.clone()),

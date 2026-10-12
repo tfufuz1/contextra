@@ -5,78 +5,52 @@
 
 #[cfg(loom)]
 mod loom_floor_tests {
-    use loom::sync::Arc;
-    use loom::sync::Mutex;
+    use contextra_mvcc::sync::atomic::{AtomicU64, Ordering};
+    use contextra_mvcc::sync::Arc;
+    use contextra_mvcc::{GcFloor, SnapshotRegistry};
     use loom::thread;
-    use std::collections::BTreeMap;
-    use std::sync::atomic::{AtomicU64, Ordering};
 
-    struct MockSnapshotRegistry {
-        active: Mutex<BTreeMap<u64, usize>>,
-        min_active_seqno: AtomicU64,
-    }
-
-    impl MockSnapshotRegistry {
-        fn new() -> Self {
-            Self {
-                active: Mutex::new(BTreeMap::new()),
-                min_active_seqno: AtomicU64::new(u64::MAX),
-            }
-        }
-
-        fn acquire(&self, read_seq: impl FnOnce() -> u64) -> u64 {
-            let mut active = self.active.lock().unwrap();
-            let seq = read_seq();
-            *active.entry(seq).or_default() += 1;
-            let min = active.keys().next().copied().unwrap_or(u64::MAX);
-            self.min_active_seqno.store(min, Ordering::Release);
-            seq
-        }
-
-        fn release(&self, seq: u64) {
-            let mut active = self.active.lock().unwrap();
-            if let Some(count) = active.get_mut(&seq) {
-                *count -= 1;
-                if *count == 0 {
-                    active.remove(&seq);
-                }
-            }
-            let min = active.keys().next().copied().unwrap_or(u64::MAX);
-            self.min_active_seqno.store(min, Ordering::Release);
-        }
-
-        fn floor(&self, last_applied: &AtomicU64) -> u64 {
-            let reg_min = self.min_active_seqno.load(Ordering::Acquire);
-            let la = last_applied.load(Ordering::Acquire);
-            reg_min.min(la)
-        }
+    fn loom_builder() -> loom::model::Builder {
+        let mut builder = loom::model::Builder::new();
+        let max_preemptions = std::env::var("LOOM_MAX_PREEMPTIONS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2);
+        builder.preemption_bound = Some(max_preemptions);
+        builder
     }
 
     #[test]
     fn test_loom_concurrent_acquire_and_gc_floor() {
-        loom::model(|| {
-            let registry = Arc::new(MockSnapshotRegistry::new());
+        loom_builder().check(|| {
+            let registry = Arc::new(SnapshotRegistry::new());
             let last_applied = Arc::new(AtomicU64::new(100));
+            let gc_floor = Arc::new(GcFloor::<Vec<u8>>::new(
+                Arc::clone(&registry),
+                None,
+                Arc::clone(&last_applied),
+            ));
 
             let reg1 = Arc::clone(&registry);
             let la1 = Arc::clone(&last_applied);
+            let gf1 = Arc::clone(&gc_floor);
 
-            let reg2 = Arc::clone(&registry);
             let la2 = Arc::clone(&last_applied);
+            let gf2 = Arc::clone(&gc_floor);
 
             // Thread 1: Concurrent reader acquiring snapshot lease at last_applied
             let t1 = thread::spawn(move || {
-                let seq = reg1.acquire(|| la1.load(Ordering::Acquire));
-                let floor = reg1.floor(&la1);
+                let lease = SnapshotRegistry::acquire(&reg1, || la1.load(Ordering::Acquire));
+                let floor = gf1.floor();
                 // INVARIANT: floor must never exceed an active reader's acquired sequence
-                assert!(floor <= seq);
-                reg1.release(seq);
+                assert!(floor <= lease.seq_no());
+                drop(lease);
             });
 
             // Thread 2: Concurrent compaction worker reading GC floor or advancing sequence
             let t2 = thread::spawn(move || {
-                let floor = reg2.floor(&la2);
-                assert!(floor <= 100);
+                let floor = gf2.floor();
+                assert!(floor <= la2.load(Ordering::Acquire));
             });
 
             t1.join().unwrap();

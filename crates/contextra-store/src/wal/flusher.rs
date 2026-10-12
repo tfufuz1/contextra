@@ -7,6 +7,7 @@
 //! - I-5 (Poison-State Isolation): Nach I/O- oder fsync-Fehler bleibt das Handle poisoned bis zur expliziten Replay-Recovery.
 
 use contextra_core::{ContextraError, Result};
+use contextra_durable_fs::{FaultInjector, NoFault};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -161,12 +162,23 @@ fn encode_encrypted_rewrite_chunks(
 }
 
 impl Wal {
-    /// Enables background flusher actor for processing WAL I/O commands sequentially.
+    /// Enables background flusher actor for processing WAL I/O commands sequentially with default `NoFault` injector.
     #[allow(dead_code)]
     pub(crate) fn enable_flusher_with_config(
         &self,
+        file: crate::wal::fs::File,
+        config: WalFlusherConfig,
+    ) -> Result<()> {
+        self.enable_flusher_with_injector(file, config, NoFault)
+    }
+
+    /// Enables background flusher actor for processing WAL I/O commands sequentially with a custom `FaultInjector`.
+    #[allow(dead_code)]
+    pub(crate) fn enable_flusher_with_injector<F: FaultInjector + 'static>(
+        &self,
         mut file: crate::wal::fs::File,
         config: WalFlusherConfig,
+        injector: F,
     ) -> Result<()> {
         if config.queue_capacity == 0 {
             return Err(ContextraError::invalid_input(
@@ -301,6 +313,13 @@ impl Wal {
 
                         let write_res: Result<()> = async {
                             if write_header {
+                                injector.on_write(Some(&path), WAL_V3_HEADER.len()).map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "WAL flusher header write failed for {}: {}",
+                                        path.display(),
+                                        e
+                                    ))
+                                })?;
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL flusher header write failed for {}: {}",
@@ -346,6 +365,13 @@ impl Wal {
                                 ));
                             }
 
+                            injector.on_write(Some(&path), batch_payload.len()).map_err(|e| {
+                                ContextraError::Storage(format!(
+                                    "WAL flusher write failed for {}: {}",
+                                    path.display(),
+                                    e
+                                ))
+                            })?;
                             file.write_all(&batch_payload).await.map_err(|e| {
                                 ContextraError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
@@ -390,6 +416,13 @@ impl Wal {
                         }
 
                         let sync_res: Result<()> = async {
+                            injector.on_fsync(Some(&path)).map_err(|e| {
+                                ContextraError::Storage(format!(
+                                    "WAL fsync failed, outcome unknown: {}",
+                                    e
+                                ))
+                            })?;
+
                             #[cfg(feature = "fault-injection")]
                             if FAIL_SYNC_ONCE
                                 .compare_exchange(
@@ -493,6 +526,15 @@ impl Wal {
                                 )));
                             }
 
+                            if let Err(e) = injector.on_fsync(Some(&path)) {
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                return Err(ContextraError::Storage(format!(
+                                    "WAL truncate fsync failed for {}: {}",
+                                    path.display(),
+                                    e
+                                )));
+                            }
+
                             if let Err(e) = file.sync_all().await {
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                                 return Err(ContextraError::Storage(format!(
@@ -547,6 +589,14 @@ impl Wal {
                                 ));
                             }
 
+                            injector.on_fsync(Some(&path)).map_err(|e| {
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                ContextraError::Storage(format!(
+                                    "WAL fsync failed, outcome unknown: vor rotate_and_seal fehlgeschlagen: {}",
+                                    e
+                                ))
+                            })?;
+
                             file.sync_all().await.map_err(|e| {
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                                 ContextraError::Storage(format!(
@@ -579,6 +629,15 @@ impl Wal {
                                 }
                             };
 
+                            injector.on_rename(&path, &sealed_path).map_err(|e| {
+                                ContextraError::Storage(format!(
+                                    "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
+                                    path.display(),
+                                    sealed_path.display(),
+                                    e
+                                ))
+                            })?;
+
                             crate::wal::fs::rename(&path, &sealed_path)
                                 .await
                                 .map_err(|e| {
@@ -589,6 +648,16 @@ impl Wal {
                                         e
                                     ))
                                 })?;
+
+                            if let Some(parent) = sealed_path.parent() {
+                                injector.on_dir_fsync(parent).map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "WAL rotate_and_seal parent dir fsync failed for {}: {}",
+                                        parent.display(),
+                                        e
+                                    ))
+                                })?;
+                            }
 
                             crate::util::fsync_parent_dir(&sealed_path).await?;
 
@@ -673,6 +742,13 @@ impl Wal {
                                     ))
                                 })?;
 
+                                injector.on_write(Some(&path), total_bytes.len()).map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "WAL migration write failed for {}: {}",
+                                        path.display(),
+                                        e
+                                    ))
+                                })?;
                                 file.write_all(&total_bytes).await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL migration write failed for {}: {}",
@@ -683,6 +759,14 @@ impl Wal {
                                 file.flush().await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL migration flush failed for {}: {}",
+                                        path.display(),
+                                        e
+                                    ))
+                                })?;
+
+                                injector.on_fsync(Some(&path)).map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "WAL migration fsync failed for {}: {}",
                                         path.display(),
                                         e
                                     ))
@@ -767,5 +851,75 @@ impl Wal {
             *guard = Some(handle);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod flusher_injector_tests {
+    use super::*;
+    use crate::wal::{PreparedBatch, WalOp};
+    use contextra_core::TxId;
+    use std::io::{Error, ErrorKind};
+    use tempfile::tempdir;
+
+    struct FsyncFailInjector;
+
+    impl FaultInjector for FsyncFailInjector {
+        fn on_fsync(&self, _path: Option<&std::path::Path>) -> std::io::Result<()> {
+            Err(Error::new(ErrorKind::Other, "simulated dst fsync error"))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fault_injector_fsync_error_no_ack_without_durability() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("fault_injector.wal");
+
+        let file = crate::wal::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .read(true)
+            .open(&path)
+            .await
+            .expect("open file");
+
+        let wal = Wal {
+            path: path.clone(),
+            size: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            key_manager: None,
+            fallback_integrity_key: Some([1u8; 32]),
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            min_wal_version: WalVersion::V3,
+            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
+            flusher_tx: std::sync::RwLock::new(None),
+            flusher_task: std::sync::Mutex::new(None),
+            sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
+            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+
+        wal.enable_flusher_with_injector(file, WalFlusherConfig::default(), FsyncFailInjector)
+            .expect("enable flusher with injector");
+
+        let entry = WalEntry::try_new(
+            WalOp::Put {
+                key: b"k1".to_vec(),
+                value: b"v1".to_vec(),
+                tx_id: TxId(1),
+            },
+            1,
+            &[1u8; 32],
+            [0u8; 32],
+        )
+        .expect("entry creation");
+
+        let batch = PreparedBatch(vec![entry]);
+        let res = wal.append_batch(batch).await;
+
+        assert!(res.is_err(), "Append must return Err when fsync fails (no Ack without durability)");
+        assert!(wal.is_poisoned(), "Wal handle must be poisoned after fsync failure");
     }
 }

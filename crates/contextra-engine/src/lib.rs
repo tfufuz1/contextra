@@ -46,7 +46,9 @@ pub mod fusion;
 pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
+pub mod limits;
 pub mod metrics_names;
+pub mod no_graph_stubs;
 #[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
@@ -62,6 +64,7 @@ pub use merge_operator_adapter::WasmMergeOperator;
 
 #[cfg(not(loom))]
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+pub use limits::EngineLimits;
 
 #[cfg(not(loom))]
 pub use export::{

@@ -9,6 +9,43 @@ pub trait IdGen: Send + Sync + 'static {
     fn next_id(&self) -> u64;
 }
 
+/// Alias for [`IdGen`] trait for specification naming compatibility.
+pub use IdGen as IdGenerator;
+
+/// Standard production implementation of [`IdGen`] initialized from system wall-clock nanoseconds.
+#[derive(Debug)]
+pub struct SystemIdGen {
+    next: AtomicU64,
+}
+
+/// Alias for [`SystemIdGen`] for specification naming compatibility.
+pub type SystemIdGenerator = SystemIdGen;
+
+impl SystemIdGen {
+    /// Creates a new [`SystemIdGen`] initialized from current system wall-clock nanoseconds.
+    pub fn new() -> Self {
+        let start = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
+            .unwrap_or(1);
+        Self {
+            next: AtomicU64::new(start),
+        }
+    }
+}
+
+impl Default for SystemIdGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IdGen for SystemIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
 /// A thread-safe ID generator that produces monotonically increasing 64-bit IDs.
 ///
 /// Wraps around safely on integer overflow (`u64::MAX` -> `0`) via atomic standard wrapping.
@@ -16,6 +53,9 @@ pub trait IdGen: Send + Sync + 'static {
 pub struct SequentialIdGen {
     next: AtomicU64,
 }
+
+/// Test implementation alias for [`SequentialIdGen`].
+pub type SequentialIds = SequentialIdGen;
 
 impl SequentialIdGen {
     /// Creates a new [`SequentialIdGen`] starting at `start`.
@@ -92,5 +132,21 @@ mod tests {
         _assert_dyn_id_gen(Some(gen.as_ref()));
         assert_eq!(gen.next_id(), 100);
         assert_eq!(gen.next_id(), 101);
+    }
+
+    #[test]
+    fn test_system_id_gen() {
+        let gen = SystemIdGen::default();
+        let id1 = gen.next_id();
+        let id2 = gen.next_id();
+        assert!(id1 > 0);
+        assert_eq!(id2, id1 + 1);
+    }
+
+    #[test]
+    fn test_sequential_ids_alias() {
+        let gen = SequentialIds::new(42);
+        assert_eq!(gen.next_id(), 42);
+        assert_eq!(gen.next_id(), 43);
     }
 }

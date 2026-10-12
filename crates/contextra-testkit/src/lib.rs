@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod dst;
 pub mod fault_vfs;
 pub mod in_memory_store;
 pub mod manual_clock;

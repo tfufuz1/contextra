@@ -319,7 +319,7 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr
 }
 
 impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned> {
-    /// Finalizes the builder and creates a fully attested [`DeletionProof`].
+    /// Finalizes the builder and creates a fully attested version 4 [`DeletionProof`].
     ///
     /// This method is only available when all 7 storage layers have been marked as [`Cleaned`].
     pub fn finish(self) -> Result<DeletionProof> {
@@ -330,11 +330,11 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
             ed25519_dalek::SigningKey::from_bytes(&key_bytes)
         } else {
             return Err(contextra_types::ContextraError::Internal(
-                "proof_key must be at least 32 bytes for Ed25519 v3 signature".to_string(),
+                "proof_key must be at least 32 bytes for Ed25519 v4 signature".to_string(),
             ));
         };
 
-        DeletionProof::create_full_v3(
+        DeletionProof::create_v4_internal(
             self.scope,
             self.deleted_keys,
             self.deleted_after_tx,
@@ -361,6 +361,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_typestate_builder_complete_chain_matches_direct_creation() {
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
@@ -397,8 +398,8 @@ mod tests {
             attested_at: 0,
         }];
 
-        // Direct creation reference
-        let expected_proof = DeletionProof::create_full_v3(
+        // Direct creation reference v4
+        let expected_proof = DeletionProof::create_v4_internal(
             scope.clone(),
             deleted_keys.clone(),
             tx_id,
@@ -439,6 +440,7 @@ mod tests {
         let sk = ed25519_dalek::SigningKey::from_bytes(key[..32].try_into().unwrap());
         let vk = sk.verifying_key();
 
+        assert_eq!(built_proof.signature_version, 4);
         assert_eq!(built_proof, expected_proof);
         assert!(built_proof
             .verify(crate::deletion_proof::VerificationKey::Ed25519(&vk))
