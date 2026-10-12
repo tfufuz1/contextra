@@ -7,6 +7,7 @@ use std::io::{Seek, SeekFrom, Write};
 use tempfile::TempDir;
 
 #[test]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 fn canary_oracle_negative_test_finds_existing_markers() {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
     let oracle = CanaryOracle::new();
@@ -103,6 +104,7 @@ fn canary_oracle_negative_test_finds_existing_markers() {
 }
 
 #[test]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 fn canary_oracle_positive_test_confirms_complete_erasure() {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
     let oracle = CanaryOracle::new();
@@ -172,6 +174,7 @@ fn canary_oracle_positive_test_confirms_complete_erasure() {
 }
 
 #[test]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 fn canary_oracle_straddle_chunk_boundary_test() {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
     let oracle = CanaryOracle::new();
