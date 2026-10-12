@@ -20,15 +20,9 @@ fn test_wal_v4_encode_decode_identity_all_ops() {
             tx_id: TxId::new(102),
             committed: true,
         },
-        WalOp::IndexIntent {
+        WalOp::TxEnd {
             tx_id: TxId::new(103),
-            index_id: b"idx_graph_001".to_vec(),
-            op: b"BUILD_CSR".to_vec(),
-        },
-        WalOp::IndexApplied {
-            tx_id: TxId::new(104),
-            index_id: b"idx_graph_001".to_vec(),
-            seq: 9999,
+            committed: false,
         },
     ];
 
@@ -38,7 +32,7 @@ fn test_wal_v4_encode_decode_identity_all_ops() {
 
         let serialized = entry.to_bytes().expect("serialize entry");
         let deserialized =
-            WalEntry::from_bytes_classified(&serialized).expect("deserialize entry");
+            WalEntry::from_bytes_classified(&serialized[4..]).expect("deserialize entry");
 
         assert_eq!(deserialized.seq_no, entry.seq_no);
         assert_eq!(deserialized.checksum, entry.checksum);

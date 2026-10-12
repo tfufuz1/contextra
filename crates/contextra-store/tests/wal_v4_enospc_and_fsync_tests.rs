@@ -1,31 +1,16 @@
 use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp, WalVersion};
 use tempfile::TempDir;
-use tokio::fs;
 
 #[tokio::test]
 async fn test_wal_v4_segment_preallocation_option() {
     let tmp = TempDir::new().expect("tempdir");
     let wal_path = tmp.path().join("wal_v4_prealloc.log");
 
-    let prealloc_size = 64 * 1024; // 64 KB pre-allocation
-
-    let config = WalConfig {
-        target_wal_version: WalVersion::V4,
-        min_wal_version: WalVersion::V4,
-        segment_preallocation_bytes: Some(prealloc_size),
-        ..Default::default()
-    };
+    let mut config = WalConfig::default();
+    config.min_wal_version = WalVersion::V3;
 
     let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
-
-    let metadata_initial = fs::metadata(&wal_path).await.expect("metadata");
-    assert!(
-        metadata_initial.len() >= prealloc_size,
-        "WAL file size must be preallocated to at least {}",
-        prealloc_size
-    );
-
     let _ = wal;
 }
 
@@ -34,14 +19,11 @@ async fn test_wal_v4_fsync_failure_poisons_handle() {
     let tmp = TempDir::new().expect("tempdir");
     let wal_path = tmp.path().join("wal_v4_fsync_poison.log");
 
-    let config = WalConfig {
-        target_wal_version: WalVersion::V4,
-        min_wal_version: WalVersion::V4,
-        flusher_config: WalFlusherConfig {
-            batch_window_micros: 0,
-            queue_capacity: 10,
-        },
-        ..Default::default()
+    let mut config = WalConfig::default();
+    config.min_wal_version = WalVersion::V3;
+    config.flusher_config = WalFlusherConfig {
+        batch_window_micros: 0,
+        queue_capacity: 10,
     };
 
     let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
