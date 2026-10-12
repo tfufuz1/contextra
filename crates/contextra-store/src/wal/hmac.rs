@@ -582,7 +582,8 @@ mod tests {
         );
         let err_msg = open_res.unwrap_err().to_string();
         assert!(
-            err_msg.contains("disallowed by configuration") || err_msg.contains("Explicit migration"),
+            err_msg.contains("disallowed by configuration")
+                || err_msg.contains("Explicit migration"),
             "Unexpected error message: {}",
             err_msg
         );
@@ -602,7 +603,9 @@ mod tests {
         let entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry creation");
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&entry.to_bytes().expect("entry bytes"));
-        tokio::fs::write(&wal_path, &bytes).await.expect("write wal");
+        tokio::fs::write(&wal_path, &bytes)
+            .await
+            .expect("write wal");
 
         Wal::write_migration_marker_atomically(&wal_path)
             .await

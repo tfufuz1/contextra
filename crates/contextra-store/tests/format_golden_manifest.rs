@@ -1,7 +1,7 @@
 mod golden;
 
 use contextra_store::manifest::{Manifest, ManifestEntry, MANIFEST_HEADER_MAGIC};
-use golden::generate::{golden_dir, generate_all, verify_file_hash};
+use golden::generate::{generate_all, golden_dir, verify_file_hash};
 use std::fs;
 use std::path::PathBuf;
 
@@ -15,7 +15,10 @@ async fn test_format_golden_manifest() {
     // 1. Check file exists and verify hash in MANIFEST.txt
     let manifest_filename = "manifest_mfmn.manifest";
     let manifest_path = dir.join(manifest_filename);
-    assert!(manifest_path.exists(), "Golden Manifest MFMN file must exist");
+    assert!(
+        manifest_path.exists(),
+        "Golden Manifest MFMN file must exist"
+    );
 
     let is_valid_hash = verify_file_hash(&dir, manifest_filename);
     assert!(
@@ -25,7 +28,10 @@ async fn test_format_golden_manifest() {
 
     // 2. Check binary header magic (MFMN)
     let bytes = fs::read(&manifest_path).expect("read golden manifest");
-    assert!(bytes.len() >= 4, "Manifest file must have at least header length");
+    assert!(
+        bytes.len() >= 4,
+        "Manifest file must have at least header length"
+    );
     assert_eq!(
         &bytes[0..4],
         MANIFEST_HEADER_MAGIC,
