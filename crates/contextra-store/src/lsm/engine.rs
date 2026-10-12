@@ -290,7 +290,8 @@ impl LsmStorage {
     /// Returns the current `segment_counter` value for testing verification.
     #[doc(hidden)]
     pub fn segment_counter_for_test(&self) -> u64 {
-        self.segment_counter.load(std::sync::atomic::Ordering::Acquire)
+        self.segment_counter
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     #[doc(hidden)]

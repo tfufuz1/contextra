@@ -4,7 +4,7 @@ mod block_cache;
 mod block_search;
 mod bloom;
 mod builder;
-mod io;
+pub(crate) mod io;
 mod reader;
 mod reader_ext;
 mod stream;

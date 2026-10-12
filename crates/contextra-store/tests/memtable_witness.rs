@@ -38,14 +38,20 @@ async fn test_a_put_in_active_memtable_err() {
     let res = storage
         .issue_memtable_witness(&[key.clone()], &[], tx1)
         .await;
-    assert!(res.is_err(), "Expected Err when non-tombstone Put version exists in active memtable");
+    assert!(
+        res.is_err(),
+        "Expected Err when non-tombstone Put version exists in active memtable"
+    );
     let err_msg = res.unwrap_err().to_string();
     assert!(
         err_msg.contains("INV-DELETION-1 violation"),
         "Error message should mention INV-DELETION-1: {}",
         err_msg
     );
-    assert!(!err_msg.contains("key_a"), "Error message must not leak key bytes");
+    assert!(
+        !err_msg.contains("key_a"),
+        "Error message must not leak key bytes"
+    );
 }
 
 #[tokio::test]
@@ -128,7 +134,10 @@ async fn test_d_put_in_immutable_memtable_err() {
     tokio::fs::create_dir_all(&sst_path).await.unwrap();
 
     let flush_res = storage.force_flush().await;
-    assert!(flush_res.is_err(), "Flush should fail to simulate immutable memtable retention");
+    assert!(
+        flush_res.is_err(),
+        "Flush should fail to simulate immutable memtable retention"
+    );
 
     let res = storage
         .issue_memtable_witness(&[key.clone()], &[], tx1)

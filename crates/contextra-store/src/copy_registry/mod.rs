@@ -49,7 +49,9 @@ impl CopyRegEntry {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 16 + 1 + 4 + 8 {
-            return Err(ContextraError::Serialization("CopyRegEntry too short".into()));
+            return Err(ContextraError::Serialization(
+                "CopyRegEntry too short".into(),
+            ));
         }
 
         let mut copy_id = [0u8; 16];
@@ -59,13 +61,20 @@ impl CopyRegEntry {
             1 => CopyKind::Hardlink,
             2 => CopyKind::Reflink,
             3 => CopyKind::FullCopy,
-            k => return Err(ContextraError::Serialization(format!("Unknown CopyKind {}", k))),
+            k => {
+                return Err(ContextraError::Serialization(format!(
+                    "Unknown CopyKind {}",
+                    k
+                )))
+            }
         };
 
         let file_count = u32::from_be_bytes(bytes[17..21].try_into().unwrap_or([0; 4])) as usize;
         let expected_len = 16 + 1 + 4 + (file_count * 16) + 8;
         if bytes.len() < expected_len {
-            return Err(ContextraError::Serialization("CopyRegEntry truncated file_ids".into()));
+            return Err(ContextraError::Serialization(
+                "CopyRegEntry truncated file_ids".into(),
+            ));
         }
 
         let mut offset = 21;
@@ -117,7 +126,9 @@ impl CopyRegistry {
             });
         }
 
-        let bytes = tokio::fs::read(&path).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let bytes = tokio::fs::read(&path)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
         let mut offset = 0;
         let mut entries = Vec::new();
         let mut seen_copy_ids = HashSet::new();
@@ -126,13 +137,18 @@ impl CopyRegistry {
             if bytes.len() < offset + 4 {
                 break; // Tail truncation
             }
-            let frame_len = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
+            let frame_len =
+                u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             if frame_len > 65536 || bytes.len() < offset + 4 + frame_len + 4 {
                 break; // Tail truncation
             }
 
             let payload = &bytes[offset + 4..offset + 4 + frame_len];
-            let crc_stored = u32::from_be_bytes(bytes[offset + 4 + frame_len..offset + 4 + frame_len + 4].try_into().unwrap_or([0; 4]));
+            let crc_stored = u32::from_be_bytes(
+                bytes[offset + 4 + frame_len..offset + 4 + frame_len + 4]
+                    .try_into()
+                    .unwrap_or([0; 4]),
+            );
             let crc_computed = crc32fast::hash(payload);
 
             if crc_stored != crc_computed {
@@ -178,8 +194,12 @@ impl CopyRegistry {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        file.write_all(&frame).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
+        file.write_all(&frame)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        file.sync_all()
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
         crate::util::fsync_parent_dir(&path).await?;
 
         self.seen_copy_ids.insert(entry.copy_id);

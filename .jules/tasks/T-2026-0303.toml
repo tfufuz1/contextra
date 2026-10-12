@@ -1,0 +1,42 @@
+# Task-Karte T-2026-0303
+id        = "T-2026-0303"
+title     = "Format-Verifikation, MFSX/MFBL/MFMN Golden Corpus und Migration"
+crate     = "contextra-store"
+tier      = 1
+risk      = "crash"
+goal      = "Zentrale Formatprüfung, SSTable MFSX Magic, Downgrade-Abwehr, Blob-Segmente MFBL, Migration-API und Golden-Korpus"
+non_goals = [
+  "Verdrahtung des WAL-Commit-Pfads für Blob-Zeiger",
+  "Änderung in src/wal/**",
+  "CLI-Command contextra migrate"
+]
+scope     = ["crates/contextra-store/**"]
+forbidden = [
+  "crates/contextra-store/src/wal/**",
+  "crates/contextra-store/tests/wal_v4_*.rs",
+  ".github/**",
+  "xtask/**",
+  "justfile",
+  "capabilities.toml",
+  "governance/**",
+  "AGENTS.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  ".jules/setup/**",
+  "Cargo.lock"
+]
+invariants = ["INV-FORMAT-1", "INV-IO-1", "INV-KEYSPACE-1", "Zero-Panic"]
+acceptance = [
+  "cargo check -p contextra-store",
+  "cargo test -p contextra-store --lib",
+  "cargo test -p contextra-store --test '*'",
+  "cargo clippy -p contextra-store --all-targets -- -D warnings",
+  "cargo fmt -p contextra-store --check",
+  "cargo xtask jules check"
+]
+evidence_required = ["Golden Corpus Integrationstest", "FormatHeader Roundtrip Test", "Migration Plan Dry-Run Hash Verification Test"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

@@ -12,7 +12,7 @@ mod rollover;
 #[cfg(test)]
 mod tests;
 
-pub use core::Manifest;
+pub use core::{Manifest, ManifestFormatTracker, MANIFEST_HEADER_MAGIC};
 pub use entry::ManifestEntry;
 
 /// Maximum allowed payload size for a single manifest entry (1 MB).

@@ -607,7 +607,9 @@ impl MemTable {
         let mut tombstones = 0;
         for shard_idx in shard_range {
             let entries = self.shards[shard_idx].entries.read();
-            for (k, versions) in entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded)) {
+            for (k, versions) in
+                entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
+            {
                 if !k.starts_with(prefix) {
                     break;
                 }
@@ -644,7 +646,9 @@ impl MemTable {
         let mut count = 0;
         for shard_idx in shard_range {
             let entries = self.shards[shard_idx].entries.read();
-            for (k, versions) in entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded)) {
+            for (k, versions) in
+                entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
+            {
                 if !k.starts_with(prefix) {
                     break;
                 }

@@ -4,9 +4,7 @@
 // AP-10 BEFUND: Simulierter Abbruch (leftover .sst / .tmp Dateileichen) wird sicher erkannt und per
 // durable_remove entfernt, während geschützte running_ops und Unknown Dateisystemobjekte unberührt bleiben.
 
-use contextra_store::sstable::{
-    plan_orphan_removal, remove_orphans, SstInventory, SstScanInputs,
-};
+use contextra_store::sstable::{plan_orphan_removal, remove_orphans, SstInventory, SstScanInputs};
 use tempfile::tempdir;
 
 #[tokio::test]

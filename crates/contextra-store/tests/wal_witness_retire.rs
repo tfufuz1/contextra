@@ -56,7 +56,9 @@ async fn test_wal_retire_segments_basic() -> Result<(), ContextraError> {
         return Err(ContextraError::Storage("wal_seg1 was not removed".into()));
     }
     if !remaining_files.iter().any(|f| f.contains("wal_seg2")) {
-        return Err(ContextraError::Storage("wal_seg2 was unexpectedly removed".into()));
+        return Err(ContextraError::Storage(
+            "wal_seg2 was unexpectedly removed".into(),
+        ));
     }
 
     Ok(())

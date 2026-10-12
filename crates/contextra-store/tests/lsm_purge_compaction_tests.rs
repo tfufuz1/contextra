@@ -23,7 +23,9 @@ async fn test_purge_keys_insufficient_disk_space() -> contextra_core::Result<()>
     };
     let storage = LsmStorage::open(config).await?;
 
-    let probe = TestFreeSpaceProbe { free_bytes: Some(0) };
+    let probe = TestFreeSpaceProbe {
+        free_bytes: Some(0),
+    };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
@@ -56,9 +58,7 @@ async fn test_purge_keys_success() -> contextra_core::Result<()> {
     };
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
-    let res = storage
-        .purge_keys(scope, 100, Some(&probe))
-        .await;
+    let res = storage.purge_keys(scope, 100, Some(&probe)).await;
 
     // WP-0.1: purge_keys must fail-closed with Unimplemented until real compaction filter is implemented
     assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);

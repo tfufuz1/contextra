@@ -114,19 +114,23 @@ impl WitnessReader {
                 .unwrap_or_default();
             match km.derive_file_key(file_id.as_bytes()) {
                 Ok(k) => Some(Arc::new(k)),
-                Err(e) => return Err(WitnessReadError::CorruptFile(format!("Key derivation failed: {e}"))),
+                Err(e) => {
+                    return Err(WitnessReadError::CorruptFile(format!(
+                        "Key derivation failed: {e}"
+                    )))
+                }
             }
         } else {
             None
         };
 
-        let mut file = File::open(&path_buf).map_err(|e| {
-            WitnessReadError::Io(format!("Failed to open SSTable: {e}"))
-        })?;
+        let mut file = File::open(&path_buf)
+            .map_err(|e| WitnessReadError::Io(format!("Failed to open SSTable: {e}")))?;
 
-        let file_size = file.metadata().map_err(|e| {
-            WitnessReadError::Io(format!("Failed to read metadata: {e}"))
-        })?.len();
+        let file_size = file
+            .metadata()
+            .map_err(|e| WitnessReadError::Io(format!("Failed to read metadata: {e}")))?
+            .len();
 
         if file_size < 12 {
             return Err(WitnessReadError::CorruptFile(
@@ -138,12 +142,10 @@ impl WitnessReader {
         let read_trailer_len = usize::try_from(54u64.min(file_size)).unwrap_or(54);
         let mut trailer_buf = vec![0u8; read_trailer_len];
         let trailer_seek_pos = file_size.saturating_sub(read_trailer_len as u64);
-        file.seek(SeekFrom::Start(trailer_seek_pos)).map_err(|e| {
-            WitnessReadError::Io(format!("Seek trailer failed: {e}"))
-        })?;
-        file.read_exact(&mut trailer_buf).map_err(|e| {
-            WitnessReadError::Io(format!("Read trailer failed: {e}"))
-        })?;
+        file.seek(SeekFrom::Start(trailer_seek_pos))
+            .map_err(|e| WitnessReadError::Io(format!("Seek trailer failed: {e}")))?;
+        file.read_exact(&mut trailer_buf)
+            .map_err(|e| WitnessReadError::Io(format!("Read trailer failed: {e}")))?;
 
         let trailer_len = trailer_buf.len();
         if trailer_len < 12 {
@@ -200,34 +202,54 @@ impl WitnessReader {
 
         let base = if format_version >= 1 { 0 } else { 2 };
         let min_tx_id = u64::from_le_bytes(
-            trailer_buf.get(base..base + 8)
-                .ok_or_else(|| WitnessReadError::CorruptFile("Invalid min_tx_id in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+            trailer_buf
+                .get(base..base + 8)
+                .ok_or_else(|| {
+                    WitnessReadError::CorruptFile("Invalid min_tx_id in trailer".into())
+                })?
+                .try_into()
+                .unwrap_or([0; 8]),
         );
         let max_tx_id = u64::from_le_bytes(
-            trailer_buf.get(base + 8..base + 16)
-                .ok_or_else(|| WitnessReadError::CorruptFile("Invalid max_tx_id in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+            trailer_buf
+                .get(base + 8..base + 16)
+                .ok_or_else(|| {
+                    WitnessReadError::CorruptFile("Invalid max_tx_id in trailer".into())
+                })?
+                .try_into()
+                .unwrap_or([0; 8]),
         );
         let min_seq = u64::from_le_bytes(
-            trailer_buf.get(base + 16..base + 24)
+            trailer_buf
+                .get(base + 16..base + 24)
                 .ok_or_else(|| WitnessReadError::CorruptFile("Invalid min_seq in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+                .try_into()
+                .unwrap_or([0; 8]),
         );
         let max_seq = u64::from_le_bytes(
-            trailer_buf.get(base + 24..base + 32)
+            trailer_buf
+                .get(base + 24..base + 32)
                 .ok_or_else(|| WitnessReadError::CorruptFile("Invalid max_seq in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+                .try_into()
+                .unwrap_or([0; 8]),
         );
         let bloom_offset = u64::from_le_bytes(
-            trailer_buf.get(base + 32..base + 40)
-                .ok_or_else(|| WitnessReadError::CorruptFile("Invalid bloom_offset in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+            trailer_buf
+                .get(base + 32..base + 40)
+                .ok_or_else(|| {
+                    WitnessReadError::CorruptFile("Invalid bloom_offset in trailer".into())
+                })?
+                .try_into()
+                .unwrap_or([0; 8]),
         );
         let index_offset = u64::from_le_bytes(
-            trailer_buf.get(base + 40..base + 48)
-                .ok_or_else(|| WitnessReadError::CorruptFile("Invalid index_offset in trailer".into()))?
-                .try_into().unwrap_or([0; 8]),
+            trailer_buf
+                .get(base + 40..base + 48)
+                .ok_or_else(|| {
+                    WitnessReadError::CorruptFile("Invalid index_offset in trailer".into())
+                })?
+                .try_into()
+                .unwrap_or([0; 8]),
         );
 
         let trailer_offset = file_size.saturating_sub(if format_version >= 1 { 54 } else { 52 });
@@ -241,13 +263,20 @@ impl WitnessReader {
         }
 
         // Read index section
-        let index_end = if bloom_offset > 0 { bloom_offset } else { trailer_offset };
-        let index_len = usize::try_from(index_end.saturating_sub(index_offset))
-            .map_err(|_| WitnessReadError::CorruptFile("Index length exceeds platform bounds".into()))?;
+        let index_end = if bloom_offset > 0 {
+            bloom_offset
+        } else {
+            trailer_offset
+        };
+        let index_len = usize::try_from(index_end.saturating_sub(index_offset)).map_err(|_| {
+            WitnessReadError::CorruptFile("Index length exceeds platform bounds".into())
+        })?;
 
         let mut index_raw = vec![0u8; index_len];
-        file.seek(SeekFrom::Start(index_offset)).map_err(|e| WitnessReadError::Io(e.to_string()))?;
-        file.read_exact(&mut index_raw).map_err(|e| WitnessReadError::Io(e.to_string()))?;
+        file.seek(SeekFrom::Start(index_offset))
+            .map_err(|e| WitnessReadError::Io(e.to_string()))?;
+        file.read_exact(&mut index_raw)
+            .map_err(|e| WitnessReadError::Io(e.to_string()))?;
 
         let index_payload = if index_raw.len() >= 4 {
             let stored_crc = u32::from_le_bytes(index_raw[0..4].try_into().unwrap_or([0; 4]));
@@ -277,9 +306,8 @@ impl WitnessReader {
             let key_bytes = Bytes::copy_from_slice(&index_payload[pos..pos + key_len]);
             pos += key_len;
 
-            let block_offset = u64::from_le_bytes(
-                index_payload[pos..pos + 8].try_into().unwrap_or([0; 8]),
-            );
+            let block_offset =
+                u64::from_le_bytes(index_payload[pos..pos + 8].try_into().unwrap_or([0; 8]));
             pos += 8;
 
             if block_offset > index_offset {
@@ -292,7 +320,9 @@ impl WitnessReader {
         }
 
         if pos != payload_len {
-            return Err(WitnessReadError::CorruptFile("Index trailing unparsed bytes".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Index trailing unparsed bytes".into(),
+            ));
         }
 
         let last_key = index.last().map(|(k, _)| k.clone()).unwrap_or_default();
@@ -371,27 +401,43 @@ impl WitnessReader {
     }
 
     /// Helper to read and decrypt a raw block payload at offset.
-    fn read_block_raw(&mut self, offset: u64, next_offset: u64) -> Result<Vec<u8>, WitnessReadError> {
+    fn read_block_raw(
+        &mut self,
+        offset: u64,
+        next_offset: u64,
+    ) -> Result<Vec<u8>, WitnessReadError> {
         let block_len = usize::try_from(next_offset.saturating_sub(offset))
             .map_err(|_| WitnessReadError::CorruptFile("Block length overflow".into()))?;
 
         if block_len > 16 * 1024 * 1024 {
-            return Err(WitnessReadError::CorruptFile("Block length exceeds 16MB limit".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block length exceeds 16MB limit".into(),
+            ));
         }
 
         let mut buf = vec![0u8; block_len];
-        self.file.seek(SeekFrom::Start(offset)).map_err(|e| WitnessReadError::Io(e.to_string()))?;
-        self.file.read_exact(&mut buf).map_err(|e| WitnessReadError::Io(e.to_string()))?;
+        self.file
+            .seek(SeekFrom::Start(offset))
+            .map_err(|e| WitnessReadError::Io(e.to_string()))?;
+        self.file
+            .read_exact(&mut buf)
+            .map_err(|e| WitnessReadError::Io(e.to_string()))?;
 
         let block_data = if let Some(km) = &self.key_manager {
             if buf.len() < 12 {
-                return Err(WitnessReadError::CorruptFile("Encrypted block missing nonce".into()));
+                return Err(WitnessReadError::CorruptFile(
+                    "Encrypted block missing nonce".into(),
+                ));
             }
             let mut nonce = [0u8; 12];
             nonce.copy_from_slice(&buf[0..12]);
             match km.decrypt_auto_nonce(&buf[12..], &nonce) {
                 Ok(dec) => dec,
-                Err(e) => return Err(WitnessReadError::CorruptFile(format!("Decryption failed: {e}"))),
+                Err(e) => {
+                    return Err(WitnessReadError::CorruptFile(format!(
+                        "Decryption failed: {e}"
+                    )))
+                }
             }
         } else {
             buf
@@ -399,7 +445,9 @@ impl WitnessReader {
 
         if self.has_crc {
             if block_data.len() < 4 {
-                return Err(WitnessReadError::CorruptFile("Block too small for CRC".into()));
+                return Err(WitnessReadError::CorruptFile(
+                    "Block too small for CRC".into(),
+                ));
             }
             let stored_crc = u32::from_le_bytes(block_data[0..4].try_into().unwrap_or([0; 4]));
             let payload = &block_data[4..];
@@ -431,11 +479,17 @@ impl WitnessReader {
 
         let block_bytes = self.read_block_raw(first_block_offset, next_offset)?;
         if block_bytes.len() < 2 {
-            return Err(WitnessReadError::CorruptFile("First block too short for key header".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "First block too short for key header".into(),
+            ));
         }
-        let k_len = usize::from(u16::from_le_bytes(block_bytes[0..2].try_into().unwrap_or([0; 2])));
+        let k_len = usize::from(u16::from_le_bytes(
+            block_bytes[0..2].try_into().unwrap_or([0; 2]),
+        ));
         if block_bytes.len() < 2 + k_len {
-            return Err(WitnessReadError::CorruptFile("First key truncated in block".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "First key truncated in block".into(),
+            ));
         }
         let first_key = Bytes::copy_from_slice(&block_bytes[2..2 + k_len]);
         self.metadata.first_key = first_key.clone();
@@ -483,41 +537,54 @@ fn parse_block_entries(
     let n = block_data.len();
     let (num_offsets, offsets_start) = if format_version >= 4 {
         if n < 8 {
-            return Err(WitnessReadError::CorruptFile("Block trailer too small (< 8 bytes)".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer too small (< 8 bytes)".into(),
+            ));
         }
         let num_offsets = usize::try_from(u32::from_le_bytes(
             block_data[n - 4..n].try_into().unwrap_or([0; 4]),
-        )).unwrap_or(0);
+        ))
+        .unwrap_or(0);
         let bloom_len = usize::try_from(u32::from_le_bytes(
             block_data[n - 8..n - 4].try_into().unwrap_or([0; 4]),
-        )).unwrap_or(0);
+        ))
+        .unwrap_or(0);
         let offsets_len = num_offsets.checked_mul(4).ok_or_else(|| {
             WitnessReadError::CorruptFile("Overflow in offsets length calculation".into())
         })?;
         let total_trailer = 8 + bloom_len + offsets_len;
         if n < total_trailer {
-            return Err(WitnessReadError::CorruptFile("Block trailer bounds error".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer bounds error".into(),
+            ));
         }
         let offsets_start = n - 8 - offsets_len;
         (num_offsets, offsets_start)
     } else if format_version == 3 {
         if n < 36 {
-            return Err(WitnessReadError::CorruptFile("Block trailer too small (< 36 bytes)".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer too small (< 36 bytes)".into(),
+            ));
         }
         let num_offsets = usize::try_from(u32::from_le_bytes(
             block_data[n - 4..n].try_into().unwrap_or([0; 4]),
-        )).unwrap_or(0);
+        ))
+        .unwrap_or(0);
         let offsets_len = num_offsets.checked_mul(4).ok_or_else(|| {
             WitnessReadError::CorruptFile("Overflow in offsets length calculation".into())
         })?;
         if n < 36 + offsets_len {
-            return Err(WitnessReadError::CorruptFile("Block trailer bounds error".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer bounds error".into(),
+            ));
         }
         let offsets_start = n - 4 - offsets_len;
         (num_offsets, offsets_start)
     } else {
         if n < 10 {
-            return Err(WitnessReadError::CorruptFile("Block trailer too small (< 10 bytes)".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer too small (< 10 bytes)".into(),
+            ));
         }
         let num_offsets = usize::from(u16::from_le_bytes(
             block_data[n - 2..n].try_into().unwrap_or([0; 2]),
@@ -526,7 +593,9 @@ fn parse_block_entries(
             WitnessReadError::CorruptFile("Overflow in offsets length calculation".into())
         })?;
         if n < 10 + offsets_len {
-            return Err(WitnessReadError::CorruptFile("Block trailer bounds error".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Block trailer bounds error".into(),
+            ));
         }
         let offsets_start = n - 2 - offsets_len;
         (num_offsets, offsets_start)
@@ -538,24 +607,36 @@ fn parse_block_entries(
         let entry_off = if is_v3 || format_version >= 4 {
             let p = offsets_start + i * 4;
             if p + 4 > block_data.len() {
-                return Err(WitnessReadError::CorruptFile("Offset array out of bounds".into()));
+                return Err(WitnessReadError::CorruptFile(
+                    "Offset array out of bounds".into(),
+                ));
             }
-            usize::try_from(u32::from_le_bytes(block_data[p..p + 4].try_into().unwrap_or([0; 4])))
-                .unwrap_or(0)
+            usize::try_from(u32::from_le_bytes(
+                block_data[p..p + 4].try_into().unwrap_or([0; 4]),
+            ))
+            .unwrap_or(0)
         } else {
             let p = offsets_start + i * 2;
             if p + 2 > block_data.len() {
-                return Err(WitnessReadError::CorruptFile("Offset array out of bounds".into()));
+                return Err(WitnessReadError::CorruptFile(
+                    "Offset array out of bounds".into(),
+                ));
             }
-            usize::from(u16::from_le_bytes(block_data[p..p + 2].try_into().unwrap_or([0; 2])))
+            usize::from(u16::from_le_bytes(
+                block_data[p..p + 2].try_into().unwrap_or([0; 2]),
+            ))
         };
 
         if entry_off + 2 > block_data.len() {
-            return Err(WitnessReadError::CorruptFile("Entry offset out of bounds".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Entry offset out of bounds".into(),
+            ));
         }
 
         let key_len = usize::from(u16::from_le_bytes(
-            block_data[entry_off..entry_off + 2].try_into().unwrap_or([0; 2]),
+            block_data[entry_off..entry_off + 2]
+                .try_into()
+                .unwrap_or([0; 2]),
         ));
         let pos_key = entry_off + 2;
         let pos_seq = pos_key + key_len;
@@ -564,19 +645,30 @@ fn parse_block_entries(
         let pos_val = pos_vlen + 4;
 
         if pos_val > block_data.len() {
-            return Err(WitnessReadError::CorruptFile("Entry metadata out of bounds".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Entry metadata out of bounds".into(),
+            ));
         }
 
         let key_bytes = Bytes::copy_from_slice(&block_data[pos_key..pos_key + key_len]);
-        let seq_no = u64::from_le_bytes(block_data[pos_seq..pos_seq + 8].try_into().unwrap_or([0; 8]));
+        let seq_no = u64::from_le_bytes(
+            block_data[pos_seq..pos_seq + 8]
+                .try_into()
+                .unwrap_or([0; 8]),
+        );
         let tx_id = u64::from_le_bytes(block_data[pos_tx..pos_tx + 8].try_into().unwrap_or([0; 8]));
         let val_len = usize::try_from(u32::from_le_bytes(
-            block_data[pos_vlen..pos_vlen + 4].try_into().unwrap_or([0; 4]),
-        )).unwrap_or(0);
+            block_data[pos_vlen..pos_vlen + 4]
+                .try_into()
+                .unwrap_or([0; 4]),
+        ))
+        .unwrap_or(0);
 
         let end_val = pos_val + val_len;
         if end_val > offsets_start {
-            return Err(WitnessReadError::CorruptFile("Value extends into trailer section".into()));
+            return Err(WitnessReadError::CorruptFile(
+                "Value extends into trailer section".into(),
+            ));
         }
 
         let val_bytes = Bytes::copy_from_slice(&block_data[pos_val..end_val]);
