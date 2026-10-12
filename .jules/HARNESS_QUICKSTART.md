@@ -1,9 +1,9 @@
 # Harness Quickstart
 
-10-Zeilen-Spickzettel für die 5 Jules-Phasen. Siehe [PREAMBLE.md](PREAMBLE.md) für den Sitzungsvertrag.
+10-Zeilen-Spickzettel für die kanonischen Jules-Phasen. Siehe [PREAMBLE.md](PREAMBLE.md) für den Sitzungsvertrag.
 
 ```bash
-# 1. Session starten (Karte linten, Claim setzen, Kontext packen)
+# 1. Session starten (Karte linten, Claim setzen, Kontext packen - intern laufen session-init & context-pack)
 cargo xtask jules start --card .jules/tasks/T-2026-0001.toml
 
 # 2. Während der Arbeit Syntax, Scope, Pfade & Duplikate prüfen
