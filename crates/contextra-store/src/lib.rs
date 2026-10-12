@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-10-11T00:00:00Z (SESSION: 0ccaf2ff)
+// ZWECK: Crate-Einstiegspunkt, Modul-Hierarchie und Re-Exports der contextra-store Storage Engine
+// INVARIANTEN: Strikte Kapselung LSM-interner Details (lsm::guard ist pub(crate)); #![forbid(unsafe_code)]
+// NICHT-OFFENSICHTLICH: Snapshot-Pinning nur über contextra-checkpoint Guard; Store-Module für Benches/Tests freigegeben
+// SIEHE AUCH: AGENTS.md, docs/audits/AUDIT_contextra-store_2026-10-04.md
+
 #![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
 //!

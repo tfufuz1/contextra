@@ -1,6 +1,6 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-Stand: 2026-10-06 · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
+Stand: 2026-10-11 · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
 
 ## 1. Rangfolge
 
