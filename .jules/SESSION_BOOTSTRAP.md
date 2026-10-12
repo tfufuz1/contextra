@@ -8,7 +8,9 @@
 
 ## 🎯 Kontext-Ladeordnung
 
-Lies NUR `.jules/context/CONTEXT_PACK.md` (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
+Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
+
+Das Kontextpaket (`.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
 
 ---
 
@@ -24,21 +26,21 @@ Die Phasen-Runner-Konfiguration (`.jules/harness-phases.toml`) ist die kanonisch
 | `submit` | `integrity` / `report` | `cargo xtask jules submit` | Verifiziert PR-Integrität, Diff-Budget & Session-Report |
 | `stop` | `guard` | `cargo xtask jules stop --reason <grund>` | Stoppt die Session und den Loop Guard bei Eskalation |
 
-*Hinweis*: `session-init` und `context-pack` sind interne Teilschritte von `cargo xtask jules start`. Das erzeugte Paket ist `.jules/context/CONTEXT_PACK.md`. `refresh-context.sh` nie ohne `--agent` mitten in der Aufgabe aufrufen.
+*Hinweis*: `session-init` und `context-pack` sind interne Teilschritte von `cargo xtask jules start`. Das erzeugte Paket ist `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->. Für Details siehe [HARNESS_QUICKSTART.md](HARNESS_QUICKSTART.md).
 
 ---
 
 ## 🛠️ Wann welches Werkzeug (Pflicht-Gates nach Risk-Klasse)
 
-| Risk-Klasse (`risk`) / Pfad | Pflichtgate & Regel-Referenz | Befehl / Rezept |
+| Risiko-Klasse (`risk`) / Pfad | Pflichtgate & Regel-Referenz | Befehl / Rezept |
 |---|---|---|
-| `sec` (Sicherheit / Crypto / Privacy) | `mutants-diff`, `fuzz-smoke` (`rules/fuzzing.md`, `rules/mutation-testing.md`) | `cargo xtask mutants-diff`, `just fuzz-smoke CRATE` |
-| `crash` (WAL / Store / Checkpoint) | `wal-replay-verify` (`rules/wal_crypto.md`) | `cargo test -p contextra-store --test wal_*` |
-| `simd` (SIMD / Vektorisierung) | SIMD-Sicherheitsanalyse (`rules/simd_safety.md`) | `cargo test -p contextra-simd` |
-| Berührt Unsafe-Pfade (`touched_unsafe`) | `unsafe-audit` (`rules/simd_safety.md`) | `cargo xtask check-unsafe-islands` |
-| Berührt Cargo-Dateien (`touched_cargo`) | `dependency-gate` (`rules/dependencies.md`) | `cargo xtask dependency-graph-audit` |
-| Berührt Geschützte Pfade (`touched_protected` / Loom / Bench) | `protected-paths`, Loom/Miri (`rules/loom-miri.md`), Bench (`rules/benchmarking.md`) | `just loom-store`, `just bench-setup` |
-| `none` / `utf8` / `fusion` / `concurrency` / `calib` | Standard-Verifikation (`rules/testing.md`, `rules/test_quality.md`) | `cargo xtask jules verify` |
+| `sec` (Sicherheit / Crypto / Privacy) | `mutants-diff`, `fuzz-smoke` (`rules/fuzzing.md`, `rules/mutation-testing.md`) <!-- doc-ref-ignore --> | `cargo xtask mutants-diff`, `just fuzz-smoke CRATE` |
+| `crash` (WAL / Store / Checkpoint / Durabilität) | `wal-replay-verify` (`rules/wal_crypto.md`) <!-- doc-ref-ignore --> | `cargo test -p contextra-store --test wal_*` |
+| `simd` (SIMD / Vektorisierung) | SIMD-Sicherheitsanalyse (`rules/simd_safety.md`) <!-- doc-ref-ignore --> | `cargo test -p contextra-simd` |
+| Berührt Unsafe-Pfade (`touched_unsafe`) | `unsafe-audit` (`rules/simd_safety.md`) <!-- doc-ref-ignore --> | `cargo xtask check-unsafe-islands` |
+| Berührt Cargo-Dateien (`touched_cargo`) | `dependency-gate` (`rules/dependencies.md`) <!-- doc-ref-ignore --> | `cargo xtask dependency-graph-audit` |
+| Berührt Geschützte Pfade (`touched_protected` / Loom / Bench) | `protected-paths`, Loom/Miri (`rules/loom-miri.md`), Bench (`rules/benchmarking.md`) <!-- doc-ref-ignore --> | `just loom-store`, `just bench-setup` |
+| `none` / `utf8` / `fusion` / `concurrency` / `calib` | Standard-Verifikation (`rules/testing.md`, `rules/test_quality.md`) <!-- doc-ref-ignore --> | `cargo xtask jules verify` |
 
 ---
 
