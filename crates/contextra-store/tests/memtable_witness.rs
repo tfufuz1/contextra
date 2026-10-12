@@ -221,7 +221,6 @@ async fn test_g_property_like_random_sequence() {
     let target_key = b"target_prop_key".to_vec();
     let target_prefix = b"target_prop_".to_vec();
 
-    let mut in_memtable = false;
     let mut tx_counter = 1u64;
 
     for _step in 0..50 {
@@ -229,23 +228,23 @@ async fn test_g_property_like_random_sequence() {
         let tx = TxId::new(tx_counter);
         tx_counter += 1;
 
-        match op {
+        let in_memtable = match op {
             0 => {
                 storage.put(tx, &target_key, b"v").await.unwrap();
                 storage.commit(tx).await.unwrap();
-                in_memtable = true;
+                true
             }
             1 => {
                 storage.delete(tx, &target_key).await.unwrap();
                 storage.commit(tx).await.unwrap();
-                // delete still leaves a non-tombstone Put version in memtable if Put was present!
+                true
             }
             2 => {
                 storage.force_flush().await.unwrap();
-                in_memtable = false;
+                false
             }
             _ => unreachable!(),
-        }
+        };
 
         let witness_res = storage
             .issue_memtable_witness(&[target_key.clone()], &[target_prefix.clone()], tx)
@@ -263,4 +262,73 @@ async fn test_g_property_like_random_sequence() {
             );
         }
     }
+}
+
+#[tokio::test]
+async fn test_h_witness_before_force_flush_fails() {
+    let (storage, _tmp) = create_test_storage().await;
+    let tx1 = TxId::new(1);
+    let key = b"key_h_flush".to_vec();
+
+    storage.delete(tx1, &key).await.unwrap();
+    storage.commit(tx1).await.unwrap();
+
+    // Witness BEFORE force_flush must fail
+    let res_before = storage
+        .issue_memtable_witness(&[key.clone()], &[], tx1)
+        .await;
+    assert!(
+        res_before.is_err(),
+        "Memtable witness before force_flush MUST fail"
+    );
+    let err_msg = res_before.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("before force_flush") || err_msg.contains("unflushed") || err_msg.contains("INV-DELETION-1"),
+        "Error message must indicate unflushed residue or pre-flush rejection: {}",
+        err_msg
+    );
+
+    // Also test layer variants from A-01 via issue_layer_witness
+    let layer_res_before = storage
+        .issue_layer_witness(DeletionLayer::LsmMemtable, &[key.clone()], &[], tx1)
+        .await;
+    assert!(
+        layer_res_before.is_err(),
+        "issue_layer_witness before force_flush MUST fail for LsmMemtable"
+    );
+
+    // After force_flush, witness must succeed
+    storage.force_flush().await.unwrap();
+
+    let res_after = storage
+        .issue_memtable_witness(&[key.clone()], &[], tx1)
+        .await;
+    assert!(
+        res_after.is_ok(),
+        "Memtable witness after force_flush MUST succeed"
+    );
+
+    let layer_res_after = storage
+        .issue_layer_witness(DeletionLayer::LsmMemtable, &[key.clone()], &[], tx1)
+        .await;
+    assert!(
+        layer_res_after.is_ok(),
+        "issue_layer_witness after force_flush MUST succeed for LsmMemtable"
+    );
+
+    // Also test other LSM layer variants
+    let sst_witness = storage
+        .issue_layer_witness(DeletionLayer::SsTableAllLevels, &[key.clone()], &[], tx1)
+        .await;
+    assert!(sst_witness.is_ok());
+
+    let wal_witness = storage
+        .issue_layer_witness(
+            DeletionLayer::WalAllSegments { seq_after: 1 },
+            &[key.clone()],
+            &[],
+            tx1,
+        )
+        .await;
+    assert!(wal_witness.is_ok());
 }
