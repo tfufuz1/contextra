@@ -64,7 +64,7 @@ pub use apprh::{
 pub use arc_slice::ArcSlice;
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
-    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
+    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, CascadeTombstone,
     GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
