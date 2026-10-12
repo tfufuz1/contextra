@@ -1,91 +1,103 @@
-# ADR-SCOPE-FREEZE-2026-10: Scope Freeze & Crate-Klassifizierung (Kern, Rand, Experimentell)
+# ADR-SCOPE-FREEZE-2026-10: Scope Freeze & Verbindliche Crate-Klassifikation (K, R, E)
 
-* **Datum:** 2026-10-12
-* **Status:** Vorschlag / Proposed
-* **Rolle:** Produkt-Architekt
-* **Kontext / Referenzen:** Spezifikation §6.0, Projektbewertung 10.9, ADR-N08 (`capabilities.toml`)
-
----
-
-## 1. Kontext & Zielsetzung
-
-Das Contextra-Projekt umfasst 34 Rust-Workspace-Crates mit unterschiedlichen Aufgabenbereichen. Um unbeabsichtigten Scope Creep zu verhindern, Ressourcen auf die Kern-Engine zu fokussieren und verlässliche Stabilitätsversprechen (SemVer, Invarianten-Garantien) abzugeben, wird hiermit ein verbindlicher **Scope Freeze** definiert.
-
-Gemäß Spezifikation §6.0 werden alle Crates sowie spezifische Submodule in drei eindeutige Klassen unterteilt:
-- **Klasse K (Kern / Core Engine):** Das kritische Fundament (Storage, MVCC, Indexierung, Vektor/Text/Graph-Kerne, Kryptographie, Compute-Pool). Höchste Anforderungen an Invarianten, Testabdeckung und Stabilität.
-- **Klasse R (Rand / Peripherie & FFI):** Schnittstellen, Endnutzer-Facade, Protokoll-Server, Inferenz-Adapter, Python-Bindings und Isolations-Sandboxes.
-- **Klasse E (Experimentell):** Forschungspfade, Zusatzgeneratoren, adaptive Routing-/Bandit-Module und fortgeschrittene Graph-Verfahren. Diese Komponenten sind **aus allen Stabilitäts- und Abwärtskompatibilitätsgarantien ausgenommen**.
+* **Datum**: 2026-10-12
+* **Status**: 📝 Vorschlag
+* **Rolle**: Produkt-Architekt
+* **Kontext**: Spezifikation §6.0, Projektbewertung 10.9, ADR-N08, Ring-Modell v2
 
 ---
 
-## 2. Zuordnung aller 34 Workspace-Crates (K, R, E)
+## 1. Kontext & Problemstellung
 
-| Crate | Ring | Klasse | Kurzbeschreibung & Scope-Einordnung |
-| :--- | :--- | :--- | :--- |
-| `contextra` | Ring 4 | **R** | Haupt-Library Facade für Endanwender |
-| `contextra-adapt` | Ring 0 | **E** | PID Latency Controller / Modell-Adaptierung |
-| `contextra-agent` | Ring 3 | **E** | Agent Execution Pipeline & InMemoryStorageEngine (*fällt aus Stabilitätsaussagen*) |
-| `contextra-audit-export` | Ring 0 | **E** | Audit Log & DSGVO Art. 30 Verarbeitungsverzeichnis-Export (*AVV-/Audit-Zusatz*) |
-| `contextra-avv-generator` | Ring 0 | **E** | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
-| `contextra-checkpoint` | Ring 1 | **K** | Persistent Checkpoint Engine & Blake3 Manifest-Verifikation |
-| `contextra-cognition` | Ring 3 | **E** | Konsolidierungs- & Background Sleep Passes (*fällt aus Stabilitätsaussagen*) |
-| `contextra-core` | Ring 0 | **K** | Kern-Datenstrukturen, Tombstones, Invarianten & Memory-Buffer |
-| `contextra-crypto` | Ring 0 | **K** | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung & HMAC |
-| `contextra-db` | Ring 3 | **K** | Database Abstraction, Hybrid Search & Collection Management |
-| `contextra-durable-fs` | Ring 0 | **K** | Durable Filesystem Operations & synchrone Disk-Flushes |
-| `contextra-engine` | Ring 3 | **K** | Bounded Compute Pool & Asynchrone Storage-Execution Layer |
-| `contextra-graph` | Ring 0 | **K*** | CSR Graph-Engine & Traversal (*Kern K; Submodul PPR -> E*) |
-| `contextra-infer-candle` | Ring 2 | **R** | Candle In-Process LLM Inference Client & KV-Bridge Adapter |
-| `contextra-infer-ollama` | Ring 2 | **R** | Ollama External Provider Client & Embeddings Integration |
-| `contextra-infer-onnx` | Ring 2 | **E** | ONNX Embeddings & Cross-Encoder Execution Provider |
-| `contextra-kvcache` | Ring 1 | **K** | Stufenmodell KV-Cache Storage & Offloading |
-| `contextra-license` | Ring 4 | **E** | Lizenz- und Aktivierungsprüfung (*Lizenz-Crate*) |
-| `contextra-mcp` | Ring 4 | **R** | Model Context Protocol Server & Cloud Egress Gateway |
-| `contextra-mvcc` | Ring 0 | **K** | Multi-Version Concurrency Control & Isolation-Mechanismen |
-| `contextra-ports` | Ring 0 | **K** | Abstrakte Port-Schnittstellen & Trait-Definitionen |
-| `contextra-privacy` | Ring 3 | **K** | Egress Filtering, Anonymisierung & Privacy Rules |
-| `contextra-py` | Ring 4 | **R** | PyO3 Python Bindings & FFI-Grenzschicht |
-| `contextra-rank` | Ring 0 | **K*** | Ranking-, Fusion- & Kalibrierungs-Algorithmen (*Kern K; Submodul DRIFT -> E*) |
-| `contextra-router` | Ring 3 | **E** | Lyapunov Drift Control & Multi-Candidate Search Routing (*fällt aus Stabilitätsaussagen*) |
+Im Rahmen der Vorbereitung für das Release v0.1.0/v1.0 von Contextra muss der Funktionsumfang verbindlich eingefroren (Scope Freeze) und die Stabilitätsversprechen für das Gesamtsystem klar gegenüber Anwendern und Auditoren abgegrenzt werden.
+
+Das Contextra-Workspace umfasst derzeit 34 Crates (31 Fach-Crates plus Tooling/Benchmarks/xtask). Gemäß Spezifikation §6.0 und Projektbewertung 10.9 müssen alle Komponenten und Crates in genau eine von drei Verbindlichkeits-Klassen eingestuft werden:
+
+- **Klasse K (Kern / Core)**: Das stabile, deterministische Fundament für lokale RAG- und Vektordatenbank-Operationen. Beinhaltet Ring-0-Primitives, Persistenz, Indexierung sowie Basisausführung. Höchste Qualitäts- und Stabilitätsgarantien (Zero-Panic, deterministische Recovery, volle Abwärtskompatibilität).
+- **Klasse R (Rand / Peripheral)**: Äußere Schnittstellen, Adapter, FFI-Bindings, Sandbox-Sicherheitsgrenzen und Endanwender-Fassaden. Garantieren Schnittstellenstabilität und Sicherheit an den Systemgrenzen, hängen jedoch von externen Laufzeiten oder Anwenderumgebungen ab.
+- **Klasse E (Experimentell / Experimental)**: Erweiterte kognitive Schleifen, adaptive Heuristiken, experimentelle Algorithmen, dynamische Agenten-Pipelines sowie automatisierte Compliance-Generatoren. Komponenten dieser Klasse fallen ausdrücklich aus den zentralen Stabilitäts-, Determinismus- und SemVer-Garantien des Kerns heraus.
+
+---
+
+## 2. Verbindliche Klassifikation aller Workspace-Crates (§6.0)
+
+Die folgende Tabelle klassifiziert jede im Workspace vorhandene Crate verbindlich in Klasse K, R oder E:
+
+| Crate Name | Ring (capabilities.toml) | Klasse | Beschreibung & Scope-Freeze Status |
+|---|---|---|---|
+| `contextra-types` | Ring 0 | **K** | Typen, IDs (`DocId`, `TxId`), Invarianten & Fehler-Taxonomie (Kern) |
+| `contextra-ports` | Ring 0 | **K** | Trait-Definitionen & Entkopplungs-Schnittstellen (Kern) |
+| `contextra-mvcc` | Ring 0 | **K** | MVCC Snapshot-Isolation & Concurrency Primitives (Kern) |
+| `contextra-wire` | Ring 0 | **K** | FlatBuffers Zero-Copy Wire-Protokolle (Kern, Unsafe-Insel) |
+| `contextra-sys` | Ring 0 | **K** | High-Performance I/O & Memory-Mapping (Kern, Unsafe-Insel) |
+| `contextra-simd` | Ring 0 | **K** | SIMD-beschleunigte Distanzberechnungen (Kern, Unsafe-Insel) |
+| `contextra-crypto` | Ring 0 | **K** | AES-256-GCM-SIV, Zeroize, HMAC-WAL-Kette & Deletion-Proof (Kern) |
+| `contextra-durable-fs` | Ring 0 | **K** | Synchrone Disk-Flushes, `sync_dir`, `atomic_replace` (Kern) |
+| `contextra-vector` | Ring 0 | **K** | HNSW, DiskANN Vektor-Indizes & Quantisierung (Kern) |
+| `contextra-text` | Ring 0 | **K** | Invertierter BM25/BM25F-Volltext-Index (Kern) |
+| `contextra-core` | Ring 0 | **K** | Strangler-Fassade / Re-Export-Layer für Ring-0-Primitives (Kern) |
+| `contextra-store` | Ring 1 | **K** | LSM-Tree, WAL Durability & Compaction Engine (Kern) |
+| `contextra-kvcache` | Ring 1 | **K** | Stufenmodell KV-Cache Storage & Offloading (Kern) |
+| `contextra-checkpoint` | Ring 1 | **K** | Blake3 Checkpoint Engine & Time-Travel Storage (Kern) |
+| `contextra-engine` | Ring 3 | **K** | Compute Pool & Asynchrone Storage Execution Engine (Kern) |
+| `contextra-db` | Ring 3 | **K** | Hybrid Search Engine & Main Collection Database Abstraction (Kern) |
+| `contextra-privacy` | Ring 3 | **K** | Egress Filtering, DLP, PII Vault & Guarded Payload (Kern) |
+| `contextra` | Ring 4 | **R** | Haupt-Library-Fassade & Composition Root |
+| `contextra-mcp` | Ring 4 | **R** | Stdio JSON-RPC Model Context Protocol Server & Gateway |
 | `contextra-sandbox` | Ring 2 | **R** | WASM Execution Boundary & Isolations-Sandbox |
-| `contextra-simd` | Ring 0 | **K** | SIMD-beschleunigte Distanzberechnungen & Vektor-Operationen |
-| `contextra-store` | Ring 1 | **K** | LSM-Tree Storage Engine, WAL Durability & Compaction |
-| `contextra-sys` | Ring 0 | **K** | Systemnahe Bindings, Low-Level I/O & Memory-Mapping |
-| `contextra-testkit` | Tooling | **R** | Test Fixtures, Mock Engines & Chaos Matrix Harness |
-| `contextra-text` | Ring 0 | **K** | Volltextsuche & Inverted-Index (BM25 Engine) |
-| `contextra-types` | Ring 0 | **K** | Grundlegende Typdefinitionen (DocId, TxId, TenantId, Errors) |
-| `contextra-vector` | Ring 0 | **K*** | Vektorsuche & Indexierung (*Kern K; experimental-diskann -> E*) |
-| `contextra-wire` | Ring 0 | **K** | FlatBuffers Wire-Protokolle & Serialisierungs-Formate |
+| `contextra-infer-candle` | Ring 2 | **R** | Lokales Candle LLM Inferenz- & KV-Bridge-Modul |
+| `contextra-infer-ollama` | Ring 2 | **R** | Ollama Remote Provider Client |
+| `contextra-py` | Ring 4 | **R** | PyO3 Python Bindings & FFI-Panicschutz |
+| `contextra-testkit` | Tooling | **R** | Fault-VFS, Mock-Engines & Test-Harness |
+| `contextra-agent` | Ring 3 | **E** | Agent Execution Pipeline & In-Memory Audit (Experimentell) |
+| `contextra-router` | Ring 3 | **E** | Multi-Candidate SLM Kaskaden-Routing (Experimentell) |
+| `contextra-cognition` | Ring 3 | **E** | Consolidation & Sleep Cycle Pass (Experimentell) |
+| `contextra-graph` | Ring 0 | **K / E** | CSR Graph-Engine (**K**), ausgenommen `graph-PPR` (**E**) |
+| `contextra-rank` | Ring 0 | **K / E** | 4-Signal-Fusion & Platt/Isotonic Scaler (**K**), ausgenommen `rank-DRIFT` (**E**) |
+| `contextra-adapt` | Ring 0 | **E** | PID Controller, Bandit & Lyapunov Drift Control (Experimentell) |
+| `contextra-infer-onnx` | Ring 2 | **E** | ONNX Runtime Native Client (Experimentell) |
+| `contextra-license` | Ring 4 | **E** | Lizenz- & Aktivierungsprüfung (Experimentell) |
+| `contextra-audit-export` | Ring 0 | **E** | DSGVO Art. 30 Verarbeitungsverzeichnis-Exporter (Experimentell) |
+| `contextra-avv-generator` | Ring 0 | **E** | Art. 28 DSGVO AVV-Template Generator (Experimentell) |
 
 ---
 
-## 3. Experimentelle Komponenten ohne Stabilitätsaussage (Projektbewertung 10.9)
+## 3. Ausweisung der Experimentell-Crates & Subkomponenten (Projektbewertung 10.9)
 
-Gemäß Projektbewertung 10.9 und Spezifikation §6.0 fallen die folgenden Komponenten explizit aus den Stabilitäts- und Abwärtskompatibilitätsaussagen des Gesamtsystems:
+Ausdrücklich aus den Kern-Stabilitätsaussagen, Garantie-Zusagen und der API-Schnittstellenkonstanz ausgenommen sind die folgenden **7 Hauptbereiche (Crates und isolierte Subkomponenten)** gemäß Projektbewertung 10.9:
 
-1. **`contextra-agent`**: Agent Execution Pipeline & InMemoryStorageEngine.
-2. **`contextra-router`**: Conformal Calibration & Multi-Candidate Routing Engine.
-3. **`contextra-cognition`**: Sleep-Cycle Consolidation & Background Maintenance.
-4. **`graph-PPR`** (in `contextra-graph`): Personalized PageRank (PPR) Graph-Expansion & Random-Walk-Schätzungen.
-5. **`rank-DRIFT`** (in `contextra-rank` / `contextra-adapt`): Adaptives Drift-Scoring, PID Latency Control & Off-Policy Feedback.
-6. **Lizenz-Crates (`contextra-license`)**: Lizenzierungs- & Aktivierungs-Gates.
-7. **AVV- & Audit-Crates (`contextra-avv-generator`, `contextra-audit-export`)**: Template-Generatoren für DSGVO Art. 28 / Art. 30 Verarbeitungsverzeichnisse.
+1. **`contextra-agent`**: Agenten-Workflow-Pipeline, Prompt-Synthese und dynamische Aufruf-Orchestrierung.
+2. **`contextra-router`**: Dynamisches SLM-Kaskadenrouting und Multi-Candidate-Profilauswahl.
+3. **`contextra-cognition`**: Hintergrund-Konsolidierung, Schlafzyklus-Kompaktierung und Session-Grouping.
+4. **`graph-PPR`** (Subkomponente in `contextra-graph`): Personalized PageRank Diffusions-Algorithmen und approximatives PPR-Routing.
+5. **`rank-DRIFT`** (Subkomponente in `contextra-rank`): Adaptives Drift-Monitoring, Conformal-Prediction-Rescaling und dynamisches Score-Refactoring.
+6. **`contextra-license`**: Lizenzierungs-Gates und digitale Schlüssel-Aktivierungsprüfungen.
+7. **`contextra-avv-generator`**: Automatische Vorlagen-Generierung von Auftragsverarbeitungsverträgen (Art. 28 DSGVO).
 
----
-
-## 4. Offene Fragen & Identifizierte Abweichungen zu `capabilities.toml`
-
-Bei der Gegenüberstellung der Spezifikation §6.0 mit dem aktuellen Stand von `capabilities.toml` (ADR-N08) wurden folgende Abweichungen identifiziert:
-
-1. **Maturity-Flag-Diskrepanz:**
-   - In `capabilities.toml` sind `contextra-agent`, `contextra-router` und `contextra-cognition` aktuell fälschlicherweise als `maturity = 'stable'` eingeordnet.
-   - *Offene Frage:* Entsprechend §6.0 müssen diese auf `maturity = 'experimental'` gesetzt werden.
-2. **Feingranulare Subkomponenten-Klassifizierung:**
-   - `capabilities.toml` führt derzeit Reifegrade nur auf Crate-Ebene. Submodule wie `graph-PPR` (`contextra-graph`) und `rank-DRIFT` (`contextra-rank`) benötigen zukünftig ggf. Feature-Maturity-Marker im TOML-Manifest.
+*Zusätzlich* bleiben als experimentell ausgewiesen: `contextra-adapt` (PID Controller / Bandit), `contextra-audit-export` (Art. 30 Exporter) sowie `contextra-infer-onnx` (ONNX C-Library Backend).
 
 ---
 
-## 5. Beschluss & Nächste Schritte
+## 4. Offene Fragen & Abweichungen zur Spezifikation (§6.0 vs. `capabilities.toml`)
 
-- **Status:** Dieser ADR stellt den abgestimmten Klassifizierungsstand als **Vorschlag** bereit.
-- **Keine Änderung an `capabilities.toml` in diesem Schritt:** Die physische Aktualisierung der Manifest-Einträge in `capabilities.toml` erfolgt in einem separaten W0-Prompt.
+Bei der Gegenüberstellung von `capabilities.toml` und Spezifikation §6.0 / Projektbewertung 10.9 wurden folgende systematische Diskrepanzen identifiziert. Diese werden hiermit als **offene Fragen** zur späteren Bereinigung festgehalten:
+
+1. **Diskrepanz im Reifegrad-Marker (`maturity`)**:
+   - In `capabilities.toml` sind `contextra-agent`, `contextra-router`, `contextra-cognition`, `contextra-graph` und `contextra-rank` mit `maturity = 'stable'` eingetragen.
+   - *Offene Frage*: Soll im nachfolgenden W0-Prompt zur Bereinigung von `capabilities.toml` für `agent`, `router` und `cognition` das Attribut `maturity` auf `'experimental'` umgestellt werden, sowie für `graph` und `rank` eine Kennzeichnung der experimentellen Submodule (`graph-PPR`, `rank-DRIFT`) in den Capabilities-Flags erfolgen?
+
+2. **Diskrepanz bei der Ring-Zuordnung (`ring`)**:
+   - `capabilities.toml` führt `contextra-audit-export` und `contextra-avv-generator` in `Ring 0`.
+   - Spezifikation III.21 und III.22 klassifizieren beide Komponenten als reine `Ring 4` Utility-Module.
+   - *Offene Frage*: Sollen `contextra-audit-export` und `contextra-avv-generator` im W0-Prompt von `Ring 0` nach `Ring 4` verschoben werden, um der Schichtenarchitektur (keine Business-Utility-Logik in Ring 0) zu entsprechen?
+
+3. **Keine direkte Änderung an `capabilities.toml` in diesem ADR**:
+   - Gemäß Arbeitsanweisung bleibt `capabilities.toml` in diesem ADR unberührt. Die Anpassungen an `capabilities.toml` erfolgen im separaten Umsetzungs-Prompt (W0).
+
+---
+
+## 5. Konsequenzen
+
+- **Klarheit für Anwender**: Nutzer des Core-SDKs verlassen sich auf Stabilisierungszusagen in Klasse K.
+- **Entwicklungs-Freiheit**: Module in Klasse E können ohne Breaking Changes am Kern weiterentwickelt oder überarbeitet werden.
+- **Unveränderlichkeit der Konfiguration**: `capabilities.toml` bleibt in diesem Schritt unberührt; die Spezifikation §6.0 ist mit dieser ADR verbindlich formuliert.
