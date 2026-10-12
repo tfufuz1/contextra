@@ -1,0 +1,24 @@
+# Task-Karte Template
+# ID Format: T-YYYY-NNNN
+id        = "T-2026-9211"
+title     = "Footprint, Registry, Reverse-Sweep"
+crate     = "contextra-engine"
+tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
+risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
+goal      = "Footprint, Registry, Reverse-Sweep (INV-D1)"
+non_goals = ["Keine Änderung an Produktionscode außerhalb von deletion/*"]
+scope     = ["crates/contextra-engine/src/deletion/**", "docs/deletion/**", "crates/contextra-engine/tests/**"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root"]
+acceptance = [
+  "cargo test -p contextra-engine --test key_family_registry",
+  "cargo test -p contextra-engine --test reverse_sweep",
+  "cargo test -p contextra-engine",
+  "cargo xtask jules check"
+]
+evidence_required = ["Neuer Test, der die Funktionalität absichert"]
+
+[budget]
+files = 18
+lines = 1000
+iterations = 10
