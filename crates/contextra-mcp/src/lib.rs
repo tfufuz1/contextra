@@ -1,4 +1,5 @@
 #![deny(dead_code)]
+#![deny(clippy::print_stdout)]
 #![forbid(unsafe_code)]
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
 //!
@@ -23,11 +24,13 @@
 //! | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 
 pub mod bulk_exfiltration_detector;
+pub mod cli;
 pub mod config;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod explain;
 pub mod io;
+pub mod ipc;
 pub mod plugin_status;
 pub mod prompt_injection;
 pub mod proof_key;
@@ -55,6 +58,7 @@ pub use egress_gateway::{
 };
 
 pub use explain::{ExplainRequest, ExplainResponse};
+pub use ipc::Channel;
 pub use plugin_status::{handle_plugin_status, PluginStatusEntry, PluginStatusResponse};
 pub use proof_key::deletion_proof_key_from_env;
 
