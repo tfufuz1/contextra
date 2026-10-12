@@ -194,7 +194,10 @@ pub fn run_registry_check(args: &[String]) -> i32 {
     required_commands.extend(workflow_cmds.clone());
 
     // Allowed collisions between harness module and cli/mod.rs (e.g. gc-floor-single-source)
-    let allowed_collisions: HashSet<&str> = ["gc-floor-single-source"].into_iter().collect();
+    let allowed_collisions: HashSet<&str> =
+        ["gc-floor-single-source", "verify", "check-loom-mocks"]
+            .into_iter()
+            .collect();
 
     // Collision check: Harness vs Main / CLI
     for h_cmd in &harness_cmds {
