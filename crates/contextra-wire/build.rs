@@ -46,16 +46,13 @@ fn main() {
                 .ok();
 
             if let (Some(sm), Some(gm)) = (schema_mtime, gen_mtime) {
-                if let Ok(diff) = sm.duration_since(gm) {
-                    // Ignore checkout timestamp jitter (< 2s difference between files during git clone)
-                    if diff > std::time::Duration::from_secs(2) {
-                        eprintln!(
-                            "Error: Schema '{}' is newer than generated code '{}', but 'flatc' is not available.",
-                            schema_path,
-                            output_file.display()
-                        );
-                        std::process::exit(1);
-                    }
+                if sm > gm {
+                    eprintln!(
+                        "Error: Schema '{}' is newer than generated code '{}', but 'flatc' is not available.",
+                        schema_path,
+                        output_file.display()
+                    );
+                    std::process::exit(1);
                 }
             }
             println!("cargo:warning=flatc not found, using existing generated code.");
