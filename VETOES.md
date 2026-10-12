@@ -4,7 +4,7 @@
 
 feature_id: F-02
 status: conditionally_accepted
-conditional_review_due: 2026-10-07
+conditional_review_due: 2027-10-12
 last_verified: 2026-10-12
 adr_ref: docs/decisions/ADR-VETO-REVIEW-F02-OP03-2026-10.md
 affected_paths: ["crates/contextra-vector/", "crates/contextra-store/"]
@@ -24,7 +24,7 @@ reason: >
 
 feature_id: OP-03
 status: conditionally_accepted
-conditional_review_due: 2026-10-07
+conditional_review_due: 2027-10-12
 last_verified: 2026-10-12
 adr_ref: docs/decisions/ADR-VETO-REVIEW-F02-OP03-2026-10.md
 keywords: ["voice assistant", "speech-to-text", "realtime-audio", "jarvis", "OP-03"]
