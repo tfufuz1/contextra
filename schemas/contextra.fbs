@@ -1,5 +1,17 @@
 namespace Contextra.IPC;
 
+file_identifier "CTRA";
+
+// Schema Version: 1
+// Inkompatibler Kompatibilitätsbruch:
+// Version 1 ist das initiale FlatBuffers IPC Schema.
+// Ein Kompatibilitätsbruch (Breaking Change) liegt vor bei:
+// - Entfernen oder Umbenennen bestehender Felder
+// - Ändern von Feldtypen oder Feld-IDs
+// - Ändern von Enum-Werten oder Zuordnungen
+// Abwärtskompatible Änderungen (neue optionale Felder) verbleiben in Version 1.
+// Bei einem Kompatibilitätsbruch muss 'version' auf 2 (oder höher) erhöht werden.
+
 table Embedding {
   data: [float];
   quantized_u8: [ubyte];
@@ -14,6 +26,7 @@ table ScoredDocument {
 }
 
 table SearchResponse {
+  version: uint = 1;
   results: [ScoredDocument];
   total_hits: uint;
   processing_time_ms: float;

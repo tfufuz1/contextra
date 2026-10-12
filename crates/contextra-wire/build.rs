@@ -17,164 +17,45 @@ fn main() {
             .unwrap_or(false);
 
         if flatc_exists {
-            if let Ok(status) = Command::new("flatc")
+            match Command::new("flatc")
                 .args(["--rust", "-o", out_dir, schema_path])
                 .status()
             {
-                assert!(status.success(), "flatc failed to generate code");
-                post_process_generated_code(&output_file);
-            }
-        } else if !output_file.exists() {
-            eprintln!("flatc not found and generated code does not exist. Please install flatbuffers compiler.");
-            std::process::exit(1);
-        } else {
-            println!("cargo:warning=flatc not found, using existing generated code.");
-        }
-    }
-}
-
-fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
-    let pattern = "self._tab.get";
-    if !line.contains(pattern) {
-        return line.to_string();
-    }
-
-    let mut result = String::with_capacity(line.len() + 32);
-    let mut search_from = 0;
-
-    while let Some(rel_idx) = line[search_from..].find(pattern) {
-        let idx = search_from + rel_idx;
-
-        // Check if this occurrence is already preceded by `unsafe` on the same line
-        let prefix = &line[..idx];
-        if prefix.trim_end().ends_with("unsafe {") || prefix.contains("unsafe") {
-            // Already wrapped
-            result.push_str(&line[search_from..idx + pattern.len()]);
-            search_from = idx + pattern.len();
-            continue;
-        }
-
-        // Find the opening parenthesis of `get::<...>(...`
-        if let Some(rel_paren_open) = line[idx + pattern.len()..].find('(') {
-            let paren_open = idx + pattern.len() + rel_paren_open;
-
-            // Find matching closing parenthesis
-            let mut depth = 0;
-            let mut close_paren = None;
-            for (i, ch) in line[paren_open..].char_indices() {
-                if ch == '(' {
-                    depth += 1;
-                } else if ch == ')' {
-                    depth -= 1;
-                    if depth == 0 {
-                        close_paren = Some(paren_open + i);
-                        break;
-                    }
+                Ok(status) if status.success() => {}
+                Ok(status) => {
+                    eprintln!("flatc exited with non-zero status: {status}");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Failed to execute flatc: {e}");
+                    std::process::exit(1);
                 }
             }
-
-            if let Some(end_idx) = close_paren {
-                result.push_str(&line[search_from..idx]);
-                result.push_str("unsafe { ");
-                result.push_str(&line[idx..=end_idx]);
-                result.push_str(" }");
-                search_from = end_idx + 1;
-                continue;
-            }
-        }
-
-        result.push_str(&line[search_from..idx + pattern.len()]);
-        search_from = idx + pattern.len();
-    }
-
-    result.push_str(&line[search_from..]);
-    result
-}
-
-fn replace_unwrap_with_unwrap_or_default(line: &str, prev_line: &str) -> String {
-    if !line.contains(".unwrap()") {
-        return line.to_string();
-    }
-
-    let is_get_some = |s: &str| s.contains("get") && s.contains("Some(");
-    if is_get_some(line) || is_get_some(prev_line) {
-        return line.replace(".unwrap()", ".unwrap_or_default()");
-    }
-
-    line.to_string()
-}
-
-fn post_process_generated_code(output_file: &Path) {
-    let content = match std::fs::read_to_string(output_file) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let mut modified = false;
-    let mut prev_line = String::new();
-    let new_lines: Vec<String> = content
-        .lines()
-        .map(|line| {
-            let step1 = wrap_tab_get_calls_in_unsafe(line);
-            let step2 = replace_unwrap_with_unwrap_or_default(&step1, &prev_line);
-            if step2 != line {
-                modified = true;
-            }
-            prev_line = step1;
-            step2
-        })
-        .collect();
-
-    if modified {
-        let mut new_content = new_lines.join("\n");
-        if content.ends_with('\n') {
-            new_content.push('\n');
-        }
-        if let Err(e) = std::fs::write(output_file, new_content) {
-            eprintln!("Failed to write post-processed FlatBuffers Rust code in build.rs: {e}");
+        } else if !output_file.exists() {
+            eprintln!(
+                "Error: flatc not found and generated code '{}' does not exist.",
+                output_file.display()
+            );
             std::process::exit(1);
+        } else {
+            let schema_mtime = std::fs::metadata(schema_path)
+                .and_then(|m| m.modified())
+                .ok();
+            let gen_mtime = std::fs::metadata(&output_file)
+                .and_then(|m| m.modified())
+                .ok();
+
+            if let (Some(sm), Some(gm)) = (schema_mtime, gen_mtime) {
+                if sm > gm {
+                    eprintln!(
+                        "Error: Schema '{}' is newer than generated code '{}', but 'flatc' is not available.",
+                        schema_path,
+                        output_file.display()
+                    );
+                    std::process::exit(1);
+                }
+            }
+            println!("cargo:warning=flatc not found, using existing generated code.");
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_wrap_tab_get_calls() {
-        let input1 = "    self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap()";
-        let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input1), expected1);
-
-        let input2 =
-            "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
-        let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input2), expected2);
-
-        let input3 = "    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input3), input3);
-    }
-
-    #[test]
-    fn test_replace_unwrap_with_unwrap_or_default() {
-        let single_line = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }";
-        let single_line_exp =
-            "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default() }";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(single_line, ""),
-            single_line_exp
-        );
-
-        let prev = "            self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0))";
-        let curr = "            .unwrap()";
-        let curr_exp = "            .unwrap_or_default()";
-        assert_eq!(replace_unwrap_with_unwrap_or_default(curr, prev), curr_exp);
-
-        let non_get_line = "    Some(val).unwrap()";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(non_get_line, ""),
-            non_get_line
-        );
     }
 }
