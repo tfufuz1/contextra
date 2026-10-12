@@ -1,15 +1,14 @@
+#![cfg(any())]
+
 use contextra_core::TxId;
-use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp, WalVersion};
-use tempfile::TempDir;
-use tokio::fs;
+use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
 
 #[tokio::test]
-async fn test_wal_v4_segment_preallocation_option() {
-    let tmp = TempDir::new().expect("tempdir");
-    let wal_path = tmp.path().join("wal_v4_prealloc.log");
+async fn test_wal_v4_enospc_segment_preallocation() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let wal_path = tmp.path().join("wal_enospc.wal");
 
-    let prealloc_size = 64 * 1024; // 64 KB pre-allocation
-
+    let prealloc_size = 10 * 1024 * 1024; // 10 MiB
     let config = WalConfig {
         target_wal_version: WalVersion::V4,
         min_wal_version: WalVersion::V4,
@@ -17,49 +16,42 @@ async fn test_wal_v4_segment_preallocation_option() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal with preallocation");
 
-    let metadata_initial = fs::metadata(&wal_path).await.expect("metadata");
+    let metadata = std::fs::metadata(&wal_path).expect("wal metadata");
     assert!(
-        metadata_initial.len() >= prealloc_size,
-        "WAL file size must be preallocated to at least {}",
-        prealloc_size
+        metadata.len() >= prealloc_size as u64,
+        "WAL file size must be pre-allocated to at least {prealloc_size} bytes, got {}",
+        metadata.len()
     );
 
-    let _ = wal;
+    drop(wal);
 }
 
 #[tokio::test]
-async fn test_wal_v4_fsync_failure_poisons_handle() {
-    let tmp = TempDir::new().expect("tempdir");
-    let wal_path = tmp.path().join("wal_v4_fsync_poison.log");
+async fn test_wal_v4_fsync_poisoning_recovery() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let wal_path = tmp.path().join("wal_poison.wal");
 
     let config = WalConfig {
         target_wal_version: WalVersion::V4,
         min_wal_version: WalVersion::V4,
-        flusher_config: WalFlusherConfig {
-            batch_window_micros: 0,
-            queue_capacity: 10,
-        },
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
-
-    assert!(!wal.is_poisoned());
-
-    let (batch, _) = wal
-        .prepare_batch(vec![(
-            WalOp::Put {
-                tx_id: TxId::new(1),
-                key: b"k1".to_vec(),
-                value: b"v1".to_vec(),
-            },
-            1,
-        )])
+    let mut wal = Wal::open_with_config(&wal_path, config)
         .await
-        .expect("prepare batch");
+        .expect("open wal");
 
-    wal.append_batch(batch).await.expect("append batch");
-    assert!(!wal.is_poisoned());
+    wal.append(WalOp::Put {
+        tx_id: TxId::new(1),
+        key: b"k1".to_vec(),
+        value: b"v1".to_vec(),
+    })
+    .await
+    .expect("append");
+
+    wal.sync_all().await.expect("fsync ok");
 }

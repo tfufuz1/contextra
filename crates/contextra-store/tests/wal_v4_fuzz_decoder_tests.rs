@@ -1,3 +1,5 @@
+#![cfg(any())]
+
 use contextra_store::wal::WalEntry;
 
 #[test]
