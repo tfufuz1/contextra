@@ -12,7 +12,7 @@ impl LsmStorage {
         tx_id: TxId,
         origin: WriteOrigin,
         durable: bool,
-    ) {
+    ) -> Result<()> {
         let seq_no = entries.last().map(|e| e.seq_no).unwrap_or(0);
         let ctx = CommitContext {
             tx_id,
@@ -20,7 +20,7 @@ impl LsmStorage {
             durable,
         };
         self.observer_registry
-            .notify_with_context(entries, seq_no, ctx);
+            .notify_with_context(entries, seq_no, ctx)
     }
 
     /// Clears intent locks matching a predicate, gracefully recovering from poisoned locks.
