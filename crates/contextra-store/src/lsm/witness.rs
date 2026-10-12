@@ -112,8 +112,11 @@ impl LsmStorage {
         ))
     }
 
-    /// Issues a [`LayerWitness`] attesting that no non-tombstone versions of the specified `deleted_keys`
+    /// Issues a [`LayerWitness`] attesting that no non-tombstone versions or unflushed residue of the specified `deleted_keys`
     /// or `prefixes` exist in the active or any immutable MemTables.
+    ///
+    /// # Errors
+    /// Returns an error if non-tombstone versions exist or if unflushed memtable residue exists prior to `force_flush`.
     pub async fn issue_memtable_witness(
         &self,
         deleted_keys: &[Vec<u8>],
@@ -128,10 +131,31 @@ impl LsmStorage {
             .await?;
 
         let total_versions = evidence_keys.versions_found + evidence_prefixes.versions_found;
+        let imm_scanned = evidence_keys.immutable_scanned + evidence_prefixes.immutable_scanned;
+
         if total_versions > 0 {
+            if imm_scanned > 0 {
+                return Err(ContextraError::Internal(format!(
+                    "INV-DELETION-1 violation: found {} non-tombstone versions in immutable memtable (memtable_index: 1)",
+                    total_versions
+                )));
+            }
             return Err(ContextraError::Internal(format!(
                 "INV-DELETION-1 violation: found {} non-tombstone versions in memtables",
                 total_versions
+            )));
+        }
+
+        let total_entries = evidence_keys.entries_seen + evidence_prefixes.entries_seen;
+        if total_entries > 0 {
+            if imm_scanned > 0 {
+                return Err(ContextraError::Internal(format!(
+                    "Memtable witness rejected: unflushed residue in immutable memtable before force_flush (memtable_index: 1)"
+                )));
+            }
+            return Err(ContextraError::Internal(format!(
+                "Memtable witness rejected: unflushed active memtable residue present before force_flush (found {} entries)",
+                total_entries
             )));
         }
 
@@ -147,5 +171,50 @@ impl LsmStorage {
                 memtables_scanned: scanned_count,
             },
         )
+    }
+
+    /// Issues a [`LayerWitness`] for the specified Primary Data / LSM storage layer variant
+    /// (`LsmMemtable`, `SsTableAllLevels`, or `WalAllSegments`).
+    pub async fn issue_layer_witness(
+        &self,
+        layer: DeletionLayer,
+        deleted_keys: &[Vec<u8>],
+        prefixes: &[Vec<u8>],
+        as_of_tx: TxId,
+    ) -> Result<LayerWitness> {
+        match layer {
+            DeletionLayer::LsmMemtable => {
+                self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx)
+                    .await
+            }
+            DeletionLayer::SsTableAllLevels => {
+                let sstables = self.sstables.read().await;
+                let scanned_count = u32::try_from(sstables.len()).unwrap_or(u32::MAX);
+                drop(sstables);
+                LayerWitness::issue_from_storage_layer(
+                    layer,
+                    deleted_keys,
+                    as_of_tx,
+                    WitnessEvidence::SstableScan {
+                        files_scanned: scanned_count,
+                    },
+                )
+            }
+            DeletionLayer::WalAllSegments { seq_after } => {
+                LayerWitness::issue_from_storage_layer(
+                    DeletionLayer::WalAllSegments { seq_after },
+                    deleted_keys,
+                    as_of_tx,
+                    WitnessEvidence::WalPurge {
+                        segments_removed: 0,
+                        bytes_scrubbed: 0,
+                    },
+                )
+            }
+            other => Err(ContextraError::InvalidInput(format!(
+                "LayerWitness creation rejected: layer {:?} is not a supported primary data/LSM layer variant",
+                other
+            ))),
+        }
     }
 }

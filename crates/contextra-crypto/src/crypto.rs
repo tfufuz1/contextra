@@ -380,6 +380,12 @@ impl KeyManager {
     ///
     /// This is the recommended, cryptographically secure deletion proof generation method. Asymmetric v3
     /// proofs decouple proof verification from master key material and remain valid across master key rotations.
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     #[allow(clippy::too_many_arguments)]
     pub fn create_deletion_proof_v3(
         keypair: &crate::deletion_proof::DeletionProofKeyPair,
@@ -392,6 +398,7 @@ impl KeyManager {
         graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
     ) -> Result<crate::deletion_proof::DeletionProof> {
         let durability = crate::deletion_proof::DurabilityProof::new(deleted_after_tx.0);
+        #[allow(deprecated)]
         crate::deletion_proof::DeletionProof::create_v3(
             scope,
             deleted_keys,
@@ -411,6 +418,12 @@ impl KeyManager {
     /// # DEPRECATION / LEGACY NOTICE
     /// This method generates symmetric HMAC deletion proofs derived from master key material.
     /// Callers SHOULD migrate to asymmetric Ed25519 version 3 proofs via [`Self::create_deletion_proof_v3`].
+    #[cfg_attr(
+        not(test),
+        deprecated(
+            note = "Creation of v2 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
+        )
+    )]
     pub fn create_deletion_proof(
         &self,
         scope: crate::deletion_proof::DeletionScope,
@@ -421,6 +434,7 @@ impl KeyManager {
     ) -> Result<crate::deletion_proof::DeletionProof> {
         tracing::warn!("KeyManager::create_deletion_proof called for legacy symmetric HMAC proof; migrate to v3 Ed25519 proofs via create_deletion_proof_v3");
         let proof_key = self.derive_deletion_proof_key()?;
+        #[allow(deprecated)]
         crate::deletion_proof::DeletionProof::create(
             scope,
             deleted_keys,

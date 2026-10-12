@@ -417,7 +417,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        );
+        )?;
 
         // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
         let state = storage.state.read().await;
@@ -748,7 +748,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             leader_tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        );
+        )?;
 
         let mut current_idx = leader_entries_count;
         for (i, r) in requests.iter().enumerate() {
@@ -764,7 +764,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                         r.tx_id,
                         WriteOrigin::UserWrite,
                         is_durable,
-                    );
+                    )?;
                 }
             }
             current_idx += follower_entries_count;

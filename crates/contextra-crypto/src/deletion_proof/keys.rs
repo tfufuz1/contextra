@@ -4,7 +4,7 @@ use crate::ed25519_proof::SignatureVersion;
 
 /// KeyPair for Ed25519 signing and verification of DeletionProofs (version 3).
 pub struct DeletionProofKeyPair {
-    pub(super) signing_key: ed25519_dalek::SigningKey,
+    pub signing_key: ed25519_dalek::SigningKey,
     pub verifying_key: ed25519_dalek::VerifyingKey,
 }
 
@@ -22,10 +22,18 @@ impl DeletionProofKeyPair {
     pub fn zeroize(&mut self) {
         self.signing_key = ed25519_dalek::SigningKey::from_bytes(&[0u8; 32]);
     }
+
     /// Generates a new random Ed25519 keypair using OsRng.
     pub fn generate() -> Self {
         let mut rng = rand::rngs::OsRng;
-        let signing_key = ed25519_dalek::SigningKey::generate(&mut rng);
+        Self::generate_with_rng(&mut rng)
+    }
+
+    /// Generates a new Ed25519 keypair using an explicit random number generator.
+    pub fn generate_with_rng(rng: &mut impl rand::RngCore) -> Self {
+        let mut secret_bytes = [0u8; 32];
+        rng.fill_bytes(&mut secret_bytes);
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
         let verifying_key = signing_key.verifying_key();
         Self {
             signing_key,
@@ -41,6 +49,11 @@ impl DeletionProofKeyPair {
     /// Returns a reference to the signing key.
     pub fn signing_key(&self) -> &ed25519_dalek::SigningKey {
         &self.signing_key
+    }
+
+    /// Returns a reference to the verifying key.
+    pub fn verifying_key(&self) -> &ed25519_dalek::VerifyingKey {
+        &self.verifying_key
     }
 }
 

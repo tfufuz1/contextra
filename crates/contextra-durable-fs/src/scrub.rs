@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-12
 // ZWECK: Sicheres Entfernen von Dateien (Scrubbing) mit Sicherheitsprüfungen (CoW, Hardlinks, ReaderAlive).
 // INVARIANTEN: Zero-Panic, pure safe Rust, I/O-Fehler werden als std::io::Result propagiert.
 
-use crate::{durable_remove, ScrubReceipt};
+use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubReceipt};
 use contextra_sys::{flush_file, FlushKind};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -53,8 +53,19 @@ pub fn scrub_if_safe(
     reader_alive: bool,
     not_obsolete: bool,
 ) -> std::io::Result<ScrubOutcome> {
+    scrub_if_safe_with_injector(path, policy, reader_alive, not_obsolete, &NoFault)
+}
+
+/// Safely scrubs a file with a custom [`FaultInjector`].
+pub fn scrub_if_safe_with_injector<F: FaultInjector>(
+    path: &Path,
+    policy: ScrubPolicy,
+    reader_alive: bool,
+    not_obsolete: bool,
+    injector: &F,
+) -> std::io::Result<ScrubOutcome> {
     if policy == ScrubPolicy::Disabled {
-        durable_remove(path)?;
+        durable_remove_with_injector(path, injector)?;
         return Ok(ScrubOutcome::RemovedUnscrubbed);
     }
 
@@ -106,14 +117,16 @@ pub fn scrub_if_safe(
             let chunk_size = usize::try_from(remaining)
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
+            injector.on_write(Some(path), chunk_size)?;
             file.write_all(&zeros[..chunk_size])?;
             remaining -= chunk_size as u64;
         }
 
+        injector.on_fsync(Some(path))?;
         flush_file(&file, FlushKind::DataAndMetadata)?;
     }
 
-    durable_remove(path)?;
+    durable_remove_with_injector(path, injector)?;
 
     Ok(ScrubOutcome::Scrubbed(ScrubReceipt {
         bytes_scrubbed: len,

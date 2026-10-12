@@ -88,6 +88,19 @@ impl DeletionProof {
 
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
+            (SignatureVersion::V4, VerificationKey::Ed25519(verifying_key)) => {
+                let payload = self
+                    .construct_v4_payload()
+                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+                use ed25519_dalek::Verifier;
+                let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
+                    Ok(s) => s,
+                    Err(_) => return Ok(false),
+                };
+
+                Ok(verifying_key.verify(&payload, &sig).is_ok())
+            }
             _ => Err(ContextraError::Internal(format!(
                 "VerificationKey version mismatch: key version {:?} does not match DeletionProof signature_version {:?}",
                 key.version(),
@@ -160,11 +173,15 @@ impl DeletionProof {
             .signature_version_typed()
             .map_err(|_| CryptoError::UnsupportedProofVersion(self.signature_version))?;
 
-        if version != SignatureVersion::V3 {
+        if version != SignatureVersion::V3 && version != SignatureVersion::V4 {
             return Err(CryptoError::UnsupportedProofVersion(self.signature_version));
         }
 
-        let payload = self.construct_v3_payload()?;
+        let payload = if version == SignatureVersion::V4 {
+            self.construct_v4_payload()?
+        } else {
+            self.construct_v3_payload()?
+        };
 
         use ed25519_dalek::Verifier;
         let sig = ed25519_dalek::Signature::from_slice(&self.signature)

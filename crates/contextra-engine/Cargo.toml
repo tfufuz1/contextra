@@ -25,11 +25,11 @@ blake3 = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-checkpoint = { workspace = true }
-contextra-graph = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-adapt = { workspace = true }
-contextra-kvcache = { workspace = true }
-contextra-infer-candle = { workspace = true }
+contextra-graph = { workspace = true, optional = true }
+contextra-rank = { workspace = true, optional = true }
+contextra-adapt = { workspace = true, optional = true }
+contextra-kvcache = { workspace = true, optional = true }
+contextra-infer-candle = { workspace = true, optional = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -40,8 +40,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 bincode = { workspace = true }
-hmac = "0.12"
-sha2 = "0.10"
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"
@@ -62,7 +60,12 @@ name = "kv_delete_cascade_e2e"
 path = "tests/kv_delete_cascade_e2e.rs"
 
 [features]
-default = []
+default = ["graph", "rank", "adapt", "kvcache", "candle"]
+graph = ["dep:contextra-graph"]
+rank = ["dep:contextra-rank"]
+adapt = ["dep:contextra-adapt"]
+kvcache = ["dep:contextra-kvcache"]
+candle = ["dep:contextra-infer-candle"]
 onnx = []
 reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2, ADR-15)
@@ -71,8 +74,8 @@ bench = []
 sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
-graph-connectivity-health = ["contextra-graph/physio-percolation"]
-edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
+graph-connectivity-health = ["graph", "contextra-graph/physio-percolation"]
+edge-reinforcement-learning = ["graph", "contextra-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 entity-extraction = []
