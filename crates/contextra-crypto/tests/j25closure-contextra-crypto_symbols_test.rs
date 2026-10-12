@@ -77,6 +77,7 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
     )?;
 
     assert_eq!(proof.signature_version, 3);
+    assert_eq!(proof.deleted_after_tx, TxId(durability.confirmed_seq_no));
     assert_eq!(proof.audit_chain_position, audit_position);
     assert!(proof.verify(&keypair.verifying_key)?);
 
