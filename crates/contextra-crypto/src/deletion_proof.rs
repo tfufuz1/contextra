@@ -26,10 +26,14 @@
 pub mod audit_export;
 pub mod builder;
 pub mod canon;
+pub mod claim_text;
+pub mod evidence;
+pub mod exclusions;
 pub mod keys;
 pub mod layer_ids;
 pub mod layer_proof;
 pub mod policy;
+pub mod probe;
 pub mod proof;
 pub mod proof_store;
 pub mod proof_v2;
@@ -42,9 +46,13 @@ pub mod wal_receipt;
 
 pub use self::builder::*;
 pub use self::canon::*;
+pub use self::claim_text::*;
+pub use self::evidence::*;
+pub use self::exclusions::*;
 pub use self::keys::*;
 pub use self::layer_proof::*;
 pub use self::policy::*;
+pub use self::probe::*;
 pub use self::proof::{Coverage, DeletionProof, UncoveredLayer, UncoveredReason};
 pub use self::proof_store::*;
 pub use self::proof_v4::*;
