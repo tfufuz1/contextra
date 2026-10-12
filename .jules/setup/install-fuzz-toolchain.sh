@@ -7,8 +7,6 @@
 
 set -euo pipefail
 
-. "$HOME/.cargo/env" 2>/dev/null || true
-
 echo "============================================================"
 echo "  Contextra Fuzzing Toolchain Setup"
 echo "  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -18,11 +16,12 @@ echo "============================================================"
 echo ""
 echo "[1/3] Ensuring Rust nightly toolchain is available..."
 
-if ! rustup toolchain list 2>/dev/null | grep -q "nightly"; then
-    echo "  ℹ️ Installing Rust nightly toolchain..."
-    rustup toolchain install nightly --profile minimal -c rust-src -c llvm-tools-preview
+if ! rustup toolchain list | grep -q "nightly"; then
+    echo "  ℹ️ Installing Rust nightly toolchain with rust-src, llvm-tools-preview, miri..."
+    rustup toolchain install nightly --profile minimal -c rust-src -c llvm-tools-preview -c miri
 else
-    echo "  ✅ Rust nightly toolchain is installed."
+    echo "  ✅ Rust nightly toolchain is installed. Ensuring components..."
+    rustup component add --toolchain nightly rust-src llvm-tools-preview miri 2>/dev/null || true
 fi
 
 # ── 2. Install cargo-fuzz (NEVER cargo install fuzz) ─────────────────────────
@@ -31,10 +30,10 @@ echo "[2/3] Installing cargo-fuzz sub-command..."
 echo "  ⚠️ WARNING: Always install 'cargo-fuzz', NOT 'fuzz'."
 echo "  ⚠️ 'fuzz' on crates.io is an unmaintained obsolete crate (v0.1.1)."
 
-if ! cargo fuzz --version >/dev/null 2>&1 && ! cargo +nightly fuzz --version >/dev/null 2>&1; then
-    cargo +nightly install cargo-fuzz --locked
-else
+if cargo fuzz --version >/dev/null 2>&1 || cargo +nightly fuzz --version >/dev/null 2>&1; then
     echo "  ✅ cargo-fuzz is already installed."
+else
+    cargo +nightly install --locked cargo-fuzz
 fi
 
 # ── 3. Verification ──────────────────────────────────────────────────────────

@@ -4,13 +4,13 @@
 name = "git"
 version_cmd = ["git", "--version"]
 required = true
-needed_by = ["version-control", "diff-budget"]
+needed_by = ["version-control"]
 
 [[tool]]
 name = "rg"
 version_cmd = ["rg", "--version"]
 required = true
-needed_by = ["code-search"]
+needed_by = ["workspace-scan"]
 
 [[tool]]
 name = "jq"
@@ -19,22 +19,16 @@ required = true
 needed_by = ["json-parsing"]
 
 [[tool]]
-name = "curl"
-version_cmd = ["curl", "--version"]
-required = true
-needed_by = ["bench-download"]
-
-[[tool]]
 name = "flatc"
 version_cmd = ["flatc", "--version"]
 required = false
-needed_by = ["check-fbs-drift"]
+needed_by = ["fbs-drift"]
 
 [[tool]]
 name = "ast-grep"
 version_cmd = ["ast-grep", "--version"]
 required = false
-needed_by = ["fast-diff-lint", "debt-audit"]
+needed_by = ["doctrine-scan"]
 
 [[tool]]
 name = "cargo-nextest"
@@ -46,19 +40,13 @@ needed_by = ["test-runner"]
 name = "cargo-deny"
 version_cmd = ["cargo", "deny", "--version"]
 required = false
-needed_by = ["dependency-gate"]
-
-[[tool]]
-name = "cargo-audit"
-version_cmd = ["cargo", "audit", "--version"]
-required = false
 needed_by = ["security-scan"]
 
 [[tool]]
 name = "nightly-toolchain"
 version_cmd = ["rustc", "+nightly", "--version"]
 required = true
-needed_by = ["fuzz-smoke", "sanitizers", "miri"]
+needed_by = ["fuzz-smoke", "loom-run"]
 
 [[tool]]
 name = "cargo-fuzz"
@@ -76,13 +64,13 @@ needed_by = ["mutants-diff"]
 name = "cargo-llvm-cov"
 version_cmd = ["cargo", "llvm-cov", "--version"]
 required = false
-needed_by = ["coverage-gate"]
+needed_by = ["coverage"]
 
 [[tool]]
 name = "cargo-insta"
 version_cmd = ["cargo", "insta", "--version"]
 required = false
-needed_by = ["snapshot-testing"]
+needed_by = ["insta-test"]
 
 [[tool]]
 name = "cargo-hack"
@@ -94,7 +82,7 @@ needed_by = ["feature-matrix"]
 name = "miri"
 version_cmd = ["cargo", "+nightly", "miri", "--version"]
 required = false
-needed_by = ["unsafe-audit"]
+needed_by = ["loom-run"]
 
 [[tool]]
 name = "maturin"
@@ -109,7 +97,7 @@ required = false
 needed_by = ["workflow-check"]
 
 [[tool]]
-name = "shellcheck"
-version_cmd = ["shellcheck", "--version"]
+name = "curl"
+version_cmd = ["curl", "--version"]
 required = false
-needed_by = ["shell-commit-gate"]
+needed_by = ["bench-download"]
