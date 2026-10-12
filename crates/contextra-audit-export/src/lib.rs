@@ -46,6 +46,30 @@ pub struct DeletionProofSummary {
     pub verified: bool,
 }
 
+impl From<&contextra_crypto::deletion_proof::DeletionProof> for DeletionProofSummary {
+    fn from(proof: &contextra_crypto::deletion_proof::DeletionProof) -> Self {
+        let proof_id = if proof.signature.len() >= 16 {
+            proof.signature[..16]
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        } else {
+            proof
+                .signature
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        };
+
+        Self {
+            proof_id,
+            scope: format!("{:?}", proof.scope),
+            timestamp_nanos: proof.timestamp * 1_000_000_000,
+            verified: proof.signature_version >= 2,
+        }
+    }
+}
+
 /// A record entry in the GDPR Article 30 processing register.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegisterEntry {
