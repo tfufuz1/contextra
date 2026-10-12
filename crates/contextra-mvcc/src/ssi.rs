@@ -20,11 +20,11 @@ use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
+use crate::sync::atomic::{AtomicU64, Ordering};
+use crate::sync::Arc;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
@@ -868,7 +868,9 @@ impl SequenceLogSsiValidator {
 
         // Fail-closed check if commit key capacity limit is reached or exceeded
         if committed_writes.len() >= self.max_tracked_keys {
-            let blocker_msg = if let Some(blocker) = self.diagnose_pruning_blocker() {
+            let blocker_msg = if let Some(blocker) =
+                self.diagnose_pruning_blocker_internal(committed_writes, Instant::now())
+            {
                 format!(
                     "; pruning blocker details: min_unpruned_seq={}, longest_pin_duration={:?}, is_pin_expired={}",
                     blocker.min_unpruned_seq,

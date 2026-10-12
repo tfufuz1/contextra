@@ -417,8 +417,12 @@ impl LsmStorage {
         })?;
 
         let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
-            Some(Arc::new(crate::wal::KeyManager::try_new(
-                passphrase, &salt,
+            let header = contextra_crypto::KdfHeader::new(
+                contextra_crypto::KdfParams::default(),
+                salt,
+            )?;
+            Some(Arc::new(crate::wal::KeyManager::try_new_strict(
+                passphrase, &header,
             )?))
         } else {
             None

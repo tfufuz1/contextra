@@ -8,11 +8,14 @@ Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`fsync`/`fdatasyn
 | Datei/Verzeichnis | Verantwortung |
 |---|---|
 | `src/lib.rs` | Dateisystem-Hilfsfunktionen für atomares Ersetzen (`atomic_replace`) und dauerhaftes Löschen (`durable_remove`) |
+| `src/fault_injector.rs` | Trait `FaultInjector` und Zero-Cost `NoFault` Injektor für I/O-Fehlerinjektion |
 
 ## 3. Invarianten
 
 - `INV-DURABLE-FS-SAFE`: Rein sichere Dateisystem-Verwaltung; Fehler werden deterministisch als `std::io::Result` propagiert.
 - `INV-DURABLE-FS-NO-PANIC`: Keine `panic!`, `unwrap()`, oder `expect()` in Produktions-Dateisystem-Pfaden.
+- `INV-FSYNC-1`: Handle-Poisoning bei fsync-Fehlern in `DurableHandle`; verhindert weitere Flush- oder Schreibzugriffe nach I/O-Fehlern.
+- `INV-ENOSPC-1`: Fail-closed ENOSPC-/Disk-Full- und I/O-Fehlerbehandlung bei Schreiben, fsync, rename und Verzeichnis-Sync; saubere Fehlerpropagation via `std::io::Error` ohne Panics.
 
 ## 4. Verboten / Anti-Patterns
 

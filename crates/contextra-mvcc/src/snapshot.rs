@@ -16,11 +16,10 @@
 // RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
 
 use crate::lease::SnapshotLease;
+use crate::sync::atomic::{AtomicU64, Ordering};
+use crate::sync::{Arc, Mutex};
 use crate::types::TOMBSTONE_BIT;
-use parking_lot::Mutex;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Trait for querying the minimum sequence number floor for active MVCC snapshots and transaction readers.
@@ -85,15 +84,38 @@ impl SnapshotRegistry {
     /// `f` muss günstig und synchron sein und darf NICHT re-entrant in diese
     /// `SnapshotRegistry` zurückrufen (kein verschachtelter Lock-Erwerb), sonst droht ein
     /// Deadlock.
+    /// Erwirbt einen Read-Snapshot, indem `f` *innerhalb* des Registry-Locks ausgewertet wird.
+    #[cfg(loom)]
+    pub fn acquire(this: &Arc<Self>, f: impl FnOnce() -> u64) -> SnapshotLease {
+        SnapshotRegistry::acquire_at(this, f, Instant::now())
+    }
+
+    /// Erwirbt einen Read-Snapshot, indem `f` *innerhalb* des Registry-Locks ausgewertet wird.
+    #[cfg(not(loom))]
     pub fn acquire(self: &Arc<Self>, f: impl FnOnce() -> u64) -> SnapshotLease {
         self.acquire_at(f, Instant::now())
     }
 
     /// Wie [`acquire`], erlaubt aber einen expliziten Erstellungszeitstempel `at`
     /// (u. a. für Diagnosen wie [`SnapshotRegistry::longest_active_pin`]).
+    #[cfg(loom)]
+    pub fn acquire_at(this: &Arc<Self>, f: impl FnOnce() -> u64, at: Instant) -> SnapshotLease {
+        let seq_no = {
+            let mut active = this.active.lock().unwrap();
+            let seq_no = f() & !TOMBSTONE_BIT;
+            active.entry(seq_no).or_default().push(at);
+            this.update_min(&active);
+            seq_no
+        };
+        SnapshotLease::new(Arc::clone(this), seq_no, Some(at))
+    }
+
+    /// Wie [`acquire`], erlaubt aber einen expliziten Erstellungszeitstempel `at`
+    /// (u. a. für Diagnosen wie [`SnapshotRegistry::longest_active_pin`]).
+    #[cfg(not(loom))]
     pub fn acquire_at(self: &Arc<Self>, f: impl FnOnce() -> u64, at: Instant) -> SnapshotLease {
         let seq_no = {
-            let mut active = self.active.lock();
+            let mut active = self.active.lock().unwrap();
             let seq_no = f() & !TOMBSTONE_BIT;
             active.entry(seq_no).or_default().push(at);
             self.update_min(&active);
@@ -108,6 +130,18 @@ impl SnapshotRegistry {
         note = "Use SnapshotRegistry::acquire instead to eliminate the read-then-register race window"
     )]
     #[allow(deprecated)]
+    #[cfg(loom)]
+    pub fn register(this: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
+        SnapshotRegistry::register_at(this, seq_no, Instant::now())
+    }
+
+    /// Registers a read snapshot. Returns an RAII guard that
+    /// automatically deregisters on drop.
+    #[deprecated(
+        note = "Use SnapshotRegistry::acquire instead to eliminate the read-then-register race window"
+    )]
+    #[allow(deprecated)]
+    #[cfg(not(loom))]
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
         self.register_at(seq_no, Instant::now())
     }
@@ -117,6 +151,18 @@ impl SnapshotRegistry {
         note = "Use SnapshotRegistry::acquire_at instead to eliminate the read-then-register race window"
     )]
     #[allow(deprecated)]
+    #[cfg(loom)]
+    pub fn register_at(this: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
+        let lease = SnapshotRegistry::acquire_at(this, || seq_no, at);
+        SnapshotGuard { lease }
+    }
+
+    /// Registers a read snapshot at a specific creation timestamp `at`.
+    #[deprecated(
+        note = "Use SnapshotRegistry::acquire_at instead to eliminate the read-then-register race window"
+    )]
+    #[allow(deprecated)]
+    #[cfg(not(loom))]
     pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
         let lease = self.acquire_at(|| seq_no, at);
         SnapshotGuard { lease }
@@ -146,7 +192,7 @@ impl SnapshotRegistry {
     /// Persistent pin of a sequence number at a specific timestamp `at`.
     pub fn pin_at(&self, seq_no: u64, at: Instant) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
+        let mut active = self.active.lock().unwrap();
         active.entry(seq_no).or_default().push(at);
         self.update_min(&active);
     }
@@ -162,7 +208,7 @@ impl SnapshotRegistry {
 
     pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<Instant>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
+        let mut active = self.active.lock().unwrap();
         if let Some(timestamps) = active.get_mut(&seq_no) {
             if let Some(ts) = created_at {
                 if let Some(pos) = timestamps.iter().position(|&t| t == ts) {
@@ -185,7 +231,7 @@ impl SnapshotRegistry {
     /// Identifies which active snapshot sequence number has been held the longest relative to `now`,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
     pub fn longest_active_pin_at(&self, now: Instant) -> Option<(u64, Duration)> {
-        let active = self.active.lock();
+        let active = self.active.lock().unwrap();
         let mut longest: Option<(u64, Duration)> = None;
 
         for (&seq_no, timestamps) in active.iter() {
