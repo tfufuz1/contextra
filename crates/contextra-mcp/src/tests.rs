@@ -365,7 +365,30 @@ async fn test_contextra_forget_collection_with_proof() {
     let proof_val = &json_res["proof"];
     let proof: contextra_crypto::deletion_proof::DeletionProof =
         serde_json::from_value(proof_val.clone()).unwrap();
-    assert!(proof.verify(test_key.as_bytes()).unwrap());
+
+    struct FixedRng([u8; 32]);
+    impl rand::RngCore for FixedRng {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            let len = dest.len().min(32);
+            dest[..len].copy_from_slice(&self.0[..len]);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&test_key.as_bytes()[..32]);
+    let keypair =
+        contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate(&mut FixedRng(key_bytes));
+    assert!(proof.verify(keypair.verifying_key()).unwrap());
 
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
 }
