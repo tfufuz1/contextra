@@ -1,6 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Test for golden vectors of version 4 deletion proofs (byte-identity and verification).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::{ProofBuilder, ProofV4};
 use contextra_types::{DocId, TenantId};

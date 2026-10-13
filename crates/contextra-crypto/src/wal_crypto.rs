@@ -63,6 +63,33 @@ impl EncryptedWal {
         })
     }
 
+    /// Constructs an `EncryptedWal` by deriving stream key material via a `KmsProvider`.
+    pub fn from_kms(kms: &dyn KmsProvider, file_id: &[u8]) -> Result<Self> {
+        if file_id.is_empty() {
+            return Err(CryptoError::InvalidInput(
+                "file_id cannot be empty".to_string(),
+            ));
+        }
+        if file_id.len() > 10_000 {
+            return Err(CryptoError::InvalidInput(format!(
+                "file_id length {} exceeds maximum allowed bound of 10000 bytes",
+                file_id.len()
+            )));
+        }
+        let raw_key = kms.derive_key("wal", file_id)?;
+        if raw_key.len() != 32 {
+            return Err(CryptoError::Crypto(
+                "KMS returned key of invalid length for WAL".to_string(),
+            ));
+        }
+        let mut key_arr = [0u8; 32];
+        key_arr.copy_from_slice(&raw_key);
+        let sub_km = KeyManager::from_raw_key(key_arr)?;
+        Ok(Self {
+            key_manager: sub_km,
+        })
+    }
+
     /// Wraps the internal WAL chunk in AES-256-GCM-SIV stream.
     /// Prepends the 12-byte nonce to the encrypted ciphertext.
     pub fn encrypt_chunk(&self, payload: &[u8]) -> Result<Vec<u8>> {
@@ -459,6 +486,36 @@ mod tests {
         } else {
             panic!("Expected WalCorruption with offset");
         }
+    }
+
+    #[tokio::test]
+    async fn test_encrypted_wal_from_kms_roundtrip() -> Result<()> {
+        use crate::kms::LocalKmsProvider;
+        use crate::keystore::MfksKeystore;
+        use crate::kv_shredding::KeyRegistry;
+        use crate::revocation_log::RevocationLog;
+        use contextra_ports::SystemClock;
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+        use std::sync::Arc;
+
+        let (master_key, header) = KeyManager::try_new_argon2id("kms-wal-pass").unwrap();
+        let keystore = MfksKeystore::new(header, vec![], vec![]).unwrap();
+        let clock = Arc::new(SystemClock::new());
+        let sk = SigningKey::generate(&mut OsRng);
+        let vk = sk.verifying_key();
+        let log = Arc::new(RevocationLog::new_in_memory(clock.clone(), Some(sk), vk));
+        let registry = Arc::new(KeyRegistry::new());
+
+        let kms = LocalKmsProvider::new(master_key, keystore, registry, log, clock);
+
+        let wal = EncryptedWal::from_kms(&kms, b"segment_001.wal")?;
+        let data = b"payload via kms derived wal";
+        let encrypted = wal.encrypt_chunk(data)?;
+        let decrypted = wal.decrypt_chunk(&encrypted)?;
+        assert_eq!(decrypted, data);
+
+        Ok(())
     }
 
     #[tokio::test]

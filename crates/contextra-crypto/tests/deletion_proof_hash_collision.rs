@@ -3,7 +3,7 @@
 // INVARIANTEN: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.
 // STAND: TS:2026-09-27T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,

@@ -3,7 +3,7 @@
 // INVARIANTEN: DeletionProof V3 signatures are verified externally via Ed25519 verifying key without secret key.
 // NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating Ed25519 payload verification and tamper rejection.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, deprecated)]
 
 use contextra_crypto::deletion_proof::{DeletionProof, DeletionScope, DurabilityProof};
 use contextra_types::{TenantId, TxId};

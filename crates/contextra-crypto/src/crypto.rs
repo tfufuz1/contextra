@@ -52,6 +52,29 @@ pub struct KeyManager {
     nonce_counter: AtomicU64,
 }
 
+impl Clone for KeyManager {
+    fn clone(&self) -> Self {
+        let key_bytes = self.key.as_bytes();
+        let mut key_raw = [0u8; 32];
+        key_raw.copy_from_slice(key_bytes);
+
+        let cipher_cache = OnceLock::new();
+        if let Ok(cipher) = Aes256GcmSiv::new_from_slice(&key_raw) {
+            let _ = cipher_cache.set(cipher);
+        }
+
+        let mut nonce_prefix = [0u8; 4];
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+
+        Self {
+            key: VolatileEncryptionKey::new(key_raw),
+            cipher_cache,
+            nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
+        }
+    }
+}
+
 impl std::fmt::Debug for KeyManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KeyManager")
@@ -155,6 +178,29 @@ impl KeyManager {
         let header = KdfHeader::generate_default()?;
         let km = Self::try_new_with_kdf(passphrase, &header)?;
         Ok((km, header))
+    }
+
+    /// Constructs a `KeyManager` directly from a 32-byte raw key.
+    pub fn from_raw_key(key_raw: [u8; 32]) -> Result<Self> {
+        let cipher = Aes256GcmSiv::new_from_slice(&key_raw)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
+        let mut nonce_prefix = [0u8; 4];
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+
+        Ok(Self {
+            key: VolatileEncryptionKey::new(key_raw),
+            cipher_cache,
+            nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
+        })
+    }
+
+    /// Replacement constructor for `CryptoKey` / `KeyManager` compatibility.
+    pub fn from_key_manager(km: Self) -> Self {
+        km
     }
 
     /// Creates a new KeyManager with a cryptographically secure random salt.
