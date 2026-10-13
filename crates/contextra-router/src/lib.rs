@@ -8,6 +8,7 @@ pub mod ports_local;
 pub mod profile;
 pub mod router;
 pub mod serde_helpers;
+pub mod wiring;
 
 #[deprecated(
     since = "0.1.0",
@@ -36,7 +37,6 @@ pub use contextra_privacy::guarded_payload;
 pub mod fc_ts_dispatch;
 #[cfg(any(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
 pub mod routing_strategy;
-#[cfg(feature = "cloud-egress-guard")]
 pub mod transport;
 
 #[cfg(all(test, feature = "bandit-routing"))]
@@ -51,6 +51,7 @@ pub use dispatch::{dispatch_to_slm, route_and_dispatch_to_slm};
 pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
+pub use wiring::{RouterHandle, RouterWiring, RouterWiringDeps};
 
 #[cfg(feature = "bandit-routing")]
 pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};
