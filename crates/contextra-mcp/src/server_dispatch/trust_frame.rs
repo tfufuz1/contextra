@@ -56,3 +56,14 @@ impl<T> TrustFrame<T> {
         }
     }
 }
+
+pub fn decode_isolated_trust_frame<T: serde::de::DeserializeOwned>(
+    payload: &str,
+) -> Result<TrustFrame<T>, StructuredMcpError> {
+    serde_json::from_str(payload).map_err(|e| {
+        StructuredMcpError::new(
+            McpErrorCode::Corrupt,
+            format!("Invalid trust frame JSON payload: {e}"),
+        )
+    })
+}

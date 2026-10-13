@@ -22,3 +22,13 @@ impl Channel {
         matches!(self, Self::HostStdio)
     }
 }
+
+/// Configures channel bounds for framing and buffer capacities.
+pub fn configure_channel_bounds(max_line_bytes: usize) -> Result<usize, contextra_types::ContextraError> {
+    if max_line_bytes == 0 {
+        return Err(contextra_types::ContextraError::InvalidInput(
+            "Channel line limit must be greater than 0".into(),
+        ));
+    }
+    Ok(max_line_bytes)
+}

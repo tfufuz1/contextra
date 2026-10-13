@@ -395,7 +395,6 @@ impl LlmConfig {
         }
     }
 
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     /// Instantiates the configured `LlmTextGenerator` as an `Arc<dyn LlmTextGenerator>`.
     pub fn build_generator(&self) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
         create_llm_text_generator(

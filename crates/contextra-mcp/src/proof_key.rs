@@ -80,7 +80,6 @@ pub(crate) fn resolve_deletion_proof_key(
     }
 }
 
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Liest den DeletionProof-Schlüssel aus den Prozess-Umgebungsvariablen
 /// (`CONTEXTRA_DELETION_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`), ruft die reine Auflösungsfunktion auf
 /// und gibt bei Warnzuständen einmalige `tracing::warn!`-Meldungen aus.
