@@ -11,8 +11,12 @@ pub mod egress_vault;
 pub mod error;
 pub mod guarded_payload;
 pub mod processing_registry;
+pub mod wiring;
+
+pub use wiring::{PrivacyWiring, PrivacyWiringConfig};
 
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+#[allow(deprecated)]
 pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,

@@ -7,6 +7,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Kontextdaten für die Erstellung eines Auftragsverarbeitungsvertrags (AVV).
+#[deprecated(
+    note = "Nutze contextra-avv-generator anstelle von contextra-privacy::avv_generator"
+)]
+#[allow(deprecated)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AvvContext {
     /// Name oder Bezeichnung des Verantwortlichen (Auftraggeber).
@@ -27,6 +31,10 @@ pub struct AvvContext {
 ///
 /// Der Entwurf enthält alle nach Art. 28 DSGVO geforderten Abschnitte und referenziert
 /// die technischen Garantien aus dem übergebenen `AvvContext`.
+#[deprecated(
+    note = "Nutze contextra-avv-generator anstelle von contextra-privacy::avv_generator"
+)]
+#[allow(deprecated)]
 pub fn generate_avv_draft(ctx: &AvvContext) -> String {
     let egress_status = if ctx.egress_gateway_active {
         "Aktiviert (Egress Gateway filtert und blockiert unbefugte Datenabflüsse automatisiert)"
@@ -117,6 +125,7 @@ Der Auftragnehmer sichert zu, die folgenden produktspezifischen technischen Schu
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 
