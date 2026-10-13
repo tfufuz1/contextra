@@ -86,7 +86,8 @@ impl ManualClock {
     /// Advances the clock by the specified [`Duration`](std::time::Duration).
     pub fn advance(&self, duration: std::time::Duration) {
         let delta: u64 = duration.as_nanos().try_into().unwrap_or(u64::MAX);
-        self.nanos.fetch_add(delta, std::sync::atomic::Ordering::SeqCst);
+        self.nanos
+            .fetch_add(delta, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Sets the clock nanoseconds directly to `nanos`.

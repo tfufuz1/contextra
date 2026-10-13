@@ -67,7 +67,7 @@ fn test_cli_doctor_outputs_not_checkable() {
 fn test_cli_verify_proof_offline() {
     // Generate valid Ed25519 keypair and proof payload
     let mut rng = rand::rngs::StdRng::seed_from_u64(12345);
-    let keypair = contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate(&mut rng);
+    let keypair = contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate();
 
     let payload = b"canonical_proof_payload_bytes";
     let sig = contextra_crypto::ed25519_proof::sign_deletion_proof_v3(&keypair, payload);

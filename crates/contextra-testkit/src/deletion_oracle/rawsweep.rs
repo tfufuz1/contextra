@@ -132,8 +132,7 @@ fn sweep_single_file(
 
             let last_possible_offset = valid_len - needle.len();
             for window_offset in 0..=last_possible_offset {
-                if &valid_buffer[window_offset..window_offset + needle.len()] == needle.as_slice()
-                {
+                if &valid_buffer[window_offset..window_offset + needle.len()] == needle.as_slice() {
                     let absolute_offset =
                         (file_bytes_scanned - valid_len as u64) + window_offset as u64;
                     ctx.hits.push(OrcHit {

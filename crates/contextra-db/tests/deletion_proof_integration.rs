@@ -139,10 +139,8 @@ async fn test_negative_reconstruction_no_data_discoverable_after_drop() {
     // Confirm keys exist in underlying storage before drop
     let col_data_prefix = format!("__col:{col_name}:");
     let txt_data_prefix = format!("__txt:{col_name}:");
-    let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-        db.inner_storage(),
-        tenant_id,
-    );
+    let tenant_storage =
+        contextra_store::tenant_codec::TenantScopedStorage::new(db.inner_storage(), tenant_id);
 
     let col_keys_before = tenant_storage
         .scan_prefix(col_data_prefix.as_bytes())

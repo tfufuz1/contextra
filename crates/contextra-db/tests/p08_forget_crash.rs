@@ -1,13 +1,13 @@
 #[path = "support_canary/mod.rs"]
 mod support_canary;
 
-use support_canary::{scan_dir, PersonCanaryGenerator};
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_types::{DistanceMetric, TenantId};
 use serde_json::json;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
+use support_canary::{scan_dir, PersonCanaryGenerator};
 use tempfile::TempDir;
 
 const CRASH_ENV_VAR: &str = "CANARY_CRASH_CHILD_MARKER";
@@ -36,7 +36,10 @@ async fn test_forget_crash_recovery_matrix() {
     ];
 
     for marker in progress_markers {
-        println!("\n=== CRASH MATRIX TEST: KILLED AT PROGRESS MARKER '{}' ===", marker);
+        println!(
+            "\n=== CRASH MATRIX TEST: KILLED AT PROGRESS MARKER '{}' ===",
+            marker
+        );
 
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let db_path = tmp_dir.path().join("contextra_crash_db");
@@ -62,7 +65,10 @@ async fn test_forget_crash_recovery_matrix() {
         for line in reader.lines().flatten() {
             println!("  [child stdout]: {}", line);
             if line.contains(&format!("PROGRESS_EMITTED:{}", marker)) {
-                println!("  Parent detected progress marker '{}' -> Killing child process immediately!", marker);
+                println!(
+                    "  Parent detected progress marker '{}' -> Killing child process immediately!",
+                    marker
+                );
                 let _ = child.kill();
                 let _ = child.wait();
                 killed_at_marker = true;
@@ -204,7 +210,10 @@ async fn verify_recovery_state_after_crash(db_path: &std::path::Path, marker: &s
     let db = match Contextra::open_with_config(db_path, config).await {
         Ok(db) => db,
         Err(e) => {
-            println!("  [NOTE] DB reopen failed after crash at marker '{}': {}", marker, e);
+            println!(
+                "  [NOTE] DB reopen failed after crash at marker '{}': {}",
+                marker, e
+            );
             return;
         }
     };
@@ -244,12 +253,24 @@ async fn verify_recovery_state_after_crash(db_path: &std::path::Path, marker: &s
     // (ii) Rollback completed: doc_a_opt is Some and Person A is readable
     if doc_a_opt.is_none() {
         println!("  Outcome (i): Person A deletion committed/recovered cleanly.");
-        let query_res = col_a.query().embedding(vec_a).k(10).execute().await.expect("query a");
-        assert!(query_res.is_empty(), "Person A must return 0 search results when deleted");
+        let query_res = col_a
+            .query()
+            .embedding(vec_a)
+            .k(10)
+            .execute()
+            .await
+            .expect("query a");
+        assert!(
+            query_res.is_empty(),
+            "Person A must return 0 search results when deleted"
+        );
     } else {
         println!("  Outcome (ii): Person A deletion rolled back atomically prior to commit.");
         let doc_a = doc_a_opt.expect("doc_a1");
-        assert_eq!(doc_a.id, "doc_a1", "Person A document must be fully intact when deletion is rolled back");
+        assert_eq!(
+            doc_a.id, "doc_a1",
+            "Person A document must be fully intact when deletion is rolled back"
+        );
     }
 
     db.close().await.expect("close reopened DB");

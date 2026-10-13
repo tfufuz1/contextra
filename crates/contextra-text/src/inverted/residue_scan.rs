@@ -96,8 +96,7 @@ impl<S: StorageEngine> super::index_struct::InvertedIndex<S> {
         // Verify total_docs against metadata key if present
         let meta_key = self.key("meta:stats");
         if let Some(meta_bytes) = self.storage.get(&meta_key).await? {
-            if let Ok(meta) = bincode::deserialize::<super::types::TextIndexMetadata>(&meta_bytes)
-            {
+            if let Ok(meta) = bincode::deserialize::<super::types::TextIndexMetadata>(&meta_bytes) {
                 evidence.doc_count_before_after_consistent = meta.total_docs == docs;
             } else {
                 evidence.doc_count_before_after_consistent = true;

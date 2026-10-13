@@ -1,7 +1,5 @@
 use contextra_core::{DocId, TxId, VectorIndex};
-use contextra_vector::hnsw::{
-    GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth,
-};
+use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth};
 
 #[tokio::test]
 async fn test_hnsw_residue_scan_clean_positive() -> Result<(), Box<dyn std::error::Error>> {

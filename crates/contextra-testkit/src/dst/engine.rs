@@ -258,13 +258,7 @@ impl DstEngine {
         self.active_data.len()
     }
 
-    fn encode_record(
-        tag: u8,
-        seq_no: u64,
-        prev_hash: u64,
-        key: &[u8],
-        value: &[u8],
-    ) -> Vec<u8> {
+    fn encode_record(tag: u8, seq_no: u64, prev_hash: u64, key: &[u8], value: &[u8]) -> Vec<u8> {
         let key_len = u32::try_from(key.len()).unwrap_or(u32::MAX);
         let val_len = u32::try_from(value.len()).unwrap_or(u32::MAX);
 
@@ -299,7 +293,8 @@ impl DstEngine {
 
         let key = slice[21..21 + key_len].to_vec();
         let val_offset = 21 + key_len;
-        let val_len = u32::from_le_bytes(slice[val_offset..val_offset + 4].try_into().ok()?) as usize;
+        let val_len =
+            u32::from_le_bytes(slice[val_offset..val_offset + 4].try_into().ok()?) as usize;
 
         let total_len = val_offset + 4 + val_len + 4;
         if slice.len() < total_len {
@@ -308,7 +303,11 @@ impl DstEngine {
 
         let value = slice[val_offset + 4..val_offset + 4 + val_len].to_vec();
         let checksum_offset = val_offset + 4 + val_len;
-        let checksum = u32::from_le_bytes(slice[checksum_offset..checksum_offset + 4].try_into().ok()?);
+        let checksum = u32::from_le_bytes(
+            slice[checksum_offset..checksum_offset + 4]
+                .try_into()
+                .ok()?,
+        );
 
         Some((
             DecodedRecord {

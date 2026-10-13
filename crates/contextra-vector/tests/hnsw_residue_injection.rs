@@ -1,7 +1,5 @@
 use contextra_core::{DocId, TxId, VectorIndex};
-use contextra_vector::hnsw::{
-    GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth, VectorData,
-};
+use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth, VectorData};
 
 #[tokio::test]
 async fn test_injected_f32_nonzero_vector_detected() -> Result<(), Box<dyn std::error::Error>> {
@@ -228,15 +226,25 @@ async fn test_injected_slot_reuse_ghost_edge_detected() -> Result<(), Box<dyn st
 
     // Reuse slot for doc 99
     let new_doc = DocId::new(99);
-    index.insert(TxId::new(99), new_doc, &vec![0.5f32; dim]).await?;
+    index
+        .insert(TxId::new(99), new_doc, &vec![0.5f32; dim])
+        .await?;
     index.commit(TxId::new(99)).await?;
 
     // Inject ghost edge pointing to slot 4 from node 2
-    let mut conns = index.inner_core().hot.arena.get_ram_node_connections(2, 0, m);
+    let mut conns = index
+        .inner_core()
+        .hot
+        .arena
+        .get_ram_node_connections(2, 0, m);
     if !conns.contains(&(target_slot as u32)) {
         conns.push(target_slot as u32);
     }
-    index.inner_core().hot.arena.update_backlink(2, 0, m, &conns)?;
+    index
+        .inner_core()
+        .hot
+        .arena
+        .update_backlink(2, 0, m, &conns)?;
 
     let evidence = index.scan_residue(&[new_doc], ResDepth::FullSweep)?;
     assert!(

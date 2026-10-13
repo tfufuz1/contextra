@@ -22,8 +22,7 @@ fn canary_oracle_negative_test_finds_existing_markers() {
     fs::create_dir_all(&db_sub_dir).expect("create sstable dir");
     let sstable_file = db_sub_dir.join("000001.sst");
     let mut file = File::create(&sstable_file).expect("create sstable file");
-    file.write_all(b"HEADER_DUMMY_DATA_")
-        .expect("write header");
+    file.write_all(b"HEADER_DUMMY_DATA_").expect("write header");
     file.write_all(marker_a).expect("write marker a");
     file.write_all(b"_FOOTER_DUMMY_DATA").expect("write footer");
     file.flush().expect("flush sstable");
