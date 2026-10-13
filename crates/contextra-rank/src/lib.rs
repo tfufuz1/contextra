@@ -11,8 +11,6 @@ pub mod fusion;
 #[cfg(feature = "dibud")]
 pub mod dibud;
 
-// TODO(contextra-plan): Export and ensure robust error propagation and zero-panic guarantees for 4-signal fusion, calibration (Isotonic/Platt), and drift detection [ref:eigenbau-rrf-fusion]
-
 pub use calibration::{
     AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
     PlattScaler,
@@ -30,6 +28,6 @@ pub use fusion::{
     weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
     weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
     GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
-    SignalKind,
+    ProvenanceRecord, RerankStage, ResonanceConfig, SearchResult, SignalCalibrationContext,
+    SignalContribution, SignalKind,
 };

@@ -1,0 +1,22 @@
+id        = "T-2026-9283"
+title     = "Verdrahtung CrossEncoderReranker und RerankStage in contextra-rank und contextra-infer-onnx"
+crate     = "contextra-rank"
+tier      = 1
+risk      = "calib"
+goal      = "Reranker Wiring in contextra-infer-onnx und RerankStage in contextra-rank samt Drift/Kalibrierungs-Tests und TODO-Bereinigung"
+non_goals = ["Keine Inferenz-Engine-Aenderung in contextra-engine", "Keine Aenderung an contextra-ports"]
+scope     = ["crates/contextra-rank/**", "crates/contextra-infer-onnx/**", ".jules/tasks/W2-03.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "P5 Ring Layering", "P26 Pure Async", "Deterministische Tie-Breaking"]
+acceptance = [
+  "cargo test -p contextra-rank -p contextra-infer-onnx",
+  "cargo xtask unwired-ports",
+  "cargo xtask check-ring-layering-full",
+  "cargo xtask check-nan-hot-loop"
+]
+evidence_required = ["Tests fuer RerankStage, RerankWiring, Drift, Calibration"]
+
+[budget]
+files      = 10
+lines      = 1000
+iterations = 10

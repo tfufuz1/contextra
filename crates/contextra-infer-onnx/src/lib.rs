@@ -36,7 +36,9 @@ use tokenizers::Tokenizer;
 use tracing::{debug, info, warn};
 
 pub mod reranker;
+pub mod wiring;
 pub use reranker::{CrossEncoderReranker, PlattScaledSigmoid, RerankConfig, RerankResult};
+pub use wiring::{RerankWiring, RerankWiringDeps};
 
 use std::path::{Path, PathBuf};
 
