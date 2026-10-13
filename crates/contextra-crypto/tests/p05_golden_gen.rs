@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::deletion_proof::signer::ProofKeyPairSigner;
 use contextra_crypto::deletion_proof::ProofBuilder;
 use contextra_types::{DocId, TenantId};
