@@ -396,6 +396,7 @@ impl HnswIndexCore {
             }
         }
 
+        self.hot.index_epoch.fetch_add(1, Ordering::SeqCst);
         let ep_val = self.hot.get_entry_point();
         let ram_ep_val = self.hot.get_ram_entry_point();
 
@@ -605,6 +606,7 @@ impl HnswIndexCore {
 
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
+            self.hot.index_epoch.fetch_add(1, Ordering::SeqCst);
             *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
             self.cold
                 .consecutive_rapid_rebuilds
