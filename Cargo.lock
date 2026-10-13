@@ -1252,6 +1252,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "contextra-ports",
+ "contextra-store",
  "contextra-types",
  "parking_lot 0.12.5",
  "tempfile",

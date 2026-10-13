@@ -8,8 +8,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use contextra_ports::Clock;
 
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// A thread-safe, manually advanceable clock for deterministic tests.
+///
+/// Enforces monotonicity as a type invariant: `set_nanos` will never move
+/// the clock timestamp backwards. To explicitly rewind time in tests, call `rewind_for_test`.
 #[derive(Debug)]
 pub struct ManualClock {
     nanos: AtomicU64,
@@ -39,7 +41,15 @@ impl ManualClock {
     }
 
     /// Sets the clock to an absolute timestamp in nanoseconds since UNIX_EPOCH.
+    ///
+    /// Monotonicity invariant: `set_nanos` will never move the clock backwards.
+    /// If `nanos` is less than the current timestamp, the timestamp remains unchanged.
     pub fn set_nanos(&self, nanos: u64) {
+        self.nanos.fetch_max(nanos, Ordering::SeqCst);
+    }
+
+    /// Explicitly rewinds the clock timestamp for test scenarios (e.g. timeout / TTL tests).
+    pub fn rewind_for_test(&self, nanos: u64) {
         self.nanos.store(nanos, Ordering::SeqCst);
     }
 
@@ -88,13 +98,32 @@ mod tests {
 
     #[test]
     fn test_manual_clock_set() {
-        let clock = ManualClock::default();
+        let clock = ManualClock::new(10);
         clock.set_nanos(42);
         assert_eq!(clock.now_nanos(), 42);
         assert_eq!(
             clock.now_system_time(),
             UNIX_EPOCH + Duration::from_nanos(42)
         );
+    }
+
+    #[test]
+    fn test_manual_clock_set_nanos_monotonic() {
+        let clock = ManualClock::new(100);
+        // Attempting to set nanos backwards must be ignored by set_nanos
+        clock.set_nanos(50);
+        assert_eq!(clock.now_nanos(), 100);
+
+        // Setting forwards works
+        clock.set_nanos(200);
+        assert_eq!(clock.now_nanos(), 200);
+    }
+
+    #[test]
+    fn test_manual_clock_rewind_for_test() {
+        let clock = ManualClock::new(100);
+        clock.rewind_for_test(30);
+        assert_eq!(clock.now_nanos(), 30);
     }
 
     #[test]
