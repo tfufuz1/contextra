@@ -5,9 +5,9 @@
 
 #![deny(clippy::print_stdout)]
 
-use contextra_mcp::cli::verify_proof::hex_decode;
 use contextra_mcp::cli::{
-    execute_confirm, execute_doctor, execute_init, execute_verify_proof, InitOptions,
+    execute_confirm, execute_doctor, execute_init, execute_verify_proof_v4, InitOptions,
+    VerifyProofOptions,
 };
 use contextra_mcp::ipc::primary::ENDPOINT_FILE_NAME;
 use std::path::PathBuf;
@@ -56,20 +56,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             execute_doctor(&db_path)?;
         }
         "verify-proof" => {
-            if args.len() < 4 {
-                eprintln!("Usage: contextra-mcp-cli verify-proof <proof-json-or-file> <public-key-hex>");
+            if args.len() < 3 {
+                eprintln!("Usage: contextra-mcp-cli verify-proof <proof-file-or-json> --pubkey <pubkey-file-or-hex> [--policy <policy-json>] [--chain <chain-path>] [--allow-legacy]");
                 std::process::exit(1);
             }
-            let proof_input = &args[2];
-            let key_hex = &args[3];
-            let key_bytes = hex_decode(key_hex)?;
 
-            let valid = execute_verify_proof(proof_input, &key_bytes)?;
-            if valid {
-                eprintln!("Proof verification SUCCESSFUL.");
-            } else {
-                eprintln!("Proof verification FAILED.");
+            let proof_path_or_str = args[2].clone();
+
+            let pubkey_path_or_str = args
+                .iter()
+                .position(|a| a == "--pubkey")
+                .and_then(|i| args.get(i + 1))
+                .cloned()
+                .or_else(|| args.get(3).cloned())
+                .unwrap_or_default();
+
+            if pubkey_path_or_str.is_empty() {
+                eprintln!("Error: --pubkey parameter or public key positional argument is required.");
                 std::process::exit(1);
+            }
+
+            let policy_path = args
+                .iter()
+                .position(|a| a == "--policy")
+                .and_then(|i| args.get(i + 1))
+                .cloned();
+
+            let chain_path = args
+                .iter()
+                .position(|a| a == "--chain")
+                .and_then(|i| args.get(i + 1))
+                .cloned();
+
+            let allow_legacy = args.iter().any(|a| a == "--allow-legacy");
+
+            let opts = VerifyProofOptions {
+                proof_path_or_str,
+                pubkey_path_or_str,
+                policy_path,
+                chain_path,
+                allow_legacy,
+            };
+
+            match execute_verify_proof_v4(&opts) {
+                Ok(true) => {
+                    eprintln!("Proof verification SUCCESSFUL.");
+                }
+                Ok(false) => {
+                    eprintln!("Proof verification FAILED.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Proof verification ERROR: {e}");
+                    std::process::exit(1);
+                }
             }
         }
         "confirm" => {
