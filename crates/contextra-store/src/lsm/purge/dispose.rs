@@ -1,26 +1,21 @@
 // FILE-CONTEXT
 // STAND: 2026-10-13
 // ZWECK: Sichere Entsorgung obsoleter SSTable-Dateien via PendingDeleteJournal und Scrubbing (Spezifikation C5.1, ADR-10).
-// INVARIANTEN: Atomare Aufzeichnung vor Entsorgung, DisposePolicy-gesteuertes Scrubbing, Propagierung aller Fehler.
+// INVARIANTEN: Atomare Aufzeichnung vor Entsorgung, RequireScrub-Fail-Closed bei ScrubRefusal, Propagierung aller Fehler.
 
 use contextra_durable_fs::{
     durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
 use std::path::{Path, PathBuf};
 
-/// Policy controlling file disposal behavior upon scrubbing refusal or standard deletion.
+/// Policy controlling disposal behavior when file scrubbing is refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DisposePolicy {
-    /// Strict scrubbing required. Refusal to scrub (e.g. hardlinks, CoW) causes an error,
-    /// leaving the file recorded in the pending delete journal.
+    /// Refusal during scrubbing is treated as a hard error and keeps the file in the journal.
     #[default]
     RequireScrub,
-    /// Scrubbing is attempted, but if refused, falls back to standard durable removal.
-    /// Files removed without scrubbing count under [`OrxDisposeReport::removed_unscrubbed`].
+    /// Refusal permits falling back to durable removal without zero-overwriting.
     AllowRemoveUnscrubbed,
-    /// Scrubbing is disabled; standard durable removal is performed for all files.
-    /// Files removed count under [`OrxDisposeReport::removed_unscrubbed`].
-    Disabled,
 }
 
 /// Report summarizing file disposal outcome.
@@ -30,23 +25,27 @@ pub struct OrxDisposeReport {
     pub files_removed: usize,
     /// Number of files overwritten with zeros before removal.
     pub files_scrubbed: usize,
-    /// Number of files removed without zero-overwriting (unscrubbed removal).
+    /// Number of files removed without zero-overwriting.
     pub removed_unscrubbed: usize,
     /// List of scrub refusals encountered during disposal.
     pub refusals: Vec<(PathBuf, ScrubRefusal)>,
-    /// List of files that were not cleanly scrubbed, representing residual risk (path + refusal reason).
+    /// List of files where scrubbing was refused resulting in residual risk.
     pub residual_risk: Vec<(PathBuf, ScrubRefusal)>,
 }
 
-/// Disposes obsolete files durably using standard configuration.
+/// Disposes obsolete files durably using an explicit [`DisposePolicy`].
 ///
 /// Records paths in `PendingDeleteJournal` before removal.
-/// Delegates to [`dispose_obsolete_files_with_policy`].
-/// Uses [`DisposePolicy::RequireScrub`] if `secure_delete` is `true`, or [`DisposePolicy::Disabled`] if `false`.
-pub async fn dispose_obsolete_files(
+/// Attempts `scrub_if_safe` if `secure_delete` is `true`.
+/// If scrubbing is refused:
+/// - Under [`DisposePolicy::RequireScrub`], returns an I/O error and keeps the file in the journal.
+/// - Under [`DisposePolicy::AllowRemoveUnscrubbed`], falls back to standard durable removal,
+///   records refusal in `residual_risk`, and increments `removed_unscrubbed`.
+pub async fn dispose_obsolete_files_with_policy(
     storage_dir: &Path,
     obsolete_files: Vec<PathBuf>,
     secure_delete: bool,
+    dispose_policy: DisposePolicy,
 ) -> std::io::Result<OrxDisposeReport> {
     let policy = if secure_delete {
         DisposePolicy::RequireScrub
@@ -75,7 +74,7 @@ pub async fn dispose_obsolete_files_with_policy(
         let journal_path = dir.join("pending_delete.journal");
         let mut journal = PendingDeleteJournal::open(&journal_path)?;
 
-        // Record all obsolete files in journal before starting physical removal (avoiding duplicates)
+        // Record obsolete files in journal before starting physical removal (skip duplicates)
         for file in &obsolete_files {
             if !journal.pending().contains(file) {
                 journal.record(file)?;
@@ -111,13 +110,12 @@ pub async fn dispose_obsolete_files_with_policy(
                 Ok(ScrubOutcome::Refused(refusal)) => {
                     report.refusals.push((path.to_path_buf(), refusal));
                     report.residual_risk.push((path.to_path_buf(), refusal));
-
-                    match policy {
+                    match dispose_policy {
                         DisposePolicy::RequireScrub => Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("Scrubbing refused for {}: {:?}", path.display(), refusal),
+                            std::io::ErrorKind::PermissionDenied,
+                            format!("Scrubbing refused for {:?}: {:?}", path, refusal),
                         )),
-                        DisposePolicy::AllowRemoveUnscrubbed | DisposePolicy::Disabled => {
+                        DisposePolicy::AllowRemoveUnscrubbed => {
                             durable_remove(path)?;
                             report.files_removed += 1;
                             report.removed_unscrubbed += 1;
@@ -137,4 +135,22 @@ pub async fn dispose_obsolete_files_with_policy(
     })
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
+}
+
+/// Disposes obsolete files durably.
+///
+/// Records paths in `PendingDeleteJournal` before removal.
+/// Wraps [`dispose_obsolete_files_with_policy`] with default policy [`DisposePolicy::RequireScrub`]
+/// when `secure_delete` is `true`, or [`DisposePolicy::AllowRemoveUnscrubbed`] when `false`.
+pub async fn dispose_obsolete_files(
+    storage_dir: &Path,
+    obsolete_files: Vec<PathBuf>,
+    secure_delete: bool,
+) -> std::io::Result<OrxDisposeReport> {
+    let dispose_policy = if secure_delete {
+        DisposePolicy::RequireScrub
+    } else {
+        DisposePolicy::AllowRemoveUnscrubbed
+    };
+    dispose_obsolete_files_with_policy(storage_dir, obsolete_files, secure_delete, dispose_policy).await
 }
