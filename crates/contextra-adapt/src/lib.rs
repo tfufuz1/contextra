@@ -11,6 +11,11 @@ pub mod drift;
 pub mod flow_thompson;
 pub mod homeostat;
 pub mod lyapunov;
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `contextra_adapt::offpolicy` instead of `off_policy`."
+)]
+#[allow(deprecated)]
 pub mod off_policy;
 pub mod offpolicy;
 pub mod pid;
@@ -18,6 +23,7 @@ pub mod pid_latency_controller;
 #[cfg(feature = "rie-greedy-personalization")]
 pub mod rie_greedy;
 pub mod shadow_mode;
+pub mod wiring;
 
 #[cfg(feature = "bandit-routing")]
 pub use bandit::*;
@@ -27,9 +33,11 @@ pub use drift::*;
 pub use flow_thompson::*;
 pub use homeostat::*;
 pub use lyapunov::*;
+#[allow(deprecated)]
 pub use off_policy::*;
 pub use pid::*;
 pub use pid_latency_controller::*;
 #[cfg(feature = "rie-greedy-personalization")]
 pub use rie_greedy::{RieGreedyError, RieGreedyProfile};
 pub use shadow_mode::*;
+pub use wiring::{AdaptWiring, AdaptWiringDeps};

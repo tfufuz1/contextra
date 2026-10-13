@@ -6,7 +6,8 @@
 
 //! PID Latency Controller & Latency Budget Guard.
 
-use std::time::Instant;
+use std::sync::Arc;
+use contextra_ports::{Clock, SystemClock};
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).
 ///
@@ -164,31 +165,51 @@ impl PidLatencyController {
 }
 
 /// Simple, panic-free latency budget guard for iterative multi-step search loops.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LatencyBudgetGuard {
-    start: Instant,
+    clock: Arc<dyn Clock>,
+    start_monotonic_nanos: u64,
     budget_ms: f64,
 }
 
+impl std::fmt::Debug for LatencyBudgetGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LatencyBudgetGuard")
+            .field("start_monotonic_nanos", &self.start_monotonic_nanos)
+            .field("budget_ms", &self.budget_ms)
+            .finish()
+    }
+}
+
 impl LatencyBudgetGuard {
-    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds.
-    pub fn new(budget_ms: f64) -> Self {
+    /// Creates a new `LatencyBudgetGuard` with specified budget in ms and injected [`Clock`] port.
+    pub fn new_with_clock(budget_ms: f64, clock: Arc<dyn Clock>) -> Self {
         let budget_ms = if budget_ms.is_finite() && budget_ms > 0.0 {
             budget_ms
         } else {
             DEFAULT_TARGET_LATENCY_MS
         };
 
-        #[allow(clippy::disallowed_methods)]
+        let start_monotonic_nanos = clock.monotonic_nanos();
         Self {
-            start: Instant::now(),
+            clock,
+            start_monotonic_nanos,
             budget_ms,
         }
     }
 
+    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds.
+    ///
+    /// Delegates to [`Self::new_with_clock`] using a standard [`SystemClock`].
+    pub fn new(budget_ms: f64) -> Self {
+        Self::new_with_clock(budget_ms, Arc::new(SystemClock::new()))
+    }
+
     /// Returns elapsed time in milliseconds since guard instantiation.
     pub fn elapsed_ms(&self) -> f64 {
-        self.start.elapsed().as_secs_f64() * 1000.0
+        let now_nanos = self.clock.monotonic_nanos();
+        let elapsed_nanos = now_nanos.saturating_sub(self.start_monotonic_nanos);
+        elapsed_nanos as f64 / 1_000_000.0
     }
 
     /// Returns `true` if the elapsed time has exceeded the configured budget.
