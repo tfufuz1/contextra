@@ -12,9 +12,10 @@ pub enum RefOp {
     Put { key: Vec<u8>, value: Vec<u8> },
     /// Marks a key as deleted (tombstone).
     Delete { key: Vec<u8> },
+    /// Marks a key as shredded / forgotten.
+    Forget { key: Vec<u8> },
 }
 
-// TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceModel {
@@ -48,6 +49,17 @@ impl ReferenceModel {
             .push(RefOp::Delete { key: key.to_vec() });
     }
 
+    /// Stages a `Forget` operation in uncommitted pending buffer.
+    pub fn forget(&mut self, key: &[u8]) {
+        self.pending_writes
+            .push(RefOp::Forget { key: key.to_vec() });
+    }
+
+    /// Clears unacknowledged pending writes when a commit fails.
+    pub fn commit_unacked(&mut self) {
+        self.rollback();
+    }
+
     /// Clears any uncommitted pending writes without advancing sequence number.
     pub fn rollback(&mut self) {
         self.pending_writes.clear();
@@ -78,7 +90,7 @@ impl ReferenceModel {
                         .or_default()
                         .push((commit_seq, Some(value)));
                 }
-                RefOp::Delete { key } => {
+                RefOp::Delete { key } | RefOp::Forget { key } => {
                     self.history
                         .entry(key)
                         .or_default()
@@ -168,6 +180,19 @@ impl ReferenceModel {
         self.scan_range_at(Bound::Unbounded, Bound::Unbounded, seq)
             .into_iter()
             .collect()
+    }
+
+    /// Verifies that recovered snapshot matches reference model expected snapshot.
+    pub fn verify_recovery(&self, recovered: &BTreeMap<Vec<u8>, Vec<u8>>) -> Result<(), String> {
+        let expected = self.snapshot_map_at(self.snapshot_seq());
+        if &expected == recovered {
+            Ok(())
+        } else {
+            Err(format!(
+                "Recovery divergence: expected {:?}, recovered {:?}",
+                expected, recovered
+            ))
+        }
     }
 }
 

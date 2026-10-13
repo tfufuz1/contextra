@@ -505,6 +505,9 @@ impl SimVfsFile for SimFsFileImpl {
 
         let new_len = usize::try_from(len).unwrap_or(usize::MAX);
         rec.cache_data.resize(new_len, 0);
+        if rec.durable_data.len() > new_len {
+            rec.durable_data.resize(new_len, 0);
+        }
         rec.dirty = true;
         Ok(())
     }
