@@ -105,6 +105,7 @@ pub struct HnswHotCore {
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
+    pub index_epoch: AtomicU64,
     pub rebuilding: AtomicBool,
     pub arena: HnswArena,
 }
@@ -236,6 +237,7 @@ impl HnswIndex {
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
+                    index_epoch: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
                     arena: HnswArena::new(),
                 },
@@ -305,6 +307,7 @@ impl HnswIndex {
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
+                    index_epoch: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
                     arena: HnswArena::new(),
                 },
@@ -377,6 +380,16 @@ impl HnswIndex {
     pub fn with_metrics_sink(self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.set_metrics_sink(sink);
         self
+    }
+
+    /// Returns the current index epoch (monotonically increasing on insert/delete/rebuild).
+    pub fn index_epoch(&self) -> u64 {
+        self.inner.hot.index_epoch.load(Ordering::Acquire)
+    }
+
+    /// Increments the index epoch counter.
+    pub fn bump_index_epoch(&self) -> u64 {
+        self.inner.hot.index_epoch.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     /// Sets the random seed used for HNSW layer selection during insertions.
