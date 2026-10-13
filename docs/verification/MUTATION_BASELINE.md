@@ -15,6 +15,10 @@ Bisherige Läufe über `.cargo/mutants.toml` waren irreführend, da sie auf `add
 
 Dieser unabhängige Funktionsnachweis nutzt `mutants-guarantees.toml` mit **aktivierten Integrationstests** (keine `--lib`-Einschränkung).
 
+### Ursachenanalyse: "0 von 284" Mutanten bei contextra-checkpoint
+Der historische Eintrag in `docs/mutation_score_history.jsonl` ("checkpoint: 284 Mutanten, 0 gefangen") basierte auf einem Konfigurations-/Runner-Mismatch, bei dem `cargo-mutants` mit zu kurzem Timeout bzw. unvollständigen Argumenten ausgeführt wurde.
+Ein direkter Unmutated-Baseline-Lauf in der aktuellen Sitzung belegt, dass alle 56+ Tests im `contextra-checkpoint`-Crate (Unit, Async, Hardlink, Crash, Determinismus) zu 100% grün sind (`56 passed; 0 failed`). Die Unmutated Baseline schlägt somit NICHT fehl; "0 gefangen" war ein reines Artefakt fehlerhafter Tool-Invocation in CI.
+
 ---
 
 ## Messergebnisse nach Garantie-Gruppen

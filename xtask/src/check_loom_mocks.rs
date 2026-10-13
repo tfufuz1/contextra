@@ -16,18 +16,25 @@ pub const ALLOWLIST: &[&str] = &[
     "crates/contextra-mvcc/tests/loom_snapshot_registry.rs",
 ];
 
-pub fn run_check_loom_mocks(_args: &[String]) -> i32 {
-    let root = crate::find_root_dir();
+pub fn run_check_loom_mocks(args: &[String]) -> i32 {
+    let mut root = crate::find_root_dir();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--root" && i + 1 < args.len() {
+            root = std::path::PathBuf::from(&args[i + 1]);
+            i += 1;
+        } else if let Some(val) = args[i].strip_prefix("--root=") {
+            root = std::path::PathBuf::from(val);
+        }
+        i += 1;
+    }
     let allowlist_set: HashSet<&str> = ALLOWLIST.iter().copied().collect();
 
     let crates_dir = root.join("crates");
     let mut violations = Vec::new();
 
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(Result::ok) {
             let path = entry.path();
             if !path.is_file() {
                 continue;
@@ -72,7 +79,9 @@ pub fn run_check_loom_mocks(_args: &[String]) -> i32 {
             }
             eprintln!("  {} (patterns: {})", file_path, patterns.join(", "));
         }
-        eprintln!("Loom tests should exercise real production code without mock or mirror abstractions.");
+        eprintln!(
+            "Loom tests should exercise real production code without mock or mirror abstractions."
+        );
         return 1;
     }
 

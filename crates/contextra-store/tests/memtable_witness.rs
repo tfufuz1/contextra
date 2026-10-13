@@ -283,7 +283,9 @@ async fn test_h_witness_before_force_flush_fails() {
     );
     let err_msg = res_before.unwrap_err().to_string();
     assert!(
-        err_msg.contains("before force_flush") || err_msg.contains("unflushed") || err_msg.contains("INV-DELETION-1"),
+        err_msg.contains("before force_flush")
+            || err_msg.contains("unflushed")
+            || err_msg.contains("INV-DELETION-1"),
         "Error message must indicate unflushed residue or pre-flush rejection: {}",
         err_msg
     );

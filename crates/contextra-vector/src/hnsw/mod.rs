@@ -10,8 +10,10 @@ pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
 pub mod durable_fs;
+pub mod residue_scan;
 pub mod sq8_bias;
 pub mod verify;
+pub mod witness;
 
 mod acorn_filtered;
 mod batch;
@@ -34,6 +36,7 @@ pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
 pub use durable_fs::{atomic_replace, durable_remove};
+pub use residue_scan::{ResDepth, ResHnswEvidence};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,

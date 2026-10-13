@@ -265,13 +265,18 @@ impl DstEngine {
         key: &[u8],
         value: &[u8],
     ) -> Vec<u8> {
+        let key_len = u32::try_from(key.len()).unwrap_or(u32::MAX);
+        let val_len = u32::try_from(value.len()).unwrap_or(u32::MAX);
+
         let mut buf = Vec::with_capacity(1 + 8 + 8 + 4 + key.len() + 4 + value.len() + 4);
         buf.push(tag);
         buf.extend_from_slice(&seq_no.to_le_bytes());
         buf.extend_from_slice(&prev_hash.to_le_bytes());
-        buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+        let k_len = u32::try_from(key.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&k_len.to_le_bytes());
         buf.extend_from_slice(key);
-        buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        let v_len = u32::try_from(value.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&v_len.to_le_bytes());
         buf.extend_from_slice(value);
 
         let checksum = fnv1a_32(&buf);

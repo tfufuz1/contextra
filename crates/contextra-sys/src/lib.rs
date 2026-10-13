@@ -4,6 +4,7 @@
 
 pub mod acl_win32;
 pub mod durability;
+pub mod env_observe;
 pub mod mlock;
 pub mod mmap;
 pub mod posix;
@@ -14,6 +15,7 @@ pub use durability::{
     flush_dir, flush_file, fs_class, rename_durable, FlushKind, FsClass, OsSyscallBackend,
     SyscallBackend,
 };
+pub use env_observe::*;
 pub use mlock::{mem_lock, mem_unlock};
 pub use mmap::mmap_readonly;
 pub use posix::reopen_and_dup2;

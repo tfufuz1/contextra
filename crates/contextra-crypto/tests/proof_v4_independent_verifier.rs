@@ -222,6 +222,68 @@ fn independent_verify_proof_v4(
     Ok(vk.verify(&signed_msg, &sig).is_ok())
 }
 
+#[test]
+fn test_canonicalization_non_ambiguity_and_field_distinction() {
+    let signer = ProofKeyPairSigner::from_secret_bytes([42u8; 32]);
+    let scope = DeletionScope::Document {
+        doc_id: DocId(1),
+        tenant_id: TenantId::try_new(1).unwrap(),
+    };
+
+    let base_proof = ProofBuilder::new(scope, "db-canonical-test")
+        .with_deleted_after_tx(100)
+        .with_deleted_keys_hash([0x01; 32])
+        .finish(&signer)
+        .unwrap();
+
+    let bytes_base = base_proof.signed_bytes();
+
+    // 1. Storage scope variation
+    let p_storage = ProofBuilder::new(
+        DeletionScope::Document {
+            doc_id: DocId(1),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        },
+        "db-canonical-test",
+    )
+    .with_deleted_after_tx(100)
+    .with_deleted_keys_hash([0x01; 32])
+    .with_storage_scope("different_storage_scope")
+    .finish(&signer)
+    .unwrap();
+    assert_ne!(bytes_base, p_storage.signed_bytes());
+
+    // 2. Stage variation
+    let p_stage = ProofBuilder::new(
+        DeletionScope::Document {
+            doc_id: DocId(1),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        },
+        "db-canonical-test",
+    )
+    .with_stage(1)
+    .with_deleted_after_tx(100)
+    .with_deleted_keys_hash([0x01; 32])
+    .finish(&signer)
+    .unwrap();
+    assert_ne!(bytes_base, p_stage.signed_bytes());
+
+    // 3. Observed empty flag variation
+    let p_empty = ProofBuilder::new(
+        DeletionScope::Document {
+            doc_id: DocId(1),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        },
+        "db-canonical-test",
+    )
+    .with_deleted_after_tx(100)
+    .with_deleted_keys_hash([0x01; 32])
+    .with_observed_empty(true)
+    .finish(&signer)
+    .unwrap();
+    assert_ne!(bytes_base, p_empty.signed_bytes());
+}
+
 fn create_test_vector_files(dir: &Path) {
     fs::create_dir_all(dir).unwrap();
 
@@ -273,7 +335,7 @@ fn create_test_vector_files(dir: &Path) {
 
 #[test]
 fn test_independent_verifier_matches_crate_verifier_on_all_vectors() {
-    let vector_dir = Path::new("crates/contextra-crypto/tests/vectors/v4");
+    let vector_dir = Path::new("docs/deletion/vectors");
     create_test_vector_files(vector_dir);
 
     let signer = ProofKeyPairSigner::from_secret_bytes([42u8; 32]);

@@ -72,7 +72,11 @@ fn main() {
     let mut available_cmds: Vec<&str> = COMMAND_DISPATCH_TABLE
         .iter()
         .map(|(name, _)| *name)
-        .chain(xtask::harness::registered_commands().iter().map(|(n, _)| *n))
+        .chain(
+            xtask::harness::registered_commands()
+                .iter()
+                .map(|(n, _)| *n),
+        )
         .collect();
     available_cmds.sort_unstable();
     available_cmds.dedup();

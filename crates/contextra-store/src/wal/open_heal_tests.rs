@@ -72,10 +72,8 @@ async fn test_key_derivation_vector_hkdf_vs_argon2id() -> Result<()> {
     let km_legacy = KeyManager::try_new(passphrase, salt)?;
     let key_legacy = km_legacy.integrity_key()?;
 
-    let header = contextra_crypto::KdfHeader::new(
-        contextra_crypto::KdfParams::default(),
-        salt.to_vec(),
-    )?;
+    let header =
+        contextra_crypto::KdfHeader::new(contextra_crypto::KdfParams::default(), salt.to_vec())?;
     let km_strict = KeyManager::try_new_strict(passphrase, &header)?;
     let key_strict = km_strict.integrity_key()?;
 

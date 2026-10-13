@@ -3,6 +3,7 @@ use contextra_crypto::CchSecureBuf;
 use lru::LruCache;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use zeroize::Zeroize;
 
 /// Sharded block cache: 64 independent shards to reduce contention.
 /// Shard selection uses ahash tuple hashing on (file_id, offset).

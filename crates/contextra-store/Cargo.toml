@@ -21,7 +21,7 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [features]
-default = ["wal-integrity"]
+default = ["wal-integrity", "block-cache-v2"]
 encryption-at-rest = ["wal-integrity"]
 wal-integrity = []
 wal-v4-wip = []
@@ -47,6 +47,7 @@ blake3 = { workspace = true }
 crc32fast = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }

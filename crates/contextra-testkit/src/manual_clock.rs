@@ -55,7 +55,7 @@ impl ManualClock {
 
     /// Returns the current timestamp as a `SystemTime`.
     pub fn now_system_time(&self) -> SystemTime {
-        UNIX_EPOCH + Duration::from_nanos((self.now_secs_f64() * 1_000_000_000.0) as u64)
+        UNIX_EPOCH + Duration::from_nanos(self.now_nanos())
     }
 }
 

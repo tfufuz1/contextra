@@ -1,0 +1,26 @@
+# Task-Karte: Ledger in Replay und Recovery
+id        = "T-2026-9204"
+title     = "Ledger in Replay und Recovery"
+crate     = "contextra-store"
+tier      = 1
+risk      = "crash"
+goal      = "Integration des ErasureLedger in WAL-Replay und LsmStorage-Recovery (INV-D3)"
+non_goals = ["Refactoring von compaction/*", "Änderung des Manifest-Formats"]
+scope     = [
+  "crates/contextra-store/src/erasure_ledger/**",
+  "crates/contextra-store/src/wal/**",
+  "crates/contextra-store/src/lsm/**",
+  "crates/contextra-store/tests/**"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed", "INV-D3"]
+acceptance = [
+  "cargo test -p contextra-store",
+  "cargo xtask jules check"
+]
+evidence_required = ["Integrationstests für Replay, Recovery, Rollback und WAL-Truncation"]
+
+[budget]
+files = 14
+lines = 1000
+iterations = 12

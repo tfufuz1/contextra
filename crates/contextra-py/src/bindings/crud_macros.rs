@@ -170,6 +170,7 @@ macro_rules! contextra_crud_methods {
                         results: Some(results_vec_off),
                         total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),
                         processing_time_ms: 0.0,
+                        version: 1,
                     },
                 );
 
@@ -293,6 +294,7 @@ macro_rules! contextra_crud_methods {
                         results: Some(results_vec_off),
                         total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),
                         processing_time_ms: 0.0,
+                        version: 1,
                     },
                 );
 

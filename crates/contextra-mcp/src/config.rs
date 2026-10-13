@@ -15,6 +15,76 @@ use std::sync::{Arc, Once};
 static EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 
+/// Resolves the encryption-at-rest passphrase for MCP database initialization.
+///
+/// # Default Behavior
+/// Encryption at rest is **active by default**.
+/// 1. Checks `CONTEXTRA_ENCRYPTION_PASSPHRASE` or `CONTEXTRA_PASSPHRASE` environment variables.
+/// 2. If CLI args contain `--disable-encryption-at-rest` or `CONTEXTRA_DISABLE_ENCRYPTION=1`,
+///    encryption at rest is explicitly disabled and a loud warning log is emitted.
+/// 3. Otherwise, generates or loads a persistent 256-bit passphrase keyfile (`.contextra_master.key`)
+///    located inside `db_path`.
+pub fn resolve_mcp_encryption_config(
+    db_path: &Path,
+    cli_args: &[String],
+) -> (Option<String>, bool) {
+    let disabled_by_flag = cli_args.iter().any(|a| a == "--disable-encryption-at-rest");
+    let disabled_by_env = std::env::var("CONTEXTRA_DISABLE_ENCRYPTION")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if disabled_by_flag || disabled_by_env {
+        tracing::warn!(
+            "SECURITY WARNING: Encryption at rest has been explicitly disabled via opt-out flag (--disable-encryption-at-rest / CONTEXTRA_DISABLE_ENCRYPTION). Stored database segments and WAL files are UNENCRYPTED!"
+        );
+        return (None, true);
+    }
+
+    let env_passphrase = std::env::var("CONTEXTRA_ENCRYPTION_PASSPHRASE")
+        .ok()
+        .or_else(|| std::env::var("CONTEXTRA_PASSPHRASE").ok())
+        .filter(|p| !p.trim().is_empty());
+
+    if let Some(p) = env_passphrase {
+        return (Some(p), false);
+    }
+
+    // Auto-generate or load persistent master key file in db_path
+    let key_file = db_path.join(".contextra_master.key");
+    if key_file.exists() {
+        if let Ok(key_hex) = std::fs::read_to_string(&key_file) {
+            let clean = key_hex.trim().to_string();
+            if !clean.is_empty() {
+                return (Some(clean), false);
+            }
+        }
+    }
+
+    // Generate fresh key
+    if !db_path.exists() {
+        let _ = std::fs::create_dir_all(db_path);
+    }
+
+    use rand::RngCore;
+    let mut key_bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut key_bytes);
+    let key_hex = hex_encode(key_bytes);
+
+    if let Err(e) = std::fs::write(&key_file, &key_hex) {
+        tracing::warn!(
+            error = %e,
+            "Failed to save auto-generated master key file at {}",
+            key_file.display()
+        );
+    }
+
+    (Some(key_hex), false)
+}
+
+fn hex_encode(bytes: [u8; 32]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
 /// Ergebnis der Provider-Einstellung-Auflösung.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ResolvedProviderSetting {
@@ -44,6 +114,25 @@ pub(crate) fn resolve_provider_setting(
             value: default_val.to_string(),
             used_unprefixed_fallback: false,
         },
+    }
+}
+
+/// Cloud Query configuration settings.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct CloudQueryConfig {
+    /// Explicit opt-in flag required to enable `contextra_cloud_query`.
+    pub enable_cloud_query: bool,
+}
+
+impl CloudQueryConfig {
+    /// Loads configuration from environment variables with fallbacks.
+    pub fn from_env() -> Self {
+        let enable = std::env::var("CONTEXTRA_ENABLE_CLOUD_QUERY")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        Self {
+            enable_cloud_query: enable,
+        }
     }
 }
 
@@ -141,18 +230,25 @@ impl EmbeddingConfig {
     pub fn build_provider(&self) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
         let trimmed_provider = self.provider.trim();
         if trimmed_provider.is_empty() {
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+            #[cfg(feature = "test-utils")]
             let msg = "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string();
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+            #[cfg(not(feature = "test-utils"))]
             let msg = "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx' oder 'candle' setzen.".to_string();
             return Err(ContextraError::InvalidInput(msg));
         }
 
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+        #[cfg(feature = "test-utils")]
         if trimmed_provider.eq_ignore_ascii_case("mock") {
             tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             return Ok(Arc::new(embedder));
+        }
+
+        #[cfg(not(feature = "test-utils"))]
+        if trimmed_provider.eq_ignore_ascii_case("mock") {
+            return Err(ContextraError::InvalidInput(
+                "Embedding-Provider 'mock' ist ohne feature 'test-utils' deaktiviert".to_string(),
+            ));
         }
 
         let mut backend = EmbeddingBackend::from_str(trimmed_provider)?;
@@ -253,13 +349,13 @@ pub fn create_embedding_provider(
             capability: "candle embedding backend".to_string(),
             reason: "contextra-mcp was built without the 'candle' feature".to_string(),
         }),
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+        #[cfg(feature = "test-utils")]
         EmbeddingBackend::None => {
             tracing::warn!("Embedding-Provider 'mock' / 'none' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+        #[cfg(not(feature = "test-utils"))]
         EmbeddingBackend::None => Err(ContextraError::InvalidInput(
             "Kein Embedding-Backend konfiguriert".to_string(),
         )),
@@ -387,12 +483,12 @@ pub fn create_llm_text_generator(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+        #[cfg(feature = "test-utils")]
         "mock" => {
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+        #[cfg(not(feature = "test-utils"))]
         "mock" => Err(ContextraError::InvalidInput(
             "LLM-Provider 'mock' ist in Release-Builds deaktiviert".to_string(),
         )),
@@ -585,6 +681,7 @@ mod tests {
         assert!(config.candle_model_dir.is_none());
     }
 
+    #[cfg(feature = "test-utils")]
     #[test]
     fn test_llm_config_build_generator() {
         let config = LlmConfig::default();
@@ -594,6 +691,7 @@ mod tests {
         assert!(response.contains("[Mock LLM response for: test prompt]"));
     }
 
+    #[cfg(feature = "test-utils")]
     #[test]
     fn test_create_embedding_provider_mock() {
         let provider = create_embedding_provider(&EmbeddingBackend::None).unwrap();
@@ -622,6 +720,7 @@ mod tests {
         assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
     }
 
+    #[cfg(feature = "test-utils")]
     #[test]
     fn test_create_llm_generator_mock() {
         let generator =
