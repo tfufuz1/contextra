@@ -190,3 +190,29 @@ fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
         .windows(needle.len())
         .any(|window| window == needle)
 }
+
+/// Standalone facade to collect witnesses from real SSTables for Engine Prompt W2-03.
+pub fn collect_witnesses(
+    data_dir: &std::path::Path,
+    live_files: Vec<std::path::PathBuf>,
+    manifest_generation: u64,
+    as_of_tx: u64,
+    explicit_keys: Vec<Vec<u8>>,
+    prefixes: Vec<Vec<u8>>,
+    key_manager: Option<Arc<KeyManager>>,
+) -> Result<SstScanEvidence, WitnessReadError> {
+    let scope = SstScopeSpec {
+        explicit: explicit_keys,
+        prefixes,
+    };
+    let inputs = SstScanInputs {
+        data_dirs: vec![data_dir.to_path_buf()],
+        live_files,
+        pending_delete_files: Vec::new(),
+        manifest_generation,
+        as_of_tx,
+        depth: 1,
+    };
+
+    scan_sstables(&scope, &inputs, key_manager, || manifest_generation)
+}

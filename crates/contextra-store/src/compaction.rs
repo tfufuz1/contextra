@@ -6,6 +6,7 @@ mod engine;
 pub mod merge_operator;
 pub mod purge_filter;
 pub mod retention;
+pub mod wiring;
 
 #[cfg(test)]
 mod tests;
@@ -15,6 +16,7 @@ pub use config::*;
 pub use engine::*;
 pub use merge_operator::*;
 pub use retention::*;
+pub use wiring::*;
 
 /// Removed TTL feature stub per Decision Option B.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
