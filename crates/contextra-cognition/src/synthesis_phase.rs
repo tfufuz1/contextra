@@ -9,12 +9,14 @@ use contextra_ports::SegmentSynthesizer;
 use contextra_types::DocId;
 
 /// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SegmentSynthesisResult {
     /// Neu synthetisierte Chunks (einer pro konsolidiertem Segment).
     pub synthesized_chunks: Vec<SynthesizedChunk>,
     /// Anzahl der Segmente, für die keine Synthese möglich war (LLM-Fehler / zu kurz).
     pub skipped_segments: usize,
+    /// Detaillierte Fehlermeldungen fehlgeschlagener Segment-Synthesen.
+    pub errors: Vec<String>,
 }
 
 #[deprecated(note = "use SegmentSynthesisResult")]
@@ -41,7 +43,6 @@ pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
 /// # Fehlerverhalten
 /// Einzelne Segment-Fehler werden übersprungen (`skipped_segments` inkrementiert),
 /// nie als Err propagiert. Globale Fehler (Trait-Fehler im Setup) propagieren als Err.
-// TODO(contextra-plan): Generative synthesis pass execution on segment level with synthesizer trait abstraction. [ref:eigenbau-consolidation-pass]
 pub async fn run_synthesis_pass(
     segments: &[TurnSegment],
     segment_texts: &[Vec<String>], // Texte der Turns pro Segment
@@ -50,6 +51,7 @@ pub async fn run_synthesis_pass(
 ) -> SegmentSynthesisResult {
     let mut synthesized_chunks = Vec::new();
     let mut skipped_segments = 0;
+    let mut errors = Vec::new();
 
     for (i, segment) in segments.iter().enumerate() {
         if segment.turn_ids.len() < min_turns_for_synthesis {
@@ -81,12 +83,14 @@ pub async fn run_synthesis_pass(
                 });
             }
             Err(e) => {
+                let err_msg = format!("Segment {i} synthesis failed: {e}");
                 tracing::warn!(
                     segment_idx = i,
                     error = %e,
                     "Generative synthesis pass segment synthesis failed; skipping segment"
                 );
                 skipped_segments += 1;
+                errors.push(err_msg);
             }
         }
     }
@@ -94,6 +98,7 @@ pub async fn run_synthesis_pass(
     SegmentSynthesisResult {
         synthesized_chunks,
         skipped_segments,
+        errors,
     }
 }
 
@@ -180,6 +185,64 @@ mod tests {
 
         assert_eq!(res.synthesized_chunks.len(), 0);
         assert_eq!(res.skipped_segments, 1);
+    }
+
+    #[tokio::test]
+    async fn test_synthesis_pass_segment_2_failure_captures_error() {
+        struct MockSegment2FailingSynthesizer {
+            model: String,
+        }
+
+        impl SegmentSynthesizer for MockSegment2FailingSynthesizer {
+            fn synthesize_segment<'a>(
+                &'a self,
+                segment_texts: &'a [&'a str],
+            ) -> BoxFuture<'a, Result<String>> {
+                Box::pin(async move {
+                    if segment_texts.iter().any(|t| t.contains("segment_2")) {
+                        Err(contextra_types::ContextraError::Internal(
+                            "Segment 2 failed synthesis".into(),
+                        ))
+                    } else {
+                        Ok(format!("Synthesized: {}", segment_texts.join(" + ")))
+                    }
+                })
+            }
+
+            fn model_id(&self) -> &str {
+                &self.model
+            }
+        }
+
+        let synthesizer = MockSegment2FailingSynthesizer {
+            model: "test-model".to_string(),
+        };
+
+        let seg1 = TurnSegment {
+            turn_ids: vec![DocId::new(1), DocId::new(2), DocId::new(3)],
+            representative_embedding: vec![1.0, 0.0],
+        };
+        let seg2 = TurnSegment {
+            turn_ids: vec![DocId::new(4), DocId::new(5), DocId::new(6)],
+            representative_embedding: vec![0.0, 1.0],
+        };
+
+        let texts = vec![
+            vec!["seg1_turn1".into(), "seg1_turn2".into(), "seg1_turn3".into()],
+            vec![
+                "segment_2_turn1".into(),
+                "segment_2_turn2".into(),
+                "segment_2_turn3".into(),
+            ],
+        ];
+
+        let res = run_synthesis_pass(&[seg1, seg2], &texts, &synthesizer, 3).await;
+
+        assert_eq!(res.synthesized_chunks.len(), 1);
+        assert_eq!(res.skipped_segments, 1);
+        assert_eq!(res.errors.len(), 1);
+        assert!(res.errors[0].contains("Segment 1 synthesis failed"));
+        assert!(res.errors[0].contains("Segment 2 failed synthesis"));
     }
 
     #[tokio::test]
