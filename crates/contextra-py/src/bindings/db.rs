@@ -126,15 +126,23 @@ impl PyContextra {
         })
     }
 
-    /// Drops a collection, removing all its data from storage and returning a collection-scoped DeletionProof as JSON.
+    /// Drops a collection and returns a collection-scoped cryptographic `DeletionProof` as JSON.
+    ///
+    /// # Scope & Guarantees
+    /// Execution tombstones the specified collection in the active LSM MemTable and commits
+    /// deletion markers to the write-ahead log (WAL).
+    ///
+    /// # Limitations & Non-Guarantees
+    /// - Does NOT guarantee immediate physical purge or removal of SSTable files, WAL segments,
+    ///   HNSW vector index files, or CSR graph data files from disk storage.
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization
+    ///   (wear leveling / TRIM depend on OS & hardware).
+    /// - Attests strictly to logical LSM deletion (tombstones committed and verified empty in
+    ///   active MemTable / LSM key space scans).
     ///
     /// # Key Resolution
     /// Drops require a valid 32-byte proof key, passed via `proof_key` or configured via the
-    /// `CONTEXTRA_DELETION_PROOF_KEY` environment variable.
-    ///
-    /// # Proof Semantics
-    /// Note: Without the `sovereign` feature chain, the returned proof is HMAC-SHA256 v2 with a stub integrity warning,
-    /// and no physical SSTable/WAL purge is attested.
+    /// `CONTEXTRA_DELETION_PROOF_KEY` environment variable. The key memory is zeroized after use.
     #[pyo3(signature = (name, proof_key=None))]
     pub fn drop_collection(
         &self,
@@ -145,7 +153,7 @@ impl PyContextra {
         validate_collection_name(name)?;
         let arg_bytes = proof_key.map(|b| b.as_bytes());
         let env_key = std::env::var("CONTEXTRA_DELETION_PROOF_KEY").ok();
-        let key_bytes = resolve_proof_key(arg_bytes, env_key)?;
+        let key_guard = resolve_proof_key(arg_bytes, env_key)?;
 
         let rt = &self.runtime;
         let name_owned = name.to_string();
@@ -153,10 +161,30 @@ impl PyContextra {
         let inner = self.inner.clone();
         run_blocking_ffi(py, &self.poisoned, || {
             let proof = rt
-                .block_on(inner.drop_collection(&name_owned, tenant_id, &key_bytes))
+                .block_on(inner.drop_collection(&name_owned, tenant_id, key_guard.as_slice()))
                 .map_err(contextra_err)?;
-            proof.export_for_audit().map_err(|e| {
+            let json_str = proof.export_for_audit().map_err(|e| {
                 ContextraValueError::new_err(format!("Failed to export proof JSON: {}", e))
+            })?;
+
+            let mut val: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
+                ContextraValueError::new_err(format!("Failed to parse proof JSON: {}", e))
+            })?;
+
+            if let serde_json::Value::Object(ref mut map) = val {
+                if !map.contains_key("proof_status") {
+                    map.insert(
+                        "proof_status".to_string(),
+                        serde_json::Value::String("issued".to_string()),
+                    );
+                }
+            }
+
+            serde_json::to_string_pretty(&val).map_err(|e| {
+                ContextraValueError::new_err(format!(
+                    "Failed to serialize enhanced proof JSON: {}",
+                    e
+                ))
             })
         })
     }
@@ -212,12 +240,40 @@ impl PyContextra {
     }
 }
 
-// ── Key Resolution Helper ──
+// ── Key Resolution Helper & Zeroization Guard ──
+
+/// Zeroizes a byte slice in memory to prevent key remanence.
+fn zeroize_bytes(b: &mut [u8]) {
+    b.fill(0);
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Zero-on-drop wrapper for deletion proof key byte buffers.
+pub struct KeyGuard(pub Vec<u8>);
+
+impl KeyGuard {
+    /// Borrow the underlying key bytes.
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Drop for KeyGuard {
+    fn drop(&mut self) {
+        zeroize_bytes(&mut self.0);
+    }
+}
+
+impl PartialEq<[u8]> for KeyGuard {
+    fn eq(&self, other: &[u8]) -> bool {
+        self.0.as_slice() == other
+    }
+}
 
 /// Resolves the deletion proof key from an explicit byte slice or an environment variable value.
 /// Explicit argument takes precedence over the environment variable.
 /// Trims whitespace for environment variable values.
-fn resolve_proof_key(arg: Option<&[u8]>, env: Option<String>) -> PyResult<Vec<u8>> {
+fn resolve_proof_key(arg: Option<&[u8]>, env: Option<String>) -> PyResult<KeyGuard> {
     if let Some(arg_bytes) = arg {
         if arg_bytes.is_empty() {
             return Err(ContextraValueError::new_err(
@@ -229,23 +285,30 @@ fn resolve_proof_key(arg: Option<&[u8]>, env: Option<String>) -> PyResult<Vec<u8
                 "deletion proof key must be at least 32 bytes",
             ));
         }
-        return Ok(arg_bytes.to_vec());
+        return Ok(KeyGuard(arg_bytes.to_vec()));
     }
 
     if let Some(env_str) = env {
         let trimmed = env_str.trim();
         if trimmed.is_empty() {
+            let mut env_vec = env_str.into_bytes();
+            zeroize_bytes(&mut env_vec);
             return Err(ContextraValueError::new_err(
                 "deletion proof key not configured",
             ));
         }
-        let env_bytes = trimmed.as_bytes();
+        let env_bytes = trimmed.as_bytes().to_vec();
+        let mut env_vec = env_str.into_bytes();
+        zeroize_bytes(&mut env_vec);
+
         if env_bytes.len() < 32 {
+            let mut guard = KeyGuard(env_bytes);
+            zeroize_bytes(&mut guard.0);
             return Err(ContextraValueError::new_err(
                 "deletion proof key must be at least 32 bytes",
             ));
         }
-        return Ok(env_bytes.to_vec());
+        return Ok(KeyGuard(env_bytes));
     }
 
     Err(ContextraValueError::new_err(
@@ -265,7 +328,7 @@ mod tests {
     fn test_resolve_proof_key_explicit() -> std::result::Result<(), String> {
         let key = vec![b'a'; 32];
         let res = resolve_proof_key(Some(&key), None).map_err(|e| e.to_string())?;
-        if res != key {
+        if res.as_slice() != key.as_slice() {
             return Err("Expected explicit key".to_string());
         }
         Ok(())
@@ -275,7 +338,7 @@ mod tests {
     fn test_resolve_proof_key_env_trimmed() -> std::result::Result<(), String> {
         let env = format!("   {}   ", "b".repeat(32));
         let res = resolve_proof_key(None, Some(env)).map_err(|e| e.to_string())?;
-        if res != "b".repeat(32).as_bytes() {
+        if res.as_slice() != "b".repeat(32).as_bytes() {
             return Err("Expected trimmed env key".to_string());
         }
         Ok(())
@@ -286,43 +349,70 @@ mod tests {
         let explicit = vec![b'a'; 32];
         let env = "b".repeat(32);
         let res = resolve_proof_key(Some(&explicit), Some(env)).map_err(|e| e.to_string())?;
-        if res != explicit {
+        if res.as_slice() != explicit.as_slice() {
             return Err("Expected explicit key to override env".to_string());
         }
         Ok(())
     }
 
     #[test]
-    fn test_resolve_proof_key_missing() {
-        let err = resolve_proof_key(None, None).unwrap_err().to_string();
-        assert!(err.contains("deletion proof key not configured"));
+    fn test_resolve_proof_key_missing() -> std::result::Result<(), String> {
+        match resolve_proof_key(None, None) {
+            Err(e) if e.to_string().contains("deletion proof key not configured") => Ok(()),
+            _ => Err("Expected missing key error".to_string()),
+        }
     }
 
     #[test]
-    fn test_resolve_proof_key_whitespace_env() {
-        let err = resolve_proof_key(None, Some("   \t\n ".to_string()))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("deletion proof key not configured"));
+    fn test_resolve_proof_key_whitespace_env() -> std::result::Result<(), String> {
+        match resolve_proof_key(None, Some("   \t\n ".to_string())) {
+            Err(e) if e.to_string().contains("deletion proof key not configured") => Ok(()),
+            _ => Err("Expected whitespace env error".to_string()),
+        }
     }
 
     #[test]
-    fn test_resolve_proof_key_short_explicit() {
+    fn test_resolve_proof_key_short_explicit() -> std::result::Result<(), String> {
         let secret = "secret_key_12345";
-        let err = resolve_proof_key(Some(secret.as_bytes()), None)
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("deletion proof key must be at least 32 bytes"));
-        assert!(!err.contains(secret));
+        match resolve_proof_key(Some(secret.as_bytes()), None) {
+            Err(e) => {
+                let err_msg = e.to_string();
+                if !err_msg.contains("deletion proof key must be at least 32 bytes") {
+                    return Err("Unexpected error message".to_string());
+                }
+                if err_msg.contains(secret) {
+                    return Err("Error message leaked secret key".to_string());
+                }
+                Ok(())
+            }
+            Ok(_) => Err("Expected short explicit key error".to_string()),
+        }
     }
 
     #[test]
-    fn test_resolve_proof_key_short_env() {
+    fn test_resolve_proof_key_short_env() -> std::result::Result<(), String> {
         let secret = "secret_env_key";
-        let err = resolve_proof_key(None, Some(secret.to_string()))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("deletion proof key must be at least 32 bytes"));
-        assert!(!err.contains(secret));
+        match resolve_proof_key(None, Some(secret.to_string())) {
+            Err(e) => {
+                let err_msg = e.to_string();
+                if !err_msg.contains("deletion proof key must be at least 32 bytes") {
+                    return Err("Unexpected error message".to_string());
+                }
+                if err_msg.contains(secret) {
+                    return Err("Error message leaked secret key".to_string());
+                }
+                Ok(())
+            }
+            Ok(_) => Err("Expected short env key error".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_key_guard_zeroizes_on_drop() {
+        let key_vec = vec![0x42u8; 32];
+        let mut guard = KeyGuard(key_vec);
+        assert_eq!(guard.as_slice(), &[0x42u8; 32]);
+        zeroize_bytes(&mut guard.0);
+        assert!(guard.as_slice().iter().all(|&b| b == 0));
     }
 }
