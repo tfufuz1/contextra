@@ -1,6 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: KmsProvider-Trait, LocalKmsProvider und typestate-gesicherter Shredding-Löschbeleg (INV-KMS-1, INV-SHRED-1).
 // INVARIANTEN: Trait KmsProvider (generate, derive, wrap, unwrap, destroy). Receipt nur aus DestroyedKey erzeugbar.
+// Fail-Closed bei Registry-Fehlern im Widerruf (Zwei-Phasen-Modell).
 
 //! Key Management Service (KMS) Abstraktion und lokaler Provider.
 
@@ -13,6 +14,20 @@ use crate::kv_shredding::KeyRegistry;
 use crate::revocation_log::{RevocationLog, RevocationTarget};
 use std::sync::Arc;
 use zeroize::ZeroizeOnDrop;
+
+/// Status des Schlüsselwiderrufs im Zwei-Phasen-Modell.
+///
+/// Zwei-Phasen-Semantik:
+/// 1. Phase 1 (Anforderungszeitpunkt): Dauerhafte Protokollierung im `RevocationLog`. Ab diesem Zeitpunkt gilt der Schlüssel logisch als widerrufen.
+/// 2. Phase 2 (Vernichtungszeitpunkt): Zeroization des Schlüsselmaterials in der `KeyRegistry` / RAM.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyRevocationStatus {
+    /// Phase 1 und Phase 2 erfolgreich abgeschlossen (Widerruf protokolliert und RAM-Kopien zeroized).
+    RevokedAndZeroized,
+    /// Phase 1 erfolgreich protokolliert, aber Phase 2 (Registry-Vernichtung/Zeroization) ist fehlgeschlagen.
+    /// Der Schlüssel gilt weiter als widerrufen (fail-closed), es darf jedoch kein Löschbeleg erzeugt werden.
+    RevokedLoggedZeroizeFailed,
+}
 
 /// KmsProvider Trait nach Spec §20.2 (INV-KMS-1).
 pub trait KmsProvider: Send + Sync {
@@ -46,7 +61,7 @@ impl DestroyedKey {
     }
 }
 
-/// Krypografischer Löschbeleg.
+/// Kryptografischer Löschbeleg.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeletionReceipt {
     pub key_id: String,
@@ -116,15 +131,34 @@ impl KmsProvider for LocalKmsProvider {
     fn destroy_key(&self, key_id: &str) -> Result<DestroyedKey> {
         let now = self.clock.now_unix_nanos();
 
-        // 1. Permanently revoke record / key in KeyRegistry and zeroize RAM copies
-        if let Ok(id_u64) = key_id.parse::<u64>() {
-            let _ = self.registry.revoke_group(id_u64);
-        }
-
-        // 2. Append durable entry to RevocationLog before issuing receipt (INV-SHRED-1)
+        // 1. Phase 1 (Anforderungszeitpunkt): Dauerhafte Protokollierung im RevocationLog (INV-SHRED-1)
         self.revocation_log
             .append(RevocationTarget::Record(key_id.to_string()))
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+
+        // 2. Phase 2 (Vernichtungszeitpunkt): Permanent revoke record / key in KeyRegistry und zeroize RAM copies
+        let status = if let Ok(id_u64) = key_id.parse::<u64>() {
+            match self.registry.revoke_group(id_u64) {
+                Ok(_) => KeyRevocationStatus::RevokedAndZeroized,
+                Err(e) => {
+                    // Phase 1 ist protokolliert, aber Phase 2 (Zeroization in Registry) schlug fehl.
+                    // Das System bleibt fail-closed widerrufen, darf aber keinen Löschbeleg erzeugen.
+                    return Err(CryptoError::Crypto(format!(
+                        "Widerruf protokolliert ({:?}), Registry-Vernichtung fehlgeschlagen: {e}",
+                        KeyRevocationStatus::RevokedLoggedZeroizeFailed
+                    )));
+                }
+            }
+        } else {
+            KeyRevocationStatus::RevokedAndZeroized
+        };
+
+        if status != KeyRevocationStatus::RevokedAndZeroized {
+            return Err(CryptoError::Crypto(format!(
+                "Widerruf unvollständig: status={:?}",
+                KeyRevocationStatus::RevokedLoggedZeroizeFailed
+            )));
+        }
 
         Ok(DestroyedKey {
             key_id: key_id.to_string(),
