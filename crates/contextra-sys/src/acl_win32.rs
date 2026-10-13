@@ -321,6 +321,27 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_acl_stubs_or_execution() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("contextra_acl_test_{}.tmp", std::process::id()));
+        std::fs::write(&test_file, b"acl test")?;
+
+        let res_set = set_restrictive_file_acl(&test_file);
+        assert!(res_set.is_ok(), "set_restrictive_file_acl failed: {:?}", res_set);
+
+        let res_verify = verify_file_acl_owner_only(&test_file);
+        assert!(res_verify.is_ok(), "verify_file_acl_owner_only failed: {:?}", res_verify);
+
+        let _ = std::fs::remove_file(test_file);
+        Ok(())
+    }
+}
+
 #[cfg(not(windows))]
 pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     let _ = path;

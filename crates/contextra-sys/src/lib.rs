@@ -9,6 +9,9 @@ pub mod mlock;
 pub mod mmap;
 pub mod posix;
 pub mod vault;
+pub mod wiring;
+
+pub use wiring::SysWiring;
 
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use durability::{
