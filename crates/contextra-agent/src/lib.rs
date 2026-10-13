@@ -82,8 +82,10 @@ pub mod event_source;
 pub mod goal_condition;
 pub mod graph;
 pub mod step;
+pub mod wiring;
 
 pub use budget::{BudgetStrategy, Reservation, TokenBudget};
+pub use wiring::AgentWiring;
 pub use clm_scratchpad::{
     ClmScratchpad, ContextEditAuditSink, CountingContextEditAuditSink,
     CountingScratchpadCacheInvalidator, NoopContextEditAuditSink, NoopScratchpadCacheInvalidator,
