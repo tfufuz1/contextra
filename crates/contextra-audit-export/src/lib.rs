@@ -12,10 +12,12 @@ pub mod bsi_mapping;
 pub mod error;
 pub mod markdown_template;
 pub mod testkit;
+pub mod wiring;
 
 pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
 pub use error::AuditExportError;
 pub use markdown_template::{render_art30_register_markdown, render_register_markdown};
+pub use wiring::AuditExportWiring;
 
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
