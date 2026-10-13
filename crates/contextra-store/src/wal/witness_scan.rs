@@ -50,6 +50,7 @@ pub struct WalScanInputs {
     pub encrypted_mode: bool,
     pub timeout: Duration,
     pub scope: WalScopeSpec,
+    pub key_identifiers_claimed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +105,13 @@ pub enum WalFileType {
 
 pub fn classify_wal_filename(filename: &str) -> WalFileType {
     if filename.starts_with('.')
+        || filename == "MANIFEST"
+        || filename == "SALT"
+        || filename == "LOCK"
+        || filename.contains("ledger")
+        || filename == "purge.intent"
+        || filename == "pending_delete.journal"
+        || filename.ends_with(".sst")
         || filename.ends_with(".wal_integrity_key")
         || filename.ends_with(".rekeyed")
         || filename.ends_with(".uuid")
@@ -210,7 +218,7 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
                             }
                         }
                         WalOp::Delete { key, .. } => {
-                            if inputs.scope.matches_key(key) {
+                            if inputs.key_identifiers_claimed && inputs.scope.matches_key(key) {
                                 frames_matching_scope += 1;
                             }
                         }
@@ -231,9 +239,11 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
             let tail_len = file_len - last_logical_pos;
             if !inputs.encrypted_mode {
                 tail_bytes_raw_scanned += tail_len;
-                if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await {
-                    if inputs.scope.matches_raw_bytes(&tail_bytes) {
-                        frames_matching_scope += 1;
+                if inputs.key_identifiers_claimed {
+                    if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await {
+                        if inputs.scope.matches_raw_bytes(&tail_bytes) {
+                            frames_matching_scope += 1;
+                        }
                     }
                 }
             }

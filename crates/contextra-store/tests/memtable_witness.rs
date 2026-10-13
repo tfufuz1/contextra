@@ -322,7 +322,7 @@ async fn test_h_witness_before_force_flush_fails() {
     let sst_witness = storage
         .issue_layer_witness(DeletionLayer::SsTableAllLevels, &[key.clone()], &[], tx1)
         .await;
-    assert!(sst_witness.is_ok());
+    assert!(sst_witness.is_err());
 
     let wal_witness = storage
         .issue_layer_witness(
@@ -332,5 +332,5 @@ async fn test_h_witness_before_force_flush_fails() {
             tx1,
         )
         .await;
-    assert!(wal_witness.is_ok());
+    assert!(wal_witness.is_err());
 }

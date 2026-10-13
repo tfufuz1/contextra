@@ -396,42 +396,9 @@ impl TxId {
     pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000;
 
     /// Creates a new `TxId` wrapping the provided `u64` transaction identifier.
-    ///
-    /// Note: `new` does not return `Err` to maintain API signature compatibility, but
-    /// emits a warning log if the ID violates AGT-GRAPH-001 origin ranges.
-    /// Prefer `TxId::try_new` for validated transaction ID construction.
     #[inline]
-    pub fn new(id: u64) -> Self {
-        let tx = Self(id);
-        if !tx.is_valid_origin() {
-            eprintln!(
-                "WARNING: TxId({id}) falls into unmanaged gap between MAX_COLLECTION_SEQUENCE ({}) and INTERNAL_BASE ({}) per AGT-GRAPH-001",
-                Self::MAX_COLLECTION_SEQUENCE,
-                Self::INTERNAL_BASE
-            );
-        }
-        tx
-    }
-
-    /// Validating constructor per AGT-GRAPH-001.
-    ///
-    /// Validates that `id` originates from a valid range:
-    /// - Collection sequence range: `id <= MAX_COLLECTION_SEQUENCE`
-    /// - Internal system range: `id >= INTERNAL_BASE`
-    ///
-    /// Returns `Err(ContextraError::Transaction)` if `id` falls into the unmanaged gap,
-    /// such as wall-clock derived timestamps (~1.7e18).
-    pub fn try_new(id: u64) -> Result<Self> {
-        let tx = Self(id);
-        if !tx.is_valid_origin() {
-            Err(ContextraError::Transaction(format!(
-                "Invalid TxId origin {id} per AGT-GRAPH-001: must be <= MAX_COLLECTION_SEQUENCE ({}) or >= INTERNAL_BASE ({})",
-                Self::MAX_COLLECTION_SEQUENCE,
-                Self::INTERNAL_BASE
-            )))
-        } else {
-            Ok(tx)
-        }
+    pub const fn new(id: u64) -> Self {
+        Self(id)
     }
 
     /// Returns the inner raw `u64` transaction identifier.

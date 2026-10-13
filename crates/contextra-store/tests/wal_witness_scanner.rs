@@ -31,6 +31,7 @@ async fn test_scanner_control_clean_wal() -> Result<(), ContextraError> {
             key_prefixes: vec![b"target_scope_".to_vec()],
             raw_needles: vec![b"SECRET_MARKER".to_vec()],
         },
+        key_identifiers_claimed: false,
     };
 
     let evidence = scan_wal_directory(&inputs).await?;
@@ -78,6 +79,7 @@ async fn test_scanner_injection_line_14_sealed_segment_with_scope() -> Result<()
             key_prefixes: vec![b"target_scope_".to_vec()],
             raw_needles: vec![],
         },
+        key_identifiers_claimed: false,
     };
 
     let evidence = scan_wal_directory(&inputs).await?;
@@ -127,6 +129,7 @@ async fn test_scanner_injection_line_15_marker_behind_logical_eof_cleartext(
             key_prefixes: vec![],
             raw_needles: vec![b"RESIDUAL_SECRET_MARKER".to_vec()],
         },
+        key_identifiers_claimed: false,
     };
 
     let evidence = scan_wal_directory(&inputs).await?;
@@ -165,6 +168,7 @@ async fn test_scanner_injection_line_16_archived_segment_with_scope() -> Result<
             key_prefixes: vec![b"target_scope_".to_vec()],
             raw_needles: vec![],
         },
+        key_identifiers_claimed: false,
     };
 
     let evidence = scan_wal_directory(&inputs).await?;

@@ -1,17 +1,17 @@
 # Task-Karte Template
 # ID Format: T-YYYY-NNNN
 id        = "T-2026-9213"
-title     = "ProofIssuer v4"
-crate     = "contextra-crypto"
+title     = "Witness-Ausstellung mit Scan"
+crate     = "contextra-store"
 tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
 risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
 goal      = "Präzise Beschreibung des angestrebten Zielzustands"
 non_goals = ["Was explizit nicht getan werden soll", "Kein Refactoring fremder Module"]
-scope     = ["crates/contextra-crypto/src/**"]
+scope     = ["crates/contextra-store/src/**"]
 forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "Single Error Root"]
 acceptance = [
-  "cargo test -p contextra-crypto",
+  "cargo test -p contextra-store",
   "cargo xtask jules check"
 ]
 evidence_required = ["Neuer Test, der die Funktionalität absichert"]

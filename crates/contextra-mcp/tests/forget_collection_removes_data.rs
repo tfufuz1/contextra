@@ -164,9 +164,11 @@ async fn test_forget_collection_removes_data_inner() -> Result<(), Box<dyn std::
     };
     let forget_resp = server.handle(forget_req).await;
     let forget_val = serde_json::to_value(&forget_resp)?;
-    if forget_val["result"]["isError"] == true {
-        panic!("EXPECTED FAILURE / ROT: Document should be deleted after contextra_forget");
-    }
+    assert_ne!(
+        forget_val["result"]["isError"], true,
+        "forget failed: {:?}",
+        forget_val
+    );
 
     let forget_text = forget_val["result"]["content"][0]["text"]
         .as_str()

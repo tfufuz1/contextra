@@ -1,8 +1,6 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-11
 // ZWECK: Traits und Typen für Purge-Compaction Record Filter und Disk Space Probes.
-
-use std::path::PathBuf;
 
 /// Hook/Filter called during compaction to decide whether a record should be dropped.
 pub trait CompactionRecordFilter: Send + Sync {
@@ -58,14 +56,10 @@ pub enum PurgeBlocked {
     Unimplemented,
     /// Scan timeout occurred.
     ScanTimeout,
-    /// Free space probe returned None (unknown available space).
-    UnknownFreeSpace,
-    /// Memtable flush before purge failed.
-    FlushFailed(String),
 }
 
 /// Report summarizing results of a successful purge compaction.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PurgeReport {
     /// Number of records/versions dropped.
     pub records_purged: u64,
@@ -73,8 +67,4 @@ pub struct PurgeReport {
     pub bytes_reclaimed: u64,
     /// SSTable files removed/replaced.
     pub sstables_replaced: usize,
-    /// Obsolete SSTable file paths to be scheduled for secure deletion/purging.
-    pub obsolete_files: Vec<PathBuf>,
-    /// Newly written SSTable file paths.
-    pub files_written: Vec<PathBuf>,
 }

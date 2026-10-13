@@ -37,20 +37,20 @@ impl CchSecureBuf {
         self.inner.is_empty()
     }
 
-    /// Explicitly zeroizes the underlying buffer in memory.
-    pub fn zeroize(&mut self) {
-        self.inner.as_mut_slice().zeroize();
-    }
-
     /// Consumes `self` and returns the inner `Zeroizing<Vec<u8>>`.
     pub fn into_zeroizing(self) -> Zeroizing<Vec<u8>> {
         self.inner
+    }
+
+    /// Zeroes out the buffer memory in-place.
+    pub fn zeroize(&mut self) {
+        self.inner.as_mut_slice().zeroize();
     }
 }
 
 impl Zeroize for CchSecureBuf {
     fn zeroize(&mut self) {
-        CchSecureBuf::zeroize(self);
+        self.inner.as_mut_slice().zeroize();
     }
 }
 
