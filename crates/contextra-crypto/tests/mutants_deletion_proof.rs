@@ -70,7 +70,10 @@ fn test_kill_mutant_keys_zeroize_and_drop() {
 
     // Verify keypair generates non-zero bytes initially
     let original_bytes = keypair.signing_key().to_bytes();
-    assert_ne!(original_bytes, [0u8; 32], "Signing key bytes must not be all zeros initially");
+    assert_ne!(
+        original_bytes, [0u8; 32],
+        "Signing key bytes must not be all zeros initially"
+    );
 
     // Test explicit zeroize
     keypair.zeroize();
@@ -94,8 +97,14 @@ fn test_kill_mutant_keys_verifying_key_bytes() {
         keypair.verifying_key.to_bytes(),
         "verifying_key_bytes() must return exact verifying public key bytes"
     );
-    assert_ne!(bytes, [0u8; 32], "verifying_key_bytes must not be fixed dummy [0; 32]");
-    assert_ne!(bytes, [1u8; 32], "verifying_key_bytes must not be fixed dummy [1; 32]");
+    assert_ne!(
+        bytes, [0u8; 32],
+        "verifying_key_bytes must not be fixed dummy [0; 32]"
+    );
+    assert_ne!(
+        bytes, [1u8; 32],
+        "verifying_key_bytes must not be fixed dummy [1; 32]"
+    );
 }
 
 // Mutant Target 7, 8, 9:

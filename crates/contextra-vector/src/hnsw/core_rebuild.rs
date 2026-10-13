@@ -389,6 +389,9 @@ impl HnswIndexCore {
                         }
                     }
                 }
+                self.hot
+                    .arena
+                    .clear_node_connections(ram_idx, self.cold.config.m);
                 self.hot.arena.free_node(ram_idx);
             }
         }

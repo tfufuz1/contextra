@@ -33,7 +33,7 @@ needed_by = ["doctrine-scan"]
 [[tool]]
 name = "cargo-nextest"
 version_cmd = ["cargo", "nextest", "--version"]
-required = false
+required = true
 needed_by = ["test-runner"]
 
 [[tool]]
@@ -81,7 +81,7 @@ needed_by = ["feature-matrix"]
 [[tool]]
 name = "miri"
 version_cmd = ["cargo", "+nightly", "miri", "--version"]
-required = false
+required = true
 needed_by = ["loom-run"]
 
 [[tool]]

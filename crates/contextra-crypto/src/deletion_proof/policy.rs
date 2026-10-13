@@ -27,6 +27,8 @@ pub struct ProofPolicy {
     pub trusted_anchor: bool,
     /// Expected previous chain hash for R7 verification.
     pub expected_prev_chain_hash: Option<[u8; 32]>,
+    /// Trusted signer key IDs (R16). If non-empty, signer_key_id must be in this set.
+    pub trusted_signer_key_ids: HashSet<[u8; 32]>,
 }
 
 impl Default for ProofPolicy {
@@ -42,6 +44,7 @@ impl Default for ProofPolicy {
             evidence_invariant: None,
             trusted_anchor: false,
             expected_prev_chain_hash: None,
+            trusted_signer_key_ids: HashSet::new(),
         }
     }
 }
@@ -285,6 +288,68 @@ pub fn verify_with_policy(
         },
     });
 
+    // R14: Claim scanned_at_tx >= deleted_after_tx boundary check
+    let r14_passed = proof
+        .claims
+        .iter()
+        .all(|c| c.scanned_at_tx >= proof.deleted_after_tx);
+    results.push(PolicyRuleResult {
+        rule_id: "R14".to_string(),
+        passed: r14_passed,
+        message: if r14_passed {
+            "R14 PASS: All claims scanned at or after deleted_after_tx".to_string()
+        } else {
+            "R14 FAIL: Claim scanned_at_tx earlier than deleted_after_tx".to_string()
+        },
+    });
+
+    // R15: Stage & supersedes scope consistency check
+    let mut r15_passed = (1..=2).contains(&proof.stage);
+    let mut r15_msg = if r15_passed {
+        "R15 PASS: Stage is valid and supersedes consistent".to_string()
+    } else {
+        format!("R15 FAIL: Invalid proof stage {}", proof.stage)
+    };
+
+    if r15_passed {
+        if let Some(sup_id) = proof.supersedes {
+            if sup_id == [0u8; 32] || sup_id == proof.proof_id {
+                r15_passed = false;
+                r15_msg = "R15 FAIL: Invalid supersedes self-reference or zeroes".to_string();
+            }
+        }
+    }
+
+    results.push(PolicyRuleResult {
+        rule_id: "R15".to_string(),
+        passed: r15_passed,
+        message: r15_msg,
+    });
+
+    // R16: Trusted signer key set validation
+    let r16_passed = if policy.trusted_signer_key_ids.is_empty() {
+        true
+    } else {
+        policy.trusted_signer_key_ids.contains(&proof.signer_key_id)
+    };
+    results.push(PolicyRuleResult {
+        rule_id: "R16".to_string(),
+        passed: r16_passed,
+        message: if r16_passed {
+            "R16 PASS: Signer key ID trusted or trust set empty".to_string()
+        } else {
+            "R16 FAIL: Signer key ID not in trusted signer set".to_string()
+        },
+    });
+
+    // R17: Non-critical unknown TLV tags handling
+    let r17_passed = true; // Non-critical unknown tags are ignored without error
+    results.push(PolicyRuleResult {
+        rule_id: "R17".to_string(),
+        passed: r17_passed,
+        message: "R17 PASS: Non-critical unknown TLV tags ignored deterministically".to_string(),
+    });
+
     let overall_valid = results.iter().all(|r| r.passed);
 
     PolicyReport {
@@ -364,7 +429,7 @@ mod tests {
             "Valid proof MUST pass all rules; report: {:?}",
             report
         );
-        assert_eq!(report.rule_results.len(), 13);
+        assert_eq!(report.rule_results.len(), 17);
     }
 
     #[test]

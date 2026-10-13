@@ -18,7 +18,9 @@ async fn test_wal_v4_golden_bytes_header_and_ops() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal");
 
     let op_intent = WalOp::IndexIntent {
         tx_id: TxId::new(10),
@@ -63,7 +65,9 @@ async fn test_wal_v4_open_index_intents_replay() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal");
 
     let op_intent1 = WalOp::IndexIntent {
         tx_id: TxId::new(1),
@@ -90,7 +94,10 @@ async fn test_wal_v4_open_index_intents_replay() {
 
     wal.append_batch(batch).await.expect("append batch");
 
-    let open_intents = wal.replay_open_index_intents().await.expect("replay intents");
+    let open_intents = wal
+        .replay_open_index_intents()
+        .await
+        .expect("replay intents");
 
     assert_eq!(
         open_intents.len(),

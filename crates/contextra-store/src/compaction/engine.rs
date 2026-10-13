@@ -410,6 +410,154 @@ impl CompactionEngine {
         raw_overhead + min_stream_buffer
     }
 
+    /// Performs Purge-Compaction over selected SSTables following Spec C5.4.
+    ///
+    /// Records matching `scope` (or `record_filter`) with `tx <= as_of_tx` are discarded.
+    /// Records with `tx > as_of_tx` or non-matching keys are preserved.
+    pub async fn purge_compact_sstables(
+        &self,
+        inputs: &[Arc<SstableReader>],
+        output_path: &std::path::Path,
+        scope: &crate::compaction::purge_filter::PurgeScope,
+        as_of_tx: u64,
+        record_filter: Option<&dyn crate::compaction::purge_filter::CompactionRecordFilter>,
+    ) -> Result<crate::compaction::purge_filter::PurgeReport> {
+        use crate::compaction::purge_filter::PurgeReport;
+
+        if inputs.is_empty() {
+            return Ok(PurgeReport::default());
+        }
+
+        struct HeapItem {
+            key: bytes::Bytes,
+            value: bytes::Bytes,
+            seq: u64,
+            tx: u64,
+            source_idx: usize,
+        }
+
+        impl From<(bytes::Bytes, bytes::Bytes, u64, u64, usize)> for HeapItem {
+            fn from(tuple: (bytes::Bytes, bytes::Bytes, u64, u64, usize)) -> Self {
+                Self {
+                    key: tuple.0,
+                    value: tuple.1,
+                    seq: tuple.2,
+                    tx: tuple.3,
+                    source_idx: tuple.4,
+                }
+            }
+        }
+
+        impl PartialEq for HeapItem {
+            fn eq(&self, other: &Self) -> bool {
+                self.key == other.key
+                    && (self.seq & !TOMBSTONE_BIT) == (other.seq & !TOMBSTONE_BIT)
+                    && self.source_idx == other.source_idx
+            }
+        }
+
+        impl Eq for HeapItem {}
+
+        impl PartialOrd for HeapItem {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl Ord for HeapItem {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                match other.key.cmp(&self.key) {
+                    std::cmp::Ordering::Equal => {
+                        let self_raw = self.seq & !TOMBSTONE_BIT;
+                        let other_raw = other.seq & !TOMBSTONE_BIT;
+                        self_raw
+                            .cmp(&other_raw)
+                            .then_with(|| self.source_idx.cmp(&other.source_idx))
+                    }
+                    ord => ord,
+                }
+            }
+        }
+
+        let mut streams = Vec::new();
+        for sst in inputs {
+            streams.push(sst.stream().await?);
+        }
+
+        let mut heap = std::collections::BinaryHeap::new();
+        for (i, stream) in streams.iter_mut().enumerate() {
+            if let Some((key, value, seq, tx)) = stream.next_entry().await? {
+                heap.push(HeapItem {
+                    key,
+                    value,
+                    seq,
+                    tx,
+                    source_idx: i,
+                });
+            }
+        }
+
+        let mut builder =
+            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
+
+        let mut records_purged = 0u64;
+        let mut bytes_reclaimed = 0u64;
+        let mut kept_keys_count = 0usize;
+
+        let mut io_token_bytes_written: u64 = 0;
+        let mut io_token_last_reset = std::time::Instant::now();
+
+        while let Some(current_item) = heap.pop() {
+            let _raw_seq = current_item.seq & !TOMBSTONE_BIT;
+            let matches_scope = scope.matches_key(&current_item.key)
+                || record_filter.map_or(false, |f| f.drop_record(&current_item.key, current_item.tx));
+
+            if matches_scope && current_item.tx <= as_of_tx {
+                records_purged += 1;
+                bytes_reclaimed += (current_item.key.len() + current_item.value.len()) as u64;
+                Self::fetch_next_entry(current_item.source_idx, &mut streams, &mut heap).await?;
+                continue;
+            }
+
+            kept_keys_count += 1;
+            Self::fetch_next_entry(current_item.source_idx, &mut streams, &mut heap).await?;
+
+            self.write_entry_with_rate_limit(
+                &mut builder,
+                &current_item.key,
+                &current_item.value,
+                current_item.seq,
+                current_item.tx,
+                &mut io_token_bytes_written,
+                &mut io_token_last_reset,
+            )
+            .await?;
+        }
+
+        let obsolete_files: Vec<std::path::PathBuf> =
+            inputs.iter().map(|s| s.file_path().to_path_buf()).collect();
+
+        let files_written = if kept_keys_count > 0 {
+            builder.finish().await?;
+            vec![output_path.to_path_buf()]
+        } else {
+            let p = output_path.to_path_buf();
+            let _ = tokio::task::spawn_blocking(move || {
+                contextra_durable_fs::durable_remove(&p)
+            })
+            .await;
+            Vec::new()
+        };
+
+        Ok(PurgeReport {
+            records_purged,
+            bytes_reclaimed,
+            sstables_replaced: inputs.len(),
+            obsolete_files,
+            files_written,
+        })
+    }
+
     /// Performs a multi-way merge of input SSTables into a single output SSTable.
     ///
     /// During merge:

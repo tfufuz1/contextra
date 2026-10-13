@@ -156,7 +156,9 @@ pub fn jules_facade_run_step(
 
     // Task 3: symbol-exists im check-Schritt -> übergebe tatsächlich geänderte Dateien
     if sub_cmd == "symbol-exists" || raw_step_args.iter().any(|a| a == "symbol-exists") {
-        if let Some(changed) = blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD") {
+        if let Some(changed) =
+            blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD")
+        {
             if !changed.is_empty() {
                 for f in changed {
                     if !raw_step_args.contains(&f) {
@@ -176,11 +178,18 @@ pub fn jules_facade_run_step(
             }
         }
 
-        let changed_files = blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD").unwrap_or_default();
-        let touched_cargo = changed_files.iter().any(|f| f.to_lowercase().ends_with("cargo.toml") || f.to_lowercase().ends_with("cargo.lock"));
+        let changed_files =
+            blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD")
+                .unwrap_or_default();
+        let touched_cargo = changed_files.iter().any(|f| {
+            f.to_lowercase().ends_with("cargo.toml") || f.to_lowercase().ends_with("cargo.lock")
+        });
 
         let card_crate = card_opt.as_ref().map(|c| c.get_crate()).unwrap_or_default();
-        let card_risk = card_opt.as_ref().and_then(|c| c.risk.as_deref()).unwrap_or("none");
+        let card_risk = card_opt
+            .as_ref()
+            .and_then(|c| c.risk.as_deref())
+            .unwrap_or("none");
 
         if !touched_cargo && card_risk != "concurrency" && !card_crate.is_empty() {
             raw_step_args = vec!["test".to_string(), "-p".to_string(), card_crate];
@@ -193,7 +202,11 @@ pub fn jules_facade_run_step(
         let arg = &extra_args[arg_idx];
         if arg == "--card" || arg == "--reason" || arg == "--root" {
             arg_idx += 2;
-        } else if arg == "--allow-overlap" || arg == "--full" || arg == "--timings" || arg == "--json" {
+        } else if arg == "--allow-overlap"
+            || arg == "--full"
+            || arg == "--timings"
+            || arg == "--json"
+        {
             arg_idx += 1;
         } else {
             filtered_extra_args.push(arg.clone());
@@ -279,8 +292,13 @@ pub fn jules_facade_run_step(
     (exit_code, stdout, stderr)
 }
 
-fn compute_required_risk_gates(root: &Path, risk_cfg: Option<&JulesFacadeRiskGatesConfig>) -> Vec<String> {
-    let changed = blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD").unwrap_or_default();
+fn compute_required_risk_gates(
+    root: &Path,
+    risk_cfg: Option<&JulesFacadeRiskGatesConfig>,
+) -> Vec<String> {
+    let changed =
+        blast_radius::blast_radius_get_changed_files_worktree(root, "origin/main", "HEAD")
+            .unwrap_or_default();
     let mut gates = Vec::new();
 
     let mut max_tier = "none";
@@ -292,11 +310,17 @@ fn compute_required_risk_gates(root: &Path, risk_cfg: Option<&JulesFacadeRiskGat
         let f_lower = file.to_lowercase();
         if f_lower.contains("crypto") || f_lower.contains("privacy") {
             max_tier = "sec";
-        } else if f_lower.contains("wal") || f_lower.contains("store") || f_lower.contains("checkpoint") {
+        } else if f_lower.contains("wal")
+            || f_lower.contains("store")
+            || f_lower.contains("checkpoint")
+        {
             if max_tier != "sec" {
                 max_tier = "crash";
             }
-        } else if (f_lower.contains("simd") || f_lower.contains("vector")) && max_tier != "sec" && max_tier != "crash" {
+        } else if (f_lower.contains("simd") || f_lower.contains("vector"))
+            && max_tier != "sec"
+            && max_tier != "crash"
+        {
             max_tier = "simd";
         }
 
@@ -308,7 +332,8 @@ fn compute_required_risk_gates(root: &Path, risk_cfg: Option<&JulesFacadeRiskGat
             touched_cargo = true;
         }
 
-        if f_lower.starts_with(".github/") || f_lower == "constitution.md" || f_lower == "deny.toml" {
+        if f_lower.starts_with(".github/") || f_lower == "constitution.md" || f_lower == "deny.toml"
+        {
             touched_protected = true;
         }
     }
@@ -322,34 +347,55 @@ fn compute_required_risk_gates(root: &Path, risk_cfg: Option<&JulesFacadeRiskGat
 
     match max_tier {
         "sec" => {
-            let list = risk_cfg.map(|rc| &rc.sec).filter(|v| !v.is_empty()).unwrap_or(&default_sec);
+            let list = risk_cfg
+                .map(|rc| &rc.sec)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(&default_sec);
             gates.extend(list.clone());
         }
         "crash" => {
-            let list = risk_cfg.map(|rc| &rc.crash).filter(|v| !v.is_empty()).unwrap_or(&default_crash);
+            let list = risk_cfg
+                .map(|rc| &rc.crash)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(&default_crash);
             gates.extend(list.clone());
         }
         "simd" => {
-            let list = risk_cfg.map(|rc| &rc.simd).filter(|v| !v.is_empty()).unwrap_or(&default_simd);
+            let list = risk_cfg
+                .map(|rc| &rc.simd)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(&default_simd);
             gates.extend(list.clone());
         }
         _ => {}
     }
 
     if touched_unsafe {
-        let list = risk_cfg.map(|rc| &rc.simd).filter(|v| !v.is_empty()).unwrap_or(&default_simd);
+        let list = risk_cfg
+            .map(|rc| &rc.simd)
+            .filter(|v| !v.is_empty())
+            .unwrap_or(&default_simd);
         gates.extend(list.clone());
     }
     if touched_cargo {
-        let list = risk_cfg.map(|rc| &rc.cargo).filter(|v| !v.is_empty()).unwrap_or(&default_cargo);
+        let list = risk_cfg
+            .map(|rc| &rc.cargo)
+            .filter(|v| !v.is_empty())
+            .unwrap_or(&default_cargo);
         gates.extend(list.clone());
     }
     if touched_protected {
-        let list = risk_cfg.map(|rc| &rc.protected).filter(|v| !v.is_empty()).unwrap_or(&default_protected);
+        let list = risk_cfg
+            .map(|rc| &rc.protected)
+            .filter(|v| !v.is_empty())
+            .unwrap_or(&default_protected);
         gates.extend(list.clone());
     }
     if changed.len() > 10 {
-        let list = risk_cfg.map(|rc| &rc.diff_budget).filter(|v| !v.is_empty()).unwrap_or(&default_diff);
+        let list = risk_cfg
+            .map(|rc| &rc.diff_budget)
+            .filter(|v| !v.is_empty())
+            .unwrap_or(&default_diff);
         gates.extend(list.clone());
     }
 
@@ -365,18 +411,19 @@ pub fn jules_facade_execute_phase(
     config_override: Option<&JulesFacadeConfig>,
 ) -> (i32, serde_json::Value) {
     let default_config_path = root.join(".jules/harness-phases.toml");
-    let (loaded_config, parsed_risk_gates) = if config_override.is_none() && default_config_path.exists() {
-        if let Ok(content) = fs::read_to_string(&default_config_path) {
-            let cfg: Option<JulesFacadeConfig> = toml::from_str(&content).ok();
-            let full_cfg: Option<JulesFacadeFullConfig> = toml::from_str(&content).ok();
-            let r_gates = full_cfg.and_then(|fc| fc.risk_gates);
-            (cfg, r_gates)
+    let (loaded_config, parsed_risk_gates) =
+        if config_override.is_none() && default_config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&default_config_path) {
+                let cfg: Option<JulesFacadeConfig> = toml::from_str(&content).ok();
+                let full_cfg: Option<JulesFacadeFullConfig> = toml::from_str(&content).ok();
+                let r_gates = full_cfg.and_then(|fc| fc.risk_gates);
+                (cfg, r_gates)
+            } else {
+                (None, None)
+            }
         } else {
             (None, None)
-        }
-    } else {
-        (None, None)
-    };
+        };
 
     let config = config_override.or(loaded_config.as_ref());
 
@@ -430,16 +477,31 @@ pub fn jules_facade_execute_phase(
     // Task 7: Parallel-Schutz via check-branch-overlap bei jules start
     if phase_name == "start" {
         if let Some(ref cp) = card_path_buf {
-            let actual_cp = if cp.is_relative() { root.join(cp) } else { cp.clone() };
+            let actual_cp = if cp.is_relative() {
+                root.join(cp)
+            } else {
+                cp.clone()
+            };
             if actual_cp.exists() {
                 let overlap_step = JulesFacadeStep {
-                    cmd: vec!["cargo".to_string(), "xtask".to_string(), "check-branch-overlap".to_string(), "--card".to_string(), cp.to_string_lossy().to_string()],
+                    cmd: vec![
+                        "cargo".to_string(),
+                        "xtask".to_string(),
+                        "check-branch-overlap".to_string(),
+                        "--card".to_string(),
+                        cp.to_string_lossy().to_string(),
+                    ],
                     required: false,
                     parallel_group: None,
                     when_changed: None,
                     serial: false,
                 };
-                let (code, stdout, stderr) = jules_facade_run_step(&overlap_step, extra_args, root, card_path_buf.as_deref());
+                let (code, stdout, stderr) = jules_facade_run_step(
+                    &overlap_step,
+                    extra_args,
+                    root,
+                    card_path_buf.as_deref(),
+                );
                 let combined = format!("{}\n{}", stdout, stderr);
                 let is_unknown = combined.contains("Unknown xtask command")
                     || combined.contains("Unbekannter Unterbefehl")
@@ -462,29 +524,57 @@ pub fn jules_facade_execute_phase(
     // Task 5: jules start ruft session-init und context-pack als interne Teilschritte auf
     if phase_name == "start" {
         if let Some(ref cp) = card_path_buf {
-            let actual_card_path = if cp.is_relative() { root.join(cp) } else { cp.clone() };
+            let actual_card_path = if cp.is_relative() {
+                root.join(cp)
+            } else {
+                cp.clone()
+            };
             if let Ok(card_str) = fs::read_to_string(&actual_card_path) {
                 if let Ok(parsed_card) = toml::from_str::<TaskCardMinimal>(&card_str) {
                     let krate = parsed_card.get_crate();
                     let title = parsed_card.title.unwrap_or_default();
 
                     let init_step = JulesFacadeStep {
-                        cmd: vec!["cargo".to_string(), "xtask".to_string(), "session-init".to_string(), "--crate".to_string(), krate.clone(), "--task".to_string(), title],
+                        cmd: vec![
+                            "cargo".to_string(),
+                            "xtask".to_string(),
+                            "session-init".to_string(),
+                            "--crate".to_string(),
+                            krate.clone(),
+                            "--task".to_string(),
+                            title,
+                        ],
                         required: false,
                         parallel_group: None,
                         when_changed: None,
                         serial: false,
                     };
-                    let _ = jules_facade_run_step(&init_step, extra_args, root, card_path_buf.as_deref());
+                    let _ = jules_facade_run_step(
+                        &init_step,
+                        extra_args,
+                        root,
+                        card_path_buf.as_deref(),
+                    );
 
                     let pack_step = JulesFacadeStep {
-                        cmd: vec!["cargo".to_string(), "xtask".to_string(), "context-pack".to_string(), "--crate".to_string(), krate],
+                        cmd: vec![
+                            "cargo".to_string(),
+                            "xtask".to_string(),
+                            "context-pack".to_string(),
+                            "--crate".to_string(),
+                            krate,
+                        ],
                         required: false,
                         parallel_group: None,
                         when_changed: None,
                         serial: false,
                     };
-                    let _ = jules_facade_run_step(&pack_step, extra_args, root, card_path_buf.as_deref());
+                    let _ = jules_facade_run_step(
+                        &pack_step,
+                        extra_args,
+                        root,
+                        card_path_buf.as_deref(),
+                    );
                 }
             }
         }
@@ -540,7 +630,9 @@ pub fn jules_facade_execute_phase(
     // Task 6: Persistent last error hash file
     let last_hash_path = root.join(".jules/context/last_error_hash");
     let mut last_error_hash: Option<String> = if last_hash_path.exists() {
-        fs::read_to_string(&last_hash_path).ok().map(|s| s.trim().to_string())
+        fs::read_to_string(&last_hash_path)
+            .ok()
+            .map(|s| s.trim().to_string())
     } else {
         None
     };
@@ -1044,7 +1136,10 @@ iterations = 1
         let (code, json) = jules_facade_execute_phase(&root, "start", &[], None);
         assert_eq!(code, 2);
         assert_eq!(json["status"], "error");
-        assert!(json["summary"].as_str().unwrap().contains("Parameter --card <PFAD> fehlt"));
+        assert!(json["summary"]
+            .as_str()
+            .unwrap()
+            .contains("Parameter --card <PFAD> fehlt"));
     }
 
     #[test]

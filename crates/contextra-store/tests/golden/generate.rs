@@ -23,8 +23,8 @@ pub async fn generate_all() {
 
     let uuid_path = dir.join("wal_v3.wal.uuid");
     let uuid_bytes = [
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10,
     ];
     fs::write(&uuid_path, &uuid_bytes).expect("write uuid");
 
@@ -81,9 +81,7 @@ pub async fn generate_all() {
     if manifest_path.exists() {
         let _ = fs::remove_file(&manifest_path);
     }
-    let manifest = Manifest::open(&manifest_path)
-        .await
-        .expect("manifest open");
+    let manifest = Manifest::open(&manifest_path).await.expect("manifest open");
     manifest
         .append(&ManifestEntry::FormatVersionRecord {
             file_kind: 0,
@@ -100,9 +98,7 @@ pub async fn generate_all() {
         .await
         .expect("manifest add");
     manifest
-        .append(&ManifestEntry::WalCheckpoint {
-            hmac: [0x55u8; 32],
-        })
+        .append(&ManifestEntry::WalCheckpoint { hmac: [0x55u8; 32] })
         .await
         .expect("manifest wal checkpoint");
     manifest

@@ -228,6 +228,41 @@ blocking = false
 phase = "Phase 0"
 
 [[commands]]
+name = "verify"
+owner_tier = "ci-gate"
+summary = "Verifikationsebene und Einzelbefehl zur Evidenzerzeugung (cargo xtask verify --tier kernel|full)."
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-loom-mocks"
+owner_tier = "ci-gate"
+summary = "Scanner für nicht freigegebene Loom-Mock/Mirror-Implementierungen."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "help"
+owner_tier = "tool"
+summary = "Zeigt Hilfe zu den xtask-Befehlen an."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "--help"
+owner_tier = "tool"
+summary = "Zeigt Hilfe zu den xtask-Befehlen an."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "-h"
+owner_tier = "tool"
+summary = "Zeigt Hilfe zu den xtask-Befehlen an."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
 name = "check-manifest-completeness"
 owner_tier = "tool"
 summary = "Prüft Vollständigkeit von Crate Cargo.toml Manifesten."

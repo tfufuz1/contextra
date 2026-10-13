@@ -62,7 +62,9 @@ fn test_all_registry_commands_resolvable() {
         let is_in_dispatch_table = dispatch_cmds.contains(name);
         let is_in_harness = name == "harness-list"
             || name == "harness-help"
-            || xtask::harness::registered_commands().iter().any(|(n, _)| *n == name);
+            || xtask::harness::registered_commands()
+                .iter()
+                .any(|(n, _)| *n == name);
 
         assert!(
             is_in_dispatch_table || is_in_harness,

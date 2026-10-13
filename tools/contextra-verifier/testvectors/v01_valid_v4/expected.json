@@ -1,0 +1,7 @@
+{
+  "origin": "python-selfsigned",
+  "result": "VALID",
+  "exit_code": 0,
+  "category": "VALID",
+  "reason": "Version 4 DeletionProof signature verified successfully"
+}

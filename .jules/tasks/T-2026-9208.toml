@@ -1,0 +1,34 @@
+# Task-Karte: Residue-Scanner HNSW und Text
+id        = "T-2026-9208"
+title     = "Residue-Scanner HNSW und Text"
+crate     = "contextra-vector"
+tier      = 1            # 1, 2, 3
+risk      = "concurrency"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
+goal      = "Schichteigene rein lesende Residue-Scanner fuer Vector (HNSW) und Text (Inverted Index) inklusive Injektionstests"
+non_goals = ["Kein Refactoring fremder Module außerhalb des Arbeitsbereichs", "Keine Cargo.toml-Aenderungen", "Keine neuen Dependencies"]
+scope     = [
+  "crates/contextra-vector/src/hnsw/**",
+  "crates/contextra-vector/tests/hnsw_residue_scan.rs",
+  "crates/contextra-vector/tests/hnsw_residue_injection.rs",
+  "crates/contextra-text/src/inverted/**",
+  "crates/contextra-text/tests/text_residue_scan.rs",
+  "crates/contextra-text/tests/text_residue_injection.rs",
+  ".jules/tasks/T-2026-9208.toml"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root", "INV-D9 No write_mutex held in scan"]
+acceptance = [
+  "cargo test -p contextra-vector --test hnsw_residue_scan",
+  "cargo test -p contextra-vector --test hnsw_residue_injection",
+  "cargo test -p contextra-text --test text_residue_scan",
+  "cargo test -p contextra-text --test text_residue_injection",
+  "cargo test -p contextra-vector",
+  "cargo test -p contextra-text",
+  "cargo clippy -p contextra-vector -p contextra-text --all-targets -- -D warnings"
+]
+evidence_required = ["Neuer Test, der die Funktionalität absichert"]
+
+[budget]
+files = 20
+lines = 1000
+iterations = 12
