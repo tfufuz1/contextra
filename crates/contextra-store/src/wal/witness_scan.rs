@@ -1,13 +1,14 @@
 #![allow(clippy::cast_possible_truncation)]
 
 //! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
-//! Stand: 2026-10-11
+//! Stand: 2026-10-13
 //! Zweck: WAL-Witness Scanner (C4.3) fuer Assurance & Claim Verification (Interface-Vertrag V1).
 //! Invarianten:
 //! - segments_scanned == segments_total - segments_removed
 //! - frames_matching_scope == 0
 
 use contextra_core::{ContextraError, Result};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -60,6 +61,7 @@ pub struct WalScanEvidence {
     pub segments_removed: u64,
     pub tail_bytes_raw_scanned: u64,
     pub frames_matching_scope: u64,
+    pub post_cutoff_hits: u64,
     pub last_removed_seq: u64,
     pub unclassified_files_found: u64,
 }
@@ -77,6 +79,12 @@ impl WalScanEvidence {
             violations.push(format!(
                 "Invariant violation: frames_matching_scope ({}) != 0",
                 self.frames_matching_scope
+            ));
+        }
+        if self.post_cutoff_hits != 0 {
+            violations.push(format!(
+                "Post-cutoff write hits present ({}); scope key modified after deletion cutoff",
+                self.post_cutoff_hits
             ));
         }
         if self.unclassified_files_found != 0 {
@@ -104,18 +112,16 @@ pub enum WalFileType {
 }
 
 pub fn classify_wal_filename(filename: &str) -> WalFileType {
-    if filename.starts_with('.')
-        || filename == "MANIFEST"
-        || filename == "SALT"
-        || filename == "LOCK"
-        || filename.contains("ledger")
-        || filename == "purge.intent"
-        || filename == "pending_delete.journal"
-        || filename.ends_with(".sst")
-        || filename.ends_with(".wal_integrity_key")
-        || filename.ends_with(".rekeyed")
+    if matches!(
+        filename,
+        "MANIFEST"
+            | "SALT"
+            | "LOCK"
+            | "purge.intent"
+            | "pending_delete.journal"
+            | ".wal_integrity_key"
+    ) || filename.ends_with(".rekeyed")
         || filename.ends_with(".uuid")
-        || filename.contains(".tmp.")
     {
         WalFileType::Sidecar
     } else if filename.contains(".sealed.") || filename.ends_with(".sealed") {
@@ -151,11 +157,21 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
     let mut segments_scanned = 0u64;
     let mut tail_bytes_raw_scanned = 0u64;
     let mut frames_matching_scope = 0u64;
+    let mut post_cutoff_hits = 0u64;
     let mut unclassified_files_found = 0u64;
 
+    let mut initial_segment_names = HashSet::new();
     let mut paths_to_scan = Vec::new();
 
-    while let Ok(Some(entry)) = entries.next_entry().await {
+    while let Some(entry_res) = entries.next_entry().await.transpose() {
+        let entry = entry_res.map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to read directory entry in {}: {}",
+                inputs.wal_dir.display(),
+                e
+            ))
+        })?;
+
         if start_time.elapsed() > inputs.timeout {
             return Err(ContextraError::Storage("WAL scan timed out".into()));
         }
@@ -181,6 +197,7 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
             | WalFileType::Archived
             | WalFileType::Backup => {
                 segments_total += 1;
+                initial_segment_names.insert(filename.to_string());
                 paths_to_scan.push(path);
             }
         }
@@ -194,6 +211,10 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
         let metadata = match tokio::fs::metadata(&path).await {
             Ok(m) => m,
             Err(err) => {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    // Segment was removed prior to scanning
+                    continue;
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to stat WAL segment {}: {}",
                     path.display(),
@@ -203,26 +224,34 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
         };
 
         let file_len = metadata.len();
-        let wal = Wal::open_read_only(&path, None).await?;
+        let wal = match Wal::open_read_only(&path, None).await {
+            Ok(w) => w,
+            Err(ContextraError::Storage(msg))
+                if msg.contains("No such file") || msg.contains("not found") =>
+            {
+                // Segment was removed prior to open
+                continue;
+            }
+            Err(err) => return Err(err),
+        };
         let mut last_logical_pos = 0u64;
 
         let scan_res = wal
             .scan_entries_with_callback(file_len, |_seq, entry, end_pos| {
                 last_logical_pos = end_pos;
                 let tx = entry.tx_id().inner();
-                if tx <= inputs.as_of_tx {
-                    match &entry.op {
-                        WalOp::Put { key, .. } => {
-                            if inputs.scope.matches_key(key) {
-                                frames_matching_scope += 1;
-                            }
-                        }
-                        WalOp::Delete { key, .. } => {
-                            if inputs.key_identifiers_claimed && inputs.scope.matches_key(key) {
-                                frames_matching_scope += 1;
-                            }
-                        }
-                        WalOp::TxEnd { .. } => {}
+                let is_hit = match &entry.op {
+                    WalOp::Put { key, .. } => inputs.scope.matches_key(key),
+                    WalOp::Delete { key, .. } => {
+                        inputs.key_identifiers_claimed && inputs.scope.matches_key(key)
+                    }
+                    WalOp::TxEnd { .. } => false,
+                };
+
+                if is_hit {
+                    frames_matching_scope += 1;
+                    if tx > inputs.as_of_tx {
+                        post_cutoff_hits += 1;
                     }
                 }
                 true
@@ -237,14 +266,11 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
         // Tail inspection past logical endpoint
         if last_logical_pos < file_len {
             let tail_len = file_len - last_logical_pos;
-            if !inputs.encrypted_mode {
-                tail_bytes_raw_scanned += tail_len;
-                if inputs.key_identifiers_claimed {
-                    if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await
-                    {
-                        if inputs.scope.matches_raw_bytes(&tail_bytes) {
-                            frames_matching_scope += 1;
-                        }
+            tail_bytes_raw_scanned += tail_len;
+            if inputs.key_identifiers_claimed || !inputs.scope.raw_needles.is_empty() {
+                if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await {
+                    if inputs.scope.matches_raw_bytes(&tail_bytes) {
+                        frames_matching_scope += 1;
                     }
                 }
             }
@@ -253,12 +279,57 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
         segments_scanned += 1;
     }
 
+    // Directory check after scan to count removed segments
+    let mut final_entries = match tokio::fs::read_dir(&inputs.wal_dir).await {
+        Ok(e) => e,
+        Err(err) => {
+            return Err(ContextraError::Storage(format!(
+                "Failed to read WAL directory during final verification {}: {}",
+                inputs.wal_dir.display(),
+                err
+            )));
+        }
+    };
+
+    let mut final_segment_names = HashSet::new();
+    while let Some(entry_res) = final_entries.next_entry().await.transpose() {
+        let entry = entry_res.map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to read directory entry during final verification in {}: {}",
+                inputs.wal_dir.display(),
+                e
+            ))
+        })?;
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+        if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+            let file_type = classify_wal_filename(filename);
+            if matches!(
+                file_type,
+                WalFileType::Active
+                    | WalFileType::Sealed
+                    | WalFileType::Archived
+                    | WalFileType::Backup
+            ) {
+                final_segment_names.insert(filename.to_string());
+            }
+        }
+    }
+
+    let segments_removed = initial_segment_names
+        .iter()
+        .filter(|name| !final_segment_names.contains(*name))
+        .count() as u64;
+
     Ok(WalScanEvidence {
         segments_total,
         segments_scanned,
-        segments_removed: 0,
+        segments_removed,
         tail_bytes_raw_scanned,
         frames_matching_scope,
+        post_cutoff_hits,
         last_removed_seq: 0,
         unclassified_files_found,
     })
