@@ -141,9 +141,9 @@ impl EmbeddingConfig {
     pub fn build_provider(&self) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
         let trimmed_provider = self.provider.trim();
         if trimmed_provider.is_empty() {
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+            #[cfg(any(test, debug_assertions, feature = "test-utils"))]
             let msg = "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx', 'candle' oder 'mock' setzen.".to_string();
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+            #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
             let msg = "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'ollama', 'onnx' oder 'candle' setzen.".to_string();
             return Err(ContextraError::InvalidInput(msg));
         }

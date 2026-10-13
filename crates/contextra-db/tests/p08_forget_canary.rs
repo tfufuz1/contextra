@@ -1,10 +1,10 @@
 #[path = "support_canary/mod.rs"]
 mod support_canary;
 
-use support_canary::{scan_dir, PersonCanaryGenerator};
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_types::{DistanceMetric, TenantId};
 use serde_json::json;
+use support_canary::{scan_dir, PersonCanaryGenerator};
 use tempfile::TempDir;
 
 /// Phase 3: Deletion test against real Contextra database with Canary Oracle.

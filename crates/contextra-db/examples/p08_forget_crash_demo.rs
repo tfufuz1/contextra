@@ -27,10 +27,7 @@ async fn main() {
         }
     }
 
-    let num_memories: usize = args
-        .get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(100);
+    let num_memories: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(100);
 
     println!("========================================================================");
     println!(" CONTEXTRA P08 CANARY ORACLE & FORGET CRASH DEMO");
@@ -49,7 +46,10 @@ async fn main() {
     // -------------------------------------------------------------------------
     // STEP 1: WRITE MEMORIES FOR MULTIPLE PERSONS
     // -------------------------------------------------------------------------
-    println!("\n[STEP 1] Writing {} memories for Person A, B, and C...", num_memories);
+    println!(
+        "\n[STEP 1] Writing {} memories for Person A, B, and C...",
+        num_memories
+    );
 
     let canary_str_a = format!("CANARY_PERSON_A_SECRET_KEY_PAYLOAD_{}_001", 0xA1A1);
     let canary_str_b = format!("CANARY_PERSON_B_SECRET_KEY_PAYLOAD_{}_002", 0xB2B2);
@@ -91,18 +91,30 @@ async fn main() {
             };
 
             col_a
-                .insert(&doc_id, &vec_sample, Some(json!({ "content": text_payload, "owner": "PersonA" })))
+                .insert(
+                    &doc_id,
+                    &vec_sample,
+                    Some(json!({ "content": text_payload, "owner": "PersonA" })),
+                )
                 .await
                 .expect("insert col_a");
         }
 
         col_b
-            .insert("doc_b1", &[0.1, 0.2, 0.3, 0.4], Some(json!({ "content": canary_str_b.clone(), "owner": "PersonB" })))
+            .insert(
+                "doc_b1",
+                &[0.1, 0.2, 0.3, 0.4],
+                Some(json!({ "content": canary_str_b.clone(), "owner": "PersonB" })),
+            )
             .await
             .expect("insert col_b");
 
         col_c
-            .insert("doc_c1", &[0.4, 0.3, 0.2, 0.1], Some(json!({ "content": canary_str_c.clone(), "owner": "PersonC" })))
+            .insert(
+                "doc_c1",
+                &[0.4, 0.3, 0.2, 0.1],
+                Some(json!({ "content": canary_str_c.clone(), "owner": "PersonC" })),
+            )
             .await
             .expect("insert col_c");
 
@@ -132,7 +144,9 @@ async fn main() {
     for line in reader.lines().flatten() {
         println!("  [child process]: {}", line);
         if line.contains("CRASH_MARKER:ABORTING_PROCESS_MID_DELETE") {
-            println!("  [PARENT ACTION] Detected progress marker -> Killing child process immediately!");
+            println!(
+                "  [PARENT ACTION] Detected progress marker -> Killing child process immediately!"
+            );
             let _ = child.kill();
             let _ = child.wait();
             break;
@@ -150,11 +164,25 @@ async fn main() {
             .await
             .expect("open db post-crash");
 
-        let col_b = db.collection_for_tenant("person_b_col", tenant_b).await.expect("col_b");
-        let col_c = db.collection_for_tenant("person_c_col", tenant_c).await.expect("col_c");
+        let col_b = db
+            .collection_for_tenant("person_b_col", tenant_b)
+            .await
+            .expect("col_b");
+        let col_c = db
+            .collection_for_tenant("person_c_col", tenant_c)
+            .await
+            .expect("col_c");
 
-        let doc_b = col_b.get("doc_b1").await.expect("get doc_b1").expect("doc_b1 exists");
-        let doc_c = col_c.get("doc_c1").await.expect("get doc_c1").expect("doc_c1 exists");
+        let doc_b = col_b
+            .get("doc_b1")
+            .await
+            .expect("get doc_b1")
+            .expect("doc_b1 exists");
+        let doc_c = col_c
+            .get("doc_c1")
+            .await
+            .expect("get doc_c1")
+            .expect("doc_c1 exists");
 
         println!("  [RECOVERY VERIFIED] Person B and Person C documents queryable via API:");
         println!("    Person B doc: {}", doc_b.id);
@@ -188,14 +216,28 @@ async fn main() {
     println!("\n========================================================================");
     println!(" SUMMARY REPORT");
     println!("========================================================================");
-    println!("  Person A Canary Hits: {} (Expected: 0 on fully compacted storage)", hits_a.len());
-    println!("  Person B State      : Intact (Scanner Hits: {}, API: Available)", hits_b.len());
-    println!("  Person C State      : Intact (Scanner Hits: {}, API: Available)", hits_c.len());
+    println!(
+        "  Person A Canary Hits: {} (Expected: 0 on fully compacted storage)",
+        hits_a.len()
+    );
+    println!(
+        "  Person B State      : Intact (Scanner Hits: {}, API: Available)",
+        hits_b.len()
+    );
+    println!(
+        "  Person C State      : Intact (Scanner Hits: {}, API: Available)",
+        hits_c.len()
+    );
 
     if !hits_a.is_empty() {
         println!("\n  [CANARY FINDING]: Residual bytes detected in LSM SSTable files prior to compaction:");
         for hit in &hits_a {
-            println!("    - File: {}, Offset: {}, Encoding: {}", hit.0.display(), hit.1, hit.2);
+            println!(
+                "    - File: {}, Offset: {}, Encoding: {}",
+                hit.0.display(),
+                hit.1,
+                hit.2
+            );
         }
     }
 
@@ -222,7 +264,9 @@ async fn run_child_crash_workload(db_path_str: &str) {
         println!("CRASH_MARKER:ABORTING_PROCESS_MID_DELETE");
         let _ = std::io::stdout().flush();
 
-        let _ = db.drop_collection("person_a_col", tenant_a, proof_key).await;
+        let _ = db
+            .drop_collection("person_a_col", tenant_a, proof_key)
+            .await;
         let _ = db.flush().await;
     }
 }
@@ -283,7 +327,11 @@ fn multi_encoding_scan_dir(root: &Path, needles: &[DemoNeedle]) -> Vec<DemoScanH
                         }
                         for (i, window) in content.windows(n_len).enumerate() {
                             if window == needle.bytes.as_slice() {
-                                hits.push(DemoScanHit(path.clone(), i as u64, needle.encoding.clone()));
+                                hits.push(DemoScanHit(
+                                    path.clone(),
+                                    i as u64,
+                                    needle.encoding.clone(),
+                                ));
                             }
                         }
                     }

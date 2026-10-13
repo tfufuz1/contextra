@@ -24,12 +24,10 @@ fn test_marker_detection_scenarios() {
     // 1. Regular file with field_a marker
     let file1_path = root.join("data.db");
     let mut f1 = File::create(&file1_path).expect("create file1");
-    f1.write_all(b"HEADER_PREFIX_")
-        .expect("write header");
+    f1.write_all(b"HEADER_PREFIX_").expect("write header");
     let marker_a_bytes = needles[0].clone();
     f1.write_all(&marker_a_bytes).expect("write marker_a");
-    f1.write_all(b"_TRAILER_SUFFIX")
-        .expect("write trailer");
+    f1.write_all(b"_TRAILER_SUFFIX").expect("write trailer");
     drop(f1);
 
     // 2. Subdirectory file with field_b marker
@@ -45,10 +43,7 @@ fn test_marker_detection_scenarios() {
     let mut f_tmp = File::create(&tmp_path).expect("create tmp file");
     // Write 4 bytes prefix, then vector marker 8-byte signature
     f_tmp.write_all(b"TMP_").expect("write tmp prefix");
-    let vec_bytes: Vec<u8> = vec_f32[0..2]
-        .iter()
-        .flat_map(|f| f.to_le_bytes())
-        .collect();
+    let vec_bytes: Vec<u8> = vec_f32[0..2].iter().flat_map(|f| f.to_le_bytes()).collect();
     f_tmp.write_all(&vec_bytes).expect("write vec signature");
     drop(f_tmp);
 
@@ -61,8 +56,7 @@ fn test_marker_detection_scenarios() {
     let window_size = 1_048_576; // 1 MiB
     let mut boundary_data = vec![0u8; window_size + 1024];
     let boundary_offset = window_size - 5;
-    boundary_data[boundary_offset..boundary_offset + needles[0].len()]
-        .copy_from_slice(&needles[0]);
+    boundary_data[boundary_offset..boundary_offset + needles[0].len()].copy_from_slice(&needles[0]);
     fs::write(&boundary_path, &boundary_data).expect("write boundary file");
 
     // 6. File with marker at EOF

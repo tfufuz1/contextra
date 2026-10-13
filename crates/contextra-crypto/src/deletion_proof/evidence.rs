@@ -219,7 +219,8 @@ impl WitLayerEvidence {
                         details: format!("value versions found in SSTables: {}", versions_found),
                     });
                 }
-                if key_identifiers_claimed && *identifier_hits_index != 0
+                if (key_identifiers_claimed || assurance >= WitAssurance::S2)
+                    && *identifier_hits_index != 0
                 {
                     return Err(WitInvariantViolation {
                         layer_name: "SsTableAllLevels",

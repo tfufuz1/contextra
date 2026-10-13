@@ -1,9 +1,9 @@
 #[path = "support_canary/mod.rs"]
 mod support_canary;
 
-use support_canary::{inject_needle_into_file, scan_dir, PersonCanaryGenerator};
 use std::fs::{self, File};
 use std::io::Write;
+use support_canary::{inject_needle_into_file, scan_dir, PersonCanaryGenerator};
 use tempfile::TempDir;
 
 /// Phase 2.1: Injection Matrix Test over all file families from KEYFAMILIES.toml
@@ -113,11 +113,19 @@ fn test_counter_probe_clean_directory_yields_zero_hits() {
     // Populate directory with dummy clean database files
     let clean_file1 = temp_dir.path().join("sstables/000001.sst");
     fs::create_dir_all(clean_file1.parent().unwrap()).expect("create sst dir");
-    fs::write(&clean_file1, b"COMPLETELY_UNRELATED_DATABASE_HEADER_AND_PAYLOAD_DATA_9999").expect("write clean1");
+    fs::write(
+        &clean_file1,
+        b"COMPLETELY_UNRELATED_DATABASE_HEADER_AND_PAYLOAD_DATA_9999",
+    )
+    .expect("write clean1");
 
     let clean_file2 = temp_dir.path().join("wal/000001.wal");
     fs::create_dir_all(clean_file2.parent().unwrap()).expect("create wal dir");
-    fs::write(&clean_file2, b"WAL_LOG_RECORD_SEQUENCE_NUMBER_100_COMMIT_INTENT_SUCCESS").expect("write clean2");
+    fs::write(
+        &clean_file2,
+        b"WAL_LOG_RECORD_SEQUENCE_NUMBER_100_COMMIT_INTENT_SUCCESS",
+    )
+    .expect("write clean2");
 
     let hits = scan_dir(temp_dir.path(), &needles);
     assert_eq!(

@@ -103,7 +103,10 @@ fn test_evidence_sstables_invariants() {
 
     // orphan files found
     let mut invalid = valid.clone();
-    if let WitLayerEvidence::SsTables { orphan_files_found, .. } = &mut invalid {
+    if let WitLayerEvidence::SsTables {
+        orphan_files_found, ..
+    } = &mut invalid
+    {
         *orphan_files_found = 1;
     }
     assert!(invalid.check_invariants(WitAssurance::S2, false).is_err());
@@ -117,7 +120,11 @@ fn test_evidence_sstables_invariants() {
 
     // identifier hits index for S2
     let mut invalid = valid.clone();
-    if let WitLayerEvidence::SsTables { identifier_hits_index, .. } = &mut invalid {
+    if let WitLayerEvidence::SsTables {
+        identifier_hits_index,
+        ..
+    } = &mut invalid
+    {
         *identifier_hits_index = 1;
     }
     assert!(invalid.check_invariants(WitAssurance::S2, false).is_err());
@@ -281,7 +288,9 @@ fn test_issue_witness_success() {
         key_identifiers_claimed: false,
     };
 
-    let witness = LayerWitness::issue(args).map_err(|e| format!("issue failed: {e}")).unwrap_or_else(|e| panic!("{e}"));
+    let witness = LayerWitness::issue(args)
+        .map_err(|e| format!("issue failed: {e}"))
+        .unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(witness.assurance(), WitAssurance::S0);
     assert_eq!(witness.claim(), WitClaimText::S0);
     assert_eq!(witness.scanned_at_tx(), TxId(10));

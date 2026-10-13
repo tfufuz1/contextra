@@ -133,8 +133,9 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
         }
     }
 
-    let entry =
-        last_matching.ok_or_else(|| MutationGateError::NoHistoryFound(format!("{} (HEAD commit: {})", crate_name, head_commit)))?;
+    let entry = last_matching.ok_or_else(|| {
+        MutationGateError::NoHistoryFound(format!("{} (HEAD commit: {})", crate_name, head_commit))
+    })?;
 
     let score_pct = if entry.total_mutants > 0 {
         (entry.caught as f64 / entry.total_mutants as f64) * 100.0

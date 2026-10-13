@@ -32,9 +32,7 @@ async fn test_scope_fence_inside_outside_prefix() {
 async fn test_scope_fence_prefix_edge_cases() {
     let fence = ErasureFence::new();
     // "a:" vs "ab:"
-    let _guard = fence
-        .acquire_scope_fence_for(vec![b"a:".to_vec()])
-        .unwrap();
+    let _guard = fence.acquire_scope_fence_for(vec![b"a:".to_vec()]).unwrap();
 
     // "a:123" is in scope "a:"
     assert_eq!(
@@ -163,7 +161,10 @@ async fn test_all_write_paths_respect_fence() {
     // 6. Path 'commit' (when operation staged before fence)
     drop(_guard);
     let tx_staged = TxId::new(2);
-    storage.put(tx_staged, b"locked:key4", b"val4").await.unwrap();
+    storage
+        .put(tx_staged, b"locked:key4", b"val4")
+        .await
+        .unwrap();
 
     let _guard_again = storage
         .erasure_fence

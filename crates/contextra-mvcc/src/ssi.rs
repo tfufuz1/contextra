@@ -18,10 +18,10 @@
 use crate::error::{ContextraError, Result};
 use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
-use crate::types::{DocId, TxId};
-use ahash::AHashMap;
 use crate::sync::atomic::{AtomicU64, Ordering};
 use crate::sync::Arc;
+use crate::types::{DocId, TxId};
+use ahash::AHashMap;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;

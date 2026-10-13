@@ -357,74 +357,74 @@ impl Contextra {
                 ));
             }
 
-        let collection_id = derive_collection_id(name)?;
+            let collection_id = derive_collection_id(name)?;
 
-        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-            self.storage.clone(),
-            tenant_id,
-        );
+            let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+                self.storage.clone(),
+                tenant_id,
+            );
 
-        let col_data_prefix = format!("__col:{}:", name);
-        let txt_data_prefix = format!("__txt:{}:", name);
-        let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+            let col_data_prefix = format!("__col:{}:", name);
+            let txt_data_prefix = format!("__txt:{}:", name);
+            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
+            let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
 
-        let col_entries = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in col_entries {
-            deleted_keys.push(k);
-        }
+            let col_entries = tenant_storage
+                .scan_prefix(col_data_prefix.as_bytes())
+                .await?;
+            for (k, _) in col_entries {
+                deleted_keys.push(k);
+            }
 
-        let txt_entries = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in txt_entries {
-            deleted_keys.push(k);
-        }
+            let txt_entries = tenant_storage
+                .scan_prefix(txt_data_prefix.as_bytes())
+                .await?;
+            for (k, _) in txt_entries {
+                deleted_keys.push(k);
+            }
 
-        deleted_keys.push(col_idx_key.clone());
+            deleted_keys.push(col_idx_key.clone());
 
-        let tx = self.allocate_tx()?;
+            let tx = self.allocate_tx()?;
 
-        tenant_storage
-            .delete_prefix(tx, col_data_prefix.as_bytes())
-            .await?;
+            tenant_storage
+                .delete_prefix(tx, col_data_prefix.as_bytes())
+                .await?;
 
-        tenant_storage
-            .delete_prefix(tx, txt_data_prefix.as_bytes())
-            .await?;
+            tenant_storage
+                .delete_prefix(tx, txt_data_prefix.as_bytes())
+                .await?;
 
-        tenant_storage.delete(tx, &col_idx_key).await?;
+            tenant_storage.delete(tx, &col_idx_key).await?;
 
-        tenant_storage.commit(tx).await?;
+            tenant_storage.commit(tx).await?;
 
-        // Durability Audit Note (Review P02 / F-03 / Invariante I-2 & I-5):
-        // `tenant_storage.commit(tx).await` executes `LsmStorage::commit`, which dispatches WAL ops to the WAL flusher
-        // actor and awaits oneshot ACK (`file.sync_all()`) before returning `Ok(())` (both in single commit and group
-        // commit leader/follower paths). Thus, disk durability (`fsync`) of all deletion tombstones is strictly
-        // guaranteed BEFORE `DeletionProof::create` is invoked and returned to caller.
+            // Durability Audit Note (Review P02 / F-03 / Invariante I-2 & I-5):
+            // `tenant_storage.commit(tx).await` executes `LsmStorage::commit`, which dispatches WAL ops to the WAL flusher
+            // actor and awaits oneshot ACK (`file.sync_all()`) before returning `Ok(())` (both in single commit and group
+            // commit leader/follower paths). Thus, disk durability (`fsync`) of all deletion tombstones is strictly
+            // guaranteed BEFORE `DeletionProof::create` is invoked and returned to caller.
 
-        let remaining_col_data = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        let remaining_txt_data = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
+            let remaining_col_data = tenant_storage
+                .scan_prefix(col_data_prefix.as_bytes())
+                .await?;
+            let remaining_txt_data = tenant_storage
+                .scan_prefix(txt_data_prefix.as_bytes())
+                .await?;
 
-        let scope = DeletionScope::Collection {
-            collection_id,
-            tenant_id,
-        };
+            let scope = DeletionScope::Collection {
+                collection_id,
+                tenant_id,
+            };
 
-        // LSM deletion via `delete_prefix` is tombstone-only.
-        // Post-commit prefix scans verify logical key space emptiness in active MemTable / LSM state.
-        // SSTable compaction and WAL truncation are asynchronous background operations; existing SSTable files
-        // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
-        // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
-        // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
-        let layer_proofs = vec![LayerCleanupProof::verify_and_create(
+            // LSM deletion via `delete_prefix` is tombstone-only.
+            // Post-commit prefix scans verify logical key space emptiness in active MemTable / LSM state.
+            // SSTable compaction and WAL truncation are asynchronous background operations; existing SSTable files
+            // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
+            // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
+            // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
+            let layer_proofs = vec![LayerCleanupProof::verify_and_create(
             DeletionLayer::LsmMemtable,
             || Ok(remaining_col_data.is_empty() && remaining_txt_data.is_empty()),
         )]
@@ -437,7 +437,7 @@ impl Contextra {
             ))
         })?;
 
-        let proof = DeletionProof::create(
+            let proof = DeletionProof::create(
             scope,
             deleted_keys,
             tx,
@@ -452,13 +452,13 @@ impl Contextra {
             ))
         })?;
 
-        self.collections.write().await.remove(name);
-        self.tenant_collections
-            .write()
-            .await
-            .remove(&(tenant_id, name.to_string()));
+            self.collections.write().await.remove(name);
+            self.tenant_collections
+                .write()
+                .await
+                .remove(&(tenant_id, name.to_string()));
 
-        Ok(proof)
+            Ok(proof)
         }
     }
 
