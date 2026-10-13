@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Targeted Invalidation von Agent-Scratchpad-Prefixes im Radix-Baum (Spec §9.2 / INV-CLM-SCRATCHPAD-1).
-// STAND: TS:2026-10-01T00:00:00Z
+// STAND: TS:2026-10-12T00:00:00Z
 
 //! # Scratchpad-Invalidierung (`ScratchpadCacheScope`, `ScratchpadInvalidator`)
 //!
@@ -14,6 +14,21 @@ use contextra_types::error::Result;
 use contextra_types::TenantId;
 
 use crate::prefix_store::TenantPrefixKvStore;
+
+/// RAM claim state representation for KV cache scopes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CchRamClaim {
+    Unreferenced,
+    Zeroized,
+}
+
+/// Cache evidence report for KV cache scopes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CchCacheReport {
+    pub caches_checked: usize,
+    pub entries_found: usize,
+    pub ram_claim: CchRamClaim,
+}
 
 /// Definiert den Bereich (Scope) eines Agenten-Scratchpads für die Cache-Invalidierung.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +56,9 @@ pub trait ScratchpadInvalidator {
     /// # Fehler
     /// Gibt einen `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Segmente/Blöcke darstellt.
     fn invalidate_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize>;
+
+    /// Zählt alle Gruppen/Blöcke im Radix-Baum, die zum angegebenen `ScratchpadCacheScope` gehören.
+    fn count_entries_in_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize>;
 }
 
 /// Implementierung von `ScratchpadInvalidator` für `TenantPrefixKvStore`.
@@ -65,6 +83,16 @@ impl<'a> PrefixStoreScratchpadInvalidator<'a> {
         self.keys = keys;
         self
     }
+
+    /// Erstellt einen `CchCacheReport` für den angegebenen `ScratchpadCacheScope`.
+    pub fn cache_report(&self, scope: &ScratchpadCacheScope) -> Result<CchCacheReport> {
+        let entries_found = self.count_entries_in_scope(scope)?;
+        Ok(CchCacheReport {
+            caches_checked: 1,
+            entries_found,
+            ram_claim: CchRamClaim::Unreferenced,
+        })
+    }
 }
 
 impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
@@ -78,6 +106,25 @@ impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
             &scope.scratchpad_key_prefix,
             &self.keys,
         )
+    }
+
+    fn count_entries_in_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize> {
+        if scope.scratchpad_key_prefix.is_empty() {
+            return Ok(0);
+        }
+
+        let mut count = 0usize;
+        for key in &self.keys {
+            if let Some(hit) = self
+                .store
+                .lookup(scope.tenant_id, key, &scope.scratchpad_key_prefix)
+            {
+                if hit.matched_tokens >= scope.scratchpad_key_prefix.len() {
+                    count = count.saturating_add(1);
+                }
+            }
+        }
+        Ok(count)
     }
 }
 
@@ -142,8 +189,20 @@ mod tests {
 
         let scope = ScratchpadCacheScope::new(tenant_a, scratchpad_tokens.clone());
 
+        // Count scan negative control before invalidation
+        let initial_count = invalidator.count_entries_in_scope(&scope).unwrap();
+        assert_eq!(initial_count, 1);
+
+        let report_before = invalidator.cache_report(&scope).unwrap();
+        assert_eq!(report_before.entries_found, 1);
+        assert_eq!(report_before.ram_claim, CchRamClaim::Unreferenced);
+
         let count = invalidator.invalidate_scope(&scope).unwrap();
         assert_eq!(count, 1);
+
+        // Count scan after invalidation
+        let post_count = invalidator.count_entries_in_scope(&scope).unwrap();
+        assert_eq!(post_count, 0);
 
         assert!(store
             .lookup(tenant_a, &key_scratchpad, &scratchpad_tokens)
@@ -171,6 +230,9 @@ mod tests {
             PrefixStoreScratchpadInvalidator::new(&store).with_keys(vec![key_pinned.clone()]);
 
         let unmatching_scope = ScratchpadCacheScope::new(tenant, vec![999, 888, 777]);
+        let count_before = invalidator.count_entries_in_scope(&unmatching_scope).unwrap();
+        assert_eq!(count_before, 0);
+
         let invalidated = invalidator.invalidate_scope(&unmatching_scope).unwrap();
         assert_eq!(invalidated, 0);
 
@@ -209,8 +271,16 @@ mod tests {
             PrefixStoreScratchpadInvalidator::new(&store).with_keys(vec![key.clone()]);
 
         let scope_a = ScratchpadCacheScope::new(tenant_a, scratchpad_tokens.clone());
+        let scope_b = ScratchpadCacheScope::new(tenant_b, scratchpad_tokens.clone());
+
+        assert_eq!(invalidator.count_entries_in_scope(&scope_a).unwrap(), 1);
+        assert_eq!(invalidator.count_entries_in_scope(&scope_b).unwrap(), 1);
+
         let count = invalidator.invalidate_scope(&scope_a).unwrap();
         assert_eq!(count, 1);
+
+        assert_eq!(invalidator.count_entries_in_scope(&scope_a).unwrap(), 0);
+        assert_eq!(invalidator.count_entries_in_scope(&scope_b).unwrap(), 1);
 
         assert!(store.lookup(tenant_a, &key, &scratchpad_tokens).is_none());
         let hit_b = store

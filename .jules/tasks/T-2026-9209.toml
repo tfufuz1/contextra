@@ -1,0 +1,31 @@
+# Task-Karte: T-2026-9209
+id        = "T-2026-9209"
+title     = "Cache-Scan und SecureBuf"
+crate     = "contextra-store"
+tier      = 1
+risk      = "sec"
+goal      = "Cache-Invalidierung mit Zählscan (C4.7) und zeroize-on-drop-Puffer CchSecureBuf"
+non_goals = ["Refactoring fremder Module", "Engine-Caches"]
+scope     = [
+  "crates/contextra-crypto/src/secure_buf.rs",
+  "crates/contextra-crypto/src/lib.rs",
+  "crates/contextra-store/src/sstable/block_cache.rs",
+  "crates/contextra-kvcache/src/scratchpad_invalidation.rs",
+  "crates/contextra-crypto/tests/secure_buf.rs",
+  "crates/contextra-store/tests/block_cache_invalidation.rs",
+  "crates/contextra-kvcache/tests/cache_scope_scan.rs",
+  ".jules/tasks/T-2026-9209.toml"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root"]
+acceptance = [
+  "cargo test -p contextra-crypto --test secure_buf",
+  "cargo test -p contextra-store",
+  "cargo test -p contextra-kvcache"
+]
+evidence_required = ["Neuer Test, der die Funktionalität absichert"]
+
+[budget]
+files = 9
+lines = 800
+iterations = 10
