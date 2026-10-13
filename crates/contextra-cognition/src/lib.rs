@@ -1,5 +1,4 @@
 #![deny(dead_code)]
-// TODO(contextra-plan): Verify error propagation for consolidation and synthesis facade re-exports. [ref:eigenbau-consolidation-pass]
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.
@@ -22,6 +21,7 @@ pub mod memory_consolidation;
 pub mod semantic_aggregation_facade;
 pub mod synthesis_phase;
 pub mod transitivity_veto;
+pub mod wiring;
 
 pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
@@ -54,3 +54,4 @@ pub use memory_consolidation::{
 pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use synthesis_phase::run_synthesis_pass;
 pub use transitivity_veto::{filter_candidates_with_transitivity_veto, validate_transitivity_veto};
+pub use wiring::{CognitionWiring, CognitionWiringDeps};

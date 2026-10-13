@@ -5,8 +5,6 @@
 // NICHT-OFFENSICHTLICH: Keine eigenen Storage-Mutationen in contextra-db; delegiert an contextra-engine und contextra-cognition.
 // SIEHE AUCH: AGENTS.md, capabilities.toml
 
-// TODO(contextra-plan): Implement 2PC transactional synchronization between LSM storage engine and vector index, CheckpointPinGuard pinning, and atomic deletion split-brain protection [ref:eigenbau-index-store-sync]
-
 #![forbid(unsafe_code)]
 
 pub use contextra_cognition as cognition;
@@ -84,6 +82,7 @@ pub mod decay_controller {
 pub use contextra_engine::fusion;
 pub mod homeostat;
 pub mod multistep;
+pub mod wiring;
 pub mod pid_latency_controller {
     pub use contextra_adapt::pid_latency_controller::*;
 }
@@ -101,6 +100,7 @@ pub use homeostat::RerankDeadline;
 #[allow(deprecated)]
 pub use homeostat::RerankPidController;
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
+pub use wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage, PipelineStages};
 pub use pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
     MIN_SCALING_FACTOR,

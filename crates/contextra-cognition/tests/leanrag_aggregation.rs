@@ -411,6 +411,7 @@ fn test_type_renaming_and_deprecation() {
     let res = SegmentSynthesisResult {
         synthesized_chunks: vec![],
         skipped_segments: 0,
+        errors: vec![],
     };
     assert_eq!(res.skipped_segments, 0);
 

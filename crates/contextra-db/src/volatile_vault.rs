@@ -100,7 +100,7 @@ pub struct PurgeReceipt {
 }
 
 /// Quittung nach erfolgreichem commit_to_storage().
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitReceipt {
     pub chunks_committed: usize,
     pub bytes_committed: usize,
@@ -296,6 +296,26 @@ impl VolatileContextVault {
         self.current_bytes = 0;
         let chunks = std::mem::take(&mut self.chunks);
         (metadata, chunks)
+    }
+
+    /// Commits the vault contents, draining all chunks and returning a [`CommitReceipt`].
+    pub fn commit(&mut self) -> Result<CommitReceipt, VaultError> {
+        if self.consumed {
+            return Err(VaultError::AlreadyConsumed);
+        }
+        let (metadata, chunks) = self.drain_for_commit();
+        let chunks_committed = chunks.len();
+        let bytes_committed = metadata.iter().map(|m| m.size_bytes).sum();
+        self.consumed = true;
+        Ok(CommitReceipt {
+            chunks_committed,
+            bytes_committed,
+        })
+    }
+
+    /// Alias for `commit()` matching spec naming convention (`commit_to_storage`).
+    pub fn commit_to_storage(&mut self) -> Result<CommitReceipt, VaultError> {
+        self.commit()
     }
 }
 
@@ -493,5 +513,22 @@ mod tests {
         assert_eq!(chunks[0].content, b"data payload");
         assert_eq!(vault.len(), 0);
         assert_eq!(vault.current_size_bytes(), 0);
+    }
+
+    #[test]
+    fn test_commit_returns_commit_receipt() {
+        let config = VaultConfig {
+            attempt_mlock: false,
+            ..Default::default()
+        };
+        let mut vault = VolatileContextVault::open(config);
+        vault.ingest(make_chunk(1, b"hello")).unwrap();
+        vault.ingest(make_chunk(2, b"world!")).unwrap();
+
+        let receipt = vault.commit().expect("commit receipt");
+        assert_eq!(receipt.chunks_committed, 2);
+        assert_eq!(receipt.bytes_committed, 11);
+
+        assert!(matches!(vault.commit(), Err(VaultError::AlreadyConsumed)));
     }
 }
