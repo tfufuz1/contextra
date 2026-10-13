@@ -7,12 +7,47 @@ use super::db_transaction::{
 };
 use super::intent::CommitIntent;
 use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
+use contextra_mvcc::SsiValidator;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TenantId, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    pub(super) fn validate_ssi_gate(&self) -> Result<()> {
+        let read_set = {
+            let guard = match self.read_set.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            guard.clone()
+        };
+
+        if read_set.is_empty() {
+            return Ok(());
+        }
+
+        if let Some(ref validator) = self.ssi_validator {
+            return validator.validate(self.tx_id, &read_set);
+        }
+
+        let storage_ref = self.collection.storage.as_ref();
+        let ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>> = (storage_ref
+            as &dyn std::any::Any)
+            .downcast_ref::<contextra_store::LsmStorage>()
+            .map(|lsm| lsm.ssi_validator.clone());
+
+        if let Some(validator) = ssi_validator {
+            validator.validate(self.tx_id, &read_set)
+        } else if storage_ref.supports_ssi_tracking() {
+            Err(ContextraError::Conflict(format!(
+                "Serializable isolation validation failed for TxId({}): SSI validator unavailable (fail-closed)",
+                self.tx_id.inner()
+            )))
+        } else {
+            Ok(())
+        }
+    }
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
         let seq_ops = {
             let mut guard = match self.staged_text_sequence.lock() {
@@ -270,6 +305,11 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     async fn commit_internal(&self) -> Result<()> {
+        if let Err(e) = self.validate_ssi_gate() {
+            self.rollback_internal().await;
+            return Err(e);
+        }
+
         let intent_key = self
             .collection
             .namespaced_key(&self.tx_id.inner().to_le_bytes(), 3);
@@ -448,10 +488,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 index_err
             )));
         }
-        let tenant_id = TenantId::try_new(1).unwrap_or_default();
         ledger.push(CompensateHnswAction::new(
             self.collection.clone(),
-            tenant_id,
+            self.tenant_id,
             Arc::clone(&doc_ids),
         ));
 

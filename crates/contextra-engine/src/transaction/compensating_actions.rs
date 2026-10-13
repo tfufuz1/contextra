@@ -76,6 +76,14 @@ impl<S: StorageEngine, V: VectorIndex> CompensateLsmAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
+            // Idempotency check: if intent is already Aborted, compensation has completed.
+            if let Ok(Some(existing_bytes)) = self.collection.storage.get(&self.intent_key).await {
+                if let Ok(CommitIntent::Aborted) = serde_json::from_slice(&existing_bytes) {
+                    tracing::info!("[INV-DB-3] Transaction already marked Aborted; skipping redundant compensation");
+                    return Ok(());
+                }
+            }
+
             let mut success = false;
             let mut attempts = 0;
             let max_attempts = 3;
