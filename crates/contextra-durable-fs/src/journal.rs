@@ -86,9 +86,6 @@ impl PendingDeleteJournal {
             }
         }
 
-        self.entries = remaining;
-        self.flush()?;
-
         // If journal is empty, attempt to durably remove the journal file itself
         if self.entries.is_empty() && self.journal_path.exists() {
             durable_remove(&self.journal_path)?;

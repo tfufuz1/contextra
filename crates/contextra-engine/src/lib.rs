@@ -26,6 +26,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 #[cfg(not(loom))]
+pub use contextra_impl::collections::CollectionScope;
+
 pub mod background_workers;
 #[cfg(not(loom))]
 pub mod chunker;

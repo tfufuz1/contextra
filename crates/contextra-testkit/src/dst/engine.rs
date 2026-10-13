@@ -272,9 +272,11 @@ impl DstEngine {
         buf.push(tag);
         buf.extend_from_slice(&seq_no.to_le_bytes());
         buf.extend_from_slice(&prev_hash.to_le_bytes());
-        buf.extend_from_slice(&key_len.to_le_bytes());
+        let k_len = u32::try_from(key.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&k_len.to_le_bytes());
         buf.extend_from_slice(key);
-        buf.extend_from_slice(&val_len.to_le_bytes());
+        let v_len = u32::try_from(value.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&v_len.to_le_bytes());
         buf.extend_from_slice(value);
 
         let checksum = fnv1a_32(&buf);

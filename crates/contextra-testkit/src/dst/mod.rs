@@ -6,6 +6,8 @@
 pub mod engine;
 pub mod invariants;
 pub mod op;
+pub mod p07_runner;
+pub mod p07_sut;
 pub mod rng;
 pub mod runner;
 pub mod scenario;
@@ -13,6 +15,8 @@ pub mod scenario;
 pub use engine::{DstEngine, StagedOp};
 pub use invariants::{DstModel, InvariantChecker};
 pub use op::DstOp;
+pub use p07_runner::{P07DivergenceRecord, P07DstReport, P07DstRunner};
+pub use p07_sut::{NaiveWalSut, SystemUnderTest};
 pub use rng::DstRng;
 pub use runner::{DstConfig, DstResult, DstRunner, FaultMode};
 pub use scenario::DstScenario;

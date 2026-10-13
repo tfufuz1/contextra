@@ -221,8 +221,26 @@ impl<'a> PurgeOrchestrator<'a> {
             self.storage.map(|s| s.erasure_fence.release_scope_fence());
         }
 
-        Ok(report)
-    }
+        // Phase: PurgeCompaction
+        if intent.phase == PurgePhase::PurgeCompaction || intent.phase == PurgePhase::P4PurgeCompaction {
+            purge_failpoint!(&hooks.failpoints, "mid_compaction_output");
+            report = (hooks.purge)(scope.clone(), intent.as_of_tx).await?;
+            purge_failpoint!(&hooks.failpoints, "after_compaction_before_manifest");
+
+            intent.phase = PurgePhase::Dispose;
+            intent.save(&self.intent_file).map_err(|e| OrxPurgeError::Io(e.to_string()))?;
+        }
+
+        // Phase: Dispose
+        if intent.phase == PurgePhase::Dispose || intent.phase == PurgePhase::P5Dispose {
+            purge_failpoint!(&hooks.failpoints, "after_manifest_before_unlink");
+            let obs_files = (hooks.obsolete_files)();
+            purge_failpoint!(&hooks.failpoints, "after_journal_record");
+            purge_failpoint!(&hooks.failpoints, "mid_unlink");
+
+            execute_dispose(self.journal_path.clone(), obs_files, hooks.secure_delete)
+                .await
+                .map_err(|e| OrxPurgeError::Io(e.to_string()))?;
 
     async fn run_pipeline_from(
         &self,
