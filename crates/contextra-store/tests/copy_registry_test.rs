@@ -43,6 +43,11 @@ async fn test_copy_registry_lifecycle() {
     let unmatched = reg2.holds_files(&[[99u8; 16]]);
     assert_eq!(unmatched.len(), 0);
 
+    // Query holds_scope_files
+    let scope_matched = reg2.holds_scope_files(&[file_id1]);
+    assert_eq!(scope_matched.len(), 1);
+    assert_eq!(scope_matched[0], copy_id1);
+
     // Remove registration
     let mut reg3 = reg2;
     reg3.remove(&copy_id1).await.unwrap();
@@ -51,6 +56,27 @@ async fn test_copy_registry_lifecycle() {
     // Reopen after removal
     let reg4 = CopyRegistry::open(dir.path()).await.unwrap();
     assert_eq!(reg4.list().len(), 0);
+}
+
+#[test]
+fn test_file_id_for_name_contract() {
+    let name1 = "000001.sst";
+    let name2 = "000002.sst";
+
+    let fid1 = file_id_for_name(name1);
+    let fid1_dup = file_id_for_name(name1);
+    let fid2 = file_id_for_name(name2);
+
+    assert_eq!(fid1, fid1_dup, "file_id_for_name must be deterministic");
+    assert_ne!(fid1, fid2, "file_id_for_name must not collide for different file names");
+
+    // Test a batch of names for collisions
+    let mut set = std::collections::HashSet::new();
+    for i in 0..1000 {
+        let name = format!("{:06}.sst", i);
+        let fid = file_id_for_name(&name);
+        assert!(set.insert(fid), "Collision detected for file_id_for_name at index {i}");
+    }
 }
 
 #[tokio::test]

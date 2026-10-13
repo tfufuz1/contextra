@@ -11,6 +11,16 @@ use tokio::io::AsyncWriteExt;
 
 pub const REGISTRY_FILENAME: &str = "copies.registry";
 
+/// Computes a deterministic 16-byte file identifier for a file name using BLAKE3 derive_key.
+pub fn file_id_for_name(name: &str) -> [u8; 16] {
+    let hash = blake3::Hasher::new_derive_key("contextra/copy-file-id/v1")
+        .update(name.as_bytes())
+        .finalize();
+    let mut file_id = [0u8; 16];
+    file_id.copy_from_slice(&hash.as_bytes()[..16]);
+    file_id
+}
+
 /// Kind of copy recorded in the registry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CopyKind {
@@ -212,6 +222,11 @@ impl CopyRegistry {
         &self.entries
     }
 
+    /// Returns a list of all currently registered copies (read-only observability for engine exclusion sets).
+    pub fn registered_copies(&self) -> Vec<CopyRegEntry> {
+        self.entries.clone()
+    }
+
     pub fn holds_files(&self, file_ids: &[[u8; 16]]) -> Vec<[u8; 16]> {
         let mut matched = Vec::new();
         let search_set: HashSet<&[u8; 16]> = file_ids.iter().collect();
@@ -226,6 +241,11 @@ impl CopyRegistry {
         }
 
         matched
+    }
+
+    /// Returns copy_ids of all registered copies holding any of the specified scope file_ids.
+    pub fn holds_scope_files(&self, live_file_ids: &[[u8; 16]]) -> Vec<[u8; 16]> {
+        self.holds_files(live_file_ids)
     }
 
     pub async fn remove(&mut self, copy_id: &[u8; 16]) -> Result<()> {

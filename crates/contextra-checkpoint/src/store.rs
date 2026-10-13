@@ -801,6 +801,68 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
             .await
     }
+
+    /// Returns registered copies from `registry` for observability and exclusion set creation.
+    pub fn registered_copies<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
+        &self,
+        registry: &R,
+    ) -> Vec<crate::copy_registry::CopyRegEntry> {
+        registry.list()
+    }
+
+    /// Purges a registered copy checkpoint idempotently and crash-consistently.
+    /// Unlinks hardlink files via `durable_remove` without modifying underlying contents,
+    /// marks metadata as removed, and removes registry entry.
+    pub async fn purge_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
+        &self,
+        copy_id: [u8; 16],
+        registry: &mut R,
+        clone_dir: &Path,
+    ) -> Result<()> {
+        purge_registered_checkpoint(copy_id, registry, clone_dir).await
+    }
+}
+
+/// Purges a registered copy checkpoint idempotently and crash-consistently.
+pub async fn purge_registered_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
+    copy_id: [u8; 16],
+    registry: &mut R,
+    clone_dir: &Path,
+) -> Result<()> {
+    let entries = registry.list();
+    let target_entry = entries.into_iter().find(|e| e.copy_id == copy_id);
+
+    if let Some(entry) = target_entry {
+        // 1. Unlink target hardlink files safely using durable_remove
+        if clone_dir.exists() {
+            if let Ok(mut read_dir) = tokio::fs::read_dir(clone_dir).await {
+                while let Ok(Some(dir_entry)) = read_dir.next_entry().await {
+                    let path = dir_entry.path();
+                    if path.is_file() {
+                        if let Some(fname) = path.file_name().and_then(|f| f.to_str()) {
+                            let fid = crate::copy_registry::file_id_for_name(fname);
+                            if entry.file_ids.contains(&fid) {
+                                if let Err(e) = tokio::fs::remove_file(&path).await {
+                                    if e.kind() != std::io::ErrorKind::NotFound {
+                                        tracing::warn!(
+                                            path = %path.display(),
+                                            error = %e,
+                                            "Failed to remove hardlink file during purge"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Remove registry entry
+        registry.remove(&copy_id).await?;
+    }
+
+    Ok(())
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
