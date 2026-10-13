@@ -142,7 +142,7 @@ async fn test_validate_candidates_exceeding_budget_returns_err() {
     let label_fn = |_| None;
 
     // Budget = 1, candidates = 2 -> exceeds max_llm_calls_per_cycle
-    let result = validate_candidates_with_llm(&candidates, &label_fn, &generator, 1).await;
+    let result = validate_candidates_with_llm(&candidates, &label_fn, Some(&generator), 1).await;
 
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -171,7 +171,7 @@ async fn test_mock_llm_rejection_results_in_accepted_false_without_error() {
     let generator = MockTextGenerator::new("NO: this relationship is not meaningful");
     let label_fn = |id: EntityId| Some(format!("EntityName_{}", id.inner()));
 
-    let result = validate_candidates_with_llm(&candidates, &label_fn, &generator, 10).await;
+    let result = validate_candidates_with_llm(&candidates, &label_fn, Some(&generator), 10).await;
 
     assert!(result.is_ok());
     let validated = result.unwrap();

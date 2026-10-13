@@ -562,37 +562,42 @@ async fn test_suspicious_txid_does_not_silently_overwrite() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "AGT-GRAPH-001")]
-async fn test_wallclock_txid_debug_assert_panics() {
+async fn test_wallclock_txid_returns_invalid_input_error() {
     let graph = CsrGraph::new();
     // Wall-clock-artiger TxId (~1.7e18 ns) in der verbotenen Gap-Zone zwischen 10^12 und INTERNAL_BASE
     let wallclock_tx = TxId::new(1_700_000_000_000_000_000);
 
     assert!(is_suspicious_tx_id(wallclock_tx));
 
-    // In Debug-Builds MUSS debug_assert!(tx.is_valid_origin()) greifen und mit "AGT-GRAPH-001" paniquen
-    let _ = graph
+    let res = graph
         .add_entity(
             wallclock_tx,
             Entity::new(EntityId::new(100), "WallClockEntity", "Type"),
         )
         .await;
+    assert!(
+        matches!(res, Err(ContextraError::InvalidInput(ref msg)) if msg.contains("AGT-GRAPH-001")),
+        "Expected InvalidInput error for invalid wallclock TxId, got: {res:?}"
+    );
 }
 
 #[tokio::test]
-#[should_panic(expected = "AGT-GRAPH-001")]
-async fn test_sentinel_txid_zero_debug_assert_panics() {
+async fn test_sentinel_txid_zero_returns_invalid_input_error() {
     let graph = CsrGraph::new();
     let invalid_tx = TxId::INVALID;
 
     assert!(is_suspicious_tx_id(invalid_tx));
 
-    let _ = graph
+    let res = graph
         .add_entity(
             invalid_tx,
             Entity::new(EntityId::new(101), "SentinelEntity", "Type"),
         )
         .await;
+    assert!(
+        matches!(res, Err(ContextraError::InvalidInput(ref msg)) if msg.contains("AGT-GRAPH-001")),
+        "Expected InvalidInput error for sentinel TxId, got: {res:?}"
+    );
 }
 
 #[tokio::test]

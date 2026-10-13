@@ -49,7 +49,7 @@ async fn test_validate_candidates_llm_budget_guard() {
     let label_fn = |_| None;
 
     // Budget = 1, candidates = 2 -> exceeds max_llm_calls_per_cycle
-    let result = validate_candidates_with_llm(&candidates, &label_fn, &generator, 1).await;
+    let result = validate_candidates_with_llm(&candidates, &label_fn, Some(&generator), 1).await;
 
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -83,7 +83,7 @@ async fn test_validate_candidates_llm_success() {
     let generator = MockLlmTextGenerator::new("YES: interacts_with");
     let label_fn = |id: EntityId| Some(format!("Entity_{}", id.inner()));
 
-    let result = validate_candidates_with_llm(&candidates, &label_fn, &generator, 5).await;
+    let result = validate_candidates_with_llm(&candidates, &label_fn, Some(&generator), 5).await;
 
     assert!(result.is_ok(), "Validation should succeed within budget");
     let validated = result.unwrap();
@@ -113,7 +113,7 @@ async fn test_validate_candidates_llm_rejection() {
     let generator = MockLlmTextGenerator::new("NO: unrelated entities");
     let label_fn = |_| None;
 
-    let result = validate_candidates_with_llm(&candidates, &label_fn, &generator, 5).await;
+    let result = validate_candidates_with_llm(&candidates, &label_fn, Some(&generator), 5).await;
 
     assert!(result.is_ok());
     let validated = result.unwrap();
@@ -127,4 +127,25 @@ async fn test_validate_candidates_llm_rejection() {
     );
     assert!(validated[0].predicate.is_empty());
     assert_eq!(validated[0].llm_confidence, 0.0);
+}
+
+#[tokio::test]
+async fn test_validate_candidates_llm_unconfigured_port_returns_err() {
+    let doc = DocId::from_key("doc-1").unwrap();
+    let candidates = vec![HyperEdgeCandidate {
+        participants: vec![EntityId::new(10), EntityId::new(20)],
+        co_occurrence_count: 1,
+        source_doc_ids: vec![doc],
+    }];
+
+    let label_fn = |_| None;
+
+    let result = validate_candidates_with_llm(&candidates, &label_fn, None, 5).await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, GraphMutationError::Internal(ref msg) if msg.contains("No LLM text generator port configured")),
+        "Expected unconfigured port error, got: {err:?}"
+    );
 }

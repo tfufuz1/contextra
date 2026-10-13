@@ -130,11 +130,11 @@ impl Default for CsrGraph {
 impl GraphIndex for CsrGraph {
     fn add_entity<'a>(&'a self, tx: TxId, entity: Entity) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            debug_assert!(
-            tx != TxId::INVALID && tx.is_valid_origin(),
-            "TxId {} verletzt AGT-GRAPH-001 Origin-Invariante — Sentinel TxId(0) oder Wall-Clock-abgeleitete IDs korrumpieren rollback_to_tx()-Kausalordnung",
-            tx
-        );
+            if tx == TxId::INVALID || !tx.is_valid_origin() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "TxId {tx} violates AGT-GRAPH-001 origin invariant"
+                )));
+            }
             // AGT-GRAPH-001: Heuristik — wall-clock-abgeleitete oder unallozierte TxIds warnen.
             if is_suspicious_tx_id(tx) {
                 tracing::warn!(
@@ -163,11 +163,11 @@ impl GraphIndex for CsrGraph {
 
     fn add_edge<'a>(&'a self, tx: TxId, edge: contextra_types::Edge) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            debug_assert!(
-            tx != TxId::INVALID && tx.is_valid_origin(),
-            "TxId {} verletzt AGT-GRAPH-001 Origin-Invariante — Sentinel TxId(0) oder Wall-Clock-abgeleitete IDs korrumpieren rollback_to_tx()-Kausalordnung",
-            tx
-        );
+            if tx == TxId::INVALID || !tx.is_valid_origin() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "TxId {tx} violates AGT-GRAPH-001 origin invariant"
+                )));
+            }
             // AGT-GRAPH-001: Heuristik — wall-clock-abgeleitete oder unallozierte TxIds warnen.
             if is_suspicious_tx_id(tx) {
                 tracing::warn!(
@@ -647,11 +647,11 @@ impl GraphIndex for CsrGraph {
 
     fn commit<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            debug_assert!(
-            tx != TxId::INVALID && tx.is_valid_origin(),
-            "TxId {} verletzt AGT-GRAPH-001 Origin-Invariante — Sentinel TxId(0) oder Wall-Clock-abgeleitete IDs korrumpieren rollback_to_tx()-Kausalordnung",
-            tx
-        );
+            if tx == TxId::INVALID || !tx.is_valid_origin() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "TxId {tx} violates AGT-GRAPH-001 origin invariant"
+                )));
+            }
             // AGT-GRAPH-001: Heuristik — wall-clock-abgeleitete oder unallozierte TxIds warnen.
             if is_suspicious_tx_id(tx) {
                 tracing::warn!(
@@ -769,11 +769,11 @@ impl GraphIndex for CsrGraph {
         to: EntityId,
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            debug_assert!(
-            tx != TxId::INVALID && tx.is_valid_origin(),
-            "TxId {} verletzt AGT-GRAPH-001 Origin-Invariante — Sentinel TxId(0) oder Wall-Clock-abgeleitete IDs korrumpieren rollback_to_tx()-Kausalordnung",
-            tx
-        );
+            if tx == TxId::INVALID || !tx.is_valid_origin() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "TxId {tx} violates AGT-GRAPH-001 origin invariant"
+                )));
+            }
             if is_suspicious_tx_id(tx) {
                 tracing::warn!(
                 tx_id = tx.inner(),

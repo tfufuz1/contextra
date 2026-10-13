@@ -193,6 +193,15 @@ impl ApprhSelector {
     }
 }
 
+impl Default for ApprhSelector {
+    fn default() -> Self {
+        let config = ApprhSelectorConfig::default();
+        Self::with_default_monitor(config).unwrap_or_else(|_| {
+            Self::new(ApprhSelectorConfig::default(), Arc::new(ApprhGateMonitor::default()))
+        })
+    }
+}
+
 impl std::fmt::Debug for ApprhSelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApprhSelector")
