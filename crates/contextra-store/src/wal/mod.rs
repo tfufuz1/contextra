@@ -331,6 +331,7 @@ pub struct WalConfig {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
+    pub expected_hwm: Option<[u8; 32]>,
 }
 
 impl Default for WalConfig {
@@ -340,6 +341,7 @@ impl Default for WalConfig {
             allow_legacy_integrity_key_fallback: false,
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
+            expected_hwm: None,
         }
     }
 }
@@ -347,6 +349,11 @@ impl Default for WalConfig {
 impl WalConfig {
     pub fn with_legacy_fallback(mut self, allow: bool) -> Self {
         self.allow_legacy_integrity_key_fallback = allow;
+        self
+    }
+
+    pub fn with_expected_hwm(mut self, hwm: Option<[u8; 32]>) -> Self {
+        self.expected_hwm = hwm;
         self
     }
 }
@@ -811,11 +818,6 @@ impl Wal {
                             .store(true, std::sync::atomic::Ordering::SeqCst);
                     }
                 } else {
-                    // TODO(Implementer): [P01 / F-02 / HIGH / JULES-P01-02]
-                    // Unvollständige Truncation partieller Frames beim Replay auf Open (Invariante I-3):
-                    // Sicherstellen, dass `verified_end` exakt der physischen Endposition des letzten vollständig
-                    // verifizierten HMAC-Frames entspricht (auch bei V3-AEAD-Verschlüsselung mit Nonce/Tag).
-                    // Müll- oder Nulldaten nach einem Absturz müssen deterministisch abgeschnitten werden.
                     let (verified_end, last_hmac) =
                         if let Some((_, last_entry, end_pos)) = entries.last() {
                             (*end_pos, last_entry.checksum)
@@ -824,6 +826,19 @@ impl Wal {
                         } else {
                             (0u64, [0u8; 32])
                         };
+
+                    if let Some(expected_hwm) = config.expected_hwm {
+                        let hwm_reached = entries
+                            .iter()
+                            .any(|(_, entry, _)| entry.checksum == expected_hwm)
+                            || expected_hwm == [0u8; 32];
+                        if !hwm_reached && !entries.is_empty() {
+                            return Err(ContextraError::wal_truncation_detected(
+                                expected_hwm,
+                                last_hmac,
+                            ));
+                        }
+                    }
 
                     if verified_end < metadata.len() {
                         let discarded_bytes = metadata.len() - verified_end;
@@ -835,6 +850,7 @@ impl Wal {
                             "Truncating torn WAL write tail on open"
                         );
                         wal.truncate(verified_end, last_hmac).await?;
+                        crate::util::fsync_parent_dir(&wal.path).await?;
                     } else {
                         let mut guard = wal.last_hmac.lock().await;
                         *guard = last_hmac;
