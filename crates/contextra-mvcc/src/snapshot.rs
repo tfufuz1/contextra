@@ -101,7 +101,10 @@ impl SnapshotRegistry {
     #[cfg(loom)]
     pub fn acquire_at(this: &Arc<Self>, f: impl FnOnce() -> u64, at: Instant) -> SnapshotLease {
         let seq_no = {
-            let mut active = this.active.lock().unwrap();
+            let mut active = match this.active.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             let seq_no = f() & !TOMBSTONE_BIT;
             active.entry(seq_no).or_default().push(at);
             this.update_min(&active);
@@ -115,7 +118,10 @@ impl SnapshotRegistry {
     #[cfg(not(loom))]
     pub fn acquire_at(self: &Arc<Self>, f: impl FnOnce() -> u64, at: Instant) -> SnapshotLease {
         let seq_no = {
-            let mut active = self.active.lock().unwrap();
+            let mut active = match self.active.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             let seq_no = f() & !TOMBSTONE_BIT;
             active.entry(seq_no).or_default().push(at);
             self.update_min(&active);
@@ -192,7 +198,10 @@ impl SnapshotRegistry {
     /// Persistent pin of a sequence number at a specific timestamp `at`.
     pub fn pin_at(&self, seq_no: u64, at: Instant) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock().unwrap();
+        let mut active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         active.entry(seq_no).or_default().push(at);
         self.update_min(&active);
     }
@@ -208,7 +217,10 @@ impl SnapshotRegistry {
 
     pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<Instant>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock().unwrap();
+        let mut active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(timestamps) = active.get_mut(&seq_no) {
             if let Some(ts) = created_at {
                 if let Some(pos) = timestamps.iter().position(|&t| t == ts) {
@@ -231,7 +243,10 @@ impl SnapshotRegistry {
     /// Identifies which active snapshot sequence number has been held the longest relative to `now`,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
     pub fn longest_active_pin_at(&self, now: Instant) -> Option<(u64, Duration)> {
-        let active = self.active.lock().unwrap();
+        let active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let mut longest: Option<(u64, Duration)> = None;
 
         for (&seq_no, timestamps) in active.iter() {

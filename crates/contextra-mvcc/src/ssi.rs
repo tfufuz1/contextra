@@ -20,7 +20,7 @@ use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::sync::atomic::{AtomicU64, Ordering};
 use crate::sync::Arc;
-use crate::types::{DocId, TxId};
+use crate::types::{DocId, TenantId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -514,7 +514,7 @@ impl Default for SequenceLogSsiValidator {
 
 /// Builder for constructing a [`SequenceLogSsiValidator`].
 ///
-/// // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+/// Wires SSI validation parameters and dependencies for use in [`SsiCommitGate`] and [`MvccWiring`](crate::wiring::MvccWiring).
 #[derive(Default)]
 pub struct SequenceLogSsiValidatorBuilder {
     max_tracked_keys: Option<usize>,
@@ -1048,6 +1048,256 @@ fn derive_doc_id_for_key(key: &[u8]) -> DocId {
     let mut hasher = ahash::AHasher::default();
     hasher.write(key);
     DocId::from(hasher.finish())
+}
+
+/// Status of a transaction for SSI validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TxStateStatus {
+    /// Active transaction ready for validation and commit.
+    Active,
+    /// Transaction has been aborted or rolled back.
+    Aborted,
+    /// Unknown or uninitialized transaction state.
+    Unknown,
+}
+
+/// Transaction state container passed to [`SsiCommitGate`] for SSI validation.
+#[derive(Debug, Clone)]
+pub struct TxSsiState {
+    tx_id: TxId,
+    tenant_id: TenantId,
+    commit_seq: u64,
+    read_set: ReadSet,
+    write_keys: Vec<Vec<u8>>,
+    has_read_tracking: bool,
+    status: TxStateStatus,
+}
+
+impl TxSsiState {
+    /// Creates a new `TxSsiState` with required transaction identifiers and target commit sequence number.
+    pub fn new(tx_id: TxId, tenant_id: TenantId, commit_seq: u64) -> Self {
+        Self {
+            tx_id,
+            tenant_id,
+            commit_seq,
+            read_set: ReadSet::new(),
+            write_keys: Vec::new(),
+            has_read_tracking: true,
+            status: TxStateStatus::Active,
+        }
+    }
+
+    /// Attaches the transaction's [`ReadSet`].
+    pub fn with_read_set(mut self, read_set: ReadSet) -> Self {
+        self.read_set = read_set;
+        self
+    }
+
+    /// Sets written keys for commit registration.
+    pub fn with_write_keys(mut self, write_keys: Vec<Vec<u8>>) -> Self {
+        self.write_keys = write_keys;
+        self
+    }
+
+    /// Sets read tracking status flag (fail-closed if `false`).
+    pub fn with_read_tracking(mut self, enabled: bool) -> Self {
+        self.has_read_tracking = enabled;
+        self
+    }
+
+    /// Sets transaction lifecycle status.
+    pub fn with_status(mut self, status: TxStateStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    /// Returns the transaction ID.
+    pub fn tx_id(&self) -> TxId {
+        self.tx_id
+    }
+
+    /// Returns the tenant ID.
+    pub fn tenant_id(&self) -> TenantId {
+        self.tenant_id
+    }
+
+    /// Returns the target commit sequence number.
+    pub fn commit_seq(&self) -> u64 {
+        self.commit_seq
+    }
+
+    /// Returns a reference to the read set.
+    pub fn read_set(&self) -> &ReadSet {
+        &self.read_set
+    }
+
+    /// Returns a slice of write keys.
+    pub fn write_keys(&self) -> &[Vec<u8>] {
+        &self.write_keys
+    }
+
+    /// Returns whether read tracking was active.
+    pub fn has_read_tracking(&self) -> bool {
+        self.has_read_tracking
+    }
+
+    /// Returns transaction lifecycle status.
+    pub fn status(&self) -> TxStateStatus {
+        self.status
+    }
+}
+
+/// Represents the decision produced by [`SsiCommitGate`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitDecision {
+    /// Transaction validation passed and commit registration succeeded.
+    Accepted {
+        /// Sequence number at which transaction writes were registered.
+        commit_seq: u64,
+    },
+    /// Transaction validation failed and must be aborted due to a conflict or rule violation.
+    Aborted {
+        /// Human-readable explanation for the commit rejection.
+        reason: String,
+    },
+}
+
+/// Error conditions arising during SSI commit gate validation.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SsiError {
+    /// Conflict detected (e.g., write-skew or concurrent modification).
+    #[error("SSI conflict detected for transaction {tx_id}: {details}")]
+    Conflict {
+        /// Transaction ID that experienced conflict.
+        tx_id: TxId,
+        /// Details of conflict.
+        details: String,
+    },
+
+    /// Transaction read tracking was disabled or missing (fail-closed).
+    #[error("Read tracking missing or uninitialized for transaction {tx_id}")]
+    MissingReadTracking {
+        /// Transaction ID missing read set.
+        tx_id: TxId,
+    },
+
+    /// Unknown, invalid, or aborted transaction state.
+    #[error("Transaction {tx_id} is in invalid or unknown state: {status:?}")]
+    UnknownTxState {
+        /// Transaction ID in invalid state.
+        tx_id: TxId,
+        /// Transaction status.
+        status: TxStateStatus,
+    },
+
+    /// Tenant mismatch during validation.
+    #[error("Tenant mismatch during SSI commit: expected {expected:?}, found {found:?}")]
+    TenantMismatch {
+        /// Expected tenant ID.
+        expected: TenantId,
+        /// Found tenant ID.
+        found: TenantId,
+    },
+
+    /// Sequence log mismatch or divergence.
+    #[error("Sequence log divergence: {message}")]
+    SequenceLogDivergence {
+        /// Explanation of divergence.
+        message: String,
+    },
+
+    /// Generic internal validation error.
+    #[error("Internal SSI validation error: {message}")]
+    Internal {
+        /// Error message.
+        message: String,
+    },
+}
+
+impl From<SsiError> for ContextraError {
+    fn from(err: SsiError) -> Self {
+        match err {
+            SsiError::Conflict { details, .. } => ContextraError::Conflict(details),
+            SsiError::MissingReadTracking { tx_id } => {
+                ContextraError::InvalidInput(format!("Missing read tracking for tx {tx_id}"))
+            }
+            SsiError::UnknownTxState { tx_id, status } => {
+                ContextraError::InvalidInput(format!("Invalid state {:?} for tx {tx_id}", status))
+            }
+            SsiError::TenantMismatch { expected, found } => {
+                ContextraError::PolicyViolation(format!(
+                    "Tenant mismatch: expected {expected:?}, found {found:?}"
+                ))
+            }
+            SsiError::SequenceLogDivergence { message } | SsiError::Internal { message } => {
+                ContextraError::Internal(message)
+            }
+        }
+    }
+}
+
+/// Commit gate performing atomic SSI validation and committed write registration.
+#[derive(Debug)]
+pub struct SsiCommitGate {
+    validator: Arc<SequenceLogSsiValidator>,
+}
+
+impl SsiCommitGate {
+    /// Constructs an `SsiCommitGate` backed by the given validator.
+    pub fn new(validator: Arc<SequenceLogSsiValidator>) -> Self {
+        Self { validator }
+    }
+
+    /// Returns a reference to the underlying [`SequenceLogSsiValidator`].
+    pub fn validator(&self) -> &Arc<SequenceLogSsiValidator> {
+        &self.validator
+    }
+
+    /// Atomically validates `tx` state and read set, and registers `tx` write keys if valid.
+    ///
+    /// # Fail-Closed Security
+    /// - If `tx.status != TxStateStatus::Active`, returns `Err(SsiError::UnknownTxState)`.
+    /// - If `tx.has_read_tracking == false`, returns `Err(SsiError::MissingReadTracking)`.
+    /// - If `tx.read_set` conflicts with concurrent committed writes, returns `Ok(CommitDecision::Aborted { ... })`.
+    /// - Otherwise, registers `write_keys` at `commit_seq` and returns `Ok(CommitDecision::Accepted { commit_seq })`.
+    pub fn validate_and_register(
+        &self,
+        tx: &TxSsiState,
+        _seq_log: &SequenceLog,
+    ) -> std::result::Result<CommitDecision, SsiError> {
+        // Fail-closed checks on transaction lifecycle status
+        if tx.status != TxStateStatus::Active {
+            return Err(SsiError::UnknownTxState {
+                tx_id: tx.tx_id,
+                status: tx.status,
+            });
+        }
+
+        // Fail-closed check on read tracking enablement
+        if !tx.has_read_tracking {
+            return Err(SsiError::MissingReadTracking { tx_id: tx.tx_id });
+        }
+
+        let write_key_refs: Vec<&[u8]> = tx.write_keys.iter().map(|k| k.as_slice()).collect();
+
+        // Perform atomic validation against committed write history in SequenceLogSsiValidator
+        match self.validator.validate_and_record(
+            tx.tx_id,
+            &tx.read_set,
+            write_key_refs,
+            tx.commit_seq,
+        ) {
+            Ok(()) => Ok(CommitDecision::Accepted {
+                commit_seq: tx.commit_seq,
+            }),
+            Err(ContextraError::Conflict(details)) => Ok(CommitDecision::Aborted {
+                reason: format!("SSI conflict for tx {}: {}", tx.tx_id, details),
+            }),
+            Err(err) => Err(SsiError::Internal {
+                message: err.to_string(),
+            }),
+        }
+    }
 }
 
 #[cfg(test)]

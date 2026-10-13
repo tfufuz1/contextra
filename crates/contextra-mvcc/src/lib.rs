@@ -21,6 +21,7 @@ pub mod snapshot;
 pub mod ssi;
 pub mod sync;
 pub mod tx_buffer;
+pub mod wiring;
 
 // FIX(2026-10-07): Remove unused SnapshotFloor re-export removed in #4406
 pub use floor::GcFloor;
@@ -28,5 +29,9 @@ pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 #[allow(deprecated)]
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
-pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
+pub use ssi::{
+    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate,
+    SsiError, SsiValidator, TxSsiState, TxStateStatus,
+};
 pub use tx_buffer::{IndexOp, TxBuffer};
+pub use wiring::{MvccWiring, MvccWiringDeps};
