@@ -26,8 +26,10 @@ pub mod posting_list;
 pub mod stream;
 pub mod tokenizer;
 pub mod wand;
+pub mod wiring;
 
-pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
+pub use bm25::{evaluate_ndcg_at_k, score_term_bm25f, Bm25Params, FieldId, FieldWeight, BM25, BM25F};
+pub use wiring::TextWiring;
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};

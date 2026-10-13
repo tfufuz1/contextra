@@ -28,7 +28,7 @@ fn get_protected_regex() -> Option<&'static Regex> {
 
 fn get_shared_splitter() -> Arc<crate::morphology::GermanCompoundSplitter> {
     SHARED_SPLITTER
-        .get_or_init(|| Arc::new(crate::morphology::GermanCompoundSplitter::new()))
+        .get_or_init(|| Arc::new(crate::morphology::GermanCompoundSplitter::new_with_all_domains()))
         .clone()
 }
 
@@ -143,10 +143,16 @@ pub struct GermanMorphTokenizer {
 }
 
 impl GermanMorphTokenizer {
+    /// Creates a German tokenizer loaded with all domain vocabularies (Legal & Medical) by default.
     pub fn new() -> Self {
         Self {
             splitter: get_shared_splitter(),
         }
+    }
+
+    /// Creates a German tokenizer with a custom compound splitter instance.
+    pub fn with_splitter(splitter: Arc<crate::morphology::GermanCompoundSplitter>) -> Self {
+        Self { splitter }
     }
 }
 
@@ -428,6 +434,40 @@ mod tests {
                 .iter()
                 .any(|t| t.contains("pruefung") || t.contains("prüfung")),
             "GermanMorphTokenizer must tokenize umlaut words across boundaries without panic"
+        );
+    }
+
+    #[test]
+    fn test_unicode_nfc_nfkc_combining_characters_safety() {
+        // NFD decomposed unicode: "A" + combining diaeresis U+0308 = "Ä"
+        let decomposed_text = "A\u{0308}rger u\u{0308}ber O\u{0308}lpreise!";
+        let default_tokens = DefaultTokenizer.tokenize(decomposed_text);
+        assert!(!default_tokens.is_empty());
+
+        let german_tokens = GermanMorphTokenizer::new().tokenize(decomposed_text);
+        assert!(!german_tokens.is_empty());
+
+        // Zero-width spaces and control characters
+        let ctrl_text = "Datenschutz\u{200B}richtlinie\u{0000}test";
+        let tokens = GermanMorphTokenizer::new().tokenize(ctrl_text);
+        assert!(!tokens.is_empty());
+    }
+
+    #[test]
+    fn test_protected_regex_redos_resilience() {
+        use std::time::Instant;
+
+        // Catastrophic input pattern: long repetitive strings containing @ or http://
+        let malicious_email = "a".repeat(100_000) + "@" + &"b".repeat(100_000) + ".com";
+        let start = Instant::now();
+        let tokens = DefaultTokenizer.tokenize(&malicious_email);
+        let elapsed = start.elapsed();
+
+        assert!(!tokens.is_empty());
+        assert!(
+            elapsed.as_millis() < 500,
+            "Tokenizer regex execution took too long: {:?}. Must execute in O(N) linear time (ADR-014)",
+            elapsed
         );
     }
 }
