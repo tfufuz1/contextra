@@ -26,17 +26,12 @@ fn generate_golden_files() {
     let bin_bytes = proof.construct_canonical_payload();
     let json_string = serde_json::to_string_pretty(&proof).expect("to_json");
 
-    fs::create_dir_all("crates/contextra-crypto/tests/golden").expect("create dir");
-    fs::write(
-        "crates/contextra-crypto/tests/golden/p05_v4_valid.bin",
-        &bin_bytes,
-    )
-    .expect("write bin");
-    fs::write(
-        "crates/contextra-crypto/tests/golden/p05_v4_valid.json",
-        &json_string,
-    )
-    .expect("write json");
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let golden_dir = std::path::Path::new(&manifest_dir).join("tests").join("golden");
+
+    fs::create_dir_all(&golden_dir).expect("create dir");
+    fs::write(golden_dir.join("p05_v4_valid.bin"), &bin_bytes).expect("write bin");
+    fs::write(golden_dir.join("p05_v4_valid.json"), &json_string).expect("write json");
 
     println!(
         "Successfully generated golden vectors! TLV size: {} bytes",

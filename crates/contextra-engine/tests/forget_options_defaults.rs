@@ -106,6 +106,7 @@ fn test_logical_and_purge_handle_debug_redaction() {
     let logical = FonLogicalHandle {
         proof_id: [0x42; 16],
         proof_path: PathBuf::from("/secret/vault/keys/proof_42.bin"),
+        full_proof_id: [0x42; 32],
     };
 
     let dbg_str = format!("{logical:?}");

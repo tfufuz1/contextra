@@ -33,6 +33,7 @@ pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;
 pub mod revocation_log;
+pub mod secure_buf;
 pub mod wal_completeness;
 pub mod wal_crypto;
 
@@ -59,4 +60,5 @@ pub use kv_segment::{
 };
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
+pub use secure_buf::CchSecureBuf;
 pub use wal_completeness::verify_wal_chain_completeness;

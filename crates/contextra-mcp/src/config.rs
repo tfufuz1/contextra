@@ -13,6 +13,76 @@ use std::str::FromStr;
 use std::sync::{Arc, Once};
 
 static EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
+
+/// Resolves the encryption-at-rest passphrase for MCP database initialization.
+///
+/// # Default Behavior
+/// Encryption at rest is **active by default**.
+/// 1. Checks `CONTEXTRA_ENCRYPTION_PASSPHRASE` or `CONTEXTRA_PASSPHRASE` environment variables.
+/// 2. If CLI args contain `--disable-encryption-at-rest` or `CONTEXTRA_DISABLE_ENCRYPTION=1`,
+///    encryption at rest is explicitly disabled and a loud warning log is emitted.
+/// 3. Otherwise, generates or loads a persistent 256-bit passphrase keyfile (`.contextra_master.key`)
+///    located inside `db_path`.
+pub fn resolve_mcp_encryption_config(
+    db_path: &Path,
+    cli_args: &[String],
+) -> (Option<String>, bool) {
+    let disabled_by_flag = cli_args.iter().any(|a| a == "--disable-encryption-at-rest");
+    let disabled_by_env = std::env::var("CONTEXTRA_DISABLE_ENCRYPTION")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if disabled_by_flag || disabled_by_env {
+        tracing::warn!(
+            "SECURITY WARNING: Encryption at rest has been explicitly disabled via opt-out flag (--disable-encryption-at-rest / CONTEXTRA_DISABLE_ENCRYPTION). Stored database segments and WAL files are UNENCRYPTED!"
+        );
+        return (None, true);
+    }
+
+    let env_passphrase = std::env::var("CONTEXTRA_ENCRYPTION_PASSPHRASE")
+        .ok()
+        .or_else(|| std::env::var("CONTEXTRA_PASSPHRASE").ok())
+        .filter(|p| !p.trim().is_empty());
+
+    if let Some(p) = env_passphrase {
+        return (Some(p), false);
+    }
+
+    // Auto-generate or load persistent master key file in db_path
+    let key_file = db_path.join(".contextra_master.key");
+    if key_file.exists() {
+        if let Ok(key_hex) = std::fs::read_to_string(&key_file) {
+            let clean = key_hex.trim().to_string();
+            if !clean.is_empty() {
+                return (Some(clean), false);
+            }
+        }
+    }
+
+    // Generate fresh key
+    if !db_path.exists() {
+        let _ = std::fs::create_dir_all(db_path);
+    }
+
+    use rand::RngCore;
+    let mut key_bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut key_bytes);
+    let key_hex = hex_encode(key_bytes);
+
+    if let Err(e) = std::fs::write(&key_file, &key_hex) {
+        tracing::warn!(
+            error = %e,
+            "Failed to save auto-generated master key file at {}",
+            key_file.display()
+        );
+    }
+
+    (Some(key_hex), false)
+}
+
+fn hex_encode(bytes: [u8; 32]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
 static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 
 /// Ergebnis der Provider-Einstellung-Auflösung.
@@ -507,11 +577,9 @@ impl RouterConfig {
 }
 
 /// Fallback Mock LLM Text Generator.
-#[cfg(any(test, debug_assertions, feature = "test-utils"))]
 #[derive(Debug, Clone, Default)]
 pub struct MockLlmGenerator;
 
-#[cfg(any(test, debug_assertions, feature = "test-utils"))]
 impl LlmTextGenerator for MockLlmGenerator {
     fn generate<'a>(
         &'a self,
