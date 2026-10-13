@@ -5,7 +5,6 @@ mod config;
 mod engine;
 pub mod merge_operator;
 pub mod purge_filter;
-pub mod purge_select;
 pub mod retention;
 
 #[cfg(test)]
@@ -15,7 +14,6 @@ pub use adaptive::*;
 pub use config::*;
 pub use engine::*;
 pub use merge_operator::*;
-pub use purge_select::*;
 pub use retention::*;
 
 /// Removed TTL feature stub per Decision Option B.

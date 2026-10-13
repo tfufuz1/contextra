@@ -179,22 +179,12 @@ async fn test_confirm_required_semantics_table_test() {
         let resp = server.handle(req).await;
         let res_val = serde_json::to_value(&resp).unwrap();
 
-        let is_error = res_val["result"]["isError"] == true;
-        let is_capability_unsupported = res_val["result"]["content"][0]["text"]
-            .as_str()
-            .map(|t| t.contains("Capability unsupported") || t.contains("deletion_proof"))
-            .unwrap_or(false);
-
         if tc.should_succeed {
-            if is_error && is_capability_unsupported {
-                // Expected when encryption-at-rest feature is disabled
-            } else {
-                assert_ne!(
-                    res_val["result"]["isError"], true,
-                    "Case '{}' expected success, got error: {:?}",
-                    tc.name, res_val
-                );
-            }
+            assert_ne!(
+                res_val["result"]["isError"], true,
+                "Case '{}' expected success, got error: {:?}",
+                tc.name, res_val
+            );
         } else {
             assert_eq!(
                 res_val["result"]["isError"], true,

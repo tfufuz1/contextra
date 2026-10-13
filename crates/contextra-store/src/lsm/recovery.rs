@@ -421,11 +421,7 @@ impl LsmStorage {
         } else {
             config.path.join("wal.log")
         };
-        let wal = if is_read_only {
-            Wal::open_read_only(&active_wal_path, key_manager.clone()).await?
-        } else {
-            Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?
-        };
+        let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
 
         let budget_config = ResourceBudget {
             memory_limit: config.max_ram_mb * 1024 * 1024,
@@ -682,9 +678,6 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
             erasure_fence: Arc::new(super::fence::ErasureFence::new()),
-            ledger_handle,
-            ledger_state,
-            is_read_only,
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
@@ -811,12 +804,6 @@ impl LsmStorage {
         target_tx: TxId,
         _guard: &CommitGuard<'_>,
     ) -> Result<()> {
-        if self.is_read_only {
-            return Err(ContextraError::Storage(format!(
-                "LsmStorage is in ReadOnly mode due to erasure ledger status ({:?}); rollback rejected",
-                self.ledger_state
-            )));
-        }
         self.clear_intent_locks_above_tx(target_tx);
 
         let intent_path = self
@@ -943,14 +930,7 @@ impl LsmStorage {
                 sstables_lock.push(Arc::new(new_reader));
             } else if !surviving_entries.is_empty() {
                 for (k, v, seq, tx) in surviving_entries {
-                    let drop = if let Some(ref h) = self.ledger_handle {
-                        h.decide(b"lsm", &k, tx) == crate::erasure_ledger::LedgerDecision::Drop
-                    } else {
-                        false
-                    };
-                    if !drop {
-                        state.memtable.put(k, v, seq, tx);
-                    }
+                    state.memtable.put(k, v, seq, tx);
                 }
             }
 

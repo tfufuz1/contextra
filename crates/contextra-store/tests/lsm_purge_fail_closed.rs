@@ -29,7 +29,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_purge_report() -> contextra_core::Result<()> {
+async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -51,9 +51,8 @@ async fn test_purge_keys_returns_purge_report() -> contextra_core::Result<()> {
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
 
-    let report = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap();
-    assert_eq!(report.records_purged, 2);
-    assert_eq!(report.sstables_replaced, 1);
+    let res = storage.purge_keys(scope, 100, Some(&probe)).await;
+    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
 
     Ok(())
 }
@@ -110,14 +109,13 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_core::Res
     };
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
-    let report = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap();
-    assert_eq!(report.records_purged, 1);
+    let res = storage.purge_keys(scope, 100, Some(&probe)).await;
+    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
 
-    // purge_keys must not directly delete obsolete SSTable files from disk
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(
         sst_count_before, sst_count_after,
-        "SSTable file count on disk must remain unchanged until orchestrator disposes obsolete files"
+        "SSTable file count must remain completely unchanged"
     );
 
     Ok(())

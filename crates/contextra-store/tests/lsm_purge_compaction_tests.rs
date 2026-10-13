@@ -23,18 +23,19 @@ async fn test_purge_keys_insufficient_disk_space() -> contextra_core::Result<()>
     };
     let storage = LsmStorage::open(config).await?;
 
-    storage.put(TxId(1), b"key1", b"val1").await?;
-    storage.commit(TxId(1)).await?;
-    StorageEngine::flush(&storage).await?;
-
     let probe = TestFreeSpaceProbe {
         free_bytes: Some(0),
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    let err = res.unwrap_err();
-    assert!(matches!(err, PurgeBlocked::InsufficientDiskSpace { free: 0, .. }));
+    assert_eq!(
+        res.unwrap_err(),
+        PurgeBlocked::InsufficientDiskSpace {
+            needed: 1024 * 1024,
+            free: 0
+        }
+    );
 
     Ok(())
 }
@@ -57,9 +58,10 @@ async fn test_purge_keys_success() -> contextra_core::Result<()> {
     };
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
-    let report = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap();
-    assert_eq!(report.records_purged, 1);
-    assert_eq!(report.sstables_replaced, 1);
+    let res = storage.purge_keys(scope, 100, Some(&probe)).await;
+
+    // WP-0.1: purge_keys must fail-closed with Unimplemented until real compaction filter is implemented
+    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
 
     Ok(())
 }

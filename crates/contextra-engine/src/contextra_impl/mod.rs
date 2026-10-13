@@ -1,4 +1,4 @@
-pub mod collections;
+mod collections;
 mod crud;
 mod diagnostics;
 mod lifecycle;

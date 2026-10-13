@@ -352,27 +352,43 @@ async fn test_contextra_forget_collection_with_proof() {
         }),
     );
     let resp_drop = server.handle(forget_req).await;
-
+    assert!(resp_drop.error.is_none());
     let res_drop = serde_json::to_value(&resp_drop).unwrap();
-    if res_drop["result"]["isError"] == true {
-        let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
-        assert!(
-            text.contains("Capability unsupported") || text.contains("deletion_proof") || text.contains("CapabilityUnsupported"),
-            "Expected Capability unsupported error when encryption-at-rest is disabled, got: {text}"
-        );
-    } else {
-        let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
-        let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-        assert_eq!(json_res["ok"], true);
-        assert_eq!(json_res["collection"], col_name);
-        assert_eq!(json_res["proof_scope"], "collection");
+    assert_ne!(res_drop["result"]["isError"], true);
 
-        let proof_val = &json_res["proof"];
-        let proof: contextra_crypto::deletion_proof::DeletionProof =
-            serde_json::from_value(proof_val.clone()).unwrap();
+    let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["collection"], col_name);
+    assert_eq!(json_res["proof_scope"], "collection");
 
-        assert!(proof.verify(test_key.as_bytes()).unwrap());
+    let proof_val = &json_res["proof"];
+    let proof: contextra_crypto::deletion_proof::DeletionProof =
+        serde_json::from_value(proof_val.clone()).unwrap();
+
+    struct FixedRng([u8; 32]);
+    impl rand::RngCore for FixedRng {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            let len = dest.len().min(32);
+            dest[..len].copy_from_slice(&self.0[..len]);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
     }
+
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&test_key.as_bytes()[..32]);
+    let keypair =
+        contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate(&mut FixedRng(key_bytes));
+    assert!(proof.verify(keypair.verifying_key()).unwrap());
 
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
 }
@@ -1108,21 +1124,9 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let bridge_adapter = Arc::new(contextra_infer_candle::KvBridgeAdapter::new(store, cipher));
 
     let server = Arc::new(
-        McpServer::with_sandbox(
-            Arc::new(db),
-            embedder,
-            Arc::new(
-                crate::sandbox::McpSandbox::new(crate::sandbox::SandboxPolicy {
-                    allow_db_reads: true,
-                    allow_db_writes: true,
-                    allow_code_execution: false,
-                    allow_cloud_egress: true,
-                    max_execution_ms: 5_000,
-                })
-                .unwrap(),
-            ),
-        )
-        .with_kv_bridge(Some(bridge_adapter)),
+        McpServer::with_write_permission(Arc::new(db), embedder, true)
+            .expect("server new")
+            .with_kv_bridge(Some(bridge_adapter)),
     );
 
     // Insert a document first so search returns a result

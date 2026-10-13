@@ -5,7 +5,6 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::CchSecureBuf;
-use zeroize::Zeroize;
 
 #[test]
 fn test_secure_buf_basic_operations() {

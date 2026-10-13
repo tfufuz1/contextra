@@ -149,9 +149,9 @@ pub struct SstScanEvidence {
 }
 
 impl SstScanEvidence {
-    /// Checks for invariant violations according to Interface Contract V1.
+    /// Checks for invariant violations according to Interface Contract V1 based on whether key identifiers are claimed.
     /// Claim CT-S2V=3 (Value witness) or CT-S2K=4 (Key witness).
-    pub fn invariant_violations(&self) -> Vec<String> {
+    pub fn invariant_violations_for_claim(&self, key_identifiers_claimed: bool) -> Vec<String> {
         let mut violations = Vec::new();
         if self.unclassified_files > 0 {
             violations.push(format!(
@@ -165,13 +165,13 @@ impl SstScanEvidence {
                 self.versions_found
             ));
         }
-        if self.identifier_hits_index > 0 {
+        if key_identifiers_claimed && self.identifier_hits_index > 0 {
             violations.push(format!(
                 "Claim CT-S2K violation: {} index separator/fence hit(s) found",
                 self.identifier_hits_index
             ));
         }
-        if self.tombstones_remaining > 0 {
+        if key_identifiers_claimed && self.tombstones_remaining > 0 {
             violations.push(format!(
                 "Claim CT-S2K violation: {} tombstone(s) remaining",
                 self.tombstones_remaining
@@ -184,5 +184,10 @@ impl SstScanEvidence {
             ));
         }
         violations
+    }
+
+    /// Checks for invariant violations assuming key identifiers are claimed.
+    pub fn invariant_violations(&self) -> Vec<String> {
+        self.invariant_violations_for_claim(true)
     }
 }

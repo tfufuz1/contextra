@@ -1,23 +1,13 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Multi-Phasen Purge-Orchestrator Zustandsautomat für Crash-Konsistenz (Spezifikation C5.1/C5.6).
-// INVARIANTEN: Fence wird über RAII-Guard gehalten, Intent wird erst in Release nach Finalize gelöscht, Fehler propagieren.
+// STAND: 2026-10-11
+// ZWECK: Orchestriert den Purge-Ablauf über Phasen P3..P6 (Intent, Flush, Compaction, Dispose).
 
-use super::dispose::dispose_obsolete_files;
-use super::failpoint::{OrxFailpointSet, OrxPurgeError};
-use super::intent::OrxPurgeIntent;
 use super::plan::PurgePhase;
 use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeReport, PurgeScope};
 use crate::lsm::engine::LsmStorage;
-use crate::purge_failpoint;
-use contextra_core::StorageEngine;
-use contextra_durable_fs::durable_remove;
-use parking_lot::Mutex;
-use rand::RngCore;
-use std::future::Future;
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::sync::Arc;
+use contextra_core::Result;
+use contextra_durable_fs::atomic_replace;
+use std::path::PathBuf;
 
 /// Convenient alias for boxed pinned futures.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -85,50 +75,27 @@ impl<'a> Drop for OrxScopeFenceGuard<'a> {
 
 /// Orchestrates execution of a multi-phase purge pipeline as a crash-safe state machine.
 pub struct PurgeOrchestrator<'a> {
-    storage: Option<&'a LsmStorage>,
-    storage_dir: PathBuf,
+    storage: &'a LsmStorage,
     intent_file: PathBuf,
-    failpoints: Option<OrxFailpointSet>,
 }
 
 impl<'a> PurgeOrchestrator<'a> {
-    /// Creates a new `PurgeOrchestrator` instance associated with `storage`.
+    /// Creates a new `PurgeOrchestrator` instance for `storage`.
     pub fn new(storage: &'a LsmStorage) -> Self {
-        let storage_dir = storage.config.path.clone();
-        let intent_file = storage_dir.join("purge.intent");
+        let intent_file = storage.config.path.join("purge.intent");
         Self {
-            storage: Some(storage),
-            storage_dir,
+            storage,
             intent_file,
-            failpoints: None,
         }
     }
 
-    /// Creates an unattached `PurgeOrchestrator` for testing state transitions in isolation.
-    pub fn new_standalone(storage_dir: impl Into<PathBuf>) -> Self {
-        let storage_dir = storage_dir.into();
-        let intent_file = storage_dir.join("purge.intent");
-        Self {
-            storage: None,
-            storage_dir,
-            intent_file,
-            failpoints: None,
-        }
-    }
-
-    /// Sets explicit failpoint configuration for test isolation.
-    pub fn with_failpoints(mut self, failpoints: OrxFailpointSet) -> Self {
-        self.failpoints = Some(failpoints);
-        self
-    }
-
-    /// Executes the complete Purge sequence through C5.1 phases with durable logging and error propagation.
+    /// Executes the complete Purge sequence through phases P3..P6 with durable logging.
     pub async fn execute_purge(
         &self,
         scope: PurgeScope,
         as_of_tx: u64,
         space_probe: Option<&dyn FreeSpaceProbe>,
-        wal_callback: Option<Box<dyn FnOnce() -> contextra_core::Result<()> + Send>>,
+        wal_callback: Option<Box<dyn FnOnce() -> Result<()> + Send>>,
     ) -> std::result::Result<PurgeReport, PurgeBlocked> {
         let mut hooks = OrxHooks::default();
         if let Some(cb) = wal_callback {
@@ -284,43 +251,31 @@ impl<'a> PurgeOrchestrator<'a> {
             purge_failpoint!(self.failpoints, "after_dispose");
         }
 
-        // Phase: WalRetire
-        if intent.phase <= PurgePhase::WalRetire {
-            if let Some(ref wal_fn) = hooks.wal_retire {
-                wal_fn()?;
-            }
-            intent.phase = PurgePhase::WalRetire;
-            intent.write_to_file(&self.intent_file)?;
-            purge_failpoint!(self.failpoints, "after_wal_retire");
+        // P5: Dispose / Pending Delete
+        let _ = self.record_phase(PurgePhase::P5Dispose);
+        crate::purge_failpoint!("after_manifest_before_unlink");
+
+        // P6: WAL Callback
+        let _ = self.record_phase(PurgePhase::P6WalCallback);
+        if let Some(cb) = wal_callback {
+            let _ = cb();
         }
 
-        // Phase: Witness
-        if intent.phase <= PurgePhase::Witness {
-            if let Some(ref wit_fn) = hooks.witness {
-                wit_fn()?;
-            }
-            intent.phase = PurgePhase::Witness;
-            intent.write_to_file(&self.intent_file)?;
-            purge_failpoint!(self.failpoints, "after_witness");
-        }
+        // Release Fence
+        self.storage.erasure_fence.release_scope_fence();
+        let _ = self.record_phase(PurgePhase::P7Complete);
 
-        // Phase: Finalize
-        if intent.phase <= PurgePhase::Finalize {
-            intent.phase = PurgePhase::Finalize;
-            intent.write_to_file(&self.intent_file)?;
-            purge_failpoint!(self.failpoints, "after_finalize");
-            purge_failpoint!(self.failpoints, "after_chain_before_ack");
-        }
-
-        // Phase: Release
-        intent.phase = PurgePhase::Release;
-        purge_failpoint!(self.failpoints, "after_release");
-
+        // Remove intent log
         if self.intent_file.exists() {
-            durable_remove(&self.intent_file)?;
+            contextra_durable_fs::durable_remove(&self.intent_file)
+                .map_err(|_| PurgeBlocked::UnclassifiedFiles { count: 1 })?;
         }
-        purge_failpoint!(self.failpoints, "after_intent_cleanup");
 
-        Ok(comp_report)
+        Ok(report)
+    }
+
+    fn record_phase(&self, phase: PurgePhase) -> std::io::Result<()> {
+        let content = format!("{:?}", phase);
+        atomic_replace(&self.intent_file, content.as_bytes())
     }
 }

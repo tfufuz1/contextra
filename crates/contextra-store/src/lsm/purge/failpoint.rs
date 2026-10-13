@@ -1,7 +1,6 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Failpoint-Injektion für Purge-Crash-Konsistenz-Tests (Spezifikation Anhang B).
-// INVARIANTEN: Zero overhead in Release ohne fault-injection Feature, explizites OrxFailpointSet ohne Env-Vars.
+// STAND: 2026-10-11
+// ZWECK: Failpoint-Makro für Purge-Tests.
 
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -101,23 +100,17 @@ impl OrxFailpointSet {
 #[cfg(any(test, feature = "fault-injection"))]
 #[macro_export]
 macro_rules! purge_failpoint {
-    ($failpoint_set:expr, $name:expr) => {
-        if let Some(ref fp_set) = $failpoint_set {
-            if fp_set.is_active($name) {
-                return Err($crate::lsm::purge::failpoint::OrxPurgeError::Interrupted {
-                    point: $name,
-                });
-            }
-        }
-    };
     ($name:expr) => {
-        // Fallback when no failpoint set is explicitly passed
+        if std::env::var(concat!("PURGE_FAILPOINT_", $name)).is_ok() {
+            return Err(
+                $crate::compaction::purge_filter::PurgeBlocked::UnclassifiedFiles { count: 999 },
+            );
+        }
     };
 }
 
-#[cfg(not(any(test, feature = "fault-injection")))]
+#[cfg(not(test))]
 #[macro_export]
 macro_rules! purge_failpoint {
-    ($failpoint_set:expr, $name:expr) => {};
     ($name:expr) => {};
 }
