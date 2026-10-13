@@ -396,9 +396,12 @@ async fn test_e2e_compliance_scenario() {
 
     // 6a. Verify valid proof file
     let valid_proof_json = fs::read_to_string(&proof_file_path).expect("Step 6: Read valid proof");
-    let valid_proof: DeletionProof = serde_json::from_str(&valid_proof_json).expect("Step 6: Parse valid proof");
+    let valid_proof: DeletionProof =
+        serde_json::from_str(&valid_proof_json).expect("Step 6: Parse valid proof");
     let is_valid_rust = valid_proof
-        .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(&signing_key.verifying_key()))
+        .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(
+            &signing_key.verifying_key(),
+        ))
         .expect("Step 6: Rust verification");
     assert!(
         is_valid_rust,
@@ -453,7 +456,9 @@ async fn test_e2e_compliance_scenario() {
 
     assert!(
         !tampered_proof
-            .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(&signing_key.verifying_key()))
+            .verify(contextra_crypto::deletion_proof::VerificationKey::Ed25519(
+                &signing_key.verifying_key()
+            ))
             .unwrap_or(false),
         "Step 6 ASSERTION FAILED: Rust accepted tampered proof!"
     );

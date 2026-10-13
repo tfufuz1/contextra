@@ -105,7 +105,10 @@ impl StorageEngine for TestStorage {
         Box::pin(async move { Ok(Vec::new()) })
     }
 
-    fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    fn scan_prefix<'a>(
+        &'a self,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
             let data = self.data.lock().unwrap();
             let mut res = Vec::new();

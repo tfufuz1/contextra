@@ -4,6 +4,7 @@
 
 use contextra_mcp::cli::doctor::{DoctorCheckStatus, DoctorChecker, SystemDoctor};
 use contextra_mcp::cli::{execute_doctor, execute_init, execute_verify_proof, InitOptions};
+use rand::SeedableRng;
 use std::path::Path;
 use tempfile::tempdir;
 
@@ -65,6 +66,7 @@ fn test_cli_doctor_outputs_not_checkable() {
 #[test]
 fn test_cli_verify_proof_offline() {
     // Generate valid Ed25519 keypair and proof payload
+    let mut rng = rand::rngs::StdRng::seed_from_u64(12345);
     let keypair = contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate();
 
     let payload = b"canonical_proof_payload_bytes";

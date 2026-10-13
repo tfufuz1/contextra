@@ -19,12 +19,19 @@ fn test_check_loom_mocks_sabotage_detects_mock() {
     .unwrap();
 
     // Create minimal Cargo.toml with [workspace] so find_root_dir recognizes root
-    fs::write(root.join("Cargo.toml"), "[workspace]\nmembers = [\"crates/contextra-test\"]\n").unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        "[workspace]\nmembers = [\"crates/contextra-test\"]\n",
+    )
+    .unwrap();
 
     let root_str = root.to_string_lossy().to_string();
     let res = xtask::check_loom_mocks::run_check_loom_mocks(&["--root".to_string(), root_str]);
 
-    assert_ne!(res, 0, "check_loom_mocks must fail when unapproved Mock pattern is found");
+    assert_ne!(
+        res, 0,
+        "check_loom_mocks must fail when unapproved Mock pattern is found"
+    );
 }
 
 #[test]

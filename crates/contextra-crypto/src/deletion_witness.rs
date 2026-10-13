@@ -192,7 +192,9 @@ impl LayerWitness {
             .map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
 
         let legacy_evidence = match &args.layer_evidence {
-            WitLayerEvidence::Memtable { memtables_scanned, .. } => WitnessEvidence::MemtableScan {
+            WitLayerEvidence::Memtable {
+                memtables_scanned, ..
+            } => WitnessEvidence::MemtableScan {
                 memtables_scanned: *memtables_scanned,
             },
             WitLayerEvidence::SsTables { files_scanned, .. } => WitnessEvidence::SstableScan {

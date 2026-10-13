@@ -114,10 +114,8 @@ async fn test_drop_collection_removes_all_data() {
         .expect("insert doc2");
 
     let col_prefix = format!("__col:{}:", name);
-    let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-        db.inner_storage(),
-        tenant_id,
-    );
+    let tenant_storage =
+        contextra_store::tenant_codec::TenantScopedStorage::new(db.inner_storage(), tenant_id);
     let before = tenant_storage
         .scan_prefix(col_prefix.as_bytes())
         .await

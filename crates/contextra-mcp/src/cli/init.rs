@@ -20,7 +20,7 @@ pub fn execute_init(opts: &InitOptions) -> Result<(), ContextraError> {
 
     if let Some(ref key_path) = opts.key_file {
         if !key_path.exists() {
-            // Generate master key bytes via contextra-crypto API (DeletionProofKeyPair)
+            // Generate master key bytes via contextra-crypto API (DeletionProofKeyPair / OsRng)
             let keypair = DeletionProofKeyPair::generate();
             let key_bytes = keypair.verifying_key_bytes();
             std::fs::write(key_path, key_bytes)?;

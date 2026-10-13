@@ -71,7 +71,10 @@ impl std::fmt::Debug for FprSweepReport {
             .field("scanned_keys_count", &self.scanned_keys_count)
             .field("hard_matches_count", &self.hard_matches_count)
             .field("ambiguous_matches_count", &self.ambiguous_matches_count)
-            .field("unregistered_residues_count", &self.unregistered_residues.len())
+            .field(
+                "unregistered_residues_count",
+                &self.unregistered_residues.len(),
+            )
             .finish()
     }
 }
@@ -104,11 +107,7 @@ pub fn reverse_sweep<S: FprSweepSource>(
         };
 
         // 2. Prüfen, ob der Schlüssel bereits durch den Footprint abgedeckt war
-        let covered_by_footprint = footprint
-            .keys
-            .explicit
-            .iter()
-            .any(|e| e.as_slice() == key)
+        let covered_by_footprint = footprint.keys.explicit.iter().any(|e| e.as_slice() == key)
             || footprint
                 .keys
                 .prefixes

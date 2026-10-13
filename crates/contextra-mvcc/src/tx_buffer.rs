@@ -23,12 +23,12 @@ use crate::error::{ContextraError, Result};
 use crate::lease::SnapshotLease;
 use crate::snapshot::SnapshotRegistry;
 use crate::ssi::ReadSet;
+use crate::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use crate::sync::Arc;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use crate::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Single canonical constant for overhead calculation per staged entry (32 bytes).
@@ -906,8 +906,8 @@ impl<T: Clone> Default for TxBuffer<T> {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use proptest::{prop_assert, prop_assert_eq};
     use crate::sync::Arc;
+    use proptest::{prop_assert, prop_assert_eq};
 
     #[test]
     fn test_tx_buffer_read_set_tracking() {

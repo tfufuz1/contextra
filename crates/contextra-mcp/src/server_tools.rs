@@ -445,11 +445,12 @@ impl McpServer {
                             McpError::invalid_params("deletion proof key not configured")
                         })?;
 
-                    let scope = contextra::CollectionScope::Untenanted;
+                    let tenant_id = contextra_types::TenantId::try_new(1)
+                        .unwrap_or(contextra_types::TenantId::SYSTEM);
 
                     let proof = self
                         .db
-                        .drop_collection_in_scope(scope, col_name, proof_key.as_bytes())
+                        .drop_collection(col_name, tenant_id, proof_key.as_bytes())
                         .await
                         .map_err(McpError::from)?;
 

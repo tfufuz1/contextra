@@ -1,7 +1,0 @@
-# DST Regression Seeds File
-# Format: one numeric seed per line
-# Empty lines and lines starting with '#' are ignored.
-
-1001
-1002
-1003

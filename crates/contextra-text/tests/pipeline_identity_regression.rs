@@ -277,20 +277,36 @@ async fn test_p3_umlaut_normalization_bidirectional() -> Result<()> {
     let index = InvertedIndex::new_with_language(storage.clone(), "p3_ns", Language::German);
 
     // Pair 1: Bär / Baer (ä / ae)
-    index.insert(TxId::new(1), DocId::new(1), "Der Bär im Wald").await?;
-    index.insert(TxId::new(2), DocId::new(2), "Herr Baer im Bueromodus").await?;
+    index
+        .insert(TxId::new(1), DocId::new(1), "Der Bär im Wald")
+        .await?;
+    index
+        .insert(TxId::new(2), DocId::new(2), "Herr Baer im Bueromodus")
+        .await?;
 
     // Pair 2: Öl / Oel (ö / oe)
-    index.insert(TxId::new(3), DocId::new(3), "Das Öl ist teuer").await?;
-    index.insert(TxId::new(4), DocId::new(4), "Das Oel wird knapp").await?;
+    index
+        .insert(TxId::new(3), DocId::new(3), "Das Öl ist teuer")
+        .await?;
+    index
+        .insert(TxId::new(4), DocId::new(4), "Das Oel wird knapp")
+        .await?;
 
     // Pair 3: München / Muenchen (ü / ue)
-    index.insert(TxId::new(5), DocId::new(5), "Der Standort München").await?;
-    index.insert(TxId::new(6), DocId::new(6), "Der Standort Muenchen").await?;
+    index
+        .insert(TxId::new(5), DocId::new(5), "Der Standort München")
+        .await?;
+    index
+        .insert(TxId::new(6), DocId::new(6), "Der Standort Muenchen")
+        .await?;
 
     // Pair 4: Straße / Strasse (ß / ss)
-    index.insert(TxId::new(7), DocId::new(7), "In der Hauptstraße").await?;
-    index.insert(TxId::new(8), DocId::new(8), "An der Ringstrasse").await?;
+    index
+        .insert(TxId::new(7), DocId::new(7), "In der Hauptstraße")
+        .await?;
+    index
+        .insert(TxId::new(8), DocId::new(8), "An der Ringstrasse")
+        .await?;
 
     index.commit(TxId::new(1)).await?;
     index.commit(TxId::new(2)).await?;
@@ -303,35 +319,59 @@ async fn test_p3_umlaut_normalization_bidirectional() -> Result<()> {
 
     // 1a: Query "Baer" -> find Doc 1 ("Bär")
     let res_baer = index.search("baer", 10).await?;
-    assert!(res_baer.iter().any(|r| r.doc_id == DocId::new(1)), "Query 'baer' must find Doc 1 ('Bär')");
+    assert!(
+        res_baer.iter().any(|r| r.doc_id == DocId::new(1)),
+        "Query 'baer' must find Doc 1 ('Bär')"
+    );
 
     // 1b: Query "Bär" -> find Doc 2 ("Baer")
     let res_bar = index.search("bär", 10).await?;
-    assert!(res_bar.iter().any(|r| r.doc_id == DocId::new(2)), "Query 'bär' must find Doc 2 ('Baer')");
+    assert!(
+        res_bar.iter().any(|r| r.doc_id == DocId::new(2)),
+        "Query 'bär' must find Doc 2 ('Baer')"
+    );
 
     // 2a: Query "Oel" -> find Doc 3 ("Öl")
     let res_oel = index.search("oel", 10).await?;
-    assert!(res_oel.iter().any(|r| r.doc_id == DocId::new(3)), "Query 'oel' must find Doc 3 ('Öl')");
+    assert!(
+        res_oel.iter().any(|r| r.doc_id == DocId::new(3)),
+        "Query 'oel' must find Doc 3 ('Öl')"
+    );
 
     // 2b: Query "Öl" -> find Doc 4 ("Oel")
     let res_ol = index.search("öl", 10).await?;
-    assert!(res_ol.iter().any(|r| r.doc_id == DocId::new(4)), "Query 'öl' must find Doc 4 ('Oel')");
+    assert!(
+        res_ol.iter().any(|r| r.doc_id == DocId::new(4)),
+        "Query 'öl' must find Doc 4 ('Oel')"
+    );
 
     // 3a: Query "Muenchen" -> find Doc 5 ("München")
     let res_muenchen = index.search("muenchen", 10).await?;
-    assert!(res_muenchen.iter().any(|r| r.doc_id == DocId::new(5)), "Query 'muenchen' must find Doc 5 ('München')");
+    assert!(
+        res_muenchen.iter().any(|r| r.doc_id == DocId::new(5)),
+        "Query 'muenchen' must find Doc 5 ('München')"
+    );
 
     // 3b: Query "München" -> find Doc 6 ("Muenchen")
     let res_munchen = index.search("münchen", 10).await?;
-    assert!(res_munchen.iter().any(|r| r.doc_id == DocId::new(6)), "Query 'münchen' must find Doc 6 ('Muenchen')");
+    assert!(
+        res_munchen.iter().any(|r| r.doc_id == DocId::new(6)),
+        "Query 'münchen' must find Doc 6 ('Muenchen')"
+    );
 
     // 4a: Query "Strasse" -> find Doc 7 ("Hauptstraße")
     let res_strasse = index.search("strasse", 10).await?;
-    assert!(res_strasse.iter().any(|r| r.doc_id == DocId::new(7)), "Query 'strasse' must find Doc 7 ('Hauptstraße')");
+    assert!(
+        res_strasse.iter().any(|r| r.doc_id == DocId::new(7)),
+        "Query 'strasse' must find Doc 7 ('Hauptstraße')"
+    );
 
     // 4b: Query "Straße" -> find Doc 8 ("Ringstrasse")
     let res_strase = index.search("straße", 10).await?;
-    assert!(res_strase.iter().any(|r| r.doc_id == DocId::new(8)), "Query 'straße' must find Doc 8 ('Ringstrasse')");
+    assert!(
+        res_strase.iter().any(|r| r.doc_id == DocId::new(8)),
+        "Query 'straße' must find Doc 8 ('Ringstrasse')"
+    );
 
     Ok(())
 }

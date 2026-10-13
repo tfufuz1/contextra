@@ -283,7 +283,7 @@ impl StorageEngineHandle for LsmStorage {
         Box::pin(self.rollback_to_tx(tx_id))
     }
     fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        Box::pin(self.flush())
+        self.flush()
     }
     fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
         self.stats()
