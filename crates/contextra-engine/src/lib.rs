@@ -388,7 +388,9 @@ pub struct Contextra {
 }
 
 #[cfg(not(loom))]
-mod contextra_impl;
+pub mod contextra_impl;
+#[cfg(not(loom))]
+pub use contextra_impl::wiring::{EngineWiring, EngineWiringExt};
 
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
