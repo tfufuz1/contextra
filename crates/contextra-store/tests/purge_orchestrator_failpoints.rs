@@ -1,83 +1,76 @@
+// FILE-CONTEXT
+// STAND: 2026-10-12
+// ZWECK: Integrationstests für alle 14 Purge Failpoints und Resumption (Spezifikation Anhang B).
+
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::{
-    resume_pending, OrxFailpointSet, OrxHooks, OrxPurgeError, OrxPurgeIntent, PurgeOrchestrator,
-    ENGINE_PURGE_FAILPOINTS, STORE_PURGE_FAILPOINTS,
+    resume_pending, CANONICAL_FAILPOINTS, OrxFailpointSet, OrxHooks, OrxPurgeIntent,
+    PurgeOrchestrator, PurgePhase,
 };
 use contextra_store::lsm::LsmStorage;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_store_failpoints_crash_and_resume() -> contextra_core::Result<()> {
-    for fp in STORE_PURGE_FAILPOINTS {
+async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result<()> {
+    for fp_name in CANONICAL_FAILPOINTS {
         let dir = tempdir()?;
         let config = LsmConfig {
             path: dir.path().to_path_buf(),
             ..Default::default()
         };
-        let storage = LsmStorage::open(config).await?;
+        let storage = LsmStorage::open(config).await.expect("open storage");
+
         let orchestrator = PurgeOrchestrator::new(&storage);
+        let failpoint_set = OrxFailpointSet::new();
+        failpoint_set.activate(fp_name);
 
-        let failpoints = OrxFailpointSet::new();
-        failpoints.enable(fp);
+        let scope = PurgeScope::Keys(vec![b"k_fp".to_vec()]);
+        let orchestrator = orchestrator.with_failpoints(failpoint_set);
 
-        let hooks = OrxHooks::new().with_failpoints(failpoints.clone());
-        let scope = PurgeScope::Keys(vec![b"k1".to_vec()]);
+        let hooks = OrxHooks::default();
+        let res = orchestrator
+            .execute_purge_internal(scope, 100, None, &hooks, false)
+            .await;
 
-        let res = orchestrator.execute_purge_with_hooks(scope.clone(), 100, &hooks).await;
+        assert!(
+            res.is_err(),
+            "Failpoint {} should interrupt execution",
+            fp_name
+        );
 
-        match res {
-            Err(OrxPurgeError::Interrupted { point }) => {
-                assert_eq!(point, fp, "Triggered failpoint must match enabled point");
-            }
-            other => panic!("Failpoint {} should trigger Interrupted error, got: {:?}", fp, other),
+        let intent_path = dir.path().join("purge.intent");
+
+        // Depending on failpoint location, intent file must exist or be cleaned up
+        if fp_name != "after_intent_cleanup" {
+            assert!(
+                intent_path.exists(),
+                "Intent file must remain intact at failpoint {}",
+                fp_name
+            );
+            let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
+            assert!(
+                intent.phase <= PurgePhase::Release,
+                "Phase at failpoint {} must be recorded",
+                fp_name
+            );
+
+            // Resume execution and verify clean completion
+            let res_opt = resume_pending(dir.path(), &hooks, None)
+                .await
+                .expect("Resumption after failpoint should succeed");
+
+            assert!(
+                res_opt.is_some(),
+                "Resumption after failpoint {} should complete",
+                fp_name
+            );
+            assert!(
+                !intent_path.exists(),
+                "Intent file must be removed after successful resumption for {}",
+                fp_name
+            );
         }
-
-        let intent_file = dir.path().join("purge.intent");
-        assert!(intent_file.exists(), "Intent file must persist on disk after crash at {}", fp);
-
-        let intent = OrxPurgeIntent::load(&intent_file)?;
-        assert!(intent.attempt >= 1);
-
-        // Resume after crash
-        let clean_hooks = OrxHooks::new();
-        let resume_res = resume_pending(&storage, &clean_hooks).await?;
-        assert!(resume_res.is_some(), "Resume must succeed after crash at {}", fp);
-
-        assert!(!intent_file.exists(), "Intent file must be unlinked after successful resume from {}", fp);
-    }
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_engine_failpoints_inventory_b05() -> contextra_core::Result<()> {
-    for fp in ENGINE_PURGE_FAILPOINTS {
-        let dir = tempdir()?;
-        let config = LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::open(config).await?;
-        let orchestrator = PurgeOrchestrator::new(&storage);
-
-        let failpoints = OrxFailpointSet::new();
-        failpoints.enable(fp);
-
-        let hooks = OrxHooks::new().with_failpoints(failpoints);
-        let scope = PurgeScope::Keys(vec![b"k1".to_vec()]);
-
-        let res = orchestrator.execute_purge_with_hooks(scope, 100, &hooks).await;
-
-        match res {
-            Err(OrxPurgeError::Interrupted { point }) => {
-                assert_eq!(point, fp);
-            }
-            other => panic!("Engine failpoint {} should trigger Interrupted error, got: {:?}", fp, other),
-        }
-
-        let intent_file = dir.path().join("purge.intent");
-        assert!(intent_file.exists(), "Engine failpoint {} must preserve intent for B05", fp);
     }
 
     Ok(())

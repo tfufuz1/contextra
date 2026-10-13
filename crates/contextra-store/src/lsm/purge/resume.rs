@@ -1,59 +1,59 @@
 // FILE-CONTEXT
 // STAND: 2026-10-12
-// ZWECK: Resume-Logik für abgebrochene/abgestürzte Purge-Operationen (C5.1 / Anhang B).
-// INVARIANTEN: Korruption der Intent-Datei schlägt fehl (Err, nie Ok(None)). Jede Phase ist idempotent.
+// ZWECK: Resume-Schnittstelle zur Wiederaufnahme nicht abgeschlossener Purge-Operationen nach Absturz (Anhang B).
+// INVARIANTEN: Erkennt Korruption (Err), führt verbleibende Phasen idempotent aus, reinigt PendingDeleteJournal.
 
+use super::dispose::dispose_obsolete_files;
+use super::failpoint::{OrxFailpointSet, OrxPurgeError};
+use super::intent::OrxPurgeIntent;
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
-use super::plan::PurgePhase;
+use crate::compaction::purge_filter::{PurgeReport, PurgeScope};
+use std::path::Path;
 
-use crate::compaction::purge_filter::PurgeScope;
-use crate::lsm::engine::LsmStorage;
-use contextra_core::{ContextraError, Result};
-
-/// Summary report of a resumed purge operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OrxResumeReport {
-    /// Initial phase recorded in `purge.intent` before resume.
-    pub resumed_from_phase: PurgePhase,
-}
-
-/// Checks for `purge.intent` or `pending_delete.journal` in `storage.config.path` and resumes pending purge work.
+/// Resumes any pending or interrupted purge operation present in `storage_dir`.
+///
+/// Evaluates saved `purge.intent` and `pending_delete.journal`.
+/// Returns `Ok(None)` if no pending operation or journal remains.
+/// Returns `Ok(Some(report))` upon successful resumption and completion.
+/// Propagates `Err` if intent or journal is corrupted or execution fails.
 pub async fn resume_pending(
-    storage: &LsmStorage,
-    hooks: &OrxHooks<'_>,
-) -> Result<Option<OrxResumeReport>> {
-    let intent_file = storage.config.path.join("purge.intent");
-    let journal_file = storage.config.path.join("pending_delete.journal");
+    storage_dir: &Path,
+    hooks: &OrxHooks,
+    failpoints: Option<&OrxFailpointSet>,
+) -> Result<Option<PurgeReport>, OrxPurgeError> {
+    let intent_file = storage_dir.join("purge.intent");
+    let journal_file = storage_dir.join("pending_delete.journal");
 
-    if !intent_file.exists() {
-        if journal_file.exists() {
-            // Pending delete journal exists without intent file; process pending deletes
-            let obs_files = (hooks.obsolete_files)();
-            let _ = super::dispose::execute_dispose(journal_file, obs_files, hooks.secure_delete)
-                .await
-                .map_err(|e| ContextraError::Storage(format!("Dispose resume failed: {}", e)))?;
-            return Ok(Some(OrxResumeReport {
-                resumed_from_phase: PurgePhase::Dispose,
-            }));
+    let intent_opt = OrxPurgeIntent::read_from_file(&intent_file)?;
+
+    if let Some(intent) = intent_opt {
+        let scope = if let Some(ref recon_fn) = hooks.reconstruct_scope {
+            recon_fn(intent.ledger_seq, intent.proof_id)?
+        } else {
+            PurgeScope::Keys(Vec::new())
+        };
+
+        let mut orchestrator = PurgeOrchestrator::new_standalone(storage_dir);
+        if let Some(fp) = failpoints {
+            orchestrator = orchestrator.with_failpoints(fp.clone());
         }
-        return Ok(None);
+
+        let report = orchestrator
+            .execute_from_intent(intent, scope, hooks, false)
+            .await?;
+
+        return Ok(Some(report));
     }
 
-    // Load intent file. Failure to load/CRC mismatch MUST yield Err, never Ok(None).
-    let intent = super::intent::OrxPurgeIntent::load(&intent_file)
-        .map_err(|e| ContextraError::Storage(format!("Corrupted purge intent: {}", e)))?;
+    // If no intent remains but pending_delete.journal is present, clean up orphaned files
+    if journal_file.exists() {
+        let _disp_rep = dispose_obsolete_files(storage_dir, Vec::new(), false).await?;
+        return Ok(Some(PurgeReport {
+            records_purged: 0,
+            bytes_reclaimed: 0,
+            sstables_replaced: 0,
+        }));
+    }
 
-    let initial_phase = intent.phase;
-
-    let scope = PurgeScope::Keys(vec![]);
-
-    let orchestrator = PurgeOrchestrator::new(storage);
-    orchestrator
-        .execute_from(intent, scope, hooks)
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Resumed purge failed: {}", e)))?;
-
-    Ok(Some(OrxResumeReport {
-        resumed_from_phase: initial_phase,
-    }))
+    Ok(None)
 }

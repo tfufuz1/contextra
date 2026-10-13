@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-10-12
 // ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Löschungen.
-// INVARIANTEN: Atomare Persistenz via atomic_replace, per-entry crash consistency, Fehler werden propagiert.
+// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert, keine let _ Verwürfe.
 
 use crate::{atomic_replace, durable_remove, sync_dir};
 use std::path::{Path, PathBuf};
@@ -47,33 +47,42 @@ impl PendingDeleteJournal {
     }
 
     /// Processes all pending entries using the supplied removal closure `remove_fn`.
-    /// Removes successfully processed paths from the journal per-entry and flushes journal on disk.
+    ///
+    /// Removes successfully processed paths from the journal and updates journal file on disk
+    /// after each item to guarantee crash consistency. Missing files are treated as processed.
     pub fn process<F>(&mut self, mut remove_fn: F) -> std::io::Result<usize>
     where
         F: FnMut(&Path) -> std::io::Result<()>,
     {
         let mut processed_count = 0;
+        let mut remaining = Vec::new();
+        let original_entries = self.entries.clone();
 
-        while !self.entries.is_empty() {
-            let entry = self.entries[0].clone();
-            match remove_fn(&entry) {
-                Ok(()) => {
-                    processed_count += 1;
-                    if let Some(parent) = entry.parent() {
-                        sync_dir(parent)?;
-                    }
-                    self.entries.remove(0);
-                    self.flush()?;
-                }
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    processed_count += 1;
-                    self.entries.remove(0);
-                    self.flush()?;
-                }
+        for (idx, entry) in original_entries.iter().enumerate() {
+            let res = remove_fn(entry);
+            let is_success = match res {
+                Ok(()) => true,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
                 Err(err) => {
+                    remaining.push(entry.clone());
+                    self.entries = remaining.clone();
+                    self.entries.extend(original_entries[idx + 1..].iter().cloned());
                     self.flush()?;
                     return Err(err);
                 }
+            };
+
+            if is_success {
+                if let Some(parent) = entry.parent() {
+                    if parent.exists() {
+                        sync_dir(parent)?;
+                    }
+                }
+                processed_count += 1;
+                // Persist updated remaining list to disk immediately
+                self.entries = original_entries[idx + 1..].to_vec();
+                self.entries.extend(remaining.clone());
+                self.flush()?;
             }
         }
 

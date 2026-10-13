@@ -1,64 +1,100 @@
-//! # Purge Phase Lifecycle and Crash Consistency Model
+// FILE-CONTEXT
+// STAND: 2026-10-12
+// ZWECK: Purge-Phasen Zustandsautomat und Idempotenz-Spezifikation (Spezifikation C5.1/C5.6).
+//
+//! # Purge Phase State Machine and Idempotency
 //!
-//! | Phase | Idempotence Strategy | Persisted State / On-Disk Artefact |
+//! | Phase | Idempotenz-Strategie | Persistierter Zustand |
 //! |---|---|---|
-//! | `Admitted` | Read intent or record new intent | `purge.intent` recorded with scope ledger ref |
-//! | `Flush` | Re-flush immutable memtables (no-op if empty) | SSTables flushed to disk, WAL updated |
-//! | `PurgeCompaction` | Re-run compaction or skip if SSTable manifest already updated | New SSTables written, Manifest committed |
-//! | `Dispose` | Process pending delete journal (skip missing files) | `pending_delete.journal` updated/cleared |
-//! | `WalRetire` | Callback re-execution or WAL segment marker check | WAL segment retired / tombstoned |
-//! | `Witness` | Issue/verify deletion proof witness | `LayerCleanupProof` or witness record |
-//! | `Finalize` | Confirm purge transaction commit | Manifest/Ledger final state recorded |
-//! | `Release` | Erasure Fence release & Intent file unlinked | `purge.intent` removed |
+//! | `Admitted` | Re-executabel; Intent existiert bereits | `purge.intent` mit Phase `Admitted` |
+//! | `Flush` | Re-executabel; `storage.flush()` ist idempotent | `purge.intent` mit Phase `Flush` nach Flush |
+//! | `PurgeCompaction` | Idempotent via Manifest Atomizität & Versioning | `purge.intent` mit Phase `PurgeCompaction` |
+//! | `Dispose` | Re-executabel; `PendingDeleteJournal` filtert fehlende Dateien | `pending_delete.journal` & Intent `Dispose` |
+//! | `WalRetire` | Callback idempotent auf R0-Clog | `purge.intent` mit Phase `WalRetire` |
+//! | `Witness` | Zero-Knowledge Proof Erzeugung idempotent | `purge.intent` mit Phase `Witness` |
+//! | `Finalize` | Proof-Chain Update idempotent | `purge.intent` mit Phase `Finalize` |
+//! | `Release` | Intent Löschung schließt Purge-Zyklus ab | `purge.intent` gelöscht |
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+use serde::{Deserialize, Serialize};
+
+/// Phasen des Purge-Zustandsautomaten (C5.1 / C5.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum PurgePhase {
-    /// Phase 1: Request admitted, intent file initialized with scope ledger reference.
+    /// Initial admission and logging of purge intent.
     Admitted,
-    /// Phase 2: Active memtables flushed to SSTables.
+    /// Memtable flush to stable SSTables.
     Flush,
-    /// Phase 3: Purge compaction executed and committed to manifest.
+    /// Purge-Compaction execution and manifest update.
     PurgeCompaction,
-    /// Phase 4: Obsolete files recorded to journal and durably deleted.
+    /// Disposal of obsolete files via PendingDeleteJournal and scrubbing.
     Dispose,
-    /// Phase 5: WAL callback executed to retire obsolete WAL records.
+    /// WAL log retirement callback execution.
     WalRetire,
-    /// Phase 6: Deletion proof witness generated/recorded.
+    /// Witness deletion proof issuance.
     Witness,
-    /// Phase 7: Purge operation finalized.
+    /// Finalization of deletion proof chain.
     Finalize,
-    /// Phase 8: Erasure fence released and intent file removed.
+    /// Release of erasure fence and cleanup of intent log.
     Release,
 
-    // Legacy phase enum variants preserved for backwards compatibility with existing serialized state.
+    // Backward-compatibility aliases for legacy P0..P7 code paths
+    #[serde(alias = "P0Init")]
     P0Init,
+    #[serde(alias = "P1Intent")]
     P1Intent,
+    #[serde(alias = "P2FenceAcquired")]
     P2FenceAcquired,
+    #[serde(alias = "P3Flush")]
     P3Flush,
+    #[serde(alias = "P4PurgeCompaction")]
     P4PurgeCompaction,
+    #[serde(alias = "P5Dispose")]
     P5Dispose,
+    #[serde(alias = "P6WalCallback")]
     P6WalCallback,
+    #[serde(alias = "P7Complete")]
     P7Complete,
 }
 
 impl PurgePhase {
-    /// Returns true if this phase is at or past `other`.
+    /// Returns `true` if this phase is completed relative to `target`.
     #[must_use]
-    pub fn is_at_least(self, other: Self) -> bool {
-        self.order() >= other.order()
+    pub fn is_at_least(self, target: Self) -> bool {
+        self.ordinal() >= target.ordinal()
     }
 
-    fn order(self) -> u8 {
+    /// Converts phase variant to u8 byte representation for compact binary serialization.
+    #[must_use]
+    pub fn to_u8(self) -> u8 {
         match self {
-            PurgePhase::Admitted | PurgePhase::P0Init | PurgePhase::P1Intent => 1,
-            PurgePhase::P2FenceAcquired => 2,
-            PurgePhase::Flush | PurgePhase::P3Flush => 3,
-            PurgePhase::PurgeCompaction | PurgePhase::P4PurgeCompaction => 4,
-            PurgePhase::Dispose | PurgePhase::P5Dispose => 5,
-            PurgePhase::WalRetire | PurgePhase::P6WalCallback => 6,
-            PurgePhase::Witness => 7,
-            PurgePhase::Finalize => 8,
-            PurgePhase::Release | PurgePhase::P7Complete => 9,
+            Self::Admitted | Self::P0Init | Self::P1Intent => 0,
+            Self::Flush | Self::P2FenceAcquired | Self::P3Flush => 1,
+            Self::PurgeCompaction | Self::P4PurgeCompaction => 2,
+            Self::Dispose | Self::P5Dispose => 3,
+            Self::WalRetire | Self::P6WalCallback => 4,
+            Self::Witness => 5,
+            Self::Finalize => 6,
+            Self::Release | Self::P7Complete => 7,
         }
+    }
+
+    /// Deserializes phase from u8 byte representation.
+    #[must_use]
+    pub fn from_u8(val: u8) -> Option<Self> {
+        match val {
+            0 => Some(Self::Admitted),
+            1 => Some(Self::Flush),
+            2 => Some(Self::PurgeCompaction),
+            3 => Some(Self::Dispose),
+            4 => Some(Self::WalRetire),
+            5 => Some(Self::Witness),
+            6 => Some(Self::Finalize),
+            7 => Some(Self::Release),
+            _ => None,
+        }
+    }
+
+    fn ordinal(self) -> u8 {
+        self.to_u8()
     }
 }

@@ -1,82 +1,86 @@
 // FILE-CONTEXT
 // STAND: 2026-10-12
-// ZWECK: Entsorgung obsoleter SSTables / Dateien über PendingDeleteJournal mit optionaler Scrub-Prüfung (ADR-10).
-// INVARIANTEN: Aufzeichnung in PendingDeleteJournal erst nach Manifest-Commit, Fehler werden propagiert.
+// ZWECK: Sichere Entsorgung obsoleter SSTable-Dateien via PendingDeleteJournal und Scrubbing (Spezifikation C5.1, ADR-10).
+// INVARIANTEN: Atomare Aufzeichnung vor Entsorgung, ScrubRefusal-Fallback auf durable_remove, Propagierung aller Fehler.
 
 use contextra_durable_fs::{
     durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-/// Summary report of the file dispose phase.
+/// Report summarizing file disposal outcome.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrxDisposeReport {
-    /// Number of files successfully removed from disk.
+    /// Number of files successfully removed.
     pub files_removed: usize,
-    /// Total bytes zero-scrubbed prior to deletion.
-    pub bytes_scrubbed: u64,
-    /// Refusal reasons encountered when secure scrubbing was skipped or unsafe.
-    pub refusals: Vec<ScrubRefusal>,
+    /// Number of files overwritten with zeros before removal.
+    pub files_scrubbed: usize,
+    /// List of scrub refusals encountered during disposal.
+    pub refusals: Vec<(PathBuf, ScrubRefusal)>,
 }
 
-/// Disposes obsolete files durably by recording them in `PendingDeleteJournal` and processing them.
+/// Disposes obsolete files durably.
 ///
-/// Runs file I/O operations inside `tokio::task::spawn_blocking`.
-pub async fn execute_dispose(
-    journal_path: PathBuf,
+/// Records paths in `PendingDeleteJournal` before removal.
+/// Attempts `scrub_if_safe` if `secure_delete` is `true`.
+/// If scrubbing is refused (e.g. multiple hardlinks or CoW filesystem), falls back to standard
+/// durable removal without zero-overwriting and records refusal in [`OrxDisposeReport`].
+pub async fn dispose_obsolete_files(
+    storage_dir: &Path,
     obsolete_files: Vec<PathBuf>,
     secure_delete: bool,
 ) -> std::io::Result<OrxDisposeReport> {
+    let dir = storage_dir.to_path_buf();
+
     tokio::task::spawn_blocking(move || {
+        let journal_path = dir.join("pending_delete.journal");
         let mut journal = PendingDeleteJournal::open(&journal_path)?;
 
-        // Record all obsolete files to journal first
+        // Record all obsolete files in journal before starting physical removal
         for file in &obsolete_files {
             journal.record(file)?;
         }
 
         let mut report = OrxDisposeReport::default();
+        let policy = if secure_delete {
+            ScrubPolicy::OverwriteZeros
+        } else {
+            ScrubPolicy::Disabled
+        };
 
-        let process_res = journal.process(|file_path| {
-            if secure_delete {
-                // Check if scrubbing is safe
-                let outcome = scrub_if_safe(
-                    file_path,
-                    ScrubPolicy::OverwriteZeros,
-                    false, // reader_alive
-                    false, // not_obsolete
-                )?;
-
-                match outcome {
-                    ScrubOutcome::Scrubbed(receipt) => {
-                        report.bytes_scrubbed += receipt.bytes_scrubbed;
-                        report.files_removed += 1;
-                        Ok(())
-                    }
-                    ScrubOutcome::RemovedUnscrubbed => {
-                        report.files_removed += 1;
-                        Ok(())
-                    }
-                    ScrubOutcome::Refused(refusal) => {
-                        report.refusals.push(refusal);
-                        // Fallback to standard durable removal
-                        durable_remove(file_path)?;
-                        report.files_removed += 1;
-                        Ok(())
-                    }
-                }
-            } else {
-                durable_remove(file_path)?;
+        journal.process(|path| {
+            if !path.exists() {
                 report.files_removed += 1;
-                Ok(())
+                return Ok(());
             }
-        });
 
-        match process_res {
-            Ok(_) => Ok(report),
-            Err(err) => Err(err),
-        }
+            match scrub_if_safe(path, policy, false, false) {
+                Ok(ScrubOutcome::Scrubbed(_)) => {
+                    report.files_removed += 1;
+                    report.files_scrubbed += 1;
+                    Ok(())
+                }
+                Ok(ScrubOutcome::RemovedUnscrubbed) => {
+                    report.files_removed += 1;
+                    Ok(())
+                }
+                Ok(ScrubOutcome::Refused(refusal)) => {
+                    report.refusals.push((path.to_path_buf(), refusal));
+                    // Fall back to standard durable removal without zero-overwriting
+                    durable_remove(path)?;
+                    report.files_removed += 1;
+                    Ok(())
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    report.files_removed += 1;
+                    Ok(())
+                }
+                Err(err) => Err(err),
+            }
+        })?;
+
+        Ok(report)
     })
     .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
 }

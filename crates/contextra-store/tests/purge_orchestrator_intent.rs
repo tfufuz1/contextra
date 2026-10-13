@@ -1,68 +1,79 @@
+// FILE-CONTEXT
+// STAND: 2026-10-12
+// ZWECK: Integrationstests für OrxPurgeIntent Persistenz, Checksumme und Korruptionserkennung.
+
+use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::purge::{OrxPurgeIntent, PurgePhase};
 use tempfile::tempdir;
 
 #[test]
-fn test_purge_intent_save_and_load_roundtrip() -> std::io::Result<()> {
+fn test_intent_roundtrip_and_crc() -> std::io::Result<()> {
     let dir = tempdir()?;
     let intent_path = dir.path().join("purge.intent");
 
-    let original = OrxPurgeIntent::new(
-        [1; 16],
-        [2; 32],
-        42,
-        Some(100),
-        Some("proof-123".to_string()),
-        500,
-        PurgePhase::Admitted,
-    );
+    let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
+    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 42, Some(100), Some([2u8; 32]), PurgePhase::Admitted);
 
-    original.save(&intent_path)?;
-    assert!(intent_path.exists());
+    // Save intent
+    intent.write_to_file(&intent_path)?;
 
-    let loaded = OrxPurgeIntent::load(&intent_path)?;
-    assert_eq!(original, loaded);
+    // Read back and verify equality
+    let loaded = OrxPurgeIntent::read_from_file(&intent_path)?;
+    assert!(loaded.is_some());
+    let loaded_intent = loaded.unwrap();
+
+    assert_eq!(loaded_intent.purge_id, intent.purge_id);
+    assert_eq!(loaded_intent.ledger_seq, intent.ledger_seq);
+    assert_eq!(loaded_intent.proof_id, intent.proof_id);
+    assert_eq!(loaded_intent.scope_hash, intent.scope_hash);
+    assert_eq!(loaded_intent.as_of_tx, intent.as_of_tx);
+    assert_eq!(loaded_intent.phase, PurgePhase::Admitted);
 
     Ok(())
 }
 
 #[test]
-fn test_purge_intent_corrupted_crc_fails() -> std::io::Result<()> {
+fn test_intent_nonexistent_returns_none() -> std::io::Result<()> {
     let dir = tempdir()?;
-    let intent_path = dir.path().join("purge.intent");
+    let intent_path = dir.path().join("missing.intent");
 
-    let intent = OrxPurgeIntent::new(
-        [1; 16],
-        [2; 32],
-        1,
-        None,
-        None,
-        100,
-        PurgePhase::Flush,
-    );
+    let loaded = OrxPurgeIntent::read_from_file(&intent_path)?;
+    assert!(loaded.is_none());
 
-    intent.save(&intent_path)?;
+    Ok(())
+}
 
+#[test]
+fn test_intent_corruption_returns_error() -> std::io::Result<()> {
+    let dir = tempdir()?;
+    let intent_path = dir.path().join("corrupted.intent");
+
+    let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
+    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 10, None, None, PurgePhase::Admitted);
+    intent.write_to_file(&intent_path)?;
+
+    // Mutate a byte in the payload to invalidate CRC
     let mut bytes = std::fs::read(&intent_path)?;
-    if bytes.len() > 10 {
-        bytes[8] ^= 0xFF;
-    }
-    std::fs::write(&intent_path, &bytes)?;
+    let last = bytes.len() - 1;
+    bytes[last] ^= 0xFF;
+    std::fs::write(&intent_path, bytes)?;
 
-    let load_res = OrxPurgeIntent::load(&intent_path);
-    assert!(load_res.is_err(), "Loading corrupted intent must return Err");
+    // Must return Err on corruption, NEVER Ok(None)
+    let res = OrxPurgeIntent::read_from_file(&intent_path);
+    assert!(res.is_err(), "Corrupted intent must return Err");
 
     Ok(())
 }
 
 #[test]
-fn test_purge_intent_truncated_fails() -> std::io::Result<()> {
+fn test_intent_truncated_returns_error() -> std::io::Result<()> {
     let dir = tempdir()?;
-    let intent_path = dir.path().join("purge.intent");
+    let intent_path = dir.path().join("truncated.intent");
 
-    std::fs::write(&intent_path, b"12")?;
+    std::fs::write(&intent_path, b"ORXI_TOO_SHORT")?;
 
-    let load_res = OrxPurgeIntent::load(&intent_path);
-    assert!(load_res.is_err(), "Loading truncated intent must return Err");
+    let res = OrxPurgeIntent::read_from_file(&intent_path);
+    assert!(res.is_err(), "Truncated file must return Err");
 
     Ok(())
 }
