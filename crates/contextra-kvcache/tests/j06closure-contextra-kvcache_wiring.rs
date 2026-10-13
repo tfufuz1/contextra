@@ -2,7 +2,7 @@
 // STAND: TS:2026-10-01T00:00:00Z
 
 use bytes::Bytes;
-use contextra_crypto::{CryptoKey, ModelFingerprint};
+use contextra_crypto::{KeyManager, ModelFingerprint};
 use contextra_ports::kv::{KvBlock, KvLayout, PrefixKey, RopeConfig};
 use contextra_ports::RequestId;
 use contextra_types::{ContextraError, Result, TenantId};
@@ -19,12 +19,12 @@ use contextra_kvcache::segment::{KvSegment, ShreddableSegmentKey, Tier2Encrypted
 use contextra_kvcache::store::TenantIsolatedKvStore;
 
 struct TestCipher {
-    key: CryptoKey,
+    key: KeyManager,
 }
 
 impl TestCipher {
     fn new() -> Self {
-        let key = CryptoKey::try_new("test-passphrase-closure", b"test-salt-closure").unwrap();
+        let (key, _) = KeyManager::try_new_argon2id("test-passphrase-closure").unwrap();
         Self { key }
     }
 }

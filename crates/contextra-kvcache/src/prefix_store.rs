@@ -250,6 +250,43 @@ impl TenantPrefixKvStore {
         Ok(total_invalidated)
     }
 
+    /// Zählt die tatsächlichen Speicher-Einträge (`partition.groups`), die zu `scratchpad_key_prefix` passen.
+    pub fn count_prefix_scope_keys(
+        &self,
+        tenant: TenantId,
+        scratchpad_key_prefix: &[u32],
+        keys: &[PrefixKey],
+    ) -> Result<usize, ContextraError> {
+        if scratchpad_key_prefix.is_empty() {
+            return Ok(0);
+        }
+
+        let map = self.partitions.read();
+        let mut total_count = 0usize;
+
+        let target_partition_keys: Vec<PrefixKey> = if keys.is_empty() {
+            map.keys()
+                .filter(|(t, _)| *t == tenant)
+                .map(|(_, k)| k.clone())
+                .collect()
+        } else {
+            keys.to_vec()
+        };
+
+        for key in target_partition_keys {
+            let partition_key = (tenant, key);
+            if let Some(partition) = map.get(&partition_key) {
+                for group in partition.groups.values() {
+                    if group.tokens.starts_with(scratchpad_key_prefix) {
+                        total_count += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(total_count)
+    }
+
     fn evict_to_budget_internal(
         map: &mut AHashMap<(TenantId, PrefixKey), Partition>,
         tenant: TenantId,

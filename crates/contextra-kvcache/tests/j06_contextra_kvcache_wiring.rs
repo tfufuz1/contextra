@@ -152,7 +152,7 @@ fn j06_test_quantized_segment_wiring() {
     let tenant = TenantId::try_new(500).unwrap();
     let segment_id = 6001;
 
-    let km = contextra_crypto::CryptoKey::try_new("passphrase-q1", b"salt-q1").unwrap();
+    let (km, _) = contextra_crypto::KeyManager::try_new_argon2id("passphrase-q1").unwrap();
 
     let num_tokens = 2;
     let num_channels = 32;
