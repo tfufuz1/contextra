@@ -86,7 +86,8 @@ fn test_forget_options_validation_s4_unavailable() {
     let opts = ForgetOptions::default().with_assurance(WitAssurance::S4);
     let err = opts.validate().unwrap_err();
     assert!(
-        err.to_string().contains("S4 requires keyring, not available"),
+        err.to_string()
+            .contains("S4 requires keyring, not available"),
         "Got: {err}"
     );
 }
@@ -96,7 +97,8 @@ fn test_forget_options_validation_until_zero_invalid() {
     let opts = ForgetOptions::default().with_wait(Wait::Until(Duration::ZERO));
     let err = opts.validate().unwrap_err();
     assert!(
-        err.to_string().contains("Wait::Until(0) duration is invalid"),
+        err.to_string()
+            .contains("Wait::Until(0) duration is invalid"),
         "Got: {err}"
     );
 }

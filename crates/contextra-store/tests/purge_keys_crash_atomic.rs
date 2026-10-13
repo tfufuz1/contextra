@@ -59,16 +59,21 @@ async fn test_purge_keys_crash_atomic_recovery() -> contextra_core::Result<()> {
     let storage2 = LsmStorage::open(LsmConfig {
         path: db_path,
         ..Default::default()
-    }).await?;
+    })
+    .await?;
 
     assert_eq!(storage2.get_at_seq(b"k1", 100).await?, None);
-    assert_eq!(storage2.get_at_seq(b"k2", 100).await?, Some(Bytes::from_static(b"v2")));
+    assert_eq!(
+        storage2.get_at_seq(b"k2", 100).await?,
+        Some(Bytes::from_static(b"v2"))
+    );
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> contextra_core::Result<()> {
+async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> contextra_core::Result<()>
+{
     let dir = tempdir()?;
     let db_path = dir.path().to_path_buf();
 
@@ -87,7 +92,11 @@ async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> conte
 
         // Simulate crash before manifest commit: write an unreferenced orphan SSTable output file to disk
         let orphan_path = db_path.join("sst-compact-00000000000000000099-0000.sst");
-        tokio::fs::write(&orphan_path, b"partial_compacted_data_before_manifest_commit").await?;
+        tokio::fs::write(
+            &orphan_path,
+            b"partial_compacted_data_before_manifest_commit",
+        )
+        .await?;
 
         // Process drops before manifest commit occurs
         drop(storage);
@@ -97,11 +106,18 @@ async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> conte
     let storage_after_crash = LsmStorage::open(LsmConfig {
         path: db_path,
         ..Default::default()
-    }).await?;
+    })
+    .await?;
 
     // Unchanged state: k1 and k2 are both still present and intact in recovery
-    assert_eq!(storage_after_crash.get_at_seq(b"k1", 100).await?, Some(Bytes::from_static(b"v1")));
-    assert_eq!(storage_after_crash.get_at_seq(b"k2", 100).await?, Some(Bytes::from_static(b"v2")));
+    assert_eq!(
+        storage_after_crash.get_at_seq(b"k1", 100).await?,
+        Some(Bytes::from_static(b"v1"))
+    );
+    assert_eq!(
+        storage_after_crash.get_at_seq(b"k2", 100).await?,
+        Some(Bytes::from_static(b"v2"))
+    );
 
     Ok(())
 }

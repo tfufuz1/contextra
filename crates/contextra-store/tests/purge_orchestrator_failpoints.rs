@@ -5,8 +5,8 @@
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::{
-    resume_pending, CANONICAL_FAILPOINTS, OrxFailpointSet, OrxHooks, OrxPurgeIntent,
-    PurgeOrchestrator, PurgePhase,
+    resume_pending, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
+    CANONICAL_FAILPOINTS,
 };
 use contextra_store::lsm::LsmStorage;
 use tempfile::tempdir;

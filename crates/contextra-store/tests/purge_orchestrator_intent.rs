@@ -12,7 +12,14 @@ fn test_intent_roundtrip_and_crc() -> std::io::Result<()> {
     let intent_path = dir.path().join("purge.intent");
 
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
-    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 42, Some(100), Some([2u8; 32]), PurgePhase::P1Intent);
+    let intent = OrxPurgeIntent::new(
+        [1u8; 16],
+        &scope,
+        42,
+        Some(100),
+        Some([2u8; 32]),
+        PurgePhase::Admitted,
+    );
 
     // Save intent
     intent.write_to_file(&intent_path)?;

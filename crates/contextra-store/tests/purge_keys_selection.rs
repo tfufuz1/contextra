@@ -143,7 +143,10 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let err = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap_err();
+    let err = storage
+        .purge_keys(scope, 100, Some(&probe))
+        .await
+        .unwrap_err();
     assert!(matches!(err, PurgeBlocked::InsufficientDiskSpace { .. }));
 
     let val = storage.get_at_seq(b"key1", 100).await?;
@@ -172,7 +175,10 @@ async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_co
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let err = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap_err();
+    let err = storage
+        .purge_keys(scope, 100, Some(&probe))
+        .await
+        .unwrap_err();
     assert_eq!(err, PurgeBlocked::ActiveSnapshot { min_seq: 10 });
 
     let val = storage.get_at_seq(b"key1", 100).await?;

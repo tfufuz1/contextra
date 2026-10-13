@@ -7,7 +7,8 @@ use contextra_types::TenantId;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_drop_collection_scope_isolation_and_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_drop_collection_scope_isolation_and_fail_closed(
+) -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
     let db = Contextra::open(tmp.path()).await?;
     let proof_key = b"01234567890123456789012345678901";
@@ -19,11 +20,18 @@ async fn test_drop_collection_scope_isolation_and_fail_closed() -> Result<(), Bo
 
     // 2. Attempt to drop in Tenant scope (TenantId 1) -> mismatch: Untenanted data remains
     let _proof_tenant = db
-        .drop_collection_in_scope(CollectionScope::Tenant(TenantId::try_new(1)?), "my_col", proof_key)
+        .drop_collection_in_scope(
+            CollectionScope::Tenant(TenantId::try_new(1)?),
+            "my_col",
+            proof_key,
+        )
         .await?;
 
     // Untenanted document must STILL exist
-    assert!(col_untenanted.get("doc1").await?.is_some(), "Untenanted document should remain after Tenant drop");
+    assert!(
+        col_untenanted.get("doc1").await?.is_some(),
+        "Untenanted document should remain after Tenant drop"
+    );
 
     // 3. Drop in Untenanted scope -> successfully removes data
     let proof_untenanted = db
@@ -31,7 +39,10 @@ async fn test_drop_collection_scope_isolation_and_fail_closed() -> Result<(), Bo
         .await?;
 
     // Document is gone
-    assert!(col_untenanted.get("doc1").await?.is_none(), "Untenanted document must be gone after Untenanted drop");
+    assert!(
+        col_untenanted.get("doc1").await?.is_none(),
+        "Untenanted document must be gone after Untenanted drop"
+    );
 
     // 4. Proof must contain all mandatory ExcludedScope variants
     let exported = proof_untenanted.export_for_audit()?;

@@ -26,6 +26,15 @@ fn test_txid_try_new_valid_ranges() -> contextra_types::Result<()> {
     assert_eq!(tx_max.inner(), u64::MAX);
     assert!(tx_max.is_valid_origin());
 
+    // 3. TxId::INVALID / 0
+    let tx_zero = TxId::try_new(0)?;
+    assert_eq!(tx_zero, TxId::INVALID);
+    assert!(tx_zero.is_valid_origin());
+
+    // 4. TryFrom<u64> conversion
+    let tx_try_from: TxId = 42u64.try_into()?;
+    assert_eq!(tx_try_from.inner(), 42);
+
     Ok(())
 }
 

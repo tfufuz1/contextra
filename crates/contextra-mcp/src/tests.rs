@@ -355,7 +355,10 @@ async fn test_contextra_forget_collection_with_proof() {
     assert!(resp_drop.error.is_none());
     let res_drop = serde_json::to_value(&resp_drop).unwrap();
     if res_drop["result"]["isError"] == true {
-        panic!("forget_req returned error: {:?}", res_drop["result"]["content"]);
+        panic!(
+            "forget_req returned error: {:?}",
+            res_drop["result"]["content"]
+        );
     }
     assert_ne!(res_drop["result"]["isError"], true);
 
@@ -388,7 +391,8 @@ async fn test_contextra_forget_collection_with_proof() {
 
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&test_key.as_bytes()[..32]);
-    let keypair = contextra_crypto::DeletionProofKeyPair::generate_with_rng(&mut TestKeyRng(&key_bytes));
+    let keypair =
+        contextra_crypto::DeletionProofKeyPair::generate_with_rng(&mut TestKeyRng(&key_bytes));
 
     assert!(proof.verify(keypair.verifying_key()).unwrap());
 

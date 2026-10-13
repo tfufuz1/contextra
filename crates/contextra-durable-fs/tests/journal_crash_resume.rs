@@ -56,7 +56,10 @@ fn test_journal_process_crash_resume_idempotency() -> std::io::Result<()> {
 
     assert!(!file2.exists());
     assert!(!file3.exists());
-    assert!(!journal_path.exists(), "Journal file should be deleted when empty");
+    assert!(
+        !journal_path.exists(),
+        "Journal file should be deleted when empty"
+    );
 
     Ok(())
 }

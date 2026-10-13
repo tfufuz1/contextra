@@ -11,7 +11,10 @@ pub fn verify_purge_oracle(dir_path: &Path, scope: &SstScopeSpec, as_of_tx: u64)
     if let Ok(entries) = std::fs::read_dir(dir_path) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "sst" || ext == "sstable") {
+            if path
+                .extension()
+                .map_or(false, |ext| ext == "sst" || ext == "sstable")
+            {
                 live_files.push(path);
             }
         }
@@ -26,8 +29,8 @@ pub fn verify_purge_oracle(dir_path: &Path, scope: &SstScopeSpec, as_of_tx: u64)
         depth: 0,
     };
 
-    let evidence = scan_sstables(scope, &inputs, None, || 1)
-        .expect("Witness scan oracle failed to execute");
+    let evidence =
+        scan_sstables(scope, &inputs, None, || 1).expect("Witness scan oracle failed to execute");
 
     assert_eq!(
         evidence.versions_found, 0,

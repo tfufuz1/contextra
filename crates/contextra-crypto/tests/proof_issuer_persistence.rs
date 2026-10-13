@@ -91,11 +91,15 @@ fn test_idempotent_reissuance_returns_existing_proof() {
     let probe_ref: &dyn WitStoreProbe = &probe;
 
     let req1 = create_request(1, scope_hash, 50);
-    let first_issued = issuer.issue(req1, &[probe_ref]).expect("first issue failed");
+    let first_issued = issuer
+        .issue(req1, &[probe_ref])
+        .expect("first issue failed");
 
     // Second call with identical request parameters
     let req2 = create_request(1, scope_hash, 50);
-    let second_issued = issuer.issue(req2, &[probe_ref]).expect("second issue failed");
+    let second_issued = issuer
+        .issue(req2, &[probe_ref])
+        .expect("second issue failed");
 
     assert_eq!(
         first_issued.proof.proof_id, second_issued.proof.proof_id,

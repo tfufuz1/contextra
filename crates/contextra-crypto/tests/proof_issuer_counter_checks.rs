@@ -241,7 +241,10 @@ fn test_sstable_manifest_file_count_mismatch_rejected() {
 
     let probe_ref: &dyn WitStoreProbe = &probe;
     let res = issuer.issue(req, &[probe_ref]);
-    assert!(res.is_err(), "Manifest file count mismatch MUST be rejected");
+    assert!(
+        res.is_err(),
+        "Manifest file count mismatch MUST be rejected"
+    );
 }
 
 #[test]
@@ -281,7 +284,10 @@ fn test_missing_mandatory_layer_for_assurance_rejected() {
 
     let probe_ref: &dyn WitStoreProbe = &probe;
     let res = issuer.issue(req, &[probe_ref]);
-    assert!(res.is_err(), "Missing required layers for S1 MUST be rejected");
+    assert!(
+        res.is_err(),
+        "Missing required layers for S1 MUST be rejected"
+    );
 }
 
 #[test]
@@ -307,7 +313,7 @@ fn test_empty_footprint_without_observed_empty_rejected() {
         storage_scope: "doc:1".to_string(),
         deleted_keys_hash: scope_hash,
         footprint_hash: [0u8; 32], // Empty footprint
-        observed_empty: false,      // But observed_empty is false
+        observed_empty: false,     // But observed_empty is false
         deleted_after_tx: 50,
         stage: 1,
         supersedes: None,
@@ -320,5 +326,8 @@ fn test_empty_footprint_without_observed_empty_rejected() {
 
     let probe_ref: &dyn WitStoreProbe = &probe;
     let res = issuer.issue(req, &[probe_ref]);
-    assert!(res.is_err(), "Empty footprint without observed_empty MUST be rejected");
+    assert!(
+        res.is_err(),
+        "Empty footprint without observed_empty MUST be rejected"
+    );
 }

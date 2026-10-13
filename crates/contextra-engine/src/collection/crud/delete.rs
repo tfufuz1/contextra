@@ -49,11 +49,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// (e) Clear RAM indices (HNSW, InvertedIndex, Graph/Relations, KV-Hooks);
     /// (f) Collect layer witnesses (Memtable, HNSW, Text, Relations, Ledger);
     /// (g) Verify scope write sequence for concurrent modification.
-    pub async fn erase_document(
-        &self,
-        id: &str,
-        _opts: &DocEraseOptions,
-    ) -> Result<DocErasure> {
+    pub async fn erase_document(&self, id: &str, _opts: &DocEraseOptions) -> Result<DocErasure> {
         if id.is_empty() {
             return Err(ContextraError::InvalidInput(
                 "Document ID cannot be empty".to_string(),
@@ -68,11 +64,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Compute Footprint first to get exact keys/prefixes
         let footprint = self.erasure_footprint(doc_id).await?;
 
-        let maybe_lsm = (self.storage.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<LsmStorage>();
+        let maybe_lsm = (self.storage.as_ref() as &dyn std::any::Any).downcast_ref::<LsmStorage>();
 
         let scope_write_seq_before = if let Some(lsm) = maybe_lsm {
-            lsm.erasure_fence.snapshot_write_seq(&footprint.keys.prefixes)
+            lsm.erasure_fence
+                .snapshot_write_seq(&footprint.keys.prefixes)
         } else {
             0
         };
@@ -157,19 +153,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
-        if let Ok(rel_witness) = issue_relations_witness(
-            doc_id,
-            scanned_edges,
-            scope_hash,
-            erased_at_tx,
-            None,
-        ) {
+        if let Ok(rel_witness) =
+            issue_relations_witness(doc_id, scanned_edges, scope_hash, erased_at_tx, None)
+        {
             witnesses.push(rel_witness);
         }
 
         // (g) Scope Write Seq verification
         if let Some(lsm) = maybe_lsm {
-            let scope_write_seq_after = lsm.erasure_fence.snapshot_write_seq(&footprint.keys.prefixes);
+            let scope_write_seq_after = lsm
+                .erasure_fence
+                .snapshot_write_seq(&footprint.keys.prefixes);
             if scope_write_seq_before != scope_write_seq_after {
                 return Err(ContextraError::InvalidInput(
                     "ConcurrentModification during erase_document execution".to_string(),

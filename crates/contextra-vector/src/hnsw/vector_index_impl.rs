@@ -456,7 +456,13 @@ impl VectorIndex for HnswIndex {
                     .unwrap_or(0)
             } else {
                 let ram_idx = old_idx - mmap_node_count;
-                self.inner.hot.nodes.read().get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+                self.inner
+                    .hot
+                    .nodes
+                    .read()
+                    .get(ram_idx)
+                    .map(|n| n.max_layer)
+                    .unwrap_or(0)
             };
 
             for layer in 0..=target_max_layer {
@@ -467,10 +473,8 @@ impl VectorIndex for HnswIndex {
 
                     if let Ok(conns) = self.inner.get_node_connections(neighbor_idx, layer) {
                         if conns.contains(&(old_idx as u32)) {
-                            let cleaned: Vec<u32> = conns
-                                .into_iter()
-                                .filter(|&c| c != old_idx as u32)
-                                .collect();
+                            let cleaned: Vec<u32> =
+                                conns.into_iter().filter(|&c| c != old_idx as u32).collect();
 
                             if neighbor_idx >= mmap_node_count {
                                 let neighbor_ram_idx = neighbor_idx - mmap_node_count;

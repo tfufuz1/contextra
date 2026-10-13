@@ -18,7 +18,13 @@ async fn test_drop_collection_name_reuse_yields_fresh_empty_collection() {
     let mut embedding = vec![0.0f32; col.dimension()];
     embedding[0] = 1.0;
 
-    col.insert(doc_id, &embedding, Some(serde_json::json!({ "text": text }))).await.unwrap();
+    col.insert(
+        doc_id,
+        &embedding,
+        Some(serde_json::json!({ "text": text })),
+    )
+    .await
+    .unwrap();
     assert_eq!(col.len().await, 1);
 
     // Drop collection
@@ -34,7 +40,11 @@ async fn test_drop_collection_name_reuse_yields_fresh_empty_collection() {
         "Re-created collection must be empty"
     );
 
-    let hits = col_new.text_index_ref().search_bm25(text, 10, None).await.unwrap();
+    let hits = col_new
+        .text_index_ref()
+        .search_bm25(text, 10, None)
+        .await
+        .unwrap();
     assert!(
         hits.is_empty(),
         "Re-created collection must not match text from dropped collection"

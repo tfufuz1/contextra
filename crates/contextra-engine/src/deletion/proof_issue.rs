@@ -10,9 +10,7 @@ use contextra_crypto::deletion_proof::issuer::{IssIssuedProof, IssRequest, Proof
 use contextra_crypto::deletion_proof::probe::WitStoreProbe;
 use contextra_crypto::deletion_proof::proof_store::ProofStoreWarning;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
-use contextra_crypto::deletion_proof::types::{
-    DeletionScope, ExcludedScope,
-};
+use contextra_crypto::deletion_proof::types::{DeletionScope, ExcludedScope};
 use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_types::{ContextraError, Result, TxId};
 use tracing::error;
@@ -42,7 +40,8 @@ impl DpiRuntimeWarningCounters {
             ProofStoreWarning::ChainMismatch { .. } => {
                 self.chain_mismatches.fetch_add(1, Ordering::Relaxed);
             }
-            ProofStoreWarning::UnchainedProofFile { .. } | ProofStoreWarning::MissingProofFile { .. } => {
+            ProofStoreWarning::UnchainedProofFile { .. }
+            | ProofStoreWarning::MissingProofFile { .. } => {
                 self.unchained_files.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -103,8 +102,9 @@ impl DpiDeletionRuntime {
         };
 
         let signer: Arc<dyn ProofSigner> = if key_path.exists() {
-            let keypair = ProofKeyPairSigner::load_from_file(&key_path)
-                .map_err(|e| ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}")))?;
+            let keypair = ProofKeyPairSigner::load_from_file(&key_path).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}"))
+            })?;
             Arc::new(keypair)
         } else {
             if let Some(parent) = key_path.parent() {
@@ -112,10 +112,11 @@ impl DpiDeletionRuntime {
                     ContextraError::Crypto(format!("Failed to create signer key dir: {e}"))
                 })?;
             }
-            let keypair = ProofKeyPairSigner::from_secret_bytes(db_instance_id_to_secret(&db_instance_id));
-            keypair
-                .save_to_file(&key_path)
-                .map_err(|e| ContextraError::Crypto(format!("Failed to save Ed25519 signer key: {e}")))?;
+            let keypair =
+                ProofKeyPairSigner::from_secret_bytes(db_instance_id_to_secret(&db_instance_id));
+            keypair.save_to_file(&key_path).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to save Ed25519 signer key: {e}"))
+            })?;
             Arc::new(keypair)
         };
 

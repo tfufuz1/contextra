@@ -8,9 +8,7 @@ use contextra_crypto::deletion_proof::policy::{verify_with_policy, ProofPolicy};
 use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
 use contextra_crypto::deletion_proof::types::{DeletionLayer, DeletionScope};
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
-use contextra_engine::deletion::{
-    DpiDeletionRuntime, DpiLogicalInput, ForgetOptions,
-};
+use contextra_engine::deletion::{DpiDeletionRuntime, DpiLogicalInput, ForgetOptions};
 use contextra_types::{DocId, TenantId, TxId};
 use tempfile::TempDir;
 
@@ -180,5 +178,9 @@ fn test_proof_issue_two_stage_logical_and_physical() {
 
     let pubkey = runtime.signer().public_key();
     let report_s1 = verify_with_policy(&issued_proof.proof, &pubkey, &policy_s1);
-    assert!(report_s1.is_valid, "Stage 1 proof must pass policy S1: {:?}", report_s1);
+    assert!(
+        report_s1.is_valid,
+        "Stage 1 proof must pass policy S1: {:?}",
+        report_s1
+    );
 }

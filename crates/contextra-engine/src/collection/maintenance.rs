@@ -827,7 +827,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let res = self.drop_collection_internal().await;
 
-        self.consolidation_in_progress.store(false, Ordering::SeqCst);
+        self.consolidation_in_progress
+            .store(false, Ordering::SeqCst);
         res
     }
 

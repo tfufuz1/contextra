@@ -32,14 +32,28 @@ async fn test_drop_collection_resets_ram_state_completely() {
 
     // Confirm RAM states before drop
     let vec_len_before = col.vector_index().len().await;
-    assert_eq!(vec_len_before, 1, "Vector index RAM should have 1 vector before drop");
+    assert_eq!(
+        vec_len_before, 1,
+        "Vector index RAM should have 1 vector before drop"
+    );
 
-    let text_hits_before = col.text_index_ref().search_bm25(text, 10, None).await.unwrap();
-    assert_eq!(text_hits_before.len(), 1, "Text index RAM should have 1 hit before drop");
+    let text_hits_before = col
+        .text_index_ref()
+        .search_bm25(text, 10, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        text_hits_before.len(),
+        1,
+        "Text index RAM should have 1 hit before drop"
+    );
 
     let eid = contextra_types::EntityId::from_key(doc_id).unwrap();
     let g_entity_before = col.graph_index().entity_exists(eid);
-    assert!(g_entity_before, "Graph index RAM should have entity before drop");
+    assert!(
+        g_entity_before,
+        "Graph index RAM should have entity before drop"
+    );
 
     // Execute drop_collection
     col.drop_collection().await.unwrap();
@@ -51,7 +65,11 @@ async fn test_drop_collection_resets_ram_state_completely() {
         "Vector index RAM must be 0 after drop_collection"
     );
 
-    let text_hits_after = col.text_index_ref().search_bm25(text, 10, None).await.unwrap();
+    let text_hits_after = col
+        .text_index_ref()
+        .search_bm25(text, 10, None)
+        .await
+        .unwrap();
     assert!(
         text_hits_after.is_empty(),
         "BM25 text index RAM postings must be empty after drop_collection"

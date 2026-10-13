@@ -32,7 +32,10 @@ fn test_block_cache_file_invalidation_and_count_scan() {
 
     // Action: invalidate files 100 and 200
     let invalidated = cache.invalidate_files(&target_files);
-    assert_eq!(invalidated, 3, "Invalidation must return exact removed count");
+    assert_eq!(
+        invalidated, 3,
+        "Invalidation must return exact removed count"
+    );
 
     // Postcondition: count scan must yield 0 for invalidated files
     let post_count = cache.entries_for_files(&target_files);

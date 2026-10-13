@@ -27,7 +27,9 @@ fn generate_golden_files() {
     let json_string = serde_json::to_string_pretty(&proof).expect("to_json");
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let golden_dir = std::path::Path::new(&manifest_dir).join("tests").join("golden");
+    let golden_dir = std::path::Path::new(&manifest_dir)
+        .join("tests")
+        .join("golden");
 
     fs::create_dir_all(&golden_dir).expect("create dir");
     fs::write(golden_dir.join("p05_v4_valid.bin"), &bin_bytes).expect("write bin");

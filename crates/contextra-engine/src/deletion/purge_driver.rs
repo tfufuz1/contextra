@@ -114,7 +114,9 @@ impl<'a> DpiPurgeDriver<'a> {
                         "Close open read transactions / snapshots".to_string(),
                     ),
                     PurgeBlocked::InsufficientDiskSpace { needed, free } => (
-                        format!("Insufficient disk space for compaction: needed {needed}, free {free}"),
+                        format!(
+                            "Insufficient disk space for compaction: needed {needed}, free {free}"
+                        ),
                         "Free disk space or increase storage capacity".to_string(),
                     ),
                     PurgeBlocked::UnclassifiedFiles { count } => (
@@ -146,10 +148,7 @@ impl<'a> DpiPurgeDriver<'a> {
                         "Retry with smaller batch size or increased timeout".to_string(),
                     ),
                 };
-                return Ok(PurgeHandle::Blocked {
-                    reason,
-                    retry_hint,
-                });
+                return Ok(PurgeHandle::Blocked { reason, retry_hint });
             }
         };
 
@@ -180,7 +179,10 @@ impl<'a> DpiPurgeDriver<'a> {
         let supersedes_32 = logical_handle.full_proof_id;
 
         let doc_id_str = scope_file_names.first().cloned().unwrap_or_default();
-        let doc_id = doc_id_str.parse::<u64>().map(DocId::new).unwrap_or_else(|_| DocId::new(0));
+        let doc_id = doc_id_str
+            .parse::<u64>()
+            .map(DocId::new)
+            .unwrap_or_else(|_| DocId::new(0));
 
         let phys_scope = DeletionScope::Document {
             doc_id,
@@ -203,11 +205,9 @@ impl<'a> DpiPurgeDriver<'a> {
             wal_chain_receipt: None,
         };
 
-        let issued = self
-            .runtime
-            .issuer()
-            .issue(req, probes)
-            .map_err(|e| ContextraError::Crypto(format!("ProofIssuer stage 2 physical failed: {e}")))?;
+        let issued = self.runtime.issuer().issue(req, probes).map_err(|e| {
+            ContextraError::Crypto(format!("ProofIssuer stage 2 physical failed: {e}"))
+        })?;
 
         let proof_id = issued.proof.proof_id;
         let proof_path = self

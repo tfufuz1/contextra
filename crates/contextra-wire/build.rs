@@ -46,7 +46,9 @@ fn main() {
                 .ok();
 
             if let (Some(sm), Some(gm)) = (schema_mtime, gen_mtime) {
-                if sm > gm && sm.duration_since(gm).unwrap_or_default() > std::time::Duration::from_secs(2) {
+                if sm > gm
+                    && sm.duration_since(gm).unwrap_or_default() > std::time::Duration::from_secs(2)
+                {
                     eprintln!(
                         "Error: Schema '{}' is newer than generated code '{}', but 'flatc' is not available.",
                         schema_path,

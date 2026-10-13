@@ -28,8 +28,7 @@ fn test_p07_naive_wal_sut_passes_campaign() {
     );
 
     // Verify report file exists and is valid JSON
-    let report_content =
-        fs::read_to_string("target/dst/report.json").expect("read report.json");
+    let report_content = fs::read_to_string("target/dst/report.json").expect("read report.json");
     assert!(report_content.contains("\"seeds_tested\":"));
     assert!(report_content.contains("\"divergences\":"));
 }

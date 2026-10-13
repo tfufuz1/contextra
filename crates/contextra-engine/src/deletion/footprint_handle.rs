@@ -40,10 +40,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
 
         let mut actual_user_id = id_str.clone();
-        if let Some(doc_val) = self.storage.get_at_seq_tracked(tx, &doc_key, u64::MAX).await? {
-            if let Ok(meta) = serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&doc_val) {
+        if let Some(doc_val) = self
+            .storage
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .await?
+        {
+            if let Ok(meta) =
+                serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&doc_val)
+            {
                 actual_user_id = meta.id;
-            } else if let Ok(full) = serde_json::from_slice::<crate::collection::StoredDocument>(&doc_val) {
+            } else if let Ok(full) =
+                serde_json::from_slice::<crate::collection::StoredDocument>(&doc_val)
+            {
                 actual_user_id = full.id;
             }
         }
@@ -67,9 +75,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let mut scanned_count = 0usize;
 
-        if let Some(user_val) = self.storage.get_at_seq_tracked(tx, &user_key, u64::MAX).await? {
+        if let Some(user_val) = self
+            .storage
+            .get_at_seq_tracked(tx, &user_key, u64::MAX)
+            .await?
+        {
             scanned_count += 1;
-            if let Ok(stored) = serde_json::from_slice::<crate::collection::StoredDocument>(&user_val) {
+            if let Ok(stored) =
+                serde_json::from_slice::<crate::collection::StoredDocument>(&user_val)
+            {
                 if let Some(text) = crate::collection::extract_text(&stored.metadata) {
                     for term in text.split_whitespace() {
                         let term_bytes = term.to_lowercase().into_bytes();
@@ -81,7 +95,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
-        if self.storage.get_at_seq_tracked(tx, &doc_key, u64::MAX).await?.is_some() {
+        if self
+            .storage
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .await?
+            .is_some()
+        {
             scanned_count += 1;
         }
 
@@ -89,7 +108,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let rel_prefix = self.namespaced_key(b"", 2);
         let rel_entries = self.storage.scan_prefix(&rel_prefix).await?;
         for (rel_k, _) in rel_entries {
-            if rel_k.windows(actual_user_id.len()).any(|w| w == actual_user_id.as_bytes()) {
+            if rel_k
+                .windows(actual_user_id.len())
+                .any(|w| w == actual_user_id.as_bytes())
+            {
                 scanned_count += 1;
                 explicit_keys.push(rel_k.clone());
                 ram.relation_keys.push(rel_k);
