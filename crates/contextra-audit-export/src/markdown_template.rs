@@ -25,6 +25,7 @@ pub fn render_register_markdown(
     entries: &[ProcessingRegisterEntry],
 ) -> Result<String, AuditExportError> {
     let mut out = String::new();
+    out.push_str("> **Hinweis:** Vorlage, keine Rechtsberatung\n\n");
     out.push_str("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)\n\n");
     out.push_str("| Mandant | Zweck | Datenkategorien | Rechtsgrundlage | Löschnachweise-Anzahl | Egress-Ereignisse-Anzahl | Generiert am |\n");
     out.push_str("| --- | --- | --- | --- | --- | --- | --- |\n");
@@ -47,6 +48,7 @@ pub fn render_register_markdown(
         ));
     }
 
+    out.push_str("\n> **Hinweis:** Vorlage, keine Rechtsberatung\n");
     Ok(out)
 }
 
@@ -68,10 +70,11 @@ pub fn render_art30_register_markdown(
     entries: &[Art30ProcessingRegisterEntry],
 ) -> Result<String, AuditExportError> {
     let mut out = String::new();
+    out.push_str("> **Hinweis:** Vorlage, keine Rechtsberatung\n\n");
     out.push_str("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 Abs. 1 lit. a–g DSGVO)\n\n");
 
     if entries.is_empty() {
-        out.push_str("*Keine Einträge vorhanden.*\n");
+        out.push_str("*Keine Einträge vorhanden.*\n\n> **Hinweis:** Vorlage, keine Rechtsberatung\n");
         return Ok(out);
     }
 
@@ -126,5 +129,6 @@ pub fn render_art30_register_markdown(
         ));
     }
 
+    out.push_str("\n> **Hinweis:** Vorlage, keine Rechtsberatung\n");
     Ok(out)
 }

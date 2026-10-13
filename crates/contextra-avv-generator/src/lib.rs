@@ -7,8 +7,10 @@
 
 pub mod error;
 pub mod template;
+pub mod wiring;
 
 pub use error::AvvGeneratorError;
+pub use wiring::AvvWiring;
 
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
@@ -53,7 +55,6 @@ impl AvvContext {
     }
 
     /// Builder pattern entry point for constructing an [`AvvContext`].
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn builder(
         controller_name: impl Into<String>,
         processor_name: impl Into<String>,

@@ -75,6 +75,7 @@ fn sanitize_markdown_cell(input: &str) -> String {
 /// Consistent with the rendering style in [`crate::markdown_template::render_register_markdown`].
 pub fn render_bsi_mapping_markdown(entries: &[BsiMappingEntry]) -> String {
     let mut out = String::new();
+    out.push_str("> **Hinweis:** Vorlage, keine Rechtsberatung\n\n");
     out.push_str("# BSI Grundschutz / TR-02102 Kryptographische Zuordnung\n\n");
     out.push_str("> **Hinweis:** Dieses Dokument / dieser Export dient der technischen Referenzzuordnung nach BSI TR-02102 und stellt KEINE Zertifizierungs- oder Konformitätsbehauptung dar. Die BSI-Empfehlungen sind regelmäßig gegen die neuesten Veröffentlichungen des BSI zu prüfen.\n\n");
     out.push_str("| Krypto-Primitive | Code-Fundstelle | BSI-Referenz | Anmerkung / Kontext |\n");
@@ -89,6 +90,7 @@ pub fn render_bsi_mapping_markdown(entries: &[BsiMappingEntry]) -> String {
         out.push_str(&format!("| {name} | `{location}` | {bsi_ref} | {note} |\n"));
     }
 
+    out.push_str("\n> **Hinweis:** Vorlage, keine Rechtsberatung\n");
     out
 }
 
