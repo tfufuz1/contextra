@@ -1,4 +1,5 @@
 //! Forget options and deletion outcome handles (§C9, WP-1.1).
+
 //!
 //! # Observation vs Guarantee (INV-D10)
 //!
@@ -164,20 +165,21 @@ impl ForgetOptions {
 }
 
 /// Logical deletion proof handle.
-///
-/// Interim type until C02 introduces `IssIssuedProof`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FonLogicalHandle {
-    /// Unique proof identifier.
+    /// Unique proof identifier (16-byte truncated prefix).
     pub proof_id: [u8; 16],
     /// File system path where the proof record is stored.
     pub proof_path: PathBuf,
+    /// Full 32-byte proof identifier for exact stage linking.
+    pub full_proof_id: [u8; 32],
 }
 
 impl std::fmt::Debug for FonLogicalHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FonLogicalHandle")
             .field("proof_id", &self.proof_id)
+            .field("full_proof_id", &self.full_proof_id)
             .field("proof_path", &"[REDACTED_PATH]")
             .finish()
     }
