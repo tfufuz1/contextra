@@ -2,7 +2,7 @@
 > Ring 3 · stable · Quelle: capabilities.toml · Spec: III.16, K.20, L.5, Teil 10
 
 ## 1. Zweck
-`contextra-privacy` bietet Cloud Egress Security, Data Loss Prevention (DLP), Anonymisierung über Surrogate-Vaulting und Schutz vor Bulk-Exfiltration in Ring 3. Die Crate führt Regex-Klassifikation, k-NN-Ähnlichkeitsprüfungen sowie Inbound-Rehydration durch und generiert DSGVO-konforme Verarbeitungsverzeichnisse und AVV-Entwürfe. Sämtliche Egress-Entscheidungen werden kryptografisch auditiert und unter Fail-closed-Garantien abgewickelt.
+`contextra-privacy` bietet Cloud Egress Security, Data Loss Prevention (DLP), Pseudonymisierung über Surrogate-Vaulting und Schutz vor Bulk-Exfiltration in Ring 3. Die Crate führt Regex-Klassifikation, k-NN-Ähnlichkeitsprüfungen sowie Inbound-Rehydration durch und generiert DSGVO-konforme Verarbeitungsverzeichnisse und AVV-Entwürfe. Sämtliche Egress-Entscheidungen werden kryptografisch auditiert und unter Fail-closed-Garantien abgewickelt.
 
 ## 2. Modul-Karte
 | Pfad | Verantwortung |
@@ -14,7 +14,7 @@
 | `src/context_edit_audit.rs` | Auditierung und Nachverfolgung von Kontext-Bearbeitungen |
 | `src/egress_gateway.rs` | Gateway-Bündelung, Handling von Cloud-Queries und Inbound-Rehydration (`CloudResponseRehydrator`) |
 | `src/egress_guard.rs` | Layer-4 Bulk-Exfiltrations-Prüfung mittels k-NN-Ähnlichkeitssuche |
-| `src/egress_vault.rs` | Layer-1 DLP-Regex-Klassifikation (`classify_layer1`) & `SurrogateVault` Anonymisierung |
+| `src/egress_vault.rs` | Layer-1 DLP-Regex-Klassifikation (`classify_layer1`) & `SurrogateVault` Pseudonymisierung |
 | `src/error.rs` | Crate-lokale Fehlerdefinitionen (`EgressError`) |
 | `src/guarded_payload.rs` | Type-State Kapselung (`GuardedPayload<S>`) gegen ungesanitisierten Egress |
 | `src/processing_registry.rs` | Maschinell erzeugtes Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO) |
