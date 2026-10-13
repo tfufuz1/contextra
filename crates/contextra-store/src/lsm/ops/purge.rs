@@ -27,11 +27,47 @@ impl LsmStorage {
         // 2. Space probe check
         let free_space = space_probe.and_then(|p| p.free_space_bytes()).unwrap_or(0);
 
-        if free_space == 0 {
-            return Err(PurgeBlocked::InsufficientDiskSpace {
-                needed: 1024 * 1024,
-                free: 0,
-            });
+        // 3. Acquire write locks / flush active memtable to SSTable first
+        StorageEngine::flush(self)
+            .await
+            .map_err(|e| PurgeBlocked::FlushFailed(e.to_string()))?;
+
+        // 4. Re-select candidates after flush to include any newly created SSTable
+        let sstables_guard = self.sstables.read().await;
+        let candidates = select_purge_candidates(&sstables_guard, &scope, space_probe)?;
+        drop(sstables_guard);
+
+        if candidates.is_empty() {
+            return Ok(PurgeReport::default());
+        }
+
+        // 5. Generate output path and run Purge Compaction
+        let output_path = self
+            .compaction_engine
+            .generate_sst_path(&self.config.path)
+            .map_err(|_| PurgeBlocked::CompactionBusy)?;
+
+        let report = self
+            .compaction_engine
+            .purge_compact_sstables(&candidates, &output_path, &scope, as_of_tx, None)
+            .await
+            .map_err(|_| PurgeBlocked::CompactionBusy)?;
+
+        // 6. In-memory state swap and MANIFEST atomic commit under write lock
+        let mut sstables_guard = self.sstables.write().await;
+
+        let is_valid_window = candidates
+            .iter()
+            .all(|cand| sstables_guard.iter().any(|s| Arc::ptr_eq(s, cand)));
+
+        if !is_valid_window {
+            if !report.files_written.is_empty() {
+                let p = output_path.clone();
+                let _ =
+                    tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
+                        .await;
+            }
+            return Err(PurgeBlocked::CompactionBusy);
         }
 
         // 3. Acquire write locks / flush active memtable to SSTable first

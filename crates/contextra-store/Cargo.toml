@@ -77,6 +77,14 @@ futures = "0.3"
 redb = "2"
 
 [[test]]
+name = "witness_issue_v2"
+path = "tests/witness_issue_v2.rs"
+
+[[test]]
+name = "witness_injection_matrix"
+path = "tests/witness_injection_matrix.rs"
+
+[[test]]
 name = "differential_redb"
 path = "tests/differential/redb_operation_sequence.rs"
 
