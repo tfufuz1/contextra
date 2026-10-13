@@ -36,7 +36,7 @@ pub const PID_MAX_POOL_SIZE_DEFAULT: usize = 200;
 ///
 /// # P28-Konformität
 /// `dt` MUSS aus einem injizierten Clock-Port abgeleitet werden, nicht aus
-/// `SystemTime::now()` direkt.
+/// der Systemuhr direkt.
 pub trait AntiWindupController: Send + Sync {
     /// Aktualisiert den Regler mit konditionellem Integrator-Update.
     ///
