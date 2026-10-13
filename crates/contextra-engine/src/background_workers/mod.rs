@@ -24,6 +24,6 @@ pub use hyperedge_worker::{
 };
 #[allow(deprecated)]
 pub use orphan_workers::{
-    start_orphan_cleanup_worker, start_orphan_cleanup_worker_with_config, start_orphan_reaper,
-    MAX_ORPHANS_PER_TICK,
+    start_orphan_cleanup_worker, start_orphan_cleanup_worker_with_config,
+    start_orphan_cleanup_worker_with_registry, start_orphan_reaper, MAX_ORPHANS_PER_TICK,
 };
