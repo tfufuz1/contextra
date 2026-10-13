@@ -1,6 +1,6 @@
 # Task-Karte Template
 # ID Format: T-YYYY-NNNN
-id        = "T-2026-9227"
+id        = "T-2026-9230"
 title     = "Dokument-Löschung mit Footprint, Ledger, Witnesses"
 crate     = "contextra-engine"
 tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)

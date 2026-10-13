@@ -79,7 +79,6 @@ pub use background_workers::start_decay_cleanup_worker;
 #[cfg(not(loom))]
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
 
-pub use collection::crud::{DocEraseOptions, DocErasure};
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(not(loom))]
