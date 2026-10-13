@@ -204,6 +204,40 @@ impl LsmStorage {
             None => None,
         };
 
+        let salt_bytes: [u8; 32] = salt
+            .as_slice()
+            .try_into()
+            .map_err(|_| ContextraError::Storage("SALT file must be 32 bytes".into()))?;
+
+        let ledger_key = if let Some(p) = &config.encryption_passphrase {
+            let master_secret = blake3::keyed_hash(&salt_bytes, p.as_bytes());
+            crate::erasure_ledger::LedgerKey::derive_from_master_secret(master_secret.as_bytes())
+        } else {
+            crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes)
+        };
+
+        let db_has_data = !directory_is_pristine(&config.path).await?;
+        let (ledger_opt, ledger_state) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
+            &config.path,
+            ledger_key,
+            db_has_data,
+            None,
+        )
+        .await?;
+
+        let is_read_only = matches!(
+            ledger_state,
+            crate::erasure_ledger::LedgerOpenStatus::RollbackSuspected { .. }
+                | crate::erasure_ledger::LedgerOpenStatus::Corrupt { .. }
+        );
+
+        let ledger_handle =
+            ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
+
+        let replay_filter: Option<Arc<dyn crate::wal::WalReplayFilter>> = ledger_handle
+            .clone()
+            .map(|h| Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(h)) as Arc<dyn crate::wal::WalReplayFilter>);
+
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
         let mut entries = tokio::fs::read_dir(&config.path)
@@ -276,7 +310,17 @@ impl LsmStorage {
 
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let wal_entries = wal.replay().await?;
+            let (wal_entries, replay_report) = wal
+                .replay_with_filter(replay_filter.as_deref())
+                .await?;
+
+            if replay_report.records_dropped_by_filter > 0 {
+                tracing::info!(
+                    records_dropped = replay_report.records_dropped_by_filter,
+                    wal_path = ?wal_path,
+                    "WAL replay filtered dropped records based on erasure ledger"
+                );
+            }
 
             if let Some((_, last_entry, _)) = wal_entries.last() {
                 last_replayed_hmac = Some(last_entry.checksum);
@@ -376,7 +420,11 @@ impl LsmStorage {
         } else {
             config.path.join("wal.log")
         };
-        let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
+        let wal = if is_read_only {
+            Wal::open_read_only(&active_wal_path, key_manager.clone()).await?
+        } else {
+            Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?
+        };
 
         let budget_config = ResourceBudget {
             memory_limit: config.max_ram_mb * 1024 * 1024,
@@ -633,6 +681,9 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
             erasure_fence: Arc::new(super::fence::ErasureFence::new()),
+            ledger_handle,
+            ledger_state,
+            is_read_only,
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
@@ -759,6 +810,12 @@ impl LsmStorage {
         target_tx: TxId,
         _guard: &CommitGuard<'_>,
     ) -> Result<()> {
+        if self.is_read_only {
+            return Err(ContextraError::Storage(format!(
+                "LsmStorage is in ReadOnly mode due to erasure ledger status ({:?}); rollback rejected",
+                self.ledger_state
+            )));
+        }
         self.clear_intent_locks_above_tx(target_tx);
 
         let intent_path = self
@@ -885,7 +942,14 @@ impl LsmStorage {
                 sstables_lock.push(Arc::new(new_reader));
             } else if !surviving_entries.is_empty() {
                 for (k, v, seq, tx) in surviving_entries {
-                    state.memtable.put(k, v, seq, tx);
+                    let drop = if let Some(ref h) = self.ledger_handle {
+                        h.decide(b"lsm", &k, tx) == crate::erasure_ledger::LedgerDecision::Drop
+                    } else {
+                        false
+                    };
+                    if !drop {
+                        state.memtable.put(k, v, seq, tx);
+                    }
                 }
             }
 
