@@ -109,6 +109,26 @@ pub fn derive_subkey(
     registry.get_or_derive(master_key, group_id)
 }
 
+/// Atomically and permanently shreds (revokes) the key for a KV cache segment.
+///
+/// # Aufrufvertrag (Call Contract):
+/// - `registry`: Reference to the active [`KeyRegistry`].
+/// - `tenant`: The `TenantId` owning the KV segment.
+/// - `segment_id`: The 64-bit identifier of the KV segment key to shred.
+/// - **Behavior**: Atomically and permanently revokes and zeroizes the sub-key (Group KEK) for the given segment
+///   in the `KeyRegistry` and appends a `RevocationTarget::Group(segment_id)` entry to the persistent `RevocationLog` (if present).
+/// - **Returns**: `Ok(true)` if the segment key was active and is now revoked; `Ok(false)` if it was already revoked;
+///   `Err(CryptoError)` if a lock or I/O error occurred.
+/// - **Complexity & Invariants**: O(1) time complexity. Permanent and non-reversible. Subsequent decryption
+///   attempts for `segment_id` fail-closed with `CryptoError::KeyRevoked`.
+pub fn shred_segment_key(
+    registry: &KeyRegistry,
+    tenant: contextra_types::TenantId,
+    segment_id: u64,
+) -> Result<bool> {
+    registry.shred_segment_key(tenant, segment_id)
+}
+
 /// Listener trait for group revocation events.
 pub trait GroupRevocationListener: Send + Sync {
     fn on_group_revoked(&self, group_id: u64);
@@ -379,6 +399,14 @@ impl KeyRegistry {
     /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
     pub fn revoke_subkey(&self, group_id: u64) -> Result<bool> {
         self.revoke_group(group_id)
+    }
+
+    /// Atomically and permanently shreds (revokes) the key for a KV segment (`segment_id`) for a given `tenant`.
+    ///
+    /// # Aufrufvertrag (Call Contract):
+    /// See [`shred_segment_key`].
+    pub fn shred_segment_key(&self, _tenant: contextra_types::TenantId, segment_id: u64) -> Result<bool> {
+        self.revoke_group(segment_id)
     }
 
     /// Revokes (destroys) the DEK wrap for a single record within `group_id` (Single Record Deletion).
@@ -743,6 +771,29 @@ mod tests {
                 *guard = Some(group_id);
             }
         }
+    }
+
+    #[test]
+    fn test_shred_segment_key_api() -> Result<()> {
+        let km = KeyManager::try_new("test-passphrase-shred-api", b"salt1")?;
+        let registry = KeyRegistry::new();
+        let tenant = contextra_types::TenantId::try_new(101).unwrap();
+        let segment_id = 555;
+
+        let subkey = registry.get_or_derive(&km, segment_id)?;
+        assert_eq!(subkey.0.len(), 32);
+        assert!(registry.is_group_active(segment_id));
+
+        // Shred segment key using shred_segment_key API
+        let shredded = shred_segment_key(&registry, tenant, segment_id)?;
+        assert!(shredded, "shred_segment_key must return Ok(true) on first shred");
+        assert!(!registry.is_group_active(segment_id));
+
+        // Subsequent shred attempt returns Ok(false)
+        let shredded_again = shred_segment_key(&registry, tenant, segment_id)?;
+        assert!(!shredded_again, "shred_segment_key must return Ok(false) on second shred");
+
+        Ok(())
     }
 
     #[test]
