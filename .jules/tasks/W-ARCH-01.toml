@@ -1,0 +1,20 @@
+id        = "W-ARCH-01"
+title     = "Wire AuditRegisterExporter and render_avv_markdown into contextra facade builder"
+crate     = "contextra"
+tier      = 1
+risk      = "none"
+goal      = "Expose AuditRegisterExporter and render_avv_markdown on contextra facade ContextraBuilder so compliance export functions are accessible to end users."
+non_goals = ["Do not alter export data formats"]
+scope     = ["crates/contextra/src/builder.rs", "crates/contextra/src/lib.rs"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Facade Composition Root Wiring"]
+acceptance = [
+  "cargo test -p contextra",
+  "cargo xtask orphan-symbols"
+]
+evidence_required = ["Verification that compliance exporters are wired in contextra builder"]
+
+[budget]
+files      = 3
+lines      = 100
+iterations = 4

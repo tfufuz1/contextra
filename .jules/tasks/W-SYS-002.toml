@@ -1,0 +1,20 @@
+id        = "W-SYS-002"
+title     = "Format inline // SAFETY: comment prefix for POSIX FFI calls in contextra-sys posix.rs"
+crate     = "contextra-sys"
+tier      = 1
+risk      = "none"
+goal      = "Format comment prefix for libc open, dup2, close unsafe calls in contextra-sys/src/posix.rs as unindented // SAFETY: comment."
+non_goals = ["Do not change POSIX descriptor logic"]
+scope     = ["crates/contextra-sys/src/posix.rs"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["// SAFETY: Dokumentationspflicht"]
+acceptance = [
+  "cargo xtask unsafe-audit",
+  "cargo test -p contextra-sys"
+]
+evidence_required = ["Passing cargo xtask unsafe-audit without warning in posix.rs"]
+
+[budget]
+files      = 1
+lines      = 15
+iterations = 2
