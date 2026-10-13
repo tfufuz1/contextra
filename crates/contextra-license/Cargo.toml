@@ -12,6 +12,9 @@ description = "License and activation enforcement gate layer for Contextra featu
 [package.metadata.contextra]
 ring = "4"
 
+[features]
+dev-open-gate = []
+
 [dependencies]
 thiserror = { workspace = true }
 serde = { workspace = true }
