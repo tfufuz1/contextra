@@ -318,7 +318,7 @@ async fn test_h_witness_before_force_flush_fails() {
         "issue_layer_witness after force_flush MUST succeed for LsmMemtable"
     );
 
-    // Also test other LSM layer variants
+    // Scan-less issue_layer_witness for SsTableAllLevels and WalAllSegments MUST be rejected
     let sst_witness = storage
         .issue_layer_witness(DeletionLayer::SsTableAllLevels, &[key.clone()], &[], tx1)
         .await;

@@ -240,7 +240,8 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
             if !inputs.encrypted_mode {
                 tail_bytes_raw_scanned += tail_len;
                 if inputs.key_identifiers_claimed {
-                    if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await {
+                    if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await
+                    {
                         if inputs.scope.matches_raw_bytes(&tail_bytes) {
                             frames_matching_scope += 1;
                         }

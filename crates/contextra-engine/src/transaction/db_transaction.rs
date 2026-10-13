@@ -7,6 +7,24 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+#[derive(Debug, Clone)]
+pub(super) enum StagedTextOp {
+    Upsert(DocId, String),
+    Delete(DocId),
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum StagedGraphEntityOp {
+    Add(Entity),
+    Delete(EntityId),
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum StagedGraphEdgeOp {
+    Add(Edge),
+    Delete(EntityId, EntityId),
+}
+
 /// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index.
 pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
     pub tx_id: TxId,
@@ -16,10 +34,13 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_doc_ids: Mutex<Arc<Vec<DocId>>>,
     pub(super) staged_text_ops: Mutex<Vec<(DocId, String)>>,
     pub(super) staged_text_deletes: Mutex<Vec<DocId>>,
+    pub(super) staged_text_sequence: Mutex<Vec<StagedTextOp>>,
     pub(super) staged_graph_entities: Mutex<Vec<Entity>>,
     pub(super) staged_graph_edges: Mutex<Vec<Edge>>,
     pub(super) staged_graph_entity_deletes: Mutex<Vec<EntityId>>,
     pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
+    pub(super) staged_graph_entity_sequence: Mutex<Vec<StagedGraphEntityOp>>,
+    pub(super) staged_graph_edge_sequence: Mutex<Vec<StagedGraphEdgeOp>>,
     pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
     pub(super) committed: AtomicBool,
 }
@@ -34,10 +55,13 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             staged_doc_ids: Mutex::new(Arc::new(Vec::with_capacity(16))),
             staged_text_ops: Mutex::new(Vec::with_capacity(16)),
             staged_text_deletes: Mutex::new(Vec::with_capacity(16)),
+            staged_text_sequence: Mutex::new(Vec::with_capacity(16)),
             staged_graph_entities: Mutex::new(Vec::with_capacity(16)),
             staged_graph_edges: Mutex::new(Vec::with_capacity(16)),
             staged_graph_entity_deletes: Mutex::new(Vec::with_capacity(16)),
             staged_graph_edge_deletes: Mutex::new(Vec::with_capacity(16)),
+            staged_graph_entity_sequence: Mutex::new(Vec::with_capacity(16)),
+            staged_graph_edge_sequence: Mutex::new(Vec::with_capacity(16)),
             staged_hyperedges: Mutex::new(Vec::with_capacity(16)),
             committed: AtomicBool::new(false),
         }
@@ -81,7 +105,13 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        guard.push((doc_id, text));
+        guard.push((doc_id, text.clone()));
+
+        let mut seq = match self.staged_text_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedTextOp::Upsert(doc_id, text));
     }
 
     pub fn stage_text_delete(&self, doc_id: DocId) {
@@ -90,6 +120,12 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Err(p) => p.into_inner(),
         };
         guard.push(doc_id);
+
+        let mut seq = match self.staged_text_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedTextOp::Delete(doc_id));
     }
 
     pub fn stage_graph_entity(&self, entity: Entity) {
@@ -97,7 +133,13 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        guard.push(entity);
+        guard.push(entity.clone());
+
+        let mut seq = match self.staged_graph_entity_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedGraphEntityOp::Add(entity));
     }
 
     pub fn stage_graph_edge(&self, edge: Edge) {
@@ -105,7 +147,13 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        guard.push(edge);
+        guard.push(edge.clone());
+
+        let mut seq = match self.staged_graph_edge_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedGraphEdgeOp::Add(edge));
     }
 
     pub fn stage_graph_entity_delete(&self, entity_id: EntityId) {
@@ -114,6 +162,12 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Err(p) => p.into_inner(),
         };
         guard.push(entity_id);
+
+        let mut seq = match self.staged_graph_entity_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedGraphEntityOp::Delete(entity_id));
     }
 
     pub fn stage_graph_edge_delete(&self, from: EntityId, to: EntityId) {
@@ -122,6 +176,12 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Err(p) => p.into_inner(),
         };
         guard.push((from, to));
+
+        let mut seq = match self.staged_graph_edge_sequence.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        seq.push(StagedGraphEdgeOp::Delete(from, to));
     }
 
     pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {

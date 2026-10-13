@@ -46,7 +46,10 @@ async fn test_issue_witnesses_v2_clean_roundtrip() {
         .await
         .expect("issue_witnesses_v2 clean roundtrip should succeed");
 
-    assert!(witnesses.len() >= 3, "Expected witnesses for Memtable, SSTables, and WAL");
+    assert!(
+        witnesses.len() >= 3,
+        "Expected witnesses for Memtable, SSTables, and WAL"
+    );
 
     let layers: Vec<_> = witnesses.iter().map(|w| w.layer()).collect();
     assert!(layers.contains(&&DeletionLayer::LsmMemtable));

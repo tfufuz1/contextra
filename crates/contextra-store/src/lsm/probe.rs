@@ -65,12 +65,8 @@ impl WitStoreProbe for ZeuStoreProbe {
 impl LsmStorage {
     /// Returns a thread-safe [`WitStoreProbe`] handle attached to this `LsmStorage` instance.
     pub fn store_probe(&self) -> Arc<dyn WitStoreProbe> {
-        let flush_ptr = Arc::new(AtomicU64::new(
-            self.flush_counter.load(Ordering::Acquire),
-        ));
-        let segment_ptr = Arc::new(AtomicU64::new(
-            self.segment_counter.load(Ordering::Acquire),
-        ));
+        let flush_ptr = Arc::new(AtomicU64::new(self.flush_counter.load(Ordering::Acquire)));
+        let segment_ptr = Arc::new(AtomicU64::new(self.segment_counter.load(Ordering::Acquire)));
 
         Arc::new(ZeuStoreProbe::new(
             Arc::clone(&self.sstables),
