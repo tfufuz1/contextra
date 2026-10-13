@@ -4,6 +4,15 @@ use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::sync::Arc;
 
+#[cfg(feature = "encryption-at-rest")]
+fn hex_encode_32_col(bytes: &[u8; 32]) -> String {
+    let mut s = String::with_capacity(64);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
 /// Derives a [`CollectionId`] from a raw `u64` hash prefix value.
 ///
 /// # Errors
@@ -359,6 +368,15 @@ impl Contextra {
 
             let collection_id = derive_collection_id(name)?;
 
+            // Schließe das Scan-Commit-Fenster: Lock-Reihenfolge collections -> kv_locks -> embedder (INV-DELETION-1).
+            // Entfernen aus der Registry vor dem Scannen verhindert, dass ein nebenläufiger Schreiber
+            // eine neue Referenz zur Collection holt und während des Löschens schreibt.
+            self.collections.write().await.remove(name);
+            self.tenant_collections
+                .write()
+                .await
+                .remove(&(tenant_id, name.to_string()));
+
             let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
                 self.storage.clone(),
                 tenant_id,
@@ -368,25 +386,25 @@ impl Contextra {
             let txt_data_prefix = format!("__txt:{}:", name);
             let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-            let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
+            let tx = self.allocate_tx()?;
 
+            // Scanne Schlüssel am konsistenten Snapshot-Stand tx.inner()
             let col_entries = tenant_storage
-                .scan_prefix(col_data_prefix.as_bytes())
+                .scan_prefix_at(col_data_prefix.as_bytes(), tx.inner())
                 .await?;
+            let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
             for (k, _) in col_entries {
                 deleted_keys.push(k);
             }
 
             let txt_entries = tenant_storage
-                .scan_prefix(txt_data_prefix.as_bytes())
+                .scan_prefix_at(txt_data_prefix.as_bytes(), tx.inner())
                 .await?;
             for (k, _) in txt_entries {
                 deleted_keys.push(k);
             }
 
             deleted_keys.push(col_idx_key.clone());
-
-            let tx = self.allocate_tx()?;
 
             tenant_storage
                 .delete_prefix(tx, col_data_prefix.as_bytes())
@@ -439,7 +457,7 @@ impl Contextra {
 
             let proof = DeletionProof::create(
             scope,
-            deleted_keys,
+            deleted_keys.clone(),
             tx,
             layer_proofs,
             vec![],
@@ -452,11 +470,58 @@ impl Contextra {
             ))
         })?;
 
-            self.collections.write().await.remove(name);
-            self.tenant_collections
-                .write()
-                .await
-                .remove(&(tenant_id, name.to_string()));
+            // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
+            let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
+            let registry = deletion::KeyFamilyRegistry::default();
+            let sweep_needles = deletion::FprNeedles {
+                doc_id_bytes: Vec::new(),
+                collection_id: Some(collection_id),
+                collection_name: name.to_string(),
+                tenant_prefix: tenant_id.inner().to_le_bytes().to_vec(),
+            };
+
+            let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
+                col_data_prefix.as_bytes().to_vec(),
+                txt_data_prefix.as_bytes().to_vec(),
+            ]);
+
+            let mut pid16 = [0u8; 16];
+            pid16.copy_from_slice(&proof.proof_id[..16]);
+
+            let fon_handle = deletion::FonLogicalHandle {
+                proof_id: pid16,
+                proof_path: std::path::PathBuf::from(format!("proofs/{}.json", hex_encode_32_col(&proof.proof_id))),
+                full_proof_id: proof.proof_id,
+            };
+
+            let forget_opts = deletion::ForgetOptions::default();
+
+            let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
+            if let Ok(runtime) = deletion::DpiDeletionRuntime::open(
+                &proof_dir,
+                None,
+                [0x33; 16],
+            ) {
+                let driver = deletion::DpiPurgeDriver::new(&self.storage, &runtime, deletion::DpiPurgeDriverConfig::default());
+                let zeu_probe = self.storage.store_probe();
+                let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] = &[zeu_probe.as_ref()];
+
+                let _ = driver.run_purge(
+                    purge_scope,
+                    &[name.to_string()],
+                    tx,
+                    &fon_handle,
+                    &forget_opts,
+                    &deleted_keys,
+                    &sweep_needles,
+                    &footprint,
+                    &registry,
+                    deletion::SweepDepth::Standard,
+                    None,
+                    probes,
+                    None,
+                ).await;
+            }
 
             Ok(proof)
         }

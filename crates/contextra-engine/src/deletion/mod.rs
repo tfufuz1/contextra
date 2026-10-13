@@ -14,6 +14,7 @@ pub mod relations_witness;
 pub mod restore_filter;
 pub mod reverse_sweep;
 pub mod text_witness;
+pub mod wiring;
 
 pub use copy_observer::{DpiCopyObserver, DpiCopyObserverReport};
 pub use footprint::{
@@ -21,7 +22,7 @@ pub use footprint::{
 };
 pub use forget_options::{FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode, VerifyDepth, Wait};
 pub use proof_issue::{DpiDeletionRuntime, DpiLogicalInput, DpiRuntimeWarningCounters};
-pub use purge_driver::{DpiPurgeDriver, DpiPurgeDriverConfig};
+pub use purge_driver::{forget_document, DpiPurgeDriver, DpiPurgeDriverConfig};
 pub use registry::{
     DeletionScopeRef, EraseUnit, Footprint, KeyFamilyEntry, KeyFamilyRegistry, PurgeScopeTarget,
     ALL_KEY_FAMILIES,
@@ -30,3 +31,4 @@ pub use restore_filter::DpiRestoreFilter;
 pub use reverse_sweep::{
     reverse_sweep, FprNeedles, FprSweepReport, FprSweepSource, FprUnregisteredResidue, SweepDepth,
 };
+pub use wiring::{DeletionWiring, DeletionWiringDeps};

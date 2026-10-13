@@ -86,6 +86,12 @@ pub use collection::crud::MAX_SCAN_RESULTS;
 pub use collection::maintenance::PercolationResult;
 #[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
+pub use collection::search::hybrid::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
+pub use deletion::{
+    forget_document, reverse_sweep, DeletionWiring, DeletionWiringDeps, DpiDeletionRuntime,
+    DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
+    PurgeHandle, VerifyDepth, Wait,
+};
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;

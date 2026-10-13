@@ -32,7 +32,7 @@ pub fn issue_text_index_witness(
         as_of_tx,
         assurance: WitAssurance::S1,
         claim: WitClaimText::S1,
-        footprint_hash: scope_hash,
+        footprint_hash: [0u8; 32],
         scope_write_seq: 0,
         scanner_name: "text_index_scanner",
         scanner_version: 1,
