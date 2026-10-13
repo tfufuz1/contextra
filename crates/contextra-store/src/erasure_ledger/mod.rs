@@ -1,15 +1,13 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12 (T-2026-9204)
+// STAND: 2026-10-11 (T-2026-9103)
 // ZWECK: ErasureLedger Modul-Einstieg und Implementierung der Append-Only Persistenz und Decision Filter.
 // INVARIANTEN: Zero-Panic, Fail-Closed, INV-DURABILITY-RING (fsync_parent_dir + sync_all).
 
 pub mod coverage;
 pub mod entry;
-pub mod replay_filter;
 
 use contextra_core::{ContextraError, Result};
 pub use coverage::{LedgerCoverage, LedgerGap};
-pub use replay_filter::{ErasureLedgerHandle, LedgerReplayFilter};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs::OpenOptions;
@@ -344,29 +342,6 @@ impl ErasureLedger {
 
     pub fn db_instance_id(&self) -> &[u8; 16] {
         &self.db_instance_id
-    }
-
-    pub fn dir(&self) -> &Path {
-        &self.dir
-    }
-
-    pub fn key(&self) -> &LedgerKey {
-        &self.key
-    }
-
-    pub fn seen_proof_ids(&self) -> &HashSet<[u8; 16]> {
-        &self.seen_proof_ids
-    }
-
-    pub fn update_after_append(&mut self, new_mac: [u8; 32], to_write: Vec<LedgerEntry>) {
-        self.last_chain_mac = new_mac;
-        for entry in to_write {
-            self.seen_proof_ids.insert(entry.proof_id);
-            if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
-                self.distinct_prefix_lens.insert(prefix_len);
-            }
-            self.entries.push(entry);
-        }
     }
 
     pub fn entries(&self) -> &[LedgerEntry] {

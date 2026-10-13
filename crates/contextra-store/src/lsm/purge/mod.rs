@@ -1,17 +1,10 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-11
 // ZWECK: Export-Modul für Purge-Pipeline.
 
-pub mod dispose;
 pub mod failpoint;
-pub mod intent;
 pub mod orchestrator;
 pub mod plan;
-pub mod resume;
 
-pub use dispose::{dispose_obsolete_files, OrxDisposeReport};
-pub use failpoint::{OrxFailpointSet, OrxPurgeError, CANONICAL_FAILPOINTS};
-pub use intent::OrxPurgeIntent;
-pub use orchestrator::{OrxHooks, PurgeOrchestrator};
+pub use orchestrator::PurgeOrchestrator;
 pub use plan::PurgePhase;
-pub use resume::resume_pending;

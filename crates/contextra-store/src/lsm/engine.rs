@@ -14,7 +14,7 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_core::{ContextraError, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId};
+use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
 use contextra_mvcc::snapshot::SnapshotFloor;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -69,9 +69,6 @@ pub struct LsmStorage {
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
     pub erasure_fence: Arc<super::fence::ErasureFence>,
-    pub(super) ledger_handle: Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>>,
-    pub(super) ledger_state: crate::erasure_ledger::LedgerOpenStatus,
-    pub(super) is_read_only: bool,
 }
 
 impl Drop for LsmStorage {
@@ -101,46 +98,6 @@ impl LsmStorage {
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
         self.pressure_rx.clone()
-    }
-
-    /// Returns true if the storage engine is operating in ReadOnly mode due to erasure ledger failure.
-    pub fn is_read_only(&self) -> bool {
-        self.is_read_only
-    }
-
-    /// Returns the open status of the erasure ledger.
-    pub fn ledger_state(&self) -> &crate::erasure_ledger::LedgerOpenStatus {
-        &self.ledger_state
-    }
-
-    /// Returns a handle to the active erasure ledger if open and available.
-    pub fn ledger_handle(&self) -> Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>> {
-        self.ledger_handle.clone()
-    }
-
-    /// Returns the 16-byte database instance ID recorded in the erasure ledger.
-    pub fn ledger_db_instance_id(&self) -> [u8; 16] {
-        self.ledger_handle
-            .as_ref()
-            .map(|h| h.db_instance_id())
-            .unwrap_or([0u8; 16])
-    }
-
-    /// Appends entries to the erasure ledger with atomic fsync durability.
-    pub async fn ledger_append(
-        &self,
-        entries: &[crate::erasure_ledger::LedgerEntry],
-    ) -> Result<()> {
-        if self.is_read_only {
-            return Err(ContextraError::Storage(format!(
-                "Storage engine is in ReadOnly mode due to erasure ledger status ({:?})",
-                self.ledger_state
-            )));
-        }
-        let handle = self.ledger_handle.as_ref().ok_or_else(|| {
-            ContextraError::Storage("Erasure ledger handle unavailable".into())
-        })?;
-        handle.append(entries).await
     }
 
     /// Signals the background compaction engine to stop.

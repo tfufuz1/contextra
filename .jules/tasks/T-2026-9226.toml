@@ -1,0 +1,36 @@
+# Task-Karte T-2026-9226
+id        = "T-2026-9226"
+title     = "ForgetOptions und Umgebungsattestation"
+crate     = "contextra-engine"
+tier      = 1
+risk      = "none"
+goal      = "Öffentliche Optionstypen ForgetOptions und Umgebungsattestation observe_environment in contextra-engine implementieren"
+non_goals = ["Kein Refactoring fremder Module", "Keine Änderungen an deletion/mod.rs"]
+scope     = [
+  "crates/contextra-engine/src/deletion/forget_options.rs",
+  "crates/contextra-engine/src/deletion/environment.rs",
+  "crates/contextra-engine/tests/forget_options_defaults.rs",
+  "crates/contextra-engine/tests/environment_attest_fixtures.rs"
+]
+forbidden = [
+  ".github/**",
+  "xtask/**",
+  "capabilities.toml",
+  "AGENTS.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  ".jules/setup/**"
+]
+invariants = ["Zero-Panic", "INV-D10"]
+acceptance = [
+  "cargo test -p contextra-engine --test forget_options_defaults",
+  "cargo test -p contextra-engine --test environment_attest_fixtures",
+  "cargo test -p contextra-engine",
+  "cargo clippy -p contextra-engine --all-targets -- -D warnings"
+]
+evidence_required = ["Tests for ForgetOptions validation and observe_environment TLV encoding"]
+
+[budget]
+files = 5
+lines = 700
+iterations = 8
