@@ -1,0 +1,20 @@
+id        = "W-COMPLIANCE-01"
+title     = "Add legal disclaimer to generated AVV contracts and Art. 30 processing registers"
+crate     = "contextra-avv-generator"
+tier      = 1
+risk      = "none"
+goal      = "Append explicit legal notice (> **Rechtlicher Hinweis:** Dieses Dokument ist eine automatisch generierte technische Vorlage und stellt keine Rechtsberatung dar.) to markdown templates in contextra-avv-generator and contextra-audit-export."
+non_goals = ["Do not alter contract clause logic"]
+scope     = ["crates/contextra-avv-generator/src/template.rs", "crates/contextra-audit-export/src/markdown_template.rs"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Legal Compliance Transparency"]
+acceptance = [
+  "cargo test -p contextra-avv-generator",
+  "cargo test -p contextra-audit-export"
+]
+evidence_required = ["Unit tests confirming disclaimer presence in rendered markdown string output"]
+
+[budget]
+files      = 3
+lines      = 60
+iterations = 3

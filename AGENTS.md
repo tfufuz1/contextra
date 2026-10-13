@@ -1,6 +1,6 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-Stand: 2026-10-11 · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
+Stand: 2026-10-13 · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
 
 ## 1. Rangfolge
 
@@ -195,9 +195,9 @@ cargo xtask check-jules-context-freshness # Kontext noch aktuell?
 
 Ein neues Werkzeug entsteht als xtask-Befehl. Kein Skript.
 
-1. Modul in `xtask/src/harness/<name>.rs` mit `//!`-Docstring (Zweck, Tier, Exit-Codes).
+1. Modul in `xtask/src/harness/<name>.rs` <!-- doc-ref-ignore --> mit `//!`-Docstring (Zweck, Tier, Exit-Codes).
 2. Eintrag in `xtask/registry.toml` mit `owner_tier`, `summary`, `phase`.
-3. Tests in `xtask/tests/<name>.rs` mit Fixtures für Befund und Nicht-Befund.
+3. Tests in `xtask/tests/<name>.rs` <!-- doc-ref-ignore --> mit Fixtures für Befund und Nicht-Befund.
 4. Befund-Kategorien: Muss-Fehler (Exit 2) und Hinweis (Exit 0).
 5. `--json` unterstützen.
 6. Befehl in Abschnitt 4 dieser Datei eintragen — zuerst als `🔲 <!-- harness:planned -->`, nach Merge und Eintrag in `registry.toml` als `✅`.
