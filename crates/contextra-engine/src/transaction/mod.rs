@@ -28,6 +28,7 @@ mod db_transaction;
 mod db_transaction_commit;
 mod db_transaction_rollback;
 mod intent;
+pub mod wiring;
 
 #[cfg(test)]
 mod tests;
@@ -39,3 +40,4 @@ pub use compensating_actions::{
 };
 pub use db_transaction::DbTransaction;
 pub use intent::CommitIntent;
+pub use wiring::{TransactionWiring, TransactionWiringDeps};

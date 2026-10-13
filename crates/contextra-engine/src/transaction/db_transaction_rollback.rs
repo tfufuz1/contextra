@@ -13,8 +13,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 .iter()
                 .map(|d| Ok(d.inner()))
                 .collect::<Result<Vec<u64>>>()?;
-            let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
-            kv_hooks.on_rollback(tenant, &chunk_ids);
+            kv_hooks.on_rollback(self.tenant_id, &chunk_ids);
         }
         Ok(())
     }
