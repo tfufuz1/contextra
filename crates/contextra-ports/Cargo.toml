@@ -12,6 +12,9 @@ description = "Canonical dyn-compatible port traits for Contextra subsystems"
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+test-utils = []
+
 [dependencies]
 contextra-types = { workspace = true }
 futures-util = "0.3"
@@ -22,5 +25,6 @@ ahash = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+contextra-ports = { path = ".", features = ["test-utils"] }
 proptest = "1.4"
 tokio = { workspace = true, features = ["rt", "macros"] }

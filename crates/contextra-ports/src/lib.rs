@@ -69,6 +69,8 @@ pub mod storage;
 pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
+/// Composition Root wiring module.
+pub mod wiring;
 
 pub use attention::*;
 pub use checkpoint::*;
@@ -90,6 +92,7 @@ pub use rng::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
+pub use wiring::*;
 
 #[cfg(test)]
 mod dyn_safety {
