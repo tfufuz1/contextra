@@ -108,6 +108,12 @@ impl ProofBuilder {
         self
     }
 
+    /// Sets opaque environment TLV metadata bytes.
+    pub fn with_environment_tlv(mut self, environment_tlv: Vec<u8>) -> Self {
+        self.environment_tlv = environment_tlv;
+        self
+    }
+
     /// Sets WAL chain receipt.
     pub fn with_wal_chain_receipt(mut self, receipt: [u8; 32]) -> Self {
         self.wal_chain_receipt = Some(receipt);
@@ -148,6 +154,7 @@ impl ProofBuilder {
         if proof_id == [0u8; 32] {
             let mut hasher = blake3::Hasher::new();
             hasher.update(self.db_instance_id.as_bytes());
+            hasher.update(&[self.stage]);
             hasher.update(&self.deleted_after_tx.to_be_bytes());
             hasher.update(&self.deleted_keys_hash);
             proof_id = *hasher.finalize().as_bytes();
