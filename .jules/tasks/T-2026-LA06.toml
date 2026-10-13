@@ -1,0 +1,17 @@
+id        = "T-2026-LA06"
+title     = "Beweisformat v3: eigener Domain-Tag, Altbestand markieren (F7)"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "high"
+goal      = "Eigener Domain-Tag contextra/deletion-proof/v3\\0 fuer Proof v3 Payload, unwrap_or_default-Pfade durch Fehler ersetzen, legacy_v4_tag Hinweis in Doku, Cross-Version-Replay-Test."
+non_goals = ["Keine Änderung der Prüfseite in verify.rs (Auftrag A07)", "Keine neuen Dependencies", "Keine Änderungen außerhalb des Scopes"]
+scope     = ["crates/contextra-crypto/src/deletion_proof/proof_v3.rs", "crates/contextra-crypto/tests/proof_v3_domain_separation.rs", ".jules/tasks/T-2026-LA06.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**", "Cargo.lock"]
+invariants = ["INV-DELETION-1", "INV-DELETION-2", "Zero-Panic", "Fail-Closed", "Domain-Separation"]
+acceptance = ["cargo test -p contextra-crypto --test proof_v3_domain_separation", "cargo test -p contextra-crypto --test deletion_proof_prefix_collision_proptest"]
+evidence_required = ["Cargo test log showing proof_v3_domain_separation passing"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

@@ -47,6 +47,27 @@ pub async fn dispose_obsolete_files_with_policy(
     secure_delete: bool,
     dispose_policy: DisposePolicy,
 ) -> std::io::Result<OrxDisposeReport> {
+    let policy = if secure_delete {
+        DisposePolicy::RequireScrub
+    } else {
+        DisposePolicy::Disabled
+    };
+    dispose_obsolete_files_with_policy(storage_dir, obsolete_files, policy).await
+}
+
+/// Disposes obsolete files durably using a specified [`DisposePolicy`].
+///
+/// Records paths in `PendingDeleteJournal` before removal.
+/// Attempts `scrub_if_safe` if policy is [`DisposePolicy::RequireScrub`] or [`DisposePolicy::AllowRemoveUnscrubbed`].
+/// Under [`DisposePolicy::RequireScrub`], if scrubbing is refused (e.g. multiple hardlinks or CoW filesystem),
+/// records refusal in `residual_risk` and returns an error, ensuring the file remains in the journal.
+/// Under [`DisposePolicy::AllowRemoveUnscrubbed`], falls back to standard durable removal without zero-overwriting,
+/// recording refusal in `residual_risk` and counting in `removed_unscrubbed`.
+pub async fn dispose_obsolete_files_with_policy(
+    storage_dir: &Path,
+    obsolete_files: Vec<PathBuf>,
+    policy: DisposePolicy,
+) -> std::io::Result<OrxDisposeReport> {
     let dir = storage_dir.to_path_buf();
 
     tokio::task::spawn_blocking(move || {
@@ -61,10 +82,12 @@ pub async fn dispose_obsolete_files_with_policy(
         }
 
         let mut report = OrxDisposeReport::default();
-        let policy = if secure_delete {
-            ScrubPolicy::OverwriteZeros
-        } else {
-            ScrubPolicy::Disabled
+
+        let scrub_policy = match policy {
+            DisposePolicy::RequireScrub | DisposePolicy::AllowRemoveUnscrubbed => {
+                ScrubPolicy::OverwriteZeros
+            }
+            DisposePolicy::Disabled => ScrubPolicy::Disabled,
         };
 
         journal.process(|path| {
@@ -73,7 +96,7 @@ pub async fn dispose_obsolete_files_with_policy(
                 return Ok(());
             }
 
-            match scrub_if_safe(path, policy, false, false) {
+            match scrub_if_safe(path, scrub_policy, false, false) {
                 Ok(ScrubOutcome::Scrubbed(_)) => {
                     report.files_removed += 1;
                     report.files_scrubbed += 1;

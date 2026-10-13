@@ -11,7 +11,9 @@ use crate::error::CryptoError;
 use contextra_types::{error::HnswDeletionError, ContextraError, Result, TxId};
 
 impl DeletionProof {
-    /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 nach Layer-Bereinigung.
+    /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 nach Layer-Bereinigung (INV-DELETION-1/2).
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -40,6 +42,8 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit optionaler WAL-Löschquittung.
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -81,9 +85,11 @@ impl DeletionProof {
         )
     }
 
-    /// Creates a DeletionProof with explicit DurabilityProof verification.
+    /// Creates a DeletionProof with explicit DurabilityProof verification (INV-DELETION-1/2).
     ///
     /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -127,7 +133,9 @@ impl DeletionProof {
         )
     }
 
-    /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
+    /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 (INV-DELETION-1/2).
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -162,6 +170,8 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -198,6 +208,8 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -233,7 +245,9 @@ impl DeletionProof {
         )
     }
 
-    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen nach physischer Bereinigung (INV-DELETION-1/2).
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -397,11 +411,9 @@ impl DeletionProof {
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let graph_repair_bytes = bincode::serialize(&self.graph_repair)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if self.wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
-        } else {
-            &[]
+        let receipt_part = match &self.wal_chain_receipt {
+            Some(receipt) => receipt.as_slice(),
+            None => &[],
         };
 
         let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
@@ -426,6 +438,7 @@ impl DeletionProof {
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).
     pub(super) fn construct_v3_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
+        let domain_tag = b"contextra/deletion-proof/v3\0";
         let scope_bytes =
             bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
@@ -436,11 +449,9 @@ impl DeletionProof {
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let graph_repair_bytes = bincode::serialize(&self.graph_repair)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if self.wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
-        } else {
-            &[]
+        let receipt_part = match &self.wal_chain_receipt {
+            Some(receipt) => receipt.as_slice(),
+            None => &[],
         };
 
         let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
@@ -451,7 +462,8 @@ impl DeletionProof {
         };
 
         let mut payload = Vec::with_capacity(
-            scope_bytes.len()
+            domain_tag.len()
+                + scope_bytes.len()
                 + 32
                 + tx_bytes.len()
                 + timestamp_bytes.len()
@@ -461,6 +473,7 @@ impl DeletionProof {
                 + receipt_part.len()
                 + audit_pos_part.len(),
         );
+        payload.extend_from_slice(domain_tag);
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);

@@ -26,8 +26,10 @@ use std::sync::Arc;
 
 pub mod bindings;
 pub mod kv_links;
+pub mod wiring;
 
 pub use bindings::*;
+pub use wiring::{PyWiring, PyWiringDeps};
 
 #[pymodule]
 fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {

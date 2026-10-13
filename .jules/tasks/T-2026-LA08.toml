@@ -1,0 +1,51 @@
+id = "T-2026-LA08"
+title = "Compaction-basierte Key-Bereinigung in purge_keys"
+crate = "contextra-store"
+tier = 1
+risk = "high"
+
+goal = "Replace Unimplemented in purge_keys with real compaction-based re-writing of SSTables matching PurgeScope."
+
+non_goals = [
+    "Changing LsmStorage compaction engine implementation outside purge.rs",
+    "Deleting obsolete SSTables directly (handled by dispose system)",
+]
+
+scope = [
+    "crates/contextra-store/src/lsm/ops/purge.rs",
+    "crates/contextra-store/tests/purge_keys_compaction.rs",
+    ".jules/tasks/T-2026-LA08.toml",
+]
+
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "xtask/**",
+    "capabilities.toml",
+    "rust-toolchain.toml",
+    "deny.toml",
+    ".jules/setup/**",
+]
+
+invariants = [
+    "Zero-panic doctrine (no unwrap/expect/panic in prod code)",
+    "fsync error propagation",
+    "Atomic manifest state transitions",
+]
+
+acceptance = [
+    "cargo test -p contextra-store --test purge_keys_compaction",
+    "cargo xtask doctrine-scan",
+]
+
+evidence_required = [
+    "Raw-scan test verifies canary keys missing post-purge",
+    "Crash safety test verifies atomic manifest transition",
+]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

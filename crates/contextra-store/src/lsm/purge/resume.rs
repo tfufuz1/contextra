@@ -44,8 +44,9 @@ pub async fn resume_pending_with_policy(
             orchestrator = orchestrator.with_failpoints(fp.clone());
         }
 
+        let secure_delete = policy != DisposePolicy::Disabled;
         let report = orchestrator
-            .execute_from_intent(intent, scope, hooks, false, None)
+            .execute_from_intent(intent, scope, hooks, secure_delete, None)
             .await?;
 
         return Ok(Some((report, OrxDisposeReport::default())));

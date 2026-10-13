@@ -199,11 +199,14 @@ impl SystemUnderTest for NaiveWalSut {
         payload_bytes.extend_from_slice(&commit_rec);
 
         if let Err(e) = file.write_at(&payload_bytes, offset) {
+            let _ = file.set_len(offset);
             self.staged.clear();
             return Err(e);
         }
 
         if let Err(e) = file.sync_data() {
+            let _ = file.set_len(offset);
+            let _ = file.sync_data();
             self.staged.clear();
             return Err(e);
         }
@@ -214,6 +217,8 @@ impl SystemUnderTest for NaiveWalSut {
             .unwrap_or_else(|| std::path::Path::new("."));
 
         if let Err(e) = self.sim_fs.sync_dir(parent) {
+            let _ = file.set_len(offset);
+            let _ = file.sync_data();
             self.staged.clear();
             return Err(e);
         }

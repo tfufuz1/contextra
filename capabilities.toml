@@ -12,7 +12,23 @@ description = 'Haupt-Library Facade für Endanwender'
 capabilities = ['public-api', 'facade']
 path = "crates/contextra"
 unsafe_island = false
-may_depend_on = ['contextra-core', 'contextra-db', 'contextra-infer-candle', 'contextra-infer-ollama', 'contextra-infer-onnx', 'contextra-rank', 'contextra-router']
+# Edge Rationale (dependency-graph-audit):
+# - contextra-audit-export: Compliance GDPR Art. 30 export
+# - contextra-avv-generator: Compliance GDPR Art. 28 template generation
+# - contextra-core: Backward-compatible core primitives re-export
+# - contextra-crypto: Encryption-at-rest & cryptographic deletion proofs
+# - contextra-db: Database orchestrator, hybrid search & collection management
+# - contextra-infer-candle: Local Candle LLM/embedding execution provider
+# - contextra-infer-ollama: Remote Ollama inference execution provider
+# - contextra-infer-onnx: Local ONNX embedding & reranking execution provider
+# - contextra-license: License gating & activation verification
+# - contextra-ports: Abstract port trait definitions & standard adapters
+# - contextra-privacy: Cloud egress filtering, DLP & surrogate vaulting
+# - contextra-rank: Fusion ranking & score calibration algorithms
+# - contextra-router: Multi-candidate search routing & drift control
+# - contextra-store: LSM storage engine & WAL durability
+# - contextra-types: Core domain types, IDs & error DTOs
+may_depend_on = ['contextra-audit-export', 'contextra-avv-generator', 'contextra-core', 'contextra-crypto', 'contextra-db', 'contextra-infer-candle', 'contextra-infer-ollama', 'contextra-infer-onnx', 'contextra-license', 'contextra-ports', 'contextra-privacy', 'contextra-rank', 'contextra-router', 'contextra-store', 'contextra-types']
 ci_class = 'pr'
 spec = ['A2', 'A3', 'A4', '0', '2', '3', '4', '5', '6', '7', '8', '9', '12', '13', '15', '16', '17', '18', '19', '20', '21', 'B', 'D']
 test = "cargo test -p contextra --locked"
@@ -96,6 +112,11 @@ description = 'Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer'
 capabilities = ['tombstone-semantics', 'tx-buffer']
 path = "crates/contextra-core"
 unsafe_island = false
+# Edge Rationale (dependency-graph-audit for strangler facade):
+# - contextra-mvcc: Re-exports transaction buffer and snapshot isolation primitives
+# - contextra-ports: Re-exports domain port interfaces
+# - contextra-types: Re-exports domain types, IDs, and error representations
+# - contextra-wire: Re-exports FlatBuffers wire protocol definitions
 may_depend_on = ['contextra-mvcc', 'contextra-ports', 'contextra-types', 'contextra-wire']
 ci_class = 'pr'
 spec = ['A2', 'A3', '0', '4', '13', '20']
@@ -413,3 +434,15 @@ may_depend_on = []
 ci_class = 'pr'
 spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-wire --locked"
+
+[crates.xtask-heavy]
+ring = 'Tooling'
+maturity = 'experimental'
+description = 'Heavy Xtask Integration Benchmark und Long-Running Heavy Verification Tasks'
+capabilities = ['heavy-benchmarks', 'heavy-verification']
+path = "xtask-heavy"
+unsafe_island = false
+may_depend_on = ['contextra-router']
+ci_class = 'pr-check-only'
+spec = ['0']
+test = "cargo check -p xtask-heavy --locked"

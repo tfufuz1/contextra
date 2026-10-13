@@ -1,0 +1,20 @@
+id        = "W-CR-04"
+title     = "Feature-gate MockEmbedder in contextra-ports to exclude from production release builds"
+crate     = "contextra-ports"
+tier      = 1
+risk      = "none"
+goal      = "Gate MockEmbedder under #[cfg(any(test, feature = \"test-utils\"))] so mock structs are not exported in release builds of contextra-ports."
+non_goals = ["Do not modify production embedding traits"]
+scope     = ["crates/contextra-ports/src/embedding.rs", "crates/contextra-ports/Cargo.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "P1"]
+acceptance = [
+  "cargo test -p contextra-ports",
+  "cargo xtask check-ring-capabilities-consistency"
+]
+evidence_required = ["Verification that MockEmbedder is isolated from production builds"]
+
+[budget]
+files      = 2
+lines      = 40
+iterations = 3

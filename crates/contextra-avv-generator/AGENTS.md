@@ -45,4 +45,5 @@ cargo xtask check-unsafe-islands
 
 ## 7. Bekannte Lücken / SOLL
 
-- Ring-Diskrepanz: `capabilities.toml` führt Crate in Ring 0, während Spec III.22 es als Ring 4 Utility beschreibt.
+- Stand: 2026-10-13 (Governance Alignment)
+- Ring-Klassifikation: `capabilities.toml` ist die verbindliche Single Source of Truth (P12) und führt `contextra-avv-generator` in Ring 0. Die Zuordnung als zustandsloses Ring-0-Blattmodul stellt sicher, dass AVV-Template-Generatoren und TOM-Garantien zyklusfrei aus allen System-Ebenen referenziert werden können.
