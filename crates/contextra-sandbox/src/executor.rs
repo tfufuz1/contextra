@@ -10,10 +10,12 @@
 //! Jeder execute_admitted()-Aufruf startet eine frische Store+Instance (kein Zustandsüberlauf).
 //! Fuel (CPU-Limit) UND Wall-Clock-Timeout (tokio) sind beide aktiv.
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::warn;
-use wasmtime::{Config, Engine, Module, Store};
+use wasmtime::{Config, Engine, Linker, Module, Store};
 
 use crate::{
     admission::AdmittedModule,
@@ -22,6 +24,106 @@ use crate::{
     output::WasmOutput,
     wasi::{self, OutputLimitExceededError, ProcessExitError},
 };
+
+/// Bounded worker pool for WASM executions to prevent thread/concurrency exhaustion.
+#[derive(Clone)]
+pub struct WasmWorkerPool {
+    semaphore: Arc<tokio::sync::Semaphore>,
+    max_workers: usize,
+}
+
+impl std::fmt::Debug for WasmWorkerPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WasmWorkerPool")
+            .field("max_workers", &self.max_workers)
+            .field("available_permits", &self.available_workers())
+            .finish()
+    }
+}
+
+impl WasmWorkerPool {
+    /// Erstellt einen neuen WasmWorkerPool mit einer festen Obergrenze an parallelen Worker-Slots.
+    pub fn new(max_workers: usize) -> Self {
+        let max_workers = max_workers.max(1);
+        Self {
+            semaphore: Arc::new(tokio::sync::Semaphore::new(max_workers)),
+            max_workers,
+        }
+    }
+
+    /// Gibt die maximale Anzahl paralleler Worker zurück.
+    pub fn max_workers(&self) -> usize {
+        self.max_workers
+    }
+
+    /// Gibt die Anzahl aktuell verbleibender freier Worker-Permits zurück.
+    pub fn available_workers(&self) -> usize {
+        self.semaphore.available_permits()
+    }
+
+    /// Führt ein Async-Job aus. Bei Rückstau (keine Permits frei) wird sofort `Err(SandboxError::Runtime("Busy: ..."))` geliefert.
+    pub async fn run_job<F, Fut, T>(&self, job: F) -> Result<T, SandboxError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<T, SandboxError>>,
+    {
+        let permit = self.semaphore.try_acquire().map_err(|_| {
+            SandboxError::Runtime("Busy: worker pool capacity reached".to_string())
+        })?;
+        let result = job().await;
+        drop(permit);
+        result
+    }
+}
+
+/// In-memory LRU module cache for compiled `wasmtime::Module` instances.
+struct ModuleCache {
+    entries: HashMap<[u8; 32], (Module, u64)>,
+    access_counter: u64,
+    max_capacity: usize,
+}
+
+impl ModuleCache {
+    fn new(max_capacity: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            access_counter: 0,
+            max_capacity: max_capacity.max(1),
+        }
+    }
+
+    fn get(&mut self, hash: &[u8; 32]) -> Option<Module> {
+        if let Some((module, access)) = self.entries.get_mut(hash) {
+            self.access_counter = self.access_counter.saturating_add(1);
+            *access = self.access_counter;
+            Some(module.clone())
+        } else {
+            None
+        }
+    }
+
+    fn insert(&mut self, hash: [u8; 32], module: Module) {
+        if self.entries.contains_key(&hash) {
+            self.access_counter = self.access_counter.saturating_add(1);
+            self.entries.insert(hash, (module, self.access_counter));
+            return;
+        }
+
+        if self.entries.len() >= self.max_capacity {
+            // Evict least recently used entry
+            if let Some((&lru_key, _)) = self
+                .entries
+                .iter()
+                .min_by_key(|(_k, (_mod, access))| *access)
+            {
+                self.entries.remove(&lru_key);
+            }
+        }
+
+        self.access_counter = self.access_counter.saturating_add(1);
+        self.entries.insert(hash, (module, self.access_counter));
+    }
+}
 
 /// Custom error type returned by host functions on capability violation (INV-SBX-3).
 #[derive(Debug, Clone)]
@@ -87,11 +189,22 @@ impl wasmtime::ResourceLimiter for SandboxState {
 /// - `#![forbid(unsafe_code)]` — ausschließlich wasmtime's sichere Rust-API
 pub struct WasmExecutor {
     engine: Engine,
+    linker: Linker<SandboxState>,
+    module_cache: Mutex<ModuleCache>,
+    worker_pool: Option<WasmWorkerPool>,
+    compilation_count: AtomicU64,
+    cache_hits: AtomicU64,
+    cache_misses: AtomicU64,
 }
 
 impl std::fmt::Debug for WasmExecutor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WasmExecutor").finish()
+        f.debug_struct("WasmExecutor")
+            .field("compilation_count", &self.compilation_count.load(Ordering::Relaxed))
+            .field("cache_hits", &self.cache_hits.load(Ordering::Relaxed))
+            .field("cache_misses", &self.cache_misses.load(Ordering::Relaxed))
+            .field("worker_pool", &self.worker_pool)
+            .finish()
     }
 }
 
@@ -99,15 +212,84 @@ impl WasmExecutor {
     /// Erstellt einen neuen WasmExecutor.
     ///
     /// # Errors
-    /// Wenn wasmtime::Engine nicht initialisiert werden kann.
+    /// Wenn wasmtime::Engine oder Linker nicht initialisiert werden kann.
     pub fn new() -> Result<Self, SandboxError> {
+        Self::new_with_pool(None)
+    }
+
+    /// Erstellt einen neuen WasmExecutor mit optionalem Worker-Pool.
+    pub fn new_with_pool(worker_pool: Option<WasmWorkerPool>) -> Result<Self, SandboxError> {
         let mut config = Config::new();
         config.async_support(true);
         config.consume_fuel(true); // Fuel-Mechanismus aktivieren (CPU-Limit)
-                                   // Cranelift-Backend (standard, sicher)
+
         let engine = Engine::new(&config)
             .map_err(|e| SandboxError::Runtime(format!("Engine init failed: {}", e)))?;
-        Ok(Self { engine })
+
+        let mut linker = Linker::new(&engine);
+
+        wasi::register(&mut linker)
+            .map_err(|e| SandboxError::Runtime(format!("Linker WASI setup failed: {}", e)))?;
+
+        linker
+            .func_wrap(
+                "contextra",
+                "host_cloud_query",
+                move |caller: wasmtime::Caller<'_, SandboxState>| -> Result<i32, wasmtime::Error> {
+                    if !caller.data().allow_cloud_egress {
+                        Err(wasmtime::Error::from(CapabilityViolationError {
+                            capability: "allow_cloud_egress",
+                        }))
+                    } else {
+                        Ok(0)
+                    }
+                },
+            )
+            .map_err(|e| SandboxError::Runtime(format!("Linker host_cloud_query failed: {}", e)))?;
+
+        linker
+            .func_wrap_async(
+                "contextra",
+                "host_sleep",
+                move |_caller: wasmtime::Caller<'_, SandboxState>, (millis,): (u32,)| {
+                    Box::new(async move {
+                        tokio::time::sleep(Duration::from_millis(millis as u64)).await;
+                        Ok(())
+                    })
+                },
+            )
+            .map_err(|e| SandboxError::Runtime(format!("Linker host_sleep failed: {}", e)))?;
+
+        Ok(Self {
+            engine,
+            linker,
+            module_cache: Mutex::new(ModuleCache::new(64)),
+            worker_pool,
+            compilation_count: AtomicU64::new(0),
+            cache_hits: AtomicU64::new(0),
+            cache_misses: AtomicU64::new(0),
+        })
+    }
+
+    /// Setzt einen Worker-Pool für diesen Executor.
+    pub fn with_worker_pool(mut self, pool: WasmWorkerPool) -> Self {
+        self.worker_pool = Some(pool);
+        self
+    }
+
+    /// Gibt die Gesamtzahl der Modul-Kompilierungen zurück.
+    pub fn compilation_count(&self) -> u64 {
+        self.compilation_count.load(Ordering::Relaxed)
+    }
+
+    /// Gibt die Anzahl der Modul-Cache-Treffer zurück.
+    pub fn cache_hits(&self) -> u64 {
+        self.cache_hits.load(Ordering::Relaxed)
+    }
+
+    /// Gibt die Anzahl der Modul-Cache-Misses zurück.
+    pub fn cache_misses(&self) -> u64 {
+        self.cache_misses.load(Ordering::Relaxed)
     }
 
     /// Validates a WASM binary without executing it.
@@ -193,6 +375,15 @@ impl WasmExecutor {
         capabilities: &WasmCapabilities,
         timeout: Duration,
     ) -> Result<WasmOutput, SandboxError> {
+        // Enforce worker pool backpressure if configured
+        let _permit = if let Some(ref pool) = self.worker_pool {
+            Some(pool.semaphore.try_acquire().map_err(|_| {
+                SandboxError::Runtime("Busy: worker pool capacity reached".to_string())
+            })?)
+        } else {
+            None
+        };
+
         // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
         let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
             std::cmp::min(
@@ -225,23 +416,49 @@ impl WasmExecutor {
         // P05 / F-02 / HIGH: Module Provenance & Authorization Policy check prior to compilation and resource allocation
         capabilities.verify_module_policy(wasm_bytes)?;
 
-        // INV-SBX-1: Offload synchronous Module compilation to spawn_blocking with wall-clock timeout to prevent compilation DoS
-        let engine_clone = self.engine.clone();
-        let wasm_bytes_vec = wasm_bytes.to_vec();
-        let compile_task = tokio::task::spawn_blocking(move || {
-            Module::from_binary(&engine_clone, &wasm_bytes_vec)
-        });
+        // Module Cache Lookup / Compilation
+        let hash = WasmCapabilities::compute_sha256(wasm_bytes);
+        let cached_module = {
+            let mut cache = self
+                .module_cache
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            cache.get(&hash)
+        };
 
-        let module = match tokio::time::timeout_at(deadline, compile_task).await {
-            Ok(Ok(Ok(m))) => m,
-            Ok(Ok(Err(e))) => return Err(SandboxError::InvalidModule(e.to_string())),
-            Ok(Err(join_err)) => {
-                return Err(SandboxError::Runtime(format!(
-                    "Compilation task failed: {}",
-                    join_err
-                )))
+        let module = match cached_module {
+            Some(m) => {
+                self.cache_hits.fetch_add(1, Ordering::Relaxed);
+                m
             }
-            Err(_) => return Err(SandboxError::Timeout { timeout_ms }),
+            None => {
+                self.cache_misses.fetch_add(1, Ordering::Relaxed);
+                let engine_clone = self.engine.clone();
+                let wasm_bytes_vec = wasm_bytes.to_vec();
+                let compile_task = tokio::task::spawn_blocking(move || {
+                    Module::from_binary(&engine_clone, &wasm_bytes_vec)
+                });
+
+                let compiled = match tokio::time::timeout_at(deadline, compile_task).await {
+                    Ok(Ok(Ok(m))) => m,
+                    Ok(Ok(Err(e))) => return Err(SandboxError::InvalidModule(e.to_string())),
+                    Ok(Err(join_err)) => {
+                        return Err(SandboxError::Runtime(format!(
+                            "Compilation task failed: {}",
+                            join_err
+                        )))
+                    }
+                    Err(_) => return Err(SandboxError::Timeout { timeout_ms }),
+                };
+
+                self.compilation_count.fetch_add(1, Ordering::Relaxed);
+                let mut cache = self
+                    .module_cache
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                cache.insert(hash, compiled.clone());
+                compiled
+            }
         };
 
         // Stdout/Stderr Buffer
@@ -287,46 +504,10 @@ impl WasmExecutor {
             warn!("WasmExecutor: allow_cloud_egress=true — erhöhtes Risiko");
         }
 
-        // Linker mit WASI-Imports
-        let mut linker = wasmtime::Linker::new(&self.engine);
-
-        wasi::register(&mut linker)
-            .map_err(|e| SandboxError::Runtime(format!("Linker WASI setup failed: {}", e)))?;
-
-        // Host Cloud Query function enforcement
-        linker
-            .func_wrap(
-                "contextra",
-                "host_cloud_query",
-                move |caller: wasmtime::Caller<'_, SandboxState>| -> Result<i32, wasmtime::Error> {
-                    if !caller.data().allow_cloud_egress {
-                        Err(wasmtime::Error::from(CapabilityViolationError {
-                            capability: "allow_cloud_egress",
-                        }))
-                    } else {
-                        Ok(0)
-                    }
-                },
-            )
-            .map_err(|e| SandboxError::Runtime(format!("Linker host_cloud_query failed: {}", e)))?;
-
-        // Host async sleep/delay helper function for testing wall-clock timeouts
-        linker
-            .func_wrap_async(
-                "contextra",
-                "host_sleep",
-                move |_caller: wasmtime::Caller<'_, SandboxState>, (millis,): (u32,)| {
-                    Box::new(async move {
-                        tokio::time::sleep(Duration::from_millis(millis as u64)).await;
-                        Ok(())
-                    })
-                },
-            )
-            .map_err(|e| SandboxError::Runtime(format!("Linker host_sleep failed: {}", e)))?;
-
         // Wall-Clock-Timeout wrapping der Instanziierung + Ausführung
         let execute_future = async {
-            let instance = linker
+            let instance = self
+                .linker
                 .instantiate_async(&mut store, &module)
                 .await
                 .map_err(|e| SandboxError::Runtime(format!("Instantiation failed: {}", e)))?;
