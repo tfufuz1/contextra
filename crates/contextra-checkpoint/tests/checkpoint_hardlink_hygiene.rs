@@ -82,9 +82,18 @@ async fn test_hardlink_cloner_filters_tmp_files() {
     let tmp_path = src.path().join("000002.tmp");
     let partial_sst_tmp = src.path().join("000003.sst.tmp");
 
-    File::create(&sst_path).unwrap().write_all(b"sst_data").unwrap();
-    File::create(&tmp_path).unwrap().write_all(b"tmp_data").unwrap();
-    File::create(&partial_sst_tmp).unwrap().write_all(b"partial_data").unwrap();
+    File::create(&sst_path)
+        .unwrap()
+        .write_all(b"sst_data")
+        .unwrap();
+    File::create(&tmp_path)
+        .unwrap()
+        .write_all(b"tmp_data")
+        .unwrap();
+    File::create(&partial_sst_tmp)
+        .unwrap()
+        .write_all(b"partial_data")
+        .unwrap();
 
     let cloner = DefaultHardlinkCloner::new();
     let registry = Arc::new(SnapshotRegistry::new());
@@ -108,7 +117,10 @@ async fn test_hardlink_cloner_registered_and_target_overwrite() {
     let reg_dir = tempdir().unwrap();
 
     let sst_path = src.path().join("000010.sst");
-    File::create(&sst_path).unwrap().write_all(b"data10").unwrap();
+    File::create(&sst_path)
+        .unwrap()
+        .write_all(b"data10")
+        .unwrap();
 
     let cloner = DefaultHardlinkCloner::new();
     let snap_registry = Arc::new(SnapshotRegistry::new());

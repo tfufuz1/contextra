@@ -32,16 +32,16 @@
 
 pub mod copy_registry;
 mod guard;
-pub mod restore_filter;
 mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
+pub mod restore_filter;
 mod store;
+pub mod wiring;
 
 pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
 pub use guard::{CheckpointGuard, PinGuard};
-pub use restore_filter::{filter_restore_records, CpyRestoreFilter, NoOpRestoreFilter};
 pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
 pub use manifest::CheckpointManifest;
 pub use meta::{CheckpointMeta, StateCheckpoint};
@@ -53,4 +53,5 @@ pub use orphan::{
     pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
     InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan,
 };
+pub use restore_filter::{filter_restore_records, CpyRestoreFilter, NoOpRestoreFilter};
 pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};

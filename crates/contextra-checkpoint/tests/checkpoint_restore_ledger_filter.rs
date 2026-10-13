@@ -37,10 +37,14 @@ async fn test_anti_resurrection_restore_filter_with_erasure_ledger() {
     let master_secret = [0x42u8; 32];
     let ledger_key = LedgerKey::derive_from_master_secret(&master_secret);
 
-    let (ledger_opt, status) = ErasureLedger::open_or_fail_closed(dir.path(), ledger_key.clone(), false, None)
-        .await
-        .unwrap();
-    assert_eq!(status, contextra_store::erasure_ledger::LedgerOpenStatus::Fresh);
+    let (ledger_opt, status) =
+        ErasureLedger::open_or_fail_closed(dir.path(), ledger_key.clone(), false, None)
+            .await
+            .unwrap();
+    assert_eq!(
+        status,
+        contextra_store::erasure_ledger::LedgerOpenStatus::Fresh
+    );
     let mut ledger = ledger_opt.unwrap();
 
     let scope = b"lsm";
@@ -66,18 +70,18 @@ async fn test_anti_resurrection_restore_filter_with_erasure_ledger() {
         b"secret_data_v1".to_vec(),
         50u64, // Created at tx = 50 (BEFORE erasure at tx = 100)
     );
-    let rec_normal = (
-        normal_key.to_vec(),
-        b"public_data_v1".to_vec(),
-        60u64,
-    );
+    let rec_normal = (normal_key.to_vec(), b"public_data_v1".to_vec(), 60u64);
     let rec_erased_rewritten = (
         erased_key.to_vec(),
         b"consent_renewed_v2".to_vec(),
         150u64, // Rewritten at tx = 150 (AFTER erasure at tx = 100)
     );
 
-    let candidate_records = vec![rec_erased_old.clone(), rec_normal.clone(), rec_erased_rewritten.clone()];
+    let candidate_records = vec![
+        rec_erased_old.clone(),
+        rec_normal.clone(),
+        rec_erased_rewritten.clone(),
+    ];
 
     let filter = ErasureLedgerRestoreFilter::new(&ledger);
 
@@ -86,19 +90,25 @@ async fn test_anti_resurrection_restore_filter_with_erasure_ledger() {
 
     // Record A (user_101 at tx = 50 <= 100) MUST be dropped (Anti-Resurrection)
     assert!(
-        !filtered_records.iter().any(|(k, _, tx)| k == erased_key && *tx == 50),
+        !filtered_records
+            .iter()
+            .any(|(k, _, tx)| k == erased_key && *tx == 50),
         "Erased record prior to erasure transaction must be dropped on restore"
     );
 
     // Record B (user_102 at tx = 60) MUST be kept
     assert!(
-        filtered_records.iter().any(|(k, _, tx)| k == normal_key && *tx == 60),
+        filtered_records
+            .iter()
+            .any(|(k, _, tx)| k == normal_key && *tx == 60),
         "Unerased normal record must be retained on restore"
     );
 
     // Record C (user_101 rewritten at tx = 150 > 100) MUST be kept
     assert!(
-        filtered_records.iter().any(|(k, _, tx)| k == erased_key && *tx == 150),
+        filtered_records
+            .iter()
+            .any(|(k, _, tx)| k == erased_key && *tx == 150),
         "Record rewritten after erasure transaction must be retained on restore"
     );
 

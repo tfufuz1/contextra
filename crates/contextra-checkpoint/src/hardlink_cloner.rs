@@ -191,9 +191,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
             while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {
                 let path = entry.path();
                 if path.is_file() {
-                    let is_sst = path
-                        .extension()
-                        .is_some_and(|ext| ext == "sst");
+                    let is_sst = path.extension().is_some_and(|ext| ext == "sst");
                     if is_sst {
                         let file_name = path.file_name().ok_or_else(|| {
                             ContextraError::invalid_input("Invalid file name in SST directory")
@@ -202,7 +200,9 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
 
                         // Remove existing link if present
                         if fs::metadata(&target_path).await.is_ok() {
-                            fs::remove_file(&target_path).await.map_err(ContextraError::Io)?;
+                            fs::remove_file(&target_path)
+                                .await
+                                .map_err(ContextraError::Io)?;
                         }
 
                         if let Err(io_err) = fs::hard_link(&path, &target_path).await {
