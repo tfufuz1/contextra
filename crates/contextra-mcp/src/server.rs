@@ -61,7 +61,9 @@ impl McpServer {
         let injection_guard = Arc::new(PromptInjectionGuard::from_env());
         let egress_classifier: Arc<dyn EgressClassifier> =
             Arc::new(DefaultEgressClassifier::default());
-        let plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>> = None;
+        let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
+            server.db.license_gate(),
+        )));
 
         Ok(server
             .with_injection_guard(injection_guard)
@@ -80,6 +82,7 @@ impl McpServer {
             allow_code_execution: false,
             allow_cloud_egress: false,
             max_execution_ms: 5_000,
+            sidecar_limits: crate::sandbox::SidecarLimits::default(),
         };
         let sandbox = McpSandbox::new(policy)
             .map_err(|e| ContextraError::Internal(format!("Sandbox init: {e}")))?;
@@ -95,6 +98,9 @@ impl McpServer {
         let kv_bridge = setup_kv_bridge(&db);
 
         let clock = Arc::new(SystemClock::new());
+        let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
+            db.license_gate(),
+        )));
         Self {
             db,
             embedder,
@@ -103,7 +109,7 @@ impl McpServer {
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             egress_guard: None,
             routing: None,
-            plugin_registry: None,
+            plugin_registry,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
             forget_guard: Arc::new(ForgetGuard::new(10, clock)),
