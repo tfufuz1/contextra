@@ -5,10 +5,11 @@
 #![forbid(unsafe_code)]
 
 use bytes::Bytes;
-use contextra_kvcache::{
-    CchRamClaim, KvReusePolicy, PrefixStoreScratchpadInvalidator, ScratchpadCacheScope,
-    ScratchpadInvalidator, TenantPrefixKvStore,
+use contextra_kvcache::radix::KvReusePolicy;
+use contextra_kvcache::scratchpad_invalidation::{
+    CchRamClaim, PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
 };
+use contextra_kvcache::TenantPrefixKvStore;
 use contextra_ports::kv::{KvBlock, KvLayout, PrefixKey, RopeConfig};
 use contextra_types::model_fingerprint::ModelFingerprint;
 use contextra_types::TenantId;
