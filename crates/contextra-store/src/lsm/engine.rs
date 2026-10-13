@@ -100,47 +100,6 @@ impl LsmStorage {
         self.pressure_rx.clone()
     }
 
-    /// Returns true if the storage engine is operating in ReadOnly mode due to erasure ledger failure.
-    pub fn is_read_only(&self) -> bool {
-        self.is_read_only
-    }
-
-    /// Returns the open status of the erasure ledger.
-    pub fn ledger_state(&self) -> &crate::erasure_ledger::LedgerOpenStatus {
-        &self.ledger_state
-    }
-
-    /// Returns a handle to the active erasure ledger if open and available.
-    pub fn ledger_handle(&self) -> Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>> {
-        self.ledger_handle.clone()
-    }
-
-    /// Returns the 16-byte database instance ID recorded in the erasure ledger.
-    pub fn ledger_db_instance_id(&self) -> [u8; 16] {
-        self.ledger_handle
-            .as_ref()
-            .map(|h| h.db_instance_id())
-            .unwrap_or([0u8; 16])
-    }
-
-    /// Appends entries to the erasure ledger with atomic fsync durability.
-    pub async fn ledger_append(
-        &self,
-        entries: &[crate::erasure_ledger::LedgerEntry],
-    ) -> Result<()> {
-        if self.is_read_only {
-            return Err(ContextraError::Storage(format!(
-                "Storage engine is in ReadOnly mode due to erasure ledger status ({:?})",
-                self.ledger_state
-            )));
-        }
-        let handle = self
-            .ledger_handle
-            .as_ref()
-            .ok_or_else(|| ContextraError::Storage("Erasure ledger handle unavailable".into()))?;
-        handle.append(entries).await
-    }
-
     /// Signals the background compaction engine to stop.
     pub fn shutdown(&self) {
         self.cancel_token.cancel();

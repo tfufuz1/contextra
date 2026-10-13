@@ -49,6 +49,7 @@ ed25519-dalek = "2"
 
 [features]
 default = []
+encryption-at-rest = ["contextra-engine/encryption-at-rest"]
 bench = []
 sandbox = ["contextra-engine/sandbox"]
 reranking = []

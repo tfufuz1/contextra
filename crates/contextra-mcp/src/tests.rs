@@ -354,6 +354,9 @@ async fn test_contextra_forget_collection_with_proof() {
     let resp_drop = server.handle(forget_req).await;
     assert!(resp_drop.error.is_none());
     let res_drop = serde_json::to_value(&resp_drop).unwrap();
+    if res_drop["result"]["isError"] == true {
+        panic!("forget_req returned error: {:?}", res_drop["result"]["content"]);
+    }
     assert_ne!(res_drop["result"]["isError"], true);
 
     let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
@@ -366,7 +369,27 @@ async fn test_contextra_forget_collection_with_proof() {
     let proof: contextra_crypto::deletion_proof::DeletionProof =
         serde_json::from_value(proof_val.clone()).unwrap();
 
-    let keypair = contextra_crypto::ed25519_proof::DeletionProofKeyPair::generate();
+    struct TestKeyRng<'a>(&'a [u8; 32]);
+    impl<'a> rand::RngCore for TestKeyRng<'a> {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            dest.copy_from_slice(self.0);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&test_key.as_bytes()[..32]);
+    let keypair = contextra_crypto::DeletionProofKeyPair::generate_with_rng(&mut TestKeyRng(&key_bytes));
+
     assert!(proof.verify(keypair.verifying_key()).unwrap());
 
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");

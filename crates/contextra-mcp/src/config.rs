@@ -507,9 +507,11 @@ impl RouterConfig {
 }
 
 /// Fallback Mock LLM Text Generator.
+#[cfg(any(test, debug_assertions, feature = "test-utils"))]
 #[derive(Debug, Clone, Default)]
 pub struct MockLlmGenerator;
 
+#[cfg(any(test, debug_assertions, feature = "test-utils"))]
 impl LlmTextGenerator for MockLlmGenerator {
     fn generate<'a>(
         &'a self,

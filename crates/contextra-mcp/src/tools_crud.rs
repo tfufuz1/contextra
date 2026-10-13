@@ -2,7 +2,6 @@ use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::collection_profile::DeploymentTier;
-use contextra_types::TenantId;
 use serde_json::{json, Value};
 
 impl McpServer {
@@ -121,7 +120,7 @@ impl McpServer {
             .key
             .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
 
-        let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
+        let tenant_id = crate::validation::extract_tenant_from_args_or_env(Some(args));
 
         let proof = self
             .db
