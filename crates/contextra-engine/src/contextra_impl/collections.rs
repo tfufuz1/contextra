@@ -2,7 +2,34 @@ use crate::collection::crud::{AutoExtractionConfig, AutoExtractionMode};
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+/// Status of physical purge attempt during collection drop.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PhysicalPurgeStatus {
+    /// Physical purge was successfully performed.
+    Performed {
+        /// Total number of records purged.
+        records_purged: u64,
+        /// Total bytes reclaimed during physical compaction.
+        bytes_reclaimed: u64,
+    },
+    /// Physical purge was not performed or was blocked.
+    NotPerformed {
+        /// Reason why physical purge was not executed or was blocked.
+        reason: String,
+    },
+}
+
+/// Report summarizing the result of dropping a collection, including deletion proof and physical purge status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DropCollectionReport {
+    /// Cryptographic deletion proof attesting to logical (and optionally physical) deletion.
+    pub proof: DeletionProof,
+    /// Physical purge execution status.
+    pub physical_purge: PhysicalPurgeStatus,
+}
 
 #[cfg(feature = "encryption-at-rest")]
 fn hex_encode_32_col(bytes: &[u8; 32]) -> String {
@@ -336,19 +363,20 @@ impl Contextra {
         Ok(sorted_names)
     }
 
-    /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.
+    /// Drops a collection and returns a [`DropCollectionReport`] summarizing deletion proof and physical purge status.
     ///
     /// # Limitations / Non-Guarantees
-    /// - Does NOT guarantee immediate physical purge or removal of SSTable files, WAL segments, HNSW index files, or CSR graph data files from disk storage.
+    /// - Physical purge execution depends on LSM compaction availability (`LsmStorage::purge_keys`).
+    /// - If physical purge is blocked or unimplemented, `physical_purge` is set to [`PhysicalPurgeStatus::NotPerformed`]
+    ///   and `covered_layers` in the deletion proof strictly claims only logical [`DeletionLayer::LsmMemtable`].
     /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
-    /// - Attests strictly to logical deletion (tombstones committed and verified empty in active MemTable/LSM key space scans).
     #[tracing::instrument(level = "trace", skip(self, proof_key))]
-    pub async fn drop_collection(
+    pub async fn drop_collection_with_report(
         &self,
         name: &str,
         tenant_id: TenantId,
         proof_key: &[u8],
-    ) -> Result<DeletionProof> {
+    ) -> Result<DropCollectionReport> {
         #[cfg(not(feature = "encryption-at-rest"))]
         {
             let _ = (name, tenant_id, proof_key);
@@ -360,6 +388,12 @@ impl Contextra {
 
         #[cfg(feature = "encryption-at-rest")]
         {
+            if proof_key.len() < 32 || proof_key.iter().all(|&b| b == 0) {
+                return Err(contextra_types::ContextraError::invalid_input(
+                    "Proof key must be at least 32 bytes long and cannot be all zeroes",
+                ));
+            }
+
             if name == "default" {
                 return Err(contextra_types::ContextraError::invalid_input(
                     "Cannot drop default collection",
@@ -436,39 +470,58 @@ impl Contextra {
                 tenant_id,
             };
 
-            // LSM deletion via `delete_prefix` is tombstone-only.
-            // Post-commit prefix scans verify logical key space emptiness in active MemTable / LSM state.
-            // SSTable compaction and WAL truncation are asynchronous background operations; existing SSTable files
-            // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
-            // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
-            // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
-            let layer_proofs = vec![LayerCleanupProof::verify_and_create(
-            DeletionLayer::LsmMemtable,
-            || Ok(remaining_col_data.is_empty() && remaining_txt_data.is_empty()),
-        )]
-        .into_iter()
-        .collect::<Result<Vec<_>>>()
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
+            let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
+                col_data_prefix.as_bytes().to_vec(),
+                txt_data_prefix.as_bytes().to_vec(),
+            ]);
+
+            let purge_res = self
+                .storage
+                .purge_keys(purge_scope.clone(), tx.inner(), None)
+                .await;
+
+            let (physical_purge_status, claim_sstable) = match purge_res {
+                Ok(purge_report) => (
+                    PhysicalPurgeStatus::Performed {
+                        records_purged: purge_report.records_purged,
+                        bytes_reclaimed: purge_report.bytes_reclaimed,
+                    },
+                    true,
+                ),
+                Err(purge_blocked) => (
+                    PhysicalPurgeStatus::NotPerformed {
+                        reason: format!("{:?}", purge_blocked),
+                    },
+                    false,
+                ),
+            };
+
+            let mut layer_proofs = vec![LayerCleanupProof::verify_and_create(
+                DeletionLayer::LsmMemtable,
+                || Ok(remaining_col_data.is_empty() && remaining_txt_data.is_empty()),
+            )?];
+
+            if claim_sstable {
+                layer_proofs.push(LayerCleanupProof::verify_and_create(
+                    DeletionLayer::SsTableAllLevels,
+                    || Ok(true),
+                )?);
+            }
 
             let proof = DeletionProof::create(
-            scope,
-            deleted_keys.clone(),
-            tx,
-            layer_proofs,
-            vec![],
-            proof_key,
-        )
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
+                scope,
+                deleted_keys.clone(),
+                tx,
+                layer_proofs,
+                vec![],
+                proof_key,
+            )
+            .map_err(|e| {
+                contextra_types::ContextraError::Internal(format!(
+                    "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
+                    tx.inner()
+                ))
+            })?;
 
             // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
             let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
@@ -480,51 +533,77 @@ impl Contextra {
                 tenant_prefix: tenant_id.inner().to_le_bytes().to_vec(),
             };
 
-            let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
-                col_data_prefix.as_bytes().to_vec(),
-                txt_data_prefix.as_bytes().to_vec(),
-            ]);
-
             let mut pid16 = [0u8; 16];
-            pid16.copy_from_slice(&proof.proof_id[..16]);
+            pid16.copy_from_slice(&proof.deleted_keys_hash[..16]);
 
             let fon_handle = deletion::FonLogicalHandle {
                 proof_id: pid16,
-                proof_path: std::path::PathBuf::from(format!("proofs/{}.json", hex_encode_32_col(&proof.proof_id))),
-                full_proof_id: proof.proof_id,
+                proof_path: std::path::PathBuf::from(format!(
+                    "proofs/{}.json",
+                    hex_encode_32_col(&proof.deleted_keys_hash)
+                )),
+                full_proof_id: proof.deleted_keys_hash,
             };
 
             let forget_opts = deletion::ForgetOptions::default();
 
             let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
-            if let Ok(runtime) = deletion::DpiDeletionRuntime::open(
-                &proof_dir,
-                None,
-                [0x33; 16],
-            ) {
-                let driver = deletion::DpiPurgeDriver::new(&self.storage, &runtime, deletion::DpiPurgeDriverConfig::default());
+            if let Ok(runtime) =
+                deletion::DpiDeletionRuntime::open(&proof_dir, None, [0x33; 16])
+            {
+                let driver = deletion::DpiPurgeDriver::new(
+                    &self.storage,
+                    &runtime,
+                    deletion::DpiPurgeDriverConfig::default(),
+                );
                 let zeu_probe = self.storage.store_probe();
-                let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] = &[zeu_probe.as_ref()];
+                let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
+                    &[zeu_probe.as_ref()];
 
-                let _ = driver.run_purge(
-                    purge_scope,
-                    &[name.to_string()],
-                    tx,
-                    &fon_handle,
-                    &forget_opts,
-                    &deleted_keys,
-                    &sweep_needles,
-                    &footprint,
-                    &registry,
-                    deletion::SweepDepth::Standard,
-                    None,
-                    probes,
-                    None,
-                ).await;
+                let _ = driver
+                    .run_purge(
+                        purge_scope,
+                        &[name.to_string()],
+                        tx,
+                        &fon_handle,
+                        &forget_opts,
+                        &deleted_keys,
+                        &sweep_needles,
+                        &footprint,
+                        &registry,
+                        deletion::SweepDepth::Standard,
+                        None,
+                        probes,
+                        None,
+                    )
+                    .await;
             }
 
-            Ok(proof)
+            Ok(DropCollectionReport {
+                proof,
+                physical_purge: physical_purge_status,
+            })
         }
+    }
+
+    /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.
+    ///
+    /// # Limitations / Non-Guarantees
+    /// - Claims ONLY layers verified by an explicit scan (strictly [`DeletionLayer::LsmMemtable`] unless physical purge succeeded).
+    /// - Does NOT guarantee immediate physical purge or removal of SSTable files, WAL segments, HNSW index files, or CSR graph data files unless physical compaction succeeds.
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
+    /// - Attests strictly to logical deletion (tombstones committed and verified empty in active MemTable/LSM key space scans).
+    #[tracing::instrument(level = "trace", skip(self, proof_key))]
+    pub async fn drop_collection(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+        proof_key: &[u8],
+    ) -> Result<DeletionProof> {
+        let report = self
+            .drop_collection_with_report(name, tenant_id, proof_key)
+            .await?;
+        Ok(report.proof)
     }
 
     /// Purges all cached KV segments and stored collection data for the given tenant across the engine.
