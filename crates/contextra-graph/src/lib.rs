@@ -31,7 +31,6 @@
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-10T19:23:40Z) (SESSION: bd6ff800)
 // PRÜFER-KONTEXT: FRESH - Verified zero-unsafe invariant, zero unhandled panics, AGT-GRAPH-001 TxId origin assertions, and 133/133 tests green.
 
-#[cfg(feature = "apprh-diffusion")]
 pub mod apprh;
 pub mod arc_slice;
 pub mod cascade;
@@ -54,8 +53,8 @@ pub mod ppr_stream;
 pub mod provenance;
 pub mod session_dag;
 pub mod tl_hfd;
+pub mod wiring;
 
-#[cfg(feature = "apprh-diffusion")]
 pub use apprh::{
     apprh_local, forward_push_apprh, shadow_compare_forward_push_vs_apprh, ApprhError,
     ApprhFlipGate, ApprhMode, ApprhParams, ApprhSelector, ApprhSelectorConfig,
@@ -103,7 +102,6 @@ pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,
     PercolationConfig,
 };
-#[cfg(feature = "apprh-diffusion")]
 pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
@@ -116,6 +114,7 @@ pub use tl_hfd::{
     ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,
 };
+pub use wiring::{GraphWiring, GraphWiringDependencies};
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
 pub trait GraphIndexExt: contextra_ports::GraphIndex {

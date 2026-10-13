@@ -108,7 +108,6 @@ pub(crate) fn compute_ppr(
 }
 
 /// Calculates Personalized PageRank using APPRH selector routing and hysteresis gate evaluation (P1.3).
-#[cfg(feature = "apprh-diffusion")]
 pub fn compute_ppr_with_apprh_selector(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

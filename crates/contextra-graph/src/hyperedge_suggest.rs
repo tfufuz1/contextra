@@ -113,12 +113,22 @@ pub fn compute_co_occurrence_candidates(
 pub async fn validate_candidates_with_llm(
     candidates: &[HyperEdgeCandidate],
     entity_labels: &dyn Fn(EntityId) -> Option<String>,
-    generator: &dyn LlmTextGenerator,
+    generator: Option<&dyn LlmTextGenerator>,
     max_llm_calls_per_cycle: usize,
 ) -> Result<Vec<ValidatedHyperEdgeCandidate>, GraphMutationError> {
     if candidates.len() > max_llm_calls_per_cycle {
         return Err(HyperedgeSuggestError::LlmValidationBudgetExceeded(candidates.len()).into());
     }
+
+    let generator = match generator {
+        Some(g) => g,
+        None => {
+            return Err(GraphMutationError::Internal(
+                "No LLM text generator port configured for hyperedge candidate validation"
+                    .to_string(),
+            ));
+        }
+    };
 
     let mut validated = Vec::with_capacity(candidates.len());
 
