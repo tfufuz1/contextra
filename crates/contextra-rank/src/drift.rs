@@ -129,7 +129,6 @@ impl DriftDetector {
     /// Records a new score observation and calculates updated drift status.
     /// Non-finite scores are ignored and do not alter recorded history.
     pub fn observe(&mut self, score: f32) -> DriftStatus {
-        // TODO(contextra-plan): Validate NaN score handling and tie-breaking cases for score drift tracking across 4-signal search fusion outputs [ref:eigenbau-rrf-fusion]
         if !score.is_finite() {
             return self.analyze();
         }
