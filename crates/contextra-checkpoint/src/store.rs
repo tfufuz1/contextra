@@ -7,6 +7,7 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 #[allow(deprecated)]
 use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
+use crate::restore_filter::CpyRestoreFilter;
 use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
@@ -71,7 +72,7 @@ pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
 /// **Architektur- und Sicherheitsvorteil (P-23):**
 /// Durch die Vereinigung zweier ehemals separater Maps/Locks in ein einziges `CheckpointIndex`-RwLock
 /// werden potenzielle Deadlock-Fenster durch unterschiedliche Lock-Erwerbsreihenfolgen (Name-First vs. Seq-First)
-/// vollständig ausgeschlossen. Säufige Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
+/// vollständig ausgeschlossen. Sämtliche Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
 /// erfolgen strikt atomar.
 #[derive(Debug, Default)]
 struct CheckpointIndex {
@@ -143,6 +144,7 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     let bytes =
         serde_json::to_vec(&meta).map_err(|e| ContextraError::Serialization(e.to_string()))?;
     let key = format!("{namespace}:checkpoint:__sys_tx_counter__");
+    #[allow(deprecated)]
     let tx = TxId::new(TxId::INTERNAL_BASE + hwm);
     storage.put(tx, key.as_bytes(), &bytes).await?;
     storage.commit(tx).await?;
@@ -178,6 +180,8 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
     clock: Arc<dyn contextra_ports::Clock>,
+    /// Injizierter Anti-Resurrection Restore-Filter (N9, Fail-Closed Default)
+    restore_filter: Option<Arc<dyn CpyRestoreFilter>>,
     /// Injected metrics sink for operational monitoring
     metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
@@ -283,6 +287,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             checkpoint_counter,
             skipped_rollbacks,
             clock,
+            restore_filter: None,
             metrics_sink: None,
         })
     }
@@ -376,6 +381,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
         }
 
+        #[allow(deprecated)]
         Ok(TxId::new(TxId::INTERNAL_BASE + raw))
     }
 
@@ -405,6 +411,22 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
+    }
+
+    /// Sets the anti-resurrection restore filter for the store (N9, fail-closed default).
+    ///
+    /// # Fail-Closed Default
+    /// Without an explicitly set `restore_filter`, restoring a checkpoint when a deletion history exists
+    /// (`last_tx > meta.tx_id`) will fail closed to prevent resurrection of erased data.
+    /// To bypass filtering explicitly, set `NoOpRestoreFilter` via `with_restore_filter(Arc::new(NoOpRestoreFilter))`.
+    pub fn with_restore_filter(mut self, filter: Arc<dyn CpyRestoreFilter>) -> Self {
+        self.restore_filter = Some(filter);
+        self
+    }
+
+    /// Sets the anti-resurrection restore filter dynamically.
+    pub fn set_restore_filter(&mut self, filter: Arc<dyn CpyRestoreFilter>) {
+        self.restore_filter = Some(filter);
     }
 
     pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
@@ -664,11 +686,14 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Restores the system to a specific checkpoint by name.
-    /// This will rollback the underlying storage to the transaction ID of the checkpoint.
+    /// This will rollback the underlying storage to the transaction ID of the checkpoint,
+    /// and then apply the anti-resurrection `CpyRestoreFilter` (if configured or required).
     ///
-    /// # Serialisierungsbarriere
-    /// Wenn neuere committete Transaktionen (`last_tx > meta.tx_id`) existieren, schlägt die Wiederherstellung
-    /// mit einem Fehler fehl.
+    /// # Serialisierungsbarriere & Anti-Resurrection
+    /// - Wenn neuere committete Transaktionen (`last_tx > meta.tx_id`) existieren, schlägt die Wiederherstellung
+    ///   ohne konfigurierten `restore_filter` fail-closed fehl, um die Wiederauferstehung gelöschter Daten zu verhindern.
+    /// - Nach dem Rollback werden alle verbliebenen Datensätze gescannt und per `restore_filter.drop_record` geprüft;
+    ///   gelöschte Datensätze werden atomar aus dem Speicher entfernt.
     pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> {
         validate_identifier("Checkpoint name", name)?;
         let _guard = self.write_lock.lock().await;
@@ -679,9 +704,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             .ok_or(ContextraError::CheckpointNotFound)?;
 
         let last_tx = self.storage.last_tx_id().await?;
-        if last_tx > meta.tx_id {
+        let has_deletion_history = last_tx > meta.tx_id;
+
+        if has_deletion_history && self.restore_filter.is_none() {
             return Err(ContextraError::Transaction(format!(
-                "Serialization barrier violation: Cannot restore checkpoint '{}' at TxId {} because newer committed transaction TxId {} exists in storage",
+                "Fail-closed restore barrier: Cannot restore checkpoint '{}' (TxId {}) without a CpyRestoreFilter when subsequent transactions exist (last TxId {}). Anti-resurrection filter is required.",
                 name,
                 meta.tx_id.inner(),
                 last_tx.inner()
@@ -691,7 +718,42 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         // 1. Rollback storage state
         self.storage.rollback_to_tx(meta.tx_id).await?;
 
-        // 2. Synchronize cache
+        // 2. Anti-Resurrection filter application (if filter present)
+        if let Some(ref filter) = self.restore_filter {
+            let all_entries = self
+                .storage
+                .scan(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded, None)
+                .await?;
+
+            let cp_tx = meta.tx_id.inner();
+            let mut keys_to_drop = Vec::new();
+
+            for (key, _val) in all_entries {
+                if filter.drop_record(&key, cp_tx) {
+                    keys_to_drop.push(key);
+                }
+            }
+
+            if !keys_to_drop.is_empty() {
+                let purger_tx = self.allocate_tx().await?;
+                for k in keys_to_drop {
+                    if let Err(e) = self.storage.delete(purger_tx, &k).await {
+                        if let Err(rb) = self.storage.rollback(purger_tx).await {
+                            tracing::warn!(tx = ?purger_tx, error = %rb, "Storage rollback failed during restore filter purge");
+                        }
+                        return Err(e);
+                    }
+                }
+                if let Err(e) = self.storage.commit(purger_tx).await {
+                    if let Err(rb) = self.storage.rollback(purger_tx).await {
+                        tracing::warn!(tx = ?purger_tx, error = %rb, "Storage rollback failed during restore filter commit");
+                    }
+                    return Err(e);
+                }
+            }
+        }
+
+        // 3. Synchronize cache
         self.list_checkpoints().await?;
 
         Ok(meta)
