@@ -1,0 +1,17 @@
+id        = "T-2026-LA18"
+title     = "Scrub: Refusal-Gruende, Hardlinks, CoW, Flash-Grenzen (N3, Feld 2)"
+crate     = "contextra-durable-fs"
+tier      = 1
+risk      = "high"
+goal      = "Typisierte Refusal-Gruende vervollstaendigen, Readback-Nullenverifikation nach Ueberschreiben einbauen und SSD/Flash Remanenz-Dokumentation im Modulkopf festlegen."
+non_goals = ["Keine Aenderungen an A10 dispose.rs", "Keine Aenderungen an Cargo.toml", "Keine Aenderungen ausserhalb des Arbeitsbereichs"]
+scope     = ["crates/contextra-durable-fs/src/scrub.rs", "crates/contextra-durable-fs/tests/scrub_refusal_matrix.rs", ".jules/tasks/T-2026-LA18.toml"]
+forbidden = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "xtask/**", "capabilities.toml", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-durable-fs --test scrub_refusal_matrix", "cargo xtask doctrine-scan", "cargo xtask check-result-dropped-io", "cargo xtask fast-diff-lint"]
+evidence_required = ["Rot-Lauf vor dem Fix (Meldung zitieren), gruen danach"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

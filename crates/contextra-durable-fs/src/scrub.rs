@@ -1,12 +1,25 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-13
 // ZWECK: Sicheres Entfernen von Dateien (Scrubbing) mit Sicherheitsprüfungen (CoW, Hardlinks, ReaderAlive).
 // INVARIANTEN: Zero-Panic, pure safe Rust, I/O-Fehler werden als std::io::Result propagiert.
+
+//! # Flash-/SSD-Remanenz und physische Vernichtungsgrenzen
+//!
+//! **WICHTIGER HINWEIS (Wei et al., FAST 2011):**
+//! Das Überschreiben von Dateiinhalten mit Nullen auf Flash-basierten Speichermedien (SSDs, NVMe, eMMC)
+//! garantiert **keine physische Vernichtung** der Datenblöcke auf Zellebene. Durch Flash Translation Layers (FTL),
+//! Wear Leveling, Over-Provisioning und Out-of-Place-Writes verbleiben alte Datenblöcke in physischen Flash-Zellen.
+//!
+//! Belastbare und zuverlässige Datenlöschung auf Flash-Medien ist **ausschließlich via Crypto-Erase (S4)**
+//! (Vernichtung des Verschlüsselungsschlüssels) möglich.
+//!
+//! Der Rückgabetyp ([`ScrubOutcome::Scrubbed`]) und die Quittung ([`ScrubReceipt`]) bieten daher explizit
+//! **keine physische Garantie** (`physical_guarantee: None`).
 
 use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubReceipt};
 use contextra_sys::{flush_file, FlushKind};
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 /// Policy controlling whether scrubbing (overwriting with zeros before deletion) is enabled.
@@ -102,7 +115,7 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
     let len = metadata.len();
     if len > 0 {
         let mut options = OpenOptions::new();
-        options.write(true);
+        options.read(true).write(true);
         #[cfg(windows)]
         {
             use std::os::windows::fs::OpenOptionsExt;
@@ -124,6 +137,9 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
 
         injector.on_fsync(Some(path))?;
         flush_file(&file, FlushKind::DataAndMetadata)?;
+
+        // Readback verification pass: verify all overwritten bytes are 0u8
+        verify_zero_readback(&mut file, path, len)?;
     }
 
     durable_remove_with_injector(path, injector)?;
@@ -131,6 +147,36 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
     Ok(ScrubOutcome::Scrubbed(ScrubReceipt {
         bytes_scrubbed: len,
     }))
+}
+
+/// Helper function to perform readback verification that file contents are zeroed out.
+fn verify_zero_readback(
+    file: &mut std::fs::File,
+    path: &Path,
+    expected_len: u64,
+) -> std::io::Result<()> {
+    file.seek(SeekFrom::Start(0))?;
+    let mut buf = [0u8; 64 * 1024];
+    let mut remaining = expected_len;
+
+    while remaining > 0 {
+        let chunk_size = usize::try_from(remaining)
+            .unwrap_or(buf.len())
+            .min(buf.len());
+        file.read_exact(&mut buf[..chunk_size])?;
+        if buf[..chunk_size].iter().any(|&b| b != 0) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!(
+                    "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
+                    path
+                ),
+            ));
+        }
+        remaining -= chunk_size as u64;
+    }
+
+    Ok(())
 }
 
 /// Checks if `path` resides on a known Copy-on-Write filesystem using `/proc/self/mountinfo` on Linux.
