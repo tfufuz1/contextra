@@ -26,11 +26,23 @@ impl CommitLedger {
         self.actions.push(Box::new(action));
     }
 
-    pub async fn execute_rollback(&mut self) {
+    pub async fn execute_rollback(&mut self) -> Result<()> {
+        let mut first_error = None;
         while let Some(action) = self.actions.pop() {
             if let Err(e) = action.execute().await {
                 tracing::error!("[INV-DB-3] CompensatingAction execution failed: {}", e);
+                if first_error.is_none() {
+                    first_error = Some(e);
+                }
             }
+        }
+        if let Some(e) = first_error {
+            Err(ContextraError::Transaction(format!(
+                "Compensating action execution failed: {}",
+                e
+            )))
+        } else {
+            Ok(())
         }
     }
 }
@@ -182,7 +194,7 @@ mod tests {
     #[test]
     fn test_docid_u64_overflow_handling() {
         let max_u64_doc = DocId::new(u64::MAX as _);
-        assert_eq!(u64::try_from(max_u64_doc.inner()), Ok(u64::MAX));
+        assert_eq!(max_u64_doc.inner(), u64::MAX);
 
         let overflow_raw: u128 = (u64::MAX as u128) + 1;
         assert!(u64::try_from(overflow_raw).is_err());
@@ -213,18 +225,19 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
-                    ContextraError::InvalidInput(format!(
-                        "DocId {} exceeds u64::MAX for EntityId conversion",
-                        doc_id.inner()
-                    ))
-                })?;
-                let eid = EntityId::new(eid_val);
-                let _ = self
+                let eid = EntityId::new(doc_id.inner());
+                if let Err(e) = self
                     .collection
                     .graph_index
                     .remove_entity(comp_tx, eid)
-                    .await;
+                    .await
+                {
+                    tracing::error!(
+                        "[INV-DB-3] Compensating graph entity removal failed for eid {:?}: {}",
+                        eid,
+                        e
+                    );
+                }
             }
             if let Err(e) = self.collection.graph_index.commit(comp_tx).await {
                 tracing::error!("[INV-DB-3] Compensating graph commit failed: {}", e);
@@ -262,14 +275,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()
-                    .map(|d| {
-                        u64::try_from(d.inner()).map_err(|_| {
-                            ContextraError::InvalidInput(format!(
-                                "DocId {} exceeds u64::MAX for chunk_id conversion",
-                                d.inner()
-                            ))
-                        })
-                    })
+                    .map(|d| Ok(d.inner()))
                     .collect::<Result<Vec<u64>>>()?;
                 kv_hooks.on_rollback(self.tenant_id, &chunk_ids);
             }

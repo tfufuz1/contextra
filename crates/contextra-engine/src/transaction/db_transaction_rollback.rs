@@ -11,14 +11,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         if let Some(kv_hooks) = self.collection.kv_hooks() {
             let chunk_ids: Vec<u64> = doc_ids
                 .iter()
-                .map(|d| {
-                    u64::try_from(d.inner()).map_err(|_| {
-                        ContextraError::InvalidInput(format!(
-                            "DocId {} exceeds u64::MAX for chunk_id conversion",
-                            d.inner()
-                        ))
-                    })
-                })
+                .map(|d| Ok(d.inner()))
                 .collect::<Result<Vec<u64>>>()?;
             let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
             kv_hooks.on_rollback(tenant, &chunk_ids);
@@ -282,8 +275,8 @@ mod tests {
     #[test]
     fn test_rollback_docid_overflow_handling() {
         let valid_doc = DocId::new(42 as _);
-        let res_valid = u64::try_from(valid_doc.inner());
-        assert_eq!(res_valid, Ok(42));
+        let res_valid = valid_doc.inner();
+        assert_eq!(res_valid, 42);
 
         let overflow_raw: u128 = (u64::MAX as u128) + 100;
         assert!(u64::try_from(overflow_raw).is_err());
