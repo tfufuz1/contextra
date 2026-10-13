@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-13
 // ZWECK: Resume-Schnittstelle zur Wiederaufnahme nicht abgeschlossener Purge-Operationen nach Absturz (Anhang B).
 // INVARIANTEN: Erkennt Korruption (Err), führt verbleibende Phasen idempotent aus, reinigt PendingDeleteJournal.
 
@@ -39,7 +39,7 @@ pub async fn resume_pending(
         }
 
         let report = orchestrator
-            .execute_from_intent(intent, scope, hooks, false)
+            .execute_from_intent(intent, scope, hooks, false, None)
             .await?;
 
         return Ok(Some(report));
@@ -52,7 +52,6 @@ pub async fn resume_pending(
             records_purged: 0,
             bytes_reclaimed: 0,
             sstables_replaced: 0,
-            ..Default::default()
         }));
     }
 
