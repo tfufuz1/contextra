@@ -39,7 +39,7 @@ impl Default for ProofPolicy {
         }
         Self {
             allowed_claim_text_ids: allowed,
-            mandatory_excluded_scopes: Vec::new(),
+            mandatory_excluded_scopes: super::exclusions::mandatory_ids(),
             required_layers: Vec::new(),
             evidence_invariant: None,
             trusted_anchor: false,

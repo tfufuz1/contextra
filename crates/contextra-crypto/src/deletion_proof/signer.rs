@@ -7,6 +7,46 @@ use std::io::Write;
 use std::path::Path;
 use zeroize::Zeroizing;
 
+/// Trait for validating key file ownership.
+pub trait FileOwnershipCheck: Send + Sync {
+    /// Verifies if the file's ownership (file UID) is acceptable.
+    fn verify_ownership(&self, file_uid: u32) -> Result<()>;
+}
+
+/// Default strict file ownership check: checks file UID against current user/process UID (or root UID 0).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StrictFileOwnershipCheck;
+
+impl FileOwnershipCheck for StrictFileOwnershipCheck {
+    fn verify_ownership(&self, file_uid: u32) -> Result<()> {
+        #[cfg(unix)]
+        {
+            let current_uid = std::env::var("USER_ID")
+                .or_else(|_| std::env::var("UID"))
+                .ok()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1000);
+            if file_uid != current_uid && file_uid != 0 {
+                return Err(CryptoError::Crypto(format!(
+                    "Key file ownership mismatch: owned by UID {}, running as UID {}",
+                    file_uid, current_uid
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Fake/permissive file ownership check for testing or container environments with fake UIDs.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FakeFileOwnershipCheck;
+
+impl FileOwnershipCheck for FakeFileOwnershipCheck {
+    fn verify_ownership(&self, _file_uid: u32) -> Result<()> {
+        Ok(())
+    }
+}
+
 /// Trait defining proof signing capability and key identification.
 pub trait ProofSigner: Send + Sync {
     /// Signs a message byte slice and returns a 64-byte Ed25519 signature.
@@ -77,8 +117,16 @@ impl ProofKeyPairSigner {
         Ok(())
     }
 
-    /// Loads a keypair from a file, verifying strict 0600 permissions and rejecting symlinks and wrong owners.
+    /// Loads a keypair from a file using default strict file ownership check ([`StrictFileOwnershipCheck`]).
     pub fn load_from_file(path: &Path) -> Result<Self> {
+        Self::load_from_file_with_ownership_check(path, &StrictFileOwnershipCheck)
+    }
+
+    /// Loads a keypair from a file, verifying strict 0600 permissions, rejecting symlinks, and executing `ownership_check`.
+    pub fn load_from_file_with_ownership_check(
+        path: &Path,
+        ownership_check: &dyn FileOwnershipCheck,
+    ) -> Result<Self> {
         let symlink_meta = std::fs::symlink_metadata(path)
             .map_err(|e| CryptoError::Crypto(format!("Failed to read key file metadata: {e}")))?;
 
@@ -102,16 +150,7 @@ impl ProofKeyPairSigner {
             }
 
             let file_uid = symlink_meta.uid();
-            let current_uid = std::env::var("USER_ID")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(1000);
-            if file_uid != current_uid && file_uid != 0 {
-                return Err(CryptoError::Crypto(format!(
-                    "Key file ownership mismatch: owned by UID {}, running as UID {}",
-                    file_uid, current_uid
-                )));
-            }
+            ownership_check.verify_ownership(file_uid)?;
         }
 
         let raw_bytes = std::fs::read(path)
@@ -245,7 +284,11 @@ mod tests {
 
         signer.save_to_file(&path).expect("save_to_file failed");
 
-        let loaded = ProofKeyPairSigner::load_from_file(&path).expect("load_from_file failed");
+        let loaded = ProofKeyPairSigner::load_from_file_with_ownership_check(
+            &path,
+            &FakeFileOwnershipCheck,
+        )
+        .expect("load_from_file_with_ownership_check failed");
 
         assert_eq!(signer.public_key(), loaded.public_key());
         assert_eq!(signer.key_id(), loaded.key_id());

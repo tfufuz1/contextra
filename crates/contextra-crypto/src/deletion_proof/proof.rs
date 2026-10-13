@@ -84,11 +84,17 @@ pub struct DeletionProof {
     pub integrity_warning: Option<String>,
 }
 
+/// Serde default provider for signature version fallback (v1 legacy).
 pub(super) const fn default_signature_version() -> u8 {
     1
 }
 
 impl DeletionProof {
+    /// Returns the default legacy signature version.
+    pub const fn default_signature_version() -> u8 {
+        default_signature_version()
+    }
+
     /// Gibt die Tenant-ID aus dem Scope zurück.
     pub fn tenant_id(&self) -> TenantId {
         match &self.scope {

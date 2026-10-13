@@ -33,3 +33,27 @@ pub fn mandatory_exclusions_for(assurance: WitAssurance) -> Vec<ExcludedScope> {
 pub fn mandatory_ids() -> Vec<u16> {
     WIT_MANDATORY_EXCLUSIONS.iter().map(|e| e.id()).collect()
 }
+
+/// Gibt die numerischen IDs aller Pflicht-Exclusions für eine bestimmte Assurance-Stufe zurück.
+pub fn mandatory_ids_for(assurance: WitAssurance) -> Vec<u16> {
+    mandatory_exclusions_for(assurance)
+        .iter()
+        .map(|e| e.id())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mandatory_ids_non_empty_and_matching() {
+        let ids = mandatory_ids();
+        assert_eq!(ids.len(), WIT_MANDATORY_EXCLUSIONS.len());
+        assert!(ids.contains(&3)); // StorageMediaRemanence is ID 3
+
+        let ids_s4 = mandatory_ids_for(WitAssurance::S4);
+        assert_eq!(ids_s4.len(), WIT_MANDATORY_EXCLUSIONS.len() - 1);
+        assert!(!ids_s4.contains(&3)); // StorageMediaRemanence (id 3) removed in S4
+    }
+}

@@ -45,6 +45,7 @@ pub mod types;
 pub mod unverified;
 pub mod verify;
 pub mod wal_receipt;
+pub mod wiring;
 
 pub use self::builder::*;
 pub use self::canon::*;
@@ -63,3 +64,4 @@ pub use self::signer::*;
 pub use self::types::*;
 pub use self::unverified::*;
 pub use self::wal_receipt::*;
+pub use self::wiring::*;
