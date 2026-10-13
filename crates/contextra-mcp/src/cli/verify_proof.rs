@@ -1,6 +1,7 @@
 //! `verify-proof` CLI subcommand performing offline validation of DeletionProof v4 and legacy structures.
 
 use contextra_crypto::deletion_proof::policy::{verify_with_policy, ProofPolicy};
+use std::collections::HashSet;
 use contextra_crypto::deletion_proof::proof_store::ProofStore;
 use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::ed25519_proof::verify_deletion_proof_v3;
@@ -117,9 +118,55 @@ pub fn execute_verify_proof_v4(opts: &VerifyProofOptions) -> Result<bool, Contex
         None
     };
 
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+struct ProofPolicyJson {
+    allowed_claim_text_ids: Option<HashSet<u16>>,
+    mandatory_excluded_scopes: Option<Vec<u16>>,
+    required_layers: Option<Vec<u16>>,
+    trusted_anchor: Option<bool>,
+    expected_prev_chain_hash_hex: Option<String>,
+}
+
+impl ProofPolicyJson {
+    fn into_policy(self) -> Result<ProofPolicy, ContextraError> {
+        let mut policy = ProofPolicy::default();
+        if let Some(allowed) = self.allowed_claim_text_ids {
+            policy.allowed_claim_text_ids = allowed;
+        }
+        if let Some(excl) = self.mandatory_excluded_scopes {
+            policy.mandatory_excluded_scopes = excl;
+        }
+        if let Some(req) = self.required_layers {
+            policy.required_layers = req;
+        }
+        if let Some(anchor) = self.trusted_anchor {
+            policy.trusted_anchor = anchor;
+        }
+        if let Some(hex_hash) = self.expected_prev_chain_hash_hex {
+            let bytes = hex_decode(&hex_hash)?;
+            let arr: [u8; 32] = bytes.try_into().map_err(|_| {
+                ContextraError::InvalidInput(
+                    "expected_prev_chain_hash_hex must be exactly 32 bytes (64 hex characters)"
+                        .to_string(),
+                )
+            })?;
+            policy.expected_prev_chain_hash = Some(arr);
+        }
+        Ok(policy)
+    }
+}
+
     if let Some(proof) = proof_v4_opt {
         // Build Policy
-        let policy = ProofPolicy::default();
+        let policy = if let Some(ref policy_path) = opts.policy_path {
+            let policy_bytes = read_file_or_raw(policy_path)?;
+            let policy_json: ProofPolicyJson = serde_json::from_slice(&policy_bytes).map_err(|e| {
+                ContextraError::InvalidInput(format!("Failed to parse policy JSON at {policy_path}: {e}"))
+            })?;
+            policy_json.into_policy()?
+        } else {
+            ProofPolicy::default()
+        };
 
         // Evaluate policy
         let report = verify_with_policy(&proof, &public_key, &policy);
