@@ -118,8 +118,8 @@ impl SystemUnderTest for FaultyWalNoFsync {
             if offset + 4 > buf.len() {
                 break;
             }
-            let klen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let klen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + klen > buf.len() {
                 break;
@@ -129,8 +129,8 @@ impl SystemUnderTest for FaultyWalNoFsync {
             if offset + 4 > buf.len() {
                 break;
             }
-            let vlen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let vlen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + vlen > buf.len() {
                 break;
@@ -259,8 +259,8 @@ impl SystemUnderTest for FaultyWalNoDirSync {
             if offset + 4 > buf.len() {
                 break;
             }
-            let klen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let klen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + klen > buf.len() {
                 break;
@@ -270,8 +270,8 @@ impl SystemUnderTest for FaultyWalNoDirSync {
             if offset + 4 > buf.len() {
                 break;
             }
-            let vlen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let vlen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + vlen > buf.len() {
                 break;
@@ -403,8 +403,8 @@ impl SystemUnderTest for FaultyWalFsyncGate {
             if offset + 4 > buf.len() {
                 break;
             }
-            let klen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let klen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + klen > buf.len() {
                 break;
@@ -414,8 +414,8 @@ impl SystemUnderTest for FaultyWalFsyncGate {
             if offset + 4 > buf.len() {
                 break;
             }
-            let vlen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let vlen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + vlen > buf.len() {
                 break;
@@ -544,8 +544,8 @@ impl SystemUnderTest for FaultyWalPartialCommit {
             if offset + 4 > buf.len() {
                 break;
             }
-            let klen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let klen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + klen > buf.len() {
                 break;
@@ -555,8 +555,8 @@ impl SystemUnderTest for FaultyWalPartialCommit {
             if offset + 4 > buf.len() {
                 break;
             }
-            let vlen = u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4]))
-                as usize;
+            let vlen =
+                u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap_or([0; 4])) as usize;
             offset += 4;
             if offset + vlen > buf.len() {
                 break;
@@ -587,7 +587,8 @@ impl SystemUnderTest for FaultyWalPartialCommit {
 fn test_meta_detects_buggy_sut_a_no_fsync() {
     let mut divergence_found = false;
     for seed in 2000..2050 {
-        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalNoFsync::new(sim_fs.clone())).is_err() {
+        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalNoFsync::new(sim_fs.clone())).is_err()
+        {
             divergence_found = true;
             break;
         }
@@ -602,7 +603,9 @@ fn test_meta_detects_buggy_sut_a_no_fsync() {
 fn test_meta_detects_buggy_sut_b_no_dir_sync() {
     let mut divergence_found = false;
     for seed in 3000..3050 {
-        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalNoDirSync::new(sim_fs.clone())).is_err() {
+        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalNoDirSync::new(sim_fs.clone()))
+            .is_err()
+        {
             divergence_found = true;
             break;
         }
@@ -617,7 +620,9 @@ fn test_meta_detects_buggy_sut_b_no_dir_sync() {
 fn test_meta_detects_buggy_sut_c_fsyncgate() {
     let mut divergence_found = false;
     for seed in 4000..4050 {
-        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalFsyncGate::new(sim_fs.clone())).is_err() {
+        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalFsyncGate::new(sim_fs.clone()))
+            .is_err()
+        {
             divergence_found = true;
             break;
         }
@@ -632,7 +637,11 @@ fn test_meta_detects_buggy_sut_c_fsyncgate() {
 fn test_meta_detects_buggy_sut_d_partial_commit() {
     let mut divergence_found = false;
     for seed in 5000..5050 {
-        if P07DstRunner::run_seed(seed, 40, |sim_fs| FaultyWalPartialCommit::new(sim_fs.clone())).is_err() {
+        if P07DstRunner::run_seed(seed, 40, |sim_fs| {
+            FaultyWalPartialCommit::new(sim_fs.clone())
+        })
+        .is_err()
+        {
             divergence_found = true;
             break;
         }

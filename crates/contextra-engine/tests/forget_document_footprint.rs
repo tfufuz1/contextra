@@ -72,7 +72,10 @@ async fn test_erase_document_leaves_zero_residue_in_reverse_sweep() {
     let erasure: DocErasure = col.erase_document(doc_a, &opts).await.expect("erase");
 
     assert!(!erasure.witnesses.is_empty(), "Witnesses must be issued");
-    assert!(!erasure.keys.is_empty(), "Footprint explicit keys must be populated");
+    assert!(
+        !erasure.keys.is_empty(),
+        "Footprint explicit keys must be populated"
+    );
 
     // Reverse sweep
     let raw_entries = col.storage().scan_prefix(b"").await.expect("scan");
@@ -101,7 +104,10 @@ async fn test_erase_document_leaves_zero_residue_in_reverse_sweep() {
 
     // Confirm doc_b is unharmed
     let doc_b_res = col.get(doc_b).await.expect("get doc_b");
-    assert!(doc_b_res.is_some(), "Document B must remain intact after Document A erasure");
+    assert!(
+        doc_b_res.is_some(),
+        "Document B must remain intact after Document A erasure"
+    );
 
     db.close().await.unwrap();
 }
@@ -119,9 +125,15 @@ async fn test_erase_empty_doc_id_returns_observed_empty() {
 
     let doc_nonexistent = "doc_ghost_999";
     let opts = DocEraseOptions::default();
-    let erasure = col.erase_document(doc_nonexistent, &opts).await.expect("erase empty");
+    let erasure = col
+        .erase_document(doc_nonexistent, &opts)
+        .await
+        .expect("erase empty");
 
-    assert!(erasure.observed_empty, "Nonexistent document must result in observed_empty = true");
+    assert!(
+        erasure.observed_empty,
+        "Nonexistent document must result in observed_empty = true"
+    );
 
     db.close().await.unwrap();
 }

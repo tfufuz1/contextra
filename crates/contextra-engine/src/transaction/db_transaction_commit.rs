@@ -2,9 +2,7 @@ use super::compensating_actions::{
     CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
     CompensateTextAction, RollbackStagedAction,
 };
-use super::db_transaction::{
-    DbTransaction, StagedGraphEdgeOp, StagedGraphEntityOp, StagedTextOp,
-};
+use super::db_transaction::{DbTransaction, StagedGraphEdgeOp, StagedGraphEntityOp, StagedTextOp};
 use super::intent::CommitIntent;
 use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
@@ -200,8 +198,12 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                                 .await?;
                         }
                         StagedGraphEdgeOp::Add(edge) => {
-                            GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge.clone())
-                                .await?;
+                            GraphIndex::add_edge(
+                                &*self.collection.graph_index,
+                                self.tx_id,
+                                edge.clone(),
+                            )
+                            .await?;
                         }
                     }
                 }
@@ -508,7 +510,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 }
             }
             if attempt < max_retries {
-                tokio::time::sleep(std::time::Duration::from_millis(50 * u64::try_from(attempt).unwrap_or(1))).await;
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    50 * u64::try_from(attempt).unwrap_or(1),
+                ))
+                .await;
             }
         }
 

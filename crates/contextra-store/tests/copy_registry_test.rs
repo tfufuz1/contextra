@@ -68,14 +68,20 @@ fn test_file_id_for_name_contract() {
     let fid2 = file_id_for_name(name2);
 
     assert_eq!(fid1, fid1_dup, "file_id_for_name must be deterministic");
-    assert_ne!(fid1, fid2, "file_id_for_name must not collide for different file names");
+    assert_ne!(
+        fid1, fid2,
+        "file_id_for_name must not collide for different file names"
+    );
 
     // Test a batch of names for collisions
     let mut set = std::collections::HashSet::new();
     for i in 0..1000 {
         let name = format!("{:06}.sst", i);
         let fid = file_id_for_name(&name);
-        assert!(set.insert(fid), "Collision detected for file_id_for_name at index {i}");
+        assert!(
+            set.insert(fid),
+            "Collision detected for file_id_for_name at index {i}"
+        );
     }
 }
 

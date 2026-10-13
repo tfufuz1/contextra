@@ -18,13 +18,21 @@ async fn test_witnesses_issued_on_erase_document() {
         "text": "witness test sample content"
     });
 
-    col.insert(doc_id, &embedding, Some(metadata)).await.expect("insert");
+    col.insert(doc_id, &embedding, Some(metadata))
+        .await
+        .expect("insert");
 
     let opts = DocEraseOptions::default();
     let erasure = col.erase_document(doc_id, &opts).await.expect("erase");
 
-    assert!(!erasure.witnesses.is_empty(), "erase_document MUST collect witnesses");
-    assert!(erasure.witnesses.len() >= 2, "Expected text and relations witnesses at least");
+    assert!(
+        !erasure.witnesses.is_empty(),
+        "erase_document MUST collect witnesses"
+    );
+    assert!(
+        erasure.witnesses.len() >= 2,
+        "Expected text and relations witnesses at least"
+    );
 
     db.close().await.unwrap();
 }
@@ -44,5 +52,8 @@ async fn test_fault_injection_unremoved_edge_causes_witness_failure() {
         Some(1), // matching_edges_found_override = 1 (fault injected)
     );
 
-    assert!(res.is_err(), "Relations witness issuance MUST fail if matching edges remain");
+    assert!(
+        res.is_err(),
+        "Relations witness issuance MUST fail if matching edges remain"
+    );
 }

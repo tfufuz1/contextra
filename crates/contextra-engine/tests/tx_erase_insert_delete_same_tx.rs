@@ -23,9 +23,14 @@ async fn test_insert_and_delete_same_tx_leaves_no_remnants() {
 
     // Begin transaction and execute insert_op then delete_op in the SAME transaction
     let mut db_tx = col.begin_transaction().unwrap();
-    col.insert_op(&db_tx, doc_id, &embedding, Some(serde_json::json!({ "text": text })))
-        .await
-        .unwrap();
+    col.insert_op(
+        &db_tx,
+        doc_id,
+        &embedding,
+        Some(serde_json::json!({ "text": text })),
+    )
+    .await
+    .unwrap();
     col.delete_op(&mut db_tx, doc_id).await.unwrap();
     db_tx.commit().await.unwrap();
 
@@ -85,7 +90,13 @@ async fn test_delete_then_insert_same_tx_overwrites_with_new_content() {
     embedding_2[1] = 1.0;
 
     // Initial insert and commit
-    col.insert(doc_id, &embedding_1, Some(serde_json::json!({ "text": old_text }))).await.unwrap();
+    col.insert(
+        doc_id,
+        &embedding_1,
+        Some(serde_json::json!({ "text": old_text })),
+    )
+    .await
+    .unwrap();
 
     // Now in a single transaction: delete then insert new
     let db_tx = col.begin_transaction().unwrap();
@@ -139,7 +150,13 @@ async fn test_rollback_after_insert_delete_same_tx_restores_prior_state() {
     let mut embedding = vec![0.0f32; col.dimension()];
     embedding[0] = 1.0;
 
-    col.insert(doc_id, &embedding, Some(serde_json::json!({ "text": initial_text }))).await.unwrap();
+    col.insert(
+        doc_id,
+        &embedding,
+        Some(serde_json::json!({ "text": initial_text })),
+    )
+    .await
+    .unwrap();
 
     // Begin transaction: insert temp, then delete, then ROLLBACK
     let mut db_tx = col.begin_transaction().unwrap();

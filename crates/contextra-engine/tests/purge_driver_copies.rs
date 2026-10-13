@@ -27,7 +27,9 @@ async fn test_purge_driver_copies_explicit_scrub_authorization() {
         path: db_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = LsmStorage::open(config).await.expect("LsmStorage::open failed");
+    let storage = LsmStorage::open(config)
+        .await
+        .expect("LsmStorage::open failed");
 
     let copy_reg_dir = db_dir.path().join("copy_reg");
     std::fs::create_dir_all(&copy_reg_dir).expect("create_dir_all failed");
@@ -44,7 +46,10 @@ async fn test_purge_driver_copies_explicit_scrub_authorization() {
         file_ids: vec![fid],
         created_tx: 20,
     };
-    copy_reg.register(entry).await.expect("register copy failed");
+    copy_reg
+        .register(entry)
+        .await
+        .expect("register copy failed");
 
     let logical_handle = FonLogicalHandle {
         proof_id: [0x66; 16],
@@ -77,5 +82,8 @@ async fn test_purge_driver_copies_explicit_scrub_authorization() {
         .expect("run_physical failed");
 
     // The purge pipeline is invoked and blocked by compaction or completes
-    assert!(matches!(handle, PurgeHandle::Final(_) | PurgeHandle::Blocked { .. }));
+    assert!(matches!(
+        handle,
+        PurgeHandle::Final(_) | PurgeHandle::Blocked { .. }
+    ));
 }

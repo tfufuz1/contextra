@@ -8,7 +8,8 @@ use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_crash_between_ledger_append_and_tombstone_commit_keeps_data_invisible() -> Result<(), ContextraError> {
+async fn test_crash_between_ledger_append_and_tombstone_commit_keeps_data_invisible(
+) -> Result<(), ContextraError> {
     let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

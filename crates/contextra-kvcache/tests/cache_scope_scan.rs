@@ -84,7 +84,10 @@ fn test_kvcache_scope_count_scan_and_veto_f10_isolation() {
 
     // Action: Invalidate Tenant A's scratchpad scope ONLY
     let removed = invalidator.invalidate_scope(&scope_a).unwrap();
-    assert_eq!(removed, 1, "Invalidator MUST remove exactly 1 entry for Tenant A");
+    assert_eq!(
+        removed, 1,
+        "Invalidator MUST remove exactly 1 entry for Tenant A"
+    );
 
     // Postcondition: Tenant A's scratchpad count MUST be 0
     let count_a_after = invalidator.count_entries_in_scope(&scope_a).unwrap();

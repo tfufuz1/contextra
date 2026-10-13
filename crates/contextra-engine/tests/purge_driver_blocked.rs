@@ -27,7 +27,9 @@ async fn test_purge_driver_blocked_on_unauthorized_copies() {
         path: db_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = LsmStorage::open(config).await.expect("LsmStorage::open failed");
+    let storage = LsmStorage::open(config)
+        .await
+        .expect("LsmStorage::open failed");
 
     // Register a copy holding 000001.sst
     let copy_reg_dir = db_dir.path().join("copy_reg");
@@ -45,7 +47,10 @@ async fn test_purge_driver_blocked_on_unauthorized_copies() {
         file_ids: vec![fid],
         created_tx: 10,
     };
-    copy_reg.register(entry).await.expect("register copy failed");
+    copy_reg
+        .register(entry)
+        .await
+        .expect("register copy failed");
 
     let logical_handle = FonLogicalHandle {
         proof_id: [0x55; 16],

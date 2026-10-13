@@ -72,7 +72,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or_default();
 
             if pubkey_path_or_str.is_empty() {
-                eprintln!("Error: --pubkey parameter or public key positional argument is required.");
+                eprintln!(
+                    "Error: --pubkey parameter or public key positional argument is required."
+                );
                 std::process::exit(1);
             }
 

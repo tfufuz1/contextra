@@ -26,21 +26,40 @@ async fn test_bilateral_relations_removed_unrelated_preserved() {
     col.insert(doc_b, &embedding, None).await.expect("insert b");
     col.insert(doc_c, &embedding, None).await.expect("insert c");
 
-    col.relate_bidirectional(doc_a, doc_b, "links").await.expect("relate a-b");
-    col.relate_bidirectional(doc_b, doc_c, "links").await.expect("relate b-c");
+    col.relate_bidirectional(doc_a, doc_b, "links")
+        .await
+        .expect("relate a-b");
+    col.relate_bidirectional(doc_b, doc_c, "links")
+        .await
+        .expect("relate b-c");
 
-    col.link_memories(doc_a_id, doc_b_id, contextra_types::domain::LinkRelation::Elaborates)
-        .await
-        .expect("link a-b");
-    col.link_memories(doc_b_id, doc_c_id, contextra_types::domain::LinkRelation::Elaborates)
-        .await
-        .expect("link b-c");
+    col.link_memories(
+        doc_a_id,
+        doc_b_id,
+        contextra_types::domain::LinkRelation::Elaborates,
+    )
+    .await
+    .expect("link a-b");
+    col.link_memories(
+        doc_b_id,
+        doc_c_id,
+        contextra_types::domain::LinkRelation::Elaborates,
+    )
+    .await
+    .expect("link b-c");
 
     // Erase Document A
     let opts = DocEraseOptions::default();
     let erasure = col.erase_document(doc_a, &opts).await.expect("erase a");
 
-    println!("ERASURE KEYS for A: {:?}", erasure.keys.iter().map(|k| String::from_utf8_lossy(k)).collect::<Vec<_>>());
+    println!(
+        "ERASURE KEYS for A: {:?}",
+        erasure
+            .keys
+            .iter()
+            .map(|k| String::from_utf8_lossy(k))
+            .collect::<Vec<_>>()
+    );
 
     let get_a = col.get(doc_a).await.expect("get a");
     println!("GET A AFTER ERASE: {:?}", get_a);

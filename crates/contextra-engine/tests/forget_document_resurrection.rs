@@ -15,7 +15,9 @@ async fn test_rewrite_higher_tx_survives() {
     let embedding_v1 = vec![0.1f32; 768];
     let embedding_v2 = vec![0.2f32; 768];
 
-    col.insert(doc_id, &embedding_v1, None).await.expect("insert v1");
+    col.insert(doc_id, &embedding_v1, None)
+        .await
+        .expect("insert v1");
 
     let opts = DocEraseOptions::default();
     col.erase_document(doc_id, &opts).await.expect("erase v1");
@@ -23,10 +25,15 @@ async fn test_rewrite_higher_tx_survives() {
     assert!(col.get(doc_id).await.expect("get").is_none());
 
     // Re-insert same doc_id at higher tx
-    col.insert(doc_id, &embedding_v2, None).await.expect("re-insert v2");
+    col.insert(doc_id, &embedding_v2, None)
+        .await
+        .expect("re-insert v2");
 
     let re_read = col.get(doc_id).await.expect("get").expect("found v2");
-    assert_eq!(re_read.id, doc_id, "Re-written document with higher TxId MUST survive");
+    assert_eq!(
+        re_read.id, doc_id,
+        "Re-written document with higher TxId MUST survive"
+    );
 
     db.close().await.unwrap();
 }

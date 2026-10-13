@@ -31,8 +31,14 @@ async fn test_resume_pending_from_admitted_phase() -> std::io::Result<()> {
         .expect("Resumption should succeed");
 
     assert!(report_opt.is_some());
-    assert!(wal_retired.load(Ordering::SeqCst), "WAL retire hook should have executed");
-    assert!(!intent_path.exists(), "Intent file should be deleted on completion");
+    assert!(
+        wal_retired.load(Ordering::SeqCst),
+        "WAL retire hook should have executed"
+    );
+    assert!(
+        !intent_path.exists(),
+        "Intent file should be deleted on completion"
+    );
 
     Ok(())
 }

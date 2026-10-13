@@ -109,11 +109,7 @@ impl ProofIssuer {
     }
 
     /// Issues a version 4 deletion proof from `req` after executing counter-checks 1–5 (C3, C7).
-    pub fn issue(
-        &self,
-        req: IssRequest,
-        probes: &[&dyn WitStoreProbe],
-    ) -> Result<IssIssuedProof> {
+    pub fn issue(&self, req: IssRequest, probes: &[&dyn WitStoreProbe]) -> Result<IssIssuedProof> {
         // Compute expected proof_id for idempotency check
         let mut hasher = blake3::Hasher::new();
         hasher.update(self.db_instance_id.as_bytes());
@@ -131,9 +127,13 @@ impl ProofIssuer {
                     if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
                         if filename.contains(&proof_id_hex) && filename.ends_with(".json") {
                             if let Ok(json_str) = fs::read_to_string(&path) {
-                                if let Ok(existing_proof) = serde_json::from_str::<ProofV4>(&json_str) {
+                                if let Ok(existing_proof) =
+                                    serde_json::from_str::<ProofV4>(&json_str)
+                                {
                                     let store_guard = self.store.lock().map_err(|_| {
-                                        CryptoError::Crypto("Failed to acquire ProofStore lock".to_string())
+                                        CryptoError::Crypto(
+                                            "Failed to acquire ProofStore lock".to_string(),
+                                        )
                                     })?;
                                     let chain_hash = store_guard.head_chain_hash();
                                     drop(store_guard);
@@ -182,7 +182,8 @@ impl ProofIssuer {
                 let probe_seq = probe.scope_write_seq(scope_hash);
                 if probe_seq != 0 && probe_seq != witness.scope_write_seq() {
                     return Err(CryptoError::Crypto(
-                        "ScopeWriteSeqMismatch: witness scope_write_seq deviates from store probe".to_string(),
+                        "ScopeWriteSeqMismatch: witness scope_write_seq deviates from store probe"
+                            .to_string(),
                     ));
                 }
             }
@@ -211,7 +212,8 @@ impl ProofIssuer {
             }
             if witness.scanned_at_tx().0 < req.deleted_after_tx {
                 return Err(CryptoError::Crypto(
-                    "InvalidTxOrder: witness scanned_at_tx earlier than request deleted_after_tx".to_string(),
+                    "InvalidTxOrder: witness scanned_at_tx earlier than request deleted_after_tx"
+                        .to_string(),
                 ));
             }
         }
@@ -219,7 +221,10 @@ impl ProofIssuer {
         // (e) SsTables manifest_file_count check
         for witness in &req.witnesses {
             if witness.layer() == &DeletionLayer::SsTableAllLevels {
-                if let Some(WitLayerEvidence::SsTables { files_in_manifest, .. }) = witness.layer_evidence() {
+                if let Some(WitLayerEvidence::SsTables {
+                    files_in_manifest, ..
+                }) = witness.layer_evidence()
+                {
                     for probe in probes {
                         if let Some(probe_count) = probe.manifest_file_count() {
                             if *files_in_manifest != probe_count {
@@ -234,7 +239,8 @@ impl ProofIssuer {
         }
 
         // (f) Missing mandatory layer for requested assurance level
-        let present_layers: HashSet<u16> = req.witnesses.iter().map(|w| w.layer().layer_id()).collect();
+        let present_layers: HashSet<u16> =
+            req.witnesses.iter().map(|w| w.layer().layer_id()).collect();
         let required_layers = required_layers_for_assurance(req.assurance);
         for req_layer in &required_layers {
             if !present_layers.contains(req_layer) {
@@ -274,8 +280,12 @@ impl ProofIssuer {
                         if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
                             if filename.contains(&sup_hex) && filename.ends_with(".json") {
                                 if let Ok(json_str) = fs::read_to_string(&path) {
-                                    if let Ok(sup_proof) = serde_json::from_str::<ProofV4>(&json_str) {
-                                        if sup_proof.stage == 1 && sup_proof.deleted_keys_hash == req.deleted_keys_hash {
+                                    if let Ok(sup_proof) =
+                                        serde_json::from_str::<ProofV4>(&json_str)
+                                    {
+                                        if sup_proof.stage == 1
+                                            && sup_proof.deleted_keys_hash == req.deleted_keys_hash
+                                        {
                                             found_valid_logical = true;
                                             break;
                                         }
@@ -349,9 +359,10 @@ impl ProofIssuer {
             builder = builder.add_excluded_scope(excl_id);
         }
 
-        let mut store_guard = self.store.lock().map_err(|_| {
-            CryptoError::Crypto("Failed to acquire ProofStore lock".to_string())
-        })?;
+        let mut store_guard = self
+            .store
+            .lock()
+            .map_err(|_| CryptoError::Crypto("Failed to acquire ProofStore lock".to_string()))?;
 
         let seq = store_guard.last_seq() + 1;
         let prev_hash = store_guard.head_chain_hash();

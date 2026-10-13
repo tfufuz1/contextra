@@ -2,9 +2,7 @@
 // STAND: 2026-10-13
 // ZWECK: Tests für CopyRegistry Verankerung und purge_checkpoint Hardlink-Entfernung mit nlink==1 Garantie.
 
-use contextra_checkpoint::{
-    purge_registered_checkpoint, CpyCopyRegistry, DefaultHardlinkCloner,
-};
+use contextra_checkpoint::{purge_registered_checkpoint, CpyCopyRegistry, DefaultHardlinkCloner};
 use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_store::copy_registry::CopyRegistry;
@@ -82,7 +80,10 @@ async fn test_purge_checkpoint_reduces_nlink_and_unlinks_target() {
 
     let sst_path = src.path().join("000005.sst");
     let original_content = b"sstable_5_data_content";
-    File::create(&sst_path).unwrap().write_all(original_content).unwrap();
+    File::create(&sst_path)
+        .unwrap()
+        .write_all(original_content)
+        .unwrap();
 
     let cloner = DefaultHardlinkCloner::new();
     let snap_registry = Arc::new(SnapshotRegistry::new());
@@ -130,13 +131,20 @@ async fn test_purge_checkpoint_reduces_nlink_and_unlinks_target() {
     // Source file must remain intact with nlink == 1
     assert!(sst_path.exists());
     let read_back = std::fs::read(&sst_path).unwrap();
-    assert_eq!(read_back, original_content, "Source file content must NOT be overwritten");
+    assert_eq!(
+        read_back, original_content,
+        "Source file content must NOT be overwritten"
+    );
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         let meta = std::fs::metadata(&sst_path).unwrap();
-        assert_eq!(meta.nlink(), 1, "After purge_checkpoint, source file nlink must be 1");
+        assert_eq!(
+            meta.nlink(),
+            1,
+            "After purge_checkpoint, source file nlink must be 1"
+        );
     }
 
     // Idempotency test: second purge on already purged copy_id returns Ok(())

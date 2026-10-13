@@ -19,7 +19,9 @@ pub use copy_observer::{DpiCopyObserver, DpiCopyObserverReport};
 pub use footprint::{
     check_nonempty_or_observed_empty, ErasureFootprint, FprRamFootprint, KeyScope, StorageScope,
 };
-pub use forget_options::{FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode, VerifyDepth, Wait};
+pub use forget_options::{
+    FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode, VerifyDepth, Wait,
+};
 pub use proof_issue::{DpiDeletionRuntime, DpiLogicalInput, DpiRuntimeWarningCounters};
 pub use purge_driver::{DpiPurgeDriver, DpiPurgeDriverConfig};
 pub use registry::{

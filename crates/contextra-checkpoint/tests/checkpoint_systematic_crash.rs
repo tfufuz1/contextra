@@ -233,7 +233,9 @@ async fn crash_during_checkpoint_deletion_leaves_clean_state() {
     // Reopen and check consistency
     if let Ok(storage) = LsmStorage::new(config).await {
         let recovered_storage = Arc::new(storage);
-        if let Ok(recovered_store) = PersistentCheckpointStore::open(recovered_storage, "test_drop_ns").await {
+        if let Ok(recovered_store) =
+            PersistentCheckpointStore::open(recovered_storage, "test_drop_ns").await
+        {
             let check = recovered_store.get_checkpoint("chk_to_drop").await;
             // Must either be fully present or cleanly dropped, no panic or corrupted state
             let _ = check;

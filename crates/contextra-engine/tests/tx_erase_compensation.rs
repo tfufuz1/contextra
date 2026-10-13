@@ -20,7 +20,13 @@ async fn test_compensation_cleans_up_storage_on_post_storage_failure() {
     let text = "compensation_safety_check_text";
     let mut embedding = vec![0.0f32; col.dimension()];
     embedding[0] = 1.0;
-    col.insert(doc_id, &embedding, Some(serde_json::json!({ "text": text }))).await.unwrap();
+    col.insert(
+        doc_id,
+        &embedding,
+        Some(serde_json::json!({ "text": text })),
+    )
+    .await
+    .unwrap();
 
     // Verify doc_id exists initially
     let doc_typed = DocId::from_key(doc_id).unwrap();

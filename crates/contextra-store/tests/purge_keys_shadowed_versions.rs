@@ -31,7 +31,9 @@ async fn test_purge_keys_shadowed_versions_injection_row5() -> contextra_core::R
     let storage = LsmStorage::open(config).await?;
 
     // Step 1: Put key in deeper level (flush to SSTable 1)
-    storage.put(TxId(10), b"shadowed_key", b"old_secret").await?;
+    storage
+        .put(TxId(10), b"shadowed_key", b"old_secret")
+        .await?;
     storage.commit(TxId(10)).await?;
     StorageEngine::flush(&storage).await?;
 

@@ -21,6 +21,12 @@ impl TenantId {
     #[deprecated(note = "Identisch zu TenantId::SYSTEM — nutze SYSTEM für Klarheit.")]
     pub const INVALID: Self = Self(0);
 
+    /// Explicit helper returning the `SYSTEM` tenant identifier (`TenantId(0)`).
+    #[inline]
+    pub const fn system() -> Self {
+        Self::SYSTEM
+    }
+
     /// Const-Konstruktor.
     #[deprecated(
         since = "0.1.0",
@@ -28,6 +34,13 @@ impl TenantId {
     )]
     #[inline]
     pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Unchecked constructor for hot-path use cases where invariants have already been verified.
+    #[doc(hidden)]
+    #[inline]
+    pub const fn new_unchecked(id: u64) -> Self {
         Self(id)
     }
 
@@ -396,9 +409,44 @@ impl TxId {
     pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000;
 
     /// Creates a new `TxId` wrapping the provided `u64` transaction identifier.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Nutze TxId::try_new() oder TxId::internal() — new() umgeht AGT-GRAPH-001 und wird in einer künftigen Version entfernt."
+    )]
     #[inline]
     pub const fn new(id: u64) -> Self {
         Self(id)
+    }
+
+    /// Unchecked constructor for hot-path use cases where invariants have already been verified.
+    #[doc(hidden)]
+    #[inline]
+    pub const fn new_unchecked(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Safely constructs a `TxId`, verifying that `id` originates from a valid origin per AGT-GRAPH-001.
+    ///
+    /// # Domain Range Rules (AGT-GRAPH-001)
+    /// Valid transaction origins are:
+    /// - Collection sequence range: `id <= MAX_COLLECTION_SEQUENCE` (including `0` / `TxId::INVALID`)
+    /// - Internal system range: `id >= INTERNAL_BASE`
+    ///
+    /// Wall-clock derived timestamps or values in the unmanaged gap (`MAX_COLLECTION_SEQUENCE < id < INTERNAL_BASE`) are rejected.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::Transaction` referencing AGT-GRAPH-001 if `id` falls into the invalid origin gap.
+    pub fn try_new(id: u64) -> Result<Self> {
+        let tx = Self(id);
+        if tx.is_valid_origin() {
+            Ok(tx)
+        } else {
+            Err(ContextraError::Transaction(format!(
+                "Invalid TxId origin {id}: violates AGT-GRAPH-001 range rules (must be <= MAX_COLLECTION_SEQUENCE ({}) or >= INTERNAL_BASE ({}))",
+                Self::MAX_COLLECTION_SEQUENCE,
+                Self::INTERNAL_BASE
+            )))
+        }
     }
 
     /// Returns the inner raw `u64` transaction identifier.
@@ -463,6 +511,14 @@ const _: () = assert!(
     "INTERNAL_BASE must be above the collection-sequence range"
 );
 const _: () = assert!(TxId::INTERNAL_BASE < u64::MAX);
+
+impl TryFrom<u64> for TxId {
+    type Error = ContextraError;
+
+    fn try_from(id: u64) -> Result<Self> {
+        Self::try_new(id)
+    }
+}
 
 impl std::fmt::Display for TxId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

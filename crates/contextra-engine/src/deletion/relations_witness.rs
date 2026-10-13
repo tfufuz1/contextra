@@ -40,5 +40,6 @@ pub fn issue_relations_witness(
         key_identifiers_claimed: true,
     };
 
-    LayerWitness::issue(args).map_err(|e| ContextraError::Storage(format!("Relations witness creation failed: {e}")))
+    LayerWitness::issue(args)
+        .map_err(|e| ContextraError::Storage(format!("Relations witness creation failed: {e}")))
 }

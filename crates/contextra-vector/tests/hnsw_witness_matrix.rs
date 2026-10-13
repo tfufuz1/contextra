@@ -56,7 +56,9 @@ async fn test_witness_matrix_injection_and_positive() -> Result<(), Box<dyn std:
     for i in 1..=10 {
         let doc_id = DocId::new(i as u64);
         let vector = vec![(i as f32) / 10.0; dim];
-        sq8_index.insert(TxId::new(i as u64), doc_id, &vector).await?;
+        sq8_index
+            .insert(TxId::new(i as u64), doc_id, &vector)
+            .await?;
         sq8_index.commit(TxId::new(i as u64)).await?;
     }
     sq8_index.inner_core().cold.deleted_nodes.write().insert(3);
@@ -71,11 +73,18 @@ async fn test_witness_matrix_injection_and_positive() -> Result<(), Box<dyn std:
     for i in 1..=10 {
         let doc_id = DocId::new(i as u64);
         let vector = vec![(i as f32) / 10.0; dim];
-        clean_index.insert(TxId::new(i as u64), doc_id, &vector).await?;
+        clean_index
+            .insert(TxId::new(i as u64), doc_id, &vector)
+            .await?;
         clean_index.commit(TxId::new(i as u64)).await?;
     }
     clean_index.set_ram_vector_at_for_test(2, VectorData::F32(vec![0.0; dim]));
-    clean_index.inner_core().cold.deleted_nodes.write().insert(2); // node idx 2 = doc 3
+    clean_index
+        .inner_core()
+        .cold
+        .deleted_nodes
+        .write()
+        .insert(2); // node idx 2 = doc 3
     let witness_ghost_res = clean_index.issue_residue_witness(&args);
     assert!(
         witness_ghost_res.is_err(),
@@ -104,7 +113,9 @@ async fn test_witness_matrix_injection_and_positive() -> Result<(), Box<dyn std:
     for i in 1..=10 {
         let doc_id = DocId::new(i as u64);
         let vector = vec![(i as f32) / 10.0; dim];
-        pos_index.insert(TxId::new(i as u64), doc_id, &vector).await?;
+        pos_index
+            .insert(TxId::new(i as u64), doc_id, &vector)
+            .await?;
         pos_index.commit(TxId::new(i as u64)).await?;
     }
 

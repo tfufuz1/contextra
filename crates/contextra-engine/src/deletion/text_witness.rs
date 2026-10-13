@@ -41,5 +41,6 @@ pub fn issue_text_index_witness(
         key_identifiers_claimed: true,
     };
 
-    LayerWitness::issue(args).map_err(|e| ContextraError::Storage(format!("TextIndex witness creation failed: {e}")))
+    LayerWitness::issue(args)
+        .map_err(|e| ContextraError::Storage(format!("TextIndex witness creation failed: {e}")))
 }

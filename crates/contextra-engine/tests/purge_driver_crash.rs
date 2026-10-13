@@ -8,7 +8,8 @@ use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe}
 use contextra_crypto::deletion_proof::types::DeletionLayer;
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 use contextra_engine::deletion::{
-    DpiDeletionRuntime, DpiLogicalInput, DpiPurgeDriver, DpiPurgeDriverConfig, ForgetOptions, PurgeHandle,
+    DpiDeletionRuntime, DpiLogicalInput, DpiPurgeDriver, DpiPurgeDriverConfig, ForgetOptions,
+    PurgeHandle,
 };
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::LsmConfig;
@@ -44,7 +45,9 @@ async fn test_purge_driver_crash_recovery_resumes_cleanly() {
         path: db_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = LsmStorage::open(config).await.expect("LsmStorage::open failed");
+    let storage = LsmStorage::open(config)
+        .await
+        .expect("LsmStorage::open failed");
 
     let deleted_keys_hash = [0xcc; 32];
     let footprint_hash = [0xdd; 32];
@@ -193,5 +196,8 @@ async fn test_purge_driver_crash_recovery_resumes_cleanly() {
         .await
         .expect("run_physical failed");
 
-    assert!(matches!(handle, PurgeHandle::Final(_) | PurgeHandle::Blocked { .. }));
+    assert!(matches!(
+        handle,
+        PurgeHandle::Final(_) | PurgeHandle::Blocked { .. }
+    ));
 }
