@@ -667,6 +667,7 @@ dependencies = [
 name = "contextra-avv-generator"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-types",
  "serde",
  "thiserror 2.0.20",
@@ -855,6 +856,7 @@ dependencies = [
  "contextra-graph",
  "contextra-infer-candle",
  "contextra-kvcache",
+ "contextra-license",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",
@@ -1105,6 +1107,7 @@ dependencies = [
 name = "contextra-py"
 version = "0.1.0"
 dependencies = [
+ "contextra",
  "contextra-adapt",
  "contextra-core",
  "contextra-db",
