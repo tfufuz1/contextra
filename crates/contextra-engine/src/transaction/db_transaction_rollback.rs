@@ -11,14 +11,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         if let Some(kv_hooks) = self.collection.kv_hooks() {
             let chunk_ids: Vec<u64> = doc_ids
                 .iter()
-                .map(|d| {
-                    u64::try_from(d.inner()).map_err(|_| {
-                        ContextraError::InvalidInput(format!(
-                            "DocId {} exceeds u64::MAX for chunk_id conversion",
-                            d.inner()
-                        ))
-                    })
-                })
+                .map(|d| Ok(d.inner()))
                 .collect::<Result<Vec<u64>>>()?;
             let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
             kv_hooks.on_rollback(tenant, &chunk_ids);

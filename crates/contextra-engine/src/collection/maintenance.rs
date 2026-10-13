@@ -14,6 +14,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Returns a reference to the inverted text index.
+    pub fn text_index_ref(&self) -> &contextra_text::inverted::InvertedIndex<S> {
+        &self.text_index
+    }
+
     /// Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch.
     /// Evictet Chunks deren effective_score unter eviction_threshold liegt.
     /// Gibt Anzahl der evictierten Dokumente zurück.
@@ -808,26 +813,54 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(map)
     }
 
-    /// Removes all data belonging to this collection from storage.
+    /// Removes all data belonging to this collection from storage and resets RAM state.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
-        let prefix = if self.name == "default" {
+        if self.name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
-        } else {
-            self.prefix.clone()
-        };
+        }
 
+        self.consolidation_in_progress.store(true, Ordering::SeqCst);
+
+        let res = self.drop_collection_internal().await;
+
+        self.consolidation_in_progress.store(false, Ordering::SeqCst);
+        res
+    }
+
+    async fn drop_collection_internal(&self) -> Result<()> {
         let tx = self.allocate_tx()?;
 
         // 1. Clean collection data (user keys, docs, rels, intents)
-        self.storage.delete_prefix(tx, &prefix).await?;
+        self.storage.delete_prefix(tx, &self.prefix).await?;
 
         // 2. Clean text index namespace (FIND-DB-002)
         let txt_prefix = format!("__txt:{}:", self.name).into_bytes();
         self.storage.delete_prefix(tx, &txt_prefix).await?;
+
+        // 3. Reset text index RAM state
+        self.text_index.resident_index().clear();
+
+        // 4. Reset graph index RAM state
+        {
+            let mut g_write = self.graph_index.write_state.lock();
+            *g_write = contextra_graph::csr::GraphInner::new();
+            self.graph_index
+                .inner
+                .store(Arc::new(contextra_graph::csr::GraphInner::new()));
+            self.graph_index.cascade_queue.lock().clear();
+        }
+
+        // 5. Reset vector index RAM state
+        if let Ok(active_doc_ids) = self.index.all_doc_ids().await {
+            for doc_id in active_doc_ids {
+                let _ = self.index.delete(tx, doc_id).await;
+            }
+            let _ = self.index.commit(tx).await;
+        }
 
         self.storage.commit(tx).await?;
         Ok(())
