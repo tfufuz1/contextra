@@ -2,7 +2,7 @@
 
 use crate::lsm::LsmStorage;
 use crate::sstable::witness_scan::scan_sstables;
-use crate::sstable::witness_types::{SstScanInputs, SstScopeSpec};
+use crate::sstable::witness_types::{SstScanEvidence, SstScanInputs, SstScopeSpec};
 use crate::wal::witness_scan::{scan_wal_directory, WalScanInputs, WalScopeSpec};
 use contextra_core::{ContextraError, Result, TxId};
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
@@ -217,10 +217,14 @@ impl LsmStorage {
             .scan_memtable_residue(MemScopeSpec::Keys(&req.scope_keys), req.as_of_tx.inner())
             .await?;
         let mem_evidence_prefixes = self
-            .scan_memtable_residue(MemScopeSpec::Prefixes(&req.scope_prefixes), req.as_of_tx.inner())
+            .scan_memtable_residue(
+                MemScopeSpec::Prefixes(&req.scope_prefixes),
+                req.as_of_tx.inner(),
+            )
             .await?;
 
-        let total_versions = mem_evidence_keys.versions_found + mem_evidence_prefixes.versions_found;
+        let total_versions =
+            mem_evidence_keys.versions_found + mem_evidence_prefixes.versions_found;
         if total_versions > 0 {
             return Err(ContextraError::InvalidInput(format!(
                 "Memtable witness rejected: found {} non-tombstone versions in memtables",
@@ -281,7 +285,7 @@ impl LsmStorage {
 
         let sst_scan_res = scan_sstables(&sst_scope, &sst_inputs, self.key_manager.clone(), || 1)
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        let violations = sst_scan_res.invariant_violations_for_claim(req.key_identifiers_claimed);
+        let violations = Self::validate_sst_evidence(&sst_scan_res, req.key_identifiers_claimed);
         if !violations.is_empty() {
             return Err(ContextraError::InvalidInput(format!(
                 "SSTable witness rejected due to invariant violations: {}",
@@ -299,7 +303,11 @@ impl LsmStorage {
             orphan_files_found: sst_scan_res.orphan_files_found as u32,
             unclassified_files: sst_scan_res.unclassified_files as u32,
             versions_found: sst_scan_res.versions_found,
-            identifier_hits_index: sst_scan_res.identifier_hits_index,
+            identifier_hits_index: if req.key_identifiers_claimed {
+                sst_scan_res.identifier_hits_index
+            } else {
+                0
+            },
             tombstones_remaining: sst_scan_res.tombstones_remaining,
         };
 
@@ -399,6 +407,41 @@ impl LsmStorage {
         }
 
         Ok(result_witnesses)
+    }
+
+    fn validate_sst_evidence(ev: &SstScanEvidence, key_identifiers_claimed: bool) -> Vec<String> {
+        let mut violations = Vec::new();
+        if ev.unclassified_files > 0 {
+            violations.push(format!(
+                "Fail-closed: {} unclassified file(s) found",
+                ev.unclassified_files
+            ));
+        }
+        if ev.versions_found > 0 {
+            violations.push(format!(
+                "Claim CT-S2V violation: {} live version(s) found in storage",
+                ev.versions_found
+            ));
+        }
+        if key_identifiers_claimed && ev.identifier_hits_index > 0 {
+            violations.push(format!(
+                "Claim CT-S2K violation: {} index separator/fence hit(s) found",
+                ev.identifier_hits_index
+            ));
+        }
+        if key_identifiers_claimed && ev.tombstones_remaining > 0 {
+            violations.push(format!(
+                "Claim CT-S2K violation: {} tombstone(s) remaining",
+                ev.tombstones_remaining
+            ));
+        }
+        if ev.range_hits > 0 {
+            violations.push(format!(
+                "Claim CT-S2K/CT-S2V violation: {} historical manifest range hit(s) found",
+                ev.range_hits
+            ));
+        }
+        violations
     }
 
     /// Issues a [`LayerWitness`] for the specified Primary Data / LSM storage layer variant.

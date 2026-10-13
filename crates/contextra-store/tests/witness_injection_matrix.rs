@@ -26,7 +26,12 @@ async fn create_test_storage() -> (LsmStorage, TempDir) {
     (storage, tmp)
 }
 
-fn build_request(keys: &[Vec<u8>], prefixes: &[Vec<u8>], tx: u64, claim: WitClaimText) -> ZeuIssueRequest {
+fn build_request(
+    keys: &[Vec<u8>],
+    prefixes: &[Vec<u8>],
+    tx: u64,
+    claim: WitClaimText,
+) -> ZeuIssueRequest {
     ZeuIssueRequest {
         scope_keys: keys.to_vec(),
         scope_prefixes: prefixes.to_vec(),
@@ -55,10 +60,6 @@ async fn test_matrix_row_01_active_memtable_put_err() {
     storage.put(tx1, &key, b"value").await.unwrap();
     storage.commit(tx1).await.unwrap();
 
-    for entry in fs::read_dir(_tmp.path()).unwrap() {
-        let entry = entry.unwrap();
-        eprintln!("Data dir file: {:?}", entry.file_name());
-    }
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
     assert!(res.is_err(), "Row 1: Active memtable Put must fail witness");
@@ -87,14 +88,19 @@ async fn test_matrix_row_02_immutable_memtable_put_err() {
     // Block flush by creating dir collision for SST
     let count = storage.segment_counter_for_test();
     let seq = storage.next_seq_no_for_test();
-    let sst_path = tmp.path().join(format!("sst-{:020}-{:06}.sst", seq, count % 1_000_000));
+    let sst_path = tmp
+        .path()
+        .join(format!("sst-{:020}-{:06}.sst", seq, count % 1_000_000));
     fs::create_dir_all(&sst_path).unwrap();
 
     let _ = storage.force_flush().await; // Fails, leaving in immutable
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 2: Immutable memtable Put must fail witness");
+    assert!(
+        res.is_err(),
+        "Row 2: Immutable memtable Put must fail witness"
+    );
 }
 
 /// Row 3: Concurrent memtable flush during scan -> retry up to 3x, then Err if instability persists
@@ -103,10 +109,12 @@ async fn test_matrix_row_03_memtable_flush_race_err() {
     let (storage, _tmp) = create_test_storage().await;
     let key = b"row03_key".to_vec();
 
-    let res = storage.scan_memtable_residue(
-        contextra_store::lsm::witness::MemScopeSpec::Keys(&[key]),
-        10,
-    ).await;
+    let res = storage
+        .scan_memtable_residue(
+            contextra_store::lsm::witness::MemScopeSpec::Keys(&[key]),
+            10,
+        )
+        .await;
     assert!(res.is_ok());
 }
 
@@ -123,7 +131,10 @@ async fn test_matrix_row_04_l0_sstable_put_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 4: Put flushed to L0 SSTable must fail witness");
+    assert!(
+        res.is_err(),
+        "Row 4: Put flushed to L0 SSTable must fail witness"
+    );
 }
 
 /// Row 5: Older value in Ln under tombstone in L0 -> Err (versions_found > 0)
@@ -144,7 +155,10 @@ async fn test_matrix_row_05_older_value_under_tombstone_err() {
 
     let req = build_request(&[key.clone()], &[], 20, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 5: Older live value version under tombstone must fail witness S2V");
+    assert!(
+        res.is_err(),
+        "Row 5: Older live value version under tombstone must fail witness S2V"
+    );
 }
 
 /// Row 6: Only tombstone remaining -> S2V ok, S2K Err
@@ -161,15 +175,18 @@ async fn test_matrix_row_06_tombstone_s2v_ok_s2k_err() {
     // S2V (Value witness) allows tombstones
     let req_s2v = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res_s2v = storage.issue_witnesses_v2(req_s2v).await;
-    if let Err(ref e) = res_s2v {
-        eprintln!("Row 06 S2V failed with error: {:?}", e);
-    }
-    assert!(res_s2v.is_ok(), "Row 6: S2V claim with tombstone only must succeed");
+    assert!(
+        res_s2v.is_ok(),
+        "Row 6: S2V claim with tombstone only must succeed"
+    );
 
     // S2K (Key witness) forbids tombstones
     let req_s2k = build_request(&[key.clone()], &[], 10, WitClaimText::S2K);
     let res_s2k = storage.issue_witnesses_v2(req_s2k).await;
-    assert!(res_s2k.is_err(), "Row 6: S2K claim with tombstone remaining must fail");
+    assert!(
+        res_s2k.is_err(),
+        "Row 6: S2K claim with tombstone remaining must fail"
+    );
 }
 
 /// Row 7: Scope prefix only as index separator -> S2K Err, S2V ok
@@ -185,11 +202,17 @@ async fn test_matrix_row_07_index_separator_s2k_err_s2v_ok() {
 
     let req_s2v = build_request(&[], &[prefix.clone()], 10, WitClaimText::S2V);
     let res_s2v = storage.issue_witnesses_v2(req_s2v).await;
-    assert!(res_s2v.is_ok(), "Row 7: S2V claim with prefix index separator must succeed");
+    assert!(
+        res_s2v.is_ok(),
+        "Row 7: S2V claim with prefix index separator must succeed"
+    );
 
     let req_s2k = build_request(&[], &[prefix.clone()], 10, WitClaimText::S2K);
     let res_s2k = storage.issue_witnesses_v2(req_s2k).await;
-    assert!(res_s2k.is_err(), "Row 7: S2K claim with index separator hit must fail");
+    assert!(
+        res_s2k.is_err(),
+        "Row 7: S2K claim with index separator hit must fail"
+    );
 }
 
 /// Row 8: Orphan SSTable with marker -> Err (fail-closed)
@@ -203,7 +226,10 @@ async fn test_matrix_row_08_orphan_sstable_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 8: Orphan SSTable in directory must trigger fail-closed Err");
+    assert!(
+        res.is_err(),
+        "Row 8: Orphan SSTable in directory must trigger fail-closed Err"
+    );
 }
 
 /// Row 9: .tmp file with marker -> Err
@@ -217,7 +243,10 @@ async fn test_matrix_row_09_temp_file_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 9: Temp file in directory must trigger fail-closed Err");
+    assert!(
+        res.is_err(),
+        "Row 9: Temp file in directory must trigger fail-closed Err"
+    );
 }
 
 /// Row 10: Old manifest with min/max in scope -> Err
@@ -233,7 +262,10 @@ async fn test_matrix_row_10_old_manifest_range_hit_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 10: Historical manifest raw match must trigger Err");
+    assert!(
+        res.is_err(),
+        "Row 10: Historical manifest raw match must trigger Err"
+    );
 }
 
 /// Row 11: Corrupt footer -> Err
@@ -247,7 +279,10 @@ async fn test_matrix_row_11_corrupt_footer_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 11: Corrupt footer must trigger fail-closed Err");
+    assert!(
+        res.is_err(),
+        "Row 11: Corrupt footer must trigger fail-closed Err"
+    );
 }
 
 /// Row 12: Unknown file -> Err
@@ -261,7 +296,10 @@ async fn test_matrix_row_12_unknown_file_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 12: Unknown file in directory must fail closed");
+    assert!(
+        res.is_err(),
+        "Row 12: Unknown file in directory must fail closed"
+    );
 }
 
 /// Row 13: Checkpoint hardlink (belongs to B04/C02, reported/skipped here)
@@ -285,7 +323,10 @@ async fn test_matrix_row_14_sealed_wal_segment_put_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S3);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 14: Sealed WAL segment with Put must fail WAL witness");
+    assert!(
+        res.is_err(),
+        "Row 14: Sealed WAL segment with Put must fail WAL witness"
+    );
 }
 
 /// Row 15: Recycled segment with marker past logical end -> Err
@@ -302,7 +343,10 @@ async fn test_matrix_row_15_recycled_segment_tail_marker_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S3);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 15: Recycled WAL segment tail marker match must fail witness");
+    assert!(
+        res.is_err(),
+        "Row 15: Recycled WAL segment tail marker match must fail witness"
+    );
 }
 
 /// Row 16: Archived segment with Put -> Err
@@ -316,7 +360,10 @@ async fn test_matrix_row_16_archived_wal_segment_put_err() {
 
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S3);
     let res = storage.issue_witnesses_v2(req).await;
-    assert!(res.is_err(), "Row 16: Archived WAL segment with Put must fail WAL witness");
+    assert!(
+        res.is_err(),
+        "Row 16: Archived WAL segment with Put must fail WAL witness"
+    );
 }
 
 /// Clean positive test: No residue anywhere -> witness issuance succeeds for all layers
@@ -325,17 +372,16 @@ async fn test_matrix_clean_positive_success() {
     let (storage, _tmp) = create_test_storage().await;
     let key = b"clean_key".to_vec();
 
-    for entry in fs::read_dir(_tmp.path()).unwrap() {
-        let entry = entry.unwrap();
-        eprintln!("Data dir file: {:?}", entry.file_name());
-    }
     let req = build_request(&[key.clone()], &[], 10, WitClaimText::S2V);
     let res = storage.issue_witnesses_v2(req).await;
-    if let Err(ref e) = res {
-        eprintln!("test_matrix_clean_positive_success failed with error: {:?}", e);
-    }
-    assert!(res.is_ok(), "Clean storage state must produce valid witnesses");
+    assert!(
+        res.is_ok(),
+        "Clean storage state must produce valid witnesses"
+    );
 
     let witnesses = res.unwrap();
-    assert!(!witnesses.is_empty(), "Must produce witnesses for scanned layers");
+    assert!(
+        !witnesses.is_empty(),
+        "Must produce witnesses for scanned layers"
+    );
 }
