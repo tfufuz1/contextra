@@ -12,6 +12,28 @@ pub trait FprSweepSource {
     fn for_each_key(&self, f: &mut dyn FnMut(&[u8]) -> bool) -> Result<(), ContextraError>;
 }
 
+impl FprSweepSource for Vec<Vec<u8>> {
+    fn for_each_key(&self, f: &mut dyn FnMut(&[u8]) -> bool) -> Result<(), ContextraError> {
+        for key in self {
+            if !f(key.as_slice()) {
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl FprSweepSource for &[Vec<u8>] {
+    fn for_each_key(&self, f: &mut dyn FnMut(&[u8]) -> bool) -> Result<(), ContextraError> {
+        for key in *self {
+            if !f(key.as_slice()) {
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Nadeln für die Rückwärtssuche in der Key-Landschaft.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct FprNeedles {

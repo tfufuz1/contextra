@@ -3,6 +3,8 @@
 
 mod query;
 
+pub use query::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
+
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
 use contextra_ports::{GraphIndex, Reranker, StorageEngine, TextIndex, VectorIndex};

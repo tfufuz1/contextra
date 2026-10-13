@@ -25,14 +25,20 @@ impl CsrGraph {
     pub fn set_storage<S>(&mut self, _storage: Arc<S>) {}
 
     pub async fn remove_entity(&self, _tx: TxId, _id: EntityId) -> contextra_types::Result<()> {
-        Ok(())
+        Err(contextra_types::ContextraError::capability_unsupported(
+            "graph",
+            "graph feature is disabled",
+        ))
     }
 
     pub async fn get_communities_batch(
         &self,
         _ids: &[EntityId],
     ) -> contextra_types::Result<ahash::AHashMap<EntityId, u64>> {
-        Ok(ahash::AHashMap::default())
+        Err(contextra_types::ContextraError::capability_unsupported(
+            "graph",
+            "graph feature is disabled",
+        ))
     }
 
     pub fn set_communities_batch(&self, _assignments: &[CommunityAssignment]) {}
@@ -55,15 +61,30 @@ impl GraphIndex for CsrGraph {
         _start_node: EntityId,
         _max_hops: usize,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
-        Box::pin(async move { Ok(vec![]) })
+        Box::pin(async move {
+            Err(contextra_types::ContextraError::capability_unsupported(
+                "graph",
+                "graph feature is disabled",
+            ))
+        })
     }
 
     fn add_entity<'a>(&'a self, _tx: TxId, _entity: Entity) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
+        Box::pin(async move {
+            Err(contextra_types::ContextraError::capability_unsupported(
+                "graph",
+                "graph feature is disabled",
+            ))
+        })
     }
 
     fn add_edge<'a>(&'a self, _tx: TxId, _edge: Edge) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
+        Box::pin(async move {
+            Err(contextra_types::ContextraError::capability_unsupported(
+                "graph",
+                "graph feature is disabled",
+            ))
+        })
     }
 
     fn commit<'a>(&'a self, _tx: TxId) -> BoxFuture<'a, Result<()>> {
@@ -88,11 +109,10 @@ impl GraphIndex for CsrGraph {
 
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
         Box::pin(async move {
-            Ok(GraphIndexStats {
-                num_entities: 0,
-                num_edges: 0,
-                memory_usage_bytes: 0,
-            })
+            Err(contextra_types::ContextraError::capability_unsupported(
+                "graph",
+                "graph feature is disabled",
+            ))
         })
     }
 }
@@ -196,7 +216,10 @@ pub async fn detect_communities<G>(
     _graph: &G,
     _config: &CommunityDetectionConfig,
 ) -> contextra_types::Result<Vec<CommunityAssignment>> {
-    Ok(vec![])
+    Err(contextra_types::ContextraError::capability_unsupported(
+        "graph",
+        "graph feature is disabled",
+    ))
 }
 
 pub mod percolation {

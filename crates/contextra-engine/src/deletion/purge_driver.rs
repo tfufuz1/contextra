@@ -15,9 +15,19 @@ use contextra_store::lsm::witness::ZeuIssueRequest;
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 
+use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
+use contextra_crypto::deletion_proof::probe::WitStoreGeneration;
+use contextra_crypto::deletion_proof::types::DeletionLayer;
+use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
+
 use super::copy_observer::DpiCopyObserver;
-use super::forget_options::{FonLogicalHandle, ForgetOptions, PurgeHandle, PurgeMode};
-use super::proof_issue::DpiDeletionRuntime;
+use super::footprint::ErasureFootprint;
+use super::forget_options::{FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode};
+use super::proof_issue::{DpiDeletionRuntime, DpiLogicalInput};
+use super::registry::KeyFamilyRegistry;
+use super::relations_witness::issue_relations_witness;
+use super::reverse_sweep::{reverse_sweep, FprNeedles, FprSweepReport, FprSweepSource, SweepDepth};
+use super::text_witness::issue_text_index_witness;
 
 /// Options controlling physical purge driver execution (§C5.3, C5.7).
 #[derive(Debug, Clone)]
@@ -224,6 +234,216 @@ impl<'a> DpiPurgeDriver<'a> {
 
         Ok(PurgeHandle::Final(phys_handle))
     }
+
+    /// Executes physical purge sequence and runs reverse_sweep to verify residual key absence (§C5.3, C1.4).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_purge<S: FprSweepSource>(
+        &self,
+        scope: PurgeScope,
+        scope_file_names: &[String],
+        as_of_tx: TxId,
+        logical_handle: &FonLogicalHandle,
+        opts: &ForgetOptions,
+        sweep_source: &S,
+        needles: &FprNeedles,
+        footprint: &ErasureFootprint,
+        registry: &KeyFamilyRegistry,
+        depth: SweepDepth,
+        space_probe: Option<&dyn FreeSpaceProbe>,
+        probes: &[&dyn WitStoreProbe],
+        copy_registry: Option<&CopyRegistry>,
+    ) -> Result<(ForgetOutcome, FprSweepReport)> {
+        let purge_handle = self
+            .run_physical(
+                scope,
+                scope_file_names,
+                as_of_tx,
+                logical_handle,
+                opts,
+                space_probe,
+                probes,
+                copy_registry,
+            )
+            .await?;
+
+        let sweep_report = reverse_sweep(
+            sweep_source,
+            needles,
+            footprint,
+            registry,
+            depth,
+        )?;
+
+        let outcome = ForgetOutcome {
+            logical: logical_handle.clone(),
+            physical: Some(purge_handle),
+        };
+
+        Ok((outcome, sweep_report))
+    }
+}
+
+/// Orchestrates complete document deletion with logical Phase-A proof issuance, physical purge driver execution,
+/// reverse index sweep, and returns a verified [`ForgetOutcome`].
+pub async fn forget_document<S: FprSweepSource>(
+    storage: &LsmStorage,
+    runtime: &DpiDeletionRuntime,
+    doc_id_str: &str,
+    as_of_tx: TxId,
+    opts: &ForgetOptions,
+    sweep_source: &S,
+    footprint: &ErasureFootprint,
+    registry: &KeyFamilyRegistry,
+) -> Result<ForgetOutcome> {
+    let doc_id = doc_id_str
+        .parse::<u64>()
+        .map(DocId::new)
+        .unwrap_or_else(|_| DocId::from_key(doc_id_str).unwrap_or(DocId::new(0)));
+
+    let scope = DeletionScope::Document {
+        doc_id,
+        tenant_id: TenantId::SYSTEM,
+    };
+
+    let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(
+        &footprint.keys.explicit,
+    );
+
+    let zeu_req = ZeuIssueRequest {
+        scope_keys: footprint.keys.explicit.clone(),
+        scope_prefixes: footprint.keys.prefixes.clone(),
+        as_of_tx,
+        scanned_at_tx: as_of_tx,
+        assurance: opts.assurance,
+        claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
+        scanner_name: "forget_document_orchestrator",
+        scanner_version: 1,
+        key_identifiers_claimed: false,
+    };
+
+    let mut witnesses = storage
+        .issue_witnesses_v2(zeu_req)
+        .await
+        .unwrap_or_default();
+
+    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::HnswIndex) {
+        if let Ok(hnsw_witness) = LayerWitness::issue(WitIssueArgs {
+            layer: DeletionLayer::HnswIndex,
+            scope_hash,
+            scanned_at_tx: as_of_tx,
+            as_of_tx,
+            assurance: opts.assurance,
+            claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
+            footprint_hash: [0u8; 32],
+            scope_write_seq: 0,
+            scanner_name: "hnsw_scanner",
+            scanner_version: 1,
+            store_generation: WitStoreGeneration(0),
+            layer_evidence: WitLayerEvidence::HnswIndex {
+                node_id: doc_id.inner(),
+                incoming_edges: 0,
+                outgoing_edges: 0,
+                pinned_by_reader: false,
+                marked_zeroed: true,
+            },
+            key_identifiers_claimed: false,
+        }) {
+            witnesses.push(hnsw_witness);
+        }
+    }
+
+    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::TextIndex) {
+        if let Ok(text_witness) = issue_text_index_witness(
+            doc_id,
+            &footprint.ram.term_bytes,
+            scope_hash,
+            as_of_tx,
+            None,
+        ) {
+            witnesses.push(text_witness);
+        }
+    }
+
+    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::Relations) {
+        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
+        if let Ok(rel_witness) = issue_relations_witness(
+            doc_id,
+            scanned_edges,
+            scope_hash,
+            as_of_tx,
+            None,
+        ) {
+            witnesses.push(rel_witness);
+        }
+    }
+
+    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::ErasureLedger) {
+        if let Ok(ledger_witness) = LayerWitness::issue(WitIssueArgs {
+            layer: DeletionLayer::ErasureLedger,
+            scope_hash,
+            scanned_at_tx: as_of_tx,
+            as_of_tx,
+            assurance: opts.assurance,
+            claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
+            footprint_hash: [0u8; 32],
+            scope_write_seq: 0,
+            scanner_name: "ledger_scanner",
+            scanner_version: 1,
+            store_generation: WitStoreGeneration(0),
+            layer_evidence: WitLayerEvidence::Memtable {
+                memtables_scanned: 1,
+                entries_found: 0,
+                tombstones_found: 0,
+            },
+            key_identifiers_claimed: false,
+        }) {
+            witnesses.push(ledger_witness);
+        }
+    }
+
+    let logical_input = DpiLogicalInput {
+        scope,
+        storage_scope: "lsm".to_string(),
+        deleted_keys_hash: scope_hash,
+        footprint_hash: [0u8; 32],
+        observed_empty: true,
+        deleted_after_tx: as_of_tx,
+        witnesses,
+        scope_file_names: vec![doc_id_str.to_string()],
+    };
+
+    let zeu_probe = storage.store_probe();
+    let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
+    let (logical_handle, _) = runtime.finalize_logical(logical_input, opts, None, probes)?;
+
+    let driver = DpiPurgeDriver::new(storage, runtime, DpiPurgeDriverConfig::default());
+    let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
+    let needles = FprNeedles {
+        doc_id_bytes: doc_id_str.as_bytes().to_vec(),
+        collection_id: None,
+        collection_name: String::new(),
+        tenant_prefix: Vec::new(),
+    };
+
+    let (outcome, _) = driver
+        .run_purge(
+            purge_scope,
+            &[doc_id_str.to_string()],
+            as_of_tx,
+            &logical_handle,
+            opts,
+            sweep_source,
+            &needles,
+            footprint,
+            registry,
+            SweepDepth::Standard,
+            None,
+            probes,
+            None,
+        )
+        .await?;
+
+    Ok(outcome)
 }
 
 fn hex_encode_32(bytes: &[u8; 32]) -> String {
