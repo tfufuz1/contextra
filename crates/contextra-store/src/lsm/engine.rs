@@ -137,9 +137,10 @@ impl LsmStorage {
                 self.ledger_state
             )));
         }
-        let handle = self.ledger_handle.as_ref().ok_or_else(|| {
-            ContextraError::Storage("Erasure ledger handle unavailable".into())
-        })?;
+        let handle = self
+            .ledger_handle
+            .as_ref()
+            .ok_or_else(|| ContextraError::Storage("Erasure ledger handle unavailable".into()))?;
         handle.append(entries).await
     }
 

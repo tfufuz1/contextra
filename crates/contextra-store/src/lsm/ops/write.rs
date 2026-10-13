@@ -186,7 +186,9 @@ pub(super) async fn delete_many(
         storage
             .erasure_fence
             .check_write_allowed_scope(key)
-            .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
+            .map_err(|e| {
+                ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
+            })?;
     }
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
@@ -219,7 +221,9 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
     storage
         .erasure_fence
         .check_write_allowed_scope(prefix)
-        .map_err(|e| ContextraError::Storage(format!("Delete prefix rejected by erasure fence: {e}")))?;
+        .map_err(|e| {
+            ContextraError::Storage(format!("Delete prefix rejected by erasure fence: {e}"))
+        })?;
     let matching_keys: Vec<Vec<u8>> = storage
         .scan_prefix(prefix)
         .await?

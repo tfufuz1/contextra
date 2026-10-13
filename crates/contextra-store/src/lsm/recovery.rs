@@ -234,9 +234,11 @@ impl LsmStorage {
         let ledger_handle =
             ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
 
-        let replay_filter: Option<Arc<dyn crate::wal::WalReplayFilter>> = ledger_handle
-            .clone()
-            .map(|h| Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(h)) as Arc<dyn crate::wal::WalReplayFilter>);
+        let replay_filter: Option<Arc<dyn crate::wal::WalReplayFilter>> =
+            ledger_handle.clone().map(|h| {
+                Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(h))
+                    as Arc<dyn crate::wal::WalReplayFilter>
+            });
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
@@ -310,9 +312,8 @@ impl LsmStorage {
 
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let (wal_entries, replay_report) = wal
-                .replay_with_filter(replay_filter.as_deref())
-                .await?;
+            let (wal_entries, replay_report) =
+                wal.replay_with_filter(replay_filter.as_deref()).await?;
 
             if replay_report.records_dropped_by_filter > 0 {
                 tracing::info!(

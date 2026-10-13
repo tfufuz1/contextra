@@ -88,11 +88,23 @@ impl SstInventory {
                     || file_name.starts_with("MANIFEST-")
                 {
                     inventory.old_manifest.push(path);
-                } else if file_name == "MANIFEST"
+                } else if file_name.starts_with('.')
+                    || file_name == "MANIFEST"
+                    || file_name == "SALT"
+                    || file_name == "LOCK"
+                    || file_name.contains("ledger")
+                    || file_name == "purge.intent"
+                    || file_name == "pending_delete.journal"
                     || file_name.ends_with(".wal")
+                    || file_name.ends_with(".log")
+                    || file_name.starts_with("wal")
+                    || file_name.ends_with(".wal_integrity_key")
+                    || file_name.ends_with(".rekeyed")
                     || file_name.contains(".uuid")
+                    || file_name.contains(".sealed")
+                    || file_name.contains(".archived")
                 {
-                    // Active manifest or active WAL file - valid system files, not orphans or unknown
+                    // Active system metadata, WAL, or ledger files - valid system files, not orphans or unknown
                     continue;
                 } else {
                     inventory.unknown.push(path);

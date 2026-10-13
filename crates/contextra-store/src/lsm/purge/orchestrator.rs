@@ -32,25 +32,21 @@ pub struct OrxHooks {
                     PurgeScope,
                     u64,
                     Option<&dyn FreeSpaceProbe>,
-                ) -> BoxFuture<'static, std::result::Result<PurgeReport, PurgeBlocked>>
+                )
+                    -> BoxFuture<'static, std::result::Result<PurgeReport, PurgeBlocked>>
                 + Send
                 + Sync,
         >,
     >,
     /// Hook providing list of obsolete SSTable files for disposal.
-    pub obsolete_files:
-        Option<Box<dyn Fn(&Path) -> std::io::Result<Vec<PathBuf>> + Send + Sync>>,
+    pub obsolete_files: Option<Box<dyn Fn(&Path) -> std::io::Result<Vec<PathBuf>> + Send + Sync>>,
     /// WAL log retirement callback.
     pub wal_retire: Option<Box<dyn Fn() -> std::io::Result<()> + Send + Sync>>,
     /// Witness proof issuance callback.
     pub witness: Option<Box<dyn Fn() -> std::io::Result<()> + Send + Sync>>,
     /// Scope reconstruction callback during crash recovery.
     pub reconstruct_scope: Option<
-        Box<
-            dyn Fn(Option<u64>, Option<[u8; 32]>) -> std::io::Result<PurgeScope>
-                + Send
-                + Sync,
-        >,
+        Box<dyn Fn(Option<u64>, Option<[u8; 32]>) -> std::io::Result<PurgeScope> + Send + Sync>,
     >,
 }
 
@@ -139,9 +135,7 @@ impl<'a> PurgeOrchestrator<'a> {
             let cb_slot = Arc::new(Mutex::new(Some(cb)));
             hooks.wal_retire = Some(Box::new(move || {
                 if let Some(c) = cb_slot.lock().take() {
-                    c().map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                    })
+                    c().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
                 } else {
                     Ok(())
                 }
@@ -173,14 +167,8 @@ impl<'a> PurgeOrchestrator<'a> {
         let mut purge_id = [0u8; 16];
         rand::thread_rng().fill_bytes(&mut purge_id);
 
-        let mut intent = OrxPurgeIntent::new(
-            purge_id,
-            &scope,
-            as_of_tx,
-            None,
-            None,
-            PurgePhase::Admitted,
-        );
+        let mut intent =
+            OrxPurgeIntent::new(purge_id, &scope, as_of_tx, None, None, PurgePhase::Admitted);
 
         // Phase 1: Admitted
         intent.write_to_file(&self.intent_file)?;
@@ -190,7 +178,14 @@ impl<'a> PurgeOrchestrator<'a> {
         purge_failpoint!(self.failpoints, "after_fence");
 
         let report = self
-            .run_pipeline_from(&mut intent, scope, as_of_tx, space_probe, hooks, secure_delete)
+            .run_pipeline_from(
+                &mut intent,
+                scope,
+                as_of_tx,
+                space_probe,
+                hooks,
+                secure_delete,
+            )
             .await?;
 
         if let Some(ref mut guard) = fence_guard {
@@ -221,26 +216,8 @@ impl<'a> PurgeOrchestrator<'a> {
             self.storage.map(|s| s.erasure_fence.release_scope_fence());
         }
 
-        // Phase: PurgeCompaction
-        if intent.phase == PurgePhase::PurgeCompaction || intent.phase == PurgePhase::P4PurgeCompaction {
-            purge_failpoint!(&hooks.failpoints, "mid_compaction_output");
-            report = (hooks.purge)(scope.clone(), intent.as_of_tx).await?;
-            purge_failpoint!(&hooks.failpoints, "after_compaction_before_manifest");
-
-            intent.phase = PurgePhase::Dispose;
-            intent.save(&self.intent_file).map_err(|e| OrxPurgeError::Io(e.to_string()))?;
-        }
-
-        // Phase: Dispose
-        if intent.phase == PurgePhase::Dispose || intent.phase == PurgePhase::P5Dispose {
-            purge_failpoint!(&hooks.failpoints, "after_manifest_before_unlink");
-            let obs_files = (hooks.obsolete_files)();
-            purge_failpoint!(&hooks.failpoints, "after_journal_record");
-            purge_failpoint!(&hooks.failpoints, "mid_unlink");
-
-            execute_dispose(self.journal_path.clone(), obs_files, hooks.secure_delete)
-                .await
-                .map_err(|e| OrxPurgeError::Io(e.to_string()))?;
+        Ok(report)
+    }
 
     async fn run_pipeline_from(
         &self,
@@ -255,14 +232,16 @@ impl<'a> PurgeOrchestrator<'a> {
             records_purged: 1,
             bytes_reclaimed: 0,
             sstables_replaced: 0,
+            ..Default::default()
         };
 
         // Phase: Flush
         if intent.phase <= PurgePhase::Flush {
             if let Some(storage) = self.storage {
-                storage.flush().await.map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                })?;
+                storage
+                    .flush()
+                    .await
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
             }
             intent.phase = PurgePhase::Flush;
             intent.write_to_file(&self.intent_file)?;

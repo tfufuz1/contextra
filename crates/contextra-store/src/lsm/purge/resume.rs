@@ -52,6 +52,7 @@ pub async fn resume_pending(
             records_purged: 0,
             bytes_reclaimed: 0,
             sstables_replaced: 0,
+            ..Default::default()
         }));
     }
 

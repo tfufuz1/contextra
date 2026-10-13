@@ -62,3 +62,4 @@ pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GRO
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use secure_buf::CchSecureBuf;
 pub use wal_completeness::verify_wal_chain_completeness;
+pub use zeroize::Zeroize;

@@ -225,14 +225,20 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "SsTableAllLevels",
                         field_name: "identifier_hits_index",
-                        details: format!("identifier index hits remaining: {}", identifier_hits_index),
+                        details: format!(
+                            "identifier index hits remaining: {}",
+                            identifier_hits_index
+                        ),
                     });
                 }
                 if key_identifiers_claimed && *tombstones_remaining != 0 {
                     return Err(WitInvariantViolation {
                         layer_name: "SsTableAllLevels",
                         field_name: "tombstones_remaining",
-                        details: format!("tombstones remaining when key identifiers claimed: {}", tombstones_remaining),
+                        details: format!(
+                            "tombstones remaining when key identifiers claimed: {}",
+                            tombstones_remaining
+                        ),
                     });
                 }
             }
@@ -277,7 +283,10 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "WalAllSegments",
                         field_name: "unscrubbed_records_found",
-                        details: format!("unscrubbed records found in WAL: {}", unscrubbed_records_found),
+                        details: format!(
+                            "unscrubbed records found in WAL: {}",
+                            unscrubbed_records_found
+                        ),
                     });
                 }
             }
@@ -290,7 +299,10 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "HnswIndex",
                         field_name: "incoming_edges",
-                        details: format!("incoming ghost edges remaining in HNSW index: {}", incoming_edges),
+                        details: format!(
+                            "incoming ghost edges remaining in HNSW index: {}",
+                            incoming_edges
+                        ),
                     });
                 }
                 if *pinned_by_reader {
@@ -306,7 +318,10 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "TextIndex",
                         field_name: "term_doc_hits",
-                        details: format!("term-document hits remaining in TextIndex: {}", term_doc_hits),
+                        details: format!(
+                            "term-document hits remaining in TextIndex: {}",
+                            term_doc_hits
+                        ),
                     });
                 }
             }
@@ -318,7 +333,10 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "Relations",
                         field_name: "matching_edges_found",
-                        details: format!("matching relational edges remaining: {}", matching_edges_found),
+                        details: format!(
+                            "matching relational edges remaining: {}",
+                            matching_edges_found
+                        ),
                     });
                 }
             }
@@ -331,7 +349,10 @@ impl WitLayerEvidence {
                     return Err(WitInvariantViolation {
                         layer_name: "ProcessCaches",
                         field_name: "active_references",
-                        details: format!("active cache references remaining: {}", active_references),
+                        details: format!(
+                            "active cache references remaining: {}",
+                            active_references
+                        ),
                     });
                 }
                 if *invalidation_in_flight {

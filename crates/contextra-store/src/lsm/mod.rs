@@ -77,6 +77,7 @@ mod engine;
 pub mod gc_floor;
 mod guard;
 pub mod observer;
+pub mod probe;
 mod validate;
 pub mod witness;
 
@@ -96,6 +97,7 @@ pub mod ops;
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::{LsmStorage, StorageHealth};
 pub use gc_floor::GcFloor;
+pub use probe::ZeuStoreProbe;
 
 pub(super) use guard::{CommitGuard, LsmState};
 pub use observer::{

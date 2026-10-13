@@ -3,9 +3,9 @@
 // ZWECK: Failpoint-Injektion für Purge-Crash-Konsistenz-Tests (Spezifikation Anhang B).
 // INVARIANTEN: Zero overhead in Release ohne fault-injection Feature, explizites OrxFailpointSet ohne Env-Vars.
 
+use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 /// Errors emitted by the Purge Orchestrator.
 #[derive(Debug)]

@@ -129,9 +129,11 @@ impl OrxPurgeIntent {
                     "truncated ledger_seq value",
                 ));
             }
-            let seq = u64::from_le_bytes(bytes[..8].try_into().map_err(|_| {
-                Error::new(ErrorKind::InvalidData, "ledger_seq parse error")
-            })?);
+            let seq = u64::from_le_bytes(
+                bytes[..8]
+                    .try_into()
+                    .map_err(|_| Error::new(ErrorKind::InvalidData, "ledger_seq parse error"))?,
+            );
             bytes = &bytes[8..];
             Some(seq)
         } else if bytes[0] == 0 {

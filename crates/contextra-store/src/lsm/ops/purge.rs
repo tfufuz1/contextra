@@ -67,10 +67,9 @@ impl LsmStorage {
         if !is_valid_window {
             if !report.files_written.is_empty() {
                 let p = output_path.clone();
-                let _ = tokio::task::spawn_blocking(move || {
-                    contextra_durable_fs::durable_remove(&p)
-                })
-                .await;
+                let _ =
+                    tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p))
+                        .await;
             }
             return Err(PurgeBlocked::CompactionBusy);
         }
