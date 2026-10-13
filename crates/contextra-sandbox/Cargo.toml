@@ -21,6 +21,7 @@ anyhow = "1"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

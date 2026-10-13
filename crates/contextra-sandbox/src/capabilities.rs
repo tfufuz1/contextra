@@ -212,9 +212,15 @@ impl WasmCapabilities {
                     "WASM module binary provenance check failed: binary hash is not present in the allowed module policy list".into(),
                 ))
             }
-            ModulePolicy::SignedBy(_trusted_keys) => Err(SandboxError::InvalidModule(
-                "WASM module provenance check failed: SignedBy policy requires ed25519 signature verification (ed25519 dependency not compiled in crate)".into(),
-            )),
+            ModulePolicy::SignedBy(trusted_keys) => {
+                let verifier = crate::admission::Ed25519ModuleVerifier::new(trusted_keys.clone());
+                use crate::admission::ModuleVerifier;
+                verifier.verify(wasm_bytes).map(|_| ()).map_err(|e| {
+                    SandboxError::InvalidModule(format!(
+                        "WASM module provenance check failed for SignedBy policy: {e}"
+                    ))
+                })
+            }
         }
     }
 

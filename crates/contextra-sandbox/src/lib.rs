@@ -18,13 +18,15 @@ pub mod executor;
 pub mod merge;
 pub mod output;
 pub mod wasi;
+pub mod wiring;
 
-pub use admission::{AdmittedModule, ModuleVerifier};
+pub use admission::{AdmittedModule, Ed25519ModuleVerifier, ModuleVerifier};
 pub use approval::{
     classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
 };
-pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
+pub use capabilities::{MergeOperatorCapabilities, ModulePolicy, WasmCapabilities};
 pub use error::{AdmissionError, SandboxError};
 pub use executor::WasmExecutor;
 pub use merge::WasmMergeFunction;
 pub use output::WasmOutput;
+pub use wiring::{SandboxWiring, SandboxWiringConfig};
