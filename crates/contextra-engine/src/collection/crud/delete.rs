@@ -91,11 +91,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let old_user_val = self
             .storage
-            .get_at_seq_tracked(erased_at_tx, &user_key, u64::MAX)
+            .get_at_seq_tracked(erased_at_tx, &user_key, erased_at_tx.inner())
             .await?;
         let old_doc_val = self
             .storage
-            .get_at_seq_tracked(erased_at_tx, &doc_key, u64::MAX)
+            .get_at_seq_tracked(erased_at_tx, &doc_key, erased_at_tx.inner())
             .await?;
 
         db_tx.stage_text_delete(doc_id);
@@ -203,11 +203,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let old_user_val = self
             .storage
-            .get_at_seq_tracked(tx, &user_key, u64::MAX)
+            .get_at_seq_tracked(tx, &user_key, tx.inner())
             .await?;
         let old_doc_val = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .get_at_seq_tracked(tx, &doc_key, tx.inner())
             .await?;
 
         db_tx.stage_text_delete(doc_id);

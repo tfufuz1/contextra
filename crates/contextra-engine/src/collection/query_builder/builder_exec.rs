@@ -156,7 +156,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
             let ctx = self
                 .current_tx
-                .unwrap_or(contextra_types::TxId::new(u64::MAX));
+                .unwrap_or(contextra_types::TxId::new(seq_no));
             results = crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,
@@ -403,7 +403,7 @@ where
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
             let ctx = self
                 .current_tx
-                .unwrap_or(contextra_types::TxId::new(u64::MAX));
+                .unwrap_or(contextra_types::TxId::new(seq_no));
             results = crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,
