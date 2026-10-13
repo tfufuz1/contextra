@@ -1,0 +1,17 @@
+id        = "T-2026-LA13"
+title     = "KMS-Widerruf fail-closed (N6)"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "high"
+goal      = "KMS key destruction fails-closed when registry zeroization fails, returning an explicit error and preventing deletion receipts while logging revocation."
+non_goals = ["Keine Änderungen außerhalb des Arbeitsbereichs", "Keine neuen Dependencies", "Keine Public-API-Brüche"]
+scope     = ["crates/contextra-crypto/src/kms.rs", "crates/contextra-crypto/tests/kms_revoke_fail_closed.rs", ".jules/tasks/T-2026-LA13.toml"]
+forbidden = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "xtask/**", "capabilities.toml", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed"]
+acceptance = ["cargo test -p contextra-crypto --test kms_revoke_fail_closed", "cargo xtask doctrine-scan", "cargo xtask check-result-dropped-io", "cargo xtask fast-diff-lint"]
+evidence_required = ["Widerruf-Fehler liefert Err", "Gruppe bleibt widerrufen", "Kein Löschnachweis bei Fehler"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

@@ -312,7 +312,8 @@ mod tests {
         let db_path = temp_dir.to_str().unwrap();
 
         Python::with_gil(|py| {
-            let db = open(py, db_path, 128, None, None, None).expect("failed to open test db");
+            register_contextra_module(py);
+            let db = open(py, db_path, 128, None, None, None, None).expect("failed to open test db");
 
             // Insert sample documents with prefixes
             let dummy_v = vec![0.1f32; 128];
@@ -345,23 +346,17 @@ mod tests {
                     pyo3::types::PyCFunction::new_closure(py, None, None, move |_args, _kwargs| {
                         Python::with_gil(|py| {
                             let prefix = if i % 2 == 0 { "pref_a_" } else { "pref_b_" };
+                            let bound_db = db_ref.bind(py);
+                            let db_borrow = bound_db.borrow();
                             for _ in 0..10 {
-                                let res: PyResult<PyObject> =
-                                    db_ref.call_method1(py, "scan_prefix", (prefix,));
+                                let res = db_borrow.scan_prefix(py, prefix, None);
                                 match res {
-                                    Ok(res_obj) => {
-                                        let list = res_obj.extract::<Vec<(String, PyObject)>>(py);
-                                        if let Ok(l) = list {
-                                            if l.len() != 10 {
-                                                errors_clone.lock().unwrap().push(format!(
-                                                    "Expected 10 docs, got {}",
-                                                    l.len()
-                                                ));
-                                            }
-                                        } else {
-                                            errors_clone.lock().unwrap().push(
-                                                "Failed to extract scan_prefix result".into(),
-                                            );
+                                    Ok(l) => {
+                                        if l.len() != 10 {
+                                            errors_clone.lock().unwrap().push(format!(
+                                                "Expected 10 docs, got {}",
+                                                l.len()
+                                            ));
                                         }
                                     }
                                     Err(e) => {
@@ -377,7 +372,9 @@ mod tests {
                     })
                     .unwrap();
 
-                let t = threading.call_method1("Thread", (worker_code,)).unwrap();
+                let kwargs = pyo3::types::PyDict::new(py);
+                kwargs.set_item("target", worker_code).unwrap();
+                let t = threading.call_method("Thread", (), Some(&kwargs)).unwrap();
                 t.call_method0("start").unwrap();
                 threads.push(t);
             }
@@ -406,5 +403,35 @@ mod tests {
         });
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    fn register_contextra_module(py: Python<'_>) {
+        if let Ok(sys) = py.import("sys") {
+            if let Ok(modules) = sys.getattr("modules") {
+                if modules.get_item("_contextra").is_err() {
+                    let m = pyo3::wrap_pymodule!(crate::_contextra)(py);
+                    let _ = modules.set_item("_contextra", m);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_tenant_isolation_two_tenants() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            register_contextra_module(py);
+            let temp_dir1 = std::env::temp_dir().join(format!("contextra_tenant_1_{}", std::process::id()));
+            let temp_dir2 = std::env::temp_dir().join(format!("contextra_tenant_2_{}", std::process::id()));
+
+            let db1 = open(py, temp_dir1.to_str().unwrap(), 128, None, None, None, Some(101)).expect("open db1");
+            let db2 = open(py, temp_dir2.to_str().unwrap(), 128, None, None, None, Some(202)).expect("open db2");
+
+            assert_eq!(db1.tenant_id(), 101);
+            assert_eq!(db2.tenant_id(), 202);
+
+            let _ = std::fs::remove_dir_all(temp_dir1);
+            let _ = std::fs::remove_dir_all(temp_dir2);
+        });
     }
 }

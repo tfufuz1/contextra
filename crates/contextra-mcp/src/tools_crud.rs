@@ -134,10 +134,16 @@ impl McpServer {
         let proof_val: Value = serde_json::from_str(&proof_json_str)
             .map_err(|e| McpError::internal_error(e.to_string()))?;
 
+        let proof_status = proof_val
+            .get("proof_status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("issued");
+
         Ok(json!({
             "ok": true,
             "collection": col_name,
             "proof": proof_val,
+            "proof_status": proof_status,
             "proof_scope": "collection"
         }))
     }
@@ -187,7 +193,7 @@ impl McpServer {
             "ok": true,
             "collection": col_name,
             "id": id,
-            "proof": null,
+            "proof_status": "logical_only",
             "proof_scope": "collection_only"
         }))
     }

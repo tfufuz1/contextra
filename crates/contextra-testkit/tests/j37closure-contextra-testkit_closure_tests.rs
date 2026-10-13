@@ -15,6 +15,7 @@ fn test_j37closure_fault_vfs_all_symbols() {
         fail_reads_after: Some(1),
         fail_syncs_after: Some(1),
         fail_all: false,
+        ..Default::default()
     });
 
     let p1 = Path::new("file1.dat");

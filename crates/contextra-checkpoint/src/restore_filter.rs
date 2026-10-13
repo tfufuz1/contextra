@@ -19,13 +19,40 @@ impl CpyRestoreFilter for NoOpRestoreFilter {
     }
 }
 
+/// Report summarizing the outcome of a restore record filtering operation.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct RestoreFilterReport {
+    /// Number of records retained after filtering.
+    pub kept: usize,
+    /// Number of records dropped due to anti-resurrection rules.
+    pub dropped: usize,
+}
+
 /// Filters a collection of KV records using `filter`, dropping any record where `filter.drop_record` returns `true`.
 pub fn filter_restore_records<F: CpyRestoreFilter + ?Sized, V>(
     records: impl IntoIterator<Item = (Vec<u8>, V, u64)>,
     filter: &F,
 ) -> Vec<(Vec<u8>, V, u64)> {
-    records
-        .into_iter()
-        .filter(|(key, _val, tx)| !filter.drop_record(key, *tx))
-        .collect()
+    let (filtered, _report) = filter_restore_records_with_report(records, filter);
+    filtered
+}
+
+/// Filters a collection of KV records using `filter`, returning the retained records along with a `RestoreFilterReport`.
+pub fn filter_restore_records_with_report<F: CpyRestoreFilter + ?Sized, V>(
+    records: impl IntoIterator<Item = (Vec<u8>, V, u64)>,
+    filter: &F,
+) -> (Vec<(Vec<u8>, V, u64)>, RestoreFilterReport) {
+    let mut kept_records = Vec::new();
+    let mut report = RestoreFilterReport::default();
+
+    for (key, val, tx) in records {
+        if filter.drop_record(&key, tx) {
+            report.dropped += 1;
+        } else {
+            report.kept += 1;
+            kept_records.push((key, val, tx));
+        }
+    }
+
+    (kept_records, report)
 }

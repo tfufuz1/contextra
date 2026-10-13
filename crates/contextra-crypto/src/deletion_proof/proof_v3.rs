@@ -97,7 +97,7 @@ impl DeletionProof {
         )
     }
 
-    /// Creates a DeletionProof with explicit DurabilityProof verification.
+    /// Creates a DeletionProof with explicit DurabilityProof verification (INV-DELETION-1/2).
     ///
     /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
     ///
@@ -190,6 +190,8 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-Chain-Eintrag.
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -226,6 +228,8 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
+    ///
+    /// Hinweis (`legacy_v4_tag`): Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(

@@ -1,0 +1,17 @@
+id        = "T-2026-LA04"
+title     = "MCP contextra_delete: Beweisvertrag statt proof: null (F4)"
+crate     = "contextra-mcp"
+tier      = 1
+risk      = "high"
+goal      = "contextra_delete liefert einen expliziten Beweisvertrag mit proof_status statt proof: null."
+non_goals = ["Keine Spezifikationsänderungen außerhalb von contextra-mcp", "Keine neuen Dependencies"]
+scope     = ["crates/contextra-mcp/src/tools_crud.rs", "crates/contextra-mcp/tests/delete_proof_contract.rs", ".jules/tasks/T-2026-LA04.toml"]
+forbidden = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "xtask/**", "capabilities.toml", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed", "INV-MCP-CLASSIFY-1"]
+acceptance = ["cargo test -p contextra-mcp --test delete_proof_contract"]
+evidence_required = ["Rot-Lauf vor dem Fix, grün danach"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

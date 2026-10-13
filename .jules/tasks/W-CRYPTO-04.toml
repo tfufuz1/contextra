@@ -1,0 +1,20 @@
+id        = "W-CRYPTO-04"
+title     = "Wire LocalKmsProvider into contextra facade composition root"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "sec"
+goal      = "Wire KmsProvider trait and LocalKmsProvider into contextra facade builder so KMS port is connected in production composition root."
+non_goals = ["Do not introduce external cloud KMS dependencies"]
+scope     = ["crates/contextra-crypto/src/kms.rs", "crates/contextra/src/builder.rs"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic", "Port-Wiring"]
+acceptance = [
+  "cargo xtask unwired-ports",
+  "cargo test -p contextra"
+]
+evidence_required = ["Verification that LocalKmsProvider is wired without unwired port warnings"]
+
+[budget]
+files      = 3
+lines      = 100
+iterations = 4
