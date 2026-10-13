@@ -47,6 +47,11 @@ impl KvTensorView {
         num_tokens: usize,
         num_channels: usize,
     ) -> Result<Self> {
+        if (num_tokens == 0 && num_channels != 0) || (num_tokens != 0 && num_channels == 0) {
+            return Err(ContextraError::InvalidInput(
+                "num_tokens and num_channels must either both be zero or both non-zero".to_string(),
+            ));
+        }
         let expected = num_tokens * num_channels;
         if keys.len() != expected {
             return Err(ContextraError::InvalidInput(format!(
@@ -65,6 +70,20 @@ impl KvTensorView {
                 num_channels,
                 expected
             )));
+        }
+        for &k in &keys {
+            if !k.is_finite() {
+                return Err(ContextraError::InvalidInput(
+                    "Keys tensor contains non-finite float value".to_string(),
+                ));
+            }
+        }
+        for &v in &values {
+            if !v.is_finite() {
+                return Err(ContextraError::InvalidInput(
+                    "Values tensor contains non-finite float value".to_string(),
+                ));
+            }
         }
         Ok(Self {
             keys,

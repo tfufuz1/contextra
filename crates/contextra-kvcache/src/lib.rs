@@ -14,6 +14,7 @@ pub mod radix;
 pub mod scratchpad_invalidation;
 pub mod segment;
 pub mod store;
+pub mod wiring;
 
 pub use attention_score::{
     rank_for_eviction, rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
@@ -31,10 +32,12 @@ pub use radix::{
 };
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 pub use scratchpad_invalidation::{
-    PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
+    CacheReport, CchRamClaim, PrefixStoreScratchpadInvalidator, ScratchpadCacheScope,
+    ScratchpadInvalidator,
 };
 pub use segment::{
     KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use store::{SpillHandler, TenantIsolatedKvStore};
+pub use wiring::{KvShreddingWiring, KvShreddingWiringDeps};

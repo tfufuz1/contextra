@@ -394,13 +394,15 @@ impl TenantIsolatedKvStore {
         (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
-    /// Inserts a segment with an explicit declarative cache directive.
+    /// Inserts a segment with an explicit declarative cache directive, enforcing segment validation.
     pub fn insert_segment_with_directive(
         &self,
         tenant: TenantId,
         segment: KvSegment,
         directive: CacheDirective,
     ) -> Result<(), ContextraError> {
+        segment.validate()?;
+
         if matches!(directive, CacheDirective::NeverCache) {
             return Ok(());
         }
@@ -429,6 +431,11 @@ impl TenantIsolatedKvStore {
     /// Fügt ein Segment für einen bestimmten Tenant ein.
     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
         let _ = self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto);
+    }
+
+    /// Versucht, ein Segment für einen bestimmten Tenant einzufügen und gibt eventuelle Validierungsfehler zurück.
+    pub fn try_insert_segment(&self, tenant: TenantId, segment: KvSegment) -> Result<(), ContextraError> {
+        self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto)
     }
 
     /// Releases transient cache segments created during a specific step.
