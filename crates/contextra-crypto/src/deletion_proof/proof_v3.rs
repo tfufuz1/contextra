@@ -12,6 +12,16 @@ use contextra_types::{error::HnswDeletionError, ContextraError, Result, TxId};
 
 impl DeletionProof {
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519 nach Layer-Bereinigung.
+    ///
+    /// # Invarianten (INV-DELETION-1 / INV-DELETION-2)
+    /// `DeletionProof::create()` und verbundene Methoden dürfen ERST NACH der vollständigen
+    /// physischen Bereinigung der jeweiligen Storage-Schichten aufgerufen werden. Die Schichten
+    /// werden durch verifizierte [`LayerCleanupProof`]-Instanzen belegt.
+    ///
+    /// # Domain Separation & Legacy-Hinweis (`legacy_v4_tag`)
+    /// V3-Payloads nutzen den dedizierten Domain-Tag `contextra/deletion-proof/v3\0`.
+    /// Beweise, die früher fälschlich mit dem V4-Tag (`contextra/deletion-proof/v4\0`)
+    /// signiert wurden, gelten per Sicherheitskontrakt F7 als nicht vertrauenswürdig und ungültig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -40,6 +50,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit optionaler WAL-Löschquittung.
+    ///
+    /// # Invarianten (INV-DELETION-1 / INV-DELETION-2)
+    /// Erfordert vollständige Bereinigung der zugrundeliegenden Schichten nachgewiesen durch `covered_layers`.
+    ///
+    /// # Legacy-Hinweis (`legacy_v4_tag`)
+    /// V3-Beweise nutzen `contextra/deletion-proof/v3\0`. Mit dem alten Tag signierte Beweise gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -84,6 +100,12 @@ impl DeletionProof {
     /// Creates a DeletionProof with explicit DurabilityProof verification.
     ///
     /// Returns `Err(CryptoError::NotDurable)` if `durability_proof` is `None` (e.g. MemoryOnly path).
+    ///
+    /// # Invarianten (INV-DELETION-1 / INV-DELETION-2)
+    /// Aufruf erst nach physischer Bereinigung und Verifikation über `covered_layers`.
+    ///
+    /// # Legacy-Hinweis (`legacy_v4_tag`)
+    /// Beweise mit veraltetem V4-Tag auf V3-Payloads gelten als ungültig und unvertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -128,6 +150,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
+    ///
+    /// # Invarianten (INV-DELETION-1 / INV-DELETION-2)
+    /// `covered_layers` muss nachgewiesene Schichten nach physischer Bereinigung enthalten.
+    ///
+    /// # Legacy-Hinweis (`legacy_v4_tag`)
+    /// Beweise, die mit dem alten Tag signiert wurden, gelten als nicht vertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -234,6 +262,12 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterungen.
+    ///
+    /// # Invarianten (INV-DELETION-1 / INV-DELETION-2)
+    /// `covered_layers` stellt verifizierte Layer-Claims nach physischer Bereinigung sicher.
+    ///
+    /// # Legacy-Hinweis (`legacy_v4_tag`)
+    /// V3-Payloads nutzen `contextra/deletion-proof/v3\0`. Altbestand mit `contextra/deletion-proof/v4\0` gilt als unvertrauenswürdig.
     #[cfg_attr(
         not(test),
         deprecated(
@@ -384,6 +418,9 @@ impl DeletionProof {
     }
 
     /// Helper to construct the signed payload for signature version 4 (Ed25519, 7-layer coverage).
+    ///
+    /// # Domain Separation
+    /// Prefixes payload strictly with `contextra/deletion-proof/v4\0`.
     pub(super) fn construct_v4_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
         let mut payload = Vec::with_capacity(128);
         payload.extend_from_slice(b"contextra/deletion-proof/v4\0");
@@ -397,18 +434,16 @@ impl DeletionProof {
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let graph_repair_bytes = bincode::serialize(&self.graph_repair)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if self.wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
-        } else {
-            &[]
+
+        let receipt_part = match &self.wal_chain_receipt {
+            Some(receipt) => receipt.as_slice(),
+            None => &[],
         };
 
         let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
-        let audit_pos_part = if let Some(ref pos_b) = audit_pos_bytes {
-            pos_b.as_slice()
-        } else {
-            &[]
+        let audit_pos_part = match &audit_pos_bytes {
+            Some(ref pos_b) => pos_b.as_slice(),
+            None => &[],
         };
 
         payload.extend_from_slice(&scope_bytes);
@@ -425,7 +460,16 @@ impl DeletionProof {
     }
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).
+    ///
+    /// # Domain Separation
+    /// Prefixes payload strictly with domain tag `contextra/deletion-proof/v3\0`.
+    ///
+    /// # Legacy Note (`legacy_v4_tag`)
+    /// Beweise, die früher mit dem v4-Tag signiert wurden, gelten per F7-Regel als nicht vertrauenswürdig.
     pub(super) fn construct_v3_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
+        let mut payload = Vec::with_capacity(128);
+        payload.extend_from_slice(b"contextra/deletion-proof/v3\0");
+
         let scope_bytes =
             bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
@@ -436,31 +480,18 @@ impl DeletionProof {
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let graph_repair_bytes = bincode::serialize(&self.graph_repair)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if self.wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
-        } else {
-            &[]
+
+        let receipt_part = match &self.wal_chain_receipt {
+            Some(receipt) => receipt.as_slice(),
+            None => &[],
         };
 
         let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
-        let audit_pos_part = if let Some(ref pos_b) = audit_pos_bytes {
-            pos_b.as_slice()
-        } else {
-            &[]
+        let audit_pos_part = match &audit_pos_bytes {
+            Some(ref pos_b) => pos_b.as_slice(),
+            None => &[],
         };
 
-        let mut payload = Vec::with_capacity(
-            scope_bytes.len()
-                + 32
-                + tx_bytes.len()
-                + timestamp_bytes.len()
-                + covered_layers_bytes.len()
-                + excluded_scopes_bytes.len()
-                + graph_repair_bytes.len()
-                + receipt_part.len()
-                + audit_pos_part.len(),
-        );
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
@@ -472,5 +503,72 @@ impl DeletionProof {
         payload.extend_from_slice(audit_pos_part);
 
         Ok(payload)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_types::{DocId, TenantId};
+
+    fn sample_proof_stub(version: u8) -> DeletionProof {
+        DeletionProof {
+            signature_version: version,
+            scope: DeletionScope::Document {
+                doc_id: DocId::from(1u64),
+                tenant_id: TenantId::try_new(100).unwrap(),
+            },
+            deleted_keys_hash: [1u8; 32],
+            deleted_after_tx: TxId(42),
+            timestamp: 1700000000,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
+            excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: Vec::new(),
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        }
+    }
+
+    #[test]
+    fn test_v3_payload_domain_tag_prefix() {
+        let proof = sample_proof_stub(SignatureVersion::V3.as_u8());
+        let payload = proof.construct_v3_payload().unwrap();
+        assert!(payload.starts_with(b"contextra/deletion-proof/v3\0"));
+    }
+
+    #[test]
+    fn test_v4_payload_domain_tag_prefix() {
+        let proof = sample_proof_stub(SignatureVersion::V4.as_u8());
+        let payload = proof.construct_v4_payload().unwrap();
+        assert!(payload.starts_with(b"contextra/deletion-proof/v4\0"));
+    }
+
+    #[test]
+    fn test_v3_and_v4_payload_prefixes_are_distinct() {
+        let proof_v3_stub = sample_proof_stub(SignatureVersion::V3.as_u8());
+        let proof_v4_stub = sample_proof_stub(SignatureVersion::V4.as_u8());
+
+        let payload_v3 = proof_v3_stub.construct_v3_payload().unwrap();
+        let payload_v4 = proof_v4_stub.construct_v4_payload().unwrap();
+
+        assert_ne!(payload_v3, payload_v4);
+        assert_eq!(&payload_v3[..28], b"contextra/deletion-proof/v3\0");
+        assert_eq!(&payload_v4[..28], b"contextra/deletion-proof/v4\0");
+    }
+
+    #[test]
+    fn test_payload_optional_fields_matching_without_defaults() {
+        let mut proof = sample_proof_stub(3);
+        let payload_none = proof.construct_v3_payload().unwrap();
+
+        proof.wal_chain_receipt = Some([9u8; 32]);
+        proof.audit_chain_position = Some(12345);
+        let payload_some = proof.construct_v3_payload().unwrap();
+
+        assert_ne!(payload_none, payload_some);
+        assert!(payload_some.len() > payload_none.len());
     }
 }
