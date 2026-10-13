@@ -134,6 +134,10 @@ pub struct KvPrefixHit {
 
 /// Trait defining the contract for KV prefix caching and block reuse (Spec §9.2).
 ///
+/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
+/// |---|---|---|---|
+/// | `KvPrefixStore` | `TenantPrefixKvStore` (`contextra-kvcache`) | `contextra-db` | Aktiver Port für KV-Cache-Prefix-Lokalisierung |
+///
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch synchrone Schnittstellen vtable-kompatibel (dyn-safe).
 pub trait KvPrefixStore: Send + Sync + 'static {

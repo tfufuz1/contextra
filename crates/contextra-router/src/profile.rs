@@ -14,7 +14,7 @@ use std::collections::HashSet;
 /// Quantization level of the underlying model execution path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[allow(non_camel_case_types)]
-pub enum QuantizationLevel {
+pub(crate) enum QuantizationLevel {
     F16,
     Q8_0,
     Q4_K_M,

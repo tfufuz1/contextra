@@ -6,6 +6,7 @@
 
 //! Client-side MCP dispatch mechanism for sending routed context to SLM endpoints.
 
+use crate::outcome::RoutingOutcome;
 use crate::router::RoutingDecision;
 use contextra_types::{ContextraError, Result};
 use contextra_wire::{JsonRpcRequest, JsonRpcResponse};
@@ -174,7 +175,21 @@ pub async fn route_and_dispatch_to_slm(
     query_text: &str,
 ) -> Result<String> {
     let decision = router.route(query_embedding, query_text).await?;
-    dispatch_to_slm(&decision).await
+    match dispatch_to_slm(&decision).await {
+        Ok(ans) => {
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+            Ok(ans)
+        }
+        Err(e) => {
+            router.record_outcome(
+                decision.decision_id,
+                RoutingOutcome::Rejected {
+                    reason: Some(e.to_string()),
+                },
+            );
+            Err(e)
+        }
+    }
 }
 
 #[cfg(test)]

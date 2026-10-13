@@ -38,6 +38,7 @@ mod meta;
 mod orphan;
 pub mod restore_filter;
 mod store;
+pub mod wiring;
 
 pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
 pub use guard::{CheckpointGuard, PinGuard};

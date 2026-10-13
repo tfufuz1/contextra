@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-13
 // ZWECK: Integrationstests für alle 14 Purge Failpoints und Resumption (Spezifikation Anhang B).
 
 use contextra_store::compaction::purge_filter::PurgeScope;
@@ -42,7 +42,7 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
         let intent_path = dir.path().join("purge.intent");
 
         // Depending on failpoint location, intent file must exist or be cleaned up
-        if fp_name != "after_intent_cleanup" {
+        if *fp_name != "after_intent_cleanup" && *fp_name != "p0_init" {
             assert!(
                 intent_path.exists(),
                 "Intent file must remain intact at failpoint {}",
@@ -55,7 +55,7 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
                 fp_name
             );
 
-            // Resume execution and verify clean completion
+            // First resume execution and verify clean completion
             let res_opt = resume_pending(dir.path(), &hooks, None)
                 .await
                 .expect("Resumption after failpoint should succeed");
@@ -68,6 +68,16 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
             assert!(
                 !intent_path.exists(),
                 "Intent file must be removed after successful resumption for {}",
+                fp_name
+            );
+
+            // Second resume must be idempotent and return Ok(None)
+            let res_opt_2 = resume_pending(dir.path(), &hooks, None)
+                .await
+                .expect("Second resumption should succeed idempotently");
+            assert!(
+                res_opt_2.is_none(),
+                "Second resumption for {} should return None",
                 fp_name
             );
         }

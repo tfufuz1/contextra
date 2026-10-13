@@ -465,10 +465,6 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                 return ERRNO_INVAL;
             }
 
-            if argc_end > mem_slice_mut.len() || buf_size_end > mem_slice_mut.len() {
-                return ERRNO_INVAL;
-            }
-
             if let Some(c_dest) = mem_slice_mut.get_mut(argc_offset..argc_end) {
                 c_dest.copy_from_slice(&0u32.to_le_bytes());
             } else {

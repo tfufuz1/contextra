@@ -37,6 +37,10 @@ impl PluginCapability {
 }
 
 /// Manifest trait implemented by dynamic or static plugins.
+///
+/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
+/// |---|---|---|---|
+/// | `PluginManifest` | `SimplePlugin` (`contextra-ports`) / `WasmPluginManifest` (`contextra-sandbox`) | `contextra-mcp` | Aktiver Port für Plugin-Erweiterbarkeit |
 pub trait PluginManifest: Send + Sync {
     /// Returns the name of the plugin.
     fn name(&self) -> &str;

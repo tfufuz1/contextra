@@ -739,7 +739,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
         let mut recovered = self
             .orphan_registry
@@ -788,7 +787,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Creates a physical hardlink clone of all SSTable files visible for `seq_no` into `target_dir`.
     ///
     /// Delegates to [`DefaultHardlinkCloner`] while holding a snapshot pin in `snapshot_registry`.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn create_hardlink_clone(
         &self,
         seq_no: u64,

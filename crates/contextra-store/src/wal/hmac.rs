@@ -268,16 +268,19 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
+            use contextra_ports::Rng;
             use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
             let mut key = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut key);
+            // CSPRNG EXCEPTION (P28): Secret key/salt generation requires cryptographically secure OS entropy via OsRng.
+            rand::rngs::OsRng.fill_bytes(&mut key);
 
+            let rng = contextra_ports::SystemRng::default();
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rng.next_u64()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -394,9 +397,10 @@ impl Wal {
             parent
         };
 
-        use rand::RngCore;
+        use contextra_ports::Rng;
         use tokio::io::AsyncWriteExt;
 
+        let rng = contextra_ports::SystemRng::default();
         let tmp_path = parent_dir.join(format!(
             "{}.tmp.{}.{}",
             marker_path
@@ -404,7 +408,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            rand::thread_rng().next_u64()
+            rng.next_u64()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -479,12 +483,13 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use rand::RngCore;
+            use contextra_ports::Rng;
             use tokio::io::AsyncWriteExt;
 
             let uuid = uuid::Uuid::new_v4();
             let bytes = *uuid.as_bytes();
 
+            let rng = contextra_ports::SystemRng::default();
             let uuid_filename = uuid_path
                 .file_name()
                 .map(|s| s.to_string_lossy())
@@ -493,7 +498,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rng.next_u64()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));

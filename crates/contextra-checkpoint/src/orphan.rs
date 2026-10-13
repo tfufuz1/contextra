@@ -473,6 +473,10 @@ pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> {
 }
 
 /// Retrieves orphaned checkpoints registered for a specific namespace.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use InstanceOrphanRegistry::get_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
+)]
 #[allow(deprecated)]
 pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> {
     get_orphaned_checkpoints()
@@ -498,14 +502,26 @@ pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
 pub fn clear_all_orphaned_checkpoints() {}
 
 /// Retained for backward compatibility. No background tasks are spawned during drop.
+#[deprecated(
+    since = "0.1.0",
+    note = "No-op. Global background rollbacks have been removed in favor of instance-bound recovery."
+)]
 pub async fn await_pending_rollbacks() {}
 
 /// Retained for backward compatibility. Always returns 0 as background task spawning is removed.
+#[deprecated(
+    since = "0.1.0",
+    note = "No-op. Global background rollbacks have been removed in favor of instance-bound recovery."
+)]
 pub fn pending_rollback_count() -> usize {
     0
 }
 
 /// Liefert die Anzahl der aktuell registrierten verwaisten ("orphaned") Checkpoints.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use InstanceOrphanRegistry::get_orphaned_checkpoints().len() instead. Global functions are not safe in multi-instance environments."
+)]
 #[allow(deprecated)]
 pub fn orphaned_checkpoint_count() -> usize {
     #[allow(deprecated)]

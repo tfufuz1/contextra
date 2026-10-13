@@ -1,21 +1,31 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-13
 // ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Löschungen.
-// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert.
+// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert, HealthState Tracking.
 
-use crate::{atomic_replace, durable_remove};
+use crate::{atomic_replace, durable_remove, AtomicHealthState, HealthEvent, HealthState};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Journal tracking files scheduled for deletion across process restarts or crashes.
 #[derive(Debug)]
 pub struct PendingDeleteJournal {
     journal_path: PathBuf,
     entries: Vec<PathBuf>,
+    health: Arc<AtomicHealthState>,
 }
 
 impl PendingDeleteJournal {
     /// Opens or creates a `PendingDeleteJournal` at `journal_path`.
     pub fn open(journal_path: impl Into<PathBuf>) -> std::io::Result<Self> {
+        Self::open_with_health(journal_path, Arc::new(AtomicHealthState::new()))
+    }
+
+    /// Opens or creates a `PendingDeleteJournal` with a custom [`AtomicHealthState`].
+    pub fn open_with_health(
+        journal_path: impl Into<PathBuf>,
+        health: Arc<AtomicHealthState>,
+    ) -> std::io::Result<Self> {
         let journal_path = journal_path.into();
         let mut entries = Vec::new();
 
@@ -32,7 +42,13 @@ impl PendingDeleteJournal {
         Ok(Self {
             journal_path,
             entries,
+            health,
         })
+    }
+
+    /// Returns the current health state of the journal's underlying storage.
+    pub fn health_state(&self) -> HealthState {
+        self.health.load()
     }
 
     /// Appends a new file path to the pending delete journal durably.
@@ -52,10 +68,17 @@ impl PendingDeleteJournal {
     where
         F: FnMut(&Path) -> std::io::Result<()>,
     {
+        self.process_inner(&mut remove_fn)
+    }
+
+    fn process_inner<F>(&mut self, remove_fn: &mut F) -> std::io::Result<usize>
+    where
+        F: FnMut(&Path) -> std::io::Result<()>,
+    {
         let mut processed_count = 0;
         let mut remaining = Vec::new();
 
-        for entry in &self.entries {
+        for (idx, entry) in self.entries.iter().enumerate() {
             match remove_fn(entry) {
                 Ok(()) => {
                     processed_count += 1;
@@ -65,10 +88,13 @@ impl PendingDeleteJournal {
                     processed_count += 1;
                 }
                 Err(err) => {
-                    remaining.push(entry.clone());
-                    // Keep error propagation behavior for unexpected failures
+                    // Keep entry that failed AND all subsequent unprocessed entries
+                    remaining.extend(self.entries[idx..].iter().cloned());
                     self.entries = remaining;
-                    let _ = self.flush();
+                    if let Err(flush_err) = self.flush() {
+                        self.health.record_event(HealthEvent::FsyncFailure);
+                        return Err(flush_err);
+                    }
                     return Err(err);
                 }
             }
@@ -79,7 +105,10 @@ impl PendingDeleteJournal {
 
         // If journal is empty, attempt to durably remove the journal file itself
         if self.entries.is_empty() && self.journal_path.exists() {
-            durable_remove(&self.journal_path)?;
+            if let Err(err) = durable_remove(&self.journal_path) {
+                self.health.record_event(HealthEvent::FsyncFailure);
+                return Err(err);
+            }
         }
 
         Ok(processed_count)
@@ -92,6 +121,27 @@ impl PendingDeleteJournal {
             buffer.push_str(&path.to_string_lossy());
             buffer.push('\n');
         }
-        atomic_replace(&self.journal_path, buffer.as_bytes())
+        match atomic_replace(&self.journal_path, buffer.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::StorageFull {
+                    self.health.record_event(HealthEvent::Enospc);
+                } else {
+                    self.health.record_event(HealthEvent::FsyncFailure);
+                }
+                Err(err)
+            }
+        }
+    }
+}
+
+impl Drop for PendingDeleteJournal {
+    fn drop(&mut self) {
+        // Drop must not panic. If journal flushing or cleanup on drop fails, record health event.
+        if !self.entries.is_empty() && self.journal_path.exists() {
+            if let Err(_err) = self.flush() {
+                self.health.record_event(HealthEvent::FsyncFailure);
+            }
+        }
     }
 }

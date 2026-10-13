@@ -168,6 +168,7 @@ impl<T: EmbeddingProvider> TextEmbeddingEngine for T {
 }
 
 /// Deterministic mock embedding provider for tests.
+#[cfg(any(test, feature = "test-utils"))]
 pub struct MockEmbedder {
     /// Target embedding dimensionality.
     pub dim: usize,
@@ -175,6 +176,7 @@ pub struct MockEmbedder {
     pub fixed_output: Option<Vec<f32>>,
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl MockEmbedder {
     /// Creates a new `MockEmbedder` with the specified dimension.
     pub fn new(dim: usize) -> Self {
@@ -199,6 +201,7 @@ impl MockEmbedder {
     }
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl EmbeddingProvider for MockEmbedder {
     fn provider_name(&self) -> &str {
         "mock"

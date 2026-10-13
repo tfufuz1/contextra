@@ -1070,6 +1070,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bytes",
+ "contextra-ports",
  "contextra-types",
  "futures-util",
  "proptest",
@@ -1169,6 +1170,7 @@ name = "contextra-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
