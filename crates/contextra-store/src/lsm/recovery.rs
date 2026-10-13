@@ -29,8 +29,8 @@ pub(crate) fn next_temp_file_counter() -> u64 {
 /// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
 pub(crate) fn generate_crypto_salt() -> [u8; 32] {
     let mut buf = [0u8; 32];
-    use rand::Rng;
-    rand::thread_rng().fill(&mut buf);
+    let rng = contextra_ports::SystemRng::new();
+    contextra_ports::Rng::fill_bytes(&rng, &mut buf);
     buf
 }
 

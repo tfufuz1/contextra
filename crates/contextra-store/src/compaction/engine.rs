@@ -93,7 +93,6 @@ impl CompactionEngine {
     }
 
     /// Attaches a custom adaptive compaction planner.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn with_adaptive_planner(mut self, planner: Arc<dyn AdaptiveCompactionPlanner>) -> Self {
         self.adaptive_planner = Some(planner);
         self
@@ -457,7 +456,7 @@ impl CompactionEngine {
         seq: u64,
         tx: u64,
         io_bytes_written: &mut u64,
-        io_last_reset: &mut std::time::Instant,
+        io_last_reset_nanos: &mut u64,
     ) -> Result<()> {
         let entry_bytes = (key.len() + value.len() + 16) as u64;
         builder.add(key, value, seq, tx).await?;
@@ -465,16 +464,22 @@ impl CompactionEngine {
         if let Some(max_bps) = self.config.max_io_bytes_per_second {
             if max_bps > 0 {
                 *io_bytes_written += entry_bytes;
-                let elapsed = io_last_reset.elapsed();
-                let target =
-                    std::time::Duration::from_secs_f64(*io_bytes_written as f64 / max_bps as f64);
-                if target > elapsed {
-                    let delay = (target - elapsed).min(std::time::Duration::from_millis(100));
-                    tokio::time::sleep(delay).await;
-                    let total_elapsed = io_last_reset.elapsed();
-                    let allowed_bytes = (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
+                let now_nanos = self.clock.monotonic_nanos();
+                let elapsed_nanos = now_nanos.saturating_sub(*io_last_reset_nanos);
+                let target_secs = *io_bytes_written as f64 / max_bps as f64;
+                let target_nanos = (target_secs * 1_000_000_000.0) as u64;
+
+                if target_nanos > elapsed_nanos {
+                    let diff_nanos = target_nanos - elapsed_nanos;
+                    let delay_nanos = diff_nanos.min(100_000_000); // capped at 100ms
+                    tokio::time::sleep(std::time::Duration::from_nanos(delay_nanos)).await;
+                    let now_after_nanos = self.clock.monotonic_nanos();
+                    let effective_now = now_after_nanos.max(*io_last_reset_nanos + delay_nanos);
+                    let total_elapsed_secs =
+                        (effective_now.saturating_sub(*io_last_reset_nanos)) as f64 / 1_000_000_000.0;
+                    let allowed_bytes = (total_elapsed_secs * max_bps as f64) as u64;
                     *io_bytes_written = io_bytes_written.saturating_sub(allowed_bytes);
-                    *io_last_reset = std::time::Instant::now();
+                    *io_last_reset_nanos = effective_now;
                 }
             }
         }
@@ -605,7 +610,7 @@ impl CompactionEngine {
 
         // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
         let mut io_token_bytes_written: u64 = 0;
-        let mut io_token_last_reset = std::time::Instant::now();
+        let mut io_token_last_reset_nanos = self.clock.monotonic_nanos();
 
         while let Some(current_item) = heap.pop() {
             if let Some(ct) = cancel_token {
@@ -631,9 +636,11 @@ impl CompactionEngine {
 
                 // FIND-STO-002: Budgeted Compaction
                 if !self.budget.has_memory_capacity() {
-                    let wait_start = std::time::Instant::now();
+                    let wait_start_nanos = self.clock.monotonic_nanos();
+                    let max_wait_nanos = u64::try_from(self.config.max_backpressure_wait.as_nanos())
+                        .unwrap_or(u64::MAX);
                     while !self.budget.has_memory_capacity() {
-                        if wait_start.elapsed() >= self.config.max_backpressure_wait {
+                        if self.clock.monotonic_nanos().saturating_sub(wait_start_nanos) >= max_wait_nanos {
                             let limit_bytes =
                                 self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
@@ -687,7 +694,7 @@ impl CompactionEngine {
                         current_item.seq,
                         current_item.tx,
                         &mut io_token_bytes_written,
-                        &mut io_token_last_reset,
+                        &mut io_token_last_reset_nanos,
                     )
                     .await?;
                 }
@@ -788,7 +795,7 @@ impl CompactionEngine {
                         acc_seq,
                         acc_tx,
                         &mut io_token_bytes_written,
-                        &mut io_token_last_reset,
+                        &mut io_token_last_reset_nanos,
                     )
                     .await?;
                 }
@@ -983,6 +990,54 @@ mod tests {
             active_sst_path
         );
         assert!(manifest_path.exists(), "Manifest file must exist");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_manual_clock_rate_limiting_deterministic() -> Result<()> {
+        let tmp = TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
+        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let manual_clock = Arc::new(contextra_ports::ManualClock::new(1_000_000));
+
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            max_io_bytes_per_second: Some(100), // Very small rate limit
+            ..Default::default()
+        };
+
+        let engine = CompactionEngine::new(
+            config,
+            registry as Arc<dyn SnapshotFloor>,
+            Arc::clone(&bc),
+            None,
+            Arc::new(contextra_core::ResourceTracker::new(
+                contextra_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        )
+        .with_clock(Arc::clone(&manual_clock) as Arc<dyn contextra_ports::Clock>);
+
+        // Create 2 input SSTables
+        let mut old_ssts = Vec::new();
+        for i in 0..2u8 {
+            let sst_path = tmp.path().join(format!("rate-sst-{i}.sst"));
+            let mut builder = crate::sstable::SstableBuilder::create(&sst_path).await?;
+            builder.add(format!("k-{i}").as_bytes(), b"value-bytes", i as u64 + 1, 1).await?;
+            builder.finish().await?;
+
+            let reader = Arc::new(
+                SstableReader::open_with_key_manager(&sst_path, Arc::clone(&bc), None).await?,
+            );
+            old_ssts.push(reader);
+        }
+
+        let output_path = tmp.path().join("rate-output.sst");
+        engine.merge_sstables(&old_ssts, &output_path, 0, false).await?;
+
+        assert!(output_path.exists());
         Ok(())
     }
 }
