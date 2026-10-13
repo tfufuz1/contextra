@@ -3,14 +3,15 @@
 // ZWECK: Resume-Schnittstelle zur Wiederaufnahme nicht abgeschlossener Purge-Operationen nach Absturz (Anhang B).
 // INVARIANTEN: Erkennt Korruption (Err), führt verbleibende Phasen idempotent aus, reinigt PendingDeleteJournal.
 
-use super::dispose::dispose_obsolete_files;
+use super::dispose::{dispose_obsolete_files_with_policy, DisposePolicy};
 use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::intent::OrxPurgeIntent;
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
 use crate::compaction::purge_filter::{PurgeReport, PurgeScope};
+use contextra_durable_fs::PendingDeleteJournal;
 use std::path::Path;
 
-/// Resumes any pending or interrupted purge operation present in `storage_dir`.
+/// Resumes any pending or interrupted purge operation present in `storage_dir` using default safe policy [`DisposePolicy::RequireScrub`].
 ///
 /// Evaluates saved `purge.intent` and `pending_delete.journal`.
 /// Returns `Ok(None)` if no pending operation or journal remains.
@@ -20,6 +21,16 @@ pub async fn resume_pending(
     storage_dir: &Path,
     hooks: &OrxHooks,
     failpoints: Option<&OrxFailpointSet>,
+) -> Result<Option<PurgeReport>, OrxPurgeError> {
+    resume_pending_with_policy(storage_dir, hooks, failpoints, DisposePolicy::RequireScrub).await
+}
+
+/// Resumes any pending or interrupted purge operation present in `storage_dir` using a specified [`DisposePolicy`].
+pub async fn resume_pending_with_policy(
+    storage_dir: &Path,
+    hooks: &OrxHooks,
+    failpoints: Option<&OrxFailpointSet>,
+    policy: DisposePolicy,
 ) -> Result<Option<PurgeReport>, OrxPurgeError> {
     let intent_file = storage_dir.join("purge.intent");
     let journal_file = storage_dir.join("pending_delete.journal");
@@ -38,8 +49,9 @@ pub async fn resume_pending(
             orchestrator = orchestrator.with_failpoints(fp.clone());
         }
 
+        let secure_delete = policy != DisposePolicy::Disabled;
         let report = orchestrator
-            .execute_from_intent(intent, scope, hooks, false, None)
+            .execute_from_intent(intent, scope, hooks, secure_delete, None)
             .await?;
 
         return Ok(Some(report));
@@ -47,7 +59,11 @@ pub async fn resume_pending(
 
     // If no intent remains but pending_delete.journal is present, clean up orphaned files
     if journal_file.exists() {
-        let _disp_rep = dispose_obsolete_files(storage_dir, Vec::new(), false).await?;
+        let journal = PendingDeleteJournal::open(&journal_file)?;
+        let obsolete_files = journal.pending().to_vec();
+
+        let _disp_rep =
+            dispose_obsolete_files_with_policy(storage_dir, obsolete_files, policy).await?;
         return Ok(Some(PurgeReport {
             records_purged: 0,
             bytes_reclaimed: 0,

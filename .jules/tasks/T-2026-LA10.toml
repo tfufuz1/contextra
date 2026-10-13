@@ -1,0 +1,44 @@
+id = "T-2026-LA10"
+title = "Dispose/Resume: kein stilles Löschen ohne Überschreiben (N3)"
+crate = "contextra-store"
+tier = 1
+risk = "sec"
+goal = "Introduce DisposePolicy with RequireScrub (default fail-closed) and AllowRemoveUnscrubbed, tracking residual_risk and removed_unscrubbed, and updating resume_pending to read obsolete files and apply configured policy."
+non_goals = [
+    "Modifying orchestrator or other crates",
+    "Adding Cargo dependencies",
+]
+scope = [
+    "crates/contextra-store/src/lsm/purge/dispose.rs",
+    "crates/contextra-store/src/lsm/purge/resume.rs",
+    "crates/contextra-store/tests/purge_dispose_scrub_policy.rs",
+    ".jules/tasks/T-2026-LA10.toml",
+]
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "xtask/**",
+    "capabilities.toml",
+    "rust-toolchain.toml",
+    "deny.toml",
+    ".jules/setup/**",
+]
+invariants = [
+    "Zero-Panic: no unwrap/expect/panic in production code",
+    "Fail-Closed: scrubbing refusal under RequireScrub yields error and retains file in journal",
+    "No public API breaks for existing callers",
+]
+acceptance = [
+    "cargo test -p contextra-store --test purge_dispose_scrub_policy",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint",
+]
+evidence_required = ["Integration test in purge_dispose_scrub_policy verifying RequireScrub failure and AllowRemoveUnscrubbed separate counter"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12
