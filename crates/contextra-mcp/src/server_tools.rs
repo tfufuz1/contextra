@@ -5,7 +5,7 @@ use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::chunker::{ChunkerConfig, MarkdownChunker};
 use contextra_ports::StorageEngine;
-use contextra_types::{DocId, TenantId, TenantScoped, MAX_SEARCH_K};
+use contextra_types::{DocId, TenantScoped, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
 /// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
@@ -445,8 +445,7 @@ impl McpServer {
                             McpError::invalid_params("deletion proof key not configured")
                         })?;
 
-                    let tenant_id = contextra_types::TenantId::try_new(1)
-                        .unwrap_or(contextra_types::TenantId::SYSTEM);
+                    let tenant_id = crate::validation::extract_tenant_from_args_or_env(Some(args));
 
                     let proof = self
                         .db
@@ -613,7 +612,7 @@ impl McpServer {
                     Some(10)
                 };
 
-                let tenant = TenantId::try_new(1)?;
+                let tenant = crate::validation::extract_tenant_from_args_or_env(Some(args));
                 let request = CloudQueryRequest {
                     query,
                     collection,

@@ -11,7 +11,6 @@ use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse, McpE
 use crate::server::McpServer;
 use channel_kind::ChannelKind;
 use confirm_handler::handle_confirm;
-use contextra_types::TenantId;
 use error_codes::{McpErrorCode, StructuredMcpError};
 use serde_json::{json, Value};
 use tool_hints::annotate_tool_schema;
@@ -175,7 +174,7 @@ impl McpServer {
                     token,
                     channel,
                     |_scope, collection| {
-                        let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
+                        let tenant_id = crate::validation::extract_tenant_from_args_or_env(None);
                         let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                             .key
                             .ok_or_else(|| {

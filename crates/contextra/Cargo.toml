@@ -36,6 +36,7 @@ tempfile = { workspace = true }
 
 [features]
 default = ["fast", "candle"]
+encryption-at-rest = ["contextra-db/encryption-at-rest"]
 fast = []
 docid-128 = ["contextra-types/docid-128"]
 sovereign = ["contextra-crypto", "contextra-privacy"]
