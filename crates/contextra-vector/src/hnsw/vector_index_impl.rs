@@ -433,6 +433,65 @@ impl VectorIndex for HnswIndex {
         drop(doc_map);
 
         for (old_idx, doc_id) in deletes_to_apply {
+            let mmap_node_count = self
+                .inner
+                .cold
+                .mmap_index
+                .read()
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+
+            let m = self.inner.cold.config.m;
+            let total_nodes = mmap_node_count + self.inner.hot.nodes.read().len();
+
+            let target_max_layer = if old_idx < mmap_node_count {
+                self.inner
+                    .cold
+                    .mmap_index
+                    .read()
+                    .as_ref()
+                    .and_then(|mmap| mmap.get_node_record(old_idx).ok())
+                    .map(|r| r.max_layer as usize)
+                    .unwrap_or(0)
+            } else {
+                let ram_idx = old_idx - mmap_node_count;
+                self.inner.hot.nodes.read().get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+            };
+
+            for layer in 0..=target_max_layer {
+                for neighbor_idx in 0..total_nodes {
+                    if neighbor_idx == old_idx {
+                        continue;
+                    }
+
+                    if let Ok(conns) = self.inner.get_node_connections(neighbor_idx, layer) {
+                        if conns.contains(&(old_idx as u32)) {
+                            let cleaned: Vec<u32> = conns
+                                .into_iter()
+                                .filter(|&c| c != old_idx as u32)
+                                .collect();
+
+                            if neighbor_idx >= mmap_node_count {
+                                let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                                self.inner.hot.arena.update_backlink(
+                                    neighbor_ram_idx,
+                                    layer,
+                                    m,
+                                    &cleaned,
+                                )?;
+                            } else {
+                                self.inner.cold.mmap_backlink_overlay.set_override(
+                                    neighbor_idx,
+                                    layer,
+                                    cleaned,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             self.inner.do_delete_node_idx(old_idx, doc_id)?;
         }
 
@@ -474,6 +533,7 @@ impl VectorIndex for HnswIndex {
             .hot
             .last_tx_id
             .fetch_max(tx.inner(), Ordering::SeqCst);
+        self.bump_index_epoch();
         Ok(())
     }
 

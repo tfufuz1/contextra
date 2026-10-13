@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use bytes::Bytes;
-use contextra_store::sstable::{BlockCache, CchRamClaim};
+use contextra_store::sstable::{BlockCache, CchCacheReport, CchRamClaim};
 
 #[test]
 fn test_block_cache_file_invalidation_and_count_scan() {
@@ -71,4 +71,22 @@ fn test_secure_buffers_ram_claim_enforcement() {
         CchRamClaim::Zeroized,
         "With secure_buffers enabled, ram_claim MUST return Zeroized"
     );
+
+    // Insert block with secure_buffers enabled
+    cache.insert(500, 0, Bytes::from_static(b"secure_block_500"));
+    assert_eq!(cache.entries_for_files(&[500]), 1);
+    let report_sec = cache.cache_report(&[500]);
+    assert_eq!(
+        report_sec,
+        CchCacheReport {
+            caches_checked: 64,
+            entries_found: 1,
+            ram_claim: CchRamClaim::Zeroized,
+        }
+    );
+
+    // Invalidate secure block
+    let invalidated_sec = cache.invalidate_files(&[500]);
+    assert_eq!(invalidated_sec, 1);
+    assert_eq!(cache.entries_for_files(&[500]), 0);
 }
