@@ -357,8 +357,9 @@ impl HnswIndexCore {
     /// (best-effort in process memory; no guarantees regarding hardware registers, OS swap, or underlying SSD storage)
     /// prior to returning `ram_idx` to the arena free-list.
     ///
-    /// Note: Memory-mapped bytes (`mmap_index`) remain read-only and unchanged; therefore, zeroing RAM vector slots
-    /// does NOT constitute a cryptographic deletion proof for `contextra_types::DeletionLayer::HnswIndex`.
+    /// Note: Memory-mapped bytes (`mmap_index`) remain read-only and unchanged. Tombstone-Pruning operates
+    /// as a standalone vector index management mechanism in accordance with VETO-F02 without requiring or
+    /// producing a cryptographic deletion proof.
     pub(super) fn do_delete_node_idx(&self, idx: usize, id: DocId) -> Result<()> {
         self.cold.deleted_nodes.write().insert(idx as u64);
         self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
@@ -388,6 +389,9 @@ impl HnswIndexCore {
                         }
                     }
                 }
+                self.hot
+                    .arena
+                    .clear_node_connections(ram_idx, self.cold.config.m);
                 self.hot.arena.free_node(ram_idx);
             }
         }

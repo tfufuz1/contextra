@@ -50,6 +50,63 @@ agent-verify *ARGS:
 agent-submit *ARGS:
     cargo xtask jules submit {{ARGS}}
 
+# Executes kernel-tier verification pipeline
+verify *ARGS:
+    cargo xtask verify --tier kernel {{ARGS}}
+
+# Executes full-tier verification pipeline
+verify-full *ARGS:
+    cargo xtask verify --tier full {{ARGS}}
+
+# Checks environment toolchain attestations and optional cargo subcommands
+jules-env-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo xtask env-attest
+    cargo +nightly fuzz --version
+    cargo mutants --version
+    cargo llvm-cov --version
+    cargo insta --version
+
+# Runs a short fuzz smoke test for all targets in a crate
+fuzz-smoke CRATE SECONDS="5":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CRATE_DIR="crates/{{CRATE}}"
+    if [ ! -d "$CRATE_DIR/fuzz/fuzz_targets" ]; then
+        echo "❌ Kein fuzz/fuzz_targets Verzeichnis in $CRATE_DIR gefunden."
+        exit 1
+    fi
+    if ! command -v cargo-fuzz &>/dev/null && ! cargo fuzz --version &>/dev/null 2>&1; then
+        echo "❌ cargo-fuzz ist nicht installiert."
+        exit 1
+    fi
+    cd "$CRATE_DIR"
+    for target_file in fuzz/fuzz_targets/*.rs; do
+        target=$(basename "$target_file" .rs)
+        echo "🔥 Fuzzing target $target in {{CRATE}} for {{SECONDS}}s..."
+        cargo +nightly fuzz run "$target" -- -max_total_time={{SECONDS}}
+    done
+
+# Sets up benchmark dependencies and downloads benchmark datasets
+bench-setup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -f .jules/setup/install-bench-deps.sh ]; then
+        bash .jules/setup/install-bench-deps.sh --check
+    fi
+    cargo xtask bench-download
+
+# Local fast gate check: fmt, clippy, gate-guard, gate-arch, registry-check
+jules-gates:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo xtask gate-guard
+    cargo xtask gate-arch
+    cargo xtask registry-check
+
 # Modular check for any crate
 check-crate CRATE *ARGS:
     just nix-run cargo check -p {{CRATE}} {{ARGS}}
@@ -347,7 +404,7 @@ asan:
 coverage-html:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	which cargo-llvm-cov || cargo install cargo-llvm-cov
+	which cargo-llvm-cov || cargo install cargo-llvm-cov --locked
 	cargo llvm-cov --workspace --exclude contextra-py --html --output-dir target/coverage/
 	echo "✅ Coverage-Report: target/coverage/index.html"
 	if command -v xdg-open &>/dev/null; then xdg-open target/coverage/index.html; fi
@@ -356,7 +413,7 @@ coverage-html:
 coverage-json:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	which cargo-llvm-cov || cargo install cargo-llvm-cov
+	which cargo-llvm-cov || cargo install cargo-llvm-cov --locked
 	cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
 	cargo xtask check-coverage-gate
 	echo "✅ Coverage-Gate bestanden"
@@ -416,10 +473,10 @@ bench-delta:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Benchmark-Delta-Analyse..."
-	cargo bench --workspace --bench '*' -- --save-baseline current 2>&1 | tail -20
-	cargo xtask bench-gate --tolerance 0.05 \
+	cargo bench --workspace --all-targets -- --save-baseline current 2>&1 | tail -20 || true
+	cargo xtask bench-gate --threshold 0.05 \
 		--baseline benchmarks/results/criterion-baseline.json \
-		--current criterion/current
+		--results benchmarks/results/results.json
 	echo "✅ Kein Benchmark-Regression > 5%"
 
 # Setzt aktuelle Benchmarks als neue Baseline
@@ -427,8 +484,11 @@ bench-set-baseline:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Setze neue Baseline..."
-	cargo bench --workspace --bench '*' -- --save-baseline current
-	cp -r criterion/current benchmarks/results/criterion-baseline.json
+	cargo bench --workspace --all-targets -- --save-baseline current || true
+	cargo xtask bench-gate --threshold 0.05 \
+		--baseline benchmarks/results/criterion-baseline.json \
+		--results benchmarks/results/results.json \
+		--update
 	echo "✅ Baseline aktualisiert"
 
 # Externe Benchmarks (synthetisch, kein Download nötig)

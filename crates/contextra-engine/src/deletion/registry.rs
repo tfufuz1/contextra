@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-12
 // ZWECK: KeyFamilyRegistry & Schlüssel-Präfix-Familien Management (WP-1.1, C1).
 // INVARIANTEN: INV-D1: Enumeration vollständig (Footprint(scope) aus Registry, kein Ad-hoc Scan).
 
@@ -36,7 +36,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__col:{collection_name}:\x00",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::Both,
-        scanner: "TODO",
+        scanner: "SstScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -44,7 +44,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__col_idx:\x00{collection_name}",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::PerCollection,
-        scanner: "TODO",
+        scanner: "SstScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -52,7 +52,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__txt:{collection_name}:",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::Both,
-        scanner: "TODO",
+        scanner: "TextScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -60,7 +60,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__rel:",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::PerDocument,
-        scanner: "TODO",
+        scanner: "RelationsScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -68,7 +68,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__docid:",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::PerDocument,
-        scanner: "TODO",
+        scanner: "SstScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -76,7 +76,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__graph:",
         owner_crate: "contextra-graph",
         erase_unit: EraseUnit::Both,
-        scanner: "TODO",
+        scanner: "GraphScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -84,7 +84,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__tx_intent:",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::PerTenant,
-        scanner: "TODO",
+        scanner: "WalScan",
         contains_identifier: false,
     },
     KeyFamilyEntry {
@@ -92,7 +92,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__kv_spill:",
         owner_crate: "contextra-kvcache",
         erase_unit: EraseUnit::PerTenant,
-        scanner: "TODO",
+        scanner: "CacheScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -100,7 +100,7 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__session_dag:",
         owner_crate: "contextra-graph",
         erase_unit: EraseUnit::PerTenant,
-        scanner: "TODO",
+        scanner: "GraphScan",
         contains_identifier: true,
     },
     KeyFamilyEntry {
@@ -108,7 +108,15 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         prefix_pattern: "__maintenance_intent:",
         owner_crate: "contextra-cognition",
         erase_unit: EraseUnit::PerTenant,
-        scanner: "TODO",
+        scanner: "none-ephemeral",
+        contains_identifier: false,
+    },
+    KeyFamilyEntry {
+        name: "SystemMeta",
+        prefix_pattern: "__meta:",
+        owner_crate: "contextra-engine",
+        erase_unit: EraseUnit::PerTenant,
+        scanner: "SstScan",
         contains_identifier: false,
     },
 ];
@@ -299,6 +307,7 @@ impl KeyFamilyRegistry {
             "MaintenanceIntent" | "__maintenance_intent:" => {
                 Some(b"__maintenance_intent:".to_vec())
             }
+            "SystemMeta" | "__meta:" => Some(b"__meta:".to_vec()),
             _ => None,
         }
     }

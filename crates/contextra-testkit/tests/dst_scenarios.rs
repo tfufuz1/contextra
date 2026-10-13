@@ -3,6 +3,8 @@
 // ZWECK: DST scenario integration tests covering bitidentical determinism, Torn Write, fsync error, and ENOSPC.
 // INVARIANTEN: Bit-identical sequence for identical seed; recovery must preserve invariants across all fault modes.
 
+#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_testkit::dst::{DstRunner, DstScenario};
 
 #[test]

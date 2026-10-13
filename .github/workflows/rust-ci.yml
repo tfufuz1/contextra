@@ -184,7 +184,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [compile-check]
-    continue-on-error: true  # Miri-Failures blockieren nicht den Merge, werden aber sichtbar
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
@@ -192,14 +191,27 @@ jobs:
           toolchain: nightly
           components: miri
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Run Miri on contextra-vector
+      - name: Run Miri on contextra-vector (Standard Stack Borrows)
         run: |
           # Nur Scalar-Pfad unter Miri (SIMD-Intrinsics werden von Miri nicht unterstützt)
           # Miri fängt OOB-Zugriffe im Scalar-Tail-Loop auf.
           MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test \
             -p contextra-vector \
             -- test_u8_distance_unequal_lengths_return_error \
-               test_scalar_u8_no_oob \
+               test_distances_match_scalar \
+               test_u8_metrics_exact_match \
+               test_public_compute_distance_api_sanity \
+               test_compute_distance_f32_bytes_equivalence \
+            2>&1
+      - name: Run Miri on contextra-vector (Tree Borrows)
+        run: |
+          MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tree-borrows" cargo +nightly miri test \
+            -p contextra-vector \
+            -- test_u8_distance_unequal_lengths_return_error \
+               test_distances_match_scalar \
+               test_u8_metrics_exact_match \
+               test_public_compute_distance_api_sanity \
+               test_compute_distance_f32_bytes_equivalence \
             2>&1
 
   cargo-hack-feature-check:
@@ -214,7 +226,9 @@ jobs:
         with:
           toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-hack
+        with:
+          tool: cargo-hack
       - name: Run cargo hack --each-feature --workspace --no-dev-deps
         run: cargo hack check --each-feature --workspace --no-dev-deps
 
@@ -435,7 +449,9 @@ jobs:
         with:
           toolchain: 1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-hack
+        with:
+          tool: cargo-hack
       - name: Workspace check with contextra-types/docid-128
         run: cargo hack check --workspace --ignore-unknown-features --features contextra-types/docid-128
       - name: Facade check with docid-128
@@ -467,3 +483,48 @@ jobs:
   # KONSOLIDIERUNGS-HINWEIS: Der redundante context-gates Job wurde hier entfernt.
   # Die Kanonische Quelle für Context Integrity Gates ist .github/workflows/context-gates.yml,
   # welcher als dedizierter Workflow parallel auf push/pull_request läuft.
+
+  fuzz-compile-check:
+    name: Fuzz Target Compile Check (${{ matrix.crate }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: [compile-check]
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - contextra-crypto
+          - contextra-db
+          - contextra-mcp
+          - contextra-store
+          - contextra-text
+          - contextra-vector
+          - contextra-wire
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@0e28dd9a7764e5f83064112bb1f24025a14c313c # nightly
+        with:
+          toolchain: nightly
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked --quiet || true
+      - name: Build Fuzz Targets for ${{ matrix.crate }}
+        run: |
+          cd crates/${{ matrix.crate }}
+          cargo +nightly fuzz build
+
+  bench-compile-check:
+    name: Benchmark Compile Check (contextra-bench)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: [compile-check]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@166de8caa14bb03d0e4ce3de7cc787f95ccf7188 # 1.89.0
+        with:
+          toolchain: 1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Compile benchmarks without running
+        run: cargo bench --no-run -p contextra-bench

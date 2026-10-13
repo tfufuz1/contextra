@@ -14,6 +14,10 @@ required = true
 cmd = ["cargo", "xtask", "context-pack"]
 required = true
 
+[[phase.start]]
+cmd = ["cargo", "xtask", "context-card"]
+required = true
+
 [[phase.check]]
 cmd = ["cargo", "fmt", "--check"]
 required = true
@@ -32,6 +36,11 @@ parallel_group = "static"
 [[phase.check]]
 cmd = ["cargo", "xtask", "symbol-exists"]
 required = true
+parallel_group = "static"
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "context-card", "--check"]
+required = false
 parallel_group = "static"
 
 [[phase.verify]]
@@ -65,3 +74,11 @@ required = false
 [[phase.stop]]
 cmd = ["cargo", "xtask", "loop-guard", "stop"]
 required = false
+
+[risk_gates]
+sec = ["mutants-diff", "fuzz-smoke"]
+crash = ["wal-replay-verify"]
+simd = ["unsafe-audit"]
+cargo = ["dependency-gate"]
+protected = ["protected-paths"]
+diff_budget = ["diff-budget"]

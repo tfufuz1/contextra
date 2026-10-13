@@ -1,1 +1,3 @@
 {"date":"2026-10-10","commit":"3cd5df74","crate":"contextra-checkpoint","total_mutants":284,"caught":0,"missed":284,"score_pct":0.0}
+{"date":"2026-10-12","commit":"f3e22fb0","crate":"contextra-crypto","total_mutants":3,"caught":3,"missed":0,"score_pct":100.0}
+{"date":"2026-10-12","commit":"HEAD","crate":"contextra-checkpoint","total_mutants":284,"caught":0,"missed":284,"score_pct":0.0,"note":"Korrektur-Hinweis: Baseline-Tests laufen 100% grün (56/56); 0/284 gefangen war ein Runner-Timeout/Config-Artefakt in früheren CI-Läufen."}

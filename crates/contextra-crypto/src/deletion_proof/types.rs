@@ -67,19 +67,19 @@ pub enum DeletionLayer {
     KvCacheSegments,
     /// In-memory vector embedding cache cleared.
     EmbeddingCache,
-    /// Text index structures purged.
+    /// Text / BM25 search index postings and dictionaries cleared.
     TextIndex,
-    /// Graph relation edges purged.
+    /// Relational table and foreign-key link structures cleared.
     Relations,
-    /// System manifest state purged.
+    /// Database manifest and level metadata records updated/purged.
     Manifest,
-    /// Checkpoint clones purged.
+    /// Checkpoint and snapshot clone references released and purged.
     CheckpointClones,
-    /// In-process transient caches purged.
+    /// Ephemeral process level caches and volatile buffers invalidated.
     ProcessCaches,
-    /// Keyring cryptographic material destroyed.
+    /// Keyring cryptographic key wrappers and key material revoked/zeroized.
     Keyring,
-    /// Erasure ledger entries purged.
+    /// Erasure coding parity blocks and ledger entries purged.
     ErasureLedger,
 }
 
@@ -90,6 +90,67 @@ pub enum ExcludedScope {
     ConsolidatedAndDistilled,
     /// LLM-Modellparameter (arXiv:2505.16831 — Unlearning Isn't Deletion).
     LlmParameterMemory,
+    /// Storage media physical remanence on magnetic or solid-state drives.
+    StorageMediaRemanence,
+    /// Unregistered or air-gapped cold backup archives.
+    UnregisteredBackups,
+    /// OS virtual memory page cache, swap files, or process crash dumps.
+    OsPageCacheSwapCoreDumps,
+    /// Temporary client session and active LLM model context buffers.
+    ClientAndModelContext,
+    /// Aggregated and anonymized statistical telemetry or metrics.
+    AggregateDerivedStatistics,
+    /// System log files and telemetry stored outside the database process.
+    LogsAndTelemetryOutsideProcess,
+    /// Data exported or transmitted to external third-party consumers.
+    ExportedData,
+    /// Explicitly registered copy identifiers that were not part of this deletion run.
+    RegisteredCopies {
+        /// Unique identifiers of excluded copies.
+        ids: Vec<String>,
+    },
+    /// Persisted HNSW graph snapshots stored on disk.
+    PersistedHnswSnapshots,
+}
+
+impl ExcludedScope {
+    /// Returns the canonical u16 numerical identifier for the excluded scope.
+    pub fn id(&self) -> u16 {
+        match self {
+            Self::ConsolidatedAndDistilled => 1,
+            Self::LlmParameterMemory => 2,
+            Self::StorageMediaRemanence => 3,
+            Self::UnregisteredBackups => 4,
+            Self::OsPageCacheSwapCoreDumps => 5,
+            Self::ClientAndModelContext => 6,
+            Self::AggregateDerivedStatistics => 7,
+            Self::LogsAndTelemetryOutsideProcess => 8,
+            Self::ExportedData => 9,
+            Self::RegisteredCopies { .. } => 10,
+            Self::PersistedHnswSnapshots => 11,
+        }
+    }
+
+    /// Constructs an `ExcludedScope` from its numerical identifier.
+    ///
+    /// Note: `RegisteredCopies` (ID 10) returns `None` because the inner `ids: Vec<String>`
+    /// payload cannot be derived solely from its numerical ID.
+    pub fn from_id(id: u16) -> Option<Self> {
+        match id {
+            1 => Some(Self::ConsolidatedAndDistilled),
+            2 => Some(Self::LlmParameterMemory),
+            3 => Some(Self::StorageMediaRemanence),
+            4 => Some(Self::UnregisteredBackups),
+            5 => Some(Self::OsPageCacheSwapCoreDumps),
+            6 => Some(Self::ClientAndModelContext),
+            7 => Some(Self::AggregateDerivedStatistics),
+            8 => Some(Self::LogsAndTelemetryOutsideProcess),
+            9 => Some(Self::ExportedData),
+            10 => None,
+            11 => Some(Self::PersistedHnswSnapshots),
+            _ => None,
+        }
+    }
 }
 
 /// Target scope for physical deletion.

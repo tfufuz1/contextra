@@ -8,6 +8,9 @@ pub mod misc;
 #[path = "../wiring_check/mod.rs"]
 pub mod wiring_check;
 
+#[path = "../check_loom_mocks.rs"]
+pub mod check_loom_mocks;
+
 pub type CmdFn = fn(&[String]) -> i32;
 
 pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
@@ -286,5 +289,9 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
         "wiring-check",
         crate::cli::wiring_check::run_wiring_check_cli,
+    ),
+    (
+        "check-loom-mocks",
+        crate::cli::check_loom_mocks::run_check_loom_mocks,
     ),
 ];

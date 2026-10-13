@@ -21,6 +21,9 @@
 //! - `INV-ENOSPC-1`: Disk-full (`ENOSPC`) and storage I/O errors across write, fsync, rename,
 //!   and directory sync are fail-closed and deterministically propagated as [`std::io::Error`] without panics.
 
+/// Fail-closed health state tracking for storage operations (§18.4).
+pub mod health;
+
 /// Fault injection hooks for durable filesystem operations.
 pub mod fault_injector;
 
@@ -30,13 +33,19 @@ pub mod journal;
 /// Scrubbing utilities and safety check policies.
 pub mod scrub;
 
+/// Virtual File System (VFS) abstraction interface.
+pub mod vfs;
+
+pub use contextra_sys::FlushKind;
 pub use fault_injector::{FaultInjector, NoFault};
+pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
 pub use scrub::{
     scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
+pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
 
-use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FlushKind, FsClass};
+use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FsClass};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};

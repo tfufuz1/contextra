@@ -1,8 +1,18 @@
 # Contextra — Jules Session Bootstrap
-> Maschinenausführbare Checkliste. Jede Session MUSS mit dieser
-> Sequenz beginnen, bevor Code geschrieben oder Dateien geändert werden.
+> Maschinenausführbare Checkliste für den Sitzungsablauf.
+> Für den Spickzettel der Befehle siehe [HARNESS_QUICKSTART.md](HARNESS_QUICKSTART.md). Für den Sitzungsvertrag siehe [PREAMBLE.md](PREAMBLE.md).
 
 - **VETOES.md** (Root): Permanent abgelehnte oder eingeschränkt akzeptierte Features. Vor Arbeitsbeginn prüfen.
+
+---
+
+## 🎯 Kontext-Ladeordnung
+
+Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
+
+Das Kontextpaket (`.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
+
+---
 
 ## Phasentabelle (Jules Fassade)
 
@@ -10,43 +20,50 @@ Die Phasen-Runner-Konfiguration (`.jules/harness-phases.toml`) ist die kanonisch
 
 | Phase | Agent-Gate | Befehl | Zweck |
 |---|---|---|---|
-| `start` | `guard` / `integrity` | `cargo xtask jules start --card <karte>` | Initialisiert Session, lintet Karte, setzt Claim, erzeugt Kontext |
+| `start` | `guard` / `integrity` | `cargo xtask jules start --card <karte>` | Initialisiert Session, lintet Karte, setzt Claim, erzeugt Kontext (führt intern `session-init` und `context-pack` aus) |
 | `check` | `guard` / `symbols` | `cargo xtask jules check` | Prüft Syntax, Lints, Scope, geschützte Pfade & Symbol-Existenz |
 | `verify` | `arch` | `cargo xtask jules verify` | Führt Akzeptanz-Tests, DAG-Checks & Architektur-Gates aus |
 | `submit` | `integrity` / `report` | `cargo xtask jules submit` | Verifiziert PR-Integrität, Diff-Budget & Session-Report |
 | `stop` | `guard` | `cargo xtask jules stop --reason <grund>` | Stoppt die Session und den Loop Guard bei Eskalation |
 
-```bash
-cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env <!-- doc-ref-ignore -->
-source .jules/session.env <!-- doc-ref-ignore -->
-cargo xtask context-pack --crate <CRATE_NAME> <!-- doc-ref-ignore -->
+*Hinweis*: `session-init` und `context-pack` sind interne Teilschritte von `cargo xtask jules start`. Das erzeugte Paket ist `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->. Für Details siehe [HARNESS_QUICKSTART.md](HARNESS_QUICKSTART.md).
+
+---
+
+## 🛠️ Wann welches Werkzeug (Pflicht-Gates nach Risk-Klasse)
+
+| Risiko-Klasse (`risk`) / Pfad | Pflichtgate & Regel-Referenz | Befehl / Rezept |
+|---|---|---|
+| `sec` (Sicherheit / Crypto / Privacy) | `mutants-diff`, `fuzz-smoke` (`rules/fuzzing.md`, `rules/mutation-testing.md`) <!-- doc-ref-ignore --> | `cargo xtask mutants-diff`, `just fuzz-smoke CRATE` |
+| `crash` (WAL / Store / Checkpoint / Durabilität) | `wal-replay-verify` (`rules/wal_crypto.md`) <!-- doc-ref-ignore --> | `cargo test -p contextra-store --test wal_*` |
+| `simd` (SIMD / Vektorisierung) | SIMD-Sicherheitsanalyse (`rules/simd_safety.md`) <!-- doc-ref-ignore --> | `cargo test -p contextra-simd` |
+| Berührt Unsafe-Pfade (`touched_unsafe`) | `unsafe-audit` (`rules/simd_safety.md`) <!-- doc-ref-ignore --> | `cargo xtask check-unsafe-islands` |
+| Berührt Cargo-Dateien (`touched_cargo`) | `dependency-gate` (`rules/dependencies.md`) <!-- doc-ref-ignore --> | `cargo xtask dependency-graph-audit` |
+| Berührt Geschützte Pfade (`touched_protected` / Loom / Bench) | `protected-paths`, Loom/Miri (`rules/loom-miri.md`), Bench (`rules/benchmarking.md`) <!-- doc-ref-ignore --> | `just loom-store`, `just bench-setup` |
+| `none` / `utf8` / `fusion` / `concurrency` / `calib` | Standard-Verifikation (`rules/testing.md`, `rules/test_quality.md`) <!-- doc-ref-ignore --> | `cargo xtask jules verify` |
+
+---
+
+## 🏷️ Kommentarsystem & Tag-Grammatik (rules/tag_taxonomy.md)
+
+Jeder im Code platzierte Tag muss der Grammatik entsprechen:
+```rust
+// AI-TAG[KATEGORIE][SEVERITY] Kurzbeschreibung (ID: AGT-<CRATE>-<8-hex>) (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
+// BEFUND: Detaillierte Analyse.
+// RISIKO: Auswirkung.
+// EMPFEHLUNG: Konkrete Handlung.
+
+// ANCHOR[TYP:ID] STATUS:OPEN (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
 ```
 
-Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->.
+---
 
-## Werkzeug-Prüfung für Einzel-Crate
+## 🔍 Review Pass Regel
+Bei Peer-Reviews oder Selbstkontrolle muss der Kommentar die explizite Markierung `PRÜFER-KONTEXT: FRESH` tragen.
 
-Für Einzel-Crate-Aufgaben benutze gezielte Checks statt Workspace-weiter Builds:
+---
 
-```bash
-cargo check -p <CRATE_NAME>
-```
-
-## Aufgabenspezifischer Kontext
-
-| Aufgabe-Typ | Zu lesende Dateien |
-|-------------|-------------------|
-| Code in `contextra-store/*` <!-- doc-ref-ignore --> | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
-| Code in `contextra-vector/*` <!-- doc-ref-ignore --> | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
-| Code in `contextra-engine/*` <!-- doc-ref-ignore --> | `crates/contextra-engine/AGENTS.md` |
-| Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
-| Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |
-| ADR schreiben | `docs/decisions/` (letzte 5 ADRs lesen), `CONSTITUTION.md §Governance` |
-| Tests schreiben | `rules/testing.md`, `rules/test_quality.md` |
-| unsafe Code | `rules/simd_safety.md` — NUR in approved files (AGENTS.md §4) |
-| Crypto/WAL | `rules/wal_crypto.md` → WAL-First-Regel verifizieren |
-
-## Notfall-Eskalation (Prompt-Thrashing)
+## 🔄 Notfall-Eskalation (Prompt-Thrashing)
 
 Wenn derselbe Compiler- oder Gate-Fehler nach 2 Iterationen nicht behoben ist:
 1. **STOPP** — keinen weiteren Code schreiben.

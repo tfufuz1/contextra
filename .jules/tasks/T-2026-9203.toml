@@ -1,0 +1,22 @@
+# Task-Karte
+id        = "T-2026-9203"
+title     = "v4 Policy/Store/Signer Härtung"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "sec"
+goal      = "v4-Nachweis, Policy-Verifier und Ablage halten Crash- und Manipulationstests stand (Welle B Härtung)"
+non_goals = ["Kein Refactoring fremder Crate-Module", "Keine Änderung öffentlicher pub-Signaturen"]
+scope     = ["crates/contextra-crypto/src/deletion_proof/**", "crates/contextra-crypto/tests/**", "docs/deletion/**"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root", "Fail-Closed"]
+acceptance = [
+  "cargo test -p contextra-crypto",
+  "cargo clippy -p contextra-crypto --all-targets -- -D warnings",
+  "cargo xtask jules check"
+]
+evidence_required = ["Tests in proof_v4_policy_rules.rs und proof_store_crash.rs"]
+
+[budget]
+files = 14
+lines = 1000
+iterations = 12

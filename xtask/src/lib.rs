@@ -6,35 +6,14 @@
     clippy::needless_range_loop,
     clippy::collapsible_if,
     clippy::duplicate_mod,
-    // TODO: entfernen - Ausnahmen für Dateien außerhalb des Task-Scopes in xtask
-    clippy::unwrap_used,
-    // TODO: entfernen
-    clippy::expect_used,
-    // TODO: entfernen
-    clippy::panic,
-    // TODO: entfernen
+    // Ausnahmen für Dateien außerhalb des Task-Scopes in xtask
     clippy::cast_possible_truncation,
-    // TODO: entfernen
-    clippy::cast_sign_loss,
-    // TODO: entfernen
-    clippy::todo,
-    // TODO: entfernen
     clippy::manual_strip,
-    // TODO: entfernen
-    clippy::should_implement_trait,
-    // TODO: entfernen
     clippy::unnecessary_map_or,
-    // TODO: entfernen
     clippy::match_like_matches_macro,
-    // TODO: entfernen
-    clippy::collapsible_match,
-    // TODO: entfernen
     clippy::regex_creation_in_loops,
-    // TODO: entfernen
     clippy::needless_borrows_for_generic_args,
-    // TODO: entfernen
     clippy::useless_vec,
-    // TODO: entfernen
     clippy::useless_format
 )]
 
@@ -74,6 +53,7 @@ pub mod check_duplicate_symbols_cross_file;
 pub mod check_ffi_panic_boundary;
 pub mod check_flatbuffers_drift;
 pub mod check_jules_context_freshness;
+pub mod check_loom_mocks;
 pub mod check_manifest_completeness;
 pub mod check_max_results_unbound;
 pub mod check_module_reachability;
@@ -130,6 +110,7 @@ pub mod session_init;
 pub mod shell_commit_audit;
 pub mod tag_health;
 pub mod validate_pr_checklist;
+pub mod verify;
 pub mod veto_deadline_gate;
 pub mod workspace_index;
 pub mod workspace_verify;

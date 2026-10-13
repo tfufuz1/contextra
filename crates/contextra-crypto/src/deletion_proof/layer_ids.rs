@@ -1,9 +1,9 @@
-//! Layer ID mappings and utilities according to Contract V1.
+//! Layer ID mappings and utilities according to Contract V1 and V4 extension.
 
 use super::types::DeletionLayer;
 
 impl DeletionLayer {
-    /// Returns the canonical u16 ID for the deletion layer per Contract V1.
+    /// Returns the canonical u16 ID for the deletion layer per Contract V1 / V4.
     pub fn layer_id(&self) -> u16 {
         match self {
             Self::LsmMemtable => 1,

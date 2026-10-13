@@ -44,6 +44,12 @@ members = [
 # - contextra-py: PyO3/NumPy FFI bindings
 # - contextra-infer-ollama: External process provider dependency
 # - contextra-infer-onnx: Native ONNX runtime C-library dependency
+# - contextra-agent: Persistent agent workflow engine (experimental)
+# - contextra-router: Multi-candidate search routing engine (experimental)
+# - contextra-adapt: Model adaptation and PID latency controller (experimental)
+# - contextra-cognition: Background sleep cycle consolidation (experimental)
+# - contextra-kvcache: Tiered KV-cache storage (experimental)
+# - contextra-infer-candle: Native Candle LLM provider (experimental)
 # These crates remain in `members` and can be built explicitly via `cargo build -p <crate>`.
 default-members = [
     "crates/contextra-wire",
@@ -60,18 +66,12 @@ default-members = [
     "crates/contextra-privacy",
     "crates/contextra-graph",
     "crates/contextra-mcp",
-    "crates/contextra-agent",
-    "crates/contextra-router",
-    "crates/contextra-infer-candle",
     "crates/contextra-testkit",
     "crates/contextra",
     "crates/contextra-types",
     "crates/contextra-ports",
     "crates/contextra-mvcc",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
     "crates/contextra-engine",
-    "crates/contextra-cognition",
     "crates/contextra-rank",
 ]
 

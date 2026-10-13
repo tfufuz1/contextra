@@ -1,21 +1,20 @@
 # Contextra — Jules Agent Context
-> Version: 3.0 | Stand: 2026-10-11 | Permanent Ambient Context für Jules Sessions (Systemspezifikation v15)
+> Version: 3.0 | Stand: 2026-10-12 | Permanent Ambient Context für Jules Sessions (Systemspezifikation v15)
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
 > Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
 > sind gemäß MECE-Prinzip (CONSTITUTION.md §Documentation Model) in folgenden Quellen verankert:
 > - **Code-Zustand & Non-Obvious Decisions**: siehe `AGENTS.md`
 > - **Dynamischer Projektstatus & Tag-Inventar**: siehe `WORKING_STATE.md`
-> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
+> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095) <!-- doc-ref-ignore -->
 
 ---
 
 ## 🎯 Kontext-Ladeordnung
 
-1. **Sitzungsvertrag & Bootstrap**: `.jules/PREAMBLE.md`, `.jules/SESSION_BOOTSTRAP.md`
-2. **Aktueller Code-Zustand & Invarianten**: `AGENTS.md` (Verifizierter Code-Befund, Non-Obvious Decisions)
-3. **Crate-spezifische Anweisungen**: Crate-spezifische `AGENTS.md` laden
-4. **Dynamischer Status & ADRs**: `WORKING_STATE.md`, `docs/decisions/README.md`
+Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
+
+Das Kontextpaket (`.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
 
 ---
 
@@ -36,6 +35,7 @@
 | `contextra-core` | `crates/contextra-core/AGENTS.md` |
 | `contextra-crypto` | `crates/contextra-crypto/AGENTS.md` |
 | `contextra-db` | `crates/contextra-db/AGENTS.md` |
+| `contextra-durable-fs` | `crates/contextra-durable-fs/AGENTS.md` |
 | `contextra-engine` | `crates/contextra-engine/AGENTS.md` |
 | `contextra-graph` | `crates/contextra-graph/AGENTS.md` |
 | `contextra-infer-candle` | `crates/contextra-infer-candle/AGENTS.md` |
@@ -59,3 +59,28 @@
 | `contextra-types` | `crates/contextra-types/AGENTS.md` |
 | `contextra-vector` | `crates/contextra-vector/AGENTS.md` |
 | `contextra-wire` | `crates/contextra-wire/AGENTS.md` |
+
+---
+
+## 🏷️ Kommentarsystem & Tag-Grammatik (rules/tag_taxonomy.md) <!-- doc-ref-ignore -->
+
+Jeder im Code platzierte Tag muss der Grammatik entsprechen:
+```rust
+// AI-TAG[KATEGORIE][SEVERITY] Kurzbeschreibung (ID: AGT-<CRATE>-<8-hex>) (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
+// BEFUND: Detaillierte Analyse.
+// RISIKO: Auswirkung.
+// EMPFEHLUNG: Konkrete Handlung.
+
+// ANCHOR[TYP:ID] STATUS:OPEN (TS: <ISO-8601-UTC>) (SESSION: <HASH>)
+```
+
+---
+
+## 🔍 Review Pass Regel
+Bei Peer-Reviews oder Selbstkontrolle muss der Kommentar die explizite Markierung `PRÜFER-KONTEXT: FRESH` tragen.
+
+---
+
+## 🔄 Kontext-Frische-Selbstprüfung
+
+Nach jeder Code-Änderung in `crates/` oder an zentralen Regeldokumenten muss das Datum/Header in `.jules/JULES_CONTEXT.md` und `AGENTS.md` aktualisiert werden. Der Frische-Check wird automatisch via `cargo run -p xtask -- check-jules-context-freshness` verifiziert.

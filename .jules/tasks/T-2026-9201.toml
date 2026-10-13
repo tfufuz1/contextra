@@ -1,0 +1,27 @@
+# Task-Karte Template
+id        = "T-2026-9201"
+title     = "Canary-Orakel Rohsweep"
+crate     = "contextra-testkit"
+tier      = 1            # 1, 2, 3
+risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
+goal      = "Unabhängiges Canary-Orakel und Rohsweep für die Löschgarantie bereitstellen"
+non_goals = ["Kein Refactoring fremder Module", "Keine Cargo.toml-Änderungen"]
+scope     = [
+  "crates/contextra-testkit/src/deletion_oracle/**",
+  "crates/contextra-testkit/src/lib.rs",
+  "crates/contextra-testkit/tests/deletion_oracle_selftest.rs",
+  ".jules/tasks/T-2026-9201.toml"
+]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Single Error Root"]
+acceptance = [
+  "cargo test -p contextra-testkit",
+  "cargo clippy -p contextra-testkit --all-targets -- -D warnings",
+  "cargo xtask determinism-check"
+]
+evidence_required = ["Selbsttest deletion_oracle_selftest.rs belegt Funktionalität"]
+
+[budget]
+files = 8
+lines = 700
+iterations = 8

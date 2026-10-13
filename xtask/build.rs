@@ -2,6 +2,12 @@
 //!
 //! Scans `src/harness/*.rs` (excluding `mod.rs`), validates stems, summaries, and entry points,
 //! and generates dispatch logic into `OUT_DIR/harness_generated.rs`.
+//!
+//! Helper modules (Hilfsmodule):
+//! Modules in `src/harness/*.rs` are registered as harness subcommands by default.
+//! If a module is a helper module (indicated by inclusion in `HELPER_STEMS` or having a `//! @helper`
+//! marker in its header comment), it is compiled as `pub mod <stem>` so its functions remain accessible
+//! to other xtask modules, but it is NOT registered as a CLI subcommand in `dispatch` or `registered_commands()`.
 
 #![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
 
@@ -9,11 +15,23 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Module stems that are treated as helper modules rather than CLI subcommands.
+const HELPER_STEMS: &[&str] = &["scan_common"];
+
 /// Subcommands explicitly allowed to exist both as a harness module and in `cli/mod.rs`.
 const ALLOWED_COLLISIONS: &[&str] = &[
     // gc-floor-single-source is registered both in harness/ and cli/mod.rs as an alias.
     "gc-floor-single-source",
+    "verify",
+    "check-loom-mocks",
 ];
+
+#[derive(Debug, Clone)]
+struct HarnessModule {
+    stem: String,
+    summary: String,
+    is_helper: bool,
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=src/harness");
@@ -58,15 +76,22 @@ fn main() {
                 let content = fs::read_to_string(&path)
                     .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
 
-                let summary = extract_summary(&content, &path);
-                validate_run_fn(&content, &stem, &path);
+                let is_helper = check_is_helper(&stem, &content);
+                let summary = extract_summary(&content, &path, is_helper);
+                if !is_helper {
+                    validate_run_fn(&content, &stem, &path);
+                }
 
-                modules.push((stem, summary));
+                modules.push(HarnessModule {
+                    stem,
+                    summary,
+                    is_helper,
+                });
             }
         }
     }
 
-    modules.sort_by(|a, b| a.0.cmp(&b.0));
+    modules.sort_by(|a, b| a.stem.cmp(&b.stem));
 
     // Check for collisions with cli/mod.rs subcommands
     let cli_mod_path = Path::new(&manifest_dir)
@@ -84,8 +109,11 @@ fn main() {
             );
         }
 
-        for (stem, _) in &modules {
-            let cmd_name = stem.replace('_', "-");
+        for m in &modules {
+            if m.is_helper {
+                continue;
+            }
+            let cmd_name = m.stem.replace('_', "-");
             if cli_cmds.contains(&cmd_name) && !ALLOWED_COLLISIONS.contains(&cmd_name.as_str()) {
                 panic!(
                     "BUILD ERROR: Harness command '{}' collides with existing subcommand in cli/mod.rs",
@@ -122,17 +150,39 @@ fn validate_stem(stem: &str, path: &Path) {
     }
 }
 
-fn extract_summary(content: &str, path: &Path) -> String {
+fn check_is_helper(stem: &str, content: &str) -> bool {
+    if HELPER_STEMS.contains(&stem) {
+        return true;
+    }
+    let first_line = content.lines().next().unwrap_or("");
+    first_line.contains("@helper")
+}
+
+fn extract_summary(content: &str, path: &Path, is_helper: bool) -> String {
     let first_line = content.lines().next().unwrap_or("");
     if let Some(summary) = first_line.strip_prefix("//!") {
         let trimmed = summary.trim();
-        if trimmed.is_empty() {
-            panic!(
-                "BUILD ERROR: Harness module {} first line `//!` summary cannot be empty",
-                path.display()
-            );
+        if let Some(rest) = trimmed.strip_prefix("@helper") {
+            let helper_summary = rest.trim();
+            if helper_summary.is_empty() {
+                "Hilfsmodul".to_string()
+            } else {
+                helper_summary.to_string()
+            }
+        } else if trimmed.is_empty() {
+            if is_helper {
+                "Hilfsmodul".to_string()
+            } else {
+                panic!(
+                    "BUILD ERROR: Harness module {} first line `//!` summary cannot be empty",
+                    path.display()
+                );
+            }
+        } else {
+            trimmed.to_string()
         }
-        trimmed.to_string()
+    } else if is_helper {
+        "Hilfsmodul".to_string()
     } else {
         panic!(
             "BUILD ERROR: Harness module {} must start with `//! <summary>` line",
@@ -230,29 +280,32 @@ pub fn extract_cli_subcommands(cli_mod_content: &str) -> HashSet<String> {
     cmds
 }
 
-fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> String {
+fn generate_harness_code(manifest_dir: &str, modules: &[HarnessModule]) -> String {
     let mut code = String::new();
     code.push_str("// Auto-generated harness dispatch code. DO NOT EDIT.\n\n");
 
-    for (stem, _) in modules {
+    for m in modules {
         let harness_path = Path::new(manifest_dir)
             .join("src")
             .join("harness")
-            .join(format!("{}.rs", stem));
+            .join(format!("{}.rs", m.stem));
         let path_str = harness_path.to_str().unwrap().replace('\\', "/");
         code.push_str(&format!(
             "#[path = \"{}\"]\npub mod {};\n\n",
-            path_str, stem
+            path_str, m.stem
         ));
     }
 
     code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");
     code.push_str("    match cmd {\n");
-    for (stem, _) in modules {
-        let cmd_name = stem.replace('_', "-");
+    for m in modules {
+        if m.is_helper {
+            continue;
+        }
+        let cmd_name = m.stem.replace('_', "-");
         code.push_str(&format!(
             "        \"{}\" => Some({}::run_{}(_args)),\n",
-            cmd_name, stem, stem
+            cmd_name, m.stem, m.stem
         ));
     }
     code.push_str("        _ => None,\n");
@@ -261,9 +314,12 @@ fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> St
 
     code.push_str("pub fn registered_commands() -> &'static [(&'static str, &'static str)] {\n");
     code.push_str("    &[\n");
-    for (stem, summary) in modules {
-        let cmd_name = stem.replace('_', "-");
-        let escaped_summary = summary.replace('\\', "\\\\").replace('"', "\\\"");
+    for m in modules {
+        if m.is_helper {
+            continue;
+        }
+        let cmd_name = m.stem.replace('_', "-");
+        let escaped_summary = m.summary.replace('\\', "\\\\").replace('"', "\\\"");
         code.push_str(&format!(
             "        (\"{}\", \"{}\"),\n",
             cmd_name, escaped_summary

@@ -32,15 +32,24 @@ pub struct CollectionProfile {
     pub auto_extraction: AutoExtractionMode,
 }
 
+/// Errors arising during validation of a [`CollectionProfile`].
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
     Performance(#[from] PerformanceProfileError),
+    /// Indicates that a KV-side cryptographic deletion proof is requested by the performance profile,
+    /// but the KV deletion mode is configured as TombstoneOnly instead of CryptoShred.
+    /// Note: Vector index maintenance (HNSW) is decoupled from cryptographic deletion proofs.
     #[error("deletion-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side DeletionProof")]
     KvDeleteMismatch,
 }
 
 impl CollectionProfile {
+    /// Validates the profile against system rules and invariants.
+    ///
+    /// Verifies that if KV-side deletion proof requirements are active in the performance profile,
+    /// the KV deletion mode is compatible (e.g. `CryptoShred`). Vector indexing operates independently
+    /// without vector-side deletion proof dependencies.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;

@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-06
+// STAND: 2026-10-12
 // ZWECK: Implementiert Schreib- und Commit-Operationen (put, put_if_absent, delete, commit) für LsmStorage.
 // INVARIANTEN:
 // - Sperrenhierarchie: commit_mutex -> pending_commit_queue -> truncate_lock -> state.
@@ -24,6 +24,10 @@ use std::time::Duration;
 pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {
     validate_key(key)?;
     validate_value(value)?;
+    storage
+        .erasure_fence
+        .check_write_allowed_scope(key)
+        .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -78,6 +82,10 @@ pub(super) async fn put_if_absent(
 ) -> Result<bool> {
     validate_key(key)?;
     validate_value(value)?;
+    storage
+        .erasure_fence
+        .check_write_allowed_scope(key)
+        .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -139,6 +147,10 @@ pub(super) async fn put_if_absent(
 
 pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
     validate_key(key)?;
+    storage
+        .erasure_fence
+        .check_write_allowed_scope(key)
+        .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -171,6 +183,10 @@ pub(super) async fn delete_many(
     }
     for key in &keys {
         validate_key(key)?;
+        storage
+            .erasure_fence
+            .check_write_allowed_scope(key)
+            .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
     }
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
@@ -199,6 +215,11 @@ pub(super) async fn delete_many(
 }
 
 pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
+    validate_key(prefix)?;
+    storage
+        .erasure_fence
+        .check_write_allowed_scope(prefix)
+        .map_err(|e| ContextraError::Storage(format!("Delete prefix rejected by erasure fence: {e}")))?;
     let matching_keys: Vec<Vec<u8>> = storage
         .scan_prefix(prefix)
         .await?
@@ -338,6 +359,27 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         return Ok(());
     }
 
+    // Check erasure fence permissions for all staged operations prior to commit
+    for op in &ops {
+        let key = match op {
+            IndexOp::Insert { data, .. } => &data.0[..],
+            IndexOp::Delete { data, .. } => {
+                if let Some((k, _)) = data {
+                    &k[..]
+                } else {
+                    continue;
+                }
+            }
+            _ => continue,
+        };
+        if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
+            storage.cleanup_intent_locks_for_tx(tx_id);
+            return Err(ContextraError::Storage(format!(
+                "Commit rejected by erasure fence: {e}"
+            )));
+        }
+    }
+
     // 3. SSI ReadSet Validierung unter commit_mutex
     if let Some(ref rs) = read_set {
         if !rs.is_empty() {
@@ -417,7 +459,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        );
+        )?;
 
         // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
         let state = storage.state.read().await;
@@ -748,7 +790,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             leader_tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        );
+        )?;
 
         let mut current_idx = leader_entries_count;
         for (i, r) in requests.iter().enumerate() {
@@ -764,7 +806,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                         r.tx_id,
                         WriteOrigin::UserWrite,
                         is_durable,
-                    );
+                    )?;
                 }
             }
             current_idx += follower_entries_count;
