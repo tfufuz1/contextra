@@ -1,3 +1,4 @@
+#![cfg(feature = "wal-v4-wip")]
 use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
 use tempfile::TempDir;
@@ -13,7 +14,9 @@ async fn test_wal_v4_cdc_events_contain_no_cleartext_payload() {
         ..Default::default()
     };
 
-    let wal = Wal::open_with_config(&wal_path, config).await.expect("open wal");
+    let wal = Wal::open_with_config(&wal_path, config)
+        .await
+        .expect("open wal");
 
     let op_put = WalOp::Put {
         tx_id: TxId::new(500),

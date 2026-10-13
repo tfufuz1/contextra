@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-12
 // ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Löschungen.
-// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert.
+// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert, keine let _ Verwürfe.
 
-use crate::{atomic_replace, durable_remove};
+use crate::{atomic_replace, durable_remove, sync_dir};
 use std::path::{Path, PathBuf};
 
 /// Journal tracking files scheduled for deletion across process restarts or crashes.
@@ -47,30 +47,43 @@ impl PendingDeleteJournal {
     }
 
     /// Processes all pending entries using the supplied removal closure `remove_fn`.
-    /// Removes successfully processed paths from the journal and updates journal file on disk.
+    ///
+    /// Removes successfully processed paths from the journal and updates journal file on disk
+    /// after each item to guarantee crash consistency. Missing files are treated as processed.
     pub fn process<F>(&mut self, mut remove_fn: F) -> std::io::Result<usize>
     where
         F: FnMut(&Path) -> std::io::Result<()>,
     {
         let mut processed_count = 0;
         let mut remaining = Vec::new();
+        let original_entries = self.entries.clone();
 
-        for entry in &self.entries {
-            match remove_fn(entry) {
-                Ok(()) => {
-                    processed_count += 1;
-                }
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    // File already deleted/missing, treat as processed
-                    processed_count += 1;
-                }
+        for (idx, entry) in original_entries.iter().enumerate() {
+            let res = remove_fn(entry);
+            let is_success = match res {
+                Ok(()) => true,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
                 Err(err) => {
                     remaining.push(entry.clone());
-                    // Keep error propagation behavior for unexpected failures
-                    self.entries = remaining;
-                    let _ = self.flush();
+                    self.entries = remaining.clone();
+                    self.entries
+                        .extend(original_entries[idx + 1..].iter().cloned());
+                    self.flush()?;
                     return Err(err);
                 }
+            };
+
+            if is_success {
+                if let Some(parent) = entry.parent() {
+                    if parent.exists() {
+                        sync_dir(parent)?;
+                    }
+                }
+                processed_count += 1;
+                // Persist updated remaining list to disk immediately
+                self.entries = original_entries[idx + 1..].to_vec();
+                self.entries.extend(remaining.clone());
+                self.flush()?;
             }
         }
 
