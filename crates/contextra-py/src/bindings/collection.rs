@@ -19,6 +19,7 @@ pub struct PyCollection {
     pub(crate) inner: Arc<ContextraCollection>,
     pub(crate) runtime: Arc<Runtime>,
     pub(crate) poisoned: Arc<AtomicBool>,
+    pub(crate) tenant_id: contextra_types::TenantId,
 }
 
 impl PyCollection {
@@ -26,17 +27,25 @@ impl PyCollection {
         inner: Arc<ContextraCollection>,
         runtime: Arc<Runtime>,
         poisoned: Arc<AtomicBool>,
+        tenant_id: contextra_types::TenantId,
     ) -> Self {
         Self {
             inner,
             runtime,
             poisoned,
+            tenant_id,
         }
     }
 }
 
 #[pymethods]
 impl PyCollection {
+    /// Returns the tenant ID associated with this collection context.
+    #[getter]
+    pub fn tenant_id(&self) -> u64 {
+        self.tenant_id.inner()
+    }
+
     /// Returns true if the collection/database engine was poisoned by a previous caught Rust panic.
     #[getter]
     pub fn is_poisoned(&self) -> bool {

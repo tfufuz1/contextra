@@ -16,12 +16,12 @@ ring = "4"
 [lib]
 name = "_contextra"
 crate-type = ["cdylib", "rlib"]
-test = false
 doctest = false
 
 [dependencies]
+contextra = { workspace = true }
 contextra-types = { workspace = true }
-pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"] }
+pyo3 = { version = "0.24.1", features = ["abi3-py38", "multiple-pymethods"] }
 numpy = "0.24"
 tokio = { workspace = true }
 # ANCHOR:ARCH:DAG-003 — Architektur-Layer durchbrochen (Ausnahme für Bindings)
@@ -42,6 +42,10 @@ flatbuffers = { workspace = true }
 serde_json = { workspace = true }
 pythonize = "0.24"
 
+[dev-dependencies]
+pyo3 = { version = "0.24.1", features = ["auto-initialize"] }
+
 [features]
-default = []
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
 docid-128 = ["contextra-types/docid-128"]

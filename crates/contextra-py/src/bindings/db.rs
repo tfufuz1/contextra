@@ -23,6 +23,7 @@ pub struct PyContextra {
     pub(crate) runtime: Arc<Runtime>,
     pub(crate) worker_threads: usize,
     pub(crate) poisoned: Arc<AtomicBool>,
+    pub(crate) tenant_id: contextra_types::TenantId,
 }
 
 impl PyContextra {
@@ -31,18 +32,26 @@ impl PyContextra {
         runtime: Arc<Runtime>,
         worker_threads: usize,
         poisoned: Arc<AtomicBool>,
+        tenant_id: contextra_types::TenantId,
     ) -> Self {
         Self {
             inner,
             runtime,
             worker_threads,
             poisoned,
+            tenant_id,
         }
     }
 }
 
 #[pymethods]
 impl PyContextra {
+    /// Returns the tenant ID associated with this database connection context.
+    #[getter]
+    pub fn tenant_id(&self) -> u64 {
+        self.tenant_id.inner()
+    }
+
     /// Returns the number of worker threads configured in this database's Tokio runtime.
     #[getter]
     pub fn worker_threads(&self) -> usize {
@@ -104,6 +113,7 @@ impl PyContextra {
             col,
             self.runtime.clone(),
             self.poisoned.clone(),
+            self.tenant_id,
         ))
     }
 
@@ -139,7 +149,7 @@ impl PyContextra {
 
         let rt = &self.runtime;
         let name_owned = name.to_string();
-        let tenant_id = contextra_types::TenantId::SYSTEM;
+        let tenant_id = self.tenant_id;
         let inner = self.inner.clone();
         run_blocking_ffi(py, &self.poisoned, || {
             let proof = rt
