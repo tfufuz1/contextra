@@ -15,6 +15,20 @@ pub const HARD_SCAN_CEILING: usize = 100_000;
 pub const MAX_SCAN_RESULTS: usize = DEFAULT_SCAN_LIMIT;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Helper predicate to decide if a key is internal and should be excluded from public scans/reads.
+    /// Internal keys start with `__` in the default collection (e.g. `__docid:`, `__tx_intent:`, `__graph:`).
+    /// `__rel:` keys are preserved when explicitly requested via `scan_prefix("__rel:...")`.
+    #[inline]
+    fn is_internal_key(&self, key: &[u8], is_rel_scan: bool) -> bool {
+        if self.name != "default" {
+            return false;
+        }
+        if is_rel_scan && key.starts_with(b"__rel:") {
+            return false;
+        }
+        key.starts_with(b"__")
+    }
+
     // AI-TAG[CONVENTION-DRIFT][MAJOR] RESOLVED: AGT-DB-001 — snapshot_seq() now propagates storage errors (TS:2026-08-25T00:00:00Z)
     // instead of silently mapping them to u64::MAX (ID: AGT-DB-001).
     // Consistent with every other error-propagation path in this file.
@@ -114,6 +128,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 break;
             }
 
+            let is_rel_scan = prefix.starts_with("__rel:");
             for (k, v) in batch {
                 let key_str = String::from_utf8_lossy(&k).to_string();
                 let user_key = if self.name == "default" {
@@ -126,6 +141,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         key_str
                     }
                 };
+
+                if self.is_internal_key(user_key.as_bytes(), is_rel_scan) {
+                    continue;
+                }
 
                 if let Ok(val) = serde_json::from_slice(&v) {
                     if results.len() >= effective_limit {
@@ -245,6 +264,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         key_str
                     }
                 };
+
+                if self.is_internal_key(user_key.as_bytes(), false) {
+                    continue;
+                }
 
                 if let Ok(val) = serde_json::from_slice(&v) {
                     if results.len() >= effective_limit {

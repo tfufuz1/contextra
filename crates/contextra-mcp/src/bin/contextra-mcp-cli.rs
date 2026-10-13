@@ -57,7 +57,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "verify-proof" => {
             if args.len() < 4 {
-                eprintln!("Usage: contextra-mcp-cli verify-proof <proof-json-or-file> <public-key-hex>");
+                eprintln!(
+                    "Usage: contextra-mcp-cli verify-proof <proof-json-or-file> <public-key-hex>"
+                );
                 std::process::exit(1);
             }
             let proof_input = &args[2];

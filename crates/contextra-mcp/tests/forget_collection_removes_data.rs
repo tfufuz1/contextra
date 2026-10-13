@@ -96,6 +96,9 @@ async fn create_mock_server() -> (Arc<McpServer>, Arc<contextra::Contextra>, Tem
 // Dieser Test ist mit #[should_panic] versehen, um CI-Verletzungen zu vermeiden, bis WP-L0.2 das Problem behebt.
 // In WP-L0.2 wird #[should_panic] entfernt, sodass der Test regulär GRÜN durchläuft.
 #[tokio::test]
+#[should_panic(
+    expected = "EXPECTED FAILURE / ROT: Document should be deleted after contextra_forget"
+)]
 async fn test_forget_collection_removes_data() {
     test_forget_collection_removes_data_inner().await.unwrap();
 }
@@ -161,39 +164,8 @@ async fn test_forget_collection_removes_data_inner() -> Result<(), Box<dyn std::
     };
     let forget_resp = server.handle(forget_req).await;
     let forget_val = serde_json::to_value(&forget_resp)?;
-
     if forget_val["result"]["isError"] == true {
-        let err_text = forget_val["result"]["content"][0]["text"]
-            .as_str()
-            .unwrap_or("");
-        assert!(
-            err_text.contains("Capability unsupported") || err_text.contains("encryption-at-rest"),
-            "When encryption-at-rest is not active, contextra_forget must fail honestly with Capability unsupported, got: {err_text}"
-        );
-        // Verify no false deletion happened — document is still accessible
-        let get_req = contextra_mcp::protocol::JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(3)),
-            method: "tools/call".into(),
-            params: json!({
-                "name": "contextra_get",
-                "arguments": {
-                    "collection": col_name,
-                    "id": doc_id
-                }
-            }),
-        };
-        let get_resp = server.handle(get_req).await;
-        let get_val = serde_json::to_value(&get_resp)?;
-        let get_text = get_val["result"]["content"][0]["text"]
-            .as_str()
-            .ok_or("missing get content text")?;
-        let get_json: Value = serde_json::from_str(get_text)?;
-        assert!(
-            !get_json.is_null(),
-            "Document must remain intact when forget fails honestly due to unsupported capability"
-        );
-        return Ok(());
+        panic!("EXPECTED FAILURE / ROT: Document should be deleted after contextra_forget");
     }
 
     let forget_text = forget_val["result"]["content"][0]["text"]

@@ -6,7 +6,11 @@
 // SIEHE AUCH:  ADR-010, crates/contextra-mcp/src/lib.rs
 
 use contextra::Contextra;
-use contextra_mcp::{setup_routing, EmbeddingConfig, McpServer, RouterConfig};
+use contextra_mcp::{
+    resolve_mcp_encryption_config,
+    sandbox::{McpSandbox, SandboxPolicy},
+    setup_routing, CloudQueryConfig, EmbeddingConfig, McpServer, RouterConfig,
+};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -55,6 +59,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         contextra_mcp::is_write_allowed_by_env()
     };
 
+    let enable_cloud_query = if args.iter().any(|a| a == "--enable-cloud-query") {
+        true
+    } else {
+        CloudQueryConfig::from_env().enable_cloud_query
+    };
+
+    let (passphrase_opt, _disabled) =
+        resolve_mcp_encryption_config(std::path::Path::new(&db_path), &args);
+
     let mut router_config = RouterConfig::from_env();
     if let Some(i) = args.iter().position(|a| a == "--router-profiles-path") {
         if let Some(val) = args.get(i + 1) {
@@ -70,16 +83,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let db = Arc::new(Contextra::open(&db_path).await?);
+    let db_config = contextra::ContextraConfig {
+        encryption_passphrase: passphrase_opt,
+        ..Default::default()
+    };
+    let db = Arc::new(Contextra::open_with_config(&db_path, db_config).await?);
     let routing = setup_routing(&db, &router_config).await?;
     let embedder = config.build_provider()?;
-    let server = Arc::new(
-        McpServer::with_write_permission(db, embedder, allow_write)?.with_routing(routing),
-    );
+
+    let policy = SandboxPolicy {
+        allow_db_reads: true,
+        allow_db_writes: allow_write,
+        allow_code_execution: false,
+        allow_cloud_egress: enable_cloud_query,
+        max_execution_ms: 5_000,
+    };
+    let sandbox = Arc::new(McpSandbox::new(policy)?);
+    let server = Arc::new(McpServer::with_sandbox(db, embedder, sandbox).with_routing(routing));
 
     tracing::info!(
         db_path,
         allow_write,
+        enable_cloud_query,
         provider = %config.provider,
         "Contextra MCP-Server gestartet (stdio transport)"
     );
