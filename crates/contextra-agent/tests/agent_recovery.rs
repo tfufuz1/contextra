@@ -181,7 +181,7 @@ async fn test_agent_error_handling() {
         .unwrap_err()
         .to_string()
         .contains("Simulated failure"));
-    assert_eq!(ctx.status, contextra_agent::context::AgentStatus::Failed);
+    assert_eq!(ctx.status(), contextra_agent::context::AgentStatus::Failed);
 
     // Verify failure logged in audit trail
     let audit_log = contextra_agent::audit::AuditLog::new(state_col);
@@ -261,7 +261,7 @@ async fn test_crash_during_execute_recovery() {
     // Execution fails during execute()
     let res = engine.run(&mut ctx, &graph).await;
     assert!(res.is_err());
-    assert_eq!(ctx.status, contextra_agent::context::AgentStatus::Failed);
+    assert_eq!(ctx.status(), contextra_agent::context::AgentStatus::Failed);
 
     // Checkpoint prior to execute() was created and is recoverable
     let checkpoints = engine

@@ -165,10 +165,10 @@ impl OrchestratorEngine {
     }
 
     pub async fn run(&self, ctx: &mut AgentContext, graph: &StateGraph) -> Result<()> {
-        ctx.status = crate::context::AgentStatus::Running;
+        ctx.set_status(crate::context::AgentStatus::Running)?;
         let res = self.run_internal(ctx, graph).await;
         if res.is_err() {
-            ctx.status = crate::context::AgentStatus::Failed;
+            let _ = ctx.set_status(crate::context::AgentStatus::Failed);
         }
         res
     }
@@ -200,7 +200,7 @@ impl OrchestratorEngine {
 
             match node.node_type {
                 NodeType::End => {
-                    ctx.status = crate::context::AgentStatus::Completed;
+                    ctx.set_status(crate::context::AgentStatus::Completed)?;
                     // Persist final state before last checkpoint (FIND-SAOS-001)
                     self.persist_final_state(ctx).await?;
                     ctx.db.inner_storage().flush().await?; // Ensure durability
@@ -688,6 +688,14 @@ impl OrchestratorEngine {
                     match event_res? {
                         Some(event) => {
                             ctx.try_attach_event(event)?;
+                            if ctx.status() == crate::context::AgentStatus::Completed
+                                || ctx.status() == crate::context::AgentStatus::Failed
+                            {
+                                let start_node = graph
+                                    .start_node_id()
+                                    .unwrap_or_else(|| "start".to_string());
+                                ctx.reset_for_new_event(&start_node)?;
+                            }
                             self.run(ctx, graph).await?;
                             self.checkpoint(ctx).await?;
                         }
@@ -717,7 +725,7 @@ impl OrchestratorEngine {
             "memory": ctx.memory,
             "output": result.output,
             "tokens_consumed": result.tokens_consumed,
-            "status": ctx.status,
+            "status": ctx.status(),
             "tx_id": tx_id.0
         });
 
@@ -766,7 +774,7 @@ impl OrchestratorEngine {
         let final_id = format!("task:{}:final", ctx.task_id);
         let metadata = serde_json::json!({
             "stage": "final",
-            "status": ctx.status,
+            "status": ctx.status(),
             "task_id": ctx.task_id,
             "step_count": ctx.step_count,
             "memory": ctx.memory,

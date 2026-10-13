@@ -76,7 +76,31 @@ pub enum AgentStatus {
     Failed,
 }
 
+impl AgentStatus {
+    /// Evaluates whether a state transition from `self` to `target` is allowed.
+    pub fn can_transition_to(&self, target: AgentStatus) -> bool {
+        match (self, target) {
+            (AgentStatus::Idle, AgentStatus::Running) => true,
+            (AgentStatus::Running, AgentStatus::Running) => true,
+            (AgentStatus::Running, AgentStatus::Completed) => true,
+            (AgentStatus::Running, AgentStatus::Failed) => true,
+            (AgentStatus::Failed, AgentStatus::Running) => true,
+            _ => false,
+        }
+    }
+}
+
 /// Operational context spanning the entire workflow execution.
+///
+/// Direct status manipulation is strictly forbidden (AGT-STATUS-001).
+///
+/// ```compile_fail
+/// use contextra_agent::context::{AgentContext, AgentStatus};
+/// fn test_compile_fail_status(ctx: &mut AgentContext) {
+///     // Direct field modification fails because status is private.
+///     ctx.status = AgentStatus::Completed;
+/// }
+/// ```
 pub struct AgentContext {
     pub task_id: String,
     pub current_node: String,
@@ -84,7 +108,7 @@ pub struct AgentContext {
     pub db: Arc<Contextra>,
     pub state_collection: Arc<Collection<LsmStorage>>,
     pub budget: TokenBudget,
-    pub status: AgentStatus,
+    status: AgentStatus,
     /// Active cache directive for the current workflow step.
     pub current_cache_directive: CacheDirective,
     /// History of cache directives set per step ID.
@@ -145,6 +169,32 @@ impl AgentContext {
             clm_scratchpad: None,
             latest_scratchpad_checkpoint: None,
         })
+    }
+
+    /// Returns the operational status of the workflow.
+    pub fn status(&self) -> AgentStatus {
+        self.status
+    }
+
+    /// Transitions internal agent status to `target` if permitted by the transition matrix.
+    pub(crate) fn set_status(&mut self, target: AgentStatus) -> Result<()> {
+        if self.status.can_transition_to(target) {
+            self.status = target;
+            Ok(())
+        } else {
+            Err(ContextraError::InvalidInput(format!(
+                "Illegal AgentStatus transition from {:?} to {:?}",
+                self.status, target
+            )))
+        }
+    }
+
+    /// Resets agent status to Idle and current node position to `start_node` for event loop iteration.
+    pub(crate) fn reset_for_new_event(&mut self, start_node: &str) -> Result<()> {
+        validate_node_id(start_node)?;
+        self.status = AgentStatus::Idle;
+        self.current_node = start_node.to_string();
+        Ok(())
     }
 
     /// Attaches an optional [`ClmScratchpad`](crate::clm_scratchpad::ClmScratchpad) to the agent context (Builder pattern).
@@ -219,6 +269,9 @@ impl AgentContext {
 }
 
 /// Agent execution engine helper managing per-step cache directives during workflow execution.
+#[deprecated(
+    note = "AgentEngine is a deprecated wrapper struct. Use OrchestratorEngine instead."
+)]
 #[derive(Debug, Clone, Default)]
 pub struct AgentEngine {
     /// Active cache directive set during step execution.
@@ -289,6 +342,53 @@ mod tests {
             ctx.clm_scratchpad.as_ref().map(|s| s.task_id()),
             Some("task-clm")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_agent_status_transition_matrix() {
+        assert!(AgentStatus::Idle.can_transition_to(AgentStatus::Running));
+        assert!(AgentStatus::Running.can_transition_to(AgentStatus::Completed));
+        assert!(AgentStatus::Running.can_transition_to(AgentStatus::Failed));
+        assert!(AgentStatus::Failed.can_transition_to(AgentStatus::Running));
+
+        // Illegal transitions
+        assert!(!AgentStatus::Completed.can_transition_to(AgentStatus::Running));
+        assert!(!AgentStatus::Completed.can_transition_to(AgentStatus::Failed));
+        assert!(!AgentStatus::Idle.can_transition_to(AgentStatus::Completed));
+        assert!(!AgentStatus::Idle.can_transition_to(AgentStatus::Failed));
+    }
+
+    #[tokio::test]
+    async fn test_agent_status_illegal_transitions_return_err() -> contextra_types::Result<()> {
+        let temp_dir = tempfile::TempDir::new()?;
+        let config = contextra_db::ContextraConfig::default();
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let state_coll = db.collection("test_status_err").await?;
+        let mut ctx = AgentContext::try_new(
+            "test_status_task",
+            "start",
+            db,
+            state_coll,
+            TokenBudget::new(1000, 0),
+        )?;
+
+        assert_eq!(ctx.status(), AgentStatus::Idle);
+
+        // Direct completion from Idle is illegal
+        assert!(ctx.set_status(AgentStatus::Completed).is_err());
+
+        // Idle -> Running is valid
+        assert!(ctx.set_status(AgentStatus::Running).is_ok());
+
+        // Running -> Completed is valid
+        assert!(ctx.set_status(AgentStatus::Completed).is_ok());
+
+        // Completed -> Running or Failed is illegal
+        assert!(ctx.set_status(AgentStatus::Running).is_err());
+        assert!(ctx.set_status(AgentStatus::Failed).is_err());
+
         Ok(())
     }
 

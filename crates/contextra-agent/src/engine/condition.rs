@@ -51,7 +51,7 @@ fn get_context_value<'a>(
         ))),
         "status" => Some(std::borrow::Cow::Owned(serde_json::Value::String(format!(
             "{:?}",
-            ctx.status
+            ctx.status()
         )))),
         _ => None,
     }
