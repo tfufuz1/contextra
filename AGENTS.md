@@ -52,6 +52,8 @@ Geplante Befehle sind mit `<!-- harness:planned -->` markiert. Ein Agent darf si
 | `cargo xtask workspace-verify` | ✅ | Workspace-Vollständigkeit und Konsistenz |
 | `cargo xtask registry-check` | ✅ | Vollständigkeit und Konsistenz aller xtask-Befehle gegen registry.toml |
 | `cargo xtask explain <gate>` | ✅ | Qualitätsgates und Invarianten erklären |
+| `cargo xtask verify [--tier kernel|full]` | ✅ | Einzelbefehl zur Verifikation und Evidenzerzeugung |
+| `cargo xtask check-loom-mocks` | ✅ | Scanner für unzulässige Loom-Mocks und Mirrors |
 | `cargo xtask search <stichwort>` | 🔲 `<!-- harness:planned -->` | Befehle nach Name/Docstring suchen |
 
 ### 4.2 Tier 1 — Workspace-Scan, ohne Domain-Build

@@ -686,4 +686,12 @@ impl HnswIndex {
         let nodes = self.inner.hot.nodes.read();
         nodes.get(ram_idx).map(|n| n.vector.clone())
     }
+
+    /// Mutates the vector data at `ram_idx` in process RAM for testing / fault injection.
+    pub fn set_ram_vector_at_for_test(&self, ram_idx: usize, vector: super::types::VectorData) {
+        let mut nodes = self.inner.hot.nodes.write();
+        if let Some(node) = nodes.get_mut(ram_idx) {
+            node.vector = vector;
+        }
+    }
 }

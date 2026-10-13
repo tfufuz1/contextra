@@ -52,10 +52,7 @@ impl CanaryOracle {
         if marker.is_empty() {
             return Ok(0);
         }
-        let mut file = match File::open(path) {
-            Ok(f) => f,
-            Err(e) => return Err(e),
-        };
+        let mut file = File::open(path)?;
 
         let metadata = file.metadata()?;
         if metadata.len() < marker.len() as u64 {
@@ -70,10 +67,7 @@ impl CanaryOracle {
 
         loop {
             let read_slice = &mut buffer[prefix_len..prefix_len + chunk_size];
-            let bytes_read = match file.read(read_slice) {
-                Ok(n) => n,
-                Err(e) => return Err(e),
-            };
+            let bytes_read = file.read(read_slice)?;
 
             if bytes_read == 0 {
                 break;

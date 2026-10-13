@@ -426,6 +426,35 @@ impl HnswArena {
         false
     }
 
+    /// Clears and zeros connection lists for a node at `ram_idx` in the arena.
+    pub fn clear_node_connections(&self, ram_idx: usize, m: usize) {
+        let offsets = self.offsets.read();
+        let count_offsets = self.count_offsets.read();
+        let mut counts = self.counts.write();
+        let mut arena = self.arena.write();
+
+        if let (Some(&node_offset), Some(&count_start)) =
+            (offsets.get(ram_idx), count_offsets.get(ram_idx))
+        {
+            let count_end = count_offsets
+                .get(ram_idx + 1)
+                .copied()
+                .unwrap_or_else(|| counts.len());
+
+            for count_idx in count_start..count_end {
+                if count_idx < counts.len() {
+                    let layer = count_idx - count_start;
+                    let l_offset = Self::layer_offset(node_offset, layer, m);
+                    let len = counts[count_idx] as usize;
+                    if len > 0 && l_offset + len <= arena.len() {
+                        arena[l_offset..l_offset + len].fill(0);
+                    }
+                    counts[count_idx] = 0;
+                }
+            }
+        }
+    }
+
     /// Marks a node's slot as free for future slot reuse.
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();

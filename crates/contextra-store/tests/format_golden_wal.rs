@@ -1,7 +1,7 @@
 mod golden;
 
 use contextra_store::wal::{Wal, WalOp, WAL_V3_HEADER};
-use golden::generate::{golden_dir, generate_all, verify_file_hash};
+use golden::generate::{generate_all, golden_dir, verify_file_hash};
 use std::fs;
 
 #[tokio::test]
@@ -24,7 +24,10 @@ async fn test_format_golden_wal() {
 
     // 2. Check binary header (MFW3)
     let bytes = fs::read(&wal_path).expect("read golden wal");
-    assert!(bytes.len() >= 4, "WAL file must have at least header length");
+    assert!(
+        bytes.len() >= 4,
+        "WAL file must have at least header length"
+    );
     assert_eq!(&bytes[0..4], &WAL_V3_HEADER, "WAL header must match MFW3");
 
     // 3. Open WAL and replay

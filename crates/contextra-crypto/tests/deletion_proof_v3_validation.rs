@@ -89,7 +89,10 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
     );
 
     let proof = res.unwrap();
-    assert_eq!(proof.deleted_after_tx, TxId::new(durability.confirmed_seq_no));
+    assert_eq!(
+        proof.deleted_after_tx,
+        TxId::new(durability.confirmed_seq_no)
+    );
     assert!(proof.verify(&keypair.verifying_key).unwrap());
 }
 

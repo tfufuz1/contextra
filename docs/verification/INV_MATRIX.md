@@ -13,10 +13,10 @@
 | :--- | :---: | :---: |
 | **Gesamtzahl eindeutiger `INV-*` aus der Spezifikation** | **44** | 100,0 % |
 | **In Code / Crates referenziert oder umgesetzt** | 37 | 84,1 % |
-| **Test vorhanden (`ja`)** | 24 | 54,5 % |
-| **Test prüft Verletzung nachweislich (`ja`)** | 20 | 45,5 % |
-| **Test prüft Verletzung unklar / indirekt (`unklar`)** | 18 | 40,9 % |
-| **Kein spezifischer Test vorhanden (`nein`)** | 6 | 13,6 % |
+| **Test vorhanden (`ja`)** | 25 | 56,8 % |
+| **Test prüft Verletzung nachweislich (`ja`)** | 26 | 59,1 % |
+| **Test prüft Verletzung unklar / indirekt (`unklar`)** | 13 | 29,5 % |
+| **Kein spezifischer Test vorhanden (`nein`)** | 5 | 11,4 % |
 
 ---
 

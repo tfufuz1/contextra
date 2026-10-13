@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_testkit::{FaultConfig, FaultVfs, ManualClock, RefOp, ReferenceModel};
 use std::ops::Bound;
 use std::path::Path;

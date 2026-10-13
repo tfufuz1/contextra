@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-12
 // ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Löschungen.
-// INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert.
+// INVARIANTEN: Atomare Persistenz via atomic_replace, per-entry crash consistency, Fehler werden propagiert.
 
-use crate::{atomic_replace, durable_remove};
+use crate::{atomic_replace, durable_remove, sync_dir};
 use std::path::{Path, PathBuf};
 
 /// Journal tracking files scheduled for deletion across process restarts or crashes.
@@ -47,35 +47,35 @@ impl PendingDeleteJournal {
     }
 
     /// Processes all pending entries using the supplied removal closure `remove_fn`.
-    /// Removes successfully processed paths from the journal and updates journal file on disk.
+    /// Removes successfully processed paths from the journal per-entry and flushes journal on disk.
     pub fn process<F>(&mut self, mut remove_fn: F) -> std::io::Result<usize>
     where
         F: FnMut(&Path) -> std::io::Result<()>,
     {
         let mut processed_count = 0;
-        let mut remaining = Vec::new();
 
-        for entry in &self.entries {
-            match remove_fn(entry) {
+        while !self.entries.is_empty() {
+            let entry = self.entries[0].clone();
+            match remove_fn(&entry) {
                 Ok(()) => {
                     processed_count += 1;
+                    if let Some(parent) = entry.parent() {
+                        sync_dir(parent)?;
+                    }
+                    self.entries.remove(0);
+                    self.flush()?;
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    // File already deleted/missing, treat as processed
                     processed_count += 1;
+                    self.entries.remove(0);
+                    self.flush()?;
                 }
                 Err(err) => {
-                    remaining.push(entry.clone());
-                    // Keep error propagation behavior for unexpected failures
-                    self.entries = remaining;
-                    let _ = self.flush();
+                    self.flush()?;
                     return Err(err);
                 }
             }
         }
-
-        self.entries = remaining;
-        self.flush()?;
 
         // If journal is empty, attempt to durably remove the journal file itself
         if self.entries.is_empty() && self.journal_path.exists() {

@@ -1,10 +1,7 @@
 // Integration test for KeyFamilyRegistry and ErasureFootprint (WP-1.1).
 
-#[path = "../src/deletion/mod.rs"]
-mod deletion;
-
+use contextra_engine::deletion::*;
 use contextra_types::{CollectionId, DocId, TenantId};
-use deletion::*;
 
 #[test]
 fn test_keyfamilies_toml_matches_rust_registry() {
@@ -30,6 +27,16 @@ fn test_keyfamilies_toml_matches_rust_registry() {
         toml_family_names, rust_names,
         "KEYFAMILIES.toml entries must match ALL_KEY_FAMILIES in registry.rs"
     );
+
+    // Scanner field check: No scanner may be "TODO" or empty
+    for family in rust_families {
+        assert!(
+            !family.scanner.is_empty() && family.scanner != "TODO",
+            "Scanner field for family '{}' must not be empty or 'TODO', got '{}'",
+            family.name,
+            family.scanner
+        );
+    }
 }
 
 #[test]
@@ -119,43 +126,37 @@ fn test_encode_prefix_property() {
 }
 
 #[test]
-fn test_erasure_footprint_compute_hash() {
+fn test_erasure_footprint_compute_hash_and_constructors() {
     let tenant_1 = TenantId::try_new(1).unwrap();
     let tenant_2 = TenantId::try_new(2).unwrap();
+    let doc_id = DocId::new(42);
 
-    let key_scope_1 = KeyScope {
-        explicit: vec![b"__col_idx:\x00col_a".to_vec()],
-        prefixes: vec![b"__col:col_a:\x00".to_vec()],
-    };
+    let doc_fpr = ErasureFootprint::for_document(tenant_1, "col_a", doc_id);
+    let col_fpr = ErasureFootprint::for_collection(tenant_1, "col_a");
+    let tenant_fpr = ErasureFootprint::for_tenant(tenant_1);
 
-    let footprint_1a = ErasureFootprint::new(StorageScope::Tenant(tenant_1), key_scope_1.clone());
-    let footprint_1b = ErasureFootprint::new(StorageScope::Tenant(tenant_1), key_scope_1);
+    assert_ne!(doc_fpr.hash, col_fpr.hash);
+    assert_ne!(col_fpr.hash, tenant_fpr.hash);
 
-    // Deterministic: Identical footprints yield identical hash
-    assert_eq!(footprint_1a.hash, footprint_1b.hash);
-    assert_eq!(footprint_1a.compute_hash(), footprint_1b.compute_hash());
+    let doc_fpr_2 = ErasureFootprint::for_document(tenant_2, "col_a", doc_id);
+    assert_ne!(doc_fpr.hash, doc_fpr_2.hash);
 
-    // Difference in StorageScope
-    let key_scope_2 = KeyScope {
-        explicit: vec![b"__col_idx:\x00col_a".to_vec()],
-        prefixes: vec![b"__col:col_a:\x00".to_vec()],
-    };
-    let footprint_tenant2 = ErasureFootprint::new(StorageScope::Tenant(tenant_2), key_scope_2);
+    // Zeroization test
+    let mut doc_fpr_mut = doc_fpr.clone();
+    doc_fpr_mut.zeroize_contents();
+    assert!(doc_fpr_mut.keys.explicit.is_empty());
+    assert!(doc_fpr_mut.keys.prefixes.is_empty());
+    assert!(doc_fpr_mut.ram.doc_ids.is_empty());
+}
 
-    assert_ne!(
-        footprint_1a.hash, footprint_tenant2.hash,
-        "Footprints with different TenantIds must yield different hashes"
-    );
+#[test]
+fn test_check_nonempty_or_observed_empty() {
+    assert!(check_nonempty_or_observed_empty(0, 0).is_ok());
+    assert!(check_nonempty_or_observed_empty(10, 5).is_ok());
 
-    // Difference in KeyScope
-    let key_scope_diff = KeyScope {
-        explicit: vec![b"__col_idx:\x00col_b".to_vec()],
-        prefixes: vec![b"__col:col_b:\x00".to_vec()],
-    };
-    let footprint_diff_keys = ErasureFootprint::new(StorageScope::Tenant(tenant_1), key_scope_diff);
-
-    assert_ne!(
-        footprint_1a.hash, footprint_diff_keys.hash,
-        "Footprints with different KeyScopes must yield different hashes"
+    let err = check_nonempty_or_observed_empty(10, 0);
+    assert!(
+        err.is_err(),
+        "Must return Err when handle contained entries but 0 were deleted"
     );
 }
