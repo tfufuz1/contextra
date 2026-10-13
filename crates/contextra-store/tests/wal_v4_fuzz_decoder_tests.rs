@@ -1,4 +1,5 @@
 #![cfg(feature = "wal-v4-wip")]
+
 use contextra_store::wal::WalEntry;
 
 #[test]
