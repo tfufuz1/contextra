@@ -67,6 +67,7 @@ pub async fn dispose_obsolete_files_with_policy(
             DisposePolicy::RequireScrub | DisposePolicy::AllowRemoveUnscrubbed => {
                 ScrubPolicy::OverwriteZeros
             }
+            DisposePolicy::Disabled => ScrubPolicy::Disabled,
         };
 
         journal.process(|path| {
