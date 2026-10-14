@@ -510,6 +510,11 @@ impl<S> TenantScopedStorage<S> {
         }
     }
 
+    /// Returns a reference to the inner storage engine.
+    pub fn inner_storage(&self) -> &S {
+        &self.inner
+    }
+
     /// Returns the immutable `TenantId` bound to this storage wrapper.
     pub fn tenant_id(&self) -> TenantId {
         self.codec.tenant_id

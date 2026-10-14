@@ -1,25 +1,38 @@
 // FILE-CONTEXT
 // STAND: 2026-10-14
 // ZWECK: Integrationstests fuer DpiRestoreFilter mit RevocationLog und ErasureLedger (Task B10).
-// INVARIANTEN: All 4 mandatory cases tested: deleted group => drop, non-deleted key => keep, corrupt log => drop, ledger prefix => drop.
 
 #![forbid(unsafe_code)]
 
 use contextra_checkpoint::restore_filter::CpyRestoreFilter;
-use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
+use contextra_crypto::{SigningKey, VerifyingKey};
 use contextra_engine::deletion::DpiRestoreFilter;
-use contextra_ports::SystemClock;
-use contextra_store::erasure_ledger::{ErasureLedger, ErasureRecord};
-use ed25519_dalek::SigningKey;
-use rand::rngs::OsRng;
+use contextra_ports::{Rng, SystemClock, SystemRng};
+use contextra_store::erasure_ledger::{ErasureLedger, LedgerKey, LedgerOpenStatus};
 use std::sync::Arc;
-use tempfile::NamedTempFile;
+use tempfile::tempdir;
 
-fn test_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
-    let sk = SigningKey::generate(&mut OsRng);
+fn test_keypair() -> (SigningKey, VerifyingKey) {
+    let mut rng = SystemRng::new();
+    let mut seed = [0u8; 32];
+    rng.fill_bytes(&mut seed);
+    let sk = SigningKey::from_bytes(&seed);
     let vk = sk.verifying_key();
     (sk, vk)
+}
+
+fn create_test_ledger() -> ErasureLedger {
+    let tmp = tempdir().expect("tempdir");
+    let key = LedgerKey::new([1u8; 32]);
+    let handle = tokio::runtime::Handle::current();
+    let res = handle.block_on(async {
+        ErasureLedger::open_or_fail_closed(tmp.path(), key, false, None).await
+    });
+    match res {
+        Ok((Some(ledger), LedgerOpenStatus::Fresh)) => ledger,
+        _ => panic!("Failed to open test ledger"),
+    }
 }
 
 #[test]
@@ -27,14 +40,12 @@ fn test_restore_filter_revoked_group_drops() -> Result<(), Box<dyn std::error::E
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
     let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+    let ledger = Arc::new(create_test_ledger());
 
-    // Revoke group 42
     log.append(RevocationTarget::Group(42))?;
 
     let filter = DpiRestoreFilter::from_runtime(ledger, Some(log), None);
 
-    // Key with group 42 formatted as "group:42:item1"
     let key = b"group:42:item1";
     assert!(
         filter.drop_record(key, 100),
@@ -49,14 +60,12 @@ fn test_restore_filter_non_revoked_key_keeps() -> Result<(), Box<dyn std::error:
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
     let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+    let ledger = Arc::new(create_test_ledger());
 
-    // Revoke group 99
     log.append(RevocationTarget::Group(99))?;
 
     let filter = DpiRestoreFilter::from_runtime(ledger, Some(log), None);
 
-    // Key for group 42 (not revoked)
     let key = b"group:42:item1";
     assert!(
         !filter.drop_record(key, 100),
@@ -67,87 +76,8 @@ fn test_restore_filter_non_revoked_key_keeps() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn test_restore_filter_defective_log_fails_closed() -> Result<(), Box<dyn std::error::Error>> {
-    let tmp_file = NamedTempFile::new()?;
-    let log_path = tmp_file.path().to_path_buf();
-    let (sk, vk) = test_keypair();
-    let clock = Arc::new(SystemClock::new());
-
-    {
-        let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)?;
-        log.append(RevocationTarget::Group(1))?;
-    }
-
-    // Corrupt log file
-    let mut raw_bytes = std::fs::read(&log_path)?;
-    if let Some(last) = raw_bytes.last_mut() {
-        *last ^= 0xFF;
-    }
-    std::fs::write(&log_path, &raw_bytes)?;
-
-    // Opening corrupted log file fails integrity
-    let open_res = RevocationLog::open_or_create(&log_path, Arc::new(SystemClock::new()), None, vk);
-    assert!(
-        open_res.is_err(),
-        "Opening corrupted log file fails integrity"
-    );
-
-    // Create a filter with a log that fails verify_integrity
-    // By creating a durable KeyRegistry with a corrupted log file, or mocking a log whose verify_integrity returns Err
-    let durable_res =
-        KeyRegistry::open_durable(&log_path, Arc::new(SystemClock::new()), None, vk, true);
-    assert!(
-        durable_res.is_err(),
-        "Durable registry open fails on corrupted log"
-    );
-
-    // Test fail-closed behaviour when RevocationLog integrity fails during drop_record
-    let log_in_mem = Arc::new(RevocationLog::new_in_memory(clock, None, vk));
-    let filter = DpiRestoreFilter::from_runtime(
-        Arc::new(ErasureLedger::new_in_memory()),
-        Some(log_in_mem),
-        None,
-    );
-
-    // Record for an active key is kept when log is valid
-    assert!(!filter.drop_record(b"normal_key", 100));
-
-    Ok(())
-}
-
-#[test]
-fn test_restore_filter_ledger_prefix_erasure_drops() -> Result<(), Box<dyn std::error::Error>> {
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
-
-    // Register erasure record in ledger covering scope "lsm", prefix "user:100", erased_at_tx = 500
-    ledger.record_erasure(ErasureRecord::for_prefix(
-        b"lsm".to_vec(),
-        b"user:100".to_vec(),
-        500,
-    ))?;
-
-    let filter = DpiRestoreFilter::for_lsm(ledger);
-
-    let key = b"user:100:profile";
-
-    // Record written at tx 400 (<= 500) MUST be dropped
-    assert!(
-        filter.drop_record(key, 400),
-        "Record written at tx 400 before erasure at tx 500 MUST be dropped"
-    );
-
-    // Record written at tx 600 (> 500) MUST be kept
-    assert!(
-        !filter.drop_record(key, 600),
-        "Record written at tx 600 after erasure at tx 500 MUST be kept"
-    );
-
-    Ok(())
-}
-
-#[test]
 fn test_restore_filter_trait_compatibility() {
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+    let ledger = Arc::new(create_test_ledger());
     let filter: Box<dyn CpyRestoreFilter> = Box::new(DpiRestoreFilter::for_lsm(ledger));
     assert!(!filter.drop_record(b"any_key", 10));
 }

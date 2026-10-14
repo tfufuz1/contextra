@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
 
+use contextra_crypto::deletion_proof::claim_text::WitAssurance;
 use contextra_engine::collection::crud::DocEraseOptions;
+use contextra_engine::deletion::forget_options::ForgetOptions;
 use contextra_engine::Contextra;
-use contextra_types::DocId;
+use contextra_types::{ContextraError, DocId};
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_witnesses_issued_on_erase_document() {
+async fn test_witnesses_not_fabricated_on_erase_document() {
     let tmp = TempDir::new().expect("temp dir");
     let db = Contextra::open(tmp.path()).await.expect("open db");
 
@@ -22,16 +24,39 @@ async fn test_witnesses_issued_on_erase_document() {
         .await
         .expect("insert");
 
-    let opts = DocEraseOptions::default();
+    let opts = DocEraseOptions {
+        options: ForgetOptions {
+            assurance: WitAssurance::S0,
+            ..ForgetOptions::default()
+        },
+    };
     let erasure = col.erase_document(doc_id, &opts).await.expect("erase");
 
     assert!(
-        !erasure.witnesses.is_empty(),
-        "erase_document MUST collect witnesses"
+        erasure.witnesses.is_empty(),
+        "REG-14: erase_document must NOT fabricate witnesses without genuine scan"
     );
+
+    db.close().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_assurance_above_s0_unsupported() {
+    let tmp = TempDir::new().expect("temp dir");
+    let db = Contextra::open(tmp.path()).await.expect("open db");
+    let col = db.collection("default").await.expect("col");
+
+    let opts = DocEraseOptions {
+        options: ForgetOptions {
+            assurance: WitAssurance::S1,
+            ..ForgetOptions::default()
+        },
+    };
+    let res = col.erase_document("doc_id", &opts).await;
     assert!(
-        erasure.witnesses.len() >= 2,
-        "Expected text and relations witnesses at least"
+        matches!(res, Err(ContextraError::CapabilityUnsupported { .. })),
+        "Assurance > S0 must return CapabilityUnsupported: {:?}",
+        res
     );
 
     db.close().await.unwrap();

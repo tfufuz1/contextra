@@ -12,8 +12,10 @@ use contextra_engine::deletion::text_witness::{
     issue_text_index_witness, scan_and_issue_text_index_witness,
 };
 use contextra_ports::{StorageEngine, TextIndex};
+use contextra_store::{LsmConfig, LsmStorage};
 use contextra_text::inverted::InvertedIndex;
 use contextra_types::{DocId, TxId};
+use std::sync::Arc;
 use tempfile::TempDir;
 
 #[tokio::test]
@@ -25,7 +27,7 @@ async fn test_relations_real_scan_lifecycle_and_mutation() {
 
     let doc_id = DocId::from_key("canary_doc_rel_1").unwrap();
     let scope_hash = [42u8; 32];
-    let as_of_tx = TxId::internal(100);
+    let as_of_tx = TxId(100);
     let user_id = "canary_doc_rel_1";
     let rel_prefix = b"__rel:";
 
@@ -96,15 +98,21 @@ async fn test_relations_real_scan_lifecycle_and_mutation() {
 #[tokio::test]
 async fn test_text_index_real_scan_lifecycle_and_mutation() {
     let tmp = TempDir::new().expect("temp dir");
-    let storage = contextra_store::LsmStorage::open(tmp.path())
-        .await
-        .expect("open storage");
+    let lsm_config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.expect("open storage"));
 
-    let index = InvertedIndex::new(storage, contextra_text::Language::English);
+    let index = InvertedIndex::new_with_language(
+        storage,
+        "default",
+        contextra_text::Language::English,
+    );
     let doc_id = DocId::from_key("canary_doc_text_1").unwrap();
     let term_bytes = vec![b"canary_term".to_vec()];
     let scope_hash = [77u8; 32];
-    let as_of_tx = TxId::internal(200);
+    let as_of_tx = TxId(200);
 
     // 1. Insert text document
     index
@@ -154,7 +162,7 @@ async fn test_text_index_real_scan_lifecycle_and_mutation() {
 fn test_missing_scan_claim_fails_closed() {
     let doc_id = DocId::from_key("doc_no_scan").unwrap();
     let scope_hash = [99u8; 32];
-    let as_of_tx = TxId::internal(300);
+    let as_of_tx = TxId(300);
 
     // Without a scan claim (None), both witness functions MUST fail closed
     let rel_res = issue_relations_witness(doc_id, 10, scope_hash, as_of_tx, None);
@@ -165,7 +173,7 @@ fn test_missing_scan_claim_fails_closed() {
 
     let text_res = issue_text_index_witness(
         doc_id,
-        &[vec![b"term".to_vec()]],
+        &[b"term".to_vec()],
         scope_hash,
         as_of_tx,
         None,

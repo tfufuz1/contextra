@@ -10,6 +10,7 @@ use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_store::lsm::witness::ZeuIssueRequest;
 use contextra_store::LsmStorage;
+use std::sync::Arc;
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use serde::Serialize;
 
@@ -73,10 +74,28 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // (a) Key lock
         let _key_guard = self.kv_locks.lock_for(id).await;
 
+        // Allocate TxId for Ledger and Tombstones
+        let db_tx = match self.begin_transaction() {
+            Ok(tx) => tx,
+            Err(err) => return Err(err),
+        };
+        let erased_at_tx = db_tx.tx_id;
+
         // Compute Footprint first to get exact keys/prefixes
         let footprint = self.erasure_footprint(doc_id).await?;
 
-        let maybe_lsm = (self.storage.as_ref() as &dyn std::any::Any).downcast_ref::<LsmStorage>();
+        let maybe_lsm = (self.storage.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<LsmStorage>()
+            .or_else(|| {
+                (self.storage.as_ref() as &dyn std::any::Any)
+                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>()
+                    .map(|s| s.inner_storage().as_ref())
+            })
+            .or_else(|| {
+                (self.storage.as_ref() as &dyn std::any::Any)
+                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<LsmStorage>>()
+                    .map(|s| s.inner_storage())
+            });
 
         let scope_write_seq_before = if let Some(lsm) = maybe_lsm {
             lsm.erasure_fence

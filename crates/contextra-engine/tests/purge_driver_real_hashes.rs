@@ -200,6 +200,7 @@ async fn test_purge_driver_stage2_real_hashes_and_tenant() {
         .expect("run_physical failed");
 
     match handle {
+        PurgeHandle::Pending { .. } => panic!("Expected Final handle, got Pending"),
         PurgeHandle::Final(phys_handle) => {
             let proof_data =
                 std::fs::read(&phys_handle.proof_path).expect("Failed to read Stage 2 proof file");

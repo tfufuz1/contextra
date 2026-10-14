@@ -33,6 +33,7 @@ pub mod collection;
 #[cfg(not(loom))]
 pub mod decay_controller;
 pub mod deletion;
+pub mod erasure_supervisor;
 #[cfg(not(loom))]
 pub mod export;
 #[cfg(feature = "entity-extraction")]
@@ -92,6 +93,7 @@ pub use deletion::{
     DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
     PurgeHandle, VerifyDepth, Wait,
 };
+pub use erasure_supervisor::ErasureSupervisor;
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
@@ -361,7 +363,7 @@ impl Default for ContextraConfig {
             orphan_registry_path: None,
             community_detection: CommunityDetectionConfig::default(),
             embedding_backend: EmbeddingBackend::None,
-            consolidation_enabled: true,
+            consolidation_enabled: false,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
             consolidation_launcher: None,

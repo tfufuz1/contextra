@@ -302,6 +302,8 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) kv_store: Option<Arc<dyn KvLifecycleHooks>>,
     /// Feature-independent KV lifecycle hooks port.
     pub(super) kv_hooks: parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>,
+    /// Erasure lifecycle hooks port.
+    pub(super) erasure_hooks: parking_lot::RwLock<Option<Arc<dyn contextra_ports::ErasureHooks>>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
     pub(super) mutations_since_community_detection: Arc<AtomicU64>,
     /// Trigger-Schwelle: bei Überschreitung wird Community Detection geplant (Default: 100, 0 = deaktiviert).
@@ -337,6 +339,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             #[cfg(feature = "encryption-at-rest")]
             kv_store: self.kv_store.clone(),
             kv_hooks: parking_lot::RwLock::new(self.kv_hooks.read().as_ref().map(Arc::clone)),
+            erasure_hooks: parking_lot::RwLock::new(self.erasure_hooks.read().as_ref().map(Arc::clone)),
             mutations_since_community_detection: self.mutations_since_community_detection.clone(),
             community_detection_trigger_threshold: self
                 .community_detection_trigger_threshold
@@ -420,6 +423,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             #[cfg(feature = "encryption-at-rest")]
             kv_store: None,
             kv_hooks: parking_lot::RwLock::new(None),
+            erasure_hooks: parking_lot::RwLock::new(None),
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
@@ -521,9 +525,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.kv_hooks.read().as_ref().map(Arc::clone)
     }
 
-    /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
-    /// otherwise defaulting to `TenantId::default()`).
-    pub fn tenant_id(&self) -> contextra_types::TenantId {
+    /// Attempts fail-closed tenant ID extraction from `TenantScopedStorage`.
+    pub fn try_tenant_id(&self) -> Result<contextra_types::TenantId> {
         (self.storage.as_ref() as &dyn std::any::Any)
             .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>()
             .map(|s| s.tenant_id())
@@ -533,7 +536,39 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     )
                     .map(|s| s.tenant_id())
             })
-            .unwrap_or_default()
+            .ok_or_else(|| {
+                contextra_types::ContextraError::InvalidInput(
+                    "Storage engine is not tenant-scoped".to_string(),
+                )
+            })
+    }
+
+    /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
+    /// defaulting to `TenantId::SYSTEM`).
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        self.try_tenant_id().unwrap_or(contextra_types::TenantId::SYSTEM)
+    }
+
+    /// Attaches ErasureHooks port implementation to the collection.
+    pub fn with_erasure_hooks(self, hooks: Arc<dyn contextra_ports::ErasureHooks>) -> Self {
+        *self.erasure_hooks.write() = Some(hooks);
+        self
+    }
+
+    /// Attaches ErasureHooks port implementation to the collection.
+    pub fn with_kv_hooks_erasure(self, hooks: Arc<dyn contextra_ports::ErasureHooks>) -> Self {
+        *self.erasure_hooks.write() = Some(hooks);
+        self
+    }
+
+    /// Sets ErasureHooks port implementation on the collection.
+    pub fn set_erasure_hooks(&self, hooks: Arc<dyn contextra_ports::ErasureHooks>) {
+        *self.erasure_hooks.write() = Some(hooks);
+    }
+
+    /// Returns a cloned reference to the attached `ErasureHooks`, if configured.
+    pub fn erasure_hooks(&self) -> Option<Arc<dyn contextra_ports::ErasureHooks>> {
+        self.erasure_hooks.read().as_ref().map(Arc::clone)
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
@@ -564,16 +599,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self
     }
 
-    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    #[cfg(feature = "encryption-at-rest")]
-    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
-        self.kv_store.as_ref()
-    }
-
-    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
-        None
+    /// Returns a reference handle to the attached `KvLifecycleHooks`, delegating to `kv_hooks()`.
+    pub fn kv_store(&self) -> Option<Arc<dyn KvLifecycleHooks>> {
+        self.kv_hooks()
     }
 
     /// Sets the text embedder for this collection (consuming version).

@@ -17,6 +17,26 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Externe Crates verwenden diese Methode statt eigener TxId-Generierung.
     /// Verhindert TxId-Kollisionen bei paralleler Ingestion (EMBED_CONCURRENCY > 1).
     pub fn allocate_tx(&self) -> Result<TxId> {
+        let storage_seq = (self.storage.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<contextra_store::LsmStorage>()
+            .map(|lsm| lsm.last_applied_seq())
+            .or_else(|| {
+                (self.storage.as_ref() as &dyn std::any::Any)
+                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<std::sync::Arc<contextra_store::LsmStorage>>>()
+                    .map(|s| s.inner_storage().last_applied_seq())
+            })
+            .or_else(|| {
+                (self.storage.as_ref() as &dyn std::any::Any)
+                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<contextra_store::LsmStorage>>()
+                    .map(|s| s.inner_storage().last_applied_seq())
+            })
+            .unwrap_or(0);
+
+        let current_next = self.next_tx.load(Ordering::SeqCst);
+        if storage_seq >= current_next {
+            self.next_tx.store(storage_seq + 1, Ordering::SeqCst);
+        }
+
         let id = self.next_tx.fetch_add(1, Ordering::SeqCst);
         if id > TxId::MAX_COLLECTION_SEQUENCE {
             return Err(contextra_types::ContextraError::Transaction(

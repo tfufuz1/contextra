@@ -30,7 +30,12 @@ async fn test_e2e_insert_erase_search_empty_proof_verified() {
     assert!(!pre_results.is_empty(), "Document MUST be found before erasure");
 
     // 1. Execute document erasure/forget
-    let erase_opts = DocEraseOptions::default();
+    let erase_opts = DocEraseOptions {
+        options: contextra_engine::deletion::forget_options::ForgetOptions {
+            assurance: contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
+            ..Default::default()
+        },
+    };
     let doc_erasure = col
         .erase_document(doc_id, &erase_opts)
         .await
