@@ -149,7 +149,11 @@ impl SimFs {
         let mut rng = DstRng::new(seed);
         let mut state = self.state.write();
         let cfg = self.config.read();
-        let sector_size = if cfg.sector_size == 0 { 4096 } else { cfg.sector_size };
+        let sector_size = if cfg.sector_size == 0 {
+            4096
+        } else {
+            cfg.sector_size
+        };
 
         let mut durable_updates = Vec::new();
 
@@ -252,13 +256,19 @@ impl SimFs {
 
     fn check_write_fault(&self) -> io::Result<()> {
         if self.crashed.load(Ordering::SeqCst) {
-            return Err(io::Error::new(ErrorKind::BrokenPipe, "SimFs simulated crash"));
+            return Err(io::Error::new(
+                ErrorKind::BrokenPipe,
+                "SimFs simulated crash",
+            ));
         }
         let cfg = self.config.read();
         let count = self.write_count.fetch_add(1, Ordering::SeqCst);
         if let Some(limit) = cfg.fail_writes_after {
             if count >= limit {
-                return Err(io::Error::new(ErrorKind::WriteZero, "Simulated write failure"));
+                return Err(io::Error::new(
+                    ErrorKind::WriteZero,
+                    "Simulated write failure",
+                ));
             }
         }
         if let Some(limit) = cfg.enospc_after {
@@ -271,7 +281,10 @@ impl SimFs {
 
     fn check_read_fault(&self) -> io::Result<()> {
         if self.crashed.load(Ordering::SeqCst) {
-            return Err(io::Error::new(ErrorKind::BrokenPipe, "SimFs simulated crash"));
+            return Err(io::Error::new(
+                ErrorKind::BrokenPipe,
+                "SimFs simulated crash",
+            ));
         }
         let cfg = self.config.read();
         let count = self.read_count.fetch_add(1, Ordering::SeqCst);
@@ -285,7 +298,10 @@ impl SimFs {
 
     fn check_sync_fault(&self) -> io::Result<()> {
         if self.crashed.load(Ordering::SeqCst) {
-            return Err(io::Error::new(ErrorKind::BrokenPipe, "SimFs simulated crash"));
+            return Err(io::Error::new(
+                ErrorKind::BrokenPipe,
+                "SimFs simulated crash",
+            ));
         }
         let cfg = self.config.read();
         let count = self.sync_count.fetch_add(1, Ordering::SeqCst);
