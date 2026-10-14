@@ -478,3 +478,82 @@ fn test_e2e_negative_revoked_key_and_missing_log_fails_closed() {
     );
     assert!(matches!(res, Err(CryptoError::IntegrityViolation)));
 }
+
+#[test]
+fn test_e2e_kms_rotation_and_old_proof_verification() {
+    let tmp = tempdir().expect("tempdir failed");
+    let initial_signer = Arc::new(ProofKeyPairSigner::generate(&mut OsRng));
+    let initial_public_key = initial_signer.public_key();
+
+    let rev_sk = SigningKey::generate(&mut OsRng);
+    let rev_vk = rev_sk.verifying_key();
+    let clock = Arc::new(SystemClock::new());
+
+    let deps = DeletionProofWiringDeps {
+        storage_dir: tmp.path().to_path_buf(),
+        signer: initial_signer,
+        db_instance_id: [0x77; 16],
+        clock: clock.clone(),
+        revocation_log: None,
+        revocation_signing_key: Some(rev_sk.clone()),
+        revocation_verifying_key: rev_vk,
+        has_existing_keys: false,
+    };
+
+    let wiring = DeletionProofWiring::build(deps).expect("initial wiring build failed");
+
+    let deleted_keys_hash = [0xAAu8; 32];
+    let footprint_hash = [0xBBu8; 32];
+    let probe = MockStoreProbe {
+        generation: 1,
+        write_seq: 10,
+    };
+    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+
+    let req = IssRequest {
+        scope: DeletionScope::Document {
+            doc_id: DocId(700),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        },
+        storage_scope: "doc:700".to_string(),
+        deleted_keys_hash,
+        footprint_hash,
+        observed_empty: false,
+        deleted_after_tx: 10,
+        stage: 1,
+        supersedes: None,
+        assurance: WitAssurance::S0,
+        witnesses: vec![witness],
+        extra_exclusions: vec![],
+        environment_tlv: vec![],
+        wal_chain_receipt: None,
+    };
+
+    let issued_old = wiring
+        .issue_proof(req, &[&probe])
+        .expect("issue proof with old key failed");
+
+    // Execute Key Rotation: New signer generated
+    let new_signer = Arc::new(ProofKeyPairSigner::generate(&mut OsRng));
+
+    let deps_rotated = DeletionProofWiringDeps {
+        storage_dir: tmp.path().to_path_buf(),
+        signer: new_signer.clone(),
+        db_instance_id: [0x77; 16],
+        clock,
+        revocation_log: Some(wiring.revocation_log()),
+        revocation_signing_key: None,
+        revocation_verifying_key: rev_vk,
+        has_existing_keys: true,
+    };
+
+    let rotated_wiring = DeletionProofWiring::build(deps_rotated).expect("rotated wiring build failed");
+    assert_ne!(rotated_wiring.public_key(), initial_public_key);
+
+    // Old proof remains verifiably valid when checked against the initial_public_key
+    let old_report = DeletionProofWiring::verify_external(&initial_public_key, &issued_old.proof);
+    assert!(
+        old_report.is_valid,
+        "Proof issued prior to key rotation MUST remain externally verifiable against historical public key"
+    );
+}
