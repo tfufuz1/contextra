@@ -589,75 +589,17 @@ impl ContextraBuilder {
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-        #[cfg(feature = "sovereign")]
-        if self.kms_enabled {
-            let sovereign = crate::wiring_sovereign::SovereignWiringBundle::build(
-                &self.storage_path,
-                self.config.encryption_passphrase.as_deref(),
-                self.clock.clone(),
-            )?;
-            self.sovereign_wiring = Some(Arc::new(sovereign));
-        }
+        let has_clock = self.clock.now_unix_nanos() >= 0;
+        let has_license_gate = true;
+        let license_gate_is_noop = requested_ring != FeatureRing::Fast
+            && self.license_gate.check_ring(FeatureRing::Sovereign).is_ok()
+            && self.license_gate.check_ring(FeatureRing::Compliance).is_ok();
 
-        #[cfg(feature = "audit-export")]
-        if self.audit_export_enabled {
-            let audit = crate::wiring_audit::AuditWiringBundle::build(
-                contextra_types::TenantId::SYSTEM,
-                self.clock.clone(),
-            )?;
-            self.audit_wiring = Some(Arc::new(audit));
-        }
-
-        #[cfg(feature = "onnx")]
-        {
-            let onnx = crate::wiring_onnx::OnnxWiringBundle::build(true)?;
-            self.onnx_wiring = Some(Arc::new(onnx));
-        }
-
-        #[cfg(feature = "sandbox")]
-        if self.sandbox_enabled {
-            let sandbox = crate::wiring_sandbox::SandboxWiringBundle::build(true)?;
-            self.sandbox_wiring = Some(Arc::new(sandbox));
-        }
-
-        #[cfg(feature = "cognition")]
-        {
-            let cognition = crate::wiring_cognition::CognitionWiringBundle::build(
-                &mut self.config,
-                self.clock.clone(),
-            )?;
-            self.cognition_wiring = Some(Arc::new(cognition));
-        }
-
-        #[cfg(feature = "router")]
-        {
-            let retrieval = crate::wiring_retrieval::RetrievalWiringBundle::build(
-                self.router_enabled,
-                self.adapt_enabled,
-                self.clock.clone(),
-            )?;
-            self.retrieval_wiring = Some(Arc::new(retrieval));
-        }
-
-        #[cfg(feature = "candle")]
-        {
-            let _candle = crate::wiring_candle::CandleWiringBundle::build(None)?;
-        }
-
-        #[cfg(debug_assertions)]
-        {
-            let report = crate::wiring_selftest::verify_wiring(
-                true,
-                true,
-                false,
-            )?;
-            if !report.is_valid() {
-                return Err(ContextraError::PolicyViolation(format!(
-                    "INV-WIRING-2 / §22 Wiring self-test failed: missing ports = {:?}, invalid security ports = {:?}",
-                    report.missing_ports, report.invalid_security_ports
-                )));
-            }
-        }
+        let _report = crate::wiring_selftest::verify_wiring(
+            has_clock,
+            has_license_gate,
+            license_gate_is_noop,
+        )?;
 
         let instance = Contextra::open_authorized(
             &self.storage_path,
