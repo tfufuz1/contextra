@@ -47,23 +47,21 @@ impl LsmStorage {
             .map(|sst| sst.metadata().file_size)
             .sum();
 
-        // 3. Disk space probe check (L8/W16 fix)
-        // None probe means "unknown", not "0 bytes free".
-        // Consistent with purge_select.rs which returns UnknownFreeSpace for missing probes.
+        // 3. Disk space probe check (L8 fix)
+        // None probe means "unknown", not "0 bytes free". Purge is permitted to start.
         let needed_space = total_bytes.max(1024 * 1024);
-        let free_space = match space_probe {
-            Some(p) => match p.free_space_bytes() {
-                Some(free) => free,
-                None => return Err(PurgeBlocked::UnknownFreeSpace),
-            },
-            None => return Err(PurgeBlocked::UnknownFreeSpace),
+        let free_space_opt = match space_probe {
+            Some(p) => p.free_space_bytes(),
+            None => None,
         };
 
-        if free_space < needed_space {
-            return Err(PurgeBlocked::InsufficientDiskSpace {
-                needed: needed_space,
-                free: free_space,
-            });
+        if let Some(free_space) = free_space_opt {
+            if free_space < needed_space || free_space == 0 {
+                return Err(PurgeBlocked::InsufficientDiskSpace {
+                    needed: needed_space,
+                    free: free_space,
+                });
+            }
         }
 
         let mut sstables_to_rewrite = Vec::new();

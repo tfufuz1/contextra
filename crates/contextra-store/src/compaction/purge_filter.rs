@@ -2,6 +2,8 @@
 // STAND: 2026-10-11
 // ZWECK: Traits und Typen für Purge-Compaction Record Filter und Disk Space Probes.
 
+use std::path::PathBuf;
+
 /// Hook/Filter called during compaction to decide whether a record should be dropped.
 pub trait CompactionRecordFilter: Send + Sync {
     /// Returns true if the record with key and transaction sequence/id should be dropped.
@@ -12,6 +14,24 @@ pub trait CompactionRecordFilter: Send + Sync {
 pub trait FreeSpaceProbe: Send + Sync {
     /// Returns available disk space in bytes, or None if space estimation failed/unsupported.
     fn free_space_bytes(&self) -> Option<u64>;
+}
+
+/// Production disk space probe using `statvfs` via `contextra-sys`.
+pub struct StatvfsSpaceProbe {
+    path: PathBuf,
+}
+
+impl StatvfsSpaceProbe {
+    /// Creates a new `StatvfsSpaceProbe` monitoring the filesystem at `path`.
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+}
+
+impl FreeSpaceProbe for StatvfsSpaceProbe {
+    fn free_space_bytes(&self) -> Option<u64> {
+        contextra_sys::statvfs_available_bytes(&self.path).ok()
+    }
 }
 
 /// Purge scope specification.

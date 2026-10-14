@@ -21,5 +21,5 @@ pub use durability::{
 pub use env_observe::*;
 pub use mlock::{mem_lock, mem_unlock};
 pub use mmap::mmap_readonly;
-pub use posix::reopen_and_dup2;
+pub use posix::{reopen_and_dup2, statvfs_available_bytes};
 pub use vault::LockedRegions;

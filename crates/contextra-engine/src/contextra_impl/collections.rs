@@ -31,7 +31,6 @@ pub struct DropCollectionReport {
     pub physical_purge: PhysicalPurgeStatus,
 }
 
-#[cfg(feature = "encryption-at-rest")]
 fn hex_encode_32_col(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
     for b in bytes {
@@ -377,22 +376,11 @@ impl Contextra {
         tenant_id: TenantId,
         proof_key: &[u8],
     ) -> Result<DropCollectionReport> {
-        #[cfg(not(feature = "encryption-at-rest"))]
-        {
-            let _ = (name, tenant_id, proof_key);
-            return Err(contextra_types::ContextraError::capability_unsupported(
-                "deletion_proof",
-                "encryption-at-rest feature is required for cryptographic deletion proof generation",
+        if proof_key.len() < 32 || proof_key.iter().all(|&b| b == 0) {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Proof key must be at least 32 bytes long and cannot be all zeroes",
             ));
         }
-
-        #[cfg(feature = "encryption-at-rest")]
-        {
-            if proof_key.len() < 32 || proof_key.iter().all(|&b| b == 0) {
-                return Err(contextra_types::ContextraError::invalid_input(
-                    "Proof key must be at least 32 bytes long and cannot be all zeroes",
-                ));
-            }
 
             if name == "default" {
                 return Err(contextra_types::ContextraError::invalid_input(
@@ -588,7 +576,6 @@ impl Contextra {
                 proof,
                 physical_purge: physical_purge_status,
             })
-        }
     }
 
     /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.

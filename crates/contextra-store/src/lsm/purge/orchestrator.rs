@@ -410,7 +410,7 @@ impl<'a> PurgeOrchestrator<'a> {
                 return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
             }
         }
-        #[cfg(any(test, feature = "fault-injection"))]
+        #[cfg(feature = "fault-injection")]
         if std::env::var(format!("PURGE_FAILPOINT_{}", name)).is_ok() {
             return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
         }

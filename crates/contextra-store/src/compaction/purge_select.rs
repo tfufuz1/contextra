@@ -102,22 +102,22 @@ pub fn select_purge_candidates(
         .map(|idx| Arc::clone(&sstables[idx]))
         .collect();
 
-    // (c) Disk space pre-flight check
+    // (c) Disk space pre-flight check (L8 fix)
+    // None probe means "unknown", not "0 bytes free". Purge is permitted to start.
     let needed_bytes: u64 = candidates.iter().map(|s| s.metadata().file_size).sum();
 
-    let free_space = match space_probe {
-        Some(probe) => match probe.free_space_bytes() {
-            Some(free) => free,
-            None => return Err(PurgeBlocked::UnknownFreeSpace),
-        },
-        None => return Err(PurgeBlocked::UnknownFreeSpace),
+    let free_space_opt = match space_probe {
+        Some(probe) => probe.free_space_bytes(),
+        None => None,
     };
 
-    if free_space < needed_bytes {
-        return Err(PurgeBlocked::InsufficientDiskSpace {
-            needed: needed_bytes,
-            free: free_space,
-        });
+    if let Some(free_space) = free_space_opt {
+        if free_space < needed_bytes || free_space == 0 {
+            return Err(PurgeBlocked::InsufficientDiskSpace {
+                needed: needed_bytes,
+                free: free_space,
+            });
+        }
     }
 
     Ok(candidates)
