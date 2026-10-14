@@ -2,6 +2,7 @@
 mod tests {
     use super::super::*;
     use contextra_core::ContextraError;
+    use numpy::PyArrayMethods;
     use pyo3::exceptions::*;
     use pyo3::prelude::*;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -305,7 +306,6 @@ mod tests {
 
     #[test]
     fn test_gil_not_held_during_blocking_ops() {
-        use numpy::PyArrayMethods;
         pyo3::prepare_freethreaded_python();
         let temp_dir =
             std::env::temp_dir().join(format!("contextra_gil_test_{}", std::process::id()));
@@ -421,17 +421,52 @@ mod tests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             register_contextra_module(py);
-            let temp_dir1 = std::env::temp_dir().join(format!("contextra_tenant_1_{}", std::process::id()));
-            let temp_dir2 = std::env::temp_dir().join(format!("contextra_tenant_2_{}", std::process::id()));
+            let temp_dir = std::env::temp_dir().join(format!("contextra_tenant_iso_{}", std::process::id()));
+            let db_path = temp_dir.to_str().unwrap();
 
-            let db1 = open(py, temp_dir1.to_str().unwrap(), 128, None, None, None, Some(101)).expect("open db1");
-            let db2 = open(py, temp_dir2.to_str().unwrap(), 128, None, None, None, Some(202)).expect("open db2");
+            // 1. Open database with tenant 1001
+            let db_t1 = open(py, db_path, 128, None, None, None, Some(1001)).expect("open db_t1");
+            assert_eq!(db_t1.tenant_id(), 1001);
 
-            assert_eq!(db1.tenant_id(), 101);
-            assert_eq!(db2.tenant_id(), 202);
+            // 2. Derive tenant 2002 via with_tenant
+            let db_t2 = db_t1.with_tenant(2002).expect("with_tenant 2002");
+            assert_eq!(db_t2.tenant_id(), 2002);
 
-            let _ = std::fs::remove_dir_all(temp_dir1);
-            let _ = std::fs::remove_dir_all(temp_dir2);
+            // 3. Verify invalid tenant ID (0) fails
+            assert!(db_t1.with_tenant(0).is_err());
+
+            // 4. Tenant 1001 inserts a document in default collection
+            let dummy_v = vec![0.1f32; 128];
+            let py_v1 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            let doc_id = "shared_doc_id";
+            db_t1.insert(py, &doc_id.into_pyobject(py).unwrap(), py_v1, None).expect("t1 insert");
+
+            // Tenant 1001 sees the document
+            let doc_t1 = db_t1.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t1 get");
+            assert!(doc_t1.is_some());
+
+            // Tenant 2002 does NOT see tenant 1001's document
+            let doc_t2 = db_t2.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t2 get");
+            assert!(doc_t2.is_none(), "Tenant 2002 must not see Tenant 1001's document");
+
+            let py_v_search = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            let search_t2 = db_t2.search(py, py_v_search, 10).expect("t2 search");
+            assert!(search_t2.is_empty(), "Tenant 2002 search must be empty");
+
+            // 5. Test named collections
+            let col_t1 = db_t1.collection("shared_catalog", py).expect("col_t1");
+            assert_eq!(col_t1.tenant_id(), 1001);
+
+            let col_t2 = col_t1.with_tenant(2002, py).expect("col_t1 with_tenant 2002");
+            assert_eq!(col_t2.tenant_id(), 2002);
+
+            let py_v2 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            col_t1.insert(py, &"col_doc_id".into_pyobject(py).unwrap(), py_v2, None).expect("col_t1 insert");
+
+            assert!(col_t1.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_some());
+            assert!(col_t2.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_none(), "Tenant 2002 collection must not see Tenant 1001's collection document");
+
+            let _ = std::fs::remove_dir_all(temp_dir);
         });
     }
 }
