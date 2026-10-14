@@ -46,6 +46,7 @@ pub mod fusion;
 pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
+pub mod lifecycle;
 pub mod limits;
 pub mod metrics_names;
 pub mod no_graph_stubs;
@@ -92,6 +93,7 @@ pub use deletion::{
     DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
     PurgeHandle, VerifyDepth, Wait,
 };
+pub use lifecycle::{EngineLifecycle, ErasureSupervisor};
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
