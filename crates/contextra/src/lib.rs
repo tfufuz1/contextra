@@ -9,7 +9,14 @@ pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
+pub mod wiring_audit;
+pub mod wiring_candle;
+pub mod wiring_cognition;
+pub mod wiring_onnx;
+pub mod wiring_retrieval;
+pub mod wiring_sandbox;
 pub mod wiring_selftest;
+pub mod wiring_sovereign;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;

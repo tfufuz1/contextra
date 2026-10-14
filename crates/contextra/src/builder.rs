@@ -43,6 +43,19 @@ pub struct ContextraBuilder {
     kms_enabled: bool,
     kv_shredding_enabled: bool,
     checkpoint_enabled: bool,
+
+    #[cfg(feature = "sovereign")]
+    pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
+    #[cfg(feature = "audit-export")]
+    pub audit_wiring: Option<Arc<crate::wiring_audit::AuditWiringBundle>>,
+    #[cfg(feature = "onnx")]
+    pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
+    #[cfg(feature = "sandbox")]
+    pub sandbox_wiring: Option<Arc<crate::wiring_sandbox::SandboxWiringBundle>>,
+    #[cfg(feature = "cognition")]
+    pub cognition_wiring: Option<Arc<crate::wiring_cognition::CognitionWiringBundle>>,
+    #[cfg(feature = "router")]
+    pub retrieval_wiring: Option<Arc<crate::wiring_retrieval::RetrievalWiringBundle>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -95,6 +108,18 @@ impl Clone for ContextraBuilder {
             kms_enabled: self.kms_enabled,
             kv_shredding_enabled: self.kv_shredding_enabled,
             checkpoint_enabled: self.checkpoint_enabled,
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: self.sovereign_wiring.clone(),
+            #[cfg(feature = "audit-export")]
+            audit_wiring: self.audit_wiring.clone(),
+            #[cfg(feature = "onnx")]
+            onnx_wiring: self.onnx_wiring.clone(),
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: self.sandbox_wiring.clone(),
+            #[cfg(feature = "cognition")]
+            cognition_wiring: self.cognition_wiring.clone(),
+            #[cfg(feature = "router")]
+            retrieval_wiring: self.retrieval_wiring.clone(),
         }
     }
 }
@@ -140,6 +165,19 @@ impl ContextraBuilder {
             kms_enabled: true,
             kv_shredding_enabled: true,
             checkpoint_enabled: true,
+
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: None,
+            #[cfg(feature = "audit-export")]
+            audit_wiring: None,
+            #[cfg(feature = "onnx")]
+            onnx_wiring: None,
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: None,
+            #[cfg(feature = "cognition")]
+            cognition_wiring: None,
+            #[cfg(feature = "router")]
+            retrieval_wiring: None,
         }
     }
 
@@ -544,6 +582,61 @@ impl ContextraBuilder {
             .license_gate
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+
+        #[cfg(feature = "sovereign")]
+        if self.kms_enabled {
+            let sovereign = crate::wiring_sovereign::SovereignWiringBundle::build(
+                &self.storage_path,
+                self.config.encryption_passphrase.as_deref(),
+                self.clock.clone(),
+            )?;
+            self.sovereign_wiring = Some(Arc::new(sovereign));
+        }
+
+        #[cfg(feature = "audit-export")]
+        if self.audit_export_enabled {
+            let audit = crate::wiring_audit::AuditWiringBundle::build(
+                contextra_types::TenantId::SYSTEM,
+                self.clock.clone(),
+            )?;
+            self.audit_wiring = Some(Arc::new(audit));
+        }
+
+        #[cfg(feature = "onnx")]
+        {
+            let onnx = crate::wiring_onnx::OnnxWiringBundle::build(true)?;
+            self.onnx_wiring = Some(Arc::new(onnx));
+        }
+
+        #[cfg(feature = "sandbox")]
+        if self.sandbox_enabled {
+            let sandbox = crate::wiring_sandbox::SandboxWiringBundle::build(true)?;
+            self.sandbox_wiring = Some(Arc::new(sandbox));
+        }
+
+        #[cfg(feature = "cognition")]
+        {
+            let cognition = crate::wiring_cognition::CognitionWiringBundle::build(
+                &mut self.config,
+                self.clock.clone(),
+            )?;
+            self.cognition_wiring = Some(Arc::new(cognition));
+        }
+
+        #[cfg(feature = "router")]
+        {
+            let retrieval = crate::wiring_retrieval::RetrievalWiringBundle::build(
+                self.router_enabled,
+                self.adapt_enabled,
+                self.clock.clone(),
+            )?;
+            self.retrieval_wiring = Some(Arc::new(retrieval));
+        }
+
+        #[cfg(feature = "candle")]
+        {
+            let _candle = crate::wiring_candle::CandleWiringBundle::build(None)?;
+        }
 
         #[cfg(debug_assertions)]
         {
