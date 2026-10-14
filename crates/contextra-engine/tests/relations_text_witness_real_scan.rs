@@ -25,7 +25,7 @@ async fn test_relations_real_scan_lifecycle_and_mutation() {
 
     let doc_id = DocId::from_key("canary_doc_rel_1").unwrap();
     let scope_hash = [42u8; 32];
-    let as_of_tx = TxId::internal(100);
+    let as_of_tx = TxId::internal_with_offset(100).unwrap();
     let user_id = "canary_doc_rel_1";
     let rel_prefix = b"__rel:";
 
@@ -96,15 +96,20 @@ async fn test_relations_real_scan_lifecycle_and_mutation() {
 #[tokio::test]
 async fn test_text_index_real_scan_lifecycle_and_mutation() {
     let tmp = TempDir::new().expect("temp dir");
-    let storage = contextra_store::LsmStorage::open(tmp.path())
+    let storage = std::sync::Arc::new(
+        contextra_store::LsmStorage::new(contextra_store::LsmConfig {
+            path: tmp.path().to_path_buf(),
+            ..Default::default()
+        })
         .await
-        .expect("open storage");
+        .expect("open storage"),
+    );
 
-    let index = InvertedIndex::new(storage, contextra_text::Language::English);
+    let index = InvertedIndex::new(storage, "default");
     let doc_id = DocId::from_key("canary_doc_text_1").unwrap();
     let term_bytes = vec![b"canary_term".to_vec()];
     let scope_hash = [77u8; 32];
-    let as_of_tx = TxId::internal(200);
+    let as_of_tx = TxId::internal_with_offset(200).unwrap();
 
     // 1. Insert text document
     index
@@ -154,7 +159,7 @@ async fn test_text_index_real_scan_lifecycle_and_mutation() {
 fn test_missing_scan_claim_fails_closed() {
     let doc_id = DocId::from_key("doc_no_scan").unwrap();
     let scope_hash = [99u8; 32];
-    let as_of_tx = TxId::internal(300);
+    let as_of_tx = TxId::internal_with_offset(300).unwrap();
 
     // Without a scan claim (None), both witness functions MUST fail closed
     let rel_res = issue_relations_witness(doc_id, 10, scope_hash, as_of_tx, None);
@@ -163,9 +168,10 @@ fn test_missing_scan_claim_fails_closed() {
         "Relations witness MUST fail closed when matching_edges_found is None"
     );
 
+    let term_bytes = vec![b"term".to_vec()];
     let text_res = issue_text_index_witness(
         doc_id,
-        &[vec![b"term".to_vec()]],
+        &term_bytes,
         scope_hash,
         as_of_tx,
         None,

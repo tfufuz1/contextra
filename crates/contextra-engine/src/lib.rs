@@ -161,7 +161,7 @@ pub struct ContextraStats {
     pub storage_stats: contextra_ports::StorageStats,
 }
 
-pub use contextra_ports::DriftStatusProvider;
+pub use contextra_ports::{DriftStatusProvider, ReadSnapshot};
 pub type DbStats = ContextraStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

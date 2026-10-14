@@ -42,7 +42,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            self.hybrid_search_with_query_at(query, seq).await
+            let snapshot = contextra_ports::ReadSnapshot::new(seq);
+            self.hybrid_search_with_query_at(query, &snapshot).await
         })
         .await
     }
@@ -52,10 +53,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
     ) -> Result<Vec<crate::SearchResult>> {
         let (results, _) = self
-            .hybrid_search_with_query_and_report_at(query, seq, SignalFailurePolicy::Fail, None)
+            .hybrid_search_with_query_and_report_at(query, snapshot, SignalFailurePolicy::Fail, None)
             .await?;
         Ok(results)
     }
@@ -65,10 +66,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_and_report_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
         on_signal_failure: SignalFailurePolicy,
         metrics: Option<&dyn MetricsSink>,
     ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
+        let seq = snapshot.max_seq();
         if query.k == 0 {
             return Ok((Vec::new(), SearchReport::default()));
         }
@@ -533,13 +535,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_and_report_at_reranked(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
         on_signal_failure: SignalFailurePolicy,
         metrics: Option<&dyn MetricsSink>,
         reranker: Option<&dyn contextra_ports::Reranker>,
     ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
         let (mut results, report) = self
-            .hybrid_search_with_query_and_report_at(query, seq, on_signal_failure, metrics)
+            .hybrid_search_with_query_and_report_at(query, snapshot, on_signal_failure, metrics)
             .await?;
 
         if let Some(r) = reranker {
