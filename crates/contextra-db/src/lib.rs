@@ -7,7 +7,6 @@
 
 #![forbid(unsafe_code)]
 
-pub use contextra_cognition as cognition;
 pub use contextra_engine as engine;
 
 // Re-exports from contextra-engine
@@ -28,52 +27,10 @@ pub use contextra_engine::collection::maintenance::PercolationResult;
 #[cfg(feature = "sandbox")]
 pub use contextra_engine::SandboxBridge;
 
-// Re-exports from contextra-cognition
-#[allow(deprecated)]
-pub use contextra_cognition::execute_sleep_cycle;
-pub use contextra_cognition::{
-    cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-    compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-    run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-    ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard, ConsolidationPhaseResult,
-    ConsolidationSession, ContextCompactor, ContextManager, MaintenanceConfig,
-    MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
-    SynthesisPhaseResult, TurnSegment,
-};
-
-pub mod context {
-    pub use contextra_cognition::context::*;
-}
-pub mod context_compaction {
-    pub use contextra_cognition::context_compaction::*;
-}
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
-pub mod synthesis_phase {
-    pub use contextra_cognition::synthesis_phase::*;
-}
-pub mod consolidation_executor {
-    pub use contextra_cognition::consolidation_executor::*;
-}
-pub mod consolidation_locks {
-    pub use contextra_cognition::consolidation_locks::*;
-}
-pub mod maintenance_scheduler {
-    pub use contextra_cognition::maintenance_scheduler::*;
-}
-pub mod maintenance_config {
-    pub use contextra_cognition::maintenance_config::*;
-}
-
 #[deprecated(note = "use background_workers instead")]
 pub mod reaper {
     pub use contextra_engine::background_workers::*;
 }
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub use contextra_cognition::start_consolidation_reaper;
 
 // mod Collection is used via pub mod collection
 pub mod decay_controller {
