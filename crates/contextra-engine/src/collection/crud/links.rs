@@ -199,8 +199,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         doc_id: DocId,
     ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        let seq = self.snapshot_seq().await?;
-        if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
+        // Explicit rationale: Link metadata (Zettelkasten edges) is structural document metadata read outside MVCC snapshot isolation
+        if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                 if let Some(obj) = meta.metadata.as_ref().and_then(|m| m.as_object()) {
                     return Ok(obj

@@ -25,7 +25,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Retrieves a document by its user-provided string ID.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn get(&self, id: &str) -> Result<Option<crate::Document>> {
-        self.get_at_snapshot(id, u64::MAX).await
+        let seq = self.snapshot_seq().await?;
+        self.get_at_snapshot(id, seq).await
     }
 
     /// Retrieves a document at a specific snapshot point.
