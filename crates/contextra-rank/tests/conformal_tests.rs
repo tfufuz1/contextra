@@ -4,7 +4,10 @@
 // ZWECK: Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
 // INVARIANTEN: INV-CALIBRATION-CONFORMAL-1 (marginal coverage guarantee, strict determinism, zero-panic input validation).
 
-use contextra_rank::{AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError};
+use contextra_rank::{
+    compute_split_conformal_threshold, AciState, AdaptiveConformalCalibrator, ConformalCalibrator,
+    ConformalError, ACI_DEFAULT_GAMMA, CONFORMAL_MIN_CALIBRATION_SAMPLES,
+};
 use contextra_types::ConfigFingerprint;
 
 struct SimpleLcg {
@@ -210,4 +213,61 @@ fn test_conformal_threshold_clamping_and_invalidation() {
     assert_eq!(cal.observation_count(), 1);
     cal.invalidate_on_config_change(fp1);
     assert_eq!(cal.observation_count(), 1);
+}
+
+// ============================================================================
+// 5. SPLIT CONFORMAL & COLD START TESTS (§9.3)
+// ============================================================================
+
+#[test]
+fn test_split_conformal_cold_start_under_30() {
+    assert_eq!(CONFORMAL_MIN_CALIBRATION_SAMPLES, 30);
+    let scores: Vec<f32> = (0..29).map(|i| i as f32 * 0.01).collect();
+    let outcome = compute_split_conformal_threshold(&scores, 0.10).unwrap();
+
+    assert!(!outcome.is_calibrated, "Expected cold start uncalibrated flag when n < 30");
+    assert_eq!(outcome.threshold, f32::INFINITY, "Expected +Inf threshold during cold start");
+    assert_eq!(outcome.sample_count, 29);
+}
+
+#[test]
+fn test_split_conformal_index_calculation_and_overflow() {
+    // 1. Exact index calculation: n = 30, alpha = 0.10
+    // k = ceil((30 + 1) * 0.9) = ceil(27.9) = 28
+    let scores: Vec<f32> = (1..=30).map(|i| i as f32 * 0.1).collect();
+    let outcome = compute_split_conformal_threshold(&scores, 0.10).unwrap();
+
+    assert!(outcome.is_calibrated);
+    assert_eq!(outcome.sample_count, 30);
+    // 28th smallest score in 1..=30 is 2.8
+    assert!((outcome.threshold - 2.8).abs() < 1e-5);
+
+    // 2. Index overflow: k > n => threshold = +Inf
+    // n = 30, alpha = 0.001 => k = ceil(31 * 0.999) = ceil(30.969) = 31 > 30
+    let overflow_outcome = compute_split_conformal_threshold(&scores, 0.001).unwrap();
+    assert!(overflow_outcome.is_calibrated);
+    assert_eq!(overflow_outcome.threshold, f32::INFINITY, "Expected +Inf when index k > n");
+}
+
+// ============================================================================
+// 6. ACI (ADAPTIVE CONFORMAL INFERENCE) DRIFT TESTS (§9.3)
+// ============================================================================
+
+#[test]
+fn test_aci_state_gamma_2_minus_8_and_update() {
+    let alpha = 0.10f32;
+    let mut aci = AciState::new(alpha).unwrap();
+
+    assert_eq!(aci.gamma(), ACI_DEFAULT_GAMMA);
+    assert_eq!(aci.gamma(), 1.0 / 256.0);
+    assert_eq!(aci.current_alpha(), alpha);
+
+    // Covered event: err_t = 0.0 => alpha_next = alpha + gamma * alpha
+    let next_a = aci.update(0.0).unwrap();
+    let expected_a = alpha + (1.0 / 256.0) * alpha;
+    assert!((next_a - expected_a).abs() < 1e-6);
+
+    // Miscovered event: err_t = 1.0 => alpha decreases
+    let next_b = aci.update(1.0).unwrap();
+    assert!(next_b < next_a, "Miscoverage should increase risk-aversion (decrease alpha)");
 }

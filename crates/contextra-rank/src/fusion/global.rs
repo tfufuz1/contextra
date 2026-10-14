@@ -67,6 +67,23 @@ impl GlobalFusionStrategy {
             return Ok(Vec::new());
         }
 
+        // 0. Input validation: reject NaN and +/-Inf weights or scores at entry
+        for (sig_name, result_set, w) in &result_sets {
+            if !w.is_finite() {
+                return Err(ContextraError::InvalidInput(format!(
+                    "Non-finite signal weight {w} for signal '{sig_name}'"
+                )));
+            }
+            for doc in result_set {
+                if !doc.score.is_finite() {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Non-finite score {} for candidate document '{}' in signal '{sig_name}'",
+                        doc.score, doc.id
+                    )));
+                }
+            }
+        }
+
         // 1. Extract community assignment for each candidate document across all signal sets.
         let mut doc_community: AHashMap<String, u64> = AHashMap::new();
         let mut total_candidates = 0usize;
@@ -160,8 +177,7 @@ impl GlobalFusionStrategy {
         // 3. Rank communities by aggregated relevance (descending score, tie-break by community_id).
         community_results.sort_by(|a, b| {
             b.aggregate_score
-                .partial_cmp(&a.aggregate_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .total_cmp(&a.aggregate_score)
                 .then_with(|| a.community_id.cmp(&b.community_id))
         });
 

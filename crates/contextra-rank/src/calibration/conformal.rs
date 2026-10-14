@@ -6,6 +6,137 @@
 use contextra_types::ConfigFingerprint;
 use thiserror::Error;
 
+/// Minimum number of calibration observations required to exit cold-start ($n_{min} = 30$).
+pub const CONFORMAL_MIN_CALIBRATION_SAMPLES: usize = 30;
+
+/// Default step-size parameter $\gamma = 2^{-8} = 1/256$ for Adaptive Conformal Inference (ACI).
+pub const ACI_DEFAULT_GAMMA: f32 = 1.0 / 256.0;
+
+/// Result of a Split Conformal threshold calculation.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SplitConformalOutcome {
+    /// Calculated quantile threshold $\hat{q}$ or $+\infty$.
+    pub threshold: f32,
+    /// Whether enough samples existed ($n \ge 30$) to calibrate the threshold.
+    pub is_calibrated: bool,
+    /// Total calibration sample count $n$.
+    pub sample_count: usize,
+}
+
+/// Computes the split conformal quantile threshold $\hat{q}$ given non-conformity scores $s_i = 1 - f(d_i)$.
+///
+/// Implements Spec §9.3:
+/// - Input scores must be finite.
+/// - Cold start: $n < 30 \implies \hat{q} = +\infty$ and `is_calibrated = false`.
+/// - Index calculation: $k = \lceil (n + 1)(1 - \alpha) \rceil$.
+/// - If $k > n \implies \hat{q} = +\infty$.
+/// - Else $\hat{q} = s_{(k)}$ (the $k$-th smallest score, 1-based index).
+pub fn compute_split_conformal_threshold(
+    scores: &[f32],
+    alpha: f32,
+) -> Result<SplitConformalOutcome, ConformalError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(ConformalError::InvalidAlpha(alpha));
+    }
+
+    for &s in scores {
+        if !s.is_finite() {
+            return Err(ConformalError::InvalidNonConformityScore(s));
+        }
+    }
+
+    let n = scores.len();
+    if n < CONFORMAL_MIN_CALIBRATION_SAMPLES {
+        return Ok(SplitConformalOutcome {
+            threshold: f32::INFINITY,
+            is_calibrated: false,
+            sample_count: n,
+        });
+    }
+
+    let mut sorted_scores = scores.to_vec();
+    sorted_scores.sort_by(|a, b| a.total_cmp(b));
+
+    let k_ceil = ((n as f64 + 1.0) * (1.0 - alpha as f64)).ceil() as usize;
+
+    let threshold = if k_ceil > n {
+        f32::INFINITY
+    } else {
+        sorted_scores[k_ceil - 1]
+    };
+
+    Ok(SplitConformalOutcome {
+        threshold,
+        is_calibrated: true,
+        sample_count: n,
+    })
+}
+
+/// Adaptive Conformal Inference (ACI) state tracking dynamic miscoverage rate $\alpha_t$ under drift (§9.3).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AciState {
+    alpha_target: f32,
+    alpha_current: f32,
+    gamma: f32,
+    step_count: u64,
+}
+
+impl AciState {
+    /// Creates a new `AciState` with target error rate $\alpha$ and step size $\gamma = 2^{-8}$.
+    pub fn new(alpha: f32) -> Result<Self, ConformalError> {
+        Self::with_gamma(alpha, ACI_DEFAULT_GAMMA)
+    }
+
+    /// Creates an `AciState` with explicit step size $\gamma$.
+    pub fn with_gamma(alpha: f32, gamma: f32) -> Result<Self, ConformalError> {
+        if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+            return Err(ConformalError::InvalidAlpha(alpha));
+        }
+        if !gamma.is_finite() || gamma <= 0.0 {
+            return Err(ConformalError::InvalidLearningRate(gamma));
+        }
+        Ok(Self {
+            alpha_target: alpha,
+            alpha_current: alpha,
+            gamma,
+            step_count: 0,
+        })
+    }
+
+    /// Returns current active error rate $\alpha_t$.
+    pub fn current_alpha(&self) -> f32 {
+        self.alpha_current
+    }
+
+    /// Returns target error rate $\alpha$.
+    pub fn target_alpha(&self) -> f32 {
+        self.alpha_target
+    }
+
+    /// Returns step size $\gamma$.
+    pub fn gamma(&self) -> f32 {
+        self.gamma
+    }
+
+    /// Returns total ACI update step count.
+    pub fn step_count(&self) -> u64 {
+        self.step_count
+    }
+
+    /// Updates $\alpha_t$ based on coverage error $err_t \in \{0.0, 1.0\}$:
+    /// $\alpha_{t+1} = \text{clamp}(\alpha_t + \gamma \cdot (\alpha - err_t), 0.0, 1.0)$.
+    pub fn update(&mut self, err_t: f32) -> Result<f32, ConformalError> {
+        if !err_t.is_finite() || !(0.0..=1.0).contains(&err_t) {
+            return Err(ConformalError::InvalidNonConformityScore(err_t));
+        }
+
+        let next = self.alpha_current + self.gamma * (self.alpha_target - err_t);
+        self.alpha_current = next.clamp(0.0, 1.0);
+        self.step_count += 1;
+        Ok(self.alpha_current)
+    }
+}
+
 /// Error type for conformal calibration and threshold updates.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum ConformalError {

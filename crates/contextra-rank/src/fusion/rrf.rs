@@ -5,7 +5,9 @@ use super::signal::{
     FusedEntry, MetadataMergePriority, SignalCalibrationContext, SignalKey, SignalKind,
 };
 use super::topk::{BoundedTopK, TopKCandidate};
-use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
+use super::types::{FixedRankScore, ProvenanceRecord, SearchResult, SignalContribution};
+
+const RRF_K_F32: f32 = 60.0;
 use ahash::AHashMap;
 pub use contextra_types::FusionStrategy;
 
@@ -213,6 +215,7 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
     let mut id_table: Vec<&str> = Vec::new();
     let mut scores: Vec<f32> = Vec::new();
+    let mut fixed_scores: Vec<FixedRankScore> = Vec::new();
     let mut valid_signal_count = 0usize;
 
     // --- Phase 1: Lightweight scoring across all candidates ---
@@ -229,12 +232,6 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
         }
         valid_signal_count += 1;
 
-        let rrf_k = k as f32;
-        debug_assert!(
-            rrf_k >= 0.0,
-            "rrf_k must be non-negative; division by zero risk"
-        );
-
         for (rank_idx, doc) in result_set.iter().enumerate() {
             if !doc.score.is_finite() {
                 tracing::error!(
@@ -245,10 +242,8 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
                 );
             }
             let rrf_rank = (rank_idx + 1) as u32;
-            let denom = rrf_k + rrf_rank as f32;
-            debug_assert!(denom > 0.0, "RRF denominator must be positive");
-            let score = weight / denom;
-            let score = if score.is_finite() { score } else { 0.0 };
+            let fixed_contrib = FixedRankScore::weighted_rrf_contrib(weight, k, rrf_rank);
+            let score = fixed_contrib.to_f32();
 
             let doc_id_str: &str = doc.id.as_str();
             let candidate_idx = match id_to_idx.get(doc_id_str) {
@@ -258,20 +253,24 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
                     id_to_idx.insert(doc_id_str, new_idx as u32);
                     id_table.push(doc_id_str);
                     scores.push(0.0_f32);
+                    fixed_scores.push(FixedRankScore(0));
                     new_idx
                 }
             };
             scores[candidate_idx] += score;
+            fixed_scores[candidate_idx] =
+                fixed_scores[candidate_idx].saturating_add(fixed_contrib);
         }
     }
 
     // --- Selection: Top-K candidates determination ---
     let mut top_k = BoundedTopK::new(max_results);
-    for idx in 0..scores.len() as u32 {
+    for idx in 0..fixed_scores.len() as u32 {
         let i = idx as usize;
         top_k.push(TopKCandidate {
             idx,
-            score: scores[i],
+            score: fixed_scores[i].to_f32(),
+            fixed_score: fixed_scores[i],
             id: id_table[i],
         });
     }
@@ -640,10 +639,10 @@ pub fn fuse_search_results_with_signal_strategies(
 
     result_sets.sort_by_key(|(signal_name, _, _)| priority.signal_rank(signal_name));
 
-    let k_rrf = 60.0_f32;
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
     let mut id_table: Vec<&str> = Vec::new();
     let mut scores: Vec<f32> = Vec::new();
+    let mut fixed_scores: Vec<FixedRankScore> = Vec::new();
     let mut valid_signal_count = 0usize;
 
     // Precalculate normalization ranges per signal
@@ -695,14 +694,10 @@ pub fn fuse_search_results_with_signal_strategies(
         for (rank_idx, doc) in result_set.iter().enumerate() {
             let rank = (rank_idx + 1) as u32;
 
-            let weighted_score = match eff_strat {
+            let (weighted_score, fixed_contrib) = match eff_strat {
                 FusionStrategy::Rrf => {
-                    let score = weight / (k_rrf + rank as f32);
-                    if score.is_finite() {
-                        score
-                    } else {
-                        0.0
-                    }
+                    let contrib = FixedRankScore::weighted_rrf_contrib(weight, 60, rank);
+                    (contrib.to_f32(), contrib)
                 }
                 FusionStrategy::ScoreNormalized => {
                     let (min_s, range) = norm_range.unwrap_or((0.0, 0.0));
@@ -711,7 +706,8 @@ pub fn fuse_search_results_with_signal_strategies(
                     } else {
                         1.0
                     };
-                    weight * norm_score
+                    let ws = weight * norm_score;
+                    (ws, FixedRankScore::from_f32(ws))
                 }
             };
 
@@ -723,20 +719,24 @@ pub fn fuse_search_results_with_signal_strategies(
                     id_to_idx.insert(doc_id_str, new_idx as u32);
                     id_table.push(doc_id_str);
                     scores.push(0.0_f32);
+                    fixed_scores.push(FixedRankScore(0));
                     new_idx
                 }
             };
             scores[candidate_idx] += weighted_score;
+            fixed_scores[candidate_idx] =
+                fixed_scores[candidate_idx].saturating_add(fixed_contrib);
         }
     }
 
     // --- Selection: Top-K candidates ---
     let mut top_k = BoundedTopK::new(max_results);
-    for idx in 0..scores.len() as u32 {
+    for idx in 0..fixed_scores.len() as u32 {
         let i = idx as usize;
         top_k.push(TopKCandidate {
             idx,
-            score: scores[i],
+            score: fixed_scores[i].to_f32(),
+            fixed_score: fixed_scores[i],
             id: id_table[i],
         });
     }
@@ -791,7 +791,7 @@ pub fn fuse_search_results_with_signal_strategies(
 
             let weighted_score = match eff_strat {
                 FusionStrategy::Rrf => {
-                    let score = weight / (k_rrf + rank as f32);
+                    let score = weight / (RRF_K_F32 + rank as f32);
                     if score.is_finite() {
                         score
                     } else {

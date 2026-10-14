@@ -1,9 +1,7 @@
+use super::types::FixedRankScore;
+
 pub(super) fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
-    match (a.is_nan(), b.is_nan()) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.total_cmp(&b),
-    }
+    a.total_cmp(&b)
 }
 
 /// Size-bounded min-heap for Top-K candidate selection during Reciprocal Rank Fusion.
@@ -61,6 +59,7 @@ impl<T: Ord> BoundedTopK<T> {
 pub(super) struct TopKCandidate<'a> {
     pub(super) idx: u32,
     pub(super) score: f32,
+    pub(super) fixed_score: FixedRankScore,
     pub(super) id: &'a str,
 }
 
@@ -74,7 +73,10 @@ impl<'a> Eq for TopKCandidate<'a> {}
 
 impl<'a> Ord for TopKCandidate<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        cmp_scores(other.score, self.score).then_with(|| self.id.cmp(other.id))
+        other
+            .fixed_score
+            .cmp(&self.fixed_score)
+            .then_with(|| self.id.cmp(other.id))
     }
 }
 

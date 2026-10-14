@@ -110,6 +110,62 @@ pub struct SignalContribution {
     pub rrf_contribution: f32,
 }
 
+/// Fixed-point rank score representation (`FixedRankScore(pub u128)`) in Q64.64 format for bit-identical ISA-independent RRF scoring (§9.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
+pub struct FixedRankScore(pub u128);
+
+impl FixedRankScore {
+    /// Fixed-point shift exponent (Q64.64: 64 fractional bits).
+    pub const Q64_ONE: u128 = 1u128 << 64;
+
+    /// Creates a new `FixedRankScore` wrapping a raw Q64.64 `u128` integer.
+    pub const fn new(raw: u128) -> Self {
+        Self(raw)
+    }
+
+    /// Calculates RRF fixed-point contribution for rank $r$ (1-based) with constant $k = 60$:
+    /// $\text{score} = \frac{1 \ll 64}{k + r}$.
+    pub fn rrf_contrib(k: u32, rank_1based: u32) -> Self {
+        let denom = (k as u128).saturating_add(rank_1based as u128);
+        if denom == 0 {
+            Self(0)
+        } else {
+            Self(Self::Q64_ONE / denom)
+        }
+    }
+
+    /// Calculates weighted RRF fixed-point contribution for weight $w \in [0, 1]$ and rank $r$ (1-based):
+    /// $\text{score} = \frac{w \times (1 \ll 64)}{k + r}$.
+    pub fn weighted_rrf_contrib(weight: f32, k: u32, rank_1based: u32) -> Self {
+        if !weight.is_finite() || weight <= 0.0 {
+            return Self(0);
+        }
+        let contrib = Self::rrf_contrib(k, rank_1based);
+        let scaled = (contrib.0 as f64) * (weight as f64);
+        Self(scaled as u128)
+    }
+
+    /// Converts a floating-point score in $[0, 1]$ to Q64.64 fixed point.
+    pub fn from_f32(val: f32) -> Self {
+        if !val.is_finite() || val <= 0.0 {
+            Self(0)
+        } else {
+            let scaled = (val as f64) * (Self::Q64_ONE as f64);
+            Self(scaled.min(u128::MAX as f64) as u128)
+        }
+    }
+
+    /// Converts Q64.64 fixed point to `f32`.
+    pub fn to_f32(self) -> f32 {
+        ((self.0 as f64) / (Self::Q64_ONE as f64)) as f32
+    }
+
+    /// Adds another `FixedRankScore` with saturating addition.
+    pub fn saturating_add(self, rhs: Self) -> Self {
+        Self(self.0.saturating_add(rhs.0))
+    }
+}
+
 /// Individual search result candidate for fusion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchResult {

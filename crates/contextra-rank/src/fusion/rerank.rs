@@ -62,8 +62,11 @@ impl RerankStage {
         results.sort_by(|a, b| cmp_scores(b.score, a.score).then_with(|| a.id.cmp(&b.id)));
     }
 
-    /// Executes the reranking stage on fused search results.
+    /// Executes the reranking stage on fused search results (`INV-RING0-DETERMINISM-1`).
     ///
+    /// - **INV-RING0-DETERMINISM-1:** This is the classified async method in Ring 0 `contextra-rank`.
+    ///   It delegates model inference to the asynchronous `Reranker` port while preserving strict candidate
+    ///   sorting determinism (score descending, then document ID ascending).
     /// - Top-k-only: only reranks up to `top_k` candidates; remaining candidates are not passed to the reranker.
     /// - Stable tie-breaking: results with equal scores are ordered deterministically by document ID ascending.
     /// - Safe fallback: if `reranker` is `None` or `top_k == 0`, returns top-k sorted candidates directly.

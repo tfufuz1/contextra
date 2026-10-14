@@ -2,7 +2,7 @@ use super::resonance::{apply_resonance_bonus, ResonanceConfig};
 use super::rrf::{merge_metadata_ref, weighted_reciprocal_rank_fusion_with_options};
 use super::signal::{FusedEntry, MetadataMergePriority, SignalKey, SignalKind};
 use super::topk::{BoundedTopK, TopKCandidate};
-use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
+use super::types::{FixedRankScore, ProvenanceRecord, SearchResult, SignalContribution};
 use ahash::AHashMap;
 
 /// Score-normalized fusion (CombSUM with MinMax normalization).
@@ -196,6 +196,7 @@ pub fn score_normalized_fusion_with_options(
         top_k.push(TopKCandidate {
             idx,
             score: scores[i],
+            fixed_score: FixedRankScore::from_f32(scores[i]),
             id: id_table[i],
         });
     }

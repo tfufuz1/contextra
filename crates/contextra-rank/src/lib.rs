@@ -12,8 +12,9 @@ pub mod fusion;
 pub mod dibud;
 
 pub use calibration::{
-    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
-    PlattScaler,
+    compute_split_conformal_threshold, AciState, AdaptiveConformalCalibrator, ConformalCalibrator,
+    ConformalError, IsotonicCalibrator, PlattScaler, SplitConformalOutcome, ACI_DEFAULT_GAMMA,
+    CONFORMAL_MIN_CALIBRATION_SAMPLES,
 };
 #[cfg(feature = "dibud")]
 pub use dibud::{
@@ -27,7 +28,7 @@ pub use fusion::{
     reciprocal_rank_fusion, score_normalized_fusion_with_options, weighted_reciprocal_rank_fusion,
     weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
     weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
-    GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, RerankStage, ResonanceConfig, SearchResult, SignalCalibrationContext,
-    SignalContribution, SignalKind,
+    FixedRankScore, GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority,
+    ProvenanceBuilder, ProvenanceRecord, RerankStage, ResonanceConfig, SearchResult,
+    SignalCalibrationContext, SignalContribution, SignalKind,
 };

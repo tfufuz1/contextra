@@ -28,6 +28,7 @@ Er ist strikt synchron (P26) und erzwingt `#![forbid(unsafe_code)]`.
 
 ## 3. Invarianten
 - **INV-CALIBRATION-CONFORMAL-1:** Adaptive Conformal Calibration wird über `AdaptiveConformalCalibrator` im Code bereitgestellt.
+- **INV-RING0-DETERMINISM-1:** `RerankStage::execute` ist die klassifizierte async-Funktion in Ring 0 `contextra-rank`. Sie delegiert Modellinferenz an den `Reranker`-Port unter Erhaltung streng deterministischer Sortierung (Score absteigend, DocId aufsteigend).
 - **NO-AD-HOC-SIGMOID:** Sigmoidale Kalibrierungs- und Transformationslogik darf NICHT ad-hoc außerhalb von `contextra-rank` (z. B. in `PlattScaler`) reimplementiert werden.
 - **NO-DUPLICATE-RECALIBRATE:** `recalibrate_conformal` ist eine High-Level-Routing-Aktion und lebt primär in `contextra-router` (Spec Anhang C Nr. 2); `contextra-rank` liefert die reinen Kalibrierungs-Algorithmen.
 
