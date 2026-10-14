@@ -46,6 +46,8 @@ pub mod fusion;
 pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
+#[cfg(not(loom))]
+pub mod lifecycle;
 pub mod limits;
 pub mod metrics_names;
 pub mod no_graph_stubs;
@@ -78,6 +80,8 @@ pub use import::ImportSummary;
 pub use background_workers::start_decay_cleanup_worker;
 #[cfg(not(loom))]
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
+#[cfg(not(loom))]
+pub use lifecycle::{EngineLifecycle, ErasureSupervisor};
 
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
