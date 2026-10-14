@@ -239,8 +239,12 @@ impl ProofIssuer {
         }
 
         // (f) Missing mandatory layer for requested assurance level
-        let present_layers: HashSet<u16> =
-            req.witnesses.iter().map(|w| w.layer().layer_id()).collect();
+        let present_layers: HashSet<u16> = req
+            .witnesses
+            .iter()
+            .filter(|w| w.layer_evidence().is_some())
+            .map(|w| w.layer().layer_id())
+            .collect();
         let required_layers = required_layers_for_assurance(req.assurance);
         for req_layer in &required_layers {
             if !present_layers.contains(req_layer) {
@@ -326,32 +330,41 @@ impl ProofIssuer {
             builder = builder.with_wal_chain_receipt(receipt);
         }
 
+        let mut unbacked_layer_exclusions = Vec::new();
+
         for w in &req.witnesses {
             let layer_id = w.layer().layer_id();
             let assurance = w.assurance().level();
             let claim_text_id = w.claim().id();
             let scanned_at_tx = w.scanned_at_tx().0;
 
-            let (witness_digest, evidence_tlv) = if let Some(ev) = w.layer_evidence() {
-                (ev.witness_digest(layer_id), ev.to_canonical_tlv())
-            } else {
-                ([0u8; 32], Vec::new())
-            };
+            if let Some(ev) = w.layer_evidence() {
+                let witness_digest = ev.witness_digest(layer_id);
+                if witness_digest != [0u8; 32] {
+                    let evidence_tlv = ev.to_canonical_tlv();
+                    builder = builder.add_claim(ProofClaimV4 {
+                        layer_id,
+                        assurance,
+                        claim_text_id,
+                        witness_digest,
+                        scanned_at_tx,
+                        evidence_tlv,
+                    });
+                    continue;
+                }
+            }
 
-            builder = builder.add_claim(ProofClaimV4 {
-                layer_id,
-                assurance,
-                claim_text_id,
-                witness_digest,
-                scanned_at_tx,
-                evidence_tlv,
-            });
+            // Witness lacks evidence or has zero witness digest -> exclude layer from claims, add to excluded_scopes
+            unbacked_layer_exclusions.push(layer_id);
         }
 
         let mandatory_excl = mandatory_exclusions_for(req.assurance);
         let mut all_excl_ids: Vec<u16> = mandatory_excl.iter().map(|e| e.id()).collect();
         for extra in &req.extra_exclusions {
             all_excl_ids.push(extra.id());
+        }
+        for unbacked in unbacked_layer_exclusions {
+            all_excl_ids.push(unbacked);
         }
         all_excl_ids.sort();
         all_excl_ids.dedup();
