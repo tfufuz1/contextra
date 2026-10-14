@@ -208,6 +208,10 @@ impl<'a> DpiPurgeDriver<'a> {
                         "Scan timeout during purge compaction".to_string(),
                         "Retry with smaller batch size or increased timeout".to_string(),
                     ),
+                    PurgeBlocked::UnknownFreeSpace => (
+                        "Unable to determine free disk space".to_string(),
+                        "Check disk space probe or filesystem permissions".to_string(),
+                    ),
                 };
                 return Ok(PurgeHandle::Blocked { reason, retry_hint });
             }
