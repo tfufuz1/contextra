@@ -26,7 +26,7 @@ Das KV-Cache Management kombiniert drei komplementäre SOTA-Verfahren:
 * **KIVI (2-Bit Quantization)**: Key-Tensoren werden pro Kanal (*per-channel*) und Value-Tensoren pro Token (*per-token*) auf 2-Bit quantisiert:
   $$\hat{X}_{2\text{bit}} = \text{round}\left(\frac{X - \text{zp}}{\text{scale}}\right) \in \{0, 1, 2, 3\}$$
   wobei $\text{scale} = \frac{\max(X) - \min(X)}{3}$ und $\text{zp} = \min(X)$.
-* **SnapKV (Observation Window Attention Allocation)**: Berechnung der Wichtigkeit von Key-Tokens basierend auf den Attention-Gewichten eines Beobachtungsfensters $W_{obs}$:
+* **SnapKV (Observation Window Attention Allocation)**: Berechnung der Wichtigkeit von Key-Tokens basierend auf den Attention-Gewichten eines Beobachtungsfensters $W_obs$:
   $$S_i = \sum_{q \in W_{obs}} A_{q, i}$$
   Die Top-$K$ Tokens außerhalb des Prefix-Pools werden selektiert.
 * **Irminsul (Prefix Tree & Tier-2 NVMe/mmap Spill-over)**: Radix-Trie-basierte Prefix-Teilung mit atomarer Referenzzählung. Nicht-aktive Seiten werden deterministisch in Tier-2 (NVMe/mmap) verschoben.
@@ -122,12 +122,6 @@ impl SnapKvSelector {
         attention_scores: &[f64],
         config: &SnapKvConfig,
     ) -> Result<Vec<usize>, ContextraError> {
-        if config.max_capacity_tokens < config.prefix_pool_size {
-            return Err(ContextraError::invalid_input(
-                "max_capacity_tokens must be greater than or equal to prefix_pool_size",
-            ));
-        }
-
         if attention_scores.len() <= config.max_capacity_tokens {
             return Ok(Vec::new());
         }
@@ -280,8 +274,8 @@ impl ConformalCalibrator {
         if calibration_scores.is_empty() {
             return Err(ContextraError::invalid_input("Calibration set is empty"));
         }
-        if alpha.is_nan() || alpha <= 0.0 || alpha >= 1.0 {
-            return Err(ContextraError::invalid_input("Alpha must be a valid float in (0, 1)"));
+        if alpha <= 0.0 || alpha >= 1.0 {
+            return Err(ContextraError::invalid_input("Alpha must be in (0, 1)"));
         }
 
         let mut sorted_scores = calibration_scores.to_vec();
@@ -377,9 +371,6 @@ impl SketchedLinUCB {
 
     pub fn update(&mut self, x_tilde: &[f64], reward: f64) -> Result<(), ContextraError> {
         let k = self.sketch_dim;
-        if x_tilde.len() != k {
-            return Err(ContextraError::invalid_input("Sketched feature dimension mismatch"));
-        }
 
         // Compute A_inv * x_tilde
         let mut ax = vec![0.0; k];
@@ -564,11 +555,7 @@ impl BudgetedPathDiffusion {
         });
 
         while let Some(candidate) = heap.pop() {
-            let last_node = candidate
-                .path
-                .last()
-                .copied()
-                .ok_or_else(|| ContextraError::invalid_input("Path candidate cannot be empty"))?;
+            let last_node = *candidate.path.last().unwrap();
 
             if visited_nodes.insert(last_node) {
                 result_paths.push(candidate.clone());

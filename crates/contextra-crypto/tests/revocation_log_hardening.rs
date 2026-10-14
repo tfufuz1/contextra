@@ -168,6 +168,7 @@ fn test_signed_marker_tampering_and_legacy_upgrade() -> Result<()> {
         let legacy_marker = contextra_crypto::revocation_log::RevocationMarker {
             count: 1,
             head_hash: entries[0].entry_hash,
+            generation: 1,
         };
         let legacy_bytes =
             bincode::serialize(&legacy_marker).map_err(|e| CryptoError::Crypto(e.to_string()))?;
