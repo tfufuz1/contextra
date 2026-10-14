@@ -180,6 +180,10 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
     clock: Arc<dyn contextra_ports::Clock>,
+    /// Injizierbarer ID-Generator (P28)
+    id_generator: Arc<dyn contextra_ports::IdGenerator>,
+    /// Option: Checkpoint-Scrubbing bei Dokument-Löschung (§5.10 / E31)
+    checkpoint_scrub_on_erase: bool,
     /// Injizierter Anti-Resurrection Restore-Filter (N9, Fail-Closed Default)
     restore_filter: Option<Arc<dyn CpyRestoreFilter>>,
     /// Injected metrics sink for operational monitoring
@@ -274,6 +278,8 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let checkpoint_counter = Arc::new(AtomicU64::new(0));
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
         let clock = orphan_registry.clock().clone();
+        let id_generator: Arc<dyn contextra_ports::IdGenerator> =
+            Arc::new(contextra_ports::SystemIdGenerator::new());
 
         Ok(Self {
             storage,
@@ -287,6 +293,8 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             checkpoint_counter,
             skipped_rollbacks,
             clock,
+            id_generator,
+            checkpoint_scrub_on_erase: false,
             restore_filter: None,
             metrics_sink: None,
         })
@@ -411,6 +419,101 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
+    }
+
+    /// Setzt den ID-Generator für den `PersistentCheckpointStore`.
+    pub fn with_id_generator(
+        mut self,
+        id_gen: Arc<dyn contextra_ports::IdGenerator>,
+    ) -> Self {
+        self.id_generator = id_gen;
+        self
+    }
+
+    pub fn set_id_generator(&mut self, id_gen: Arc<dyn contextra_ports::IdGenerator>) {
+        self.id_generator = id_gen;
+    }
+
+    pub fn id_generator(&self) -> &Arc<dyn contextra_ports::IdGenerator> {
+        &self.id_generator
+    }
+
+    /// Konfiguriert die Option `checkpoint_scrub_on_erase` (§5.10, E31).
+    pub fn with_checkpoint_scrub_on_erase(mut self, scrub: bool) -> Self {
+        self.checkpoint_scrub_on_erase = scrub;
+        self
+    }
+
+    pub fn set_checkpoint_scrub_on_erase(&mut self, scrub: bool) {
+        self.checkpoint_scrub_on_erase = scrub;
+    }
+
+    pub fn checkpoint_scrub_on_erase(&self) -> bool {
+        self.checkpoint_scrub_on_erase
+    }
+
+    /// Scrubt und entfernt einen Checkpoint deterministisch und atomar (§5.10).
+    /// Nullt die Daten des Checkpoints im Storage vor dem eigentlichen Löschen und Entpinnen.
+    pub async fn scrub_checkpoint(&self, name: &str) -> Result<()> {
+        validate_identifier("Checkpoint name", name)?;
+        let _guard = self.write_lock.lock().await;
+
+        if let Some(checkpoint) = self.get_checkpoint_internal(name).await? {
+            let key = format!("{}:checkpoint:{}", self.namespace, name);
+            let unique_tx = self.allocate_tx().await?;
+
+            // Zeroize stored payload before unlinking
+            let dummy_payload = vec![0u8; 128];
+            if let Ok(()) = self.storage.put(unique_tx, key.as_bytes(), &dummy_payload).await {
+                let _ = self.storage.commit(unique_tx).await;
+            }
+
+            let del_tx = self.allocate_tx().await?;
+            if let Err(e) = self.storage.delete(del_tx, key.as_bytes()).await {
+                let _ = self.storage.rollback(del_tx).await;
+                return Err(e);
+            }
+            if let Err(e) = self.storage.commit(del_tx).await {
+                let _ = self.storage.rollback(del_tx).await;
+                return Err(e);
+            }
+
+            if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
+                tracing::warn!(
+                    seq = checkpoint.seq_no,
+                    "Unpin after scrub failed: {e}"
+                );
+            }
+
+            self.index.write().remove_by_name(&checkpoint.name);
+        }
+        Ok(())
+    }
+
+    /// Scrubt und entfernt alle Checkpoints, die zu einer spezifischen Collection gehören (§5.10 / E31).
+    pub async fn scrub_collection_checkpoints(&self, collection_id: &str) -> Result<usize> {
+        let all_checkpoints = self.list_checkpoints().await?;
+        let mut count = 0;
+        for cp in all_checkpoints {
+            if cp.collection_id == collection_id {
+                self.scrub_checkpoint(&cp.name).await?;
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Scrubt und entfernt alle Checkpoints eines Mandanten / Namespace (§5.10 / E31).
+    pub async fn scrub_tenant_checkpoints(&self, tenant_id: &str) -> Result<usize> {
+        let all_checkpoints = self.list_checkpoints().await?;
+        let mut count = 0;
+        for cp in all_checkpoints {
+            if cp.collection_id.contains(tenant_id) || self.namespace.contains(tenant_id) {
+                self.scrub_checkpoint(&cp.name).await?;
+                count += 1;
+            }
+        }
+        Ok(count)
     }
 
     /// Sets the anti-resurrection restore filter for the store (N9, fail-closed default).

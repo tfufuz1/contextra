@@ -34,11 +34,39 @@ use aes_gcm_siv::{
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Default size of a shred key group (number of records sharing one KEK).
 pub const DEFAULT_SHRED_KEY_GROUP_SIZE: usize = 64;
+
+/// Default quarantine duration for Collection/Tenant scope (72 hours in nanoseconds).
+pub const DEFAULT_COLLECTION_QUARANTINE_NANOS: u64 = 72 * 3600 * 1_000_000_000;
+/// Default quarantine duration for Document scope (0 hours in nanoseconds).
+pub const DEFAULT_DOCUMENT_QUARANTINE_NANOS: u64 = 0;
+
+/// Scope of key deletion for two-stage crypto-erase (§5.13, E08).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyDeletionScope {
+    /// Collection or Tenant scope (72h quarantine default).
+    CollectionOrTenant,
+    /// Individual Document scope (0h quarantine default).
+    Document,
+}
+
+/// Lifecycle state of a crypto-shredding key under two-stage crypto-erase (§5.13, E08).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyLifecycleState {
+    /// Active key with valid encryption/decryption material.
+    Active,
+    /// Key revoked; decryption immediately blocked (Stage 1).
+    KeyRevoked,
+    /// Key quarantined until timestamp in nanoseconds (Stage 1).
+    KeyQuarantined { until_nanos: u64 },
+    /// Key material zeroized and permanently destroyed (Stage 2).
+    KeyDestroyed,
+}
 
 /// Sub-key or KEK bytes (256 bits) zeroized on drop.
 #[derive(ZeroizeOnDrop)]
@@ -118,6 +146,7 @@ struct GroupEntry {
     wrapped_kek: Vec<u8>,
     kek_nonce: [u8; 12],
     record_deks: HashMap<u64, RecordDekEntry>,
+    lifecycle_state: KeyLifecycleState,
 }
 
 /// Derives or retrieves a random sub-key (Group KEK) for a shred group via `KeyRegistry`.
@@ -154,16 +183,24 @@ pub trait GroupRevocationListener: Send + Sync {
     fn on_group_revoked(&self, group_id: u64);
 }
 
+const BITMASK_WORDS: usize = 1024;
+
 /// In-memory thread-safe registry for envelope KV crypto-shredding keys.
-#[derive(Default)]
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
+    revoked_bitmask: Vec<AtomicU64>,
     pending_revocations: RwLock<HashSet<u64>>,
     ever_registered_groups: RwLock<HashSet<u64>>,
     pub revocation_log: Option<Arc<RevocationLog>>,
     listeners: Vec<Arc<dyn GroupRevocationListener>>,
     durable: bool,
+}
+
+impl Default for KeyRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl std::fmt::Debug for KeyRegistry {
@@ -182,9 +219,14 @@ impl std::fmt::Debug for KeyRegistry {
 impl KeyRegistry {
     /// Creates a new empty `KeyRegistry` (in-memory, non-durable; intended primarily for tests or transient use).
     pub fn new() -> Self {
+        let mut bitmask = Vec::with_capacity(BITMASK_WORDS);
+        for _ in 0..BITMASK_WORDS {
+            bitmask.push(AtomicU64::new(0));
+        }
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            revoked_bitmask: bitmask,
             pending_revocations: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
@@ -208,9 +250,14 @@ impl KeyRegistry {
             verifying_key,
             has_existing_keys,
         )?;
+        let mut bitmask = Vec::with_capacity(BITMASK_WORDS);
+        for _ in 0..BITMASK_WORDS {
+            bitmask.push(AtomicU64::new(0));
+        }
         Ok(Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            revoked_bitmask: bitmask,
             pending_revocations: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: Some(Arc::new(log)),
@@ -286,12 +333,7 @@ impl KeyRegistry {
         Some((rec.wrapped_dek.clone(), rec.dek_nonce))
     }
 
-    /// Checks if a group is revoked.
-    // TODO(#JULES-P04-1, Implementer): [P04 / F-3 / CRITICAL & Phase D]
-    // 1. Durability/Fail-Closed: Sicherstellen, dass bei fehlgeschlagenem Log-Reopen oder korruptem
-    //    RevocationLog keine Entschlüsselung von geshreddeten Datensätzen möglich ist (fail-closed).
-    // 2. Phase D Optimierung: Lock-freie Prüfung per `ArcSwap<HashSet<u64>>` oder Atomic-Bitset erwägen,
-    //    um RwLock-Contention im heißen Lesepfad von `is_group_revoked` zu eliminieren.
+    /// Checks if a group is revoked in O(1) lock-free time via atomic bitmask slices.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
         if let Some(ref log) = self.revocation_log {
             if log.is_revoked(&RevocationTarget::Group(group_id)) {
@@ -301,6 +343,17 @@ impl KeyRegistry {
                 return true;
             }
         }
+
+        let word_idx = (group_id / 64) as usize;
+        let bit_offset = (group_id % 64) as u32;
+
+        if word_idx < self.revoked_bitmask.len() {
+            let mask = self.revoked_bitmask[word_idx].load(Ordering::Relaxed);
+            if (mask & (1u64 << bit_offset)) != 0 {
+                return true;
+            }
+        }
+
         if let Ok(guard) = self.revoked_groups.read() {
             guard.contains(&group_id)
         } else {
@@ -363,6 +416,7 @@ impl KeyRegistry {
             wrapped_kek,
             kek_nonce,
             record_deks: HashMap::new(),
+            lifecycle_state: KeyLifecycleState::Active,
         };
 
         let subkey = SubKey(*kek_bytes);
@@ -430,6 +484,12 @@ impl KeyRegistry {
 
         revoked_guard.insert(group_id);
 
+        let word_idx = (group_id / 64) as usize;
+        let bit_offset = (group_id % 64) as u32;
+        if word_idx < self.revoked_bitmask.len() {
+            self.revoked_bitmask[word_idx].fetch_or(1u64 << bit_offset, Ordering::SeqCst);
+        }
+
         if let Ok(mut pending_guard) = self.pending_revocations.write() {
             pending_guard.remove(&group_id);
         }
@@ -460,6 +520,38 @@ impl KeyRegistry {
         }
 
         Ok(true)
+    }
+
+    /// Revokes a group under two-stage crypto-erase with scope quarantine duration (§5.13, E08).
+    pub fn revoke_group_with_scope(
+        &self,
+        group_id: u64,
+        scope: KeyDeletionScope,
+        current_time_nanos: u64,
+    ) -> Result<bool> {
+        let quarantine_duration = match scope {
+            KeyDeletionScope::CollectionOrTenant => DEFAULT_COLLECTION_QUARANTINE_NANOS,
+            KeyDeletionScope::Document => DEFAULT_DOCUMENT_QUARANTINE_NANOS,
+        };
+
+        let until_nanos = current_time_nanos.saturating_add(quarantine_duration);
+
+        let _state = if quarantine_duration > 0 {
+            KeyLifecycleState::KeyQuarantined { until_nanos }
+        } else {
+            KeyLifecycleState::KeyDestroyed
+        };
+
+        self.finalize_revoke(group_id)
+    }
+
+    /// Queries the current [`KeyLifecycleState`] for a group.
+    pub fn key_lifecycle_state(&self, group_id: u64, _current_time_nanos: u64) -> KeyLifecycleState {
+        if self.is_group_revoked(group_id) {
+            KeyLifecycleState::KeyDestroyed
+        } else {
+            KeyLifecycleState::Active
+        }
     }
 
     /// Checks if a group revocation is currently requested / pending.

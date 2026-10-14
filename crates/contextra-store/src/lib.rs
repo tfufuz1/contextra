@@ -29,6 +29,7 @@ pub mod engine;
 pub mod erasure_ledger;
 pub mod format;
 pub mod kv;
+pub mod restore_guard;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -74,3 +75,4 @@ pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+pub use restore_guard::StreamingRestoreGuard;
