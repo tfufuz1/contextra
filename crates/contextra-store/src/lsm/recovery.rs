@@ -274,7 +274,27 @@ impl LsmStorage {
         let mut replayed_hmac_set = std::collections::HashSet::new();
         replayed_hmac_set.insert([0u8; 32]);
 
-        let replay_options = WalReplayOptions::default();
+        let salt_bytes: [u8; 32] = salt.as_slice().try_into().unwrap_or([0u8; 32]);
+        let ledger_key = crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes);
+        let db_has_data = !directory_is_pristine(&config.path).await?;
+        let (ledger_opt, ledger_status) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
+            &config.path,
+            ledger_key,
+            db_has_data,
+            None,
+        ).await?;
+
+        let read_only = !matches!(
+            ledger_status,
+            crate::erasure_ledger::LedgerOpenStatus::Ok | crate::erasure_ledger::LedgerOpenStatus::Fresh
+        );
+
+        let erasure_ledger_handle = ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
+
+        let mut replay_options = WalReplayOptions::default();
+        if let Some(ref handle) = erasure_ledger_handle {
+            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(Arc::clone(handle))));
+        }
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
             let (wal_entries, _report) = wal.replay_with_filter(replay_options.filter.as_deref()).await?;
@@ -690,6 +710,9 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
             erasure_fence: Arc::new(super::fence::ErasureFence::new()),
+            erasure_ledger_handle,
+            read_only,
+            ledger_status,
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);

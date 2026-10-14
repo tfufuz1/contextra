@@ -16,6 +16,7 @@ pub use adaptive::*;
 pub use config::*;
 pub use engine::*;
 pub use merge_operator::*;
+pub use purge_filter::*;
 pub use retention::*;
 pub use wiring::*;
 
