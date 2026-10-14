@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 #![allow(clippy::cast_possible_truncation)]
 
 //! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN

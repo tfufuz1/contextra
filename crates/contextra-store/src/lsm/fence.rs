@@ -1,10 +1,21 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Scope-weite und präfixbasierte Schreibsperre (ErasureFence) zur Blockierung von Schreibvorgängen während der Purge-Compaction.
+// STAND: 2026-10-14
+// ZWECK: Scope-weite und präfixbasierte Schreibsperre (ErasureGate & ErasureFence) zur Blockierung von Schreibvorgängen während der Purge-Compaction.
 // INVARIANTEN: Lock-Hierarchie einhalten, keine Locks über .await, loom-kompatibel.
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+#[cfg(loom)]
+use loom::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+#[cfg(loom)]
+use loom::sync::{Arc, Mutex, RwLock};
+
+#[cfg(not(loom))]
+use parking_lot::Mutex;
+#[cfg(not(loom))]
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+#[cfg(not(loom))]
 use std::sync::Arc;
 
 /// Scope-wide write block state.
@@ -25,11 +36,262 @@ pub enum FenceError {
     Conflict,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrefixFence {
+    pub purge_id: u64,
+    pub prefixes: Vec<Vec<u8>>,
+}
+
+/// Low-level gate managing atomic active flag, RCU prefix fence table, and inflight write batch tracking.
 #[derive(Debug)]
-struct RegisteredPrefixFence {
-    id: u64,
-    prefixes: Vec<Vec<u8>>,
-    write_seq: Arc<AtomicU64>,
+pub struct ErasureGate {
+    active: AtomicBool,
+    #[cfg(not(loom))]
+    table: arc_swap::ArcSwap<Vec<PrefixFence>>,
+    #[cfg(loom)]
+    table: RwLock<Vec<PrefixFence>>,
+    inflight: AtomicU32,
+    drained: tokio::sync::Notify,
+    install: Mutex<()>,
+}
+
+impl ErasureGate {
+    pub fn new() -> Self {
+        Self {
+            active: AtomicBool::new(false),
+            #[cfg(not(loom))]
+            table: arc_swap::ArcSwap::new(Arc::new(Vec::new())),
+            #[cfg(loom)]
+            table: RwLock::new(Vec::new()),
+            inflight: AtomicU32::new(0),
+            drained: tokio::sync::Notify::new(),
+            install: Mutex::new(()),
+        }
+    }
+
+    /// Fast-path check: returns whether any scope fence is active.
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.active.load(Ordering::Acquire)
+    }
+
+    /// Returns current count of inflight write batches in progress.
+    #[inline]
+    pub fn inflight_count(&self) -> u32 {
+        self.inflight.load(Ordering::Acquire)
+    }
+
+    /// Increments inflight batch counter.
+    #[inline]
+    pub fn inc_inflight(&self) {
+        self.inflight.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Decrements inflight batch counter and notifies drain waiters if count reaches zero.
+    #[inline]
+    pub fn dec_inflight(&self) {
+        let prev = self.inflight.fetch_sub(1, Ordering::SeqCst);
+        if prev == 1 && self.is_active() {
+            self.drained.notify_waiters();
+        }
+    }
+
+    /// Checks if a key violates any active prefix fence.
+    pub fn check_write_allowed(&self, key: &[u8]) -> Result<(), FenceError> {
+        if !self.is_active() {
+            return Ok(());
+        }
+
+        #[cfg(not(loom))]
+        {
+            let table = self.table.load();
+            for pf in table.iter() {
+                for prefix in &pf.prefixes {
+                    if prefix.is_empty() || key.starts_with(prefix) {
+                        return Err(FenceError::CollectionDropping);
+                    }
+                }
+            }
+        }
+
+        #[cfg(loom)]
+        {
+            if let Ok(table) = self.table.read() {
+                for pf in table.iter() {
+                    for prefix in &pf.prefixes {
+                        if prefix.is_empty() || key.starts_with(prefix) {
+                            return Err(FenceError::CollectionDropping);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Helper to test prefix overlap.
+    fn prefixes_overlap(p1: &[u8], p2: &[u8]) -> bool {
+        if p1.is_empty() || p2.is_empty() {
+            return true;
+        }
+        p1.starts_with(p2) || p2.starts_with(p1)
+    }
+
+    /// Installs a new prefix fence, drains inflight write batches until inflight == 0.
+    pub async fn acquire_fence(
+        &self,
+        purge_id: u64,
+        prefixes: Vec<Vec<u8>>,
+        timeout: Duration,
+    ) -> Result<(), FenceError> {
+        #[cfg(not(loom))]
+        let _guard = self.install.lock();
+        #[cfg(loom)]
+        let _guard = self.install.lock().unwrap();
+
+        if prefixes.is_empty() {
+            return Err(FenceError::Conflict);
+        }
+
+        // Validate internal overlaps in requested prefixes
+        for i in 0..prefixes.len() {
+            for j in (i + 1)..prefixes.len() {
+                if Self::prefixes_overlap(&prefixes[i], &prefixes[j]) {
+                    return Err(FenceError::Conflict);
+                }
+            }
+        }
+
+        // Validate overlaps against existing prefix fences
+        #[cfg(not(loom))]
+        {
+            let current_table = self.table.load();
+            for existing in current_table.iter() {
+                for ex_p in &existing.prefixes {
+                    for new_p in &prefixes {
+                        if Self::prefixes_overlap(ex_p, new_p) {
+                            return Err(FenceError::Conflict);
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(loom)]
+        {
+            if let Ok(current_table) = self.table.read() {
+                for existing in current_table.iter() {
+                    for ex_p in &existing.prefixes {
+                        for new_p in &prefixes {
+                            if Self::prefixes_overlap(ex_p, new_p) {
+                                return Err(FenceError::Conflict);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Install new fence into table
+        #[cfg(not(loom))]
+        {
+            let current_vec: &Vec<PrefixFence> = &**self.table.load();
+            let mut new_table = current_vec.clone();
+            new_table.push(PrefixFence {
+                purge_id,
+                prefixes: prefixes.clone(),
+            });
+            self.table.store(Arc::new(new_table));
+        }
+        #[cfg(loom)]
+        {
+            if let Ok(mut table) = self.table.write() {
+                table.push(PrefixFence {
+                    purge_id,
+                    prefixes: prefixes.clone(),
+                });
+            }
+        }
+
+        self.active.store(true, Ordering::Release);
+
+        // Drain phase: wait until inflight == 0
+        let start = std::time::Instant::now();
+        loop {
+            if self.inflight.load(Ordering::Acquire) == 0 {
+                break;
+            }
+
+            if start.elapsed() >= timeout {
+                // Timeout during Drain: revert fence installation
+                self.release_fence_internal(purge_id);
+                return Err(FenceError::Conflict);
+            }
+
+            // Wait on notification or brief sleep
+            let _ = tokio::time::timeout(Duration::from_millis(2), self.drained.notified()).await;
+        }
+
+        Ok(())
+    }
+
+    /// Releases a registered prefix fence by purge_id.
+    pub fn release_fence(&self, purge_id: u64) {
+        #[cfg(not(loom))]
+        let _guard = self.install.lock();
+        #[cfg(loom)]
+        let _guard = self.install.lock().unwrap();
+
+        self.release_fence_internal(purge_id);
+    }
+
+    fn release_fence_internal(&self, purge_id: u64) {
+        #[cfg(not(loom))]
+        {
+            let current_vec: &Vec<PrefixFence> = &**self.table.load();
+            let mut new_table = current_vec.clone();
+            new_table.retain(|f| f.purge_id != purge_id);
+            let is_empty = new_table.is_empty();
+            self.table.store(Arc::new(new_table));
+            if is_empty {
+                self.active.store(false, Ordering::Release);
+            }
+        }
+
+        #[cfg(loom)]
+        {
+            if let Ok(mut table) = self.table.write() {
+                table.retain(|f| f.purge_id != purge_id);
+                if table.is_empty() {
+                    self.active.store(false, Ordering::Release);
+                }
+            }
+        }
+    }
+}
+
+impl Default for ErasureGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// RAII Guard that increments inflight counter on creation and decrements on drop.
+pub struct InflightGuard<'a> {
+    gate: &'a ErasureGate,
+}
+
+impl<'a> InflightGuard<'a> {
+    pub fn new(gate: &'a ErasureGate) -> Self {
+        gate.inc_inflight();
+        Self { gate }
+    }
+}
+
+impl<'a> Drop for InflightGuard<'a> {
+    fn drop(&mut self) {
+        self.gate.dec_inflight();
+    }
 }
 
 /// RAII Guard for a scope fence over specific key prefixes.
@@ -72,34 +334,29 @@ impl<'a> Drop for FenDocLockGuard<'a> {
     }
 }
 
-/// ErasureFence manages scope-wide write blocks (`CollectionDropping`), prefix-based scope fences, and document-level locks.
+/// ErasureFence manages scope-wide write blocks (`CollectionDropping`), prefix-based scope fences via `ErasureGate`, and document-level locks.
 #[derive(Debug)]
 pub struct ErasureFence {
+    pub gate: ErasureGate,
     scope_state: parking_lot::RwLock<FenceScopeState>,
     locked_doc_ids: parking_lot::RwLock<HashSet<Vec<u8>>>,
     scope_write_seq: AtomicU64,
     next_fence_id: AtomicU64,
-    prefix_fences: parking_lot::RwLock<Vec<RegisteredPrefixFence>>,
 }
 
 impl ErasureFence {
     /// Creates a new inactive `ErasureFence`.
     pub fn new() -> Self {
         Self {
+            gate: ErasureGate::new(),
             scope_state: parking_lot::RwLock::new(FenceScopeState::Active),
             locked_doc_ids: parking_lot::RwLock::new(HashSet::new()),
             scope_write_seq: AtomicU64::new(0),
             next_fence_id: AtomicU64::new(1),
-            prefix_fences: parking_lot::RwLock::new(Vec::new()),
         }
     }
 
-    /// Checks if two prefixes overlap (i.e. one is a prefix of the other).
-    fn prefixes_overlap(p1: &[u8], p2: &[u8]) -> bool {
-        p1.starts_with(p2) || p2.starts_with(p1)
-    }
-
-    /// Checks if a scope-wide or document-level write block is currently active for `key`.
+    /// Checks if a scope-wide, prefix-based, or document-level write block is currently active for `key`.
     /// Returns `true` if write access is allowed, `false` if blocked by fence.
     pub fn check_write_allowed(&self, key: &[u8]) -> bool {
         self.check_write_allowed_scope(key).is_ok()
@@ -113,16 +370,7 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
-        let fences = self.prefix_fences.read();
-        for f in fences.iter() {
-            for prefix in &f.prefixes {
-                if key.starts_with(prefix) {
-                    f.write_seq.fetch_add(1, Ordering::SeqCst);
-                    self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
-                    return Err(FenceError::CollectionDropping);
-                }
-            }
-        }
+        self.gate.check_write_allowed(key)?;
 
         let locked_docs = self.locked_doc_ids.read();
         if locked_docs.contains(key) {
@@ -148,9 +396,6 @@ impl ErasureFence {
     }
 
     /// Acquires a scope fence for specific key prefixes.
-    ///
-    /// Returns `Err(FenceError::Conflict)` if any of the requested prefixes overlap
-    /// with an already active scope fence, or internally with each other.
     pub fn acquire_scope_fence_for(
         &self,
         prefixes: Vec<Vec<u8>>,
@@ -160,39 +405,17 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
-        if prefixes.is_empty() {
-            return Err(FenceError::Conflict);
-        }
-
-        // Check internal overlaps within requested prefixes
-        for i in 0..prefixes.len() {
-            for j in (i + 1)..prefixes.len() {
-                if Self::prefixes_overlap(&prefixes[i], &prefixes[j]) {
-                    return Err(FenceError::Conflict);
-                }
-            }
-        }
-
-        let mut fences = self.prefix_fences.write();
-        // Check overlaps against existing active prefix fences
-        for existing in fences.iter() {
-            for ex_p in &existing.prefixes {
-                for new_p in &prefixes {
-                    if Self::prefixes_overlap(ex_p, new_p) {
-                        return Err(FenceError::Conflict);
-                    }
-                }
-            }
-        }
-
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
-        fences.push(RegisteredPrefixFence {
-            id,
-            prefixes: prefixes.clone(),
-            write_seq: Arc::clone(&write_seq),
-        });
+        // Use blocking handle for sync caller on acquire_fence
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.gate
+                    .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
+                    .await
+            })
+        })?;
 
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
@@ -206,8 +429,7 @@ impl ErasureFence {
 
     /// Helper to release a registered prefix fence by ID.
     fn release_prefix_fence(&self, id: u64) {
-        let mut fences = self.prefix_fences.write();
-        fences.retain(|f| f.id != id);
+        self.gate.release_fence(id);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -242,17 +464,9 @@ impl ErasureFence {
             }
         }
 
-        let fences = self.prefix_fences.read();
-        for f in fences.iter() {
-            for doc_id in &doc_ids {
-                for prefix in &f.prefixes {
-                    if doc_id.starts_with(prefix) {
-                        return Err(FenceError::Conflict);
-                    }
-                }
-            }
+        for doc_id in &doc_ids {
+            self.gate.check_write_allowed(doc_id)?;
         }
-        drop(fences);
 
         let mut locked = self.locked_doc_ids.write();
         // Atomic validation under write lock prior to modifying locked set
@@ -291,20 +505,8 @@ impl ErasureFence {
     }
 
     /// Takes a snapshot of the write sequence across active fences matching `prefixes`.
-    pub fn snapshot_write_seq(&self, prefixes: &[Vec<u8>]) -> u64 {
-        let fences = self.prefix_fences.read();
-        let mut sum = self.scope_write_seq.load(Ordering::Acquire);
-        for f in fences.iter() {
-            for ex_p in &f.prefixes {
-                for target_p in prefixes {
-                    if Self::prefixes_overlap(ex_p, target_p) {
-                        sum += f.write_seq.load(Ordering::Acquire);
-                        break;
-                    }
-                }
-            }
-        }
-        sum
+    pub fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {
+        self.scope_write_seq.load(Ordering::Acquire)
     }
 }
 

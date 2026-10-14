@@ -40,6 +40,7 @@ contextra-sys = { workspace = true }
 contextra-core = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
+arc-swap = "1.9.2"
 quick_cache = { version = "0.6", optional = true }
 contextra-crypto = { workspace = true }
 bytes = { workspace = true }
@@ -75,6 +76,10 @@ proptest = "1.4"
 loom = "0.7"
 futures = "0.3"
 redb = "2"
+
+[[test]]
+name = "loom_fence"
+path = "tests/loom_fence.rs"
 
 [[test]]
 name = "differential_redb"

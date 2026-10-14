@@ -1205,6 +1205,7 @@ name = "contextra-store"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "arc-swap",
  "blake3",
  "bytes",
  "contextra-core",
