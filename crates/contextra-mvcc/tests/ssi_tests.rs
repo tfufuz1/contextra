@@ -3,7 +3,7 @@
 //! Integration test matrix for MVCC SSI validation, multi-tenant isolation, fail-closed behavior, and P7/P8 invariants.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use contextra_types::{TenantId, TxId};
 use contextra_mvcc::{
@@ -20,31 +20,26 @@ fn test_ssi_write_skew_cahill_fekete_rejection() {
     let tx1_id = TxId::new(101);
     let tx2_id = TxId::new(102);
 
-    // Initial snapshot sequence is 10
     let snapshot_seq = 10u64;
 
-    // T1 reads key A ("account_a") at snapshot_seq 10, writes key B ("account_b")
     let mut rs1 = ReadSet::new();
     rs1.record_read(b"account_a".to_vec(), snapshot_seq);
     let tx1_state = TxSsiState::new(tx1_id, tenant_id, 15)
         .with_read_set(rs1)
         .with_write_keys(vec![b"account_b".to_vec()]);
 
-    // T2 reads key B ("account_b") at snapshot_seq 10, writes key A ("account_a")
     let mut rs2 = ReadSet::new();
     rs2.record_read(b"account_b".to_vec(), snapshot_seq);
     let tx2_state = TxSsiState::new(tx2_id, tenant_id, 16)
         .with_read_set(rs2)
         .with_write_keys(vec![b"account_a".to_vec()]);
 
-    // T1 commits first -> Accepted
     let decision1 = wiring
         .ssi_commit_gate
         .validate_and_register(&tx1_state, &seq_log)
         .expect("T1 validation decision");
     assert_eq!(decision1, CommitDecision::Accepted { commit_seq: 15 });
 
-    // T2 attempts to commit second -> Must be Aborted due to write-skew ($rw$-antidependency on account_b)
     let decision2 = wiring
         .ssi_commit_gate
         .validate_and_register(&tx2_state, &seq_log)
@@ -72,7 +67,6 @@ fn test_ssi_serial_schedule_accepted() {
     let tx1_id = TxId::new(201);
     let tx2_id = TxId::new(202);
 
-    // T1 reads key A at snapshot 10, writes key B at commit 15
     let mut rs1 = ReadSet::new();
     rs1.record_read(b"key_a".to_vec(), 10);
     let tx1_state = TxSsiState::new(tx1_id, tenant_id, 15)
@@ -85,7 +79,6 @@ fn test_ssi_serial_schedule_accepted() {
         .expect("T1 decision");
     assert_eq!(decision1, CommitDecision::Accepted { commit_seq: 15 });
 
-    // T2 starts after T1 committed (reads at snapshot_seq 15), reads key B, writes key C
     let mut rs2 = ReadSet::new();
     rs2.record_read(b"key_b".to_vec(), 15);
     let tx2_state = TxSsiState::new(tx2_id, tenant_id, 20)
@@ -110,28 +103,24 @@ fn test_two_tenant_isolation() {
     let tx1_id = TxId::new(301);
     let tx2_id = TxId::new(302);
 
-    // Tenant 1 reads tenant-prefixed key
     let mut rs1 = ReadSet::new();
     rs1.record_read(b"t1:doc_a".to_vec(), 10);
     let tx1_state = TxSsiState::new(tx1_id, tenant1, 15)
         .with_read_set(rs1)
         .with_write_keys(vec![b"t1:doc_b".to_vec()]);
 
-    // Tenant 2 writes tenant-prefixed key at sequence 12
     let mut rs2 = ReadSet::new();
     rs2.record_read(b"t2:doc_x".to_vec(), 10);
     let tx2_state = TxSsiState::new(tx2_id, tenant2, 12)
         .with_read_set(rs2)
         .with_write_keys(vec![b"t2:doc_a".to_vec()]);
 
-    // T2 commits first
     let decision2 = wiring
         .ssi_commit_gate
         .validate_and_register(&tx2_state, &seq_log)
         .expect("T2 decision");
     assert_eq!(decision2, CommitDecision::Accepted { commit_seq: 12 });
 
-    // T1 commits second: no conflict because keyspace prefixes are isolated
     let decision1 = wiring
         .ssi_commit_gate
         .validate_and_register(&tx1_state, &seq_log)
@@ -145,7 +134,6 @@ fn test_fail_closed_on_missing_read_tracking_and_unknown_state() {
     let seq_log = SequenceLog::new();
     let tenant_id = TenantId::try_new(1).expect("valid tenant");
 
-    // Case 1: Read tracking disabled -> Must return SsiError::MissingReadTracking
     let tx_no_tracking = TxSsiState::new(TxId::new(401), tenant_id, 10)
         .with_read_tracking(false);
 
@@ -159,7 +147,6 @@ fn test_fail_closed_on_missing_read_tracking_and_unknown_state() {
         "Expected MissingReadTracking error, found: {err1:?}"
     );
 
-    // Case 2: Invalid status (Aborted or Unknown) -> Must return SsiError::UnknownTxState
     let tx_aborted = TxSsiState::new(TxId::new(402), tenant_id, 10)
         .with_status(TxStateStatus::Aborted);
 
@@ -199,16 +186,14 @@ fn test_p8_orphan_reaper_snapshot_unpinning_integration() {
     buffer.set_snapshot_registry(registry.clone());
 
     let tx = TxId::new(501);
-    let past_time = Instant::now() - Duration::from_secs(60);
+    let past_time = 10_000_000u64; // 10ms in nanos
+    let now_ticks = past_time + 20_000_000; // 20ms later (> 10ms tx_timeout)
     buffer.begin_with_seq_at(tx, 77, past_time);
 
-    // Confirm that snapshot sequence 77 is active
     assert_eq!(registry.min_active_seqno(), 77);
 
-    // Reap expired orphan transaction
-    let reaped = buffer.reap_orphans_at(Instant::now());
+    let reaped = buffer.reap_orphans_at(now_ticks);
     assert_eq!(reaped, vec![tx]);
 
-    // Confirm that snapshot sequence 77 was unpinned from SnapshotRegistry
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 }

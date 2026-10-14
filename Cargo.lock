@@ -814,7 +814,6 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-cognition",
  "contextra-crypto",
  "contextra-engine",
  "contextra-graph",
@@ -897,7 +896,6 @@ dependencies = [
  "blake3",
  "contextra-adapt",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
  "criterion",
@@ -1077,6 +1075,7 @@ name = "contextra-ports"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "blake3",
  "bytes",
  "contextra-ports",
  "contextra-types",
@@ -1086,6 +1085,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "trybuild",
 ]
 
 [[package]]
@@ -1205,6 +1205,7 @@ name = "contextra-store"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "arc-swap",
  "blake3",
  "bytes",
  "contextra-core",
@@ -1213,7 +1214,6 @@ dependencies = [
  "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-sandbox",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",

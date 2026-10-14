@@ -573,6 +573,13 @@ impl RevocationLog {
             return Err(CryptoError::IntegrityViolation);
         }
 
+        if let Some(ref path) = self.file_path {
+            if !path.exists() || !marker_path_for(path).exists() {
+                self.rollback_detected.store(true, Ordering::SeqCst);
+                return Err(CryptoError::IntegrityViolation);
+            }
+        }
+
         let entries_guard = self.entries.read();
         let cursor = *self.verified_cursor.read();
 
@@ -785,6 +792,12 @@ impl RevocationLog {
     pub fn is_revoked(&self, target: &RevocationTarget) -> bool {
         if self.rollback_detected.load(Ordering::SeqCst) {
             return true;
+        }
+        if let Some(ref path) = self.file_path {
+            if !path.exists() || !marker_path_for(path).exists() {
+                self.rollback_detected.store(true, Ordering::SeqCst);
+                return true;
+            }
         }
         if self.verify_integrity().is_err() {
             self.rollback_detected.store(true, Ordering::SeqCst);

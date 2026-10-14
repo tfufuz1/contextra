@@ -94,7 +94,8 @@ impl NaiveWalSut {
 
         let key = slice[13..13 + key_len].to_vec();
         let val_offset = 13 + key_len;
-        let val_len = u32::from_le_bytes(slice[val_offset..val_offset + 4].try_into().ok()?) as usize;
+        let val_len =
+            u32::from_le_bytes(slice[val_offset..val_offset + 4].try_into().ok()?) as usize;
 
         let total_len = val_offset + 4 + val_len + 4;
         if slice.len() < total_len {
@@ -146,7 +147,7 @@ impl SystemUnderTest for NaiveWalSut {
                 let mut opts = SimOpenOptions::new();
                 opts.create(true).write(true);
                 if let Ok(file) = self.sim_fs.open(&self.wal_path, &opts) {
-                    let _ = file.sync_all();
+                    let _ = file.sync_all(); // INTENTIONAL-DROP
                 }
             }
             DstOp::Commit => {
@@ -199,14 +200,14 @@ impl SystemUnderTest for NaiveWalSut {
         payload_bytes.extend_from_slice(&commit_rec);
 
         if let Err(e) = file.write_at(&payload_bytes, offset) {
-            let _ = file.set_len(offset);
+            let _ = file.set_len(offset); // INTENTIONAL-DROP
             self.staged.clear();
             return Err(e);
         }
 
         if let Err(e) = file.sync_data() {
-            let _ = file.set_len(offset);
-            let _ = file.sync_data();
+            let _ = file.set_len(offset); // INTENTIONAL-DROP
+            let _ = file.sync_data(); // INTENTIONAL-DROP
             self.staged.clear();
             return Err(e);
         }
@@ -217,8 +218,8 @@ impl SystemUnderTest for NaiveWalSut {
             .unwrap_or_else(|| std::path::Path::new("."));
 
         if let Err(e) = self.sim_fs.sync_dir(parent) {
-            let _ = file.set_len(offset);
-            let _ = file.sync_data();
+            let _ = file.set_len(offset); // INTENTIONAL-DROP
+            let _ = file.sync_data(); // INTENTIONAL-DROP
             self.staged.clear();
             return Err(e);
         }

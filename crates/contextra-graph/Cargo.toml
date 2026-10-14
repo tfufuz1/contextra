@@ -41,7 +41,6 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
-contextra-store = { workspace = true }
 contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"

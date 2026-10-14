@@ -22,3 +22,11 @@ Das Verzeichnis `docs/decisions/` ist die einzige kanonische Quelle (Single Sour
 
 ## Neueste Entscheidungen
 - [ADR-SCOPE-FREEZE-2026-10](ADR-SCOPE-FREEZE-2026-10.md): Scope Freeze & Crate-Klassifizierung (Kern, Rand, Experimentell)
+
+## Vorgeschlagene ADR-T Entwürfe (In Arbeit / Proposed)
+- [ADR-T01-P29-kein-globaler-veraenderlicher-zustand](ADR-T01-P29-kein-globaler-veraenderlicher-zustand.md): Prinzip P29 — Kein globaler veränderlicher Zustand (Entwurf)
+- [ADR-T02-INV-KMS-1-kms-provider-verdrahtung](ADR-T02-INV-KMS-1-kms-provider-verdrahtung.md): INV-KMS-1 — Strikte KMS-Provider-Verdrahtung (Entwurf)
+- [ADR-T03-INV-DELETION-WIRE-1-loeschpfad-verdrahtung](ADR-T03-INV-DELETION-WIRE-1-loeschpfad-verdrahtung.md): INV-DELETION-WIRE-1 — Durchgängige Löschpfad-Verdrahtung (Entwurf)
+- [ADR-T04-INV-SSI-ACTIVE-1-ssi-durchsetzung](ADR-T04-INV-SSI-ACTIVE-1-ssi-durchsetzung.md): INV-SSI-ACTIVE-1 — Strikte SSI-Durchsetzung (Entwurf)
+- [ADR-T05-INV-DOC-SINGLE-SOURCE-1-doc-single-source](ADR-T05-INV-DOC-SINGLE-SOURCE-1-doc-single-source.md): INV-DOC-SINGLE-SOURCE-1 — Doc Single Source of Truth (Entwurf)
+- [ADR-T06-INV-RING0-DETERMINISM-1-ring0-determinismus](ADR-T06-INV-RING0-DETERMINISM-1-ring0-determinismus.md): INV-RING0-DETERMINISM-1 — Ring-0 Determinismus (Entwurf)

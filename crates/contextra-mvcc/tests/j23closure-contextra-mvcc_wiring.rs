@@ -8,7 +8,7 @@ use contextra_mvcc::{
 };
 use parking_lot::RwLock;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[test]
 fn test_j23closure_seq_log_expired_pins_and_set_max_pin_duration() {
@@ -16,16 +16,14 @@ fn test_j23closure_seq_log_expired_pins_and_set_max_pin_duration() {
     seq_log.set_max_pin_duration(Duration::from_millis(10));
     assert_eq!(seq_log.max_pin_duration(), Duration::from_millis(10));
 
-    let now = Instant::now();
-    let past = now.checked_sub(Duration::from_millis(50)).unwrap();
+    let now_ticks = 100_000_000u64; // 100ms
+    let past_ticks = 10_000_000u64; // 10ms (90ms ago > 10ms max_pin_duration)
 
-    seq_log.pin_snapshot_at(100, past);
-    let expired = seq_log.expired_pins_at(now);
+    seq_log.pin_snapshot_at(100, past_ticks);
+    let expired = seq_log.expired_pins_at(now_ticks);
     assert_eq!(expired, vec![100]);
 
-    // SequenceLog::expired_pins() uses Instant::now() and is called by min_retention_seq()
-    let _expired_now = seq_log.expired_pins();
-    let min_ret = seq_log.min_retention_seq();
+    let min_ret = seq_log.min_retention_seq_at(now_ticks);
     assert_eq!(min_ret, Some(100));
 }
 
@@ -45,7 +43,6 @@ fn test_j23closure_ssi_validator_wiring_and_maps() {
     let seq_log = Arc::new(RwLock::new(SequenceLog::new()));
     let registry = Arc::new(SnapshotRegistry::new());
 
-    // SequenceLogSsiValidatorBuilder uses with_sequence_log and with_snapshot_registry
     let validator = SequenceLogSsiValidator::builder()
         .with_max_tracked_keys(10)
         .with_sequence_log(seq_log.clone())
@@ -59,7 +56,6 @@ fn test_j23closure_ssi_validator_wiring_and_maps() {
     read_set.record_read(b"key_a".to_vec(), 10);
     read_set.record_prefix(b"pref_".to_vec(), 10);
 
-    // ReadSet methods delegate to keys_map and prefixes_map
     assert_eq!(read_set.keys_map().len(), 1);
     assert_eq!(read_set.prefixes_map().len(), 1);
     assert_eq!(read_set.len(), 2);
@@ -67,21 +63,17 @@ fn test_j23closure_ssi_validator_wiring_and_maps() {
     assert_eq!(read_set.iter().count(), 1);
     assert_eq!(read_set.prefixes_iter().count(), 1);
 
-    // record_commit_key delegates to record_commit_keys
     validator.record_commit_key(b"key_b", 10);
     validator.record_commit_keys([b"key_c".as_slice()], 10);
 
-    // SsiValidator::validate delegates to validate_and_record
     assert!(validator.validate(TxId::new(1), &read_set).is_ok());
     assert!(validator
         .validate_and_record(TxId::new(2), &read_set, [b"key_d".as_slice()], 12)
         .is_ok());
 
-    // diagnose_pruning_blocker tests
     let blocker = validator.diagnose_pruning_blocker();
     assert!(blocker.is_some());
 
-    // set_snapshot_registry mutation wiring test
     let mut mut_val = SequenceLogSsiValidator::new();
     mut_val.set_snapshot_registry(registry);
 }
@@ -103,11 +95,9 @@ fn test_j23closure_tx_buffer_staged_status_and_validate_ops() {
         )
         .unwrap();
 
-    // is_key_staged_for_tx directly tested and used by staged_status
     assert!(buffer.is_key_staged_for_tx(tx, b"key1"));
     assert_eq!(buffer.staged_status(b"key1"), Some(true));
 
-    // validate_pending_ops directly tested and used by get_ops and drain_kv
     assert!(buffer.validate_pending_ops(tx).is_ok());
     assert_eq!(buffer.get_ops(tx).map(|v| v.len()), Some(1));
     let ops = buffer.drain_kv(tx);

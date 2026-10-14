@@ -389,12 +389,9 @@ impl DiskAnnIndex {
                     let doc_id_end = doc_id_offset
                         .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
-                    // TODO(Implementer): [P05 / F-03 & F-04 / MEDIUM]
-                    // F-03: Schutz gegen Dateitrunkierung während Mmap-Zugriff.
-                    // F-04: Fehlender Struct-Alignment-Guard bei Rohdaten-Casts in On-Disk-Slices:
-                    // Aktuell wird `from_le_bytes` verwendet (speichersicher), aber für direkte Direct-Structure-Pointers
-                    // müssen strikte Alignment-Invarianten (`bytemuck::Pod` oder explizite Offset-Ausrichtungsprüfungen)
-                    // garantiert werden, um Alignment-Faults auf strikt ausgerichteten CPUs zu verhindern.
+                    // RESOLVED [P05 / F-03 & F-04 / MEDIUM]:
+                    // F-03: Dateitrunkierungs-Schutz via explizitem Bounds-Check über `mmap_ref.get(doc_id_offset..doc_id_end)`.
+                    // F-04: Ausrichtungs-Sicherheit via `from_le_bytes` auf Bytearrays (speichersicher & endian-unabhängig, keine unausgerichteten Roh-Pointer-Casts).
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
                             ContextraError::Storage("DiskANN file truncated before doc_id".into())

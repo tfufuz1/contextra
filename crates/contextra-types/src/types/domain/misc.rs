@@ -40,6 +40,23 @@ mod hex {
     }
 }
 
+/// A deterministic timestamp containing wall-clock time in milliseconds since Unix epoch
+/// and a monotonic counter value for ordering and duration measurements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DeterministicTimestamp {
+    /// Wall-clock time in milliseconds since the Unix epoch.
+    pub wall_ms: u64,
+    /// Monotonic counter value for ordering within the same millisecond or tick sequence.
+    pub mono_ctr: u64,
+}
+
+impl DeterministicTimestamp {
+    /// Creates a new [`DeterministicTimestamp`].
+    pub const fn new(wall_ms: u64, mono_ctr: u64) -> Self {
+        Self { wall_ms, mono_ctr }
+    }
+}
+
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowState {

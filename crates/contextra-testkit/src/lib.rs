@@ -15,6 +15,8 @@ pub mod sim_fs;
 pub mod wiring;
 
 pub use deletion_oracle::{raw_sweep, OrcFieldMarker, OrcHit, OrcMarkerSet, OrcSweepReport};
+pub use dst::{EntropyRng, SeededRng};
+#[cfg(feature = "fault-injection")]
 pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_store::InMemoryStorageEngine;
 pub use manual_clock::ManualClock;

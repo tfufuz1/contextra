@@ -178,9 +178,7 @@ impl P07DstRunner {
 
         // Validate recovered snapshot against oracle invariants
         let recovered_snapshot = sut.snapshot();
-        oracle
-            .verify_recovery(&recovered_snapshot)
-            .map(|_| ())
+        oracle.verify_recovery(&recovered_snapshot).map(|_| ())
     }
 
     /// Delta-debugging shrinker: minimizes a failing op sequence.
@@ -313,9 +311,9 @@ impl P07DstRunner {
         // Write report file
         let path = Path::new(&report_path);
         if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
+            let _ = fs::create_dir_all(parent); // INTENTIONAL-DROP
         }
-        let _ = fs::write(path, report.to_json());
+        let _ = fs::write(path, report.to_json()); // INTENTIONAL-DROP
 
         Ok(report)
     }

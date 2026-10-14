@@ -5,7 +5,7 @@
 //!
 //! This crate provides the concurrency and isolation layer:
 //! - [`SequenceLog`]: Monotonic sequence tracking and change notifications.
-//! - [`SnapshotRegistry`] / [`SnapshotGuard`]: MVCC read isolation guards.
+//! - [`SnapshotRegistry`] / [`SnapshotLease`]: MVCC read isolation guards.
 //! - [`TxBuffer`]: Sharded transaction staging with orphan reaping.
 //! - [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI) read tracking and conflict detection.
 
@@ -26,8 +26,9 @@ pub mod wiring;
 pub use floor::{GcFloor, SnapshotFloor};
 pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-#[allow(deprecated)]
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
+pub use snapshot::{
+    SnapshotRegistry, DEFAULT_MAX_SNAPSHOT_AGE_TICKS, DEFAULT_PIN_GRACE_TICKS,
+};
 pub use ssi::{
     CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate,
     SsiError, SsiValidator, TxSsiState, TxStateStatus,

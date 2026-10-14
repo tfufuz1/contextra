@@ -354,6 +354,17 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
+
+    /// Active read snapshot has expired due to max_snapshot_age policy.
+    #[error("Snapshot {seq_no} expired (age: {age_ticks} ticks > max_snapshot_age: {max_age_ticks} ticks)")]
+    SnapshotExpired {
+        /// Sequence number of expired snapshot.
+        seq_no: u64,
+        /// Age of snapshot in ticks.
+        age_ticks: u64,
+        /// Maximum allowed snapshot age in ticks.
+        max_age_ticks: u64,
+    },
 }
 
 impl ContextraError {
@@ -485,6 +496,15 @@ impl ContextraError {
         Self::CrossDeviceLink {
             source_path: source_path.into(),
             target_path: target_path.into(),
+        }
+    }
+
+    /// Creates a `SnapshotExpired` error.
+    pub fn snapshot_expired(seq_no: u64, age_ticks: u64, max_age_ticks: u64) -> Self {
+        Self::SnapshotExpired {
+            seq_no,
+            age_ticks,
+            max_age_ticks,
         }
     }
 
