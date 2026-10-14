@@ -43,12 +43,18 @@ Er ist strikt synchron (P26) und erzwingt `#![forbid(unsafe_code)]`.
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-rank
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-rank
+cargo xtask check-nan-hot-loop
+cargo xtask determinism-check
 cargo xtask doctrine-scan --crate contextra-rank
 cargo xtask check-ring0-async-purity
 cargo xtask check-unsafe-islands
+cargo test -p contextra-rank --locked
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP3 & Phase 3 Roadmap)
+
+- **Conformal Fusion Calibration (Phase 3)**: Vollständige Übernahme von Split-Conformal Prediction mit mathematischer Coverage-Garantie ($P(Y \in C(X)) \ge 1 - \alpha$) zur Ablösung von heuristischem PAVA/Platt-Scaling.
+- **Deterministische Floats**: Durchgängige Verwendung von `f64::total_cmp` zur Vermeidung von NaN-Panic und Nicht-Determinismus.
 - DiBud-Integration ist hinter dem Feature `dibud` gesealt.
+

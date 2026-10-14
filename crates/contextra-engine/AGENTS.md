@@ -43,18 +43,23 @@ Reine Async-Laufzeitumgebung auf Layer 3 (Tokio). Zugriffe auf `Collection`-Ress
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-engine
-cargo test -p contextra-engine --test multi_index_transaction
-cargo test -p contextra-engine --test invariant_isolation
-cargo test -p contextra-engine --test engine_commit_crash_points
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-engine
+cargo xtask check-compile
 cargo xtask doctrine-scan --crate contextra-engine
 cargo xtask check-unsafe-islands
 cargo xtask wal-replay-verify
+cargo test -p contextra-engine --locked
+cargo test -p contextra-engine --test multi_index_transaction
+cargo test -p contextra-engine --test invariant_isolation
+cargo test -p contextra-engine --test engine_commit_crash_points
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (Phase 0 & EP1 Roadmap)
 
-- Testabdeckung für hypothetische 3-Node/Cluster-Crashes entfällt, da Single-Node-Ein-Prozess-Architektur gilt (v15 Teil F).
-- Integrations- und Crash-Tests befinden sich in `crates/contextra-engine/tests/` (z. B. `write_skew_via_engine_api.rs`, `commit_crash_consistency.rs`).
+- **N-B (Downcast-Eliminierung via ErasureBackend)**: Downcast von Storage-Handles entfällt; direkte Nutzung des `ErasureBackend`-Traits.
+- **N-K (PhysicalScope-Integration)**: Weiterleitung von `PhysicalScope` mit Tenant-Präfix an Vektor-, Text- und KV-Engines.
+- **N-N (Match-Arm-Vollständigkeit)**: Sauberes Matching von `FreeSpaceProbe::UnknownFreeSpace`.
+- **Option B (Lockless Schreib-Fence)**: Atomare `FenceEpoch`-Prüfung zur Synchronisation von Schreibvorgängen mit Purge-Operationen.
+- **Single-Node Invariante**: Keine verteilte/Cluster-Logik; strikte Konzentration auf Ein-Prozess-Architektur (v15 Teil F).
+
 

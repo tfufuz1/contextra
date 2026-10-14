@@ -32,14 +32,19 @@ Die Crate ist strikt synchron (P26), frei von Async-Runtimes und erzwingt `#![fo
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-mvcc
-cargo test -p contextra-mvcc --test ssi_write_skew
-cargo test -p contextra-mvcc --test campaign_cov_tx_buffer_reap
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-mvcc
+cargo xtask gc-floor-single-source
 cargo xtask doctrine-scan --crate contextra-mvcc
 cargo xtask check-unsafe-islands
 cargo xtask check-ring0-async-purity
+cargo test -p contextra-mvcc --locked
+cargo test -p contextra-mvcc --test ssi_write_skew
+cargo test -p contextra-mvcc --test campaign_cov_tx_buffer_reap
 ```
 
-## 7. Bekannte Lücken / SOLL
-- SSI-Coarsening schaltet bei Auslastung der gewachteten Commit-Keys (>= 80%) automatisch auf Grob-Granularität um (bestätigt durch `campaign_cov_ssi_coarsening.rs`).
+## 7. Bekannte Lücken / SOLL (EP1 Roadmap)
+
+- **INV-MVCC-SSI-1 Read-Set-Tracking**: Lese-Iteratoren registrieren sich mit `ReadSnapshotToken`, um Write-Skew bei nebenläufigen Transaktions-Commits fail-closed zu erkennen.
+- **GC-Floor Single-Source**: Garbage-Collection Floor (`min_active_seqno()`) darf ausschließlich über die vorgesehene Floor-Schnittstelle ermittelt werden.
+- SSI-Coarsening schaltet bei Auslastung der gewachteten Commit-Keys (>= 80%) automatisch auf Grob-Granularität um.
+

@@ -46,13 +46,17 @@ Erzwingt strikte Sandbox-Richtlinien, Egress-Gateway-Grenzen und Quarantäne dur
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-mcp
-cargo check -p contextra-mcp
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-mcp
 cargo xtask doctrine-scan --crate contextra-mcp
 cargo xtask check-unsafe-islands
+cargo test -p contextra-mcp --locked
+cargo test -p contextra-mcp --test egress_guard_fail_closed
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP6 & Phase 6 Roadmap)
 
+- **Behebung B1 (Fail-Closed EgressGuard)**: Zwingende EgressGuard-Prüfung vor jedem Aufruf von `contextra_cloud_query` (kein ungeschützter Egress).
+- **Behebung B4 (DeletionProofV4 Durchreichung)**: `contextra_delete_with_proof` gibt echten `DeletionProofV4` an den Aufrufer zurück statt `proof: null`.
+- **Behebung B9 (Dual-Path Eliminierung)**: Alle CRUD- und Suchoperationen delegieren strikt an `ContextraDb`; keine Re-Implementierung von Collection-Logik im MCP-Server.
 - Dynamisches Hinzufügen externer WASM-MCP-Plugins erfordert Neustart der Stdio-Session.
+

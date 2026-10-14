@@ -1,5 +1,5 @@
 # AGENTS.md — contextra-cognition
-> Ring 3 · stable · Quelle: capabilities.toml · Spec: K.6, III.15
+> Ring 3 · experimental · Quelle: capabilities.toml · Spec: K.6, III.15
 
 ## 1. Zweck
 
@@ -42,14 +42,17 @@ Arbeitet asynchron auf Layer 3 über `contextra-engine`. LLM-Konsolidierungsdurc
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-cognition
-cargo xtask check-agents-integrity
-cargo xtask doctrine-scan --crate contextra-cognition
+cargo xtask crate-context contextra-cognition
 cargo xtask determinism-check
+cargo xtask doctrine-scan --crate contextra-cognition
 cargo xtask check-unsafe-islands
+cargo test -p contextra-cognition --locked
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP5 & Phase 4 Roadmap)
 
+- **Brand's Rang-1 SVD (Phase 4)**: Inkrementelle Spektralzerlegung zur Hyperkanten-Deduplizierung mit Kahan-Summation für präzise Cosinus-Ähnlichkeiten.
+- **Sleep-Cycle Consolidation**: Automatisierte, asynchrone Gedächtnis-Konsolidierungsläufe basierend auf konfigurierbaren Inaktivitätszeitfenstern.
 - `filter_candidates_with_transitivity_veto` ist im Code vollständig implementiert und in `memory_consolidation.rs` integriert.
+
 

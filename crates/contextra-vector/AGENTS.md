@@ -52,15 +52,19 @@ tokio::spawn(async move { ... });
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-vector --locked
-cargo test -p contextra-vector --features experimental-diskann
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-vector
 cargo xtask doctrine-scan --crate contextra-vector
 cargo xtask check-ring0-async-purity
 cargo xtask check-unsafe-islands
+cargo xtask check-nan-hot-loop
+cargo test -p contextra-vector --locked
+cargo test -p contextra-vector --test k02_snapshot_rebuild_determinism
+cargo test -p contextra-vector --features experimental-diskann
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP1 Roadmap)
 
-- `quantize_rabitq.rs` ist als RaBitQ-Prototyp vorhanden, aber noch nicht in den Produktions-Searchpath integriert.
-- `experimental-diskann` ist opt-in und verlangt explizite Feature-Aktivierung.
+- **Purge v2 In-Memory Slot Zeroing**: Slot-Zeroisierung in der Vektor-Arena (`purge_vector_slot`) für L2-Löschung ohne HNSW-Graph-Rewiring (Erhalt von VETO-F02).
+- **Ryzen 3500U AVX2 Optimierung**: Deterministische AVX2/FMA Ausführung ohne CUDA-Abhängigkeit gemäß Solo-Entwickler-Profil.
+- **RaBitQ & DiskANN**: `quantize_rabitq.rs` und `experimental-diskann` bleiben opt-in und experimentell isoliert.
+

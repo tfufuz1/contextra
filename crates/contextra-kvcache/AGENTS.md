@@ -1,5 +1,5 @@
 # AGENTS.md — contextra-kvcache
-> Ring 1 · stable · Quelle: capabilities.toml · Spec: K.15 / III.10 / L.3 / L.4
+> Ring 1 · experimental · Quelle: capabilities.toml · Spec: K.15 / III.10 / L.3 / L.4
 
 ## 1. Zweck
 Speicher- und Tiering-Subsystem für den LLM-KV-Cache mit Mandantenisolierung, Prefix-Radix-Bäumen, Attention-basierter Eviction und 2-Bit-KIVI-Quantisierung.
@@ -46,14 +46,18 @@ Erzwingt `#![forbid(unsafe_code)]` im gesamten Crate.
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-kvcache --locked
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-kvcache
 cargo xtask doctrine-scan --crate contextra-kvcache
 cargo xtask check-unsafe-islands
 cargo xtask check-result-dropped-io
+cargo xtask check-loom-mocks
+cargo test -p contextra-kvcache --locked
+cargo test -p contextra-kvcache --test kivi_quantization_accuracy
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP4 & Phase 3 Roadmap)
 
-- **KIVI-Quantisierung als Feature-Flag**: 2-Bit-Quantisierung in `quantize_kivi.rs` erfordert die Features `kivi-quantization` oder `kvcache-kivi-quant`.
+- **Irminsul KV-Cache Prefix-Reuse (Phase 3)**: Radix-Trie Deduplizierung über KV-Blöcke (`ref_count > 1`) mit SnapKV Attention Pooling für Multi-Turn-Sessions.
+- **KIVI 2-Bit Quantisierung**: Asymmetrische 2-Bit-Quantisierung (Keys per-channel, Values per-token) produktiv im Tiering-Pfad nutzen.
 - **Content-Addressed Cache Opt-in**: Multi-Level-Match (Position, Content-Hash, Semantik) ist hinter Feature `content-addressed-kv-cache` gekapselt.
+

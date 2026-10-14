@@ -37,12 +37,16 @@
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-privacy
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-privacy
 cargo xtask doctrine-scan --crate contextra-privacy
 cargo xtask check-unsafe-islands
+cargo test -p contextra-privacy --locked
 ```
 
-## 7. Bekannte Lücken / SOLL
-- **Standardmuster-Ablösung**: `EgressVault::default_patterns()` verwendet statische Teilstring-Muster (`sk-`, `AKIA`, `api_key`, `password`, E-Mail-Regex), die keine allgemeinen PII-Formen (z. B. Namen, Adressen) ohne konfigurierte `EntityRecognizer` erfassen.
-- **Kollisionsrisiko bei Surrogate-Keys**: `SurrogateVault` generiert 16-Bit (4 Hex-Zeichen) Hash-Tokens (`[USER_ENTITY_xxxx]`). Bei sehr vielen Entitäten pro Sitzung können Kollisionen auftreten, bei denen neuere Mappings frühere überschreiben.
+## 7. Bekannte Lücken / SOLL (EP6 & Phase 6 Roadmap)
+
+- **BLAKE3 Hash-Chained Audit-Trail (Phase 6)**: Fälschungssichere Audit-Kette für sämtliche Egress-Entscheidungen (`INV-EGRESS-AUDIT-1`) ohne Klartext-Persistenz.
+- **Luhn / IBAN DLP-Erweiterung**: Fail-closed Validierung numerischer Finanzidentifikatoren im Stream.
+- **Kollisionsrisiko bei Surrogate-Keys**: Geplante Umstellung von 16-Bit-Tokens auf 64-Bit SipHash/BLAKE3-Präfixe zur Vermeidung von Kollisionen bei großen Sitzungen.
+- `EgressVault::default_patterns()` verwendet statische Teilstring-Muster; Vollabdeckung für Namen/Adressen erfolgt über konfigurierte `EntityRecognizer`.
+

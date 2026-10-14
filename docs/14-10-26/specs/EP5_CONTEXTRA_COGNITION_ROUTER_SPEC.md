@@ -1,60 +1,90 @@
 # Contextra — Mikrofeingranulare Implementierungsspezifikation EP5: Contextra Cognition & Adaptive Routing
 
 **Dokumenten-ID:** `DOC-SPEC-EP5-COGNITION-2026-10-14`  
-**Version:** 1.0 · **Datum:** 14. Oktober 2026  
+**Version:** 2.0 (Punktgenaue Feinspezifikation) · **Datum:** 14. Oktober 2026  
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für Kognition, Routing & Agenten  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Adaption):** [`contextra-adapt`](file:///home/freddy/Projekte/contextra/crates/contextra-adapt)  
-- **Ring 3 (Routing):** [`contextra-router`](file:///home/freddy/Projekte/contextra/crates/contextra-router)  
-- **Ring 3 (Kognition):** [`contextra-cognition`](file:///home/freddy/Projekte/contextra/crates/contextra-cognition)  
-- **Ring 3 (Agenten):** [`contextra-agent`](file:///home/freddy/Projekte/contextra/crates/contextra-agent)
+- **Ring 0 (Adaption & PID):** [`contextra-adapt`](file:///home/freddy/Projekte/contextra/crates/contextra-adapt)  
+- **Ring 1 (Ports):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Traits: `Clock`, `Rng`, `HybridSearchProvider`, `CommunityResolver`, `ContextPreparer`)  
+- **Ring 3 (Routing & Kaskaden):** [`contextra-router`](file:///home/freddy/Projekte/contextra/crates/contextra-router)  
+- **Ring 3 (Kognition & Konsolidierung):** [`contextra-cognition`](file:///home/freddy/Projekte/contextra/crates/contextra-cognition)  
+- **Ring 3 (Agenten & Event-Loop):** [`contextra-agent`](file:///home/freddy/Projekte/contextra/crates/contextra-agent)  
+- **Ring 4 (Fassade):** [`contextra`](file:///home/freddy/Projekte/contextra/crates/contextra)
 
 ---
 
 ## 1. Architektonische Grenzziehung & Disjunktion
 
-Contextra Cognition (EP5) umfasst alle autonomen Lern- und Konsolidierungsschleifen: adaptive Latenzregelung via PID-Controller, Flow-Corrected Thompson Sampling Bandit Routing, nächtliche Konsolidierungszyklen (Memory Sleep Passes) und die deterministische Agenten-Event-Loop.
+Contextra Cognition & Adaptive Routing (EP5) umfasst alle autonomen Lern-, Regelungs- und Konsolidierungsschleifen: adaptive Latenzregelung via diskretem PID-Controller, Flow-Corrected Thompson Sampling Bandit Routing, nächtliche Konsolidierungszyklen (Memory Sleep Passes) und die deterministische Agenten-Event-Loop.
 
 **Disjunktionsregeln für EP5:**
 1. **Kein Basisspeicher:** Alle Kognitions- und Routing-Module interagieren über `contextra-ports` mit dem Speicher. Sie führen keine direkten Dateisystemzugriffe durch.
-2. **Determinismus:** Alle Zeitstempel und Zufallsprozesse in Bandits und Drift-Watchern müssen über die injizierten Ports `Clock` und `Rng` bezogen werden (P28).
-3. **Strikte Kapselung von `AgentStatus`:** Der Status eines Agenten darf niemals öffentlich überschrieben werden; Übergänge sind an Vorbedingungen und Events der `OrchestratorEngine` gebunden.
+2. **Determinismus (P28):** Alle Zeitstempel und Zufallsprozesse in Bandits und Drift-Watchern müssen über die injizierten Ports `Clock` und `Rng` bezogen werden. Direkte Aufrufe von `SystemTime::now()` oder `rand::thread_rng()` im Produktionscode sind verboten.
+3. **Strikte Kapselung von `AgentStatus` (AGT-STATUS-001):** Der Status eines Agenten darf niemals öffentlich überschrieben werden; Übergänge sind an Vorbedingungen und Events gebunden.
+4. **Eliminierung von No-Op Stubs:** Im `ContextraBuilder` dürfen bei aktivierter Routing-Engine keine Dummy-No-Op-Provider verwendet werden; stattdessen binden echte Adapter an die `Contextra`-Instanz.
 
 ---
 
-## 2. Modul- und Datei-Feinspezifikationen
+## 2. Befund- und Korrekturmatrix EP5
 
-### 2.1 Komponente 1: Kapselung von `AgentStatus` & Typestate-Übergänge (Behebung `AGT-STATUS-001`)
+| ID | Datei | Zeile(n) | Problem & Befund | Exakte Korrekturmaßnahme |
+|---|---|---|---|---|
+| **AGT-STATUS-001** | `crates/contextra-agent/src/context.rs` | 70–135 | `pub status: AgentStatus` erlaubte unkontrollierte Statusänderungen ohne Prüfung. | Feld privatisieren; validierte Methode `transition_to` mit Typestate-Prüfung einführen. |
+| **AGENT-ORPHAN** | `crates/contextra-agent/src/context.rs` | 223 | `AgentEngine` war eine ungenutzte Hüllstruktur ohne Konsumenten. | Struktur und Implementierung vollständig entfernen. |
+| **ROUTER-STUBS** | `crates/contextra/src/builder.rs` | 616–678 | Dummy-NoOp-Stubs (`NoOpHybridSearch`, etc.) im Router führten ins Leere. | Echte Engine-Adapter anbinden (`RealHybridSearchAdapter`, `RealCommunityAdapter`). |
+| **BANDIT-DET** | `crates/contextra-router/src/bandit.rs` | neu | Thompson Sampling nutzte potenziell non-deterministischen System-Zufall. | Injektion von `Arc<dyn Rng>` und `Arc<dyn Clock>` aus `contextra-ports` erzwingen. |
+| **PID-WINDUP** | `crates/contextra-adapt/src/pid.rs` | neu | Diskreter Latenz-Regler akkumulierte Integrator-Windup bei Stau. | Anti-Windup Begrenzung mit symmetrischem Sättigungsfilter implementieren. |
 
-#### Problem
-In [`crates/contextra-agent/src/context.rs:20`](file:///home/freddy/Projekte/contextra/crates/contextra-agent/src/context.rs#L20) war `pub status: AgentStatus` ein öffentliches Feld. Externe Aufrufer konnten beliebige, illegale Statusänderungen (z. B. direkt von `Created` auf `Completed`) durchführen.
+---
 
-#### Datei: `crates/contextra-agent/src/context.rs`
+## 3. Punktgenaue Schnittstellen & Datenstrukturen
+
+### 3.1 Kapselung von `AgentStatus` (`crates/contextra-agent/src/context.rs`)
 ```rust
-use contextra_types::ContextraError;
+// In crates/contextra-agent/src/context.rs
+use contextra_types::{ContextraError, Result};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AgentStatus {
-    Created,
+    Idle,
     Running,
-    Suspended,
     Completed,
     Failed,
 }
 
+impl AgentStatus {
+    pub fn can_transition_to(&self, target: AgentStatus) -> bool {
+        match (self, target) {
+            (AgentStatus::Idle, AgentStatus::Running) => true,
+            (AgentStatus::Running, AgentStatus::Running) => true,
+            (AgentStatus::Running, AgentStatus::Completed) => true,
+            (AgentStatus::Running, AgentStatus::Failed) => true,
+            (AgentStatus::Failed, AgentStatus::Running) => true, // Retry
+            _ => false,
+        }
+    }
+}
+
 pub struct AgentContext {
-    // Kapselung: Feld ist strikt privat!
+    pub task_id: String,
+    pub current_node: String,
+    pub step_count: u64,
+    pub budget: contextra_types::TokenBudget,
+    /// Feld ist privat! Kapselung nach AGT-STATUS-001
     status: AgentStatus,
-    pub session_id: String,
-    // ...
+    pub memory: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl AgentContext {
-    pub fn new(session_id: String) -> Self {
+    pub fn new(task_id: impl Into<String>, budget: contextra_types::TokenBudget) -> Self {
         Self {
-            status: AgentStatus::Created,
-            session_id,
+            task_id: task_id.into(),
+            current_node: String::new(),
+            step_count: 0,
+            budget,
+            status: AgentStatus::Idle,
+            memory: std::collections::HashMap::new(),
         }
     }
 
@@ -63,130 +93,205 @@ impl AgentContext {
         self.status
     }
 
-    /// Kontrollierter Zustandsübergang nach festgelegter Zustandsmaschine
-    pub fn transition_to(&mut self, next: AgentStatus) -> Result<(), ContextraError> {
-        let allowed = match (self.status, next) {
-            (AgentStatus::Created, AgentStatus::Running) => true,
-            (AgentStatus::Running, AgentStatus::Suspended) => true,
-            (AgentStatus::Suspended, AgentStatus::Running) => true,
-            (AgentStatus::Running, AgentStatus::Completed) => true,
-            (AgentStatus::Running, AgentStatus::Failed) => true,
-            (AgentStatus::Suspended, AgentStatus::Failed) => true,
-            _ => false,
-        };
-
-        if allowed {
-            self.status = next;
+    /// Führt einen validierten Statusübergang durch (Fail-Closed)
+    pub fn transition_to(&mut self, target: AgentStatus) -> Result<()> {
+        if self.status.can_transition_to(target) {
+            self.status = target;
             Ok(())
         } else {
-            Err(ContextraError::invalid_state(format!(
-                "Illegal agent status transition from {:?} to {:?}", self.status, next
+            Err(ContextraError::InvalidState(format!(
+                "Illegal agent status transition from {:?} to {:?}", self.status, target
             )))
         }
     }
 }
 ```
 
----
-
-### 2.2 Komponente 2: Router-Wiring & Clock-Injektion in `ContextraBuilder` (Behebung N-O)
-
-#### Problem
-In `crates/contextra/src/builder.rs` scheiterte der Build unter `--features router`, weil `clock` als `Option<Arc<dyn Clock>>` an `RouterWiringDeps` übergeben wurde, welches ein konkretes `Arc<dyn Clock>` verlangte.
-
-#### Datei: `crates/contextra/src/builder.rs`
+### 3.2 Flow-Corrected Contextual Thompson Sampling (`crates/contextra-router/src/bandit.rs`)
 ```rust
-#[cfg(feature = "router")]
-{
-    let clock_instance: Arc<dyn contextra_ports::Clock> = self
-        .clock
-        .clone()
-        .unwrap_or_else(|| Arc::new(contextra_ports::SystemClock));
+// In crates/contextra-router/src/bandit.rs
+use std::sync::Arc;
+use contextra_ports::{Clock, Rng};
+use contextra_types::{ContextraError, Result};
 
-    let router_deps = contextra_router::RouterWiringDeps {
-        community_resolver: Arc::new(NoOpCommunityResolver),
-        context_preparer: Arc::new(NoOpContextPreparer),
-        catalog: Vec::new(),
-        clock: clock_instance,
-        arm_registry: None,
-        calibration_store_path: None,
-        transport: None,
-        route_timeout: None,
-    };
+pub struct ThompsonBanditArm {
+    pub id: usize,
+    pub d: usize,
+    pub b: Vec<f64>,
+    pub inv_a: Vec<Vec<f64>>,
+}
 
-    let router = contextra_router::RouterEngine::new_with_deps(router_deps);
-    // ...
+pub struct ContextualBanditRouter {
+    arms: Vec<ThompsonBanditArm>,
+    clock: Arc<dyn Clock>,
+    rng: Arc<dyn Rng>,
+}
+
+impl ContextualBanditRouter {
+    pub fn new(num_arms: usize, feature_dim: usize, clock: Arc<dyn Clock>, rng: Arc<dyn Rng>) -> Self {
+        let mut arms = Vec::with_capacity(num_arms);
+        for id in 0..num_arms {
+            let mut inv_a = vec![vec![0.0; feature_dim]; feature_dim];
+            for i in 0..feature_dim {
+                inv_a[i][i] = 1.0; // Identitätsmatrix als Prior
+            }
+            arms.push(ThompsonBanditArm {
+                id,
+                d: feature_dim,
+                b: vec![0.0; feature_dim],
+                inv_a,
+            });
+        }
+        Self { arms, clock, rng }
+    }
+
+    /// Wählt den besten Arm für gegebene Context-Features aus (deterministisch via Rng-Port)
+    pub fn select_arm(&self, context: &[f64]) -> Result<usize> {
+        let mut best_arm = 0;
+        let mut max_sample = f64::NEG_INFINITY;
+
+        for arm in &self.arms {
+            let mut mean = 0.0;
+            for i in 0..arm.d {
+                let mut theta_i = 0.0;
+                for j in 0..arm.d {
+                    theta_i += arm.inv_a[i][j] * arm.b[j];
+                }
+                mean += context[i] * theta_i;
+            }
+
+            let mut var = 0.0;
+            for i in 0..arm.d {
+                for j in 0..arm.d {
+                    var += context[i] * arm.inv_a[i][j] * context[j];
+                }
+            }
+            let std_dev = var.max(1e-6).sqrt();
+
+            // Deterministischer Zufallsstichprobentest über Rng-Port
+            let z = self.rng.sample_gaussian();
+            let sample = mean + std_dev * z;
+
+            if sample.total_cmp(&max_sample).is_gt() {
+                max_sample = sample;
+                best_arm = arm.id;
+            }
+        }
+
+        Ok(best_arm)
+    }
+
+    /// Online Bayesian Update via Sherman-Morrison Rang-1 Invertierung
+    pub fn update_reward(&mut self, arm_id: usize, context: &[f64], reward: f64) -> Result<()> {
+        let arm = self.arms.get_mut(arm_id).ok_or_else(|| {
+            ContextraError::InvalidData(format!("Unknown bandit arm {}", arm_id))
+        })?;
+
+        for i in 0..arm.d {
+            arm.b[i] += reward * context[i];
+        }
+
+        // Sherman-Morrison: (A + u v^T)^-1 = A^-1 - (A^-1 u v^T A^-1) / (1 + v^T A^-1 u)
+        let mut inv_a_u = vec![0.0; arm.d];
+        for i in 0..arm.d {
+            for j in 0..arm.d {
+                inv_a_u[i] += arm.inv_a[i][j] * context[j];
+            }
+        }
+
+        let mut denom = 1.0;
+        for i in 0..arm.d {
+            denom += context[i] * inv_a_u[i];
+        }
+
+        for i in 0..arm.d {
+            for j in 0..arm.d {
+                arm.inv_a[i][j] -= (inv_a_u[i] * inv_a_u[j]) / denom;
+            }
+        }
+
+        Ok(())
+    }
 }
 ```
 
----
-
-### 2.3 Komponente 3: Adaptive Latenzregelung via PID-Controller (`contextra-adapt`)
-
-#### Mathematik
-Der diskrete PID-Regler steuert die Größe des Retrieval-Kandidatenpools basierend auf gemessenen p95-Latenzen:
-$$e[t] = L_{\text{target}} - L_{\text{meas}}[t]$$
-$$u[t] = K_p e[t] + K_i \sum_{k=0}^t e[k] \Delta t + K_d \frac{e[t] - e[t-1]}{\Delta t}$$
-$$K_{\text{pool}}[t] = \text{clamp}(K_{\text{base}} + \alpha u[t], K_{\min}, K_{\max})$$
-
-#### Datei: `crates/contextra-adapt/src/pid_latency_controller.rs`
+### 3.3 Diskreter PID Latenz-Controller (`crates/contextra-adapt/src/pid.rs`)
 ```rust
-pub struct PidLatencyController {
-    kp: f32,
-    ki: f32,
-    kd: f32,
-    target_latency_ms: f32,
-    integral: f32,
-    prev_error: f32,
-    min_pool: usize,
-    max_pool: usize,
+// In crates/contextra-adapt/src/pid.rs
+pub struct PidController {
+    pub kp: f64,
+    pub ki: f64,
+    pub kd: f64,
+    integral: f64,
+    last_error: f64,
+    pub integral_max: f64,
 }
 
-impl PidLatencyController {
-    pub fn observe_and_adjust(&mut self, measured_p95_ms: f32, current_pool: usize) -> usize {
-        let error = self.target_latency_ms - measured_p95_ms;
-        self.integral = (self.integral + error).clamp(-100.0, 100.0);
-        let derivative = error - self.prev_error;
-        self.prev_error = error;
+impl PidController {
+    pub fn new(kp: f64, ki: f64, kd: f64, integral_max: f64) -> Self {
+        Self {
+            kp,
+            ki,
+            kd,
+            integral: 0.0,
+            last_error: 0.0,
+            integral_max,
+        }
+    }
 
-        let delta = self.kp * error + self.ki * self.integral + self.kd * derivative;
-        let new_pool = (current_pool as f32 + delta).round() as isize;
+    pub fn update(&mut self, error: f64, dt_seconds: f64) -> f64 {
+        if dt_seconds <= 0.0 {
+            return 0.0;
+        }
 
-        new_pool.clamp(self.min_pool as isize, self.max_pool as isize) as usize
+        // Anti-Windup Clamping des Integrator-Zustands
+        self.integral = (self.integral + error * dt_seconds)
+            .clamp(-self.integral_max, self.integral_max);
+
+        let derivative = (error - self.last_error) / dt_seconds;
+        self.last_error = error;
+
+        self.kp * error + self.ki * self.integral + self.kd * derivative
+    }
+
+    pub fn reset(&mut self) {
+        self.integral = 0.0;
+        self.last_error = 0.0;
     }
 }
 ```
 
 ---
 
-### 2.4 Komponente 4: Nächtliche Speicher-Konsolidierungs-Schleife (`contextra-cognition`)
+## 4. Normative Testfälle & Akzeptanzkriterien
 
-#### Datei: `crates/contextra-cognition/src/consolidation_executor.rs`
+### 4.1 AgentStatus Transition Test (AGT-STATUS-001)
 ```rust
-pub struct MemoryConsolidationExecutor {
-    context_manager: Arc<ContextManager>,
-}
+#[test]
+fn test_agent_status_transition_gating() {
+    let budget = contextra_types::TokenBudget::new(1000);
+    let mut ctx = AgentContext::new("test-task-1", budget);
 
-impl MemoryConsolidationExecutor {
-    /// Führt die semantische Aggregation und Session-Verdichtung aus
-    pub async fn run_consolidation_pass(
-        &self,
-        tenant_id: TenantId,
-        collection_id: CollectionId,
-    ) -> Result<ConsolidationSummary, ContextraError> {
-        // 1. Veraltete oder redundante Dokumentversionen identifizieren
-        // 2. Synthese und Zusammenfassung historischer Fakten
-        // 3. Atomares Schreiben der verdichteten Zusammenfassung
-        Ok(ConsolidationSummary::default())
-    }
+    assert_eq!(ctx.status(), AgentStatus::Idle);
+
+    // Erlaubter Übergang: Idle -> Running
+    assert!(ctx.transition_to(AgentStatus::Running).is_ok());
+    assert_eq!(ctx.status(), AgentStatus::Running);
+
+    // Erlaubter Übergang: Running -> Completed
+    assert!(ctx.transition_to(AgentStatus::Completed).is_ok());
+    assert_eq!(ctx.status(), AgentStatus::Completed);
+
+    // Verbotener Übergang: Completed -> Running (Fail-Closed)
+    assert!(ctx.transition_to(AgentStatus::Running).is_err());
+    assert_eq!(ctx.status(), AgentStatus::Completed);
 }
 ```
 
----
-
-## 3. Akzeptanzkriterien & Qualitätsgates (EP5)
-
-1. **State-Machine Gate:**
-   Ein Unit-Test weist nach, dass ein direkter Statusübergang von `Created` nach `Completed` ohne `Running` fail-closed mit `Err(ContextraError::InvalidState)` abgelehnt wird.
-2. **Router-Wiring Test:**
-   `cargo test -p contextra --features router` kompiliert fehlerfrei und führt Routen über die initialisierte `RouterEngine` aus.
+### 4.2 Akzeptanz-Gates
+```bash
+cargo xtask check-compile
+cargo xtask check-ring-layering
+cargo xtask determinism-check
+cargo test -p contextra-adapt -p contextra-agent -p contextra-router
+```

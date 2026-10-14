@@ -65,14 +65,22 @@ Implementiert die Schnittstelle `StorageEngine` aus `contextra-core` für produk
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-store --locked
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-store
 cargo xtask doctrine-scan --crate contextra-store
 cargo xtask check-unsafe-islands
 cargo xtask check-result-dropped-io
+cargo xtask wal-replay-verify
+cargo test -p contextra-store --locked
+cargo test -p contextra-store --test purge_v2_resilience
+cargo test -p contextra-store --test recovery_tests
+cargo test -p contextra-store --test mvcc_tests
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP1 & Phase 0 Roadmap)
 
+- **N-B / N-K: Erasure Backend & PhysicalScope**: `ErasureBackend`-Implementierung ohne Downcast; Durchsetzung von `PhysicalScope` mit Tenant-Präfix `t:{tenant_id}:` zur Vermeidung von Vollscans.
+- **L1–L6: Streaming Purge v2 mit Intent-Resume (N-A)**: Manifest-geführtes Purge-Intent-Protokoll mit atomarer State-Transition (`IntentWritten` → `SSTableRewritten` → `WalTruncated` → `Committed`). 3-Arm-Match (`FreeSpaceProbe::Known`, `Exhausted`, `UnknownFreeSpace`).
+- **L8: `FreeSpaceProbe = None` Fallback**: Robuste Behandlung von unbeschränktem Speicherplatz ohne Panic.
 - **WASM Merge-Operatoren im Compaction-Pfad (C.4.3.2)**: Trait `MergeOperator` ist vorhanden, WASM-basierte Ausführung während Compaction-Merge ist als Erweiterung vorbereitet (🟡 TEIL).
 - **SSTable-Rang-Feld (S-01)**: `rank` in Manifest-Einträgen ist seit der Umstellung auf kontinuierliche Compaction deprecated.
+

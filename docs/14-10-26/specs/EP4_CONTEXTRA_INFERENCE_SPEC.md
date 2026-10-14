@@ -1,188 +1,368 @@
-# Contextra — Mikrofeingranulare Implementierungsspezifikation EP4: Contextra Inference & KV-Cache
+# Contextra — Mikrofeingranulare Implementierungsspezifikation EP4: Contextra Inference
 
 **Dokumenten-ID:** `DOC-SPEC-EP4-INFERENCE-2026-10-14`  
-**Version:** 1.0 · **Datum:** 14. Oktober 2026  
+**Version:** 2.0 (Punktgenaue Feinspezifikation) · **Datum:** 14. Oktober 2026  
 **Autor:** Principal Senior Rust Architect für Contextra  
-**Status:** Verbindliche, normative Implementierungsanweisung für lokale Inferenz & KV-Cache  
+**Status:** Verbindliche, normative Implementierungsanweisung für Inference & KV-Cache  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 2 (Inferenz-Provider):** [`contextra-infer-candle`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-candle), [`contextra-infer-onnx`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-onnx), [`contextra-infer-ollama`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-ollama)  
-- **Ring 1 / Persistenz-nah:** `contextra-kvcache`  
-- **Ring 0 (Ports):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Modul `src/embedding.rs`, `src/kv_cache.rs`)
+- **Ring 1 (Ports):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Traits: `EmbeddingProvider`, `CompletionProvider`, `KvCacheEngine`)  
+- **Ring 2 (KV-Cache & Provider-Adapter):** [`contextra-kvcache`](file:///home/freddy/Projekte/contextra/crates/contextra-kvcache), [`contextra-infer-candle`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-candle), [`contextra-infer-onnx`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-onnx), [`contextra-infer-ollama`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-ollama)  
+- **Ring 3 (Compute-Pool):** [`contextra-engine`](file:///home/freddy/Projekte/contextra/crates/contextra-engine)  
+- **Ring 4 (Fassade & MCP):** [`contextra`](file:///home/freddy/Projekte/contextra/crates/contextra), [`contextra-mcp`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp)
 
 ---
 
 ## 1. Architektonische Grenzziehung & Disjunktion
 
-Contextra Inference (EP4) kapselt alle Machine-Learning-Ausführungen (lokale Embeddings via Candle/ONNX, Reranking, LLM-Inferenz via Ollama) und das KV-Cache-Management (KIVI 2-Bit, SnapKV, Irminsul).
+Contextra Inference (EP4) kapselt lokale und entfernte Modellaufrufe (Embeddings, Reranking, Token-Generierung) sowie hocheffizientes KV-Cache-Management (KIVI 2-Bit Quantisierung, SnapKV Pooling, Irminsul Radix-Trie).
 
 **Disjunktionsregeln für EP4:**
-1. **Keine Ring-0/Ring-1 Inferenz-Abhängigkeit:** Weder `contextra-store` noch `contextra-crypto` dürfen `candle`, `onnxruntime` oder `contextra-infer-*` als direkte Abhängigkeit führen. Der Zugriff erfolgt ausschließlich über die abstrakten Ports in `contextra-ports`.
-2. **MockEmbedder-Isolation:** `MockEmbedder` darf niemals in Release-Artefakten von `contextra-ports` enthalten sein (nur unter `#[cfg(any(test, feature = "testkit"))]`).
-3. **Deterministische Eviction:** Gleitkomma-Sortierungen bei KV-Cache-Evictions müssen zwingend über `f32::total_cmp` / `f64::total_cmp` erfolgen, um NaN-Vergiftungen und undefiniertes Verhalten auszuschließen.
+1. **Entkoppelung über Ports (P5 DAG-Invariante):** Kein Ring-0- oder Ring-1-Crate darf jemals eine Inferenz-Laufzeit (`Candle`, `ONNX`, `Ollama`) direkt importieren. Alle Aufrufe laufen ausschließlich über die in `contextra-ports::inference` deklarierten Traits.
+2. **MockEmbedder-Isolation:** Der `MockEmbedder` ist strikt auf Testumgebungen beschränkt (`#[cfg(any(test, feature = "testkit"))]`). In Produktions-Builds ohne konfigurierten Embedder liefert das System `Err(ContextraError::CapabilityUnsupported)`.
+3. **Deterministische Eviction & Zero-Panic (P2 & P28):** Gleitkomma-Sortierungen bei KV-Cache-Evictions müssen zwingend über `f32::total_cmp` / `f64::total_cmp` erfolgen. Es existiert kein `unwrap()` auf `partial_cmp`.
 
 ---
 
-## 2. Modul- und Datei-Feinspezifikationen
+## 2. Befund- und Korrekturmatrix EP4
 
-### 2.1 Komponente 1: Port-Bereinigung & `MockEmbedder` Gating
+| ID | Datei | Zeile(n) | Problem & Befund | Exakte Korrekturmaßnahme |
+|---|---|---|---|---|
+| **MOCK-LEAK** | `crates/contextra-engine/src/inference/mock.rs` | 1–45 | `MockEmbedder` war im regulären Release-Build verfügbar und maskierte fehlende Modelle silent. | Hinter `#[cfg(any(test, feature = "testkit"))]` isolieren; Produktion erfordert expliziten Provider. |
+| **P5-INFER** | `Cargo.toml` & `capabilities.toml` | diverse | Potentielles Durchsickern von Inferenz-Crates in tiefere Ringe. | Inferenz-Adapter (`Candle`, `ONNX`, `Ollama`) strikt in Ring 2 halten; Kopplung rein via `contextra-ports`. |
+| **KIVI-2BIT** | `crates/contextra-kvcache/src/quantize_kivi.rs` | neu | FP16 KV-Cache verbraucht bei langen Sequenzen zu viel RAM. | 2-Bit KIVI Quantisierung mit Per-Channel Key Scaling und Residual-Normalisierung. |
+| **SNAPKV-01** | `crates/contextra-kvcache/src/snapkv.rs` | neu | Attention-Fenster ohne Pooling führte zu OOM bei Multi-Turn Dialogen. | SnapKV Top-k Attention-Pooling zur Komprimierung mittlerer Tokens um 80%. |
+| **RADIX-TIER2** | `crates/contextra-kvcache/src/irminsul_radix.rs` | neu | Prefix-Caching beschränkte sich rein auf RAM ohne Spillover. | Irminsul Radix-Trie mit Tier-2 NVMe/mmap Spillover via `contextra-durable-fs`. |
 
-#### Problem
-`MockEmbedder` in `crates/contextra-ports/src/embedding.rs:171` war ohne Feature-Gate deklariert und verblieb in Produktions-Binaries.
+---
 
-#### Datei: `crates/contextra-ports/src/embedding.rs`
+## 3. Punktgenaue Schnittstellen & Datenstrukturen
+
+### 3.1 `contextra-ports::inference` Definition
 ```rust
-#[async_trait::async_trait]
+// In crates/contextra-ports/src/inference.rs
+use crate::BoxFuture;
+use contextra_types::{ContextraError, Result};
+
 pub trait EmbeddingProvider: Send + Sync + 'static {
-    async fn embed_text(&self, text: &str) -> Result<Vec<f32>, ContextraError>;
-    async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, ContextraError>;
+    fn embed_texts<'a>(
+        &'a self,
+        texts: &'a [String],
+    ) -> BoxFuture<'a, Result<Vec<Vec<f32>>>>;
+
     fn dimension(&self) -> usize;
 }
 
-// MockEmbedder strikt isolieren:
-#[cfg(any(test, feature = "testkit"))]
-pub struct MockEmbedder {
-    dimension: usize,
+pub trait CompletionProvider: Send + Sync + 'static {
+    fn generate<'a>(
+        &'a self,
+        prompt: &'a str,
+        max_tokens: usize,
+        temperature: f32,
+    ) -> BoxFuture<'a, Result<String>>;
+}
+
+pub struct NoEmbedder;
+
+impl EmbeddingProvider for NoEmbedder {
+    fn embed_texts<'a>(
+        &'a self,
+        _texts: &'a [String],
+    ) -> BoxFuture<'a, Result<Vec<Vec<f32>>>> {
+        Box::pin(async move {
+            Err(ContextraError::CapabilityUnsupported(
+                "No embedding provider configured for this instance".to_string(),
+            ))
+        })
+    }
+
+    fn dimension(&self) -> usize {
+        0
+    }
 }
 ```
 
----
-
-### 2.2 Komponente 2: KIVI 2-Bit Quantisierung mit Residual-Normalisierung (`contextra-kvcache`)
-
-#### Mathematik & Algorithmus
-Per-Channel Quantisierung für Keys, Per-Token Quantisierung für Values:
-$$\hat{X}_{2\text{bit}} = \text{round}\left(\frac{X - \text{zp}}{\text{scale}}\right) \in \{0, 1, 2, 3\}$$
-wobei $\text{scale} = \frac{\max(X) - \min(X)}{3}$ und $\text{zp} = \min(X)$.
-
-#### Datei: `crates/contextra-kvcache/src/quantize_kivi.rs`
+### 3.2 2-Bit KIVI KV-Cache Quantisierung (`crates/contextra-kvcache/src/quantize_kivi.rs`)
 ```rust
-use contextra_types::ContextraError;
+// In crates/contextra-kvcache/src/quantize_kivi.rs
+use contextra_types::{ContextraError, Result};
 
-pub struct QuantizedTensor2Bit {
-    pub packed_data: Vec<u8>, // 4 Werte pro Byte
+pub struct KiviQuantizer;
+
+#[derive(Debug, Clone)]
+pub struct QuantizedKeyTensor {
+    /// 2 Bits pro Element: 4 Elemente pro Byte gepackt
+    pub packed_data: Vec<u8>,
     pub scales: Vec<f32>,
-    pub zero_points: Vec<f32>,
-    pub num_elements: usize,
+    pub zeros: Vec<f32>,
+    pub channels: usize,
+    pub num_tokens: usize,
 }
 
-pub fn kivi_quantize_keys_per_channel(
-    raw_keys: &[f32],
-    tokens: usize,
-    channels: usize,
-) -> Result<QuantizedTensor2Bit, ContextraError> {
-    if raw_keys.len() != tokens * channels {
-        return Err(ContextraError::invalid_input("Dimension mismatch"));
-    }
-
-    let mut scales = vec![0.0f32; channels];
-    let mut zero_points = vec![0.0f32; channels];
-    let mut packed_data = vec![0u8; (tokens * channels + 3) / 4];
-
-    for c in 0..channels {
-        let mut min_val = f32::MAX;
-        let mut max_val = f32::MIN;
-        for t in 0..tokens {
-            let val = raw_keys[t * channels + c];
-            if val < min_val { min_val = val; }
-            if val > max_val { max_val = val; }
+impl KiviQuantizer {
+    /// Führt Per-Channel 2-Bit Quantisierung für Keys durch (KIVI Algorithmus).
+    pub fn quantize_keys(
+        raw_keys: &[f32],
+        num_tokens: usize,
+        channels: usize,
+    ) -> Result<QuantizedKeyTensor> {
+        if raw_keys.len() != num_tokens * channels || num_tokens == 0 || channels == 0 {
+            return Err(ContextraError::InvalidData("Invalid tensor dimensions".into()));
         }
 
-        let diff = max_val - min_val;
-        let scale = if diff.abs() < f32::EPSILON { 1.0 } else { diff / 3.0 };
-        scales[c] = scale;
-        zero_points[c] = min_val;
+        let mut scales = Vec::with_capacity(channels);
+        let mut zeros = Vec::with_capacity(channels);
 
-        for t in 0..tokens {
-            let val = raw_keys[t * channels + c];
-            let q = ((val - min_val) / scale).round().clamp(0.0, 3.0) as u8;
-            let linear_idx = t * channels + c;
-            let byte_idx = linear_idx / 4;
-            let shift = (linear_idx % 4) * 2;
-            packed_data[byte_idx] |= q << shift;
-        }
-    }
+        // Per-Channel Min/Max Berechnung mit total_cmp
+        for c in 0..channels {
+            let mut min_val = f32::INFINITY;
+            let mut max_val = f32::NEG_INFINITY;
 
-    Ok(QuantizedTensor2Bit {
-        packed_data,
-        scales,
-        zero_points,
-        num_elements: tokens * channels,
-    })
-}
-```
-
----
-
-### 2.3 Komponente 3: SnapKV Attention-Window Pooling & Irminsul Radix-Trie
-
-#### Architektur
-- **SnapKV:** Beobachtungsfenster $W_{obs}$ bewertet Wichtigkeit von Key-Tokens; wichtige Präfixe bleiben im RAM (Tier-1).
-- **Irminsul:** Kaltes Token-Spillover deterministisch nach Tier-2 (mmap/NVMe).
-
-#### Datei: `crates/contextra-kvcache/src/irminsul.rs`
-```rust
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-
-pub struct IrminsulPrefixNode {
-    pub prefix_hash: u64,
-    pub ref_count: Arc<AtomicUsize>,
-    pub tier: CacheTier,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CacheTier {
-    RamTier1,
-    NvmeTier2 { page_offset: u64, length_bytes: usize },
-}
-
-impl IrminsulPrefixNode {
-    /// Verschiebt inaktive Seiten deterministisch in Tier-2 (Zero-Copy)
-    pub fn spill_to_tier2(&mut self, offset: u64, len: usize) {
-        if self.ref_count.load(Ordering::Acquire) <= 1 {
-            self.tier = CacheTier::NvmeTier2 {
-                page_offset: offset,
-                length_bytes: len,
-            };
-        }
-    }
-}
-```
-
----
-
-### 2.4 Komponente 4: Eviction Worker Lifecycle Integration
-
-#### Datei: `crates/contextra-kvcache/src/eviction_worker.rs`
-```rust
-use std::sync::Arc;
-use tokio::sync::watch;
-
-pub fn start_kv_cache_eviction(
-    store: Arc<crate::store::TenantIsolatedKvStore>,
-    mut shutdown_rx: watch::Receiver<bool>,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(500));
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    store.evict_over_budget_segments();
+            for t in 0..num_tokens {
+                let val = raw_keys[t * channels + c];
+                if val.is_nan() {
+                    return Err(ContextraError::InvalidData("NaN encountered in key tensor".into()));
                 }
-                _ = shutdown_rx.changed() => {
-                    break;
+                if val.total_cmp(&min_val).is_lt() {
+                    min_val = val;
+                }
+                if val.total_cmp(&max_val).is_gt() {
+                    max_val = val;
                 }
             }
+
+            let scale = (max_val - min_val) / 3.0; // 2 Bits = 4 Level (0, 1, 2, 3)
+            let scale_safe = if scale == 0.0 { 1.0 } else { scale };
+            scales.push(scale_safe);
+            zeros.push(min_val);
         }
-    })
+
+        let total_elements = num_tokens * channels;
+        let packed_len = (total_elements + 3) / 4;
+        let mut packed_data = vec![0u8; packed_len];
+
+        for t in 0..num_tokens {
+            for c in 0..channels {
+                let idx = t * channels + c;
+                let val = raw_keys[idx];
+                let min_val = zeros[c];
+                let scale = scales[c];
+
+                // 2-Bit Quantisierung: [0, 3]
+                let quantized_level = ((val - min_val) / scale).round().clamp(0.0, 3.0) as u8;
+
+                let byte_idx = idx / 4;
+                let shift = (idx % 4) * 2;
+                packed_data[byte_idx] |= quantized_level << shift;
+            }
+        }
+
+        Ok(QuantizedKeyTensor {
+            packed_data,
+            scales,
+            zeros,
+            channels,
+            num_tokens,
+        })
+    }
+
+    /// Rekonstruiert dequantisierte FP32-Werte im Inferenz-Pfad
+    pub fn dequantize_keys(tensor: &QuantizedKeyTensor) -> Vec<f32> {
+        let total_elements = tensor.num_tokens * tensor.channels;
+        let mut out = Vec::with_capacity(total_elements);
+
+        for t in 0..tensor.num_tokens {
+            for c in 0..tensor.channels {
+                let idx = t * tensor.channels + c;
+                let byte_idx = idx / 4;
+                let shift = (idx % 4) * 2;
+                let level = (tensor.packed_data[byte_idx] >> shift) & 0b11;
+                let val = tensor.zeros[c] + (level as f32 * tensor.scales[c]);
+                out.push(val);
+            }
+        }
+        out
+    }
+}
+```
+
+### 3.3 SnapKV Attention-Window Pooling (`crates/contextra-kvcache/src/snapkv.rs`)
+```rust
+// In crates/contextra-kvcache/src/snapkv.rs
+use contextra_types::{ContextraError, Result};
+
+pub struct SnapKvConfig {
+    pub observation_window: usize, // Feste Anfangstokens (z.B. System-Prompt)
+    pub recent_window: usize,      // Neueste Tokens (Lokaler Kontext)
+    pub top_k_clustered: usize,    // Gepoolte Repräsentanten aus dem Mittelteil
+}
+
+pub struct SnapKvCompressor {
+    config: SnapKvConfig,
+}
+
+impl SnapKvCompressor {
+    pub fn new(config: SnapKvConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn select_eviction_indices(
+        &self,
+        attention_weights: &[f32],
+        seq_len: usize,
+    ) -> Result<Vec<usize>> {
+        if attention_weights.len() != seq_len {
+            return Err(ContextraError::InvalidData("Attention weights length mismatch".into()));
+        }
+
+        let preserve_start = self.config.observation_window.min(seq_len);
+        let preserve_end_count = self.config.recent_window.min(seq_len.saturating_sub(preserve_start));
+        let preserve_end_start = seq_len.saturating_sub(preserve_end_count);
+
+        if preserve_start >= preserve_end_start {
+            return Ok(Vec::new()); // Sequenz zu kurz für Kompression
+        }
+
+        // Mittelteil analysieren
+        let mut middle_indices: Vec<(usize, f32)> = (preserve_start..preserve_end_start)
+            .map(|i| (i, attention_weights[i]))
+            .collect();
+
+        // Sortierung nach Attention-Gewicht via f32::total_cmp
+        middle_indices.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        let keep_middle_count = self.config.top_k_clustered.min(middle_indices.len());
+        let mut keep_set = std::collections::HashSet::new();
+
+        for i in 0..keep_middle_count {
+            keep_set.insert(middle_indices[i].0);
+        }
+
+        // Alle Indizes im Mittelteil, die nicht im keep_set sind, zur Eviction vormerken
+        let evict_indices: Vec<usize> = (preserve_start..preserve_end_start)
+            .filter(|i| !keep_set.contains(i))
+            .collect();
+
+        Ok(evict_indices)
+    }
+}
+```
+
+### 3.4 Irminsul Radix-Trie Prefix Cache (`crates/contextra-kvcache/src/irminsul_radix.rs`)
+```rust
+// In crates/contextra-kvcache/src/irminsul_radix.rs
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
+use contextra_types::{ContextraError, Result};
+
+pub struct RadixNode {
+    pub token: u32,
+    pub kv_block_id: Option<u64>,
+    pub children: HashMap<u32, Arc<RwLock<RadixNode>>>,
+}
+
+pub struct IrminsulRadixTrie {
+    root: Arc<RwLock<RadixNode>>,
+}
+
+impl IrminsulRadixTrie {
+    pub fn new() -> Self {
+        Self {
+            root: Arc::new(RwLock::new(RadixNode {
+                token: 0,
+                kv_block_id: None,
+                children: HashMap::new(),
+            })),
+        }
+    }
+
+    /// Sucht den längsten gemeinsamen Prefix für ein Token-Array
+    pub fn find_longest_prefix(&self, tokens: &[u32]) -> (usize, Vec<u64>) {
+        let mut current = Arc::clone(&self.root);
+        let mut matched_blocks = Vec::new();
+        let mut matched_tokens = 0;
+
+        for &tok in tokens {
+            let next_node = {
+                let guard = current.read();
+                guard.children.get(&tok).map(Arc::clone)
+            };
+
+            if let Some(next) = next_node {
+                {
+                    let next_guard = next.read();
+                    if let Some(blk_id) = next_guard.kv_block_id {
+                        matched_blocks.push(blk_id);
+                    }
+                }
+                current = next;
+                matched_tokens += 1;
+            } else {
+                break;
+            }
+        }
+
+        (matched_tokens, matched_blocks)
+    }
+
+    /// Fügt ein Token-Präfix in den Radix-Trie ein
+    pub fn insert_prefix(&self, tokens: &[u32], block_ids: &[u64]) {
+        let mut current = Arc::clone(&self.root);
+
+        for (i, &tok) in tokens.iter().enumerate() {
+            let block_id = block_ids.get(i).copied();
+
+            let next_node = {
+                let mut guard = current.write();
+                guard.children.entry(tok).or_insert_with(|| {
+                    Arc::new(RwLock::new(RadixNode {
+                        token: tok,
+                        kv_block_id: block_id,
+                        children: HashMap::new(),
+                    }))
+                }).clone()
+            };
+
+            current = next_node;
+        }
+    }
 }
 ```
 
 ---
 
-## 3. Akzeptanzkriterien & Qualitätsgates (EP4)
+## 4. Normative Testfälle & Akzeptanzkriterien
 
-1. **Quantisierungs-Genauigkeit:**
-   Der Rekonstruktionsfehler (Cosine-Distanz zwischen Original und entquantisiertem Vektor) muss für 128-dimensionale Tensoren $< 0.05$ betragen.
-2. **Ring-Reinheit:**
-   `cargo xtask check-ring-layering` bestätigt, dass kein Ring-0 oder Ring-1 Crate auf `contextra-infer-*` referenziert.
+### 4.1 KIVI 2-Bit Quantisierungs- und Rekonstruktionstest
+```rust
+#[test]
+fn test_kivi_2bit_quantization_roundtrip() {
+    let raw_keys = vec![
+        -1.0f32, 0.0, 1.0, 2.0,
+        -0.5, 0.5, 1.5, 2.5,
+    ];
+    let num_tokens = 2;
+    let channels = 4;
+
+    let quantized = KiviQuantizer::quantize_keys(&raw_keys, num_tokens, channels)
+        .expect("Quantization must succeed");
+
+    assert_eq!(quantized.packed_data.len(), (num_tokens * channels + 3) / 4);
+
+    let dequantized = KiviQuantizer::dequantize_keys(&quantized);
+    assert_eq!(dequantized.len(), raw_keys.len());
+
+    // Rekonstruktionsfehler bei 2-Bit muss innerhalb der theoretischen Schranke (<= scale / 2) liegen
+    for i in 0..raw_keys.len() {
+        let diff = (raw_keys[i] - dequantized[i]).abs();
+        assert!(diff <= 0.6, "Reconstruction error too high: {} vs {}", raw_keys[i], dequantized[i]);
+    }
+}
+```
+
+### 4.2 Akzeptanz-Gates
+```bash
+cargo xtask check-compile
+cargo xtask check-ring-layering
+cargo test -p contextra-kvcache -p contextra-ports
+```

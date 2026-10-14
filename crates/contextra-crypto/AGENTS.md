@@ -41,12 +41,20 @@ Encryption-at-Rest (AES-256-GCM-SIV), HKDF-Schlüsselableitung, WAL-HMAC-Integri
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-crypto
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-crypto
 cargo xtask doctrine-scan --crate contextra-crypto
+cargo xtask determinism-check
 cargo xtask check-unsafe-islands
 cargo xtask check-ring0-async-purity
+cargo test -p contextra-crypto --locked
+cargo test -p contextra-crypto --test deletion_proof_v4_tamper_matrix
 ```
 
-## 7. Bekannte Lücken / SOLL
-- Die Spezifikation nennt `contextra-crypto` historisch als Unsafe-Insel; der Code erzwingt jedoch strikt `#![forbid(unsafe_code)]` und `capabilities.toml` führt `unsafe_island = false`.
+## 7. Bekannte Lücken / SOLL (EP2 & Phase 5 Roadmap)
+
+- **FINDING-CRYPTO-01 (KmsProvider-Verdrahtung)**: Aktuell existiert ein Mock-Fallback; vollständige Anbindung an `contextra-ports::KmsProvider` in Phase 1a.
+- **FEHLER-A1 (Lock-Free Revocation)**: Migration von `RwLock<BitVec>` auf `AtomicU64[16]` für wait-free O(1) Key-Revokation im Hotpath.
+- **FEHLER-D1 / D2 (DeletionProof v4 Konsolidierung)**: Entfernung von `mandatory_ids`, strikte Durchsetzung von `REQUIRED_LAYER_BITS = 0x7F` (7-Layer Pflicht).
+- **Crate-Split (Phase 5)**: Modularisierung in `contextra-crypto-core`, `contextra-erasure-evidence`, `contextra-proof-verify` und `contextra-avv-generator`.
+- **Historische Deklaration**: Code erzwingt strikt `#![forbid(unsafe_code)]` und `capabilities.toml` führt `unsafe_island = false`.
+

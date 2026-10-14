@@ -42,14 +42,19 @@ Er besitzt die Reife `experimental`, ist intern im Workspace integriert, ist str
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-adapt
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-adapt
+cargo xtask determinism-check
 cargo xtask doctrine-scan --crate contextra-adapt
 cargo xtask check-ring0-async-purity
 cargo xtask check-unsafe-islands
+cargo test -p contextra-adapt --locked
+cargo test -p contextra-adapt --test sketched_linucb_regret
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP5 & Phase 4 Roadmap)
 
+- **P28-Determinismus via Clock-Port (Phase 4)**: Anbindung des `contextra-ports::Clock`-Ports im PID-Latenzregler anstelle nativer Systemzeit.
+- **Sketched LinUCB mit Achlioptas-Projektion**: $\mathcal{O}(k^2)$ Sherman-Morrison Kovarianz-Aktualisierung im projizierten Raum für latenzkritische Routing-Pfade.
 - Feature-Gating: `bandit-routing`, `flow-corrected-thompson`, `sketched-bandit`, `rie-greedy-personalization` sind steuerbar über Cargo-Features.
+
 

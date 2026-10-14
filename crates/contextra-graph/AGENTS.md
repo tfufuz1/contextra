@@ -57,13 +57,18 @@ tokio::spawn(async move { ... });
 ## 6. Verifikation
 
 ```bash
-cargo test -p contextra-graph --locked
-cargo xtask check-agents-integrity
+cargo xtask crate-context contextra-graph
+cargo xtask unwired-ports
 cargo xtask doctrine-scan --crate contextra-graph
 cargo xtask check-ring0-async-purity
 cargo xtask check-unsafe-islands
+cargo test -p contextra-graph --locked
+cargo test -p contextra-graph --test path_rag_k_path_budget
 ```
 
-## 7. Bekannte Lücken / SOLL
+## 7. Bekannte Lücken / SOLL (EP3 & Phase 3 Roadmap)
 
-- Hyperkanten-Vorschläge (`hyperedge_suggest.rs`) und Perkolation (`percolation.rs`) bieten fortgeschrittene Graph-Analyse, werden jedoch selektiv je nach Feature-Konfiguration aktiviert.
+- **PathRAG Dijkstra-Exposition (Phase 3)**: Öffentliche Exposition von `PathRAGEngine` in der Haupt-Fassade für strukturierte Graph-Traversierung.
+- **KPathDiffusion Kapselung**: Kapselung der 321 LOC Diffusions-Implementierung unter `pub(crate)` bzw. Feature `k-path-diffusion`.
+- **Hyperkanten-Vorschläge**: Selektive Aktivierung von `hyperedge_suggest.rs` und `percolation.rs` je nach Profil.
+
