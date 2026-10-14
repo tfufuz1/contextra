@@ -8,9 +8,10 @@
 //! - frames_matching_scope == 0
 
 use contextra_core::{ContextraError, Result};
+use contextra_ports::{Clock, SystemClock};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::{Wal, WalOp};
 
@@ -67,6 +68,18 @@ pub struct WalScanEvidence {
 }
 
 impl WalScanEvidence {
+    pub fn layer_id(&self) -> u8 {
+        LAYER_ID_WAL_ALL_SEGMENTS
+    }
+
+    pub fn assurance_level(&self) -> u8 {
+        ASSURANCE_LEVEL
+    }
+
+    pub fn claim_text_id(&self) -> u8 {
+        CLAIM_TEXT_ID
+    }
+
     pub fn invariant_violations(&self) -> Vec<String> {
         let mut violations = Vec::new();
         if self.segments_scanned != self.segments_total.saturating_sub(self.segments_removed) {
@@ -141,7 +154,16 @@ pub fn classify_wal_filename(filename: &str) -> WalFileType {
 }
 
 pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidence> {
-    let start_time = Instant::now();
+    scan_wal_directory_with_clock(inputs, &SystemClock::new()).await
+}
+
+pub async fn scan_wal_directory_with_clock(
+    inputs: &WalScanInputs,
+    clock: &dyn Clock,
+) -> Result<WalScanEvidence> {
+    let start_nanos = clock.monotonic_nanos();
+    let timeout_nanos = inputs.timeout.as_nanos() as u64;
+
     let mut entries = match tokio::fs::read_dir(&inputs.wal_dir).await {
         Ok(e) => e,
         Err(err) => {
@@ -172,7 +194,7 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
             ))
         })?;
 
-        if start_time.elapsed() > inputs.timeout {
+        if clock.monotonic_nanos().saturating_sub(start_nanos) > timeout_nanos {
             return Err(ContextraError::Storage("WAL scan timed out".into()));
         }
 
@@ -204,7 +226,7 @@ pub async fn scan_wal_directory(inputs: &WalScanInputs) -> Result<WalScanEvidenc
     }
 
     for path in paths_to_scan {
-        if start_time.elapsed() > inputs.timeout {
+        if clock.monotonic_nanos().saturating_sub(start_nanos) > timeout_nanos {
             return Err(ContextraError::Storage("WAL scan timed out".into()));
         }
 
