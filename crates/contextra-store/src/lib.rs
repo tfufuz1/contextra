@@ -21,12 +21,16 @@
 #![forbid(unsafe_code)]
 #![allow(unexpected_cfgs)]
 
+#[cfg(not(loom))]
 pub mod blob;
 #[cfg(not(loom))]
 pub mod compaction;
+#[cfg(not(loom))]
 pub mod copy_registry;
 pub mod engine;
+#[cfg(not(loom))]
 pub mod erasure_ledger;
+#[cfg(not(loom))]
 pub mod format;
 pub mod kv;
 pub mod restore_guard;

@@ -5,6 +5,8 @@
 //! - Segmente werden nur entfernt, wenn max_tx <= checkpoint_tx.
 //! - Entfernung erfolgt ueber contextra_durable_fs::durable_remove in spawn_blocking.
 
+#![cfg(not(loom))]
+
 use contextra_core::{ContextraError, Result};
 use std::path::Path;
 

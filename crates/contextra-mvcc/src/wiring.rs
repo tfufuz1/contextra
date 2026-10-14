@@ -1,6 +1,5 @@
 //! Composition root wiring entrypoint for `contextra-mvcc`.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use contextra_types::ContextraError;
@@ -8,6 +7,7 @@ use contextra_types::ContextraError;
 use crate::seq_log::SequenceLog;
 use crate::snapshot::SnapshotRegistry;
 use crate::ssi::{SequenceLogSsiValidator, SsiCommitGate};
+use crate::sync::Arc;
 use crate::tx_buffer::TxBuffer;
 
 /// Dependencies required to construct [`MvccWiring`].

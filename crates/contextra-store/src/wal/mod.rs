@@ -26,7 +26,9 @@ pub use flusher::*;
 pub(crate) use hmac::*;
 pub use replay::*;
 pub use replay_filter::*;
+#[cfg(not(loom))]
 pub use retire::*;
+#[cfg(not(loom))]
 pub use witness_scan::*;
 
 #[cfg(not(loom))]
