@@ -4,6 +4,7 @@
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
 pub use contextra_core::types::domain::AutoExtractionMode;
+use contextra_ports::erasure::ErasureMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
@@ -53,7 +54,9 @@ impl CollectionProfile {
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
+        if (resolved.erasure_mode != ErasureMode::Off || self.performance == PerformanceProfile::Compliance)
+            && self.kv_delete_mode == KvDeleteMode::TombstoneOnly
+        {
             return Err(CollectionProfileError::KvDeleteMismatch);
         }
         Ok(())

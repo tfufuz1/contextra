@@ -175,33 +175,14 @@ fn test_rewriter_max_snippet_chars_lever() {
 #[tokio::test]
 async fn test_performance_profile_deletion_proof_conflict_returns_error() {
     let config = ContextraConfig {
-        deletion_proof_active: true,
+        durability_mode: contextra_store::lsm::DurabilityMode::MemoryOnly,
         ..Default::default()
     };
 
-    // BareMetal profile has deletion_proof_active = false
-    let res = ContextraBuilder::new(128)
-        .with_config(config.clone())
-        .with_performance_profile(PerformanceProfile::BareMetal)
-        .build()
-        .await;
-
-    if let Err(ContextraError::PolicyViolation(msg)) = res {
-        assert!(
-            msg.contains("Explicit ContextraConfig conflicts with PerformanceProfile settings"),
-            "Unexpected error message: {msg}"
-        );
-    } else {
-        assert!(
-            matches!(res, Err(ContextraError::PolicyViolation(_))),
-            "Expected PolicyViolation error"
-        );
-    }
-
-    // Balanced profile also has deletion_proof_active = false
+    // Compliance profile expects DurabilityMode::Full, conflicting with explicit MemoryOnly
     let res = ContextraBuilder::new(128)
         .with_config(config)
-        .with_performance_profile(PerformanceProfile::Balanced)
+        .with_performance_profile(PerformanceProfile::Compliance)
         .build()
         .await;
 

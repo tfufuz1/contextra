@@ -62,6 +62,8 @@ path = "tests/kv_delete_cascade_e2e.rs"
 
 [features]
 default = ["graph", "rank", "adapt", "kvcache", "candle"]
+fast = []
+erasure = []
 graph = ["dep:contextra-graph"]
 rank = ["dep:contextra-rank"]
 adapt = ["dep:contextra-adapt"]

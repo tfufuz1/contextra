@@ -55,9 +55,10 @@ async fn test_license_wiring_matrix() -> Result<(), Box<dyn std::error::Error>> 
         .await
         .expect("Build with valid signed license must succeed");
 
-    assert!(
-        db_valid.config().deletion_proof_active,
-        "Compliance profile with signed license must activate deletion_proof_active"
+    assert_ne!(
+        db_valid.config().erasure_mode,
+        contextra_ports::erasure::ErasureMode::Off,
+        "Compliance profile with signed license must activate erasure_mode"
     );
     db_valid.close().await?;
 

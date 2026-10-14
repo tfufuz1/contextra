@@ -249,9 +249,9 @@ pub struct ContextraConfig {
     /// Default: DurabilityMode::Full.
     pub durability_mode: DurabilityMode,
 
-    /// Controls whether deletion proof generation and HMAC integrity guarantees are active.
-    /// Default: false.
-    pub deletion_proof_active: bool,
+    /// Controls operational erasure mode (§4.6).
+    /// Default: ErasureMode::Off.
+    pub erasure_mode: contextra_ports::erasure::ErasureMode,
 
     /// Controls vector index deletion repair behavior.
     /// Default: VectorDeleteMode::BackgroundRepair.
@@ -316,7 +316,7 @@ impl std::fmt::Debug for ContextraConfig {
                 &self.group_commit_window_micros,
             )
             .field("durability_mode", &self.durability_mode)
-            .field("deletion_proof_active", &self.deletion_proof_active)
+            .field("erasure_mode", &self.erasure_mode)
             .field("vector_delete_mode", &self.vector_delete_mode)
             .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
@@ -354,14 +354,14 @@ impl Default for ContextraConfig {
             max_ram_mb: 2048,
             group_commit_window_micros: 500,
             durability_mode: DurabilityMode::default(),
-            deletion_proof_active: false,
+            erasure_mode: contextra_ports::erasure::ErasureMode::Off,
             vector_delete_mode: VectorDeleteMode::BackgroundRepair,
             memtable_size_limit: 64 * 1024 * 1024,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
             community_detection: CommunityDetectionConfig::default(),
             embedding_backend: EmbeddingBackend::None,
-            consolidation_enabled: true,
+            consolidation_enabled: false,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
             consolidation_launcher: None,

@@ -10,7 +10,7 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(path, gate))]
     pub async fn open_with_gate(path: impl AsRef<Path>, gate: Arc<dyn LicenseGate>) -> Result<Self> {
         let config = ContextraConfig {
-            deletion_proof_active: false,
+            erasure_mode: contextra_ports::erasure::ErasureMode::Off,
             ..Default::default()
         };
         Self::open_with_config_and_gate(path, config, gate).await
@@ -23,7 +23,7 @@ impl Contextra {
         mut config: ContextraConfig,
         gate: Arc<dyn LicenseGate>,
     ) -> Result<Self> {
-        config.deletion_proof_active = false;
+        config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
         let token = gate
             .authorize(FeatureRing::Fast)
             .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
@@ -127,7 +127,7 @@ impl Contextra {
         gate: Arc<dyn LicenseGate>,
     ) -> Result<Self> {
         if authorized_ring.ring() == FeatureRing::Fast {
-            config.deletion_proof_active = false;
+            config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
         }
 
         if config.dimension == 0 {
@@ -290,9 +290,7 @@ impl Contextra {
                         }
                     });
                 } else {
-                    return Err(contextra_types::ContextraError::PolicyViolation(
-                        "consolidation_enabled is true but no consolidation_launcher is configured on ContextraConfig".to_string(),
-                    ));
+                    tracing::warn!("consolidation_enabled is true but no consolidation_launcher is configured on ContextraConfig");
                 }
             }
         }

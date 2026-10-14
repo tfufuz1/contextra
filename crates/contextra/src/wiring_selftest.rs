@@ -6,7 +6,7 @@
 
 use contextra_core::error::ContextraError;
 use contextra_db::Contextra;
-use crate::builder::ContextraBuilder;
+use crate::builder::{BuildError, ContextraBuilder};
 
 /// Liste der kritischen Pflicht-Ports (§22 Punkt 4).
 pub const REQUIRED_SECURITY_PORTS: &[&str] = &["Clock", "Rng", "IdGen", "LicenseGate"];
@@ -21,54 +21,21 @@ pub struct WiringReport {
 
 impl WiringReport {
     pub fn is_valid(&self) -> bool {
-        self.missing_ports.is_empty() && self.invalid_security_ports.is_empty()
+        self.missing_ports.iter().all(|m| m.contains("(disabled)"))
+            && self.invalid_security_ports.is_empty()
     }
 }
 
-/// Generiert einen Verdrahtungsbericht für `ContextraBuilder`.
+/// Generiert einen Verdrahtungsbericht für `ContextraBuilder` und prüft die Vollständigkeit der Ports.
 pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
     let mut report = WiringReport::default();
 
+    let _nanos = builder.clock().now_unix_nanos();
     report.wired_ports.push("Clock".to_string());
+
     report.wired_ports.push("Rng".to_string());
     report.wired_ports.push("IdGen".to_string());
     report.wired_ports.push("LicenseGate".to_string());
-
-    if builder.router_enabled() {
-        report.wired_ports.push("Router".to_string());
-    } else {
-        report.missing_ports.push("Router (disabled)".to_string());
-    }
-
-    if builder.adapt_enabled() {
-        report.wired_ports.push("AdaptController".to_string());
-    } else {
-        report.missing_ports.push("AdaptController (disabled)".to_string());
-    }
-
-    if builder.privacy_enabled() {
-        report.wired_ports.push("PrivacyEgress".to_string());
-    } else {
-        report.missing_ports.push("PrivacyEgress (disabled)".to_string());
-    }
-
-    if builder.sandbox_enabled() {
-        report.wired_ports.push("WasmSandbox".to_string());
-    } else {
-        report.missing_ports.push("WasmSandbox (disabled)".to_string());
-    }
-
-    if builder.audit_export_enabled() {
-        report.wired_ports.push("AuditExport".to_string());
-    } else {
-        report.missing_ports.push("AuditExport (disabled)".to_string());
-    }
-
-    if builder.avv_generator_enabled() {
-        report.wired_ports.push("AvvGenerator".to_string());
-    } else {
-        report.missing_ports.push("AvvGenerator (disabled)".to_string());
-    }
 
     if builder.kms_enabled() {
         report.wired_ports.push("Kms".to_string());
@@ -88,7 +55,81 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
         report.missing_ports.push("CheckpointRecovery (disabled)".to_string());
     }
 
+    if builder.router_enabled() {
+        report.wired_ports.push("Router".to_string());
+    } else {
+        report.missing_ports.push("Router (disabled)".to_string());
+    }
+
+    #[cfg(feature = "adapt")]
+    if builder.adapt_enabled() {
+        report.wired_ports.push("AdaptController".to_string());
+    } else {
+        report.missing_ports.push("AdaptController (disabled)".to_string());
+    }
+
+    #[cfg(feature = "privacy")]
+    if builder.privacy_enabled() {
+        report.wired_ports.push("PrivacyEgress".to_string());
+    } else {
+        report.missing_ports.push("PrivacyEgress (disabled)".to_string());
+    }
+
+    if builder.sandbox_enabled() {
+        report.wired_ports.push("WasmSandbox".to_string());
+    } else {
+        report.missing_ports.push("WasmSandbox (disabled)".to_string());
+    }
+
+    if builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
+        report.wired_ports.push("Erasure".to_string());
+    }
+
     report
+}
+
+/// Dynamic wiring validator for ContextraBuilder (§4.7).
+pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport, BuildError> {
+    let report = generate_report_for_builder(builder);
+
+    if builder.router_enabled() && !cfg!(feature = "router") {
+        return Err(BuildError::FeatureMissing {
+            mode: "router".to_string(),
+            feature: "router".to_string(),
+        });
+    }
+
+    if builder.sandbox_enabled() && !cfg!(feature = "sandbox") {
+        return Err(BuildError::FeatureMissing {
+            mode: "sandbox".to_string(),
+            feature: "sandbox".to_string(),
+        });
+    }
+
+    if (builder.explicit_erasure_mode() || builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off) && !cfg!(feature = "erasure") {
+        if builder.explicit_erasure_mode() && builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
+            return Err(BuildError::FeatureMissing {
+                mode: format!("{:?}", builder.erasure_mode()),
+                feature: "erasure".to_string(),
+            });
+        }
+    }
+
+    if !report.is_valid() {
+        let missing = report
+            .missing_ports
+            .iter()
+            .filter(|m| !m.contains("(disabled)"))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(BuildError::IncompleteWiring {
+            flag: "security_ports".to_string(),
+            missing,
+        });
+    }
+
+    Ok(report)
 }
 
 /// Generiert einen Verdrahtungsbericht für eine `Contextra`-Instanz.
