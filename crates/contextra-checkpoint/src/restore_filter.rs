@@ -9,6 +9,13 @@ pub trait CpyRestoreFilter: Send + Sync {
     fn drop_record(&self, key: &[u8], tx: u64) -> bool;
 }
 
+impl<T: contextra_ports::RestoreGuard + ?Sized> CpyRestoreFilter for T {
+    #[allow(deprecated)]
+    fn drop_record(&self, key: &[u8], tx: u64) -> bool {
+        self.admit(key, contextra_types::TxId::new(tx)) == contextra_ports::RestoreVerdict::Reject
+    }
+}
+
 /// No-op restore filter that allows all records to be restored.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NoOpRestoreFilter;
