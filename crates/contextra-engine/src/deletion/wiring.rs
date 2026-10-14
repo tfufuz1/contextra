@@ -11,6 +11,16 @@ use contextra_types::Result;
 use super::proof_issue::DpiDeletionRuntime;
 use super::purge_driver::{DpiPurgeDriver, DpiPurgeDriverConfig};
 
+/// Execution ring mode for deletion proof generation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RingMode {
+    /// Sovereign ring requiring strict cryptographic deletion proofs and proof keys (fail-closed).
+    #[default]
+    Sovereign,
+    /// Fast ring where proofs are skipped with explicit (non-silent) diagnostic tracing.
+    Fast,
+}
+
 /// Dependencies required to initialize [`DeletionWiring`].
 pub struct DeletionWiringDeps {
     /// Active LSM storage handle.
@@ -21,6 +31,8 @@ pub struct DeletionWiringDeps {
     pub signer_cfg_path: Option<PathBuf>,
     /// Unique 16-byte database instance identifier.
     pub db_instance_id: [u8; 16],
+    /// Ring mode controlling key enforcement.
+    pub ring_mode: RingMode,
 }
 
 impl std::fmt::Debug for DeletionWiringDeps {
@@ -37,6 +49,7 @@ impl std::fmt::Debug for DeletionWiringDeps {
 pub struct DeletionWiring {
     runtime: Arc<DpiDeletionRuntime>,
     storage: Arc<LsmStorage>,
+    ring_mode: RingMode,
 }
 
 impl DeletionWiring {
@@ -55,7 +68,37 @@ impl DeletionWiring {
         Ok(Self {
             runtime: Arc::new(runtime),
             storage: deps.storage,
+            ring_mode: deps.ring_mode,
         })
+    }
+
+    /// Enforces key requirements for the active ring mode (§2).
+    ///
+    /// # Errors
+    /// Returns [`ContextraError::InvalidInput`] if in Sovereign mode and `proof_key` is missing or empty.
+    pub fn validate_proof_key(&self, proof_key: Option<&[u8]>) -> Result<bool> {
+        match self.ring_mode {
+            RingMode::Sovereign => {
+                match proof_key {
+                    Some(key) if key.len() >= 32 && !key.iter().all(|&b| b == 0) => Ok(true),
+                    _ => Err(contextra_types::ContextraError::invalid_input(
+                        "Sovereign ring requires a valid proof key (at least 32 non-zero bytes) for deletion proof generation",
+                    )),
+                }
+            }
+            RingMode::Fast => {
+                tracing::warn!(
+                    "Fast-ring execution active: DeletionProof generation explicitly skipped"
+                );
+                Ok(false)
+            }
+        }
+    }
+
+    /// Returns active ring mode.
+    #[must_use]
+    pub fn ring_mode(&self) -> RingMode {
+        self.ring_mode
     }
 
     /// Accesses the underlying deletion runtime.
