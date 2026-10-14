@@ -2,7 +2,31 @@
 
 #![forbid(unsafe_code)]
 
+use crate::deletion_proof::types::DeletionLayer;
 use serde::Serialize;
+
+/// Standard-Disclaimer für Deletion Proof Audits (rechtlich vorsichtig).
+pub const AUDIT_SCOPE_DISCLAIMER: &str =
+    "Audit gegen definierte Zeugen und Toleranzen, kein Beweis der Abwesenheit";
+
+/// Status-Klassifizierung für einzelne Layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum LayerVerificationStatus {
+    /// Layer wurde durch einen realen Scan verifiziert.
+    Verified,
+    /// Layer ist im Prüfumfang nicht abgedeckt.
+    NotCovered,
+}
+
+impl LayerVerificationStatus {
+    /// Gibt den deutschen Status-Text zurück.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Verified => "verifiziert",
+            Self::NotCovered => "nicht abgedeckt",
+        }
+    }
+}
 
 /// Assurance-Stufen S0 bis S4 für den Deletion Witness.
 #[non_exhaustive]
@@ -110,5 +134,89 @@ impl WitClaimText {
             Self::RamUnreferenced,
             Self::RamZeroized,
         ]
+    }
+}
+
+/// Prüft, ob eine Menge abgedeckter Layer alle notwendigen Kernlayer für eine "vollständig"-Behauptung enthält.
+/// Kernlayer für Vollständigkeit: `LsmMemtable`, `SsTableAllLevels`, `WalAllSegments`.
+pub fn possesses_full_core_coverage(covered_layers: &[DeletionLayer]) -> bool {
+    let has_memtable = covered_layers
+        .iter()
+        .any(|l| matches!(l, DeletionLayer::LsmMemtable));
+    let has_sstable = covered_layers
+        .iter()
+        .any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
+    let has_wal = covered_layers
+        .iter()
+        .any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
+
+    has_memtable && has_sstable && has_wal
+}
+
+/// Erzeugt eine vorsichtige, rechts- und fachkonforme Zusammenfassung des Audits.
+/// Ohne alle Kernlayer wird das Wort "vollständig" strikt unterdrückt.
+pub fn generate_audit_summary_claim(covered_layers: &[DeletionLayer]) -> String {
+    if possesses_full_core_coverage(covered_layers) {
+        format!(
+            "{}. status: alle Kernlayer verifiziert (LsmMemtable, SsTableAllLevels, WalAllSegments)",
+            AUDIT_SCOPE_DISCLAIMER
+        )
+    } else {
+        format!(
+            "{}. status: partielle Abdeckung; nur Teilbereiche verifiziert (keine Gesamtsystemgarantie)",
+            AUDIT_SCOPE_DISCLAIMER
+        )
+    }
+}
+
+/// Ermittelt den Verifikationsstatus für einen spezifischen DeletionLayer.
+pub fn evaluate_layer_status(
+    target_layer: &DeletionLayer,
+    covered_layers: &[DeletionLayer],
+) -> LayerVerificationStatus {
+    let is_covered = covered_layers.iter().any(|l| match (l, target_layer) {
+        (DeletionLayer::LsmMemtable, DeletionLayer::LsmMemtable) => true,
+        (DeletionLayer::SsTableAllLevels, DeletionLayer::SsTableAllLevels) => true,
+        (DeletionLayer::HnswIndex, DeletionLayer::HnswIndex) => true,
+        (DeletionLayer::WalAllSegments { .. }, DeletionLayer::WalAllSegments { .. }) => true,
+        (DeletionLayer::CsrGraph, DeletionLayer::CsrGraph) => true,
+        (DeletionLayer::KvCacheSegments, DeletionLayer::KvCacheSegments) => true,
+        (DeletionLayer::EmbeddingCache, DeletionLayer::EmbeddingCache) => true,
+        (DeletionLayer::TextIndex, DeletionLayer::TextIndex) => true,
+        (DeletionLayer::Relations, DeletionLayer::Relations) => true,
+        (DeletionLayer::Manifest, DeletionLayer::Manifest) => true,
+        (DeletionLayer::CheckpointClones, DeletionLayer::CheckpointClones) => true,
+        (DeletionLayer::ProcessCaches, DeletionLayer::ProcessCaches) => true,
+        (DeletionLayer::Keyring, DeletionLayer::Keyring) => true,
+        (DeletionLayer::ErasureLedger, DeletionLayer::ErasureLedger) => true,
+        _ => false,
+    });
+
+    if is_covered {
+        LayerVerificationStatus::Verified
+    } else {
+        LayerVerificationStatus::NotCovered
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audit_disclaimer_and_no_full_claim_without_core_layers() {
+        let partial_layers = vec![DeletionLayer::LsmMemtable];
+        let summary = generate_audit_summary_claim(&partial_layers);
+
+        assert!(summary.contains(AUDIT_SCOPE_DISCLAIMER));
+        assert!(!summary.contains("vollständig"));
+        assert_eq!(
+            evaluate_layer_status(&DeletionLayer::LsmMemtable, &partial_layers),
+            LayerVerificationStatus::Verified
+        );
+        assert_eq!(
+            evaluate_layer_status(&DeletionLayer::SsTableAllLevels, &partial_layers),
+            LayerVerificationStatus::NotCovered
+        );
     }
 }
