@@ -15,7 +15,7 @@ Implementiert die Schnittstelle `StorageEngine` aus `contextra-core` für produk
 | `wal/` | Write-Ahead-Log: V3 HMAC-Chaining, CRC32-Verifikation, Flusher-Actor, Append-Only I/O und Open/Heal-Recovery |
 | `memtable.rs` | In-Memory Skip-List mit Sequenznummern und Tombstone-Markierungen |
 | `sstable/` | On-Disk SSTable-Segmente: Block-Builder/Reader, Bloom-Filter, Index, CRC32 und Block-Cache (`quick_cache` S3-FIFO) |
-| `compaction/` | `CompactionEngine`: Tiered/Leveled Compaction, MVCC-Retention, Merge-Operatoren und `CostBasedAdaptivePlanner` (STO-021) |
+| `compaction/` | `CompactionEngine`: Tiered/Leveled Compaction, MVCC-Retention, Merge-Operatoren, `CostBasedAdaptivePlanner` (STO-021) und `CompactionEngineWiring` |
 | `manifest/` | Append-Only Manifest (`MFMN`), Rebuild valider/toter SSTables (L.2) und Schutz vor SSTable-Wiederauferstehung |
 | `engine/` | StorageEngine-Implementierungen (z. B. `MemoryOnlyStorageEngine` für Tests/In-Memory-Betrieb) |
 | `kv/` | KV-Segment-Persistenz und `KvDeleteMode`-Steuerung |
