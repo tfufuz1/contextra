@@ -5,10 +5,10 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für das Löschnachweis-Subsystem  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Krypto-Kern & Verifier):** [`contextra-crypto`](file:///home/freddy/Projekte/contextra/crates/contextra-crypto), `contextra-verify` (I/O-freier Standalone-Prüfer), [`contextra-audit-export`](file:///home/freddy/Projekte/contextra/crates/contextra-audit-export), [`contextra-avv-generator`](file:///home/freddy/Projekte/contextra/crates/contextra-avv-generator)  
-- **Ring 1 (Ports & Intent-Ledger):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Traits: `KmsProvider`, `KeyManager`, `ErasureEvidenceScanner`), `contextra-erasure`  
+- **Ring 0 (Krypto-Kern & Verifier):** [`contextra-crypto`](../crates/contextra-crypto), `contextra-verify` (I/O-freier Standalone-Prüfer), [`contextra-audit-export`](../crates/contextra-audit-export), [`contextra-avv-generator`](../crates/contextra-avv-generator)
+- **Ring 1 (Ports & Intent-Ledger):** [`contextra-ports`](../crates/contextra-ports) (Traits: `KmsProvider`, `KeyManager`, `ErasureEvidenceScanner`), `contextra-erasure`
 - **Ring 3 (Beweis-Orchestrierung):** `contextra-evidence` (7-Layer-Zeugen-Scans)  
-- **Ring 4 (Fassade & MCP):** [`contextra`](file:///home/freddy/Projekte/contextra/crates/contextra) (`ContextraComplianceExt`), [`contextra-mcp`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp) (Tool `contextra_forget` mit Proof-Serialisierung)
+- **Ring 4 (Fassade & MCP):** [`contextra`](../crates/contextra) (`ContextraComplianceExt`), [`contextra-mcp`](../crates/contextra-mcp) (Tool `contextra_forget` mit Proof-Serialisierung)
 
 ---
 
@@ -17,7 +17,7 @@
 Contextra Proof (EP2) implementiert die mathematisch und kryptografisch beweisbare Löschung (DSGVO Art. 17, ZPO § 371a) über die **Zero-Cost-Plugin-Doktrin**.
 
 **Disjunktionsregeln für EP2:**
-1. **Kein Basisspeicher:** EP2 enthält **keinen** eigenen LSM-Tree oder Vektorindex. Es bindet sich rein über die in [`contextra-ports::erasure`](file:///home/freddy/Projekte/contextra/crates/contextra-ports/src/erasure.rs) deklarierten Traits an EP1 an.
+1. **Kein Basisspeicher:** EP2 enthält **keinen** eigenen LSM-Tree oder Vektorindex. Es bindet sich rein über die in [`contextra-ports::erasure`](../crates/contextra-ports/src/erasure.rs) deklarierten Traits an EP1 an.
 2. **Autonomie des Verifiers:** `contextra-verify` darf **weder** `contextra-store`, `contextra-engine`, noch `tokio` als Abhängigkeit führen. Die Verifikation eines Beweises muss offline und in $< 500\,\mu\text{s}$ rein deterministisch erfolgen.
 3. **Klare Trennung der Modi:**
    - `ErasureMode::Off`: 0 ns Overhead im Schreibpfad, keine Beweiscookies.

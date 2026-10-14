@@ -5,11 +5,11 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für Release 1.0  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Primitiven & Invarianten):** [`contextra-types`](file:///home/freddy/Projekte/contextra/crates/contextra-types), [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports), [`contextra-mvcc`](file:///home/freddy/Projekte/contextra/crates/contextra-mvcc), [`contextra-durable-fs`](file:///home/freddy/Projekte/contextra/crates/contextra-durable-fs), [`contextra-simd`](file:///home/freddy/Projekte/contextra/crates/contextra-simd), [`contextra-sys`](file:///home/freddy/Projekte/contextra/crates/contextra-sys)  
-- **Ring 1 (Speicher & Haltbarkeit):** [`contextra-store`](file:///home/freddy/Projekte/contextra/crates/contextra-store), [`contextra-checkpoint`](file:///home/freddy/Projekte/contextra/crates/contextra-checkpoint)  
-- **Ring 2 (Indizes & Algorithmen):** [`contextra-vector`](file:///home/freddy/Projekte/contextra/crates/contextra-vector), [`contextra-text`](file:///home/freddy/Projekte/contextra/crates/contextra-text), [`contextra-rank`](file:///home/freddy/Projekte/contextra/crates/contextra-rank)  
-- **Ring 3 (Compute & Orchestrierung):** [`contextra-engine`](file:///home/freddy/Projekte/contextra/crates/contextra-engine), [`contextra-db`](file:///home/freddy/Projekte/contextra/crates/contextra-db)  
-- **Ring 4 (Fassade & Protokoll):** [`contextra`](file:///home/freddy/Projekte/contextra/crates/contextra), [`contextra-mcp`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp) (Kern-Endpunkte: `contextra_remember`, `contextra_search`, `contextra_forget_key`)
+- **Ring 0 (Primitiven & Invarianten):** [`contextra-types`](../crates/contextra-types), [`contextra-ports`](../crates/contextra-ports), [`contextra-mvcc`](../crates/contextra-mvcc), [`contextra-durable-fs`](../crates/contextra-durable-fs), [`contextra-simd`](../crates/contextra-simd), [`contextra-sys`](../crates/contextra-sys)
+- **Ring 1 (Speicher & Haltbarkeit):** [`contextra-store`](../crates/contextra-store), [`contextra-checkpoint`](../crates/contextra-checkpoint)
+- **Ring 2 (Indizes & Algorithmen):** [`contextra-vector`](../crates/contextra-vector), [`contextra-text`](../crates/contextra-text), [`contextra-rank`](../crates/contextra-rank)
+- **Ring 3 (Compute & Orchestrierung):** [`contextra-engine`](../crates/contextra-engine), [`contextra-db`](../crates/contextra-db)
+- **Ring 4 (Fassade & Protokoll):** [`contextra`](../crates/contextra), [`contextra-mcp`](../crates/contextra-mcp) (Kern-Endpunkte: `contextra_remember`, `contextra_search`, `contextra_forget_key`)
 
 ---
 
@@ -457,7 +457,7 @@ impl SnapshotFloorTracker {
 
 ## 4. Vollständige Builder-Verdrahtung in `contextra` (Behebung S5 & N-O)
 
-In [`crates/contextra/src/builder.rs`](file:///home/freddy/Projekte/contextra/crates/contextra/src/builder.rs) werden alle Schalter strikt validiert und an die internen Engines gebunden:
+In [`crates/contextra/src/builder.rs`](../crates/contextra/src/builder.rs) werden alle Schalter strikt validiert und an die internen Engines gebunden:
 ```rust
 // In crates/contextra/src/builder.rs
 impl ContextraBuilder {

@@ -5,11 +5,11 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für Egress-Schutz, Sandbox & Lizenzen  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Datenschutz & DLP):** [`contextra-privacy`](file:///home/freddy/Projekte/contextra/crates/contextra-privacy)  
-- **Ring 2 (WASM-Sandbox):** [`contextra-sandbox`](file:///home/freddy/Projekte/contextra/crates/contextra-sandbox)  
-- **Ring 0 (Lizenz-Gating):** [`contextra-license`](file:///home/freddy/Projekte/contextra/crates/contextra-license)  
-- **Ring 4 (MCP Guard Wiring):** [`contextra-mcp`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp) (Gating von `contextra_cloud_query`)  
-- **Ring 0 (Port-Verträge):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Modul `src/merge_operator.rs`)
+- **Ring 0 (Datenschutz & DLP):** [`contextra-privacy`](../crates/contextra-privacy)
+- **Ring 2 (WASM-Sandbox):** [`contextra-sandbox`](../crates/contextra-sandbox)
+- **Ring 0 (Lizenz-Gating):** [`contextra-license`](../crates/contextra-license)
+- **Ring 4 (MCP Guard Wiring):** [`contextra-mcp`](../crates/contextra-mcp) (Gating von `contextra_cloud_query`)
+- **Ring 0 (Port-Verträge):** [`contextra-ports`](../crates/contextra-ports) (Modul `src/merge_operator.rs`)
 
 ---
 
@@ -133,7 +133,7 @@ impl EgressVault {
 ### 2.2 Komponente 2: MCP Gating von `contextra_cloud_query` (Behebung B1)
 
 #### Problem
-In [`crates/contextra-mcp/src/sandbox.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp/src/sandbox.rs) war `contextra_cloud_query` registriert, selbst wenn kein Egress-Guard konfiguriert war. Dadurch konnte ein Agent Daten ohne Egress-Filterung an externe Clouds senden.
+In [`crates/contextra-mcp/src/sandbox.rs`](../crates/contextra-mcp/src/sandbox.rs) war `contextra_cloud_query` registriert, selbst wenn kein Egress-Guard konfiguriert war. Dadurch konnte ein Agent Daten ohne Egress-Filterung an externe Clouds senden.
 
 #### Datei: `crates/contextra-mcp/src/sandbox.rs`
 **SOLL-Blueprint:**
