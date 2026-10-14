@@ -42,7 +42,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut actual_user_id = id_str.clone();
         if let Some(doc_val) = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .get_at_seq_tracked(tx, &doc_key, tx.inner())
             .await?
         {
             if let Ok(meta) =
@@ -98,7 +98,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         if let Some(user_val) = self
             .storage
-            .get_at_seq_tracked(tx, &user_key, u64::MAX)
+            .get_at_seq_tracked(tx, &user_key, tx.inner())
             .await?
         {
             scanned_count += 1;
@@ -118,7 +118,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         if self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .get_at_seq_tracked(tx, &doc_key, tx.inner())
             .await?
             .is_some()
         {
