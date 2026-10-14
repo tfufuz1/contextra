@@ -24,9 +24,14 @@ pub struct ManifestFormatTracker {
     pub max_sstable_version: u16,
     pub max_blob_version: u16,
     pub max_manifest_version: u16,
+    pub max_wal_version: u16,
+    pub max_ledger_version: u16,
+    pub id_width: Option<u8>,
     pub allowed_sstable_migrated_from: std::collections::HashSet<u16>,
     pub allowed_blob_migrated_from: std::collections::HashSet<u16>,
     pub allowed_manifest_migrated_from: std::collections::HashSet<u16>,
+    pub allowed_wal_migrated_from: std::collections::HashSet<u16>,
+    pub allowed_ledger_migrated_from: std::collections::HashSet<u16>,
 }
 
 impl ManifestFormatTracker {
@@ -61,6 +66,18 @@ impl ManifestFormatTracker {
                                 .insert(*migrated_from);
                         }
                     }
+                    3 => {
+                        tracker.max_wal_version = tracker.max_wal_version.max(*max_version);
+                        if *migrated_from > 0 {
+                            tracker.allowed_wal_migrated_from.insert(*migrated_from);
+                        }
+                    }
+                    4 => {
+                        tracker.max_ledger_version = tracker.max_ledger_version.max(*max_version);
+                        if *migrated_from > 0 {
+                            tracker.allowed_ledger_migrated_from.insert(*migrated_from);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -83,6 +100,8 @@ impl ManifestFormatTracker {
                 self.max_manifest_version,
                 &self.allowed_manifest_migrated_from,
             ),
+            FileKind::Wal => (self.max_wal_version, &self.allowed_wal_migrated_from),
+            FileKind::Ledger => (self.max_ledger_version, &self.allowed_ledger_migrated_from),
         };
 
         if recorded_max > 0
@@ -94,6 +113,18 @@ impl ManifestFormatTracker {
                 file_version,
                 recorded_version: recorded_max,
             });
+        }
+        Ok(())
+    }
+
+    pub fn verify_id_width(&self, expected_width: u8) -> std::result::Result<(), FormatError> {
+        if let Some(recorded_width) = self.id_width {
+            if recorded_width != expected_width {
+                return Err(FormatError::IdWidthMismatch {
+                    expected: expected_width,
+                    found: recorded_width,
+                });
+            }
         }
         Ok(())
     }

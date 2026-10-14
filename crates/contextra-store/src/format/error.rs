@@ -19,6 +19,9 @@ pub enum FormatError {
         file_version: u16,
         recorded_version: u16,
     },
+
+    #[error("IdWidth mismatch: expected {expected}, found {found}")]
+    IdWidthMismatch { expected: u8, found: u8 },
 }
 
 impl From<FormatError> for ContextraError {
