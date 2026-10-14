@@ -9,13 +9,6 @@ pub struct CosineSimilarityPartsU8 {
     pub norm_b_sq: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CosineSimilarityPartsF32U8 {
-    pub dot: f32,
-    pub norm_a_sq: f32,
-    pub norm_b_sq: f32,
-}
-
 #[inline]
 pub fn cosine_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     let mut dot = 0.0f32;
@@ -177,28 +170,6 @@ pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &
         sum += diff * diff;
     }
     sum
-}
-
-#[inline]
-pub fn cosine_similarity_parts_f32_u8(a: &[f32], b: &[u8]) -> CosineSimilarityPartsF32U8 {
-    let min_len = a.len().min(b.len());
-    let mut dot = 0.0f32;
-    let mut norm_a_sq = 0.0f32;
-    let mut norm_b_sq = 0.0f32;
-
-    for i in 0..min_len {
-        let x = a[i];
-        let y = b[i] as f32;
-        dot += x * y;
-        norm_a_sq += x * x;
-        norm_b_sq += y * y;
-    }
-
-    CosineSimilarityPartsF32U8 {
-        dot,
-        norm_a_sq,
-        norm_b_sq,
-    }
 }
 
 pub fn normalize_inplace(v: &mut [f32]) {

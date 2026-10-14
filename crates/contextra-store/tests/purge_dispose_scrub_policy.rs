@@ -24,7 +24,6 @@ async fn test_dispose_policy_refusal_require_scrub() {
     let res = dispose_obsolete_files_with_policy(
         storage_dir,
         vec![target_file.clone()],
-        true,
         DisposePolicy::RequireScrub,
     )
     .await;
@@ -55,7 +54,6 @@ async fn test_dispose_policy_refusal_allow_remove_unscrubbed() {
     let report = dispose_obsolete_files_with_policy(
         storage_dir,
         vec![target_file.clone()],
-        true,
         DisposePolicy::AllowRemoveUnscrubbed,
     )
     .await

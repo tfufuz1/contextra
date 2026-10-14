@@ -44,7 +44,7 @@ pub async fn resume_pending_with_policy(
             orchestrator = orchestrator.with_failpoints(fp.clone());
         }
 
-        let secure_delete = policy != DisposePolicy::Disabled;
+        let secure_delete = dispose_policy != DisposePolicy::Disabled;
         let report = orchestrator
             .execute_from_intent(intent, scope, hooks, secure_delete, None)
             .await?;
@@ -60,7 +60,6 @@ pub async fn resume_pending_with_policy(
         let disp_rep = dispose_obsolete_files_with_policy(
             storage_dir,
             obsolete_files,
-            false,
             dispose_policy,
         )
         .await?;
@@ -70,6 +69,7 @@ pub async fn resume_pending_with_policy(
                 records_purged: 0,
                 bytes_reclaimed: 0,
                 sstables_replaced: 0,
+                obsolete_files: Vec::new(),
             },
             disp_rep,
         )));

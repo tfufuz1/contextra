@@ -1,5 +1,5 @@
 # AGENTS.md — contextra-durable-fs
-> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.8
+> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.8 · Stand: 2026-10-13
 
 ## 1. Zweck
 Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`fsync`/`fdatasync`, atomare Ersetzung, sichere Löschung) für Contextra-Komponenten.

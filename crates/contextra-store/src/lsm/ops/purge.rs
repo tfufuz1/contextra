@@ -83,6 +83,7 @@ impl LsmStorage {
                 records_purged: 0,
                 bytes_reclaimed: 0,
                 sstables_replaced: 0,
+                obsolete_files: Vec::new(),
             });
         }
 
@@ -204,6 +205,7 @@ impl LsmStorage {
             records_purged,
             bytes_reclaimed,
             sstables_replaced,
+            obsolete_files: replaced_old_paths,
         })
     }
 }

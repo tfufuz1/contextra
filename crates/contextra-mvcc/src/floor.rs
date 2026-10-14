@@ -11,6 +11,18 @@ pub trait SnapshotFloor: Send + Sync {
     fn floor(&self) -> u64;
 }
 
+impl<T: SnapshotFloor + ?Sized> SnapshotFloor for Arc<T> {
+    fn floor(&self) -> u64 {
+        (**self).floor()
+    }
+}
+
+impl<T: Send + Sync + Clone> SnapshotFloor for GcFloor<T> {
+    fn floor(&self) -> u64 {
+        Self::floor(self)
+    }
+}
+
 /// Calculator for the MVCC garbage collection sequence floor.
 ///
 /// Ensures tombstone GC never purges entries at or above the floor sequence number.

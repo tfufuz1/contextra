@@ -11,6 +11,7 @@ use contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed;
 use contextra_crypto::deletion_proof::probe::WitStoreGeneration;
 use contextra_crypto::deletion_proof::DeletionLayer;
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs, WitnessEvidence};
+use contextra_durable_fs::PendingDeleteJournal;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -212,6 +213,35 @@ impl LsmStorage {
 
         let mut result_witnesses = Vec::new();
 
+        // Dynamische Manifest-Generation (1-basiert: 1 + flush_counter)
+        let flush_gen = self.flush_counter.load(Ordering::Acquire);
+        let manifest_gen = 1 + flush_gen;
+
+        // Dynamisches Auslesen des PendingDeleteJournals (fail-closed bei Read-Error)
+        let pending_delete_journal_path = self.config.path.join("pending_delete.journal");
+        let pending_delete_files = if pending_delete_journal_path.exists() {
+            let journal =
+                PendingDeleteJournal::open(&pending_delete_journal_path).map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Failed to open pending_delete.journal for witness issuance: {e}"
+                    ))
+                })?;
+            journal.pending().to_vec()
+        } else {
+            Vec::new()
+        };
+
+        // Dynamische Ermittlung von in_flight_commits aus pending_commit_queue
+        let in_flight_commits = {
+            let queue_guard = self.pending_commit_queue.lock().await;
+            if let Some(ref queue) = *queue_guard {
+                let shared = queue.shared.lock().unwrap_or_else(|e| e.into_inner());
+                u32::try_from(shared.requests.len()).unwrap_or(u32::MAX)
+            } else {
+                0u32
+            }
+        };
+
         // 1. MemTable Witness
         let mem_evidence_keys = self
             .scan_memtable_residue(MemScopeSpec::Keys(&req.scope_keys), req.as_of_tx.inner())
@@ -272,8 +302,8 @@ impl LsmStorage {
         let sst_inputs = SstScanInputs {
             data_dirs: vec![self.config.path.clone()],
             live_files: live_sst_paths,
-            pending_delete_files: Vec::new(),
-            manifest_generation: 1,
+            pending_delete_files,
+            manifest_generation: manifest_gen,
             as_of_tx: req.as_of_tx.inner(),
             depth: 0,
         };
@@ -283,8 +313,10 @@ impl LsmStorage {
             prefixes: req.scope_prefixes.clone(),
         };
 
-        let sst_scan_res = scan_sstables(&sst_scope, &sst_inputs, self.key_manager.clone(), || 1)
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let sst_scan_res = scan_sstables(&sst_scope, &sst_inputs, self.key_manager.clone(), || {
+            manifest_gen
+        })
+        .map_err(|e| ContextraError::Storage(e.to_string()))?;
         let violations = Self::validate_sst_evidence(&sst_scan_res, req.key_identifiers_claimed);
         if !violations.is_empty() {
             return Err(ContextraError::InvalidInput(format!(
@@ -322,17 +354,27 @@ impl LsmStorage {
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,
-            store_generation: WitStoreGeneration(1),
+            store_generation: WitStoreGeneration(manifest_gen),
             layer_evidence: sst_layer_ev,
             key_identifiers_claimed: req.key_identifiers_claimed,
         })?;
         result_witnesses.push(sst_witness);
 
         // 3. Manifest Witness
+        // Dynamische Ermittlung ungeflushter Memtable-Einträge (unpersisted_edits)
+        let state = self.state.read().await;
+        let mut unpersisted_count = state.memtable.iter().len();
+        for imm in &state.immutable_memtables {
+            unpersisted_count += imm.iter().len();
+        }
+        drop(state);
+
+        let unpersisted_edits = u32::try_from(unpersisted_count).unwrap_or(u32::MAX);
+
         let manifest_layer_ev = WitLayerEvidence::Manifest {
-            current_manifest_gen: 1,
-            in_flight_commits: 0,
-            unpersisted_edits: 0,
+            current_manifest_gen: manifest_gen,
+            in_flight_commits,
+            unpersisted_edits,
         };
 
         let manifest_witness = LayerWitness::issue(WitIssueArgs {
@@ -346,7 +388,7 @@ impl LsmStorage {
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,
-            store_generation: WitStoreGeneration(1),
+            store_generation: WitStoreGeneration(manifest_gen),
             layer_evidence: manifest_layer_ev,
             key_identifiers_claimed: req.key_identifiers_claimed,
         })?;

@@ -47,3 +47,4 @@ Die folgenden in früheren Berichten fälschlicherweise zitierten Test-Dateien u
 ## 3. Verifikation der Existenten Symbole
 
 Alle in Tabelle 1 aufgeführten `contextra_testkit::*` Symbole und Funktionen wurden automatisiert per `cargo xtask symbol-exists` und `cargo test -p contextra-testkit` verifiziert.
+<!-- Audit verification: verified TODO(wiring) marker clearance in W4-03 session -->

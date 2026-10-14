@@ -20,9 +20,15 @@ contextra-crypto = { workspace = true, optional = true }
 contextra-privacy = { workspace = true, optional = true }
 contextra-audit-export = { workspace = true, optional = true }
 contextra-avv-generator = { workspace = true, optional = true }
+contextra-cognition = { workspace = true, optional = true }
+contextra-sandbox = { workspace = true, optional = true }
+contextra-graph = { workspace = true, optional = true }
+contextra-text = { workspace = true, optional = true }
+contextra-adapt = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
 contextra-infer-candle = { workspace = true, optional = true }
 contextra-infer-ollama = { workspace = true, optional = true }
 contextra-infer-onnx = { workspace = true, optional = true }
@@ -36,6 +42,7 @@ tempfile = { workspace = true }
 
 [features]
 default = ["fast", "candle"]
+dev-open-gate = ["contextra-license/dev-open-gate"]
 encryption-at-rest = ["contextra-db/encryption-at-rest"]
 fast = []
 docid-128 = ["contextra-types/docid-128"]
@@ -46,7 +53,10 @@ avv-generator = ["dep:contextra-avv-generator"]
 onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
-router = ["contextra-router", "contextra-rank"]
+router = ["contextra-router", "contextra-rank", "dep:contextra-graph", "dep:contextra-text", "dep:contextra-adapt"]
+sandbox = ["dep:contextra-sandbox"]
+cognition = ["dep:contextra-cognition"]
+kv-stage-b = ["candle", "contextra-infer-candle/kv-stage-b"]
 
 [lints]
 workspace = true

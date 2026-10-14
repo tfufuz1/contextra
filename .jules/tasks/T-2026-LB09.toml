@@ -1,0 +1,37 @@
+id = "T-2026-LB09"
+title = "Purge-Driver Stage 2: echte Hashes, korrekter Tenant (F9)"
+crate = "contextra-engine"
+tier = 1
+risk = "high"
+goal = "Entfernen von Null-Hashes bei Stage-2-Nachweisen im Purge-Driver, Korrektur der Tenant-Zuordnung (INV-TENANT-1) und Absicherung gegen unbeabsichtigten Vollzug bei Unimplemented."
+non_goals = ["Verdrahtung von run_physical_checked in fremde Crate-Dateien", "Anderungen an bestehenden Tests", "Cargo.toml oder Cargo.lock Modifikationen"]
+scope = [
+    "crates/contextra-engine/src/deletion/purge_driver.rs",
+    "crates/contextra-engine/tests/purge_driver_real_hashes.rs",
+    ".jules/tasks/T-2026-LB09.toml",
+]
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "xtask/**",
+    "capabilities.toml",
+    "rust-toolchain.toml",
+    "deny.toml",
+    ".jules/setup/**",
+    "governance/**",
+]
+invariants = ["INV-TENANT-1", "INV-FAIL-CLOSED", "Zero-Panic"]
+acceptance = [
+    "cargo test -p contextra-engine --test purge_driver_real_hashes",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint",
+]
+evidence_required = ["Tests purge_driver_real_hashes bestanden"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

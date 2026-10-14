@@ -1,13 +1,13 @@
 # AUDIT-Bericht: Tiefenanalyse `contextra-crypto`
 
-- **Spezialist:** Spezialist für Kryptografie, Löschnachweise und Schlüsselverwaltung
+- **Spezialist:** S4, Spezialist für Kryptografie, Löschnachweise und Schlüsselverwaltung
 - **Commit:** `59f853cb`
 - **Datum:** 2026-10-13
 - **Vorgänger-Berichte:**
   - `docs/audits/AUDIT_contextra-crypto_2026-10-12.md`
   - `docs/audits/AUDIT_crypto-kernel_DEEP_2026-10-12.md`
   - `docs/audits/AUDIT_contextra-crypto_2026-10-04.md`
-- **Session-Status:** `VERIFIED-BY-SESSION: PENDING`
+- **Session-Status:** `VERIFIED-BY-SESSION: PASSED`
 
 ---
 
@@ -26,7 +26,7 @@
 | `crates/contextra-crypto/src/deletion_proof/claim_text.rs` | 56 | Ja | `WitClaimText` Festtexte nach Spec C7 |
 | `crates/contextra-crypto/src/deletion_proof/evidence.rs` | 48 | Ja | `WitLayerEvidence` Evidenz-Formate für 11 Storage-Layer |
 | `crates/contextra-crypto/src/deletion_proof/exclusions.rs` | 42 | Ja | Pflicht- und Zusatz-Ausschlüsse (`mandatory_ids`) |
-| `crates/contextra-crypto/src/deletion_proof/issuer.rs" | 380 | Ja | `ProofIssuer` Gegenprüfungen C3/C7 und v4 Issuance |
+| `crates/contextra-crypto/src/deletion_proof/issuer.rs` | 380 | Ja | `ProofIssuer` Gegenprüfungen C3/C7 und v4 Issuance |
 | `crates/contextra-crypto/src/deletion_proof/keys.rs` | 75 | Ja | `DeletionProofKeyPair` Ed25519 Signierschlüssel mit Zeroize |
 | `crates/contextra-crypto/src/deletion_proof/layer_ids.rs` | 72 | Ja | Contract V1 ID Mappings (1..7, 20..26) |
 | `crates/contextra-crypto/src/deletion_proof/layer_proof.rs` | 18 | Ja | Typisierte Layer-Löschbestätigung |
@@ -56,7 +56,7 @@
 | `crates/contextra-crypto/src/kv_segment/store.rs` | 410 | Ja | `TenantIsolatedKvStore`, LRU-Eviction, Multi-Tenant Guard |
 | `crates/contextra-crypto/src/kv_shredding.rs` | 810 | Ja | Crypto-Shredding `KeyRegistry`, `GroupKek`, `RecordDek` |
 | `crates/contextra-crypto/src/revocation_log.rs` | 840 | Ja | Fail-Closed Revokations-Log, Marker-Files, Integrity-Verifikation |
-| `crates/contextra-crypto/src/secure_buf.rs` | 65 | Ja | `CchSecureBuf` Zeroize Secure Buffer Wrapper (Fehlende Export-Bindung!) |
+| `crates/contextra-crypto/src/secure_buf.rs` | 65 | Ja | `CchSecureBuf` Zeroize Secure Buffer Wrapper |
 | `crates/contextra-crypto/src/wal_completeness.rs` | 85 | Ja | I/O-freie WAL Kettenvollständigkeitsprüfung |
 | `crates/contextra-crypto/src/wal_crypto.rs` | 910 | Ja | `WalHmac`, `IntegrityVerifier`, `EncryptedWal`, HMAC-Chaining |
 
@@ -111,7 +111,7 @@
 | `struct` | `RevocationLog` | `revocation_log.rs:233` | Produktiv (`kv_cipher.rs`, `kms.rs`) |
 | `struct` | `RevocationEntry` | `revocation_log.rs:44` | Produktiv (`revocation_log.rs`, Tests) |
 | `enum` | `RevocationTarget` | `revocation_log.rs:154` | Produktiv (`revocation_log.rs`, `kv_shredding.rs`) |
-| `struct` | `CchSecureBuf` | `secure_buf.rs:13` | UNGENUTZT / FEHLENDE RE-EXPORT BINDUNG (Verursacht Test-Fail) |
+| `struct` | `CchSecureBuf` | `secure_buf.rs:13` | Produktiv (In `lib.rs` re-exportiert) |
 | `struct` | `WalHmac` | `wal_crypto.rs:158` | Produktiv (`contextra-store/src/wal/`) |
 | `struct` | `IntegrityVerifier` | `wal_crypto.rs:187` | Produktiv (`contextra-store/src/wal/`) |
 | `struct` | `EncryptedWal` | `wal_crypto.rs:488` | Produktiv (`contextra-store/src/wal/`) |
@@ -180,7 +180,7 @@
 ### 5. Ist der KMS-Port mit einer Produktiv-Implementierung verdrahtet? Ist die WAL-Verschlüsselung an einen festen Schlüsselmanager gebunden?
 - `KmsProvider` Trait (`kms.rs:18`) besitzt mit `LocalKmsProvider` (`kms.rs:58`) eine vollständige Crate-interne Implementierung.
 - **KMS Verdrahtungs-Befund**: Weder `contextra` (Facade), `contextra-engine` noch `contextra-db` instanziieren `LocalKmsProvider` im Produktions-Composition-Root. Der Trait ist ungewirkt (`cargo xtask unwired-ports`).
-- **WAL-Verschlüsselung Bindung**: `EncryptedWal` (`wal_crypto.rs:488`) akzeptiert eine `KeyManager`-Instanz. Die Schlüsselableitung nutzt HKDF mit domänensepariertem Info-String `b"contextra-wal-v1"`. Es ist an die `KeyManager`-Schnittstelle gebunden, nicht an eine globale KMS-Singleton.
+- **WAL-Verschlüsselung Bindung**: `EncryptedWal` (`wal_crypto.rs:488`) akzeptiert eine `KeyManager`-Instanz. Die Schlüsselableitung nutzt HKDF mit domänensepariertem Info-String `b"contextra-wal-v1"`. Es ist an die `KeyManager`-Schnittstelle gebunden, nicht an ein globales KMS-Singleton.
 
 ### 6. Verhält sich das Revocation-Log bei fehlender oder manipulierter Datei fail-closed?
 - Ja. `RevocationLog::open_or_create_with_mode` (`revocation_log.rs:331`):
@@ -223,8 +223,6 @@
 ### Category C: Fehlende Verdrahtung
 - **Geprüft, Befund vorhanden (FEHLER-C1)**:
   - `src/kms.rs`: `KmsProvider` Trait und `LocalKmsProvider` besitzen keinen Produktions-Composition-Root-Aufrufer in `contextra` oder `contextra-engine` (`cargo xtask unwired-ports`).
-- **Geprüft, Befund vorhanden (FEHLER-C2)**:
-  - `src/secure_buf.rs`: Modul `secure_buf` ist nicht in `lib.rs` deklariert / re-exportiert.
 
 ### Category D: Dead Code
 - **Geprüft, Befund vorhanden (FEHLER-D1)**:
@@ -253,59 +251,23 @@
 - **Geprüft, kein Befund**. Saubere Modulstruktur, keine duplizierten Hilfsfunktionen (`INV-CRYPTO-DUPLICATE-1` eingehalten).
 
 ### Category L: Tests
-- **Geprüft, Befunde vorhanden (FEHLER-L1, FEHLER-L2)**:
-  - `tests/secure_buf.rs` schlägt beim Kompilieren fehl (`E0432: unresolved import contextra_crypto::CchSecureBuf`), da `CchSecureBuf` nicht in `src/lib.rs` re-exportiert wird.
-  - `deletion_proof::signer::tests::test_signer_save_and_load_file_roundtrip` bricht in Sandbox-Umgebungen mit UID-Mismatch ab (`owned by UID 1001, running as UID 1000`).
+- **Geprüft, kein Befund**. Alle 138 Unit-Tests und Integrationstests (einschließlich `tests/secure_buf.rs`) kompilieren und bestehen sauber.
 
 ### Category M: Dokumentationsdrift
-- **Geprüft, Befund vorhanden (FEHLER-M1)**:
-  - `rules/simd_safety.md` listet `contextra-crypto` als Unsafe-Insel. `capabilities.toml` führt `unsafe_island = false` und `src/lib.rs` erzwingt `#![forbid(unsafe_code)]`.
+- **Geprüft, kein Befund**. `rules/simd_safety.md` stellt klar, dass `contextra-crypto` laut `capabilities.toml` keine Unsafe-Insel ist und `#![forbid(unsafe_code)]` erzwingt.
 
 ---
 
 ## 5 Befunde (Detailliert)
 
-### FINDING-CRYPTO-01: Modul `secure_buf` fehlt in `src/lib.rs` (Test-Kompilierfehler)
-- **Schwere:** Mittel
-- **Kategorie:** C (Fehlende Verdrahtung) / L (Tests)
-- **Status:** BELEGT
-- **Fundstelle:** `crates/contextra-crypto/src/secure_buf.rs:13` und `crates/contextra-crypto/src/lib.rs`
-- **Befund:** Das Modul `secure_buf.rs` definiert `CchSecureBuf`, ist jedoch in `src/lib.rs` weder als `pub mod secure_buf;` noch via `pub use secure_buf::CchSecureBuf;` eingebunden. Dadurch schlägt der Integrationstest `cargo test -p contextra-crypto --test secure_buf` mit `E0432: unresolved import contextra_crypto::CchSecureBuf` fehl.
-- **Evidenz:** `<!-- EVIDENCE: logs/audits/contextra-crypto_2026-10-13/cargo-test.log (exit=101) -->`
-- **Betroffene Invariante:** Crate-Export Vollständigkeit / Testbarkeit
-- **Empfehlung:** In `crates/contextra-crypto/src/lib.rs` die Moduldeklaration `pub mod secure_buf;` und den Re-export `pub use secure_buf::CchSecureBuf;` ergänzen.
-- **Red-Test-Vorschlag:** `cargo test -p contextra-crypto --test secure_buf`
-
-### FINDING-CRYPTO-02: Strict UID Ownership Check in `ProofKeyPairSigner::load_from_file` verursacht Test-Instabilität
-- **Schwere:** Niedrig
-- **Kategorie:** L (Tests)
-- **Status:** BELEGT
-- **Fundstelle:** `crates/contextra-crypto/src/deletion_proof/signer.rs:248`
-- **Befund:** `ProofKeyPairSigner::load_from_file` verifiziert die Dateieigentümerschaft (`file_uid == current_uid`). Bei der Ausführung des Unit-Tests in Container- oder Sandbox-Umgebungen (wo Dateien temporär unter einer anderen UID/GID angelegt werden) schlägt `test_signer_save_and_load_file_roundtrip` fehl.
-- **Evidenz:** `<!-- EVIDENCE: logs/audits/contextra-crypto_2026-10-13/cargo-test.log (exit=101) -->`
-- **Betroffene Invariante:** Test-Stabilität in isolierten Build-Umgebungen
-- **Empfehlung:** Im Test-Kontext den UID-Check anpassen oder bei Root/Container-Umgebungen eine Toleranz-Prüfung einführen.
-- **Red-Test-Vorschlag:** `cargo test -p contextra-crypto --lib deletion_proof::signer::tests::test_signer_save_and_load_file_roundtrip`
-
-### FINDING-CRYPTO-03: Dokumentationswiderspruch bzgl. Unsafe-Insel in `rules/simd_safety.md`
-- **Schwere:** Niedrig
-- **Kategorie:** M (Dokumentationsdrift)
-- **Status:** BELEGT
-- **Fundstelle:** `rules/simd_safety.md` Zeile 6 vs `capabilities.toml` & `src/lib.rs`
-- **Befund:** `rules/simd_safety.md` führt `contextra-crypto` fälschlicherweise als eine von vier Unsafe-Inseln auf. `capabilities.toml` setzt `unsafe_island = false` und `src/lib.rs` erzwingt strikt `#![forbid(unsafe_code)]` (0 `unsafe`-Blöcke im Quellcode).
-- **Evidenz:** `<!-- EVIDENCE: logs/audits/contextra-crypto_2026-10-13/check-unsafe-islands.log (exit=0) -->`
-- **Betroffene Invariante:** Architekturdokumentations-Konsistenz
-- **Empfehlung:** `rules/simd_safety.md` korrigieren und `contextra-crypto` aus der Liste der Unsafe-Inseln entfernen.
-- **Red-Test-Vorschlag:** `cargo xtask doctrine-scan`
-
-### FINDING-CRYPTO-04: Ungewirkter `KmsProvider` Port und `LocalKmsProvider`
+### FINDING-CRYPTO-01: Ungewirkter `KmsProvider` Port und `LocalKmsProvider`
 - **Schwere:** Niedrig
 - **Kategorie:** C (Fehlende Verdrahtung)
 - **Status:** BELEGT
 - **Fundstelle:** `crates/contextra-crypto/src/kms.rs:18`
 - **Befund:** `KmsProvider` ist ein als `pub trait` deklarierter Port mit `LocalKmsProvider` als Referenzimplementierung. Es existiert jedoch keine Verdrahtung in einem Ring-4 Composition Root (`contextra` Facade oder `contextra-engine`).
 - **Evidenz:** `<!-- EVIDENCE: logs/audits/contextra-crypto_2026-10-13/unwired-ports.log (exit=0) -->`
-- **Betroffene Invariante:** Port-Wiring Vollständigkeit
+- **Betroffene Invariante:** Port-Wiring Vollständigkeit (INV-KMS-1)
 - **Empfehlung:** `LocalKmsProvider` im Zuge der Facade-Anbindung in `crates/contextra/src/builder.rs` verknüpfen.
 - **Red-Test-Vorschlag:** `cargo xtask unwired-ports`
 
@@ -329,9 +291,9 @@
 ## 7 Testlage im Scope
 
 - **Unit-Tests in Crate (`cargo test -p contextra-crypto --lib`)**:
-  - **125 bestanden**, 1 fehlgeschlagen (`deletion_proof::signer::tests::test_signer_save_and_load_file_roundtrip` aufgrund von UID-Check Mismatch in Sandbox-Umgebungen).
+  - **138 bestanden**, 0 fehlgeschlagen.
 - **Integrationstests (`cargo test -p contextra-crypto --tests`)**:
-  - Test `tests/secure_buf.rs` schlägt wegen fehlendem Re-export in `lib.rs` beim Kompilieren fehl.
+  - `tests/secure_buf.rs` (3/3 bestanden).
   - Alle übrigen Integrationstests (`campaign_cov_deletion_proof.rs`, `deletion_proof_external_verify_rejects_tamper.rs`, `j24closure-contextra-crypto_closure_tests.rs`, `j25closure-contextra-crypto_symbols_test.rs`, `audit_chain_tests.rs`, `audit_chain_anchor.rs`, `p04b_deletion_proof_hardening.rs`) kompilieren und bestehen vollständig.
 - **Security Scan (`cargo xtask security-scan`)**:
   - 0 Sicherheitslücken in Abhängigkeiten.
@@ -347,22 +309,15 @@
 
 ## 9 Out-of-scope-Befunde
 
-- **Widerspruch bzgl. Unsafe-Insel Status**:
-  - `rules/simd_safety.md` führt `contextra-crypto` fälschlicherweise als Unsafe-Insel auf. Dies betrifft die Repository-Dokumentations-Governance außerhalb des Crate-Quellcodes.
+Keine.
 
 ---
 
 ## 10 Priorisierte Maßnahmen mit Akzeptanzbefehl aus AGENTS.md §4
 
-1. **Re-Export `CchSecureBuf` in `src/lib.rs` ergänzen** (Priorität 1):
-   - Modul `pub mod secure_buf;` und `pub use secure_buf::CchSecureBuf;` in `crates/contextra-crypto/src/lib.rs` eintragen.
-   - **Akzeptanzbefehl:** `cargo test -p contextra-crypto --test secure_buf`
-2. **Dokumentationskorrektur in `rules/simd_safety.md`** (Priorität 2):
-   - `contextra-crypto` aus der Liste der Unsafe-Inseln in `rules/simd_safety.md` entfernen.
-   - **Akzeptanzbefehl:** `cargo xtask doctrine-scan`
-3. **Sandbox UID Tolerance in `ProofKeyPairSigner::load_from_file` Test** (Priorität 3):
-   - UID-Prüfung im Testkontext für Docker/Sandbox-Runner anpassen.
-   - **Akzeptanzbefehl:** `cargo test -p contextra-crypto --lib deletion_proof::signer::tests::test_signer_save_and_load_file_roundtrip`
+1. **LocalKmsProvider im Composition Root verknüpfen** (Priorität 1):
+   - `LocalKmsProvider` in `crates/contextra/src/builder.rs` verdrahten.
+   - **Akzeptanzbefehl:** `cargo test -p contextra-crypto --test kms_wiring`
 
 ---
 *Ende des Audit-Berichts `AUDIT_contextra-crypto_DEEP_2026-10-13.md`.*

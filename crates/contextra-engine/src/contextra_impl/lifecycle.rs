@@ -61,6 +61,62 @@ impl Contextra {
         Self::open_with_config_and_gate(path, config, gate).await
     }
 
+    /// Opens or creates a `Contextra` instance with explicit config, wiring, and `Arc<dyn LicenseGate>`.
+    #[tracing::instrument(level = "trace", skip(path, config, wiring, gate))]
+    pub async fn open_with_config_wiring_and_gate(
+        path: impl AsRef<Path>,
+        config: ContextraConfig,
+        wiring: EngineWiring,
+        gate: Arc<dyn LicenseGate>,
+    ) -> Result<Self> {
+        let token = gate
+            .authorize(FeatureRing::Fast)
+            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
+        Self::open_authorized_with_wiring(path, config, wiring, &token, gate).await
+    }
+
+    /// Opens or creates a `Contextra` instance with explicit config and wiring using default local gate.
+    #[tracing::instrument(level = "trace", skip(path, config, wiring))]
+    pub async fn open_with_config_and_wiring(
+        path: impl AsRef<Path>,
+        config: ContextraConfig,
+        wiring: EngineWiring,
+    ) -> Result<Self> {
+        #[cfg(any(test, debug_assertions))]
+        let gate: Arc<dyn LicenseGate> = Arc::new(
+            contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref())),
+        );
+
+        #[cfg(not(any(test, debug_assertions)))]
+        let gate: Arc<dyn LicenseGate> = {
+            let local_gate =
+                contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref()));
+            if local_gate.check_ring(FeatureRing::Fast).is_err() {
+                return Err(contextra_types::ContextraError::PolicyViolation(
+                    "Valid license activation required in release mode".to_string(),
+                ));
+            }
+            Arc::new(local_gate)
+        };
+
+        Self::open_with_config_wiring_and_gate(path, config, wiring, gate).await
+    }
+
+    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token,
+    /// attached [`LicenseGate`], and explicit [`EngineWiring`].
+    #[tracing::instrument(level = "trace", skip(path, config, wiring, authorized_ring, gate))]
+    pub async fn open_authorized_with_wiring(
+        path: impl AsRef<Path>,
+        config: ContextraConfig,
+        wiring: EngineWiring,
+        authorized_ring: &AuthorizedRing,
+        gate: Arc<dyn LicenseGate>,
+    ) -> Result<Self> {
+        let db = Self::open_authorized(path, config, authorized_ring, gate).await?;
+        db.apply(wiring);
+        Ok(db)
+    }
+
     /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token
     /// and attached [`LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path, config, authorized_ring, gate))]
@@ -100,9 +156,8 @@ impl Contextra {
             LsmStorage::migrate_legacy_wal_keys(&lsm_config, clock).await?;
         }
 
-        let storage = if let Some(passphrase) = lsm_config.encryption_passphrase.clone() {
-            let _ = passphrase;
-            Arc::new(LsmStorage::open(lsm_config).await?)
+        let storage = if let Some(op) = config.merge_operator.clone() {
+            Arc::new(LsmStorage::open_with_merge_operator(lsm_config, op).await?)
         } else {
             Arc::new(LsmStorage::open(lsm_config).await?)
         };
@@ -150,12 +205,33 @@ impl Contextra {
         ));
 
         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
-        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store.clone());
+        let key_registry = Arc::new(contextra_crypto::kv_shredding::KeyRegistry::new());
+        let shredding_wiring = Arc::new(contextra_kvcache::KvShreddingWiring::build(
+            contextra_kvcache::KvShreddingWiringDeps { key_registry },
+        )?);
+
+        let kv_integration = crate::kv_cache_integration::wiring::KvCacheIntegrationWiring::build(
+            crate::kv_cache_integration::wiring::KvCacheIntegrationWiringDeps {
+                kv_store: Some(kv_store),
+                shredding_wiring,
+                attention_exporter: None,
+            },
+        )?;
 
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
             .clone()
             .unwrap_or_else(|| Arc::new(contextra_ports::NoopMetricsSink));
+
+        // Record initial normal operational backpressure level (0.0 = Normal)
+        crate::metrics_names::record_gauge_safe(
+            metrics_sink.as_ref(),
+            crate::metrics_names::BACKPRESSURE_LEVEL,
+            0.0,
+            &[("status", "normal")],
+        );
+
+        let kv_hooks_arc = kv_integration.kv_hooks();
 
         let db = Self {
             storage,
@@ -170,16 +246,21 @@ impl Contextra {
             cancel_token: cancel_token.clone(),
             task_tracker: task_tracker.clone(),
             embedder: parking_lot::RwLock::new(None),
-            orphan_registry,
+            orphan_registry: orphan_registry.clone(),
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
             pid_controller: parking_lot::RwLock::new(None),
-            kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
+            kv_eviction_worker: parking_lot::RwLock::new(kv_integration.eviction_worker),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
             kv_hooks: parking_lot::RwLock::new(Some(
-                kv_store as Arc<dyn contextra_ports::KvLifecycleHooks>,
+                kv_hooks_arc as Arc<dyn contextra_ports::KvLifecycleHooks>,
             )),
         };
+
+        let storage_ref = db.storage.as_ref();
+        if let Err(err) = db.orphan_registry.recover_and_clean(storage_ref).await {
+            tracing::warn!(error = %err, "Startup checkpoint/pin orphan recovery failed");
+        }
 
         db.initialize_collections().await?;
 
@@ -208,6 +289,10 @@ impl Contextra {
                             tracing::warn!(error = %e, "ConsolidationEngine task failed or was cancelled");
                         }
                     });
+                } else {
+                    return Err(contextra_types::ContextraError::PolicyViolation(
+                        "consolidation_enabled is true but no consolidation_launcher is configured on ContextraConfig".to_string(),
+                    ));
                 }
             }
         }
@@ -296,6 +381,7 @@ impl Contextra {
 
     async fn repair_on_open_internal(&self) -> Result<()> {
         let start_time = std::time::Instant::now();
+        let sink = self.metrics_sink.read().clone();
 
         let collection_name_from_key = |key: &[u8]| -> String {
             if key.starts_with(b"__tx_intent:") {
@@ -434,6 +520,12 @@ impl Contextra {
         }
 
         let elapsed = start_time.elapsed();
+        crate::metrics_names::record_counter_safe(
+            sink.as_ref(),
+            crate::metrics_names::CHECKPOINT_DURATION,
+            elapsed.as_millis() as u64,
+            &[("phase", "repair_on_open")],
+        );
         tracing::info!(
             "repair_on_open: completed in {:?} — collections verified: {}",
             elapsed,
@@ -606,7 +698,10 @@ mod consolidation_launcher_tests {
     async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()>
     {
         let dir = tempdir().unwrap();
-        let config = ContextraConfig::default(); // no launcher set
+        let config = ContextraConfig {
+            consolidation_enabled: false,
+            ..Default::default()
+        };
 
         let db = Contextra::open_with_config(dir.path(), config).await?;
         db.close().await?;
@@ -622,6 +717,7 @@ mod consolidation_launcher_tests {
             durability_mode: DurabilityMode::MemoryOnly,
             group_commit_window_micros: 100,
             memtable_size_limit: 32 * 1024 * 1024,
+            consolidation_enabled: false,
             ..Default::default()
         };
 

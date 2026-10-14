@@ -8,9 +8,16 @@ use std::time::Duration;
 
 use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
+use contextra_db::engine::{EngineWiring, EngineWiringExt};
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
-use contextra_license::SignedLicenseGate;
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
+use contextra_license::signed_gate::SignedLicenseGate;
+use contextra_license::wiring::{LicenseWiring, LicenseWiringDeps};
+use contextra_license::LicenseGateMode;
+use contextra_ports::clock::{Clock, SystemClock};
+use contextra_ports::id_gen::{IdGen, SystemIdGen};
+use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
+use contextra_ports::rng::{Rng, SystemRng};
+use contextra_ports::wiring::PortsWiring;
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -25,6 +32,31 @@ pub struct ContextraBuilder {
     signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
     collection_profile: Option<crate::collection_profile::CollectionProfile>,
+    clock: Arc<dyn Clock>,
+    rng: Arc<dyn Rng>,
+    id_gen: Arc<dyn IdGen>,
+    router_enabled: bool,
+    adapt_enabled: bool,
+    privacy_enabled: bool,
+    sandbox_enabled: bool,
+    audit_export_enabled: bool,
+    avv_generator_enabled: bool,
+    kms_enabled: bool,
+    kv_shredding_enabled: bool,
+    checkpoint_enabled: bool,
+
+    #[cfg(feature = "sovereign")]
+    pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
+    #[cfg(feature = "audit-export")]
+    pub audit_wiring: Option<Arc<crate::wiring_audit::AuditWiringBundle>>,
+    #[cfg(feature = "onnx")]
+    pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
+    #[cfg(feature = "sandbox")]
+    pub sandbox_wiring: Option<Arc<crate::wiring_sandbox::SandboxWiringBundle>>,
+    #[cfg(feature = "cognition")]
+    pub cognition_wiring: Option<Arc<crate::wiring_cognition::CognitionWiringBundle>>,
+    #[cfg(feature = "router")]
+    pub retrieval_wiring: Option<Arc<crate::wiring_retrieval::RetrievalWiringBundle>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -41,6 +73,15 @@ impl std::fmt::Debug for ContextraBuilder {
             .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .field("collection_profile", &self.collection_profile)
+            .field("router_enabled", &self.router_enabled)
+            .field("adapt_enabled", &self.adapt_enabled)
+            .field("privacy_enabled", &self.privacy_enabled)
+            .field("sandbox_enabled", &self.sandbox_enabled)
+            .field("audit_export_enabled", &self.audit_export_enabled)
+            .field("avv_generator_enabled", &self.avv_generator_enabled)
+            .field("kms_enabled", &self.kms_enabled)
+            .field("kv_shredding_enabled", &self.kv_shredding_enabled)
+            .field("checkpoint_enabled", &self.checkpoint_enabled)
             .finish()
     }
 }
@@ -56,6 +97,30 @@ impl Clone for ContextraBuilder {
             signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
             collection_profile: self.collection_profile,
+            clock: Arc::clone(&self.clock),
+            rng: Arc::clone(&self.rng),
+            id_gen: Arc::clone(&self.id_gen),
+            router_enabled: self.router_enabled,
+            adapt_enabled: self.adapt_enabled,
+            privacy_enabled: self.privacy_enabled,
+            sandbox_enabled: self.sandbox_enabled,
+            audit_export_enabled: self.audit_export_enabled,
+            avv_generator_enabled: self.avv_generator_enabled,
+            kms_enabled: self.kms_enabled,
+            kv_shredding_enabled: self.kv_shredding_enabled,
+            checkpoint_enabled: self.checkpoint_enabled,
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: self.sovereign_wiring.clone(),
+            #[cfg(feature = "audit-export")]
+            audit_wiring: self.audit_wiring.clone(),
+            #[cfg(feature = "onnx")]
+            onnx_wiring: self.onnx_wiring.clone(),
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: self.sandbox_wiring.clone(),
+            #[cfg(feature = "cognition")]
+            cognition_wiring: self.cognition_wiring.clone(),
+            #[cfg(feature = "router")]
+            retrieval_wiring: self.retrieval_wiring.clone(),
         }
     }
 }
@@ -63,18 +128,62 @@ impl Clone for ContextraBuilder {
 impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
     pub fn new(dimension: usize) -> Self {
+        let storage_path = PathBuf::from("./contextra_data");
+        let ports_wiring = PortsWiring::build().unwrap_or_else(|_| PortsWiring {
+            clock: Arc::new(SystemClock::new()),
+            rng: Arc::new(SystemRng::new()),
+            id_gen: Arc::new(SystemIdGen::new()),
+        });
+        let clock = ports_wiring.clock;
+        let rng = ports_wiring.rng;
+        let id_gen = ports_wiring.id_gen;
+
+        let license_gate = LicenseWiring::build(LicenseWiringDeps {
+            mode: LicenseGateMode::Enforced,
+            storage_path: Some(storage_path.clone()),
+            clock: Some(clock.clone()),
+            ..Default::default()
+        })
+        .map(|w| w.into_gate())
+        .unwrap_or_else(|_| Arc::new(SignedLicenseGate::no_activation_with_clock(clock.clone())));
+
         Self {
-            storage_path: PathBuf::from("./contextra_data"),
+            storage_path,
             config: ContextraConfig {
                 dimension,
                 ..Default::default()
             },
             explicit_user_config: false,
             embedder: None,
-            license_gate: Arc::new(OpenFastGate),
+            license_gate,
             signed_license_error: None,
             performance_profile: None,
             collection_profile: None,
+            clock,
+            rng,
+            id_gen,
+            router_enabled: true,
+            adapt_enabled: true,
+            privacy_enabled: true,
+            sandbox_enabled: true,
+            audit_export_enabled: true,
+            avv_generator_enabled: true,
+            kms_enabled: true,
+            kv_shredding_enabled: true,
+            checkpoint_enabled: true,
+
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: None,
+            #[cfg(feature = "audit-export")]
+            audit_wiring: None,
+            #[cfg(feature = "onnx")]
+            onnx_wiring: None,
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: None,
+            #[cfg(feature = "cognition")]
+            cognition_wiring: None,
+            #[cfg(feature = "router")]
+            retrieval_wiring: None,
         }
     }
 
@@ -205,6 +314,141 @@ impl ContextraBuilder {
         b
     }
 
+    /// Configures the builder to use permissive development mode (`LicenseGateMode::DevelopmentOpen`).
+    ///
+    /// Allows Fast ring bypass without activation.
+    /// Only available in test/debug builds or when the `dev-open-gate` feature is enabled.
+    #[cfg(any(test, debug_assertions, feature = "dev-open-gate"))]
+    pub fn with_development_open_gate(mut self) -> Self {
+        if let Ok(wiring) = LicenseWiring::build(LicenseWiringDeps {
+            mode: LicenseGateMode::DevelopmentOpen,
+            storage_path: Some(self.storage_path.clone()),
+            clock: Some(self.clock.clone()),
+            ..Default::default()
+        }) {
+            self.license_gate = wiring.into_gate();
+            self.signed_license_error = None;
+        }
+        self
+    }
+
+    /// Attaches a custom [`Clock`] port.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Attaches a custom [`Rng`] port.
+    pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
+        self.rng = rng;
+        self
+    }
+
+    /// Attaches a custom [`IdGen`] port.
+    pub fn with_id_gen(mut self, id_gen: Arc<dyn IdGen>) -> Self {
+        self.id_gen = id_gen;
+        self
+    }
+
+    /// Configures whether the router subsystem is enabled.
+    pub fn with_router(mut self, enabled: bool) -> Self {
+        self.router_enabled = enabled;
+        self
+    }
+
+    /// Disables the router subsystem.
+    pub fn without_router(self) -> Self {
+        self.with_router(false)
+    }
+
+    /// Configures whether the adapt subsystem is enabled.
+    pub fn with_adapt(mut self, enabled: bool) -> Self {
+        self.adapt_enabled = enabled;
+        self
+    }
+
+    /// Disables the adapt subsystem.
+    pub fn without_adapt(self) -> Self {
+        self.with_adapt(false)
+    }
+
+    /// Configures whether the privacy/egress subsystem is enabled.
+    pub fn with_privacy(mut self, enabled: bool) -> Self {
+        self.privacy_enabled = enabled;
+        self
+    }
+
+    /// Disables the privacy/egress subsystem.
+    pub fn without_privacy(self) -> Self {
+        self.with_privacy(false)
+    }
+
+    /// Configures whether the WASM sandbox subsystem is enabled.
+    pub fn with_sandbox(mut self, enabled: bool) -> Self {
+        self.sandbox_enabled = enabled;
+        self
+    }
+
+    /// Disables the WASM sandbox subsystem.
+    pub fn without_sandbox(self) -> Self {
+        self.with_sandbox(false)
+    }
+
+    /// Configures whether the audit export subsystem is enabled.
+    pub fn with_audit_export(mut self, enabled: bool) -> Self {
+        self.audit_export_enabled = enabled;
+        self
+    }
+
+    /// Disables the audit export subsystem.
+    pub fn without_audit_export(self) -> Self {
+        self.with_audit_export(false)
+    }
+
+    /// Configures whether the AVV generator subsystem is enabled.
+    pub fn with_avv_generator(mut self, enabled: bool) -> Self {
+        self.avv_generator_enabled = enabled;
+        self
+    }
+
+    /// Disables the AVV generator subsystem.
+    pub fn without_avv_generator(self) -> Self {
+        self.with_avv_generator(false)
+    }
+
+    /// Configures whether the KMS subsystem is enabled.
+    pub fn with_kms(mut self, enabled: bool) -> Self {
+        self.kms_enabled = enabled;
+        self
+    }
+
+    /// Disables the KMS subsystem.
+    pub fn without_kms(self) -> Self {
+        self.with_kms(false)
+    }
+
+    /// Configures whether the KV shredding subsystem is enabled.
+    pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
+        self.kv_shredding_enabled = enabled;
+        self
+    }
+
+    /// Disables the KV shredding subsystem.
+    pub fn without_kv_shredding(self) -> Self {
+        self.with_kv_shredding(false)
+    }
+
+    /// Configures whether the checkpoint subsystem is enabled.
+    pub fn with_checkpoint(mut self, enabled: bool) -> Self {
+        self.checkpoint_enabled = enabled;
+        self
+    }
+
+    /// Disables the checkpoint subsystem.
+    pub fn without_checkpoint(self) -> Self {
+        self.with_checkpoint(false)
+    }
+
     /// Sets the complete `ContextraConfig` directly.
     pub fn with_config(self, config: ContextraConfig) -> Self {
         let storage_path = self.storage_path;
@@ -213,6 +457,9 @@ impl ContextraBuilder {
         let signed_license_error = self.signed_license_error;
         let performance_profile = self.performance_profile;
         let collection_profile = self.collection_profile;
+        let clock = self.clock;
+        let rng = self.rng;
+        let id_gen = self.id_gen;
 
         let mut b = Self::from_config(config);
         b.storage_path = storage_path;
@@ -221,6 +468,9 @@ impl ContextraBuilder {
         b.signed_license_error = signed_license_error;
         b.performance_profile = performance_profile;
         b.collection_profile = collection_profile;
+        b.clock = clock;
+        b.rng = rng;
+        b.id_gen = id_gen;
         b
     }
 
@@ -239,9 +489,65 @@ impl ContextraBuilder {
         &self.license_gate
     }
 
+    /// Returns the configured clock port.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
+    /// Returns the configured RNG port.
+    pub fn rng(&self) -> &Arc<dyn Rng> {
+        &self.rng
+    }
+
+    /// Returns the configured ID generator port.
+    pub fn id_gen(&self) -> &Arc<dyn IdGen> {
+        &self.id_gen
+    }
+
+    pub fn router_enabled(&self) -> bool {
+        self.router_enabled
+    }
+
+    pub fn adapt_enabled(&self) -> bool {
+        self.adapt_enabled
+    }
+
+    pub fn privacy_enabled(&self) -> bool {
+        self.privacy_enabled
+    }
+
+    pub fn sandbox_enabled(&self) -> bool {
+        self.sandbox_enabled
+    }
+
+    pub fn audit_export_enabled(&self) -> bool {
+        self.audit_export_enabled
+    }
+
+    pub fn avv_generator_enabled(&self) -> bool {
+        self.avv_generator_enabled
+    }
+
+    pub fn kms_enabled(&self) -> bool {
+        self.kms_enabled
+    }
+
+    pub fn kv_shredding_enabled(&self) -> bool {
+        self.kv_shredding_enabled
+    }
+
+    pub fn checkpoint_enabled(&self) -> bool {
+        self.checkpoint_enabled
+    }
+
     /// Returns the configured performance profile preset, if any.
     pub fn performance_profile(&self) -> Option<crate::performance_profile::PerformanceProfile> {
         self.performance_profile
+    }
+
+    /// Generates a wiring self-test report for this builder.
+    pub fn wiring_report(&self) -> crate::wiring_selftest::WiringReport {
+        crate::wiring_selftest::generate_report_for_builder(self)
     }
 
     /// Builds and initializes the `Contextra` engine instance.
@@ -283,6 +589,76 @@ impl ContextraBuilder {
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
+        #[cfg(feature = "sovereign")]
+        if self.kms_enabled {
+            let sovereign = crate::wiring_sovereign::SovereignWiringBundle::build(
+                &self.storage_path,
+                self.config.encryption_passphrase.as_deref(),
+                self.clock.clone(),
+            )?;
+            self.sovereign_wiring = Some(Arc::new(sovereign));
+        }
+
+        #[cfg(feature = "audit-export")]
+        if self.audit_export_enabled {
+            let audit = crate::wiring_audit::AuditWiringBundle::build(
+                contextra_types::TenantId::SYSTEM,
+                self.clock.clone(),
+            )?;
+            self.audit_wiring = Some(Arc::new(audit));
+        }
+
+        #[cfg(feature = "onnx")]
+        {
+            let onnx = crate::wiring_onnx::OnnxWiringBundle::build(true)?;
+            self.onnx_wiring = Some(Arc::new(onnx));
+        }
+
+        #[cfg(feature = "sandbox")]
+        if self.sandbox_enabled {
+            let sandbox = crate::wiring_sandbox::SandboxWiringBundle::build(true)?;
+            self.sandbox_wiring = Some(Arc::new(sandbox));
+        }
+
+        #[cfg(feature = "cognition")]
+        {
+            let cognition = crate::wiring_cognition::CognitionWiringBundle::build(
+                &mut self.config,
+                self.clock.clone(),
+            )?;
+            self.cognition_wiring = Some(Arc::new(cognition));
+        }
+
+        #[cfg(feature = "router")]
+        {
+            let retrieval = crate::wiring_retrieval::RetrievalWiringBundle::build(
+                self.router_enabled,
+                self.adapt_enabled,
+                self.clock.clone(),
+            )?;
+            self.retrieval_wiring = Some(Arc::new(retrieval));
+        }
+
+        #[cfg(feature = "candle")]
+        {
+            let _candle = crate::wiring_candle::CandleWiringBundle::build(None)?;
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            let report = crate::wiring_selftest::verify_wiring(
+                true,
+                true,
+                false,
+            )?;
+            if !report.is_valid() {
+                return Err(ContextraError::PolicyViolation(format!(
+                    "INV-WIRING-2 / §22 Wiring self-test failed: missing ports = {:?}, invalid security ports = {:?}",
+                    report.missing_ports, report.invalid_security_ports
+                )));
+            }
+        }
+
         let instance = Contextra::open_authorized(
             &self.storage_path,
             self.config,
@@ -290,6 +666,27 @@ impl ContextraBuilder {
             self.license_gate,
         )
         .await?;
+
+        let mut engine_wiring = EngineWiring::default();
+
+        #[cfg(feature = "router")]
+        let _router_wiring_keepalive = if self.router_enabled {
+            let router_deps = contextra_router::RouterWiringDeps {
+                clock: Some(self.clock.clone()),
+                ..Default::default()
+            };
+            if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
+                let arc_rw = Arc::new(router_wiring);
+                engine_wiring.router = Some(Arc::downgrade(&arc_rw) as _);
+                Some(arc_rw)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        instance.apply(engine_wiring);
 
         if let Some(embedder) = self.embedder {
             Ok(instance.with_embedder(embedder).await)
@@ -357,6 +754,97 @@ mod tests {
             .await?;
 
         assert_eq!(db.len().await?, 0);
+        let _ = std::fs::remove_dir_all(&tmp_path);
+        Ok(())
+    }
+
+    #[test]
+    fn test_builder_subsystem_levers() {
+        let b = ContextraBuilder::new(128)
+            .without_router()
+            .without_adapt()
+            .without_privacy()
+            .without_sandbox()
+            .without_audit_export()
+            .without_avv_generator()
+            .without_kms()
+            .without_kv_shredding()
+            .without_checkpoint();
+
+        assert!(!b.router_enabled());
+        assert!(!b.adapt_enabled());
+        assert!(!b.privacy_enabled());
+        assert!(!b.sandbox_enabled());
+        assert!(!b.audit_export_enabled());
+        assert!(!b.avv_generator_enabled());
+        assert!(!b.kms_enabled());
+        assert!(!b.kv_shredding_enabled());
+        assert!(!b.checkpoint_enabled());
+
+        let report = b.wiring_report();
+        assert_eq!(report.missing_ports.len(), 9);
+
+        let b = b
+            .with_router(true)
+            .with_adapt(true)
+            .with_privacy(true)
+            .with_sandbox(true)
+            .with_audit_export(true)
+            .with_avv_generator(true)
+            .with_kms(true)
+            .with_kv_shredding(true)
+            .with_checkpoint(true);
+
+        assert!(b.router_enabled());
+        assert!(b.adapt_enabled());
+        assert!(b.privacy_enabled());
+        assert!(b.sandbox_enabled());
+        assert!(b.audit_export_enabled());
+        assert!(b.avv_generator_enabled());
+        assert!(b.kms_enabled());
+        assert!(b.kv_shredding_enabled());
+        assert!(b.checkpoint_enabled());
+
+        let report2 = b.wiring_report();
+        assert!(report2.missing_ports.is_empty());
+    }
+
+    #[test]
+    fn test_builder_ports_attachment() {
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let rng: Arc<dyn Rng> = Arc::new(SystemRng::new());
+        let id_gen: Arc<dyn IdGen> = Arc::new(SystemIdGen::new());
+
+        let b = ContextraBuilder::new(128)
+            .with_clock(clock.clone())
+            .with_rng(rng.clone())
+            .with_id_gen(id_gen.clone());
+
+        assert!(Arc::ptr_eq(b.clock(), &clock));
+        assert!(Arc::ptr_eq(b.rng(), &rng));
+        assert!(Arc::ptr_eq(b.id_gen(), &id_gen));
+    }
+
+    #[tokio::test]
+    async fn test_builder_wiring_report_integration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::wiring_selftest::ContextraWiringReportExt;
+
+        let tmp_path = std::env::temp_dir().join(format!(
+            "contextra_wiring_rep_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp_path);
+
+        let db = ContextraBuilder::new(4)
+            .with_storage_path(&tmp_path)
+            .build()
+            .await?;
+
+        let report = db.wiring_report();
+        assert!(report.is_valid());
+        assert!(report.wired_ports.contains(&"Clock".to_string()));
+        assert!(report.wired_ports.contains(&"EngineWiring".to_string()));
+
         let _ = std::fs::remove_dir_all(&tmp_path);
         Ok(())
     }

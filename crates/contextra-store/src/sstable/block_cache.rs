@@ -1,28 +1,62 @@
 use bytes::Bytes;
 use lru::LruCache;
 use parking_lot::RwLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+/// RAM claim state for cached memory buffers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CchRamClaim {
+    Unreferenced,
+    Zeroized,
+}
+
+/// Detailed report on block cache content matching target SSTable files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CchCacheReport {
+    pub caches_checked: usize,
+    pub entries_found: usize,
+    pub ram_claim: CchRamClaim,
+}
 
 /// Sharded block cache: 64 independent shards to reduce contention.
 /// Shard selection uses ahash tuple hashing on (file_id, offset).
 pub const BLOCK_CACHE_SHARDS: usize = 64;
 
 /// Trait abstraction for block cache backend implementations.
-///
-/// ## Approximative LRU & Lock-Optimized Read Path
-/// SSTable block caches store immutable 4KB data blocks. For point lookups and range scans,
-/// read hits occur with high frequency on hot-set blocks.
-///
-/// While standard `LruCache` maintains strict LRU ordering by updating a doubly-linked list
-/// on every access (requiring write lock acquisition even during `get()`), lock-optimized
-/// implementations like `quick_cache::sync::Cache` (S3-FIFO / Clock eviction) achieve
-/// lock-free read hit evaluation via atomic reference counting without mutating global eviction order on every hit.
-///
-/// Functionally, strict LRU order is NOT required for correctness in SSTable block caching.
-/// Approximative LRU / S3-FIFO eviction provides equivalent or superior hit ratios while
-/// eliminating lock contention across concurrent reader threads.
+pub trait BlockCacheBackend: Send + Sync {
+    /// Creates a new cache backend instance with the specified capacity.
+    fn new(capacity: usize) -> Self
+    where
+        Self: Sized;
+
+    /// Retrieves a cached block by `(file_id, offset)` key.
+    fn get(&self, key: &(u64, u64)) -> Option<Bytes>;
+
+    /// Inserts a block into the cache.
+    fn insert(&self, key: (u64, u64), value: Bytes);
+
+    /// Returns the number of cached blocks in this backend instance.
+    fn len(&self) -> usize;
+
+    /// Returns `true` if the backend contains no cached blocks.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Checks if a key is present in the cache.
+    fn contains(&self, key: &(u64, u64)) -> bool {
+        self.get(key).is_some()
+    }
+
+    fn invalidate_files(&self, files: &[u64]) -> usize;
+
+    fn entries_for_files(&self, files: &[u64]) -> usize;
+
+    fn clear_all(&self) -> usize;
+}
+
 /// High-performance SIEVE cache backend implementation using `ahash::AHashMap`, `AtomicBool` visited flags, and `VecDeque`.
-/// Lock-optimized read path allows concurrent non-blocking gets with shared read lock.
 pub struct SieveCacheBackend {
     state: RwLock<SieveCacheState>,
 }
@@ -128,31 +162,41 @@ impl BlockCacheBackend for SieveCacheBackend {
     fn len(&self) -> usize {
         self.state.read().map.len()
     }
-}
 
-pub trait BlockCacheBackend: Send + Sync {
-    /// Creates a new cache backend instance with the specified capacity.
-    fn new(capacity: usize) -> Self
-    where
-        Self: Sized;
-
-    /// Retrieves a cached block by `(file_id, offset)` key.
-    fn get(&self, key: &(u64, u64)) -> Option<Bytes>;
-
-    /// Inserts a block into the cache.
-    fn insert(&self, key: (u64, u64), value: Bytes);
-
-    /// Returns the number of cached blocks in this backend instance.
-    fn len(&self) -> usize;
-
-    /// Returns `true` if the backend contains no cached blocks.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
+    fn invalidate_files(&self, files: &[u64]) -> usize {
+        let mut s = self.state.write();
+        let mut removed = 0;
+        let mut bytes_sub = 0;
+        s.map.retain(|k, v| {
+            if files.contains(&k.0) {
+                removed += 1;
+                bytes_sub += v.value.len();
+                false
+            } else {
+                true
+            }
+        });
+        s.current_bytes = s.current_bytes.saturating_sub(bytes_sub);
+        if removed > 0 {
+            s.nodes.retain(|n| !files.contains(&n.key.0));
+            s.hand = 0;
+        }
+        removed
     }
 
-    /// Checks if a key is present in the cache.
-    fn contains(&self, key: &(u64, u64)) -> bool {
-        self.get(key).is_some()
+    fn entries_for_files(&self, files: &[u64]) -> usize {
+        let s = self.state.read();
+        s.map.keys().filter(|k| files.contains(&k.0)).count()
+    }
+
+    fn clear_all(&self) -> usize {
+        let mut s = self.state.write();
+        let count = s.map.len();
+        s.map.clear();
+        s.nodes.clear();
+        s.hand = 0;
+        s.current_bytes = 0;
+        count
     }
 }
 
@@ -211,6 +255,36 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
     }
+
+    fn invalidate_files(&self, files: &[u64]) -> usize {
+        let mut s = self.state.write();
+        let keys_to_remove: Vec<(u64, u64)> = s
+            .cache
+            .iter()
+            .filter(|(k, _)| files.contains(&k.0))
+            .map(|(k, _)| *k)
+            .collect();
+        let count = keys_to_remove.len();
+        for k in keys_to_remove {
+            if let Some(val) = s.cache.pop(&k) {
+                s.current_bytes = s.current_bytes.saturating_sub(val.len());
+            }
+        }
+        count
+    }
+
+    fn entries_for_files(&self, files: &[u64]) -> usize {
+        let s = self.state.read();
+        s.cache.iter().filter(|(k, _)| files.contains(&k.0)).count()
+    }
+
+    fn clear_all(&self) -> usize {
+        let mut s = self.state.write();
+        let count = s.cache.len();
+        s.cache.clear();
+        s.current_bytes = 0;
+        count
+    }
 }
 
 #[cfg(feature = "block-cache-v2")]
@@ -262,6 +336,18 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.cache.get(key).is_some()
     }
+
+    fn invalidate_files(&self, _files: &[u64]) -> usize {
+        0
+    }
+
+    fn entries_for_files(&self, _files: &[u64]) -> usize {
+        0
+    }
+
+    fn clear_all(&self) -> usize {
+        0
+    }
 }
 
 #[cfg(not(feature = "block-cache-v2"))]
@@ -273,6 +359,7 @@ pub type BlockCacheShard = QuickCacheBlockCacheBackend;
 pub struct BlockCache {
     shards: Vec<BlockCacheShard>,
     hash_builder: ahash::RandomState,
+    secure_buffers: AtomicBool,
 }
 
 impl BlockCache {
@@ -291,6 +378,43 @@ impl BlockCache {
         Self {
             shards,
             hash_builder: ahash::RandomState::new(),
+            secure_buffers: AtomicBool::new(false),
+        }
+    }
+
+    pub fn entries_for_files(&self, files: &[u64]) -> usize {
+        self.shards.iter().map(|s| s.entries_for_files(files)).sum()
+    }
+
+    pub fn invalidate_files(&self, files: &[u64]) -> usize {
+        self.shards.iter().map(|s| s.invalidate_files(files)).sum()
+    }
+
+    pub fn clear_all(&self) -> usize {
+        self.shards.iter().map(|s| s.clear_all()).sum()
+    }
+
+    pub fn cache_report(&self, files: &[u64]) -> CchCacheReport {
+        CchCacheReport {
+            caches_checked: self.shards.len(),
+            entries_found: self.entries_for_files(files),
+            ram_claim: self.ram_claim(),
+        }
+    }
+
+    pub fn secure_buffers(&self) -> bool {
+        self.secure_buffers.load(Ordering::Relaxed)
+    }
+
+    pub fn set_secure_buffers(&mut self, enabled: bool) {
+        self.secure_buffers.store(enabled, Ordering::Relaxed);
+    }
+
+    pub fn ram_claim(&self) -> CchRamClaim {
+        if self.secure_buffers() {
+            CchRamClaim::Zeroized
+        } else {
+            CchRamClaim::Unreferenced
         }
     }
 

@@ -146,11 +146,55 @@ Der Verifier führt die Prüfung in folgender unveränderlicher Reihenfolge aus:
 
 ---
 
-## 7. Offene Punkte & Mehrdeutigkeiten ("OFFEN")
+## 7. Offene Punkte & Mehrdeutigkeiten ("GEKLÄRT")
 
-Folgende Mehrdeutigkeiten in den Quelltexten wurden während der Spezifikation identifiziert und als `OFFEN` markiert:
+1. **GEKLÄRT (Normative Zielkodierung TLV v4 vs. Legacy-Bincode)**:
+   - **Festlegung für den Verifier**: Der v4-Verifier folgt ausschließlich der normativen TLV-Spezifikation nach ADR-13 / C7 aus `crates/contextra-crypto/src/deletion_proof/proof_v4.rs`. Bincode-basierte Hilfsmethoden in `proof_v3.rs` gelten als veralteter Übergangscode (Legacy) und sind für v4-Verifikationen unzulässig.
 
-1. **OFFEN (Quelltext-Inkonsistenz v4 Payload)**:
-   - **Datei & Zeile**: `crates/contextra-crypto/src/deletion_proof/proof_v3.rs` Zeile 346 (`construct_v4_payload`) vs `crates/contextra-crypto/src/deletion_proof/proof_v4.rs` Zeile 125 (`ProofV4::construct_canonical_payload`).
-   - **Beschreibung**: In `proof_v3.rs` ist eine Übergangsmethode `construct_v4_payload` auf der alten `DeletionProof`-Struktur definiert, welche die Felder mittels `bincode` konkateniert. In `proof_v4.rs` wird hingegen die kanonische TLV-Struktur `ProofV4` (C7, ADR-13) mit Tag-Sortierung implementiert.
-   - **Festlegung für den Verifier**: Der v4-Verifier folgt ausschließlich der normativen TLV-Spezifikation nach ADR-13 aus `proof_v4.rs`.
+---
+
+## 8. Testvektoren-Format & Normative Standards
+
+### 8.1 Standardisiertes Testvektor-Format (JSON/Hex)
+Um einen sprachunabhängigen Verifier in einer beliebigen Programmiersprache (Python, Go, C++, TypeScript) zu entwickeln und abzunehmen, werden Testvektoren im nachfolgenden JSON-Schema definiert:
+
+```json
+{
+  "test_cases": [
+    {
+      "id": "TV-V4-VALID-01",
+      "description": "Gültiger v4 DeletionProof mit strikter TLV-Sortierung und korrekter Ed25519-Signatur",
+      "public_key_hex": "629f86221c54b38d3f6d711910d2382103350284f183751a02119d658252277d",
+      "signature_hex": "10041d08d9292e9e8020584b422f986d4e868c2d58a82d73315a6b07c80526e8ad027df581d6f519d1dddc89e2e5058f4a3390c587fb8f3d8f8d6d634289a70f",
+      "raw_tlv_hex": "80010002000480020020...",
+      "expected_exit_code": 0,
+      "expected_status": "VALID",
+      "verification_level": 0
+    },
+    {
+      "id": "TV-V4-INVALID-TAG-ORDER-02",
+      "description": "Ungültiger Proof: TLV-Tags sind nicht strikt aufsteigend sortiert",
+      "public_key_hex": "629f86221c54b38d3f6d711910d2382103350284f183751a02119d658252277d",
+      "signature_hex": "...",
+      "raw_tlv_hex": "80020020...800100020004",
+      "expected_exit_code": 2,
+      "expected_status": "FORMAT_ERROR: TAG_SORT_VIOLATION",
+      "verification_level": 0
+    }
+  ]
+}
+```
+
+### 8.2 Normative Standards & Verifikationsstufen
+
+1. **RFC 8032 (Ed25519) inklusive Errata EID 5968**:
+   - Die Verifikation der Ed25519-Signatur MUSS strikt nach RFC 8032 erfolgen. Gemäß Errata EID 5968 MÜSSEN malleable Signaturen (z. B. $S \ge L$ oder unkanonische Punktkodierungen) ohne Ausnahme als `INVALID` (Exit Code 1) abgelehnt werden.
+2. **RFC 8949 §4.2 (Kanonische Binärrepräsentation)**:
+   - Die Determinismus-Regeln für die serielle Bytedarstellung und sortierte Feldsequenzen richten sich nach den Grundsätzen kanonischer Binärkodierungen aus RFC 8949 §4.2.
+3. **RFC 3161 (Time-Stamp Protocol - TSP)**:
+   - Externe Zeitstempel-Anker für `issued_wall_ms` können optional über RFC 3161 Zeitstempel-Antworten (TimeStampResp) kryptografisch an den `proof_id`-Hash gebunden werden.
+4. **RFC 9162 (Verifiable Data Structures / Certificate Transparency)**:
+   - Die Verifikation von Löschnachweisen erfolgt in drei definierten Stufen:
+     - **Stufe 0 (Standalone)**: Isolierte Validierung von TLV-Format, Tag-Sortierung, `signer_key_id == BLAKE3(public_key)` und Ed25519-Signatur über `contextra/deletion-proof/v4\0 || canonical_tlv`.
+     - **Stufe 1 (Chain-Linked)**: Prüfung der fortlaufenden Hash-Ketten-Integrität (`chain.seq` und `chain.prev_hash` im Tag `0x8011`).
+     - **Stufe 2 (Transparency Log)**: Kryptografischer Inklusionsbeweis (Merkle Audit Path nach RFC 9162) gegen ein fälschungssicheres, append-only Transparenzlog.
