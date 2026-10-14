@@ -16,6 +16,8 @@ pub enum DisposePolicy {
     RequireScrub,
     /// Refusal permits falling back to durable removal without zero-overwriting.
     AllowRemoveUnscrubbed,
+    /// Secure overwrite disabled, standard durable removal.
+    Disabled,
 }
 
 /// Report summarizing file disposal outcome.
@@ -41,20 +43,6 @@ pub struct OrxDisposeReport {
 /// - Under [`DisposePolicy::RequireScrub`], returns an I/O error and keeps the file in the journal.
 /// - Under [`DisposePolicy::AllowRemoveUnscrubbed`], falls back to standard durable removal,
 ///   records refusal in `residual_risk`, and increments `removed_unscrubbed`.
-pub async fn dispose_obsolete_files_with_policy(
-    storage_dir: &Path,
-    obsolete_files: Vec<PathBuf>,
-    secure_delete: bool,
-    dispose_policy: DisposePolicy,
-) -> std::io::Result<OrxDisposeReport> {
-    let policy = if secure_delete {
-        DisposePolicy::RequireScrub
-    } else {
-        DisposePolicy::Disabled
-    };
-    dispose_obsolete_files_with_policy(storage_dir, obsolete_files, policy).await
-}
-
 /// Disposes obsolete files durably using a specified [`DisposePolicy`].
 ///
 /// Records paths in `PendingDeleteJournal` before removal.
@@ -87,7 +75,6 @@ pub async fn dispose_obsolete_files_with_policy(
             DisposePolicy::RequireScrub | DisposePolicy::AllowRemoveUnscrubbed => {
                 ScrubPolicy::OverwriteZeros
             }
-            DisposePolicy::Disabled => ScrubPolicy::Disabled,
         };
 
         journal.process(|path| {
@@ -110,12 +97,12 @@ pub async fn dispose_obsolete_files_with_policy(
                 Ok(ScrubOutcome::Refused(refusal)) => {
                     report.refusals.push((path.to_path_buf(), refusal));
                     report.residual_risk.push((path.to_path_buf(), refusal));
-                    match dispose_policy {
+                    match policy {
                         DisposePolicy::RequireScrub => Err(std::io::Error::new(
                             std::io::ErrorKind::PermissionDenied,
                             format!("Scrubbing refused for {:?}: {:?}", path, refusal),
                         )),
-                        DisposePolicy::AllowRemoveUnscrubbed => {
+                        DisposePolicy::AllowRemoveUnscrubbed | DisposePolicy::Disabled => {
                             durable_remove(path)?;
                             report.files_removed += 1;
                             report.removed_unscrubbed += 1;
@@ -152,5 +139,5 @@ pub async fn dispose_obsolete_files(
     } else {
         DisposePolicy::AllowRemoveUnscrubbed
     };
-    dispose_obsolete_files_with_policy(storage_dir, obsolete_files, secure_delete, dispose_policy).await
+    dispose_obsolete_files_with_policy(storage_dir, obsolete_files, dispose_policy).await
 }

@@ -17,6 +17,7 @@ use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::id_gen::{IdGen, SystemIdGen};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_ports::rng::{Rng, SystemRng};
+use contextra_ports::wiring::PortsWiring;
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -128,9 +129,14 @@ impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
     pub fn new(dimension: usize) -> Self {
         let storage_path = PathBuf::from("./contextra_data");
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
-        let rng: Arc<dyn Rng> = Arc::new(SystemRng::new());
-        let id_gen: Arc<dyn IdGen> = Arc::new(SystemIdGen::new());
+        let ports_wiring = PortsWiring::build().unwrap_or_else(|_| PortsWiring {
+            clock: Arc::new(SystemClock::new()),
+            rng: Arc::new(SystemRng::new()),
+            id_gen: Arc::new(SystemIdGen::new()),
+        });
+        let clock = ports_wiring.clock;
+        let rng = ports_wiring.rng;
+        let id_gen = ports_wiring.id_gen;
 
         let license_gate = LicenseWiring::build(LicenseWiringDeps {
             mode: LicenseGateMode::Enforced,
@@ -661,7 +667,25 @@ impl ContextraBuilder {
         )
         .await?;
 
-        let engine_wiring = EngineWiring::default();
+        let mut engine_wiring = EngineWiring::default();
+
+        #[cfg(feature = "router")]
+        let _router_wiring_keepalive = if self.router_enabled {
+            let router_deps = contextra_router::RouterWiringDeps {
+                clock: Some(self.clock.clone()),
+                ..Default::default()
+            };
+            if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
+                let arc_rw = Arc::new(router_wiring);
+                engine_wiring.router = Some(Arc::downgrade(&arc_rw) as _);
+                Some(arc_rw)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         instance.apply(engine_wiring);
 
         if let Some(embedder) = self.embedder {

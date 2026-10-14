@@ -1,6 +1,6 @@
 use ahash::AHashSet;
 use roaring::RoaringTreemap;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{compiler_fence, Ordering};
 
 use contextra_core::{ContextraError, DocId, Result};
 
@@ -353,13 +353,13 @@ impl HnswIndexCore {
     /// Deletes a document by removing its DocId mapping and recording a tombstone.
     ///
     /// If `is_safe_to_free` is true (i.e., no active snapshot pin requires the node's retention sequence),
-    /// the node's vector memory in process RAM (`nodes[ram_idx].vector`) is overwritten with zeros
-    /// (best-effort in process memory; no guarantees regarding hardware registers, OS swap, or underlying SSD storage)
+    /// the node's vector memory in process RAM (`nodes[ram_idx].vector`) is explicitly zeroized
     /// prior to returning `ram_idx` to the arena free-list.
+    /// If `is_safe_to_free` is false, the node remains deferred and un-freed in the RAM nodes array.
     ///
-    /// Note: Memory-mapped bytes (`mmap_index`) remain read-only and unchanged. Tombstone-Pruning operates
-    /// as a standalone vector index management mechanism in accordance with VETO-F02 without requiring or
-    /// producing a cryptographic deletion proof.
+    /// # Residual Risk / Mmap Note
+    /// Memory-mapped bytes (`mmap_index`) remain read-only and unmapped/closed via OS operations.
+    /// Persistent mmap nodes cannot be zeroized in-place and represent an explicit residual risk.
     pub(super) fn do_delete_node_idx(&self, idx: usize, id: DocId) -> Result<()> {
         self.cold.deleted_nodes.write().insert(idx as u64);
         self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
@@ -384,8 +384,16 @@ impl HnswIndexCore {
                     let mut nodes = self.hot.nodes.write();
                     if let Some(node) = nodes.get_mut(ram_idx) {
                         match &mut node.vector {
-                            VectorData::F32(v) => v.fill(0.0),
-                            VectorData::U8(v) => v.fill(0),
+                            VectorData::F32(v) => {
+                                v.fill(0.0);
+                                std::hint::black_box(&mut *v);
+                                compiler_fence(Ordering::SeqCst);
+                            }
+                            VectorData::U8(v) => {
+                                v.fill(0);
+                                std::hint::black_box(&mut *v);
+                                compiler_fence(Ordering::SeqCst);
+                            }
                         }
                     }
                 }
@@ -809,6 +817,11 @@ impl HnswIndexCore {
                     Sq8Bias::calibrate(&training_refs, &new_q, self.cold.config.distance_metric);
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
                 *new_index.inner.cold.sq8_bias.write() = bias;
+                for sample in &mut train_data {
+                    sample.fill(0.0);
+                    std::hint::black_box(&mut *sample);
+                    compiler_fence(Ordering::SeqCst);
+                }
             } else {
                 *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
             }
@@ -820,7 +833,7 @@ impl HnswIndexCore {
                     new_index.inner.do_insert(doc_id, &v, committed_tx)?;
                 }
                 VectorData::U8(v) => {
-                    let dequantized = {
+                    let mut dequantized = {
                         let q = quantizer_guard.as_ref().ok_or_else(|| {
                             ContextraError::Index("Quantizer missing during rebuild".into())
                         })?;
@@ -829,6 +842,9 @@ impl HnswIndexCore {
                     new_index
                         .inner
                         .do_insert(doc_id, &dequantized, committed_tx)?;
+                    dequantized.fill(0.0);
+                    std::hint::black_box(&mut *dequantized);
+                    compiler_fence(Ordering::SeqCst);
                 }
             }
             if is_deleted {
@@ -903,7 +919,7 @@ impl HnswIndexCore {
                     };
 
                     if let Some(vector) = vector_opt {
-                        let f32_vec = match vector {
+                        let mut f32_vec = match vector {
                             VectorData::F32(v) => v,
                             VectorData::U8(v) => {
                                 let q_guard = self.cold.quantizer.read();
@@ -918,6 +934,9 @@ impl HnswIndexCore {
                         };
 
                         new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
+                        f32_vec.fill(0.0);
+                        std::hint::black_box(&mut *f32_vec);
+                        compiler_fence(Ordering::SeqCst);
                     }
                 }
                 contextra_core::SeqLogChange::Delete { doc_id, .. } => {

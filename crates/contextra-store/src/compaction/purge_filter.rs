@@ -56,6 +56,8 @@ pub enum PurgeBlocked {
     Unimplemented,
     /// Scan timeout occurred.
     ScanTimeout,
+    /// Unknown free space.
+    UnknownFreeSpace,
 }
 
 /// Report summarizing results of a successful purge compaction.

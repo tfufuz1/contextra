@@ -16,9 +16,9 @@
 #![allow(unexpected_cfgs)]
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
+// STAND: 2026-10-13
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
-// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
+// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen, Registrierung vor Disk-Link.
 
 use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
 use contextra_core::SnapshotRegistry;
@@ -120,7 +120,7 @@ impl DefaultHardlinkCloner {
         Self
     }
 
-    /// Clones SSTable hardlinks and registers the copy in [`CpyCopyRegistry`].
+    /// Clones SSTable hardlinks, enforcing registration and fsync persistence BEFORE creating links on disk.
     pub async fn clone_sstable_hardlinks_registered<R>(
         &self,
         seq_no: u64,
@@ -133,17 +133,37 @@ impl DefaultHardlinkCloner {
     where
         R: CpyCopyRegistry + ?Sized,
     {
-        let mut res = self
-            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
-            .await?;
+        // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
+        let _guard = snapshot_registry.acquire(|| seq_no);
 
-        let mut file_ids = Vec::with_capacity(res.linked_files.len());
-        for path in &res.linked_files {
-            if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
-                file_ids.push(file_id_for_name(file_name));
+        // 2. Scan source directory to discover target SSTable files and calculate file_ids
+        let mut read_dir = fs::read_dir(source_dir).await.map_err(ContextraError::Io)?;
+        let mut target_file_specs = Vec::new();
+
+        while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {
+            let path = entry.path();
+            if path.is_file() {
+                let is_sst = path.extension().is_some_and(|ext| ext == "sst");
+                if is_sst {
+                    let file_name = path.file_name().ok_or_else(|| {
+                        ContextraError::invalid_input("Invalid file name in SST directory")
+                    })?;
+                    let target_path = target_dir.join(file_name);
+                    let file_name_str = file_name.to_str().ok_or_else(|| {
+                        ContextraError::invalid_input("Non-UTF8 file name in SST directory")
+                    })?;
+                    let file_id = file_id_for_name(file_name_str);
+                    target_file_specs.push((path, target_path, file_id));
+                }
             }
         }
 
+        // Sort target files for deterministic ordering
+        target_file_specs.sort_by(|a, b| a.1.cmp(&b.1));
+
+        let file_ids: Vec<[u8; 16]> = target_file_specs.iter().map(|spec| spec.2).collect();
+
+        // Compute copy_id
         let copy_id_hash = blake3::hash(
             format!("hardlink:{seq_no}:{created_tx}:{}", target_dir.display()).as_bytes(),
         );
@@ -157,12 +177,47 @@ impl DefaultHardlinkCloner {
             created_tx,
         };
 
+        // 3. Register and persist (fsync) in CopyRegistry BEFORE creating any physical link files on disk.
+        // If registration or sync fails, abort immediately without modifying disk files.
         registry.register(entry).await?;
+        registry.sync_registry().await?;
 
-        res.copy_id = copy_id;
-        res.file_ids = file_ids;
+        // 4. Create target directory and physical hardlink files
+        fs::create_dir_all(target_dir)
+            .await
+            .map_err(ContextraError::Io)?;
 
-        Ok(res)
+        let mut linked_files = Vec::with_capacity(target_file_specs.len());
+
+        for (src_path, target_path, _) in target_file_specs {
+            // Remove existing link if present
+            if fs::metadata(&target_path).await.is_ok() {
+                fs::remove_file(&target_path)
+                    .await
+                    .map_err(ContextraError::Io)?;
+            }
+
+            if let Err(io_err) = fs::hard_link(&src_path, &target_path).await {
+                if is_cross_device_error(&io_err) {
+                    return Err(ContextraError::cross_device_link(
+                        src_path.to_string_lossy(),
+                        target_path.to_string_lossy(),
+                    ));
+                } else {
+                    return Err(ContextraError::Io(io_err));
+                }
+            }
+
+            linked_files.push(target_path);
+        }
+
+        Ok(HardlinkCloneResult {
+            source_seq_no: seq_no,
+            linked_files,
+            wal_tail_offset: None,
+            copy_id,
+            file_ids,
+        })
     }
 }
 

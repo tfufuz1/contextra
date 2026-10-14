@@ -548,14 +548,16 @@ impl Contextra {
             let forget_opts = deletion::ForgetOptions::default();
 
             let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
-            if let Ok(runtime) =
-                deletion::DpiDeletionRuntime::open(&proof_dir, None, [0x33; 16])
-            {
-                let driver = deletion::DpiPurgeDriver::new(
-                    &self.storage,
-                    &runtime,
-                    deletion::DpiPurgeDriverConfig::default(),
-                );
+            let deps = deletion::DeletionWiringDeps {
+                storage: self.storage.clone(),
+                db_dir: proof_dir,
+                signer_cfg_path: None,
+                db_instance_id: [0x33; 16],
+                ring_mode: deletion::wiring::RingMode::Sovereign,
+            };
+
+            if let Ok(deletion_wiring) = deletion::DeletionWiring::build(deps) {
+                let driver = deletion_wiring.purge_driver();
                 let zeu_probe = self.storage.store_probe();
                 let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
                     &[zeu_probe.as_ref()];

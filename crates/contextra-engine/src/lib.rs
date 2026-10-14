@@ -272,6 +272,8 @@ pub struct ContextraConfig {
     pub tenant_policy: TenantPolicy,
     /// Configured metrics sink for recording engine operational metrics.
     pub metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    /// Custom merge operator for compaction / flush.
+    pub merge_operator: Option<Arc<dyn contextra_store::MergeOperator>>,
 }
 
 #[cfg(not(loom))]
@@ -288,6 +290,11 @@ impl ContextraConfig {
 
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
+        self
+    }
+
+    pub fn with_merge_operator(mut self, op: Arc<dyn contextra_store::MergeOperator>) -> Self {
+        self.merge_operator = Some(op);
         self
     }
 }
@@ -328,6 +335,10 @@ impl std::fmt::Debug for ContextraConfig {
                 "metrics_sink",
                 &self.metrics_sink.as_ref().map(|_| "dyn MetricsSink"),
             )
+            .field(
+                "merge_operator",
+                &self.merge_operator.as_ref().map(|_| "dyn MergeOperator"),
+            )
             .finish()
     }
 }
@@ -356,6 +367,7 @@ impl Default for ContextraConfig {
             consolidation_launcher: None,
             tenant_policy: TenantPolicy::Optional,
             metrics_sink: None,
+            merge_operator: None,
         }
     }
 }

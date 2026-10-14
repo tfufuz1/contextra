@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-13
 // ZWECK: Report-Typen und Verifikation fuer den Canary-Orakel Rohsweep.
 // INVARIANTEN: No unsafe code allowed (#![forbid(unsafe_code)]).
 // DOKTRIN: Keine Nutzdaten/Nadel-Inhalte in Debug/Display ausgeben. Zero-Panic.
@@ -37,6 +37,8 @@ impl fmt::Display for OrcHit {
 /// Comprehensive report produced by `raw_sweep`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrcSweepReport {
+    /// Scope of the sweep (always "files_only", as process memory is excluded).
+    pub scope: &'static str,
     /// Total count of files scanned during the sweep.
     pub files_scanned: u64,
     /// Total bytes scanned across all files.
@@ -49,7 +51,8 @@ impl fmt::Display for OrcSweepReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "OrcSweepReport {{ files_scanned: {}, bytes_scanned: {}, hits: {} }}",
+            "OrcSweepReport {{ scope: {}, files_scanned: {}, bytes_scanned: {}, hits: {} }}",
+            self.scope,
             self.files_scanned,
             self.bytes_scanned,
             self.hits.len()
@@ -70,11 +73,14 @@ impl OrcSweepReport {
         if self.hits.is_empty() {
             Ok(())
         } else {
-            Err(io::Error::other(format!(
-                "Deletion oracle raw sweep found {} residual marker hit(s):\n{}",
-                self.hits.len(),
-                self
-            )))
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(
+                    "Deletion oracle raw sweep found {} residual marker hit(s):\n{}",
+                    self.hits.len(),
+                    self
+                ),
+            ))
         }
     }
 }

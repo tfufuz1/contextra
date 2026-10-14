@@ -29,7 +29,7 @@ pub fn run_bench_gate(args: &[String]) -> bool {
                     i += 1;
                 }
             }
-            "--threshold" => {
+            "--threshold" | "--tolerance" => {
                 if i + 1 < args.len() {
                     if let Ok(t) = args[i + 1].parse::<f64>() {
                         threshold = t;

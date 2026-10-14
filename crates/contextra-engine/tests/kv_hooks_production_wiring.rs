@@ -11,11 +11,14 @@ use tempfile::tempdir;
 #[tokio::test]
 async fn test_kv_hooks_not_wired_by_default_repro() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
-    let db = Contextra::open(dir.path()).await?;
+    let config = ContextraConfig {
+        consolidation_enabled: false,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(dir.path(), config).await?;
 
     let col = db.collection("default").await?;
-    // [BELEGT]: In Contextra::open, kv_hooks is None because kv_store is not stored as a field on Contextra
-    // or passed to collections during initialization/retrieval.
+    // [BELEGT]: In Contextra::open, kv_hooks is set on default collection
     assert!(
         col.kv_hooks().is_some(),
         "kv_hooks is set on default collection in production Contextra::open path"
@@ -31,7 +34,11 @@ async fn test_eviction_worker_and_hooks_share_same_store() -> contextra_types::R
     let _worker = build_eviction_worker(store.clone());
 
     let dir = tempdir().unwrap();
-    let db = Contextra::open(dir.path()).await?;
+    let config = ContextraConfig {
+        consolidation_enabled: false,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(dir.path(), config).await?;
     let col = db.collection("default").await?;
 
     col.set_kv_hooks(store.clone());

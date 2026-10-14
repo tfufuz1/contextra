@@ -1,6 +1,89 @@
-//! Key pair and verification key definitions for deletion proofs.
+//! Key pair, key source traits, and verification key definitions for deletion proofs.
 
 use crate::ed25519_proof::SignatureVersion;
+use crate::error::Result;
+use rand::RngCore;
+use zeroize::Zeroizing;
+
+/// Trait defining a secure source for deletion proof signing keys (CSPRNG or KMS/HSM handles).
+pub trait ProofKeySource: Send + Sync {
+    /// Generates or provisions a new signing keypair via this key source.
+    fn generate_keypair(&self) -> Result<DeletionProofKeyPair>;
+
+    /// Loads the active signing keypair from this key source.
+    fn load_keypair(&self) -> Result<DeletionProofKeyPair>;
+
+    /// Returns the 32-byte public verification key associated with the active key from this source.
+    fn public_key(&self) -> Result<[u8; 32]>;
+
+    /// Returns the 32-byte BLAKE3 key ID for the active key from this source.
+    fn key_id(&self) -> Result<[u8; 32]>;
+}
+
+/// Local in-memory CSPRNG key source for generating and holding deletion proof keys.
+pub struct InMemoryCsprngKeySource {
+    keypair: DeletionProofKeyPair,
+}
+
+impl std::fmt::Debug for InMemoryCsprngKeySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InMemoryCsprngKeySource")
+            .field("keypair", &self.keypair)
+            .finish()
+    }
+}
+
+impl InMemoryCsprngKeySource {
+    /// Generates a new key source backed by system CSPRNG (`OsRng`).
+    pub fn new() -> Self {
+        Self {
+            keypair: DeletionProofKeyPair::generate(),
+        }
+    }
+
+    /// Creates a key source from an explicit keypair.
+    pub fn from_keypair(keypair: DeletionProofKeyPair) -> Self {
+        Self { keypair }
+    }
+}
+
+impl Default for InMemoryCsprngKeySource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ProofKeySource for InMemoryCsprngKeySource {
+    fn generate_keypair(&self) -> Result<DeletionProofKeyPair> {
+        let mut secret = Zeroizing::new([0u8; 32]);
+        rand::rngs::OsRng.fill_bytes(secret.as_mut());
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&*secret);
+        let verifying_key = signing_key.verifying_key();
+        Ok(DeletionProofKeyPair {
+            signing_key,
+            verifying_key,
+        })
+    }
+
+    fn load_keypair(&self) -> Result<DeletionProofKeyPair> {
+        let sk_bytes = self.keypair.signing_key.to_bytes();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_bytes);
+        let verifying_key = signing_key.verifying_key();
+        Ok(DeletionProofKeyPair {
+            signing_key,
+            verifying_key,
+        })
+    }
+
+    fn public_key(&self) -> Result<[u8; 32]> {
+        Ok(self.keypair.verifying_key_bytes())
+    }
+
+    fn key_id(&self) -> Result<[u8; 32]> {
+        let pub_key = self.keypair.verifying_key_bytes();
+        Ok(*blake3::hash(&pub_key).as_bytes())
+    }
+}
 
 /// KeyPair for Ed25519 signing and verification of DeletionProofs (version 3).
 pub struct DeletionProofKeyPair {
@@ -20,7 +103,8 @@ impl std::fmt::Debug for DeletionProofKeyPair {
 impl DeletionProofKeyPair {
     /// Explicitly zeroizes the secret signing key bytes.
     pub fn zeroize(&mut self) {
-        self.signing_key = ed25519_dalek::SigningKey::from_bytes(&[0u8; 32]);
+        let zero_bytes = Zeroizing::new([0u8; 32]);
+        self.signing_key = ed25519_dalek::SigningKey::from_bytes(&*zero_bytes);
     }
 
     /// Generates a new random Ed25519 keypair using OsRng.
@@ -31,9 +115,9 @@ impl DeletionProofKeyPair {
 
     /// Generates a new Ed25519 keypair using an explicit random number generator.
     pub fn generate_with_rng(rng: &mut impl rand::RngCore) -> Self {
-        let mut secret_bytes = [0u8; 32];
-        rng.fill_bytes(&mut secret_bytes);
-        let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
+        let mut secret_bytes = Zeroizing::new([0u8; 32]);
+        rng.fill_bytes(secret_bytes.as_mut());
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&*secret_bytes);
         let verifying_key = signing_key.verifying_key();
         Self {
             signing_key,

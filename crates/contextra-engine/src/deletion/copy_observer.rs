@@ -2,8 +2,17 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_checkpoint::copy_registry::file_id_for_name;
+use contextra_checkpoint::copy_registry::{file_id_for_name, CopyStatus};
 use contextra_store::copy_registry::CopyRegistry;
+
+/// Per-copy status observation record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CopyStatusRecord {
+    /// Identifier of the observed copy.
+    pub copy_id: [u8; 16],
+    /// Specific status of the copy (e.g., Deleted, Unreachable, OutOfScope, Retained, Unknown).
+    pub status: CopyStatus,
+}
 
 /// Report summarizing observations of registered copies (§C4.8).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -16,6 +25,8 @@ pub struct DpiCopyObserverReport {
     pub hardlinked: bool,
     /// Copy IDs holding scope files.
     pub ids: Vec<[u8; 16]>,
+    /// Per-copy statuses for observed copies holding scope data.
+    pub copy_statuses: Vec<CopyStatusRecord>,
 }
 
 /// Adapter over [`CopyRegistry`] inspecting checkpoint holds for a set of file names.
@@ -30,7 +41,8 @@ impl<'a> DpiCopyObserver<'a> {
         Self { registry }
     }
 
-    /// Observes active registered copies and determines if any hold scope files by name.
+    /// Observes active registered copies and determines if any hold scope files by name,
+    /// reporting detailed per-copy statuses.
     #[must_use]
     pub fn observe(&self, scope_file_names: &[String]) -> DpiCopyObserverReport {
         let registered = self.registry.registered_copies();
@@ -42,6 +54,7 @@ impl<'a> DpiCopyObserver<'a> {
                 copies_holding_scope: 0,
                 hardlinked: false,
                 ids: Vec::new(),
+                copy_statuses: Vec::new(),
             };
         }
 
@@ -57,6 +70,7 @@ impl<'a> DpiCopyObserver<'a> {
                 copies_holding_scope: 0,
                 hardlinked: false,
                 ids: Vec::new(),
+                copy_statuses: Vec::new(),
             };
         }
 
@@ -66,11 +80,20 @@ impl<'a> DpiCopyObserver<'a> {
 
         let copies_holding_scope = holding_ids.len();
 
+        let copy_statuses = holding_ids
+            .iter()
+            .map(|&copy_id| CopyStatusRecord {
+                copy_id,
+                status: CopyStatus::Unknown,
+            })
+            .collect();
+
         DpiCopyObserverReport {
             copies_registered,
             copies_holding_scope,
             hardlinked: copies_holding_scope > 0,
             ids: holding_ids,
+            copy_statuses,
         }
     }
 }

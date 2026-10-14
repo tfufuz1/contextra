@@ -5,6 +5,7 @@ mod config;
 mod engine;
 pub mod merge_operator;
 pub mod purge_filter;
+pub mod purge_select;
 pub mod retention;
 pub mod wiring;
 
