@@ -509,6 +509,34 @@ blocking = false
 phase = "Phase 0"
 
 [[commands]]
+name = "deletion-guarantee-gate"
+owner_tier = "ci-gate"
+summary = "Statische AST-Analyse von Löschgarantien und Crypto-Sicherheitsinvarianten."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "detect-silent-reverts"
+owner_tier = "tool"
+summary = "Erkennt stumme Reverts im Codebase."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "find-unwired-gaps"
+owner_tier = "tool"
+summary = "Findet unverdrahtete Lücken in Schnittstellen."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-interface-spec"
+owner_tier = "generator"
+summary = "Generiert Interface-Spezifikationen."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
 name = "dependency-graph-audit"
 owner_tier = "tool"
 summary = "Harness Modul: Zyklenerkennung und Ring-Distanz-Report im Crate-Abhängigkeitsgraphen (dependency-graph-audit)."

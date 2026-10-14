@@ -74,6 +74,7 @@ Geplante Befehle sind mit `<!-- harness:planned -->` markiert. Ein Agent darf si
 | `cargo xtask check-duplicate-symbols` | ✅ | Doppelte Funktions-/Struktursymbole über Dateigrenzen | 2 bei Verstoß |
 | `cargo xtask check-result-dropped-io` | ✅ | Ignorierte I/O-Fehler-Results (INV-DURABILITY-RING) | 2 bei Verstoß |
 | `cargo xtask check-nan-hot-loop` | ✅ | NaN-Validierung in Vektorberechnungs-Hotpaths | 2 bei Verstoß |
+| `cargo xtask deletion-guarantee-gate` | 🔲 `<!-- harness:planned -->` | Statische AST-Analyse von Löschgarantien und Crypto-Sicherheitsinvarianten | 2 bei Verstoß |
 | `cargo xtask symbol-exists <pfad>` | ✅ | Einzelnes Symbol-Pfad-Existenz prüfen | 2 bei fehlendem Symbol |
 | `cargo xtask claim` | ✅ | Claim-Integrität für Agent-Gates | 2 bei Verstoß |
 

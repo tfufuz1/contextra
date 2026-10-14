@@ -1,0 +1,43 @@
+id = "T-2026-LB17"
+title = "xtask-Gate deletion-guarantee-gate und Mutationskonfiguration (B17)"
+crate = "contextra"
+tier = 1
+risk = "high"
+goal = "Implement deletion-guarantee-gate harness module in xtask for static AST analysis of deletion guarantee and crypto security invariants."
+non_goals = ["Modifying domain crates", "Modifying Cargo.toml or Cargo.lock"]
+scope = [
+    "xtask/src/harness/deletion_guarantee_gate.rs",
+    "xtask/src/harness/mod.rs",
+    "xtask/registry.toml",
+    "xtask/tests/deletion_guarantee_gate.rs",
+    "AGENTS.md",
+    "mutants-guarantees.toml",
+    ".jules/tasks/T-2026-LB17.toml"
+]
+forbidden = [
+    ".github/**",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    "capabilities.toml",
+    "deny.toml",
+    "governance/**"
+]
+protected_change = "B17 registering deletion-guarantee-gate in xtask, AGENTS.md, and mutants-guarantees.toml"
+invariants = [
+    "Fail-closed: Exit code 2 on any deletion guarantee violation",
+    "Zero-Panic: No unwrap/expect/panic in xtask harness production code",
+    "Honesty: Verify AST patterns via syn, no false assertions"
+]
+acceptance = [
+    "cargo test -p xtask --test deletion_guarantee_gate",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Tests in xtask/tests/deletion_guarantee_gate.rs"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

@@ -15,8 +15,13 @@
 #     -f "crates/contextra-crypto/src/kv_shredding.rs" \
 #     -f "crates/contextra-crypto/src/kv_cipher.rs" \
 #     -f "crates/contextra-crypto/src/deletion_proof/**" \
+#     -f "crates/contextra-crypto/src/deletion_proof/timestamp_anchor.rs" \
+#     -f "crates/contextra-crypto/src/transparency_log.rs" \
 #     -f "crates/contextra-crypto/src/ed25519_proof.rs" \
 #     -f "crates/contextra-crypto/src/kdf.rs" \
+#     -f "crates/contextra-engine/src/deletion/restore_filter.rs" \
+#     -f "crates/contextra-store/src/lsm/purge/*" \
+#     -f "crates/contextra-store/src/wal/witness_scan.rs" \
 #     -o target/mutants-g2
 #
 # G3 (Audit):
