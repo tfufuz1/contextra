@@ -1,13 +1,13 @@
 // FILE-CONTEXT
 // ZWECK: Definition von KvDeleteMode (TombstoneOnly vs CryptoShred).
 // INVARIANTEN:
-// - INV-KV-DELETE-1: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+// - INV-KV-DELETE-1: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`. Ohne Verschlüsselung ist kein KV-Löschbeweis möglich.
 
 use serde::{Deserialize, Serialize};
 
 /// Mode specifying KV segment deletion behavior.
 ///
-/// INVARIANTE `INV-KV-DELETE-1`: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+/// INVARIANTE `INV-KV-DELETE-1`: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`. Ohne Verschlüsselung ist kein KV-Löschbeweis möglich.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum KvDeleteMode {
@@ -17,7 +17,7 @@ pub enum KvDeleteMode {
 
 impl Default for KvDeleteMode {
     fn default() -> Self {
-        Self::CryptoShred
+        Self::TombstoneOnly
     }
 }
 
@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn test_kv_delete_mode_default() {
-        assert_eq!(KvDeleteMode::default(), KvDeleteMode::CryptoShred);
+        assert_eq!(KvDeleteMode::default(), KvDeleteMode::TombstoneOnly);
     }
 
     #[test]

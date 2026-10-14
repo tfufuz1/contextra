@@ -22,6 +22,7 @@ windows-sys = { version = "0.61", features = [
 
 [features]
 default = ["wal-integrity", "block-cache-v2"]
+erasure = ["wal-integrity"]
 encryption-at-rest = ["wal-integrity"]
 wal-integrity = []
 wal-v4-wip = []

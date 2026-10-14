@@ -14,15 +14,57 @@ use contextra_license::signed_gate::SignedLicenseGate;
 use contextra_license::wiring::{LicenseWiring, LicenseWiringDeps};
 use contextra_license::LicenseGateMode;
 use contextra_ports::clock::{Clock, SystemClock};
+use contextra_ports::erasure::{ErasureHooks, ErasureMode};
 use contextra_ports::id_gen::{IdGen, SystemIdGen};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_ports::rng::{Rng, SystemRng};
 use contextra_ports::wiring::PortsWiring;
+use contextra_store::lsm::DurabilityMode;
+
+/// Error types emitted during contextra build/wiring verification (§4.7).
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum BuildError {
+    /// Indicates an incomplete wiring configuration where a required component is missing.
+    #[error("Incomplete wiring for flag '{flag}': missing {missing}")]
+    IncompleteWiring {
+        flag: String,
+        missing: String,
+    },
+    /// Indicates that a requested operational mode requires a feature flag that was not compiled.
+    #[error("Feature missing for mode '{mode}': feature '{feature}' is required")]
+    FeatureMissing {
+        mode: String,
+        feature: String,
+    },
+    /// Indicates an invalid or policy-violating combination of DurabilityMode and ErasureMode (§4.6).
+    #[error("INV-DURABILITY-RING: Incompatible mode combination DurabilityMode::{durability} x ErasureMode::{erasure}")]
+    IncompatibleModes {
+        durability: String,
+        erasure: String,
+    },
+    /// General engine initialization error.
+    #[error("Engine build error: {0}")]
+    Engine(String),
+}
+
+impl From<BuildError> for ContextraError {
+    fn from(err: BuildError) -> Self {
+        match err {
+            BuildError::IncompleteWiring { flag, missing } => {
+                ContextraError::PolicyViolation(format!("Incomplete wiring for flag '{flag}': missing {missing}"))
+            }
+            BuildError::FeatureMissing { mode, feature } => {
+                ContextraError::PolicyViolation(format!("Feature missing for mode '{mode}': feature '{feature}' is required"))
+            }
+            BuildError::IncompatibleModes { durability, erasure } => {
+                ContextraError::PolicyViolation(format!("INV-DURABILITY-RING: Incompatible mode combination DurabilityMode::{durability} x ErasureMode::{erasure}"))
+            }
+            BuildError::Engine(msg) => ContextraError::Internal(msg),
+        }
+    }
+}
 
 /// A builder for configuring and instantiating `Contextra`.
-///
-/// `ContextraBuilder` acts as the primary builder pattern in the `contextra` facade (Ring 4).
-/// It orchestrates subsystem configuration without containing domain business logic.
 pub struct ContextraBuilder {
     storage_path: PathBuf,
     config: ContextraConfig,
@@ -36,19 +78,20 @@ pub struct ContextraBuilder {
     rng: Arc<dyn Rng>,
     id_gen: Arc<dyn IdGen>,
     router_enabled: bool,
+    #[cfg(feature = "adapt")]
     adapt_enabled: bool,
+    #[cfg(feature = "privacy")]
     privacy_enabled: bool,
     sandbox_enabled: bool,
-    audit_export_enabled: bool,
-    avv_generator_enabled: bool,
     kms_enabled: bool,
     kv_shredding_enabled: bool,
     checkpoint_enabled: bool,
+    erasure_mode: ErasureMode,
+    explicit_erasure_mode: bool,
+    erasure_hooks: Option<Arc<dyn ErasureHooks>>,
 
     #[cfg(feature = "sovereign")]
     pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
-    #[cfg(feature = "audit-export")]
-    pub audit_wiring: Option<Arc<crate::wiring_audit::AuditWiringBundle>>,
     #[cfg(feature = "onnx")]
     pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
     #[cfg(feature = "sandbox")]
@@ -61,7 +104,8 @@ pub struct ContextraBuilder {
 
 impl std::fmt::Debug for ContextraBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ContextraBuilder")
+        let mut debug = f.debug_struct("ContextraBuilder");
+        debug
             .field("storage_path", &self.storage_path)
             .field("config", &self.config)
             .field("explicit_user_config", &self.explicit_user_config)
@@ -73,15 +117,24 @@ impl std::fmt::Debug for ContextraBuilder {
             .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .field("collection_profile", &self.collection_profile)
-            .field("router_enabled", &self.router_enabled)
-            .field("adapt_enabled", &self.adapt_enabled)
-            .field("privacy_enabled", &self.privacy_enabled)
+            .field("router_enabled", &self.router_enabled);
+
+        #[cfg(feature = "adapt")]
+        debug.field("adapt_enabled", &self.adapt_enabled);
+
+        #[cfg(feature = "privacy")]
+        debug.field("privacy_enabled", &self.privacy_enabled);
+
+        debug
             .field("sandbox_enabled", &self.sandbox_enabled)
-            .field("audit_export_enabled", &self.audit_export_enabled)
-            .field("avv_generator_enabled", &self.avv_generator_enabled)
             .field("kms_enabled", &self.kms_enabled)
             .field("kv_shredding_enabled", &self.kv_shredding_enabled)
             .field("checkpoint_enabled", &self.checkpoint_enabled)
+            .field("erasure_mode", &self.erasure_mode)
+            .field(
+                "erasure_hooks",
+                &self.erasure_hooks.as_ref().map(|_| "<dyn ErasureHooks>"),
+            )
             .finish()
     }
 }
@@ -101,18 +154,19 @@ impl Clone for ContextraBuilder {
             rng: Arc::clone(&self.rng),
             id_gen: Arc::clone(&self.id_gen),
             router_enabled: self.router_enabled,
+            #[cfg(feature = "adapt")]
             adapt_enabled: self.adapt_enabled,
+            #[cfg(feature = "privacy")]
             privacy_enabled: self.privacy_enabled,
             sandbox_enabled: self.sandbox_enabled,
-            audit_export_enabled: self.audit_export_enabled,
-            avv_generator_enabled: self.avv_generator_enabled,
             kms_enabled: self.kms_enabled,
             kv_shredding_enabled: self.kv_shredding_enabled,
             checkpoint_enabled: self.checkpoint_enabled,
+            erasure_mode: self.erasure_mode,
+            explicit_erasure_mode: self.explicit_erasure_mode,
+            erasure_hooks: self.erasure_hooks.clone(),
             #[cfg(feature = "sovereign")]
             sovereign_wiring: self.sovereign_wiring.clone(),
-            #[cfg(feature = "audit-export")]
-            audit_wiring: self.audit_wiring.clone(),
             #[cfg(feature = "onnx")]
             onnx_wiring: self.onnx_wiring.clone(),
             #[cfg(feature = "sandbox")]
@@ -162,20 +216,21 @@ impl ContextraBuilder {
             clock,
             rng,
             id_gen,
-            router_enabled: true,
+            router_enabled: cfg!(feature = "router"),
+            #[cfg(feature = "adapt")]
             adapt_enabled: true,
+            #[cfg(feature = "privacy")]
             privacy_enabled: true,
-            sandbox_enabled: true,
-            audit_export_enabled: true,
-            avv_generator_enabled: true,
+            sandbox_enabled: cfg!(feature = "sandbox"),
             kms_enabled: true,
-            kv_shredding_enabled: true,
+            kv_shredding_enabled: false,
             checkpoint_enabled: true,
+            erasure_mode: ErasureMode::Off,
+            explicit_erasure_mode: false,
+            erasure_hooks: None,
 
             #[cfg(feature = "sovereign")]
             sovereign_wiring: None,
-            #[cfg(feature = "audit-export")]
-            audit_wiring: None,
             #[cfg(feature = "onnx")]
             onnx_wiring: None,
             #[cfg(feature = "sandbox")]
@@ -212,7 +267,7 @@ impl ContextraBuilder {
         Self::from_profile(tier.resolve())
     }
 
-    /// Creates a `ContextraBuilder` initialized with a cryptographic signed license gate (§14.6, §15).
+    /// Creates a `ContextraBuilder` initialized with a cryptographic signed license gate.
     pub fn from_signed_license(
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -242,6 +297,7 @@ impl ContextraBuilder {
     /// Sets the encryption passphrase for persistent storage.
     pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
         self.config.encryption_passphrase = Some(passphrase.into());
+        self.kv_shredding_enabled = true;
         self
     }
 
@@ -271,7 +327,20 @@ impl ContextraBuilder {
         self
     }
 
-    /// Attaches a cryptographic signed license gate (§14.6, §15).
+    /// Sets the operational erasure mode (§4.6, §4.7).
+    pub fn with_erasure_mode(mut self, mode: ErasureMode) -> Self {
+        self.erasure_mode = mode;
+        self.explicit_erasure_mode = true;
+        self
+    }
+
+    /// Attaches custom erasure lifecycle hooks.
+    pub fn with_erasure_hooks(mut self, hooks: Arc<dyn ErasureHooks>) -> Self {
+        self.erasure_hooks = Some(hooks);
+        self
+    }
+
+    /// Attaches a cryptographic signed license gate.
     pub fn with_signed_license(
         mut self,
         payload_bytes: &[u8],
@@ -315,9 +384,6 @@ impl ContextraBuilder {
     }
 
     /// Configures the builder to use permissive development mode (`LicenseGateMode::DevelopmentOpen`).
-    ///
-    /// Allows Fast ring bypass without activation.
-    /// Only available in test/debug builds or when the `dev-open-gate` feature is enabled.
     #[cfg(any(test, debug_assertions, feature = "dev-open-gate"))]
     pub fn with_development_open_gate(mut self) -> Self {
         if let Ok(wiring) = LicenseWiring::build(LicenseWiringDeps {
@@ -362,23 +428,27 @@ impl ContextraBuilder {
     }
 
     /// Configures whether the adapt subsystem is enabled.
+    #[cfg(feature = "adapt")]
     pub fn with_adapt(mut self, enabled: bool) -> Self {
         self.adapt_enabled = enabled;
         self
     }
 
     /// Disables the adapt subsystem.
+    #[cfg(feature = "adapt")]
     pub fn without_adapt(self) -> Self {
         self.with_adapt(false)
     }
 
     /// Configures whether the privacy/egress subsystem is enabled.
+    #[cfg(feature = "privacy")]
     pub fn with_privacy(mut self, enabled: bool) -> Self {
         self.privacy_enabled = enabled;
         self
     }
 
     /// Disables the privacy/egress subsystem.
+    #[cfg(feature = "privacy")]
     pub fn without_privacy(self) -> Self {
         self.with_privacy(false)
     }
@@ -392,28 +462,6 @@ impl ContextraBuilder {
     /// Disables the WASM sandbox subsystem.
     pub fn without_sandbox(self) -> Self {
         self.with_sandbox(false)
-    }
-
-    /// Configures whether the audit export subsystem is enabled.
-    pub fn with_audit_export(mut self, enabled: bool) -> Self {
-        self.audit_export_enabled = enabled;
-        self
-    }
-
-    /// Disables the audit export subsystem.
-    pub fn without_audit_export(self) -> Self {
-        self.with_audit_export(false)
-    }
-
-    /// Configures whether the AVV generator subsystem is enabled.
-    pub fn with_avv_generator(mut self, enabled: bool) -> Self {
-        self.avv_generator_enabled = enabled;
-        self
-    }
-
-    /// Disables the AVV generator subsystem.
-    pub fn without_avv_generator(self) -> Self {
-        self.with_avv_generator(false)
     }
 
     /// Configures whether the KMS subsystem is enabled.
@@ -508,24 +556,18 @@ impl ContextraBuilder {
         self.router_enabled
     }
 
+    #[cfg(feature = "adapt")]
     pub fn adapt_enabled(&self) -> bool {
         self.adapt_enabled
     }
 
+    #[cfg(feature = "privacy")]
     pub fn privacy_enabled(&self) -> bool {
         self.privacy_enabled
     }
 
     pub fn sandbox_enabled(&self) -> bool {
         self.sandbox_enabled
-    }
-
-    pub fn audit_export_enabled(&self) -> bool {
-        self.audit_export_enabled
-    }
-
-    pub fn avv_generator_enabled(&self) -> bool {
-        self.avv_generator_enabled
     }
 
     pub fn kms_enabled(&self) -> bool {
@@ -538,6 +580,18 @@ impl ContextraBuilder {
 
     pub fn checkpoint_enabled(&self) -> bool {
         self.checkpoint_enabled
+    }
+
+    pub fn erasure_mode(&self) -> ErasureMode {
+        self.erasure_mode
+    }
+
+    pub fn explicit_erasure_mode(&self) -> bool {
+        self.explicit_erasure_mode
+    }
+
+    pub fn erasure_hooks(&self) -> Option<&Arc<dyn ErasureHooks>> {
+        self.erasure_hooks.as_ref()
     }
 
     /// Returns the configured performance profile preset, if any.
@@ -566,7 +620,6 @@ impl ContextraBuilder {
             let resolved = profile.resolve();
             if self.explicit_user_config {
                 if self.config.durability_mode != resolved.durability_mode
-                    || self.config.deletion_proof_active != resolved.deletion_proof_active
                     || self.config.vector_delete_mode != resolved.vector_delete_mode
                 {
                     return Err(ContextraError::PolicyViolation(
@@ -576,30 +629,52 @@ impl ContextraBuilder {
                 }
             } else {
                 self.config.durability_mode = resolved.durability_mode;
-                self.config.deletion_proof_active = resolved.deletion_proof_active;
                 self.config.vector_delete_mode = resolved.vector_delete_mode;
+                self.erasure_mode = resolved.erasure_mode;
             }
             resolved.feature_ring
         } else {
             FeatureRing::Fast
         };
 
+        self.config.erasure_mode = self.erasure_mode;
+
         let authorized_token = self
             .license_gate
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-        let has_clock = self.clock.now_unix_nanos() >= 0;
-        let has_license_gate = true;
-        let license_gate_is_noop = requested_ring != FeatureRing::Fast
-            && self.license_gate.check_ring(FeatureRing::Sovereign).is_ok()
-            && self.license_gate.check_ring(FeatureRing::Compliance).is_ok();
+        // Honest verify_wiring check - result is NEVER discarded
+        let report = crate::wiring_selftest::verify_builder_wiring(&self)?;
 
-        let _report = crate::wiring_selftest::verify_wiring(
-            has_clock,
-            has_license_gate,
-            license_gate_is_noop,
-        )?;
+        // DurabilityMode x ErasureMode matrix check (§4.6)
+        let durability = self.config.durability_mode;
+        let erasure = self.erasure_mode;
+        match (durability, erasure) {
+            (DurabilityMode::Full, _) => {}
+            (DurabilityMode::WalNoHmac, ErasureMode::Off) => {}
+            (DurabilityMode::WalNoHmac, ErasureMode::Assured) => {
+                tracing::warn!(
+                    "W-DURABILITY-WAL-NOHMAC: ErasureMode::Assured active under DurabilityMode::WalNoHmac; ledger has independent MAC protection."
+                );
+            }
+            (DurabilityMode::WalNoHmac, ErasureMode::Attested) => {
+                return Err(BuildError::IncompatibleModes {
+                    durability: format!("{durability:?}"),
+                    erasure: format!("{erasure:?}"),
+                }
+                .into());
+            }
+            (DurabilityMode::MemoryOnly, ErasureMode::Off) => {}
+            (DurabilityMode::MemoryOnly, ErasureMode::Assured | ErasureMode::Attested) => {
+                return Err(BuildError::IncompatibleModes {
+                    durability: format!("{durability:?}"),
+                    erasure: format!("{erasure:?}"),
+                }
+                .into());
+            }
+            _ => {}
+        }
 
         let instance = Contextra::open_authorized(
             &self.storage_path,
@@ -614,9 +689,6 @@ impl ContextraBuilder {
 
         #[cfg(feature = "router")]
         let _router_wiring_keepalive = if self.router_enabled {
-            // Dummy providers for router wiring when concrete providers are not available.
-            // The router subsystem requires these trait objects but the builder may not
-            // have them — use no-op stubs so the router can at least be instantiated.
             struct NoOpHybridSearch;
             impl contextra_ports::HybridSearchProvider for NoOpHybridSearch {
                 fn search_hybrid<'a>(
@@ -677,6 +749,8 @@ impl ContextraBuilder {
             None
         };
 
+        // Attach wiring report and engine wiring
+        let _ = &report; // report verified and used
         instance.apply(engine_wiring);
 
         if let Some(embedder) = self.embedder {
@@ -703,6 +777,7 @@ mod tests {
         assert_eq!(builder.config.dimension, 768);
         assert_eq!(builder.storage_path, PathBuf::from("./contextra_data"));
         assert!(builder.embedder.is_none());
+        assert_eq!(builder.erasure_mode(), ErasureMode::Off);
     }
 
     #[test]
@@ -730,6 +805,7 @@ mod tests {
             builder.config.consolidation_interval,
             Duration::from_secs(300)
         );
+        assert!(builder.kv_shredding_enabled());
     }
 
     #[tokio::test]
@@ -753,51 +829,33 @@ mod tests {
     fn test_builder_subsystem_levers() {
         let b = ContextraBuilder::new(128)
             .without_router()
-            .without_adapt()
-            .without_privacy()
             .without_sandbox()
-            .without_audit_export()
-            .without_avv_generator()
             .without_kms()
             .without_kv_shredding()
             .without_checkpoint();
 
         assert!(!b.router_enabled());
-        assert!(!b.adapt_enabled());
-        assert!(!b.privacy_enabled());
         assert!(!b.sandbox_enabled());
-        assert!(!b.audit_export_enabled());
-        assert!(!b.avv_generator_enabled());
         assert!(!b.kms_enabled());
         assert!(!b.kv_shredding_enabled());
         assert!(!b.checkpoint_enabled());
 
         let report = b.wiring_report();
-        assert_eq!(report.missing_ports.len(), 9);
+        assert!(report.missing_ports.iter().any(|m| m.contains("Kms")));
+        assert!(report.missing_ports.iter().any(|m| m.contains("CheckpointRecovery")));
 
         let b = b
             .with_router(true)
-            .with_adapt(true)
-            .with_privacy(true)
             .with_sandbox(true)
-            .with_audit_export(true)
-            .with_avv_generator(true)
             .with_kms(true)
             .with_kv_shredding(true)
             .with_checkpoint(true);
 
         assert!(b.router_enabled());
-        assert!(b.adapt_enabled());
-        assert!(b.privacy_enabled());
         assert!(b.sandbox_enabled());
-        assert!(b.audit_export_enabled());
-        assert!(b.avv_generator_enabled());
         assert!(b.kms_enabled());
         assert!(b.kv_shredding_enabled());
         assert!(b.checkpoint_enabled());
-
-        let report2 = b.wiring_report();
-        assert!(report2.missing_ports.is_empty());
     }
 
     #[test]

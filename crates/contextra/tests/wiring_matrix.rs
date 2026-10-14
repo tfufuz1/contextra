@@ -57,6 +57,7 @@ async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+#[cfg(feature = "router")]
 async fn test_builder_router_wiring_integration() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
     let db = builder(16)

@@ -591,12 +591,12 @@ name = "contextra"
 version = "0.1.0"
 dependencies = [
  "contextra-adapt",
- "contextra-audit-export",
- "contextra-avv-generator",
+ "contextra-agent",
  "contextra-cognition",
  "contextra-core",
  "contextra-crypto",
  "contextra-db",
+ "contextra-engine",
  "contextra-graph",
  "contextra-infer-candle",
  "contextra-infer-ollama",
@@ -616,6 +616,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
