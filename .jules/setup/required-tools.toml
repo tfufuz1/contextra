@@ -1,103 +1,134 @@
-# Required and optional tools configuration for env-attest
+# .jules/setup/required-tools.toml — Pflicht- und optionale Werkzeuge für env-attest
+# Verbindliche Quelle für cargo xtask env-attest.
+# Felder: name, version_cmd (Array!), required, needed_by (Array)
+# AGENTS.md §2: Kein sh -c — alle Befehle als Argument-Arrays.
+
+# ── Basis-Werkzeuge ───────────────────────────────────────────────────────────
 
 [[tool]]
-name = "git"
+name        = "git"
 version_cmd = ["git", "--version"]
-required = true
-needed_by = ["version-control"]
+required    = true
+needed_by   = ["version-control"]
 
 [[tool]]
-name = "rg"
+name        = "rg"
 version_cmd = ["rg", "--version"]
-required = true
-needed_by = ["workspace-scan"]
+required    = true
+needed_by   = ["workspace-scan"]
 
 [[tool]]
-name = "jq"
+name        = "jq"
 version_cmd = ["jq", "--version"]
-required = true
-needed_by = ["json-parsing"]
+required    = true
+needed_by   = ["json-parsing"]
 
 [[tool]]
-name = "flatc"
-version_cmd = ["flatc", "--version"]
-required = false
-needed_by = ["fbs-drift"]
-
-[[tool]]
-name = "ast-grep"
-version_cmd = ["ast-grep", "--version"]
-required = false
-needed_by = ["doctrine-scan"]
-
-[[tool]]
-name = "cargo-nextest"
-version_cmd = ["cargo", "nextest", "--version"]
-required = true
-needed_by = ["test-runner"]
-
-[[tool]]
-name = "cargo-deny"
-version_cmd = ["cargo", "deny", "--version"]
-required = false
-needed_by = ["security-scan"]
-
-[[tool]]
-name = "nightly-toolchain"
-version_cmd = ["rustc", "+nightly", "--version"]
-required = true
-needed_by = ["fuzz-smoke", "loom-run"]
-
-[[tool]]
-name = "cargo-fuzz"
-version_cmd = ["cargo", "+nightly", "fuzz", "--version"]
-required = true
-needed_by = ["fuzz-smoke"]
-
-[[tool]]
-name = "cargo-mutants"
-version_cmd = ["cargo", "mutants", "--version"]
-required = true
-needed_by = ["mutants-diff"]
-
-[[tool]]
-name = "cargo-llvm-cov"
-version_cmd = ["cargo", "llvm-cov", "--version"]
-required = false
-needed_by = ["coverage"]
-
-[[tool]]
-name = "cargo-insta"
-version_cmd = ["cargo", "insta", "--version"]
-required = false
-needed_by = ["insta-test"]
-
-[[tool]]
-name = "cargo-hack"
-version_cmd = ["cargo", "hack", "--version"]
-required = false
-needed_by = ["feature-matrix"]
-
-[[tool]]
-name = "miri"
-version_cmd = ["cargo", "+nightly", "miri", "--version"]
-required = true
-needed_by = ["loom-run"]
-
-[[tool]]
-name = "maturin"
-version_cmd = ["maturin", "--version"]
-required = false
-needed_by = ["contextra-py"]
-
-[[tool]]
-name = "actionlint"
-version_cmd = ["actionlint", "-version"]
-required = false
-needed_by = ["workflow-check"]
-
-[[tool]]
-name = "curl"
+name        = "curl"
 version_cmd = ["curl", "--version"]
-required = false
-needed_by = ["bench-download"]
+required    = false
+needed_by   = ["bench-download", "cargo-binstall"]
+
+# ── Rust Toolchains ───────────────────────────────────────────────────────────
+
+[[tool]]
+name        = "nightly-toolchain"
+version_cmd = ["rustc", "+nightly", "--version"]
+required    = true
+needed_by   = ["fuzz-smoke", "loom-run", "miri", "tsan"]
+
+[[tool]]
+name        = "miri"
+version_cmd = ["cargo", "+nightly", "miri", "--version"]
+required    = true
+needed_by   = ["miri-check"]
+
+# ── Cargo-Werkzeuge (Pflicht) ─────────────────────────────────────────────────
+
+[[tool]]
+name        = "cargo-nextest"
+version_cmd = ["cargo", "nextest", "--version"]
+required    = true
+needed_by   = ["test-runner"]
+
+[[tool]]
+name        = "cargo-audit"
+version_cmd = ["cargo", "audit", "--version"]
+required    = true
+needed_by   = ["security-scan", "supply-chain"]
+
+[[tool]]
+name        = "cargo-fuzz"
+version_cmd = ["cargo", "+nightly", "fuzz", "--version"]
+required    = true
+needed_by   = ["fuzz-smoke"]
+
+[[tool]]
+name        = "cargo-mutants"
+version_cmd = ["cargo", "mutants", "--version"]
+required    = true
+needed_by   = ["mutants-diff"]
+
+# ── Cargo-Werkzeuge (Optional) ────────────────────────────────────────────────
+
+[[tool]]
+name        = "cargo-deny"
+version_cmd = ["cargo", "deny", "--version"]
+required    = false
+needed_by   = ["security-scan", "license-check"]
+
+[[tool]]
+name        = "cargo-llvm-cov"
+version_cmd = ["cargo", "llvm-cov", "--version"]
+required    = false
+needed_by   = ["coverage"]
+
+[[tool]]
+name        = "cargo-insta"
+version_cmd = ["cargo", "insta", "--version"]
+required    = false
+needed_by   = ["insta-test", "snapshot-testing"]
+
+[[tool]]
+name        = "cargo-hack"
+version_cmd = ["cargo", "hack", "--version"]
+required    = false
+needed_by   = ["feature-matrix"]
+
+# ── Analyse-Werkzeuge (Optional) ──────────────────────────────────────────────
+
+[[tool]]
+name        = "ast-grep"
+version_cmd = ["ast-grep", "--version"]
+required    = false
+needed_by   = ["doctrine-scan", "pattern-search"]
+
+[[tool]]
+name        = "flatc"
+version_cmd = ["flatc", "--version"]
+required    = false
+needed_by   = ["fbs-drift"]
+# Hinweis: flatc ist per Shim in $HOME/.local/bin deaktiviert (Versions-Mismatch-Schutz).
+# Nur aktiv wenn CONTEXTRA_REAL_FLATC=/pfad/zu/passendem/flatc gesetzt ist.
+
+[[tool]]
+name        = "actionlint"
+version_cmd = ["actionlint", "-version"]
+required    = false
+needed_by   = ["workflow-check", "ci-lint"]
+
+# ── Python-Bindings (Optional) ────────────────────────────────────────────────
+
+[[tool]]
+name        = "maturin"
+version_cmd = ["maturin", "--version"]
+required    = false
+needed_by   = ["contextra-py"]
+
+# ── Build-System-Werkzeuge (Optional) ────────────────────────────────────────
+
+[[tool]]
+name        = "just"
+version_cmd = ["just", "--version"]
+required    = false
+needed_by   = ["justfile-recipes", "loom-run", "fuzz-smoke"]

@@ -75,7 +75,11 @@ flatc --version >/dev/null 2>&1 && warn "flatc ist noch aktiv!" || ok "flatc dea
 # ── 2. Rust Toolchains ────────────────────────────────────────────────────────
 step "[2/8] Rust-Toolchains"
 . "$HOME/.cargo/env" 2>/dev/null || true
-command -v rustup >/dev/null || { curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none >>"$LOG" 2>&1; . "$HOME/.cargo/env"; }
+if ! command -v rustup >/dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain none >>"$LOG" 2>&1
+  . "$HOME/.cargo/env"
+fi
 need rustup toolchain install "$PIN" --profile minimal -c rustfmt -c clippy -c llvm-tools-preview
 try  rustup default "$PIN"
 try  rustup target add wasm32-wasip1 wasm32-unknown-unknown --toolchain "$PIN"
@@ -92,15 +96,18 @@ RV="$(rustc --version 2>/dev/null)"
 # ── 3. Fuzzing-Toolchain via install-fuzz-toolchain.sh ───────────────────────
 step "[3/8] Fuzzing-Toolchain"
 if [ "$PROFILE" = "full" ]; then
-  need bash .jules/setup/install-fuzz-toolchain.sh
+  need .jules/setup/install-fuzz-toolchain.sh
 else
-  try bash .jules/setup/install-fuzz-toolchain.sh
+  try .jules/setup/install-fuzz-toolchain.sh
 fi
 
 # ── 4. Cargo-Werkzeuge ────────────────────────────────────────────────────────
 step "[4/8] Cargo-Tools"
 if ! command -v cargo-binstall >/dev/null; then
-  try bash -c 'curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash'
+  # Direct pipe — no sh -c wrapper
+  curl -L --proto '=https' --tlsv1.2 -sSf \
+    https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh \
+    | bash >>"$LOG" 2>&1 || warn "cargo-binstall Installation fehlgeschlagen (optional)"
 fi
 
 install_tool() {   # $1=binary-check  $2=crate
@@ -121,7 +128,11 @@ if [ "$PROFILE" = "full" ]; then
   install_tool "cargo insta --version"    cargo-insta
   install_tool "cargo hack --version"     cargo-hack
   if ! command -v actionlint >/dev/null 2>&1; then
-    try bash -c 'curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- 1.7.7 "$HOME/.local/bin"'
+    # Direct pipe — no sh -c wrapper
+    curl -sSfL \
+      https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash \
+      | bash -s -- 1.7.7 "$HOME/.local/bin" >>"$LOG" 2>&1 \
+      || warn "actionlint Download fehlgeschlagen (optional)"
   fi
   command -v actionlint >/dev/null 2>&1 && ok "actionlint" || warn "actionlint installation fehlgeschlagen"
   try cargo +nightly miri setup
@@ -139,7 +150,7 @@ step "[5/8] Python-venv & Benchmark-Deps"
 VENV="$HOME/.venv-contextra"
 [ -x "$VENV/bin/python" ] || try python3 -m venv "$VENV"
 try "$VENV/bin/pip" install -q --upgrade pip maturin numpy pytest && ok "venv: $VENV"
-try bash .jules/setup/install-bench-deps.sh
+try .jules/setup/install-bench-deps.sh
 
 # ── 6. Persistente Umgebung & Caches vorwärmen ────────────────────────────────
 step "[6/8] Umgebungsvariablen & Cache-Vorwärmung"
@@ -159,22 +170,39 @@ ENVEOF
 done
 ok ".bashrc/.profile aktualisiert"
 
-timeout 600 cargo fetch --locked >>"$LOG" 2>&1 && ok "cargo fetch --locked" || warn "cargo fetch fehlgeschlagen/Timeout"
+# --jobs 4: parallele Fetch-Operationen auf der 4-vCPU-Maschine
+timeout 600 cargo fetch --locked --jobs 4 >>"$LOG" 2>&1 && ok "cargo fetch --locked --jobs 4" || warn "cargo fetch fehlgeschlagen/Timeout"
 
 find crates -path '*/fuzz/Cargo.toml' | sort | while read -r fuzz_toml; do
   fuzz_dir="$(dirname "$fuzz_toml")"
   cname="$(basename "$(dirname "$fuzz_dir")")"
   echo "  ℹ️ Fuzz build for $cname..."
+  # Direct subshell without sh -c
   (cd "$fuzz_dir" && timeout 60 cargo +nightly fuzz build >>"$LOG" 2>&1) || warn "Fuzz build for $cname unvollständig/Fehler (siehe $LOG)"
 done
 
 if [ "${CONTEXTRA_SETUP_PREBUILD:-1}" = 1 ]; then
-  timeout 1200 cargo check --workspace --locked >>"$LOG" 2>&1 && ok "cargo check --workspace" \
+  # --exclude contextra-py: verhindert Maturin-/GTK-Abhängigkeiten im Prebuild
+  timeout 1200 cargo check --workspace --locked \
+      --exclude contextra-py \
+      >>"$LOG" 2>&1 \
+    && ok "cargo check --workspace (ohne contextra-py)" \
     || warn "cargo check Fehler/Timeout (Details: $LOG) — Snapshot trotzdem möglich"
   timeout 600 cargo check -p contextra-bench --benches --locked >>"$LOG" 2>&1 && ok "cargo check -p contextra-bench --benches" \
     || warn "cargo check -p contextra-bench --benches Fehler/Timeout"
   timeout 600 cargo bench --no-run -p contextra-bench >>"$LOG" 2>&1 && ok "cargo bench --no-run -p contextra-bench" \
     || warn "cargo bench --no-run -p contextra-bench Fehler/Timeout"
+
+  # nightly TSan Build: Thread-Sanitizer zur Erkennung von Data Races
+  if [ "$PROFILE" = "full" ]; then
+    RUSTFLAGS="-Z sanitizer=thread" \
+      timeout 900 cargo +nightly check --workspace --locked \
+        --exclude contextra-py \
+        --target x86_64-unknown-linux-gnu \
+        >>"$LOG" 2>&1 \
+      && ok "nightly TSan check (--workspace ohne contextra-py)" \
+      || warn "nightly TSan check Fehler/Timeout (Details: $LOG)"
+  fi
 fi
 
 # ── 7. Baseline-Protokoll (.jules/context/BASELINE.md) ────────────────────────
@@ -189,11 +217,14 @@ FMT_LOG="${TMPDIR:-/tmp}/baseline_fmt_$$.log"
 CLIPPY_LOG="${TMPDIR:-/tmp}/baseline_clippy_$$.log"
 XTASK_LOG="${TMPDIR:-/tmp}/baseline_xtask_$$.log"
 
-run_cmd_measure() {  # $1=cmd  $2=timeout_secs  $3=out_file
-  local cmd="$1" timeout_secs="$2" out_file="$3"
+# run_cmd_measure: führt Kommando direkt (kein sh -c) aus
+# $1=label  $2=timeout_secs  $3=out_file  rest=Befehlsargumente
+run_cmd_measure() {
+  local label="$1" timeout_secs="$2" out_file="$3"
+  shift 3
   local start_t end_t elapsed
   start_t=$(date +%s)
-  if timeout "$timeout_secs" bash -c "$cmd" >"$out_file" 2>&1; then
+  if timeout "$timeout_secs" "$@" >"$out_file" 2>&1; then
     end_t=$(date +%s)
     elapsed=$((end_t - start_t))
     local warns
@@ -213,15 +244,15 @@ run_cmd_measure() {  # $1=cmd  $2=timeout_secs  $3=out_file
   fi
 }
 
-CHECK_RES="$(run_cmd_measure "cargo check --workspace --locked" 1200 "$CHECK_LOG")"
-FMT_RES="$(run_cmd_measure "cargo fmt --check" 1200 "$FMT_LOG")"
-CLIPPY_RES="$(run_cmd_measure "cargo clippy --workspace --locked" 1200 "$CLIPPY_LOG")"
-XTASK_RES="$(run_cmd_measure "cargo check -p xtask --locked" 1200 "$XTASK_LOG")"
+CHECK_RES="$(run_cmd_measure "cargo check"   1200 "$CHECK_LOG"  cargo check --workspace --locked --exclude contextra-py)"
+FMT_RES="$(  run_cmd_measure "cargo fmt"     1200 "$FMT_LOG"   cargo fmt --check)"
+CLIPPY_RES="$(run_cmd_measure "cargo clippy" 1200 "$CLIPPY_LOG" cargo clippy --workspace --locked)"
+XTASK_RES="$( run_cmd_measure "xtask check"  1200 "$XTASK_LOG"  cargo check -p xtask --locked)"
 
-IFS='|' read -r CHECK_STATUS CHECK_TIME CHECK_WARNS <<< "$CHECK_RES"
-IFS='|' read -r FMT_STATUS FMT_TIME FMT_WARNS <<< "$FMT_RES"
+IFS='|' read -r CHECK_STATUS  CHECK_TIME  CHECK_WARNS  <<< "$CHECK_RES"
+IFS='|' read -r FMT_STATUS    FMT_TIME    FMT_WARNS    <<< "$FMT_RES"
 IFS='|' read -r CLIPPY_STATUS CLIPPY_TIME CLIPPY_WARNS <<< "$CLIPPY_RES"
-IFS='|' read -r XTASK_STATUS XTASK_TIME XTASK_WARNS <<< "$XTASK_RES"
+IFS='|' read -r XTASK_STATUS  XTASK_TIME  XTASK_WARNS  <<< "$XTASK_RES"
 
 ERR_LINES="$(grep -h -E -i 'error\[|error:' "$CHECK_LOG" "$FMT_LOG" "$CLIPPY_LOG" "$XTASK_LOG" 2>/dev/null | head -n 20 || echo "None")"
 rm -f "$CHECK_LOG" "$FMT_LOG" "$CLIPPY_LOG" "$XTASK_LOG"
@@ -238,7 +269,7 @@ cat > .jules/context/BASELINE.md <<BASELINEOF
 
 | Command | Status | Duration (s) | Warnings |
 | --- | --- | --- | --- |
-| \`cargo check --workspace --locked\` | $CHECK_STATUS | ${CHECK_TIME}s | $CHECK_WARNS |
+| \`cargo check --workspace --locked --exclude contextra-py\` | $CHECK_STATUS | ${CHECK_TIME}s | $CHECK_WARNS |
 | \`cargo fmt --check\` | $FMT_STATUS | ${FMT_TIME}s | N/A |
 | \`cargo clippy --workspace --locked\` | $CLIPPY_STATUS | ${CLIPPY_TIME}s | $CLIPPY_WARNS |
 | \`cargo check -p xtask --locked\` | $XTASK_STATUS | ${XTASK_TIME}s | N/A |
@@ -262,7 +293,7 @@ if cargo run -q --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | g
 else warn "xtask env-attest (noch) nicht registriert"; fi
 
 # Kontext einmalig erzeugen (wird bei Task-Start erneut aktualisiert)
-[ -f .jules/setup/refresh-context.sh ] && bash .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
+[ -f .jules/setup/refresh-context.sh ] && .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
 
 # ── Working-Tree zurücksetzen (Jules verifiziert sauberen Tree) ───────────────
 # Getrackte Dateien außerhalb .jules/setup/ und .jules/context/ zurücksetzen

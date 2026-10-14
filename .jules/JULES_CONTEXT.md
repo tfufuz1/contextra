@@ -1,5 +1,5 @@
 # Contextra — Jules Agent Context
-> Version: 3.0 | Stand: 2026-10-12 | Permanent Ambient Context für Jules Sessions (Systemspezifikation v15)
+> Version: 3.1 | Stand: 2026-10-14 | Permanent Ambient Context für Jules Sessions (Systemspezifikation v15)
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
 > Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
@@ -15,6 +15,10 @@
 Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
 
 Das Kontextpaket (`.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->) wird von `cargo xtask jules start` erzeugt und frischt sich selbst auf. Das Skript `refresh-context.sh` darf **nie ohne `--agent` mitten in der Aufgabe aufgerufen werden** (ohne Flag setzt es nichts Destruktives mehr, aber `--agent` ist der vorgesehene Weg).
+
+**Neue Hilfsdateien (direkt lesbar):**
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) — Kompakter Spickzettel: Befehle, APMs, Invarianten-IDs
+- [TASK_TEMPLATE.md](TASK_TEMPLATE.md) — Vollständige TOML-Schablone für neue Task-Karten
 
 ---
 

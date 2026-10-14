@@ -185,9 +185,6 @@ Die verbindliche Werkzeug-Quelle für Repo-Analyse ist `cargo xtask`. Wichtige T
   - `cargo xtask mutants-diff`: Mutation Testing Score auf Diffs.
   - `cargo xtask wal-replay-verify`: WAL-Replay-Crash-Konsistenz.
 
-### 5.3 Eigene Werkzeuge (`/home/jules/self_created_tools/`)
-
-Jules kann bei Bedarf eigene Python-Tools in `/home/jules/self_created_tools/` erstellen, um spezifische Daten- oder Log-Analysen auszuführen.
 
 ---
 
@@ -326,15 +323,41 @@ Wenn ein Branch auf Remote (GitHub) gelöscht wurde und lokal nicht im Git-Cache
 
 ---
 
-## 12. Empfehlungen zur Repository-Optimierung für Contextra
+## 12. Repository-Optimierungen für Contextra (Implementierungsstatus)
 
-Um autonome Agenten-Sitzungen (bis zu 165 Sitzungen/Tag) sowie menschliche Entwicklungszyklen in `contextra` weiter zu optimieren, werden folgende Maßnahmen empfohlen:
+Um autonome Agenten-Sitzungen (bis zu 165 Sitzungen/Tag) sowie menschliche Entwicklungszyklen in `contextra` weiter zu optimieren:
 
-1. **`WorkspaceIndex` für `xtask` vervollständigen (Tier 1 Beschleunigung):**
+### ✅ Implementiert (Oktober 2026)
+
+1. **`harness-phases.toml` vollständig** (`.jules/harness-phases.toml`):
+   - `cargo xtask repo-doctor` in `start`-Phase ergänzt (Dashboard beim Session-Start).
+   - `cargo xtask gate-integrity` in `verify`-Phase ergänzt (fehlte vorher).
+   - `cargo xtask fast-diff-lint` in `check`-Phase ergänzt.
+   - Alle `risk_gates`-Klassen vollständig: `concurrency` → `loom-run`, `utf8`/`fusion`/`calib`/`none` → Standard.
+
+2. **`environment_script.sh` AGENTS.md-konform** (`.jules/setup/environment_script.sh`):
+   - Alle `bash -c '...'` und `sh -c`-Aufrufe durch direkte Argument-Arrays ersetzt (AGENTS.md §2).
+   - `--exclude contextra-py` bei `cargo check --workspace` (vermeidet PyO3/C-Erweiterungen in Routinechecks).
+   - `--jobs 4` bei `cargo fetch` (nutzt alle 4 vCPUs der VM).
+   - Nightly-TSan-Check im `full`-Profil ergänzt.
+
+3. **`required-tools.toml` vollständig** (`.jules/setup/required-tools.toml`):
+   - `cargo-audit` als `required = true` ergänzt (fehlte trotz Installation).
+   - Alle `version_cmd`-Felder als Argument-Arrays (kein Shell-String).
+
+4. **Neue Hilfsdateien für Jules**:
+   - [`.jules/QUICK_REFERENCE.md`](../.jules/QUICK_REFERENCE.md): Kompakter Spickzettel aller Lifecycle-Befehle, Top-10-APMs, Invarianten-IDs, Crate-Schnellindex.
+   - [`.jules/TASK_TEMPLATE.md`](../.jules/TASK_TEMPLATE.md): Vollständige TOML-Schablone für neue Task-Karten mit Risiko-Klassen-Tabelle und Planmuster.
+
+5. **Abschnitt 5.3 (eigene Python-Werkzeuge) entfernt** (Widerspruch zu AGENTS.md §10).
+
+### 🔲 Geplant (noch nicht implementiert)
+
+6. **`WorkspaceIndex` für xtask vervollständigen** (Tier 1 Beschleunigung):
    - Das Caching des AST-basierten Workspace-Index in `target/xtask-cache/workspace-index.json` reduziert die Ausführungszeit von `orphan-symbols`, `unwired-ports` und `doctrine-scan` von ~2.5s auf < 150ms.
-2. **Kompilier-Caches & Target-Warmup:**
+
+7. **Kompilier-Caches & Target-Warmup**:
    - Bereitstellung eines vorgebauten Cargo target Warmup-Archives (`/target`), damit frische Agenten-VMs nicht wiederholt Abhängigkeiten wie `syn`, `quote`, `serde` oder `tokio` von Grund auf neu kompilieren müssen.
-3. **Ausschluss teurer Crates bei CI-Routinechecks:**
-   - Standardmäßige Nutzung von `--exclude contextra-tauri` und `--exclude contextra-py` bei alltäglichen Compilation-Checks zur Vermeidung teurer C++ WebKit/GTK-Builds.
-4. **Entkopplung der Heavy Gates:**
+
+8. **Entkopplung der Heavy Gates**:
    - Beibehaltung der Aufteilung von Schnellprüfungen (Tier 0 & Tier 1) für Routine-Iterationen und Auslagerung von Loom/Mutation/TSan auf Scheduled/Nightly-Runs bzw. PRs mit Label `run-deep`.

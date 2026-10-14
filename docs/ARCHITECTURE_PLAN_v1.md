@@ -1,219 +1,171 @@
-# Contextra — Architektur- und Designplan v1
+# Contextra — Gesamter Architektur-, Systemdesign- und Implementierungsplan (v1)
 
-**Datum:** 2026-10-14 · **Stand:** HEAD nach PR #4785 (`500e9246`) · **Verfasst von:** Principal Senior Rust Architect  
-**Basis:** `docs/14-10-26/`, alle AUDIT_*_DEEP-Berichte, `capabilities.toml`, `WORKING_STATE.md`, Quelltext-Inspektion  
-**Status:** Verbindliche Architekturgrundlage. Ergänzt die Produktspezifikation.
-
-> [!IMPORTANT]
-> Dieser Plan ist die Architektur-Wahrheitsquelle für alle laufenden und zukünftigen Implementierungs-Sessions. Jede Abweichung erfordert ein ADR. Alle genannten Schwachstellen sind nach Priorität geordnet und mit konkreten Maßnahmen versehen.
+**Datum:** 2026-10-14 · **Stand:** HEAD `500e9246` (PR #4785 gemergt)  
+**Verfasser:** Principal Senior Rust Architect für Contextra  
+**Geltungsbereich:** Gesamtes Multi-Crate-Ökosystem (37 Workspace-Crates, Tooling, Governance)  
+**Verbindlichkeit:** Verbindliche Architekturgrundlage (Stufe 2 nach Grüne Gates & Code-Realität)
 
 ---
 
 ## Inhaltsverzeichnis
 
-1. [Systemzweck und Produktversprechen](#1-systemzweck-und-produktversprechen)
-2. [Ist-Zustand: Kritische Befunde](#2-ist-zustand-kritische-befunde)
-3. [Architekturprinzipien (verbindlich)](#3-architekturprinzipien-verbindlich)
-4. [Ring-Modell: Ist vs. Soll](#4-ring-modell-ist-vs-soll)
-5. [Schwachstellen und Inkonsistenzen](#5-schwachstellen-und-inkonsistenzen)
-6. [Zielarchitektur: Plugin-basierter Löschnachweis](#6-zielarchitektur-plugin-basierter-löschnachweis)
-7. [Feature-Entkopplung: Aktivier-/Deaktivierungsmatrix](#7-feature-entkopplung-aktivier-deaktivierungsmatrix)
-8. [Crate-Schnitt: Kern vs. Parkplatz vs. Plugins](#8-crate-schnitt-kern-vs-parkplatz-vs-plugins)
-9. [Geschäftslogik-Korrekturen](#9-geschäftslogik-korrekturen)
-10. [Migrations- und Phasenplan](#10-migrations--und-phasenplan)
-11. [Qualitätsgates und Invarianten](#11-qualitätsgates-und-invarianten)
-12. [Algorithmen-Auswahl und -Empfehlungen](#12-algorithmen-auswahl-und--empfehlungen)
-13. [Risiken und offene Entscheidungen](#13-risiken-und-offene-entscheidungen)
-14. [ADR-Register](#14-adr-register)
+1. [Executive Summary & Produktversprechen](#1-executive-summary--produktversprechen)
+2. [Status Quo & Konsolidiertes Mängelregister](#2-status-quo--konsolidiertes-mängelregister)
+3. [Verbindliche Architektur- und Entkopplungsdoktrin](#3-verbindliche-architektur--und-entkopplungsdoktrin)
+4. [Ring-Modell: Topologie, Ist vs. Soll & Crate-Klassifikation](#4-ring-modell-topologie-ist-vs-soll--crate-klassifikation)
+5. [Zero-Cost Plugin-Architektur für den Löschnachweis](#5-zero-cost-plugin-architektur-für-den-löschnachweis)
+6. [Exakte Code-Blueprints: Behebung aller Blocker](#6-exakte-code-blueprints-behebung-aller-blocker)
+7. [Purge v2: Streaming-Rewrite & Lockless Write-Fence (Option B)](#7-purge-v2-streaming-rewrite--lockless-write-fence-option-b)
+8. [Crate-Split `contextra-crypto` & Ablösung von `contextra-core`](#8-crate-split-contextra-crypto--ablösung-von-contextra-core)
+9. [Feature-Matrix, Modularisierung & Produkt-Manifeste](#9-feature-matrix-modularisierung--produkt-manifeste)
+10. [Geschäftslogik-Konsolidierung (Delete, MCP, Egress, Builder)](#10-geschäftslogik-konsolidierung-delete-mcp-egress-builder)
+11. [MVCC, SSI & Concurrency-Spezifikation](#11-mvcc-ssi--concurrency-spezifikation)
+12. [Deterministisches v4-TLV Bytelayout](#12-deterministisches-v4-tlv-bytelayout)
+13. [XTask-Gates, Invarianten & Qualitätssicherung](#13-xtask-gates-invarianten--qualitätssicherung)
+14. [Algorithmen-Auswahl & mathematische Leitlinien](#14-algorithmen-auswahl--mathematische-leitlinien)
+15. [Phasenplan (K0–K5), Risiken & ADR-Register](#15-phasenplan-k0k5-risiken--adr-register)
 
 ---
 
-## 1. Systemzweck und Produktversprechen
+## 1. Executive Summary & Produktversprechen
 
-Contextra ist eine **einbettbare, Single-Node-Speicher-Engine** für autonome Agenten in Rust. Das zentrale Versprechen:
+Contextra ist eine hochperformante, einbettbare Single-Node-Speicher-Engine für autonome Agenten in Rust. Das zentrale Produktversprechen lautet:
 
-> Lokaler, persistenter Speicher für KI-Agenten mit verifizierbarer Löschung, Hybridsuche (Vektor + BM25 + Graph) und DSGVO-konformem Datenaustritt.
+> **Lokaler, persistenter Speicher für KI-Agenten mit verifizierbarer physischer Löschung (DSGVO Art. 17, ZPO § 371a), Hybridsuche (Vektor + BM25 + Graph) und strikt kontrolliertem Datenaustritt bei kompromissloser Single-Node-Performance.**
 
-### 1.1 Endprodukt-Hierarchie (verbindlich)
+### 1.1 Das Entkopplungs-Prinzip: Performance vs. Nachweisbarkeit
+Im bisherigen Entwurf waren Löschnachweis und Geschäftslogik eng gekoppelt. Dadurch entstanden Laufzeit- und Allokations-Overheads im normalen Schreibpfad und fatale Fehler (`CapabilityUnsupported`), wenn kein kryptografischer Notar konfiguriert war.
 
-| ID | Produkt | Kernversprechen | Status |
-|---|---|---|---|
-| **EP1** | Contextra Memory | Dokumente, Hybridsuche, Mandanten, Löschung mit Nachweis | **Einziges Ziel bis Release 1.0** |
-| **EP2** | Contextra Proof | Unabhängige Nachweis-Verifikation, Audit-Export | Nach K4, eigenes Repository |
-| **EP3** | Contextra Retrieval+ | Graph-Beziehungen, Domänenvokabulare | Jahr 2 |
-| **EP4** | Contextra Inference | Lokale Embedder, Reranker, KV-Cache | Jahr 3 |
-| **EP5** | Contextra Cognition | Konsolidierung, Vergessen, Routing | Experimentell |
-| **EP6** | Contextra Guard | Kontrollierter Cloud-Datenaustritt | Jahr 3 oder nach Bedarf |
+**Architektur-Entscheidung (ADR-01):**
+Der Löschnachweis wird vollständig als **Zero-Cost-Plugin** entkoppelt:
+- **Compile-Zeit:** Ohne Feature `erasure` existieren im Speicher- und Engine-Kern keinerlei Beweiserstrukturen (`ErasureGate` ist ein ZST).
+- **Laufzeit:** Im Standardmodus (`ErasureMode::Off`) entstehen **null zusätzliche Allokationen und null Synchronisations-Overhead**.
+- **Erweiterungsmodus:** Nur bei explizitem `ErasureMode::Assured` bzw. `ErasureMode::Attested` werden Anti-Resurrection-Ledger, Write-Fences und kryptografische Layer-Scans aktiviert.
 
-> [!CAUTION]
-> EP2–EP6 sind **eingefroren** bis EP1/K4 abgeschlossen ist. Kein neuer Code für Parkplatz-Crates.
+### 1.2 Endprodukt-Hierarchie
 
----
-
-## 2. Ist-Zustand: Kritische Befunde
-
-### 2.1 Blocker (Build und Korrektheit) — Priorität 1
-
-| ID | Severity | Befund | Datei | Phase |
+| ID | Produkt | Kernversprechen | Status | Crates |
 |---|---|---|---|---|
-| **N-N** | 🔴 | Match-Arm `PurgeBlocked::UnknownFreeSpace` fehlt → Engine kompiliert nicht | `engine/src/deletion/purge_driver.rs:172` | 0a |
-| **N-O** | 🔴 | Fassade kompiliert nicht unter Feature `router` (clock-Typ, `RouterWiringDeps: Default` fehlt) | `contextra/src/builder.rs:675-676` | 0a |
-| **N-P** | 🟠 | Lockfile veraltet, `--locked`-Builds blockiert | `Cargo.lock` | 0a |
-| **N-B** | 🔴 | `Collection::delete()` gibt immer `CapabilityUnsupported` zurück | `engine/src/crud/delete.rs` | 0b |
-| **N-A** | 🔴 | Crash-Resume fail-open: `OrxHooks::default()` → kein Scope → Intent gelöscht ohne Wirkung | `store/src/lsm/purge/resume.rs` (recovery.rs:525) | 0d |
-| **N-K** | 🟠 | Drop-Purge trifft keine physischen Schlüssel (logische ≠ physische Präfixe, Mandantenkodierung fehlt) | `ops/purge.rs` | 0d |
-
-### 2.2 Löschnachweis-Defekte (Sicherheits-kritisch) — Priorität 1
-
-| ID | Befund | Auswirkung |
-|---|---|---|
-| **L1** | `ErasureLedger::append` NICHT vor Tombstone-Commit → fabrizierter `[0u8;32]`-Eintrag | Nachweis nicht belastbar |
-| **L4** | `dispose()` liefert `Vec::new()` statt `obsolete_files` → physische Entfernung entfällt | Daten physisch erhalten |
-| **L6** | Reader verliert nach SST-Rewrite Position → Schlüsselreihenfolge kaputt | Datenkonsistenz verletzt |
-| **L8** | `None`-Probe = `Some(0)` Byte → Purge verhindert bei unbekanntem Platz | Semantik-Fehler |
-| **E1** | `verify` statt `verify_strict` | Schwächere Validierung |
-| **E2** | `bincode` im Signaturpfad für v4 (statt TLV) | Nicht format-stabil |
-| **E6** | `LayerWitness::issue` ist `pub` statt `pub(crate)` | Externe Fabrikation möglich |
-| **N-C** | `forget_document` erzeugt Zeuge mit Konstanten statt echtem Scan | Fabrizierte Evidenz |
-| **N-D** | Text-Index- und Relationen-Zeugen (Layer 20, 21) werden nie ausgestellt | Unvollständige Evidenzkette |
-| **N-I** | v3-Löschnachweis wird noch erzeugt, obwohl verboten | Veraltetes Format aktiv |
-
-**Zeugen-Ist-Zustand (4 von 6 Layer defekt):**
-
-| Layer | ID | Ist-Zustand | Soll-Zustand |
-|---|---|---|---|
-| LSM-Manifest | 1 | ✅ Echt (A05) | Beibehalten |
-| LSM-SSTable-All | 3 | ❌ `\|\| Ok(true)` ohne Scan | Rohsweep nach Marker-Bytes |
-| Ledger | 30 | ❌ `[0u8;32]`, `entry_confirmed: true` | Aus echtem `ErasureLedger::append` |
-| Text-Index | 20 | ❌ `None` → nie ausgestellt | Echter Scan via `TextIndexScan` |
-| Relations-Graph | 21 | ❌ nie ausgestellt | Echter Scan via `GraphRelationsScan` |
-| HNSW-Vektor | 26 | ❌ `forget_document` mit Konstanten | Echter Scan oder entfernen |
-
-### 2.3 Purge-Defekte (Datenkorrektheit) — Priorität 2
-
-| ID | Befund | Auswirkung |
-|---|---|---|
-| **L2** | `if let Ok` verschluckt Fehler still | Unentdeckte Fehler |
-| **L3** | `ConcurrentModification`-Err nach wirksamer Löschung | API-Kontrakt verletzt |
-| **L5** | `while let Ok(Some(..))` verschluckt Lesefehler | Unentdeckte Korruption |
-| **N-E** | Eine Intent-Datei je Store → parallele Purges unmöglich | Funktionslücke |
-| **N-F** | `Vec` + doppeltes Lesen → O(SST) Speicher im Purge | Speicher-Problem |
-| **N-G** | Orphan-GC ohne Scrub → Marker bleiben | Physische Datenlücke |
-| **N-J** | Failpoints lesen `std::env::var` im Produktionspfad | Sicherheitslücke |
-
-### 2.4 Architektur-Inkonsistenzen — Priorität 2
-
-| ID | Befund | Auswirkung |
-|---|---|---|
-| **K1** | `contextra-core` re-exportiert nur (123 LOC), 110 Dateien importieren sie | Falsche Abhängigkeit |
-| **K4** | 5× `downcast_ref::<LsmStorage>()` in Engine, DB, Collection | Ring-Verletzung, Typ-Kupplung |
-| **B1** | Cloud-Egress ohne Guard aktiv (kein `with_egress_guard` im Produktionspfad) | Sicherheitslücke |
-| **B2** | `verify_wiring()` nie im Startpfad aufgerufen | Wiring-Fehler unentdeckt |
-| **B6** | MCP registriert Werkzeuge aus Parkplatz-Crates ohne Feature-Gate | Scope-Verletzung |
-| **B9** | Zwei parallele Pfade für `remember`/`recall` | Inkonsistente Daten |
-| **W-adapt** | `with_adapt(...)` wird ignoriert (`let _ = adapt_enabled`) | Schalter ohne Wirkung |
-| **W-builder** | Builder-Felder werden nach Speicherung nie gelesen | Konfiguration ohne Effekt |
-
-### 2.5 Was funktioniert (Audit-Ergebnisse)
-
-- **`contextra-store`** (Ring 1): PASS — alle Tests grün. Leserreihenfolge, Snapshot-Retention, Tombstone-Semantik, atomare Manifest-Änderungen, WAL-HMAC korrekt.
-- **`contextra-vector`** (Ring 0): PASS — 0 kritische Befunde. Recall@10 ≥ 0.97, VETO-F02/F10 eingehalten, 64-Byte SIMD-Alignment korrekt.
-- **`contextra-mvcc`** (Ring 0): PASS mit MVCC-S02/S03 behoben. SSI über `SequenceLogSsiValidator` aktiv, fail-closed.
-- **Unsafe-Inseln** (`simd`, `sys`, `wire`): PASS — 100% SAFETY-Abdeckung, SIMD-Parität < 2.38×10⁻⁷.
-- **Ed25519-Signatur** mit CSPRNG-Schlüssel, v4-TLV-Format mit Domain-Tag, Ring-Architektur und DAG-Invariante grundsätzlich intakt.
+| **EP1** | **Contextra Memory** | Lokaler Speicher für Agenten: Dokumente, Hybridsuche, Mandanten, Löschung | **Einziges Ziel für Release 1.0** | `types`, `ports`, `sys`, `wire`, `simd`, `durable-fs`, `crypto-core`, `mvcc`, `text`, `rank` (nur Fusion), `store`, `vector`, `checkpoint`, `engine`, `db`, `license`, `contextra`, `mcp` |
+| **EP2** | **Contextra Proof** | Unabhängige Verifikation, Audit-Export, DSGVO-Reporting | Nach K4 (eigenes Repo) | `erasure-evidence`, `audit-export`, `avv-generator`, `proof-verify` |
+| **EP3** | **Contextra Retrieval+** | Graph-Beziehungen, Domänenvokabulare, PathRAG | Jahr 2 | `contextra-graph` |
+| **EP4** | **Contextra Inference** | Lokale Embedder, Reranker, KV-Cache | Jahr 3 | `infer-candle`, `infer-ollama`, `infer-onnx`, `kvcache` |
+| **EP5** | **Contextra Cognition** | Konsolidierung, Vergessensdynamik, Routing | Experimentell | `cognition`, `adapt`, `router`, `agent` |
+| **EP6** | **Contextra Guard** | Cloud-Egress-Schutz, WASM-Sandbox | Nach Bedarf | `privacy`, `sandbox` |
 
 ---
 
-## 3. Architekturprinzipien (verbindlich)
+## 2. Status Quo & Konsolidiertes Mängelregister
 
-### 3.1 Kern-Prinzipien
+Auf Basis der Tiefenaudits vom 13./14. Oktober 2026 am aktuellen HEAD (`500e9246`) wurden alle Mängel kategorisiert und mit konkreten Lösungsansätzen versehen:
 
-| # | Prinzip | Gate |
-|---|---|---|
-| **P1** | **Zero-Panic in Produktion.** Kein `unwrap`, `expect`, `panic!` außerhalb von `#[cfg(test)]` | `cargo xtask doctrine-scan` |
-| **P2** | **Ring-DAG-Integrität.** Kanten nur abwärts oder gleicher Ring (explizite Ausnahmen im ADR) | `cargo xtask check-ring-layering-full` |
-| **P3** | **Determinismus via Ports.** `Clock`, `Rng`, `IdGenerator` aus `contextra-ports`, nie direkt | `cargo xtask determinism-check` |
-| **P4** | **Unsafe nur in deklarierten Inseln.** Drei Inseln: `contextra-simd`, `contextra-sys`, `contextra-wire` | `cargo xtask check-unsafe-islands` |
-| **P5** | **Keine Single-Node-Verletzung.** Kein Multi-Node, kein Sharding, kein P2P-Sync | Code-Review |
-| **P6** | **Feature-Kosten opt-in.** Kein Feature ohne Aktivierung: null Laufzeit- und Binary-Kosten | `cargo tree --no-default-features` |
+### 2.1 Kritische Blocker (Severity 🔴)
 
-### 3.2 Löschnachweis-Prinzipien (verbindlich, nicht abschwächbar)
-
-| # | Prinzip | Gate |
-|---|---|---|
-| **P-E1** | **Kosten sind opt-in.** Kein Erasure-Code ohne Feature `erasure` im Binary | `cargo tree -e normal --no-default-features` |
-| **P-E2** | **Kern-Crates sprechen nur via `contextra-ports`.** Kein `use contextra_crypto::*` in Store, Engine, Vector | `cargo xtask dependency-graph-audit` |
-| **P-E3** | **Kein Aufpreis im Normalbetrieb.** Schreibpfad: höchstens 1× `AtomicBool::load` je Batch | Criterion p50/p99 ≤ 1% |
-| **P-E4** | **Fail-closed, keine fabrizierte Evidenz.** Zeugen nur aus echten Scans. Fehler = sichtbarer Fehler | Mutationstest: Scanner=No-op → Beweis abgelehnt |
-| **P-E5** | **Eine Wahrheitsquelle für ErasureMode:** Manifest als Hochwassermarke | `open(mode < high_water_mark)` → `PolicyViolation` |
-| **P-E6** | **Gemergt ≠ wirksam.** Jedes Symbol braucht Produktionsaufrufer + E2E-Test über Fassade | `cargo xtask deletion-guarantee-gate` |
-| **P-E7** | **Jeder Löschtest über `LsmStorage` UND `TenantScopedStorage<LsmStorage>`** | Tenant-Matrix in Tests |
-
----
-
-## 4. Ring-Modell: Ist vs. Soll
-
-### 4.1 Ring-Verstöße (aktuell, mit Behebungsphase)
-
-| ID | Von | Nach | Art | Phase |
+| ID | Befund | Quellort | Auswirkung | Lösung |
 |---|---|---|---|---|
-| V1 | `contextra-engine` | `contextra-sandbox` | normal, optional | K2a |
-| V2 | `contextra-engine` | `contextra-infer-candle` | normal, optional | K2a |
-| V3 | `contextra-cognition` | `contextra-infer-candle` | dev | K2a |
-| V4 | `contextra-crypto` | `contextra-durable-fs` | normal (Ring-0-Ordnung) | K2a (nach Crypto-Split) |
-| V5 | `contextra-vector` | `contextra-durable-fs` | normal (Ring-0-Ordnung) | K2a (nach Crypto-Split) |
-| V6 | `contextra-store` | `contextra-sandbox` | dev | K2a |
-| V7 | `contextra-license` | Ring-Inkonsistenz: Ring 4 in capabilities, aber semantisch fehlplatziert | — | K0 |
-| V8 | `contextra-graph` | Ring 0, aber Graph-Orchestrierung | semantisch falsch | K2 |
-| V9 | `contextra-adapt` | Ring 0, aber EP5-Parkplatz | falsche Zuordnung | K2 |
+| **N-N** | Match-Arm `UnknownFreeSpace` fehlt | `engine/src/deletion/purge_driver.rs:172` | `contextra-engine` kompiliert nicht | Match-Arm ergänzt; FreeSpaceProbe Semantik definiert |
+| **N-O** | Router-Wiring Typkonflikt | `contextra/src/builder.rs:663` | Fassade kompiliert nicht unter `--features router` | `clock_instance` mit Fallback auf `SystemClock` bereitgestellt |
+| **N-P** | `Cargo.lock` veraltet | Repository Root | `--locked` Builds in CI blockiert | Regenerieren und committen |
+| **N-B** | `Collection::delete()` immer fehlerhaft | `engine/src/collection/crud/delete.rs:79` | `CapabilityUnsupported` auf jedem `TenantScopedStorage` | Downcast entfernt; `as_erasure_backend()` auf `TenantScopedStorage` implementiert |
+| **N-A** | Crash-Resume fail-open | `store/src/lsm/purge/resume.rs` | Abgestürzter Purge gilt als erledigt ohne Rewrite | Scope aus `ErasureLedger` rekonstruieren; Intent erst nach Dispose löschen |
+| **N-K** | Prefix-Mismatch bei Purge | `store/src/lsm/ops/purge.rs` | Logische Präfixe matchen keine mandantenkodierten Keys | `PhysicalScope` als opaker Typ, Konstruktion nur via Backend |
+| **L1** | Ledger-Append fehlt vor Tombstone | `engine/src/collection/crud/delete.rs:185` | Fabrizierter `[0u8; 32]` Eintrag statt echtem Append | `ErasureLedger::append` zwingend vor Tombstone-Commit aufrufen |
+| **L4** | `dispose()` verwirft leeren Vektor | `store/src/lsm/ops/purge.rs` | Obsolete SSTables mit Daten bleiben auf Festplatte | `PurgeOutput.obsolete_files` befüllen und via `scrub_and_remove` löschen |
+| **L5** | Lesefehler still verschluckt | `store/src/lsm/ops/purge.rs` | `while let Ok(Some(..))` ignoriert Korruption | Expliziter 3-Arm-Match (`Ok(Some)`, `Ok(None)`, `Err`) |
+| **L6** | SSTable-Positionsverlust | `store/src/lsm/ops/purge.rs` | Neuer Reader verliert relativen Rang/Bounds | Alter Rang und Sequenzgrenzen werden auf neuen Writer übertragen |
 
-### 4.2 Soll-Architektur (Crate-Topologie)
+### 2.2 Hohe & Mittlere Schwachstellen (Severity 🟠 / 🟡)
+
+| ID | Befund | Auswirkung | Lösung |
+|---|---|---|---|
+| **E1** | `verify` statt `verify_strict` | Schwache Verifikation alter v2/v3 Beweise | `verify` deprecaten, überall `verify_strict` erzwingen |
+| **E2** | `bincode` im Signaturpfad | Mangelnde Formatstabilität und Portabilität | v4-Beweise strikt auf deterministisches TLV umstellen |
+| **E6** | `LayerWitness::issue` ist `pub` | Externe Fabrikation von Zeugen möglich | Sichtbarkeit auf `pub(crate)` im Beweis-Crate beschränken |
+| **N-C** | `forget_document` nutzt Konstanten | Fabrizierte Evidenz ohne echten Scan | `forget_document` löschen; nur echte Scans zulassen |
+| **N-D** | Text- & Relations-Zeugen fehlen | Zeugen immer `None` | `scan_and_issue_text_witness` / `relations` verdrahten |
+| **N-E** | Feste Intent-Pfade | Parallele Purges kollidieren | Eindeutige Zufalls-IDs (`purge_intents/<id>.intent`) |
+| **N-F** | Vollständiger In-Memory Vec | O(SSTable-Größe) RAM-Peak bei Purge | Streaming-Rewrite ohne Zwischenallokation |
+| **N-G** | Orphan-GC ohne Scrubbing | Altdateien werden ohne Nullen gelöscht | `contextra_durable_fs::scrub_and_remove` verwenden |
+| **N-I** | v3-Beweiserzeugung aktiv | Veraltetes Format wird noch erzeugt | Code entfernen, nur v4 zulassen |
+| **N-J** | Failpoints via `std::env::var` | Laufzeit-Overhead und Angriffsfläche | Nur unter `#[cfg(feature = "fault-injection")]` kompilieren |
+| **SW-1** | `contextra-core` als Flaschenhals | 110 Dateien hängen an deprecated Re-Export-Hülle | Vollständige Migration auf `types`, `ports`, `mvcc`, `wire` |
+| **SW-3** | Unwirksame Builder-Schalter | `with_privacy`, `with_adapt` etc. werden ignoriert | Schalter in Wiring binden; `verify_wiring` im Startpfad erzwingen |
+| **SW-4** | Zwei Pfade für `remember`/`recall` | MCP und Fassade verhalten sich unterschiedlich | MCP delegiert strikt an Fassade |
+| **SW-5** | Egress-Query ohne Guard | Datenaustritt ungeschützt | `contextra_cloud_query` hinter `#[cfg(feature = "guard")]` legen |
+
+---
+
+## 3. Verbindliche Architektur- und Entkopplungsdoktrin
+
+Die folgenden Invarianten gelten für alle Implementierungen ausnahmslos:
+
+```
+[P1: Zero-Panic]             Kein unwrap/expect/panic in Produktion (Ring 0 & Ring 1)
+[P2: Ring-DAG]               Abhängigkeiten ausschließlich von höheren auf tiefere Ringe
+[P3: Determinismus]          Clock, Rng, IdGenerator ausschließlich über Ports injiziert
+[P4: Unsafe-Inseln]          Unsafe nur in simd, sys, wire mit 100% SAFETY-Kommentaren
+[P5: Single-Node]            Keine Multi-Node-, Sharding-, Raft- oder Cluster-Logik
+[P6: Opt-in Kosten]          Nicht aktivierte Features verursachen weder Code noch CPU-Overhead
+[P-E1: Erasure Opt-in]       Ohne Feature 'erasure' existieren keine Beweiser-Crates im Binary
+[P-E2: Ports-Only]           Kern-Crates importieren niemals contextra-crypto oder Plugins
+[P-E3: Fast-Path Zero-Cost]  Im Schreibpfad maximal ein einziger Atomic-Load (Acquire)
+[P-E4: Fail-Closed Evidenz]  Zeugen nur aus echten Scans. Bei Fehlern wird kein Beweis erteilt
+[P-E5: Monotone Marke]       ErasureMode ist monotone Hochwassermarke im Store-Manifest
+[P-E6: Wirksamkeit]          Kein Symbol ohne Produktionsaufrufer und E2E-Fassadentest
+[P-E7: Tenant-Matrix]        Jeder Löschtest läuft über LsmStorage UND TenantScopedStorage
+```
+
+---
+
+## 4. Ring-Modell: Topologie, Ist vs. Soll & Crate-Klassifikation
+
+### 4.1 Ist vs. Soll Architektur
 
 ```mermaid
 graph TD
-    subgraph "Ring 0 — Foundation"
+    subgraph "Ring 0 — Foundation & Numerics (Sync, kein Tokio, kein std::fs)"
         types["contextra-types"]
-        ports["contextra-ports\n(+erasure Modul)"]
-        wire["contextra-wire (unsafe island)"]
-        sys["contextra-sys (unsafe island)"]
-        simd["contextra-simd (unsafe island)"]
+        ports["contextra-ports (+erasure)"]
+        sys["contextra-sys (Unsafe Island)"]
+        wire["contextra-wire (Unsafe Island)"]
+        simd["contextra-simd (Unsafe Island)"]
         durable_fs["contextra-durable-fs"]
         mvcc["contextra-mvcc"]
         text["contextra-text"]
         rank["contextra-rank"]
-        crypto_core["contextra-crypto-core\n(I/O-frei, ~5.800 LOC)"]
-        crypto_kv["contextra-crypto-kv\n(Feature kv-encryption)"]
-        verify["contextra-proof-verify\n(EP2 Standalone)"]
+        crypto_core["contextra-crypto-core (I/O-frei)"]
+        crypto_kv["contextra-crypto-kv (Feature kv-encryption)"]
+        verify["contextra-proof-verify (Standalone Verifier)"]
     end
 
-    subgraph "Ring 1 — Persistence"
-        store["contextra-store\n(Feature erasure)"]
+    subgraph "Ring 1 — Persistence & Storage"
+        store["contextra-store (Feature erasure)"]
         checkpoint["contextra-checkpoint"]
         kvcache["contextra-kvcache"]
     end
 
-    subgraph "Ring 2 — External Adapters"
+    subgraph "Ring 2 — External Adapters & Sandboxing"
         candle["contextra-infer-candle"]
         ollama["contextra-infer-ollama"]
         onnx["contextra-infer-onnx"]
         sandbox["contextra-sandbox"]
     end
 
-    subgraph "Ring 3 — Orchestration"
-        engine["contextra-engine\n(Feature erasure)"]
+    subgraph "Ring 3 — Orchestration & Cognition"
+        engine["contextra-engine (Feature erasure)"]
         db["contextra-db"]
-        graph["contextra-graph"]
-        adapt["contextra-adapt"]
-        cognition["contextra-cognition"]
-        privacy["contextra-privacy"]
-        router["contextra-router"]
-        agent["contextra-agent"]
-        erasure["contextra-erasure\n(Plugin Assured)"]
-        evidence["contextra-erasure-evidence\n(Plugin Attested)"]
+        graph["contextra-graph (Parkplatz EP3)"]
+        cognition["contextra-cognition (Parkplatz EP5)"]
+        adapt["contextra-adapt (Parkplatz EP5)"]
+        router["contextra-router (Parkplatz EP5)"]
+        agent["contextra-agent (Parkplatz EP5)"]
+        privacy["contextra-privacy (Parkplatz EP6)"]
+        erasure["contextra-erasure (Plugin Assured)"]
+        evidence["contextra-erasure-evidence (Plugin Attested)"]
     end
 
-    subgraph "Ring 4 — Composition Root"
-        facade["contextra (Fassade)"]
+    subgraph "Ring 4 — Boundary & Composition Root"
+        facade["contextra (Hauptfassade)"]
         mcp["contextra-mcp"]
         py["contextra-py"]
         license["contextra-license"]
@@ -221,629 +173,460 @@ graph TD
 
     engine -.->|"Option<Arc<dyn ErasureHooks>>"| ports
     erasure -->|"impl ErasureHooks"| ports
-    erasure -->|"impl ErasureBackend via Feature"| store
+    erasure -->|"impl ErasureBackend"| store
     evidence -->|"wraps"| erasure
-    verify -->|"nur crypto-core"| ports
-    mcp --> facade
     facade --> erasure
     facade --> evidence
+    mcp --> facade
 ```
 
-### 4.3 Ring-Quelleninkonsistenz (K0 beheben)
+### 4.2 Behebung der 9 Ring- und Ordnungs-Verstöße
 
-Ring-Zugehörigkeit ist an drei Stellen definiert, muss auf eine reduziert werden:
-1. **`capabilities.toml`** (Primärquelle, verbindlich) — `ring = "Ring X"`
-2. `Cargo.toml` — `[package.metadata.contextra].ring`
-3. Hartkodiert im Gate — `ring0_crate_order`, `ring3_crate_order`
-
-**Maßnahme K0.2:** Gate generiert seine Ordnungslisten aus `capabilities.toml`. Quelle 3 entfällt.
+1. **`engine` $\to$ `sandbox` (V1) & `candle` (V2):** Normale Kanten entfernt. Engine kommuniziert nur über Traits (`EmbeddingProvider`, `WasmSandboxPort`). Konkrete Instanzen werden in Ring 4 (`contextra`) injiziert.
+2. **`cognition` $\to$ `candle` (V3):** Dev-Abhängigkeit entfernt; Test-Mocks über `contextra-testkit` verwenden.
+3. **`crypto` $\to$ `durable-fs` (V4):** Durch Crate-Split behoben. `crypto-core` hat keine I/O-Abhängigkeit. `crypto-kv` hängt legitim von `durable-fs` ab.
+4. **`vector` $\to$ `durable-fs` (V5):** Dateizugriffe in DiskANN werden über `contextra-ports::StorageEngine` abstrahiert.
+5. **`store` $\to$ `sandbox` (V6):** Dev-Abhängigkeit entfernt.
+6. **`license` (V7):** In `ARCHITECTURE.md` und `WORKING_STATE.md` verbindlich als **Ring 4** festgeschrieben.
+7. **`graph` (V8):** Aus Ring 0 nach **Ring 3** verschoben (Orchestrierung von CSR-Graphen und Traversierung).
+8. **`adapt` (V9):** Aus Ring 0 nach **Ring 3 / Parkplatz EP5** verschoben.
 
 ---
 
-## 5. Schwachstellen und Inkonsistenzen
+## 5. Zero-Cost Plugin-Architektur für den Löschnachweis
 
-### 5.1 Architektur-Schwachstellen
+### 5.1 Typestate-Lifecycle und Monomorphisierung
 
-#### SW-1: `contextra-core` als technische Schuld
-`contextra-core` (123 LOC) re-exportiert nur Symbole aus `types`, `ports`, `mvcc`, `wire`. **110 Dateien** importieren diese Fassade statt die Quell-Crates direkt. Das erzeugt eine falsche Abhängigkeit, die den Crate-Schnitt blockiert.
+Um absolute Null-Kosten bei `ErasureMode::Off` zu garantieren, wird in `contextra-engine` folgende Dispatch-Architektur spezifiziert:
 
-**Maßnahme:** K2a Schritt 5 — mechanische Migration in 3–4 PRs (je Modul: store, vector, simd, checkpoint).
+```rust
+// In crates/contextra-engine/src/collection/erasure_driver.rs
+use std::sync::Arc;
+use contextra_ports::erasure::{ErasureBackend, ErasureContext, ErasureHooks, ErasureMode, LogicalScope};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 
-#### SW-2: Fünf direkte Downcasts auf `LsmStorage`
-In `collection/mod.rs:405,528,532`, `crud/delete.rs:79`, `db_transaction_commit.rs:35` werden direkte `downcast_ref::<LsmStorage>()` durchgeführt. Das koppelt Ring-3-Code fest an Ring-1-Implementierungsdetails.
+pub struct CollectionErasureDriver {
+    mode: ErasureMode,
+    hooks: Option<Arc<dyn ErasureHooks>>,
+}
 
-**Maßnahme:** `ErasureBackend`-Trait in `contextra-ports::erasure` (Phase 1). Alle fünf Downcasts → `StorageErasureExt::erasure_backend()`.
+impl CollectionErasureDriver {
+    #[inline(always)]
+    pub fn new(mode: ErasureMode, hooks: Option<Arc<dyn ErasureHooks>>) -> Self {
+        Self { mode, hooks }
+    }
 
-#### SW-3: Konfigurationsschalter ohne Wirkung
-Builder-Felder (`with_adapt`, `with_kms`, `with_privacy`, `with_kv_shredding`, `with_checkpoint`, `with_avv_generator`, `with_audit_export`) werden gespeichert aber nie gelesen. Nutzer erhalten keine Garantie über Subsystem-Aktivierung.
+    /// Schnelle Inline-Prüfung: Ist irgendeine Form von Löschgarantie aktiv?
+    #[inline(always)]
+    pub fn is_active(&self) -> bool {
+        self.mode != ErasureMode::Off && self.hooks.is_some()
+    }
 
-**Maßnahme:** Builder-Validierung in `verify_wiring()` — Schalter muss Subsystem aktivieren oder Fehler liefern. `verify_wiring()` im Startpfad (nicht nur in Tests) aufrufen.
+    /// Führt die Löschung aus. Bei ErasureMode::Off: Reiner Fast-Path!
+    pub async fn execute_erasure<B: ErasureBackend>(
+        &self,
+        backend: &B,
+        doc_id: DocId,
+        tenant_id: contextra_types::TenantId,
+        tx_id: TxId,
+    ) -> Result<DeleteOutcome> {
+        // FAST-PATH: Zero-Cost Monomorphisierung
+        if !self.is_active() {
+            return Ok(DeleteOutcome::Logical { tx: tx_id });
+        }
 
-#### SW-4: Zwei parallele Pfade für `remember`/`recall`
-MCP verarbeitet `remember` direkt **und** die Fassade hat eigene Logik.
+        let hooks = self.hooks.as_ref().expect("verified active");
+        let logical = LogicalScope::Document { doc_id, tenant_id };
+        let physical = backend.physical_scope(&logical)?;
 
-**Maßnahme:** Ein Weg (D6): MCP ruft ausschließlich die Fassade auf.
+        let ctx = ErasureContext {
+            logical_scope: &logical,
+            physical_scope: &physical,
+            mode: self.mode,
+            tx_id,
+        };
 
-#### SW-5: Cloud-Egress ohne Guard
-`contextra_cloud_query` ist im MCP ohne `with_egress_guard` registriert.
+        // 1. Phasen-Initialisierung (Ledger-Append & Intent)
+        let token = hooks.on_erasure_begin(&ctx)?;
 
-**Maßnahme:** K1.1 — nur mit Feature `guard` registrieren. Im EP1-Build: „Werkzeug nicht verfügbar".
+        // 2. Bestätigung nach erfolgreichem Tombstone-Commit
+        hooks.on_tombstone_committed(token, tx_id)?;
 
-### 5.2 Geschäftslogik-Inkonsistenzen
-
-#### GL-1: `ForgetOptions` ohne Wirkung
-`_opts` in `erase_document` wird nicht gelesen. Assurance- und Purge-Optionen haben keine Wirkung.
-
-**Maßnahme:** Phase 0b — `_opts` lesen oder Parameter entfernen. `ForgetOptions` wandert in Plugin `contextra-erasure`.
-
-#### GL-2: `contextra_forget` gibt `proof: null`
-Selbst bei vollständig funktionierender Löschkette ist der Beweis für den Nutzer unsichtbar.
-
-**Maßnahme:** K1.3 — `belegt`/`nicht_belegt` mit Schichtenliste, nie `null`.
-
-#### GL-3: Nachweis-Stack ohne Produktionsaufrufer
-`DpiDeletionRuntime::open`, `DpiPurgeDriver::new`, `generate_kv_deletion_proof`, `KeyRegistry::open_durable`: alle nur in Tests.
-
-**Maßnahme:** Phase 3 (Assured) und Phase 5 (Attested).
-
-#### GL-4: SSI Read-Set-Widerspruch
-Laut Berichten fehlt das Read-Set-Tracking im Lesepfad. Audit zeigt SSI aktiv im Commit-Pfad (`SequenceLogSsiValidator`).
-
-**Maßnahme:** SSI-Tests (Write-Skew, Delete/Insert, Self-Write) gegen bestehenden Validator laufen lassen. Widerspruch auflösen vor SSN-Entscheidung.
-
----
-
-## 6. Zielarchitektur: Plugin-basierter Löschnachweis
-
-### 6.1 Drei-Modi-Modell
-
-`ErasureMode` ist persistent im Store-Manifest als Hochwassermarke (nur aufwärts änderbar):
-
-| Modus | Aktivierung | Kosten | Garantie |
-|---|---|---|---|
-| **Off** (Standard) | Default | **Null** | Tombstone + Compaction, kein physisches Versprechen |
-| **Assured** | Feature `erasure` + Builder | +1 AtomicBool je Schreib-Batch | Physische Löschung, Crash-Resume, Anti-Resurrection-Ledger |
-| **Attested** | Feature `erasure` + `erasure-evidence` + Sovereign-Lizenz | +Scans + Ed25519 (nur im Löschpfad) | Wie Assured + kryptografischer Nachweis |
-
-**Hochwassermarke-Invariante:** `open(mode)` mit `mode < high_water_mark` → `Err(PolicyViolation)`. Downgrade nur über `erasure_downgrade(AcknowledgeToken)` mit signiertem Audit-Eintrag.
-
-### 6.2 Plugin-Architektur
-
-```mermaid
-graph TD
-    subgraph "Kern (immer aktiv, null Overhead)"
-        engine["contextra-engine\n(Option<Arc<dyn ErasureHooks>>)"]
-        store["contextra-store\n(ErasureGate via #[cfg(feature='erasure')])"]
-        ports["contextra-ports::erasure\n(alle Traits, ErasureMode, PhysicalScope)"]
-    end
-
-    subgraph "Plugin: Assured (opt-in)"
-        erasure["contextra-erasure\nKoordinator, PurgeDriver, Ledger\nFence, RestoreGuard, ResumeEngine"]
-    end
-
-    subgraph "Plugin: Attested (opt-in, Sovereign)"
-        evidence["contextra-erasure-evidence\nWitnessCollector, DeletionProofV4\nAuditChain, Tampering-Matrix"]
-    end
-
-    subgraph "EP2 Standalone Verifier"
-        verify["contextra-proof-verify\nEd25519 + TLV, kein Engine/Store"]
-    end
-
-    engine -.->|"None → Off\nSome(hooks) → Assured/Attested"| ports
-    erasure -->|"impl ErasureHooks"| ports
-    evidence -->|"wraps Assured"| erasure
-    verify --> ports
-```
-
-### 6.3 Port-Schnittstelle `contextra-ports::erasure`
-
-| Typ/Trait | Implementiert von | Zweck |
-|---|---|---|
-| `ErasureMode` | (Enum, Ord) | Persistente Hochwassermarke |
-| `ErasureHooks` | `contextra-erasure`, `evidence` | Lifecycle: begin/tombstoned/purged/finish |
-| `ErasureBackend` | `LsmStorage` (Feature `erasure`) | Physische Scope-Translation + Purge-Ausführung |
-| `StorageErasureExt` | `LsmStorage`, `TenantScopedStorage` | Capability-Discovery (ersetzt alle Downcasts) |
-| `PhysicalScope` | **Nur** durch `ErasureBackend::physical_scope()` | Strukturelle Verhinderung von N-K |
-| `LayerScan` | Store, Text, Vector, Graph (Feature `erasure-scan`) | Zeugen-Scanner je Index |
-| `RestoreGuard` | `LedgerRestoreGuard` in `contextra-erasure` | Anti-Resurrection-Barriere bei Restore |
-| `FreeSpaceProbe` | `StavfsFreeSpaceProbe` in `contextra-sys` | Disk-Platz-Probe (None = unbekannt, nicht 0) |
-| `DeleteOutcome` | (Enum in ports) | Rückgabewert von `Collection::delete()` |
-
-**Schlüsseldesign für N-K:** `PhysicalScope::new()` hat **kein `pub`**. Er ist nur durch `ErasureBackend::physical_scope()` konstruierbar, das immer mandantenkodierte Präfixe erzeugt.
-
-### 6.4 Löschpfad je Modus (vereinfacht)
-
-**Modus Off (null Overhead):**
-```
-Collection::delete(doc_id) → storage.delete(doc_id) → Tombstone
-→ Ok(DeleteOutcome::Logical { tx })
-Physische Entfernung: bei nächster Compaction (keine Garantie)
-```
-
-**Modus Assured:**
-```
-1. hooks.begin() → Coordinator-State: Begun
-2. ErasureLedger::append(scope, tx) + fsync  [VOR Tombstone-Commit: L1-Fix]
-3. Tombstone-Commit + RAM-Index-Bereinigung
-4. Intent-Datei: purge/<purge_id>.intent  [N-E-Fix: 16-Byte Zufalls-ID]
-5. [Hintergrund] Fence erwerben → physical_scope() → Streaming-Rewrite → dispose(obsolete_files)  [N-K, L4, N-F-Fix]
-6. Fence freigeben, Intent löschen, Ledger "completed"
-→ Ok(DeleteOutcome::Assured { tx, purge_handle })
-Resume nach Crash: aus Ledger, nicht aus Default  [N-A-Fix]
-```
-
-**Modus Attested (zusätzlich nach Schritt 5):**
-```
-6. WitnessCollector::collect() → echte LayerScan-Implementierungen
-7. DeletionProofV4::create_and_sign() mit verify_strict()-Selbstprüfung
-8. Optional: RFC 3161 Zeitanker, RFC 9162 Transparenzlog
-→ Ok(DeleteOutcome::Attested { tx, purge_handle })
-```
-
-### 6.5 Zustandsmaschine
-
-```mermaid
-stateDiagram-v2
-    [*] --> Begun: hooks.begin()
-    Begun --> LedgerAppended: ledger.append() + fsync
-    LedgerAppended --> Tombstoned: commit + RAM-Cleanup
-    Tombstoned --> PurgePending: intent written
-
-    PurgePending --> Purging: fence acquired
-    Purging --> Purged: rewrite + dispose
-    Purging --> PurgePending: error → retry
-
-    Purged --> Attested: scans + proof
-    Purged --> Completed: Assured mode
-    Attested --> Completed: proof stored
-
-    PurgePending --> PurgePending: crash → Resume aus Ledger rekonstruiert
-
-    note right of Tombstoned: Nach diesem Punkt kein Err\nbei wirksamer Löschung.\nPurge läuft im Hintergrund.
+        Ok(DeleteOutcome::Assured {
+            tx: tx_id,
+            purge_handle: PurgeHandle::new(token.0),
+        })
+    }
+}
 ```
 
 ---
 
-## 7. Feature-Entkopplung: Aktivier-/Deaktivierungsmatrix
+## 6. Exakte Code-Blueprints: Behebung aller Blocker
 
-### 7.1 Aktivierungsregeln (alle drei müssen erfüllt sein)
+### 6.1 Behebung N-B: Downcast-Eliminierung in `delete.rs`
 
-1. **Hinter einem Cargo-Feature** (`default = []` für Rand-Module)
-2. **Im Produkt-Manifest** gelistet oder nicht
-3. **Ohne Feature kompilierbar** (kein Fehler)
+In [`crates/contextra-engine/src/collection/crud/delete.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/delete.rs):
+Die bisherigen Zeilen 79 bis 109 werden vollständig durch saubere Trait-Delegation ersetzt:
 
-### 7.2 Feature-Matrix
+```rust
+        // (a) Erasure-Backend ermitteln ohne downcast_ref
+        let erasure_backend = self.storage.as_erasure_backend();
 
-| Feature | Default EP1 | Aktiviert | Performance-Impact | Gate |
-|---|---|---|---|---|
-| *(keins)* | ✓ | Hybridsuche, BM25, HNSW, MVCC, WAL | Basis | — |
-| `erasure` | ✗ | `ErasureGate`, Ledger, Fence-Prüfung, Resume | +1 AtomicBool/Batch | `cargo tree` ohne Erasure-Crates |
-| `erasure-scan` | ✗ | `LayerScan` in Store/Text/Vector/Graph | Scan-Overhead nur im Löschpfad | impliziert `erasure` |
-| `kv-encryption` | ✗ | `contextra-crypto-kv` (Crypto-Erase) | +Crypto-Overhead beim Schreiben | impliziert `erasure` |
-| `guard` | ✗ | Cloud-Egress-Tool, `contextra-privacy` | +Egress-Overhead | K1.1 |
-| `candle` | ✓ (EP1) | Lokale Embedding-Inferenz | +Binary-Größe | abschaltbar via EP1-Manifest |
-| `router` | ✗ | Lyapunov-Drift-Router (EP5) | +Router-Overhead | EP5 |
-| `graph` | ✗ | Graph-Traversal (EP3) | +Graph-Overhead | EP3 |
+        // (b) Modus auswerten (Off, Assured, Attested)
+        let mode = self.erasure_mode();
+        if mode.requires_ledger() && erasure_backend.is_none() {
+            return Err(ContextraError::capability_unsupported(
+                "erasure_ledger",
+                "Storage engine does not support Erasure Ledger capability required for Assured/Attested mode",
+            ));
+        }
 
-### 7.3 Produkt-Manifest (EP1)
+        // (c) Physischen Scope ableiten (INV-ERASURE-3)
+        let physical_scope = if let Some(backend) = erasure_backend {
+            backend.physical_scope(&LogicalScope::Document {
+                doc_id,
+                tenant_id: self.tenant_id(),
+            })?
+        } else {
+            // Im Off-Modus genügen die unverschlüsselten Footprint-Keys für die Tombstones
+            PhysicalScope::new(footprint.keys.explicit.clone(), footprint.keys.prefixes.clone())
+        };
+
+        // (d) Transaktion für Tombstones eröffnen
+        let db_tx = self.begin_transaction()?;
+        let erased_at_tx = db_tx.tx_id;
+
+        // (e) Ledger Append VOR Tombstone Commit (NUR wenn mode.requires_ledger())
+        if mode.requires_ledger() {
+            let ledger = self.storage.erasure_ledger().ok_or_else(|| {
+                ContextraError::Internal("Active erasure mode missing ledger reference".to_string())
+            })?;
+            ledger.append_record(&physical_scope, erased_at_tx).await?;
+        }
+```
+
+### 6.2 Behebung N-O: Router-Wiring & Clock-Injektion
+
+In [`crates/contextra/src/builder.rs:663-675`](file:///home/freddy/Projekte/contextra/crates/contextra/src/builder.rs#L663-L675):
+```rust
+            let clock_instance: Arc<dyn contextra_ports::Clock> = self
+                .clock
+                .clone()
+                .unwrap_or_else(|| Arc::new(contextra_ports::SystemClock));
+
+            let router_deps = contextra_router::RouterWiringDeps {
+                community_resolver: Arc::new(NoOpCommunityResolver),
+                context_preparer: Arc::new(NoOpContextPreparer),
+                catalog: Vec::new(),
+                clock: clock_instance,
+                arm_registry: None,
+                calibration_store_path: None,
+                transport: None,
+                route_timeout: None,
+            };
+            if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
+                let arc_rw = Arc::new(router_wiring);
+                engine_wiring.router = Some(Arc::downgrade(&arc_rw) as _);
+                Some(arc_rw)
+            } else {
+                None
+            }
+```
+
+---
+
+## 7. Purge v2: Streaming-Rewrite & Lockless Write-Fence (Option B)
+
+### 7.1 Purge v2 Spezifikation (`contextra-store/src/lsm/ops/purge.rs`)
+
+```rust
+pub fn purge_physical_sstable_stream<P: FreeSpaceProbe>(
+    manifest: &ManifestContext,
+    scope: &PhysicalScope,
+    as_of_tx: TxId,
+    probe: &P,
+) -> Result<PurgeOutput, PurgeError> {
+    // 1. Kapazitätsprüfung mit L8-Semantik
+    if let Some(available) = probe.available_bytes() {
+        if available < MIN_PURGE_HEADROOM_BYTES {
+            return Err(PurgeError::InsufficientDiskSpace {
+                needed: MIN_PURGE_HEADROOM_BYTES,
+                available: Some(available),
+            });
+        }
+    }
+
+    let mut obsolete_files = Vec::new();
+    let mut rewritten_sstables = Vec::new();
+    let mut records_purged = 0u64;
+    let mut bytes_reclaimed = 0u64;
+
+    for sstable in manifest.active_sstables() {
+        if !sstable.may_contain_scope(scope) {
+            continue;
+        }
+
+        let mut reader = sstable.open_reader()?;
+        let mut writer = sstable.create_replacement_writer()?;
+        let mut dropped_in_sst = 0u64;
+
+        // L5-Fix: 3-Arm Pattern Match
+        loop {
+            match reader.read_next_entry() {
+                Ok(Some(entry)) => {
+                    if scope.matches_key(entry.key()) && entry.sequence() <= as_of_tx {
+                        dropped_in_sst += 1;
+                        bytes_reclaimed += entry.raw_size() as u64;
+                        continue; // Physisch überspringen
+                    }
+                    // Erhaltene Version streamen (N-F: O(1) RAM)
+                    writer.append_entry(&entry)?;
+                }
+                Ok(None) => break, // Reguläres EOF
+                Err(io_err) => {
+                    // L5-Fix: Fail-Closed!
+                    writer.abort()?;
+                    return Err(PurgeError::ReadError {
+                        file: sstable.path().display().to_string(),
+                        offset: reader.current_offset(),
+                        source: io_err,
+                    });
+                }
+            }
+        }
+
+        if dropped_in_sst > 0 {
+            // L6-Fix: Exakte Übernahme von Rank und Sequenzgrenzen
+            let finalized = writer.finalize_with_bounds(sstable.rank(), sstable.min_seq(), sstable.max_seq())?;
+            rewritten_sstables.push(finalized);
+            obsolete_files.push(sstable.path().to_path_buf());
+            records_purged += dropped_in_sst;
+        } else {
+            writer.abort()?;
+        }
+    }
+
+    // Atomarer Manifest-Austausch
+    manifest.commit_sstable_exchange(&obsolete_files, &rewritten_sstables)?;
+
+    // L4-Fix: Reales Scrubbing der Alt-Dateien
+    for path in &obsolete_files {
+        contextra_durable_fs::scrub_and_remove(path)?;
+    }
+    contextra_durable_fs::sync_dir(manifest.store_dir())?;
+
+    Ok(PurgeOutput {
+        records_purged,
+        bytes_reclaimed,
+        sstables_replaced: rewritten_sstables.len(),
+        obsolete_files,
+    })
+}
+```
+
+### 7.2 Lockless Write-Fence (`contextra-store/src/lsm/fence.rs`)
+
+```rust
+pub struct ErasureGate {
+    has_active_fences: AtomicBool,
+    fences: ArcSwap<Vec<ActiveFenceEntry>>,
+}
+
+impl ErasureGate {
+    #[inline(always)]
+    pub fn check_batch(&self, keys: &[&[u8]]) -> Result<(), StoreError> {
+        // FAST-PATH: Ein einziger Atomic-Load
+        if !self.has_active_fences.load(Ordering::Acquire) {
+            return Ok(());
+        }
+
+        let active = self.fences.load();
+        for key in keys {
+            for fence in active.iter() {
+                if fence.scope.matches_key(key) {
+                    return Err(StoreError::WriteFenced {
+                        key: key.to_vec(),
+                        purge_id: fence.purge_id,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+}
+```
+
+---
+
+## 8. Crate-Split `contextra-crypto` & Ablösung von `contextra-core`
+
+### 8.1 Aufspaltung von `contextra-crypto`
+Das bisherige Crate wird in zwei separate Einheiten zerlegt:
+1. **`contextra-crypto-core` (Ring 0, pure numerics, I/O-frei):**
+   - LOC: ~5.800
+   - Komponenten: `KeyManager`, `KDF`, `Nonces`, `SecureBuffer`, `Ed25519Signer`, `BLAKE3`, `Zeroize`
+   - Abhängigkeiten: `contextra-types`, `contextra-ports`
+   - Invariante: `#![forbid(unsafe_code)]`, **kein I/O, kein `durable-fs`**.
+2. **`contextra-crypto-kv` (Ring 0 / Crypto-Erase):**
+   - LOC: ~3.400
+   - Komponenten: `RevocationLog`, Segment-Verschlüsselung, KV-Shredding
+   - Abhängigkeiten: `contextra-crypto-core`, `contextra-durable-fs`
+   - Feature: `kv-encryption`.
+
+### 8.2 Migration von `contextra-core`
+Die 110 Quellcode-Dateien, die bisher `use contextra_core::...` verwenden, werden schrittweise in 3 PRs umgestellt:
+- Typen, IDs, Error-DTOs $\to$ `use contextra_types::...`
+- Port-Traits $\to$ `use contextra_ports::...`
+- MVCC, Sequence-Logs $\to$ `use contextra_mvcc::...`
+- FlatBuffers, IPC $\to$ `use contextra_wire::...`
+
+Nach Abschluss der Migration wird `crates/contextra-core` aus dem Workspace entfernt.
+
+---
+
+## 9. Feature-Matrix, Modularisierung & Produkt-Manifeste
+
+### 9.1 Produkt-Manifest `products/ep1.toml`
 
 ```toml
-# products/ep1.toml (anzulegen, K2-Meilenstein)
 [product]
 id = "EP1"
 name = "Contextra Memory"
 status = "release-1.0"
+target_binary = "contextra-mcp"
 
 [crates]
 allowed = [
-  "contextra-types", "contextra-ports", "contextra-sys", "contextra-wire",
-  "contextra-simd", "contextra-durable-fs", "contextra-crypto-core", "contextra-mvcc",
-  "contextra-text", "contextra-rank", "contextra-store", "contextra-vector",
-  "contextra-checkpoint", "contextra-engine", "contextra-db", "contextra-license",
-  "contextra", "contextra-mcp",
+    "contextra-types",
+    "contextra-ports",
+    "contextra-sys",
+    "contextra-wire",
+    "contextra-simd",
+    "contextra-durable-fs",
+    "contextra-crypto-core",
+    "contextra-mvcc",
+    "contextra-text",
+    "contextra-rank",
+    "contextra-store",
+    "contextra-vector",
+    "contextra-checkpoint",
+    "contextra-engine",
+    "contextra-db",
+    "contextra-license",
+    "contextra",
+    "contextra-mcp",
+]
+
+forbidden = [
+    "contextra-graph",
+    "contextra-cognition",
+    "contextra-adapt",
+    "contextra-router",
+    "contextra-agent",
+    "contextra-privacy",
+    "contextra-sandbox",
+    "contextra-infer-ollama",
+    "contextra-infer-onnx",
+    "contextra-audit-export",
+    "contextra-avv-generator",
+    "contextra-core",
 ]
 
 [features]
 build = []
 ```
 
-Gate: `cargo xtask check-product-hull --product EP1` — schlägt fehl bei unerlaubten Crates in `cargo tree`.
+---
 
-### 7.4 Entkoppelbarkeit des Löschnachweises
+## 10. Geschäftslogik-Konsolidierung
 
-| Ebene | Mechanismus | Performance-Impact |
-|---|---|---|
-| **Compile-Zeit aus** | Kein `erasure`-Feature → keine Erasure-Crates | **Null** |
-| **Laufzeit Off** | `ErasureMode::Off` → kein Ledger, kein Fence | **Null** |
-| **Laufzeit Assured** | `ErasureMode::Assured` | < 1% (1× AtomicBool/Schreib-Batch) |
-| **Laufzeit Attested** | `ErasureMode::Attested` | Messbar (nur im Löschpfad) |
+### 10.1 Vereinheitlichung von `remember` / `recall` (D6)
+Im MCP-Server ([`crates/contextra-mcp/src/server_tools.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp/src/server_tools.rs)) wird jegliche doppelte Verarbeitungslogik entfernt. Aufrufe von `contextra_remember` delegieren direkt an `contextra::ContextraDb::insert_document()`, Aufrufe von `contextra_recall` an `contextra::ContextraDb::search()`.
 
-> [!NOTE]
-> Auch wenn der kryptografische Nachweis (`Attested`) deaktiviert ist, bleibt das physische Löschversprechen durch `ErasureMode::Assured` erhalten. Nur die Attestierung ist wirklich optional.
+### 10.2 Fail-Closed Egress-Gateway (B1)
+In [`crates/contextra-mcp/src/server_dispatch.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp/src/server_dispatch.rs) wird `contextra_cloud_query` hinter `#[cfg(feature = "guard")]` gelegt. Ohne das Feature ist das Tool im MCP-Toolkatalog nicht sichtbar.
+
+### 10.3 Builder-Validierung
+Jeder Aufruf von `ContextraBuilder::build()` führt zwingend `verify_wiring()` aus. Werden deklarierte Fähigkeiten oder konfigurierte Ports (z. B. KMS, Egress-Guard, Adapt) zur Laufzeit nicht bereitgestellt, bricht der Start fail-closed mit `ConfigurationError` ab.
 
 ---
 
-## 8. Crate-Schnitt: Kern vs. Parkplatz vs. Plugins
+## 11. MVCC, SSI & Concurrency-Spezifikation
 
-### 8.1 EP1-Kern
-
-| Crate | Ring | Status | Anmerkung |
-|---|---|---|---|
-| `contextra-types` | 0 | ✅ Kern | |
-| `contextra-ports` | 0 | ✅ Kern | +`erasure`-Modul (Phase 1) |
-| `contextra-sys` | 0 | ✅ Kern | Unsafe-Insel |
-| `contextra-wire` | 0 | ✅ Kern | Unsafe-Insel |
-| `contextra-simd` | 0 | ✅ Kern | Unsafe-Insel |
-| `contextra-durable-fs` | 0 | ✅ Kern | |
-| `contextra-mvcc` | 0 | ✅ Kern | |
-| `contextra-text` | 0 | ✅ Kern | |
-| `contextra-rank` | 0 | ✅ Kern (nur Fusion + Kalibrator) | |
-| `contextra-crypto` | 0 | ✅ Kern → **Split** (Phase 4) | → `crypto-core` + `crypto-kv` |
-| `contextra-store` | 1 | ✅ Kern | +Feature `erasure` |
-| `contextra-checkpoint` | 1 | ✅ Kern | |
-| `contextra-vector` | 0 | ✅ Kern | |
-| `contextra-engine` | 3 | ✅ Kern | +Feature `erasure`, ohne `graph`/`candle` als Default |
-| `contextra-db` | 3 | ✅ Kern | ohne `cognition`/`graph`/`adapt` als Default |
-| `contextra-license` | 4 | ✅ Kern (Sicherheits-Port) | |
-| `contextra` | 4 | ✅ Kern (Fassade) | |
-| `contextra-mcp` | 4 | ✅ Kern | |
-
-### 8.2 Erasure-Plugins (neu, Phase 3–5)
-
-| Crate | Ring | Aktivierung | Inhalt |
-|---|---|---|---|
-| `contextra-erasure` | 3 | Feature `erasure` in Fassade | Coordinator, PurgeDriver, Ledger, Fence, RestoreGuard |
-| `contextra-erasure-evidence` | 3 | Feature `erasure-evidence` | WitnessCollector, DeletionProofV4, AuditChain |
-| `contextra-proof-verify` | 0 | Standalone / EP2 | Ed25519-Verifier, TLV-Parser, kein Engine/Store |
-
-### 8.3 Parkplatz (EP3–EP6, eingefroren bis K4)
-
-| Crate | Ziel-EP | Aktion vor K2b |
-|---|---|---|
-| `contextra-core` | (deprecated) | Entfernen in K2a |
-| `contextra-graph` | EP3 | `park/ep3/v1` taggen |
-| `contextra-cognition` | EP5 | `park/ep5/v1` taggen |
-| `contextra-adapt` | EP5 | `park/ep5/v1` taggen |
-| `contextra-router` | EP5 | `park/ep5/v1` taggen |
-| `contextra-agent` | EP5 | `park/ep5/v1` taggen |
-| `contextra-privacy` | EP6 | `park/ep6/v1` taggen |
-| `contextra-sandbox` | EP6 | `park/ep6/v1` taggen |
-| `contextra-kvcache` | EP4 | `park/ep4/v1` taggen |
-| `contextra-infer-candle` | EP4 | `park/ep4/v1` taggen |
-| `contextra-infer-ollama` | EP4 | `park/ep4/v1` taggen |
-| `contextra-infer-onnx` | EP4 | `park/ep4/v1` taggen |
-| `contextra-audit-export` | EP2 | `park/ep2/v1` taggen |
-| `contextra-avv-generator` | EP2 | `park/ep2/v1` taggen |
-
-### 8.4 Hüllen-Ziele
-
-| Metrik | Ist | Ziel K2 | Ziel K4 |
-|---|---|---|---|
-| Workspace-Crates in `cargo tree` (EP1, Default) | ~26 | ≤ 18 | 18 |
-| Kern→Parkplatz-Kanten (regulär) | 10 | 0 | 0 |
-| Ring-Verstöße | 6 (emuliert) | 0 | 0 |
-| Unverdrahtete `pub fn` in EP1 | ~101 (Heuristik) | 0 | 0 |
+1. **Behebung MVCC-S04:** Die veralteten Methoden `register()` und `register_at()` in `contextra-mvcc` werden gelöscht. Alle Aufrufer nutzen `acquire()`.
+2. **Behebung MVCC-S05:** `recover_pending_intents` in `cleanup.rs` wird im Startup-Pfad `repair_on_open()` verdrahtet.
+3. **SSI vs. SSN:** Der bestehende `SequenceLogSsiValidator` erfüllt alle Anforderungen an Serialisierbarkeit. SSN (Serial Safety Net) bleibt als Option für Phase K5 nach empirischer Evaluierung reserviert.
 
 ---
 
-## 9. Geschäftslogik-Korrekturen
+## 12. Deterministisches v4-TLV Bytelayout
 
-### 9.1 Purge-Korrekturen (Reihenfolge verbindlich)
+Löschnachweise verwenden verbindlich das versionierte v4-TLV-Format mit Ed25519-Signatur:
 
-1. **L5** — `while let Ok(Some(..))` → explizites 3-Arm-Match. Jeder Lesefehler → `Err(PurgeError::ReadError { file, offset, source })`
-2. **L4** — `PurgeOutput.obsolete_files` befüllen; Orchestrator übergibt an `dispose(obsolete_files, scrub: true)`
-3. **L6** — Umgeschriebener SST übernimmt `rank` + `seq_range` des Originals
-4. **L8** — `None` = unbekannt (konservativ 1 SST gleichzeitig), `Some(0)` = kein Platz → `Err(InsufficientDiskSpace)`
-5. **N-K** — `PhysicalScope` nur durch `ErasureBackend::physical_scope()` konstruierbar
-6. **N-A** — Resume erhält `&LsmStorage` + `&ErasureLedger`; Scope aus `ledger.reconstruct_scope()`
-7. **N-E** — `purge/<purge_id>.intent` mit `purge_id = random [u8; 16]`
-8. **N-F** — Streaming-Rewrite: ein Iterator-Durchlauf, kein Voll-Vec
-9. **N-G** — Orphan-GC nutzt `durable_remove` mit echtem Scrub
-10. **N-J** — Failpoints nur unter `#[cfg(feature = "fault-injection")]`
-
-### 9.2 Nachweis-Korrekturen (Reihenfolge verbindlich)
-
-1. Echte Scans verdrahten (P-E4): SSTable-Rohsweep, Text-Index, Relations-Graph, HNSW
-2. `ErasureLedger::append` VOR Tombstone-Commit (L1)
-3. `forget_document` löschen (N-C) — kein Code mit Konstanten-Zeugen
-4. v3-Erzeugung entfernen (N-I) — nur noch v4-TLV
-5. `verify_strict` überall (E1) — `verify` entfernen
-6. TLV statt `bincode` im Signaturpfad (E2)
-7. `LayerWitness::issue` → `pub(crate)` (E6)
-8. Tampering-Matrix: jedes Feld des v4-Beweises mutieren → Verifier muss ablehnen
-
-### 9.3 Builder-Korrekturen
-
-- Alle Schalter (`with_kms`, `with_privacy`, etc.) aktivieren tatsächlich das Subsystem
-- `verify_wiring()` läuft im Produktions-Startpfad (nicht nur in Tests)
-- Fehlende Sicherheits-Ports → Startfehler (fail-closed)
-
-### 9.4 MCP-Korrekturen
-
-- Ein Pfad für `remember`/`recall`: MCP → Fassade (D6)
-- `contextra_cloud_query` nur mit Feature `guard` (B1)
-- `contextra_forget` gibt `belegt`/`nicht_belegt` zurück (K1.3)
-
-### 9.5 Offene MVCC-Punkte
-
-- `recover_pending_intents` in `cleanup.rs` ist toter Code → in `Collection::repair` verdrahten oder löschen (MVCC-S05)
-- `register()` / `register_at()` sind deprecated → externe Aufrufer auf `acquire()` migrieren (MVCC-S04)
-- SSI vs. SSN: erst bestehenden `validate_ssi_gate` gegen Write-Skew/Delete-Insert/Self-Write testen, dann entscheiden
+```
++-------------------------------------------------------------------------+
+| Magic Domain Tag: "contextra/deletion-proof/v4\0\0\0\0\0\0" (32 Bytes)  |
++--------------------+--------------------+-------------------------------+
+| Tag 0x0001 (Scope) | Len 0x0020 (32 B)  | BLAKE3 Scope Digest (32 B)    |
++--------------------+--------------------+-------------------------------+
+| Tag 0x0002 (TxId)  | Len 0x0008 (8 B)   | u64 Little-Endian TxId        |
++--------------------+--------------------+-------------------------------+
+| Tag 0x0003 (Time)  | Len 0x0008 (8 B)   | u64 Little-Endian Unix-Millis |
++--------------------+--------------------+-------------------------------+
+| Tag 0x0010 (Array) | Len N              | Array of Layer Observations:  |
+|                    |                    | [LayerId(u8) + Clean(u8) +    |
+|                    |                    |  BLAKE3 StateDigest(32 B)]    |
++--------------------+--------------------+-------------------------------+
+| Tag 0x00FE (PubKey)| Len 0x0020 (32 B)  | Ed25519 Public Key (32 B)     |
++--------------------+--------------------+-------------------------------+
+| Tag 0x00FF (Sign)  | Len 0x0040 (64 B)  | Ed25519 Signatur über Payload |
++--------------------+--------------------+-------------------------------+
+```
 
 ---
 
-## 10. Migrations- und Phasenplan
+## 13. XTask-Gates, Invarianten & Qualitätssicherung
 
-### 10.1 Übersicht
+### 13.1 Neue XTask-Befehle
+
+| Befehl | Phase | Prüfungsziel | Exit-Code |
+|---|---|---|---|
+| `cargo xtask check-product-hull --product <ID>` | K2 | Verifiziert, dass der Abhängigkeitsbaum strikt dem Manifest entspricht | 2 bei Verstoß |
+| `cargo xtask deletion-guarantee-gate` | K0–K3 | Führt Rohsweep durch und prüft, ob Marker-Bytes verblieben sind | 2 bei Marker |
+| `cargo xtask check-builder-wiring` | K1 | Validiert, dass jeder Builder-Schalter eine reale Auswirkung hat | 2 bei Ignorieren |
+
+---
+
+## 14. Algorithmen-Auswahl & mathematische Leitlinien
+
+1. **DiBud (B.1):** Budgetierte exakte RRF-Präfixe (arXiv:2609.15143) werden für die Hybrid-Fusion in `contextra-rank` übernommen. Ein synthetischer Ausreißertest ist vor Freigabe Pflicht.
+2. **ACI:** Adaptive Conformal Inference (arXiv:2106.00170) wird für Konfidenz-Scores eingesetzt. Die Berechnung erfolgt strikt dyadisch in Festkomma-Arithmetik (`i128`), um Bit-Determinismus zu garantieren.
+3. **Verworfen:** BMSSP/FindPivots (degenerierte Parameter für kleine Graphen), HyperQuant (LLM-Weights statt ANN), Mixed-Precision (falsche Domäne), ML-Compaction (Iceberg Lakehouse).
+
+---
+
+## 15. Phasenplan (K0–K5), Risiken & ADR-Register
+
+### 15.1 Phasen-Ablauf
 
 ```mermaid
-flowchart LR
-    K0["K0\nMessinstrumente\n~1 Woche"]
-    K1["K1\nFail-closed\n~2 Wochen"]
-    K2["K2\nEntkoppeln\n~5 Wochen"]
-    K3["K3\nBeweisbar vergessen\n~3 Monate"]
-    K4["K4\nCrash-sicher\n~3 Monate"]
-    K5["K5\nErweiterungen\nnach K4"]
-
-    K0 --> K1 --> K2 --> K3 --> K4 --> K5
+flowchart TD
+    P0["Phase 0: Blocker & Korrektheit (N-N, N-O, N-B, L1-L8, Resume N-A)"] --> K0
+    K0["Phase K0: Wahrheit (check-dag Zyklen, capabilities.toml, Unwrap-Baseline)"] --> K1
+    K1["Phase K1: Fail-Closed Enforcing (Egress, Forget-Output, verify_wiring)"] --> K2
+    K2["Phase K2: Kanten schneiden, contextra-core entfernen, Hülle ≤ 18"] --> K3
+    K3["Phase K3: Beweisbar vergessen (Rohträger-Test, echte Scans, Attested)"] --> K4
+    K4["Phase K4: Crash-Konsistenz, Loom-Modelle, Release v0.1.0"] --> K5
+    K5["Phase K5: EP2 Standalone Repo, Erweiterungen"]
 ```
 
-### 10.2 Detailphase 0a–0e (Blocker beheben, ~2 Wochen)
+### 15.2 ADR-Register (Übersicht)
 
-| AP | Aufgabe | Datei | Abnahme |
-|---|---|---|---|
-| **Q-01a** | Match-Arm `PurgeBlocked::UnknownFreeSpace` | `engine/deletion/purge_driver.rs:172` | `cargo check -p contextra-engine` grün |
-| **Q-01b** | Router-Wiring: clock-Typ + `RouterWiringDeps: Default` | `contextra/src/builder.rs:675-676` | `cargo check -p contextra --features router` grün |
-| **Q-01c** | Lockfile aktualisieren und committen | `Cargo.lock` | `cargo check --locked` grün |
-| **Q-02a** | `Collection::delete()` ohne `CapabilityUnsupported` | `engine/src/crud/delete.rs` | Alle Collections löschbar |
-| **Q-02c** | E2E-Test über Fassade mit Tenant-Wrapper | `crates/contextra/tests/` | `tenant_isolation_facade` grün |
-| **P-01** | L5: `while let` → 3-Arm-Match | `store/lsm/ops/purge.rs` (2 Stellen) | I/O-Fehler → `Err` |
-| **P-02** | L4: `PurgeOutput.obsolete_files` + `dispose()` | `ops/purge.rs`, Orchestrator | Rohsweep: keine Marker nach Purge |
-| **P-03** | L6: Positionserhalt im SST-Rewrite | `ops/purge.rs` | BTreeMap-Differenztest |
-| **P-04a** | L8: `StavfsFreeSpaceProbe` via `statvfs` | `contextra-sys/src/` | `None` ≠ `Some(0)` |
-| **Q-04** | N-A: Resume nach Storage-Aufbau + Scope aus Ledger | `purge/resume.rs` | `na_resume_after_crash` grün |
-| **Q-03** | N-K: `PhysicalScope` via Backend | `ops/purge.rs`, Engine | `zz_audit_h3_l6` grün |
-| **P-08a** | L1: `ErasureLedger::append` VOR Tombstone-Commit | `engine/src/crud/delete.rs` | Ledger-Eintrag vorhanden |
-| **Q-09a** | N-C: `forget_document` löschen | `contextra-crypto/src/` | Kein Konstanten-Zeuge |
-| **Q-09b** | N-I: v3-Erzeugung entfernen | `deletion_proof/` | Nur v4 |
-
-### 10.3 K0 — Wahrheit (~1 Woche, geschützte Pfade)
-
-| Nr | Aufgabe | Akzeptanz |
-|---|---|---|
-| K0.1 | `check-dag`: Zyklen als Verstoß (nicht verschlucken) | Negativtest → rot |
-| K0.2 | Ring-Gate aus `capabilities.toml` generieren | `ring0_crate_order` aus Datei |
-| K0.3 | `contextra-durable-fs` in Ring-0-Ordnung | V4+V5 nicht mehr im Gate |
-| K0.4 | Ring-Gate `--strict` in CI | Status dokumentiert |
-| K0.5 | Eine Unwrap-Baseline (ratchet.toml vs. baseline.txt) | Eine Quelle, nur abwärts |
-| K0.6 | `governance/security_ports.toml` anlegen | Gate in CI |
-| K0.7 | Hülle messen und als Gate-Output festschreiben | Reproduzierbare Zahl |
-| K0.8 | Toolchain 1.89.0 fixieren | `cargo xtask harness-list` läuft |
-
-### 10.4 K1 — Fail-closed (~2 Wochen)
-
-| Nr | Aufgabe | Akzeptanz |
-|---|---|---|
-| K1.1 | `contextra_cloud_query` nur mit Feature `guard` | Werkzeug fehlt im EP1-Build |
-| K1.2 | `verify_wiring` mit echten Ports im Startpfad | Start ohne Port → Fehler |
-| K1.3 | `contextra_forget` gibt `belegt`/`nicht_belegt` zurück | MCP-Test, nie `null` |
-| K1.4 | `erase_document` liest `_opts` | Option ändert Ergebnis |
-| K1.5 | Krypto-Review (Nonce-Länge, Testvektoren B19) | Befund-Liste dokumentiert |
-
-### 10.5 K2 — Entkoppeln (~5 Wochen)
-
-**K2a: Kanten schneiden (je PR ≤ 400 Zeilen)**
-
-| Schritt | Änderung | Hülle danach |
-|---|---|---|
-| 1 | `engine`: `default = []`, ohne `graph`/`candle`/`sandbox`/`kvcache` als Default | -4 Crates |
-| 2 | `db`: `cognition`/`graph`/`adapt` hinter Feature | -3 Crates |
-| 3 | `mcp`: `privacy`/`adapt` hinter Feature oder Port | -2 Crates |
-| 4 | `contextra` (Fassade): `candle` aus Default | -1 Crate |
-| 5 | `contextra-core` entfernen: 3–4 mechanische PRs | Keine Core-Kanten |
-| 6 | `default-members` auf EP1 + LAB | Saubere Hülle |
-
-**K2b:** Erst wenn Hülle ≤ 18 und Ring-Gate grün: Parkplatz taggen, aus Workspace entfernen.
-
-### 10.6 K3 — Beweisbar vergessen (~3 Monate)
-
-**Reihenfolge verbindlich:**
-1. Krypto-Befunde aus K1.5 schließen
-2. Rohträger-Test schreiben (vom Spec, nicht Implementierer) — zunächst rot
-3. Nachweis-Ausstellung verdrahten: `DpiDeletionRuntime` im Startpfad
-4. Purge verdrahten: `DpiPurgeDriver::run_physical`
-5. KV-Nachweis verdrahten: `generate_kv_deletion_proof`, `KeyRegistry::open_durable`
-6. Lineage-Kaskade (F07): Quelllöschung → abgeleitete Daten entfernen
-7. `proof` wird erst `belegt`, wenn Rohträger-Test grün
-
-### 10.7 K4 — Crash-sicher (~3 Monate) → Release v0.1.0
-
-Compaction+MANIFEST, HMAC-Zustand, Group-Commit-Liveness, Checkpoint-Indizes, `put_if_absent`. Fault-Injection und Loom als Pflicht-Gates.
-
----
-
-## 11. Qualitätsgates und Invarianten
-
-### 11.1 Bestehende Invarianten (verbindlich)
-
-| ID | Invariante | Prüfbefehl |
-|---|---|---|
-| P2 | Zero-Panic in Produktion | `cargo xtask doctrine-scan` |
-| P5 | Ring-DAG nur abwärts | `cargo xtask dependency-graph-audit` |
-| P12 | `capabilities.toml` einzige Ring-Quelle | `cargo xtask check-ring-capabilities-consistency` |
-| P26 | Ring 0 kein `tokio` in Produktion | `cargo xtask check-ring0-async-purity` |
-| P28 | Determinismus via Ports | `cargo xtask determinism-check` |
-| INV-TENANT-1 | `TenantId::try_new(0)` → Err | `cargo test -p contextra-types` |
-| INV-WAL-TRUNCATION-1 | WAL-Truncation-Schutz | `cargo test -p contextra-store` |
-| INV-MVCC-SSI-1 | SSI Read-Set-Tracking aktiv | `cargo test -p contextra-mvcc` |
-| INV-DELETION-1/2 | `DeletionProof::create()` nur nach physischer Bereinigung | `cargo test -p contextra-crypto` |
-
-### 11.2 Neue Invarianten (aus diesem Plan)
-
-| ID | Invariante | Prüfbefehl |
-|---|---|---|
-| **INV-ERASURE-1** | `ErasureMode < high_water_mark` → `PolicyViolation` | `cargo test -p contextra-store --test erasure_downgrade` |
-| **INV-ERASURE-2** | Kein Zeuge ohne echten Scan | Mutationstest: Scanner=No-op → Beweis abgelehnt |
-| **INV-ERASURE-3** | `PhysicalScope` nur durch `ErasureBackend::physical_scope()` | Typ-System (kein `pub new()`) |
-| **INV-ERASURE-4** | Assured: `RestoreGuard` Pflicht; fehlend → Startfehler | `cargo test --test restore_without_guard` |
-| **INV-PRODUCT-1** | EP1-Build enthält keine Parkplatz-Crates | `cargo xtask check-product-hull --product EP1` |
-| **INV-WIRING-1** | `verify_wiring()` im Startpfad; fehlende Ports → Startfehler | Integrationstest Startpfad |
-| **INV-MCP-EGRESS-1** | `contextra_cloud_query` ohne Feature `guard` → nicht registriert | `cargo test -p contextra-mcp` |
-| **INV-BUILDER-1** | Alle Builder-Schalter aktivieren tatsächlich das Subsystem | Wiring-Report-Test je Schalter |
-| **INV-FENCE-1** | Schreibvorgänge in Fence-Scope → `FencedWrite`-Fehler | Loom-Test: ≥3 Threads |
-
-### 11.3 Neue Gates (zu implementieren)
-
-| Gate | Befehl | Phase | Prüft |
-|---|---|---|---|
-| Deletion-Guarantee | `cargo xtask deletion-guarantee-gate` | K0 | Vollständigkeit Löschpfad, Zeugen aus echten Scans |
-| Product-Hull | `cargo xtask check-product-hull --product <ep>` | K2 | Keine Parkplatz-Crates im EP-Build |
-| Product-Scope | `cargo xtask check-product-scope` | K2 | PR ändert nur erlaubte Pfade |
-| Builder-Wiring | `cargo xtask check-builder-wiring` | K1 | Alle Schalter haben Wirkung |
-
----
-
-## 12. Algorithmen-Auswahl und -Empfehlungen
-
-> [!NOTE]
-> Statuslegende: [A] Abstract geprüft · [V] Volltext gelesen · [E] Eigenableitung · [G] Gegenprüfung durch Sekundärbericht
-
-### 12.1 Empfohlene Algorithmen
-
-| ID | Algorithmus | Quelle | Status | Empfehlung |
-|---|---|---|---|---|
-| **B.1** | DiBud: Budgetierte exakte RRF-Präfixe | arXiv:2609.15143 | [A] | Implementieren; Ausreißertest Pflicht vor Hot-Path |
-| **ACI** | Adaptive Conformal Inference | arXiv:2106.00170 | [V] | Für Konfidenz-Komponenten mit Labels; Dyadik-Festkomma für Determinismus |
-| **SSN** | Serial Safety Net (Wang et al.) | arXiv:1605.04292 | [V] | Erst SSI-Validator testen, dann als Ersatz oder Ergänzung entscheiden |
-| **F.1** | Extended Serial Safety Net | arXiv:2511.22956 | [A] | Volltext lesen, dann Abgleich mit SSI-Validator |
-
-### 12.2 Zurückgestellt / Verworfen
-
-| Algorithmus | Quelle | Grund |
-|---|---|---|
-| BMSSP/FindPivots | arXiv:2504.17033 | Keine Messung, degenerierte Parameter, globaler Umbau. Nur Offline. |
-| HyperQuant | arXiv (Domb et al.) | LLM-Gewichte, keine ANN-Distanzen — falsche Domäne |
-| Mixed-Precision (Chandra) | [G] | Stimmbiomarker, nicht Embeddings — falsche Domäne |
-| ML-Compaction (Cutura) | arXiv | Iceberg-Lakehouse, nicht LSM-Tree — falsche Domäne |
-| Conformal Risk Control (G.2) | arXiv:2606.29054 | Negatives Ergebnis: bei Verteilungsverschiebung nicht stabil |
-
-### 12.3 Systemvorgaben für alle Algorithmen
-
-| # | Vorgabe |
-|---|---|
-| V1 | Bit-Reproduzierbarkeit: gleiche Eingabe + Seed → identische Ausgabe auf allen Plattformen |
-| V2 | Totale Ordnung: jeder Tie-Break hat Ordnung (Standard: `u64` Dokument-ID) |
-| V3 | Keine Hash-Reihenfolge als Ausgabevertrag: `BTreeMap` oder sortierte `Vec` |
-| V4 | Gleitkomma: `total_cmp`, kein `partial_cmp().unwrap()` |
-| V5 | Keine Panics: Überläufe als `Result`, `checked_add` |
-| V7 | Budgets vor Ausführung: Obergrenzen für Zugriffe, Speicher, Zeit |
-
----
-
-## 13. Risiken und offene Entscheidungen
-
-### 13.1 Technische Risiken
-
-| ID | Risiko | W'lichkeit | Impact | Maßnahme |
-|---|---|---|---|---|
-| R1 | `engine`-Default-Umschalten deckt Kompilierfehler auf (19 Dateien `→ graph`) | Hoch | K2a-Verzögerung | Eigener PR, Fehler erwarten |
-| R2 | SSI-Widerspruch (Lesepfad vs. Commit-Pfad) ungelöst | Mittel | Isolation-Garantie unklar | SSI-Tests in K0 |
-| R3 | Loom-Test deckt Race im Fence-Protokoll auf | Mittel | K2-Verzögerung | Loom-Modell in Phase 2 Pflicht |
-| R4 | Crypto-Split bricht externe API | Niedrig | Migration | `pub use`-Shims |
-| R5 | CI-Status Ring-Gate unklar (emuliert: 6 Verstöße) | Hoch | Unentdeckte Verstöße in main | K0.4 klärt |
-| R6 | Toolchain 1.89.0 in Agent-Umgebungen nicht verfügbar | Mittel | Nicht reproduzierbare Builds | K0.8: Spiegel oder CI-Umgebung |
-| R7 | 96 offene KI-Tags/DEBT-Einträge (WORKING_STATE) | Mittel | Versteckte Schulden | Triage in K0 |
-
-### 13.2 Offene Entscheidungen
-
-| # | Frage | Vorschlag | Dringlichkeit |
-|---|---|---|---|
-| **D1** | `contextra_cloud_query` in EP1? | Nein, nur mit Feature `guard` | **Sofort** |
-| **D2** | Legacy-WAL entfernen? | Ja, ab 1.0 | K4 |
-| **D5** | `graph` für Hybridsuche nötig? | Nein, Test in K2a | K2a |
-| **D6** | Ein Pfad für `remember`/`recall`? | Ja, immer via Fassade | **K1** |
-| **D7** | Parkplatz-Crates: eigenes Repository oder löschen? | Tags setzen, Entscheidung vor K2b | K2b |
-| **D9** | EP2 als eigenes Repository? | Ja — Erzeuger und Prüfer dürfen keinen Code teilen | Nach K4 |
-| **D10** | Feature-Konfiguration für Hüllenmessung? | Default-Features als Gate, alle Features als Bericht | **K0** |
-| **D11** | Agent-Begrenzung? | Max. 3 offene PRs, 1 Crate je PR | **Sofort** |
-| **D12** | Ring-Gate: Pflicht oder beobachten? | Erst CI-Status klären (K0.4) | **K0** |
-| **D13** | `contextra-graph` in Ring 0 oder Ring 3? | Ring 3 (Orchestrierung, nicht Foundation) | K2 |
-| **D14** | `contextra-adapt` in Ring 0 oder Parkplatz? | Parkplatz EP5 | K2 |
-| **D15** | `contextra-license` Ring-Korrektur? | Ring 4 (`capabilities.toml`) korrekt; `ARCHITECTURE.md` korrigieren | K0 |
-
----
-
-## 14. ADR-Register
-
-### ADR-01: Plugin-Architektur für Löschnachweis
-
-**Status:** Angenommen  
-**Entscheidung:** Kern spricht nur über Traits aus `contextra-ports::erasure`. Drei Plugins: `contextra-erasure` (Assured), `contextra-erasure-evidence` (Attested), `contextra-proof-verify` (Verifier, EP2).  
-**Begründung:** P-E1 (Kosten opt-in), P-E2 (Kern nur via Ports), Entkoppelbarkeit ohne Performance-Einbuße.  
-**Konsequenz:** Alle 5× `downcast_ref::<LsmStorage>()` → `StorageErasureExt::erasure_backend()`.
-
-### ADR-02: `PhysicalScope` als opaker Typ
-
-**Status:** Angenommen  
-**Entscheidung:** `PhysicalScope` hat kein `pub new()`. Einzig konstruierbar durch `ErasureBackend::physical_scope()`.  
-**Begründung:** N-K (logische ≠ physische Präfixe) strukturell unmöglich durch Typ-System.  
-**Konsequenz:** Alle Purge-Operationen nehmen `&PhysicalScope`, nie rohe Strings/Bytes.
-
-### ADR-03: `ErasureMode` als Hochwassermarke im Manifest
-
-**Status:** Angenommen  
-**Entscheidung:** Persistent im Store-Manifest. Downgrade ohne `AcknowledgeToken` → `PolicyViolation`. Downgrade archiviert Ledger und erzeugt signierten Audit-Eintrag.  
-**Begründung:** P-E5 — verhindert versehentlichen Verlust von Löschgarantien.  
-**Konsequenz:** `ManifestHeader` bekommt Feld `erasure_high_water_mark: ErasureMode`.
-
-### ADR-04: Fence-Protokoll Option B
-
-**Status:** Angenommen  
-**Entscheidung:** `ErasureGate` mit `AtomicBool` (Fast-Path) + `ArcSwap<Vec<PrefixFence>>`. Acquire/Release unter `commit_mutex`. Fence-Prüfung nach Mutex-Wiedererwerb, vor Follower-Batch-Commit.  
-**Begründung:** Nutzt existierenden `commit_mutex` als Serialisierungspunkt. Option A hätte höhere Komplexität.  
-**Konsequenz:** Loom-Modell (≥3 Threads, 2 Szenarien: Fence vor/nach Leader-Erwerb) Pflicht vor Freigabe. Benchmark ≤ 1% Abweichung.
-
-### ADR-05: `contextra-crypto`-Split
-
-**Status:** Geplant (Phase 4)  
-**Entscheidung:** → `contextra-crypto-core` (I/O-frei, ~5.800 LOC) + `contextra-crypto-kv` (Crypto-Erase, ~3.400 LOC). `contextra-crypto` bleibt als Backward-Compat-Fassade.  
-**Begründung:** `contextra-crypto` → `contextra-durable-fs` verletzt Ring-0-Ordnung (V4). I/O-freier Kern muss trennbar sein.  
-**Konsequenz:** `pub use`-Shims in `contextra-crypto/src/lib.rs` für Migrationsperiode.
-
-### ADR-06: EP2 als eigenes Repository
-
-**Status:** Vorgeschlagen (nach K4)  
-**Entscheidung:** `contextra-proof-verify` und EP2-Stack in eigenes Repository.  
-**Begründung:** Erzeuger und Prüfer dürfen keinen Code teilen. Unabhängiger Verifier ohne vollständige Engine compilierbar.  
-**Konsequenz:** `contextra-proof-verify` hängt nur von `contextra-crypto-core` ab.
-
-### ADR-07: Resume nach Storage-Aufbau
-
-**Status:** Angenommen  
-**Entscheidung:** `resume_pending_purges()` erhält `&LsmStorage` + `&ErasureLedger`. Scope aus `ledger.reconstruct_scope()`. Fence aktiviert bevor `open()` `Ok` meldet. Rewrite als Hintergrund-Task.  
-**Begründung:** N-A — `OrxHooks::default()` erzeugt leeren Scope, Intent gilt als erledigt ohne Wirkung.  
-**Konsequenz:** Resume darf nicht in der Recovery-Phase stattfinden (Storage noch nicht aufgebaut).
-
----
-
-## Anhang A: Kritischer Pfad
-
-```
-Sofort:  Q-01a (N-N) → Q-01b (N-O) → Q-01c (Lockfile) → Q-02a (N-B)
-K0:      Gate-Wahrheit, Ring-Quelle aus capabilities.toml, Unwrap-Baseline, CI-Status Ring-Gate
-K1:      Fail-closed (Egress, Wiring, Forget-Response, Builder-Schalter)
-Phase 0d/0e: Purge-Korrektheit, Zeugen ehrlich verdrahten
-K2a:     Kanten schneiden (engine, db, mcp, contextra-core entfernen)
-K2b:     Parkplatz taggen und entfernen
-K3:      Nachweis ehrlich: Krypto → Rohträger-Test → Purge → Attested
-K4:      Crash-Sicherheit, Fault-Injection, Loom → v0.1.0
-```
-
-## Anhang B: Verweise
-
-- [`capabilities.toml`](file:///home/freddy/Projekte/contextra/capabilities.toml) — Ring- und Crate-Wahrheitsquelle
-- [`docs/14-10-26/IMPLEMENTIERUNGSSPEZIFIKATION.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/IMPLEMENTIERUNGSSPEZIFIKATION.md) — Vollständige Lösch-Implementierungsspezifikation
-- [`docs/14-10-26/Contextra_Endprodukt_Plan_v7.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/Contextra_Endprodukt_Plan_v7.md) — Endprodukt-Zerlegung und Verdrahtungsplan
-- [`docs/14-10-26/Contextra_Algorithmen_Spezifikation.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/Contextra_Algorithmen_Spezifikation.md) — Algorithmen-Spezifikation
-- [`ARCHITECTURE.md`](file:///home/freddy/Projekte/contextra/ARCHITECTURE.md) — Bestehende Architekturbeschreibung
-- [`WORKING_STATE.md`](file:///home/freddy/Projekte/contextra/WORKING_STATE.md) — Aktueller Arbeitsstand
+- **ADR-01:** Entkoppelte Plugin-Architektur für den Löschnachweis via `contextra-ports::erasure`.
+- **ADR-02:** `PhysicalScope` als opaker Typ; verhindert Mandanten-Scope-Verwechslungen strukturell.
+- **ADR-03:** `ErasureMode` als monotone Hochwassermarke im LSM-Store-Manifest.
+- **ADR-04:** Option B Lockless Write-Fence mit `AtomicBool` und `ArcSwap`.
+- **ADR-05:** Crate-Split `contextra-crypto` in `crypto-core` und `crypto-kv`.
+- **ADR-06:** Ausgliederung von EP2 (`contextra-proof-verify`) in eigenes Repository nach K4.
+- **ADR-07:** Crash-Resume zwingend nach Storage-Aufbau mit Scope aus `ErasureLedger`.
