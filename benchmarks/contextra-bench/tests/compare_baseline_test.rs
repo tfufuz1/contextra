@@ -12,11 +12,13 @@ fn test_simulated_current_10pp_below_baseline_triggers_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.90,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -25,11 +27,13 @@ fn test_simulated_current_10pp_below_baseline_triggers_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.80,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -50,11 +54,13 @@ fn test_simulated_current_within_tolerance_passes() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.90,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -63,11 +69,13 @@ fn test_simulated_current_within_tolerance_passes() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.88,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.84, // 0.01 / 0.85 = 1.17% <= 5%
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -87,11 +95,13 @@ fn test_simulated_current_above_baseline_emits_info_no_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.80,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.75,
             overall_mrr: 0.70,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -100,11 +110,13 @@ fn test_simulated_current_above_baseline_emits_info_no_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.95,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -127,11 +139,13 @@ fn test_missing_metric_sections_triggers_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.90,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: Some(LocomoMetricsSummary {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -142,6 +156,7 @@ fn test_missing_metric_sections_triggers_regression() {
             overall_recall_at_5: 0.85,
             overall_mrr: 0.80,
             total_eval_cases: 100,
+            ..Default::default()
         }),
     };
 
@@ -157,6 +172,7 @@ fn test_missing_metric_sections_triggers_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.90,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -175,6 +191,7 @@ fn test_zero_baseline_cases() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.0,
             total_cases: 0,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -183,6 +200,7 @@ fn test_zero_baseline_cases() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.0,
             total_cases: 0,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -198,6 +216,7 @@ fn test_zero_baseline_cases() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: -0.1,
             total_cases: 0,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -224,6 +243,7 @@ fn test_compare_metrics_files_errors() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.85,
             total_cases: 10,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -261,6 +281,7 @@ fn test_nan_inf_metric_values_trigger_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: 0.85,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -270,6 +291,7 @@ fn test_nan_inf_metric_values_trigger_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: f64::NAN,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: None,
     };
@@ -285,6 +307,7 @@ fn test_nan_inf_metric_values_trigger_regression() {
         long_mem_eval: Some(LongMemEvalMetricsSummary {
             overall_accuracy: f64::INFINITY,
             total_cases: 100,
+            ..Default::default()
         }),
         locomo: None,
     };

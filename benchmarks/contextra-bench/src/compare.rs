@@ -298,11 +298,13 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.85,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: Some(LocomoMetricsSummary {
                 overall_recall_at_5: 0.90,
                 overall_mrr: 0.88,
                 total_eval_cases: 50,
+                ..Default::default()
             }),
         };
 
@@ -318,6 +320,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -325,6 +328,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.70, // 12.5% drop > 5% threshold
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -341,6 +345,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -348,6 +353,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.78, // 2.5% drop <= 5% threshold
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -365,6 +371,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -372,6 +379,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.88, // Improvement
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -388,6 +396,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -395,6 +404,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: f64::NAN,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -407,6 +417,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: f64::INFINITY,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -422,6 +433,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -437,17 +449,20 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: Some(LocomoMetricsSummary {
                 overall_recall_at_5: 0.90,
                 overall_mrr: 0.88,
                 total_eval_cases: 50,
+                ..Default::default()
             }),
         };
         let current_missing_locomo = CombinedMetrics {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -463,6 +478,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.0,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -470,6 +486,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.0,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -477,6 +494,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: -0.1,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
