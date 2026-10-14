@@ -1075,6 +1075,7 @@ name = "contextra-ports"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "blake3",
  "bytes",
  "contextra-ports",
  "contextra-types",
@@ -1084,6 +1085,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "trybuild",
 ]
 
 [[package]]
