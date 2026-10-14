@@ -80,8 +80,6 @@ pub enum PurgeBlocked {
     UnknownFreeSpace,
 }
 
-use std::path::PathBuf;
-
 /// Report summarizing results of a successful purge compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PurgeReport {
