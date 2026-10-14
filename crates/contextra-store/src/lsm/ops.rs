@@ -151,4 +151,8 @@ impl StorageEngine for LsmStorage {
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(maintenance::last_tx_id(self))
     }
+
+    fn erasure_capabilities(&self) -> Option<&dyn contextra_ports::erasure::ErasureBackend> {
+        Some(self)
+    }
 }
