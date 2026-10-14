@@ -17,6 +17,6 @@ pub use invariants::{DstModel, InvariantChecker};
 pub use op::DstOp;
 pub use p07_runner::{generate_p07_ops, P07DivergenceRecord, P07DstReport, P07DstRunner};
 pub use p07_sut::{NaiveWalSut, SystemUnderTest};
-pub use rng::DstRng;
+pub use rng::{DstRng, EntropyRng, PortSeededRng as SeededRng};
 pub use runner::{DstConfig, DstResult, DstRunner, FaultMode};
 pub use scenario::DstScenario;
