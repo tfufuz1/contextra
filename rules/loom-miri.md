@@ -1,7 +1,7 @@
 # Governance Rule: Concurrency & Memory Safety Verification (`rules/loom-miri.md`)
 
 ## Gilt für
-- Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`, `contextra-crypto`)
+- Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`)
 - Lock-Hierarchien, Group-Commit, Lock-Free Datenstrukturen und Ring-0 Synchronisation (`contextra-store`, `contextra-mvcc`)
 
 ## Pflichtregeln

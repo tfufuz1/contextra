@@ -63,7 +63,7 @@ Jeder im Code platzierte Tag muss exakt einer der folgenden vier Formen entsprec
 
 - **Quorum-Regel (Gate 8):**
   - **Standard-Code:** Mindestens **2** unabhängige `REVIEW-PASS`-Einträge mit unterschiedlichen `SESSION:`-Hashes.
-  - **Kritischer Code (Unsafe-Inseln & Security):** Mindestens **3** unabhängige `REVIEW-PASS`-Einträge für Dateien in Unsafe-Inseln (`contextra-vector/src/distance.rs`, `diskann.rs`, `persistence.rs`, `contextra-crypto/src/anti_tamper.rs`) oder Tags mit Typ `SECURITY`.
+  - **Kritischer Code (Unsafe-Inseln & Security):** Mindestens **3** unabhängige `REVIEW-PASS`-Einträge für Dateien in Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`), sicherheitskritische Kernel-Dateien (`contextra-vector/src/distance.rs`, `diskann.rs`, `persistence.rs`, `contextra-crypto/src/anti_tamper.rs`; Hinweis: `vector` und `crypto` sind keine Unsafe-Inseln und erzwingen `#![forbid(unsafe_code)]`) oder Tags mit Typ `SECURITY`.
 - Wird technisch durch `cargo xtask check-review-coverage` erzwungen.
 
 ### D. Datei-Kontext-Header (`FILE-CONTEXT`)
