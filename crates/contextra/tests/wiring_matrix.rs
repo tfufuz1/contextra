@@ -44,6 +44,35 @@ async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Err
 }
 
 #[tokio::test]
+async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn std::error::Error>> {
+    let res = contextra::wiring_selftest::verify_wiring(false, true, false);
+    assert!(res.is_err());
+    if let Err(ContextraError::PolicyViolation(msg)) = res {
+        assert!(msg.contains("Clock"));
+    } else {
+        panic!("Expected PolicyViolation error for missing clock");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_builder_router_wiring_integration() -> Result<(), Box<dyn std::error::Error>> {
+    let tmp = TempDir::new()?;
+    let db = builder(16)
+        .with_storage_path(tmp.path())
+        .with_router(true)
+        .build()
+        .await?;
+
+    let report = db.wiring_report();
+    assert!(report.is_valid());
+    assert!(report.wired_ports.contains(&"EngineWiring".to_string()));
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
     let _db1 = open(tmp.path()).await?;

@@ -8,7 +8,7 @@
 use ahash::AHashMap;
 use contextra_core::{ContextraError, Result};
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{compiler_fence, AtomicU64, Ordering};
 
 /// Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
 pub const ARENA_ALIGNMENT_BYTES: usize = 64;
@@ -426,7 +426,11 @@ impl HnswArena {
         false
     }
 
-    /// Clears and zeros connection lists for a node at `ram_idx` in the arena.
+    /// Clears and zeros connection lists for a node at `ram_idx` in the arena using zeroization.
+    ///
+    /// # Residual Risk / Mmap Note
+    /// Memory-mapped node bytes in disk-resident index files remain read-only and unmapped/closed via OS operations.
+    /// RAM arena zeroization wipes volatile process memory slices using `fill(0)`, `std::hint::black_box`, and `compiler_fence`.
     pub fn clear_node_connections(&self, ram_idx: usize, m: usize) {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
@@ -447,7 +451,10 @@ impl HnswArena {
                     let l_offset = Self::layer_offset(node_offset, layer, m);
                     let len = counts[count_idx] as usize;
                     if len > 0 && l_offset + len <= arena.len() {
-                        arena[l_offset..l_offset + len].fill(0);
+                        let slice = &mut arena[l_offset..l_offset + len];
+                        slice.fill(0);
+                        std::hint::black_box(&mut *slice);
+                        compiler_fence(Ordering::SeqCst);
                     }
                     counts[count_idx] = 0;
                 }

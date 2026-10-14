@@ -5,7 +5,7 @@
 
 use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::erasure_ledger::{
-    compute_keyed_hash, LedgerEntry, LedgerEntryKind, LedgerKey,
+    compute_keyed_hash, ErasureLedger, LedgerEntry, LedgerEntryKind, LedgerKey,
 };
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::tempdir;
@@ -36,7 +36,10 @@ async fn test_g15_wal_truncation_resurrection_prevented_by_ledger() -> Result<()
         store.commit(TxId::new(1)).await?;
         store.force_flush().await?;
 
-        // 2. Append ErasureLedger entry at erased_at_tx = 2
+        // 2. Append ErasureLedger entry at erased_at_tx = 2 directly
+        let (ledger_opt, _) =
+            ErasureLedger::open_or_fail_closed(dir.path(), ledger_key.clone(), true, None).await?;
+        let mut ledger = ledger_opt.expect("ledger open");
         let entry = LedgerEntry {
             ledger_seq: 1,
             kind: LedgerEntryKind::Key,
@@ -44,7 +47,7 @@ async fn test_g15_wal_truncation_resurrection_prevented_by_ledger() -> Result<()
             erased_at_tx: 2,
             proof_id: [200u8; 16],
         };
-        store.ledger_append(&[entry]).await?;
+        ledger.append(&[entry]).await?;
 
         // 3. Perform Delete at Tx 2 (goes to WAL, NOT flushed to SSTable)
         store.delete(TxId::new(2), key).await?;

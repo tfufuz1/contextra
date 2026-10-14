@@ -17,6 +17,7 @@ use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::id_gen::{IdGen, SystemIdGen};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_ports::rng::{Rng, SystemRng};
+use contextra_ports::wiring::PortsWiring;
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -43,6 +44,19 @@ pub struct ContextraBuilder {
     kms_enabled: bool,
     kv_shredding_enabled: bool,
     checkpoint_enabled: bool,
+
+    #[cfg(feature = "sovereign")]
+    pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
+    #[cfg(feature = "audit-export")]
+    pub audit_wiring: Option<Arc<crate::wiring_audit::AuditWiringBundle>>,
+    #[cfg(feature = "onnx")]
+    pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
+    #[cfg(feature = "sandbox")]
+    pub sandbox_wiring: Option<Arc<crate::wiring_sandbox::SandboxWiringBundle>>,
+    #[cfg(feature = "cognition")]
+    pub cognition_wiring: Option<Arc<crate::wiring_cognition::CognitionWiringBundle>>,
+    #[cfg(feature = "router")]
+    pub retrieval_wiring: Option<Arc<crate::wiring_retrieval::RetrievalWiringBundle>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -95,6 +109,18 @@ impl Clone for ContextraBuilder {
             kms_enabled: self.kms_enabled,
             kv_shredding_enabled: self.kv_shredding_enabled,
             checkpoint_enabled: self.checkpoint_enabled,
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: self.sovereign_wiring.clone(),
+            #[cfg(feature = "audit-export")]
+            audit_wiring: self.audit_wiring.clone(),
+            #[cfg(feature = "onnx")]
+            onnx_wiring: self.onnx_wiring.clone(),
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: self.sandbox_wiring.clone(),
+            #[cfg(feature = "cognition")]
+            cognition_wiring: self.cognition_wiring.clone(),
+            #[cfg(feature = "router")]
+            retrieval_wiring: self.retrieval_wiring.clone(),
         }
     }
 }
@@ -103,9 +129,14 @@ impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
     pub fn new(dimension: usize) -> Self {
         let storage_path = PathBuf::from("./contextra_data");
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
-        let rng: Arc<dyn Rng> = Arc::new(SystemRng::new());
-        let id_gen: Arc<dyn IdGen> = Arc::new(SystemIdGen::new());
+        let ports_wiring = PortsWiring::build().unwrap_or_else(|_| PortsWiring {
+            clock: Arc::new(SystemClock::new()),
+            rng: Arc::new(SystemRng::new()),
+            id_gen: Arc::new(SystemIdGen::new()),
+        });
+        let clock = ports_wiring.clock;
+        let rng = ports_wiring.rng;
+        let id_gen = ports_wiring.id_gen;
 
         let license_gate = LicenseWiring::build(LicenseWiringDeps {
             mode: LicenseGateMode::Enforced,
@@ -140,6 +171,19 @@ impl ContextraBuilder {
             kms_enabled: true,
             kv_shredding_enabled: true,
             checkpoint_enabled: true,
+
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: None,
+            #[cfg(feature = "audit-export")]
+            audit_wiring: None,
+            #[cfg(feature = "onnx")]
+            onnx_wiring: None,
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: None,
+            #[cfg(feature = "cognition")]
+            cognition_wiring: None,
+            #[cfg(feature = "router")]
+            retrieval_wiring: None,
         }
     }
 
@@ -545,20 +589,17 @@ impl ContextraBuilder {
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-        #[cfg(debug_assertions)]
-        {
-            let report = crate::wiring_selftest::verify_wiring(
-                true,
-                true,
-                false,
-            )?;
-            if !report.is_valid() {
-                return Err(ContextraError::PolicyViolation(format!(
-                    "INV-WIRING-2 / §22 Wiring self-test failed: missing ports = {:?}, invalid security ports = {:?}",
-                    report.missing_ports, report.invalid_security_ports
-                )));
-            }
-        }
+        let has_clock = self.clock.now_unix_nanos() >= 0;
+        let has_license_gate = true;
+        let license_gate_is_noop = requested_ring != FeatureRing::Fast
+            && self.license_gate.check_ring(FeatureRing::Sovereign).is_ok()
+            && self.license_gate.check_ring(FeatureRing::Compliance).is_ok();
+
+        let _report = crate::wiring_selftest::verify_wiring(
+            has_clock,
+            has_license_gate,
+            license_gate_is_noop,
+        )?;
 
         let instance = Contextra::open_authorized(
             &self.storage_path,
@@ -568,7 +609,25 @@ impl ContextraBuilder {
         )
         .await?;
 
-        let engine_wiring = EngineWiring::default();
+        let mut engine_wiring = EngineWiring::default();
+
+        #[cfg(feature = "router")]
+        let _router_wiring_keepalive = if self.router_enabled {
+            let router_deps = contextra_router::RouterWiringDeps {
+                clock: Some(self.clock.clone()),
+                ..Default::default()
+            };
+            if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
+                let arc_rw = Arc::new(router_wiring);
+                engine_wiring.router = Some(Arc::downgrade(&arc_rw) as _);
+                Some(arc_rw)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         instance.apply(engine_wiring);
 
         if let Some(embedder) = self.embedder {

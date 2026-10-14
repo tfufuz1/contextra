@@ -23,8 +23,7 @@ pub mod sync;
 pub mod tx_buffer;
 pub mod wiring;
 
-// FIX(2026-10-07): Remove unused SnapshotFloor re-export removed in #4406
-pub use floor::GcFloor;
+pub use floor::{GcFloor, SnapshotFloor};
 pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 #[allow(deprecated)]

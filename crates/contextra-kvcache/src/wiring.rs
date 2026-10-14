@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_crypto::kv_shredding::{GroupRevocationListener, KeyRegistry};
+use contextra_crypto::kv_shredding::{shred_segment_key, GroupRevocationListener, KeyRegistry};
 use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -108,7 +108,7 @@ impl KvShreddingWiring {
         for (t, seg_id) in target_keys {
             if let Some(key) = keys_guard.remove(&(t, seg_id)) {
                 key.shred();
-                let _ = self.key_registry.revoke_group(seg_id);
+                let _ = shred_segment_key(&self.key_registry, t, seg_id);
             }
         }
 
@@ -137,7 +137,7 @@ impl KvShreddingWiring {
         for seg_id in segment_ids {
             if let Some(key) = keys_guard.remove(&(tenant_id, seg_id)) {
                 key.shred();
-                let _ = self.key_registry.revoke_group(seg_id);
+                let _ = shred_segment_key(&self.key_registry, tenant_id, seg_id);
                 count += 1;
             }
         }
@@ -150,10 +150,10 @@ impl KvShreddingWiring {
         let key = self.registered_keys.write().remove(&(tenant_id, segment_id));
         if let Some(key) = key {
             key.shred();
-            let _ = self.key_registry.revoke_group(segment_id);
+            let _ = shred_segment_key(&self.key_registry, tenant_id, segment_id);
             Ok(true)
         } else {
-            let _ = self.key_registry.revoke_group(segment_id);
+            let _ = shred_segment_key(&self.key_registry, tenant_id, segment_id);
             Ok(false)
         }
     }

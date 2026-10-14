@@ -1,0 +1,1292 @@
+{
+  "gate": "orphan-symbols",
+  "status": "fail",
+  "summary": {
+    "orphan_count": 36,
+    "nur_tests_count": 4,
+    "produktiv_count": 2009,
+    "verdacht_count": 140,
+    "excluded_boundary_count": 5,
+    "excluded_crates": [
+      "contextra",
+      "contextra-mcp",
+      "contextra-py"
+    ],
+    "kinds_filter": [
+      "const",
+      "enum",
+      "fn",
+      "struct",
+      "trait",
+      "type"
+    ],
+    "disclaimer": "Hinweis: Die Zahlen können gegen einen anderen Commit abweichen."
+  },
+  "orphan": [
+    {
+      "kind": "const",
+      "symbol": "ASSURANCE_LEVEL",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/witness_scan.rs",
+      "line": 17
+    },
+    {
+      "kind": "const",
+      "symbol": "CLAIM_TEXT_ID",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/witness_scan.rs",
+      "line": 18
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_BLOB_THRESHOLD",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/blob/mod.rs",
+      "line": 12
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_ECE_REBUILD_THRESHOLD",
+      "krate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/isotonic.rs",
+      "line": 15
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/cascade.rs",
+      "line": 14
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_READ_SET_KEYS",
+      "krate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+      "line": 47
+    },
+    {
+      "kind": "const",
+      "symbol": "LAYER_ID_WAL_ALL_SEGMENTS",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/witness_scan.rs",
+      "line": 19
+    },
+    {
+      "kind": "const",
+      "symbol": "MAX_INTERNAL_MERGE_ENTRIES_FACTOR",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/mod.rs",
+      "line": 119
+    },
+    {
+      "kind": "const",
+      "symbol": "MAX_WAL_SIZE",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 304
+    },
+    {
+      "kind": "const",
+      "symbol": "SEARCH_LATENCY_GRAPH",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 24
+    },
+    {
+      "kind": "const",
+      "symbol": "SEARCH_LATENCY_TEXT",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 21
+    },
+    {
+      "kind": "const",
+      "symbol": "SEARCH_LATENCY_VECTOR",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 18
+    },
+    {
+      "kind": "enum",
+      "symbol": "SstFileClass",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/witness_types.rs",
+      "line": 122
+    },
+    {
+      "kind": "fn",
+      "symbol": "block_binary_search",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/block_search.rs",
+      "line": 192
+    },
+    {
+      "kind": "fn",
+      "symbol": "collect_witnesses",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/witness_scan.rs",
+      "line": 195
+    },
+    {
+      "kind": "fn",
+      "symbol": "cosine_similarity_parts_f32_u8",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/kernels/scalar.rs",
+      "line": 183
+    },
+    {
+      "kind": "fn",
+      "symbol": "extract_surrogate_tokens",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 81
+    },
+    {
+      "kind": "fn",
+      "symbol": "extract_triples_for_config",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/extraction/mod.rs",
+      "line": 87
+    },
+    {
+      "kind": "fn",
+      "symbol": "guard_and_sanitize_payload",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 384
+    },
+    {
+      "kind": "fn",
+      "symbol": "guard_and_sanitize_payload_scoped",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 405
+    },
+    {
+      "kind": "fn",
+      "symbol": "log_tl_hfd_discrepancy_tracing",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/ppr/shadow_hook.rs",
+      "line": 49
+    },
+    {
+      "kind": "fn",
+      "symbol": "pid_regulated_candidate_pool",
+      "krate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/homeostat.rs",
+      "line": 115
+    },
+    {
+      "kind": "fn",
+      "symbol": "pii_vault_forces_crypto_shred",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 180
+    },
+    {
+      "kind": "fn",
+      "symbol": "plan_orphan_removal",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/orphan_gc.rs",
+      "line": 28
+    },
+    {
+      "kind": "fn",
+      "symbol": "register_consolidation_launcher",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 123
+    },
+    {
+      "kind": "fn",
+      "symbol": "remove_orphans",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/orphan_gc.rs",
+      "line": 55
+    },
+    {
+      "kind": "fn",
+      "symbol": "retire_segments_up_to",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/retire.rs",
+      "line": 22
+    },
+    {
+      "kind": "fn",
+      "symbol": "scrub_and_remove",
+      "krate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/lib.rs",
+      "line": 364
+    },
+    {
+      "kind": "fn",
+      "symbol": "select_purge_candidates",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/purge_select.rs",
+      "line": 41
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_consolidation_worker_full",
+      "krate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+      "line": 441
+    },
+    {
+      "kind": "struct",
+      "symbol": "PoisonedHandle",
+      "krate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/lib.rs",
+      "line": 58
+    },
+    {
+      "kind": "struct",
+      "symbol": "WalReplayOptions",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/replay_filter.rs",
+      "line": 14
+    },
+    {
+      "kind": "type",
+      "symbol": "Assurance",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/deletion/forget_options.rs",
+      "line": 27
+    },
+    {
+      "kind": "type",
+      "symbol": "QueryOptions",
+      "krate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 458
+    },
+    {
+      "kind": "type",
+      "symbol": "QueryOptionsBuilder",
+      "krate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 565
+    },
+    {
+      "kind": "type",
+      "symbol": "SystemIdGenerator",
+      "krate": "contextra-ports",
+      "file": "crates/contextra-ports/src/id_gen.rs",
+      "line": 22
+    }
+  ],
+  "nur_tests": [
+    {
+      "kind": "enum",
+      "symbol": "QuantizationLevel",
+      "krate": "contextra-router",
+      "file": "crates/contextra-router/src/profile.rs",
+      "line": 17
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_max_score",
+      "krate": "contextra-router",
+      "file": "crates/contextra-router/src/router/mod.rs",
+      "line": 258
+    },
+    {
+      "kind": "fn",
+      "symbol": "parse_importance_score",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/mod.rs",
+      "line": 95
+    },
+    {
+      "kind": "fn",
+      "symbol": "select_profile_from_chunks",
+      "krate": "contextra-router",
+      "file": "crates/contextra-router/src/router/mod.rs",
+      "line": 266
+    }
+  ],
+  "verdacht": [
+    {
+      "kind": "const",
+      "symbol": "APPRH_LARGE_GRAPH_NODE_THRESHOLD",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/wiring.rs",
+      "line": 20
+    },
+    {
+      "kind": "const",
+      "symbol": "ARENA_ALIGNMENT_BYTES",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/arena.rs",
+      "line": 14
+    },
+    {
+      "kind": "const",
+      "symbol": "BACKPRESSURE_LEVEL",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 12
+    },
+    {
+      "kind": "const",
+      "symbol": "BLOCKING_UTIL_CRITICAL",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/system_pressure.rs",
+      "line": 40
+    },
+    {
+      "kind": "const",
+      "symbol": "CANONICAL_FAILPOINTS",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/purge/failpoint.rs",
+      "line": 11
+    },
+    {
+      "kind": "const",
+      "symbol": "CASCADE_QUEUE_PREFIX",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/cascade.rs",
+      "line": 67
+    },
+    {
+      "kind": "const",
+      "symbol": "CHECKPOINT_DURATION",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 15
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_BATCH_OPS",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/limits.rs",
+      "line": 18
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_CHUNKS_PER_DOCUMENT",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/limits.rs",
+      "line": 17
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_COLLECTIONS_PER_TENANT",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/limits.rs",
+      "line": 19
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_DOCUMENT_BYTES",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/limits.rs",
+      "line": 16
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_IN_FLIGHT_PER_PRINCIPAL",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/limits.rs",
+      "line": 20
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_SUB_QUERIES",
+      "krate": "contextra-db",
+      "file": "crates/contextra-db/src/multistep.rs",
+      "line": 15
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_TOTAL_STAGED_BYTES",
+      "krate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+      "line": 57
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_MAX_TX_STAGED_BYTES",
+      "krate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+      "line": 52
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_M_COST_KIB",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 46
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_P_COST",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 48
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_P_HIGH",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/quantize/mod.rs",
+      "line": 19
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_P_LOW",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/quantize/mod.rs",
+      "line": 17
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_SHRED_KEY_GROUP_SIZE",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 26
+    },
+    {
+      "kind": "const",
+      "symbol": "DEFAULT_T_COST",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 47
+    },
+    {
+      "kind": "const",
+      "symbol": "ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT",
+      "krate": "contextra",
+      "file": "crates/contextra/src/collection_profile.rs",
+      "line": 16
+    },
+    {
+      "kind": "const",
+      "symbol": "HARD_SCAN_CEILING",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/crud/read.rs",
+      "line": 12
+    },
+    {
+      "kind": "const",
+      "symbol": "LEGACY_MIN_M_COST_KIB",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 36
+    },
+    {
+      "kind": "const",
+      "symbol": "LEGACY_MIN_P_COST",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 38
+    },
+    {
+      "kind": "const",
+      "symbol": "LEGACY_MIN_T_COST",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 37
+    },
+    {
+      "kind": "const",
+      "symbol": "MAX_CUMULATIVE_REGRET_THRESHOLD",
+      "krate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 862
+    },
+    {
+      "kind": "const",
+      "symbol": "MAX_PENDING_EVENTS_CAPACITY",
+      "krate": "contextra-agent",
+      "file": "crates/contextra-agent/src/event_source.rs",
+      "line": 112
+    },
+    {
+      "kind": "const",
+      "symbol": "MAX_TRACKED_REQUESTS",
+      "krate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/attention_exporter.rs",
+      "line": 10
+    },
+    {
+      "kind": "const",
+      "symbol": "METRIC_SEARCH_LATENCY_GRAPH",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/mod.rs",
+      "line": 23
+    },
+    {
+      "kind": "const",
+      "symbol": "METRIC_SEARCH_LATENCY_TEXT",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/mod.rs",
+      "line": 20
+    },
+    {
+      "kind": "const",
+      "symbol": "METRIC_SEARCH_LATENCY_VECTOR",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/mod.rs",
+      "line": 17
+    },
+    {
+      "kind": "const",
+      "symbol": "MIN_BANDIT_SHADOW_SAMPLES",
+      "krate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 860
+    },
+    {
+      "kind": "const",
+      "symbol": "MIN_ENTRIES_FOR_SSTABLE_REBUILD",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/mod.rs",
+      "line": 127
+    },
+    {
+      "kind": "const",
+      "symbol": "MIN_P_COST",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kdf.rs",
+      "line": 43
+    },
+    {
+      "kind": "const",
+      "symbol": "MOVEFILE_REPLACE_EXISTING",
+      "krate": "contextra-sys",
+      "file": "crates/contextra-sys/src/durability.rs",
+      "line": 105
+    },
+    {
+      "kind": "const",
+      "symbol": "MOVEFILE_WRITE_THROUGH",
+      "krate": "contextra-sys",
+      "file": "crates/contextra-sys/src/durability.rs",
+      "line": 106
+    },
+    {
+      "kind": "const",
+      "symbol": "PENDING_FLUSH_THRESHOLD_FACTOR",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/diskann/format.rs",
+      "line": 24
+    },
+    {
+      "kind": "const",
+      "symbol": "PENDING_FLUSH_THRESHOLD_MAX",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/diskann/format.rs",
+      "line": 23
+    },
+    {
+      "kind": "const",
+      "symbol": "PENDING_FLUSH_THRESHOLD_MIN",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/diskann/format.rs",
+      "line": 22
+    },
+    {
+      "kind": "const",
+      "symbol": "PID_MAX_POOL_SIZE_DEFAULT",
+      "krate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/pid.rs",
+      "line": 29
+    },
+    {
+      "kind": "const",
+      "symbol": "PROOF_CHAIN_DOMAIN_TAG",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/proof_v4.rs",
+      "line": 14
+    },
+    {
+      "kind": "const",
+      "symbol": "RESERVED_PREFIXES",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/memtable.rs",
+      "line": 73
+    },
+    {
+      "kind": "const",
+      "symbol": "WALLCLOCK_TX_HEURISTIC_MIN",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/visibility.rs",
+      "line": 11
+    },
+    {
+      "kind": "const",
+      "symbol": "WAL_QUEUE_ELEVATED_THRESHOLD",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/system_pressure.rs",
+      "line": 37
+    },
+    {
+      "kind": "const",
+      "symbol": "WITNESS_SSTABLE_MAGIC_LEGACY",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/witness_reader.rs",
+      "line": 72
+    },
+    {
+      "kind": "fn",
+      "symbol": "apply_user_metrics_topk_rerank",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/kv_cache_integration/mod.rs",
+      "line": 162
+    },
+    {
+      "kind": "fn",
+      "symbol": "atomic_replace_with_injector",
+      "krate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/lib.rs",
+      "line": 285
+    },
+    {
+      "kind": "fn",
+      "symbol": "await_pending_rollbacks",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/orphan.rs",
+      "line": 509
+    },
+    {
+      "kind": "fn",
+      "symbol": "build_eviction_worker_with_exporter",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/kv_cache_integration/mod.rs",
+      "line": 189
+    },
+    {
+      "kind": "fn",
+      "symbol": "build_prefix_key",
+      "krate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/inference/prefix_reuse.rs",
+      "line": 51
+    },
+    {
+      "kind": "fn",
+      "symbol": "build_provenance",
+      "krate": "contextra-rank",
+      "file": "crates/contextra-rank/src/fusion/provenance.rs",
+      "line": 157
+    },
+    {
+      "kind": "fn",
+      "symbol": "check_subinterpreter_guard",
+      "krate": "contextra-py",
+      "file": "crates/contextra-py/src/bindings/common.rs",
+      "line": 216
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_gamma_edge_budget",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/acorn/gamma_augmentation.rs",
+      "line": 29
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_ppr_at",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/ppr/snapshot.rs",
+      "line": 26
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_profile_scores",
+      "krate": "contextra-router",
+      "file": "crates/contextra-router/src/router/mod.rs",
+      "line": 246
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_record_commitment",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/audit_chain.rs",
+      "line": 161
+    },
+    {
+      "kind": "fn",
+      "symbol": "compute_wal_delete_receipt",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/wal_receipt.rs",
+      "line": 7
+    },
+    {
+      "kind": "fn",
+      "symbol": "consolidate_semantic_hyperedges",
+      "krate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/semantic_aggregation_facade.rs",
+      "line": 40
+    },
+    {
+      "kind": "fn",
+      "symbol": "cosine_distance_f32_bytes_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 252
+    },
+    {
+      "kind": "fn",
+      "symbol": "cosine_distance_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 129
+    },
+    {
+      "kind": "fn",
+      "symbol": "cosine_similarity_parts_u8_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 420
+    },
+    {
+      "kind": "fn",
+      "symbol": "create_extractor",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/extraction/mod.rs",
+      "line": 68
+    },
+    {
+      "kind": "fn",
+      "symbol": "current_process_uid_from_file",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/ipc/peer_cred.rs",
+      "line": 10
+    },
+    {
+      "kind": "fn",
+      "symbol": "current_process_uid_from_file",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/ipc/peer_cred.rs",
+      "line": 17
+    },
+    {
+      "kind": "fn",
+      "symbol": "derive_subkey",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 104
+    },
+    {
+      "kind": "fn",
+      "symbol": "directory_is_pristine",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 117
+    },
+    {
+      "kind": "fn",
+      "symbol": "doc_to_py",
+      "krate": "contextra-py",
+      "file": "crates/contextra-py/src/bindings/common.rs",
+      "line": 289
+    },
+    {
+      "kind": "fn",
+      "symbol": "dot_product_distance_f32_bytes_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 318
+    },
+    {
+      "kind": "fn",
+      "symbol": "dot_product_distance_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 211
+    },
+    {
+      "kind": "fn",
+      "symbol": "dot_product_u8_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 351
+    },
+    {
+      "kind": "fn",
+      "symbol": "encode_observation_tlv",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/deletion/environment.rs",
+      "line": 44
+    },
+    {
+      "kind": "fn",
+      "symbol": "euclidean_distance_f32_bytes_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 285
+    },
+    {
+      "kind": "fn",
+      "symbol": "euclidean_distance_sq_u8_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 384
+    },
+    {
+      "kind": "fn",
+      "symbol": "euclidean_distance_with_features",
+      "krate": "contextra-simd",
+      "file": "crates/contextra-simd/src/dispatch.rs",
+      "line": 170
+    },
+    {
+      "kind": "fn",
+      "symbol": "execute_verify_proof",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/cli/verify_proof.rs",
+      "line": 248
+    },
+    {
+      "kind": "fn",
+      "symbol": "execute_verify_proof_legacy",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/cli/verify_proof.rs",
+      "line": 76
+    },
+    {
+      "kind": "fn",
+      "symbol": "filter_restore_records",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/restore_filter.rs",
+      "line": 32
+    },
+    {
+      "kind": "fn",
+      "symbol": "filter_restore_records_with_report",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/restore_filter.rs",
+      "line": 41
+    },
+    {
+      "kind": "fn",
+      "symbol": "forward_push_apprh",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/apprh/mod.rs",
+      "line": 49
+    },
+    {
+      "kind": "fn",
+      "symbol": "get_legal_compound_stems",
+      "krate": "contextra-text",
+      "file": "crates/contextra-text/src/domain/legal_de.rs",
+      "line": 35
+    },
+    {
+      "kind": "fn",
+      "symbol": "get_legal_protected_terms",
+      "krate": "contextra-text",
+      "file": "crates/contextra-text/src/domain/legal_de.rs",
+      "line": 39
+    },
+    {
+      "kind": "fn",
+      "symbol": "get_medical_compound_stems",
+      "krate": "contextra-text",
+      "file": "crates/contextra-text/src/domain/medical_de.rs",
+      "line": 35
+    },
+    {
+      "kind": "fn",
+      "symbol": "get_medical_protected_terms",
+      "krate": "contextra-text",
+      "file": "crates/contextra-text/src/domain/medical_de.rs",
+      "line": 39
+    },
+    {
+      "kind": "fn",
+      "symbol": "get_orphaned_checkpoints_for_namespace",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/orphan.rs",
+      "line": 481
+    },
+    {
+      "kind": "fn",
+      "symbol": "handle_cloud_query",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 200
+    },
+    {
+      "kind": "fn",
+      "symbol": "handle_cloud_query_scoped",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 208
+    },
+    {
+      "kind": "fn",
+      "symbol": "handle_cloud_query_scoped_with_guard",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 224
+    },
+    {
+      "kind": "fn",
+      "symbol": "intake_pre_condensed_inputs",
+      "krate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+      "line": 566
+    },
+    {
+      "kind": "fn",
+      "symbol": "kv_bridge_has_existing_keys",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/routing.rs",
+      "line": 163
+    },
+    {
+      "kind": "fn",
+      "symbol": "load_bert_config",
+      "krate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/embedding.rs",
+      "line": 24
+    },
+    {
+      "kind": "fn",
+      "symbol": "mandatory_ids_for",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/exclusions.rs",
+      "line": 38
+    },
+    {
+      "kind": "fn",
+      "symbol": "migrate_legacy_key",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/hmac.rs",
+      "line": 125
+    },
+    {
+      "kind": "fn",
+      "symbol": "migrate_legacy_key",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/hmac.rs",
+      "line": 154
+    },
+    {
+      "kind": "fn",
+      "symbol": "normalize_payload_for_dlp",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_vault.rs",
+      "line": 349
+    },
+    {
+      "kind": "fn",
+      "symbol": "orphaned_checkpoint_count",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/orphan.rs",
+      "line": 526
+    },
+    {
+      "kind": "fn",
+      "symbol": "pack_kivi_block",
+      "krate": "contextra-kvcache",
+      "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+      "line": 546
+    },
+    {
+      "kind": "fn",
+      "symbol": "parse_mountinfo",
+      "krate": "contextra-sys",
+      "file": "crates/contextra-sys/src/env_observe.rs",
+      "line": 279
+    },
+    {
+      "kind": "fn",
+      "symbol": "record_counter_safe",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 51
+    },
+    {
+      "kind": "fn",
+      "symbol": "record_gauge_safe",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/metrics_names.rs",
+      "line": 39
+    },
+    {
+      "kind": "fn",
+      "symbol": "record_importance_outcome",
+      "krate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/importance.rs",
+      "line": 229
+    },
+    {
+      "kind": "fn",
+      "symbol": "render_art30_register_markdown",
+      "krate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/markdown_template.rs",
+      "line": 69
+    },
+    {
+      "kind": "fn",
+      "symbol": "render_audit_line",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+      "line": 190
+    },
+    {
+      "kind": "fn",
+      "symbol": "render_register_json",
+      "krate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 135
+    },
+    {
+      "kind": "fn",
+      "symbol": "resume_pending",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/purge/resume.rs",
+      "line": 84
+    },
+    {
+      "kind": "fn",
+      "symbol": "resume_pending_with_policy",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/purge/resume.rs",
+      "line": 24
+    },
+    {
+      "kind": "fn",
+      "symbol": "scrub_and_remove_with_injector",
+      "krate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/lib.rs",
+      "line": 369
+    },
+    {
+      "kind": "fn",
+      "symbol": "seed_from_hit",
+      "krate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/inference/prefix_reuse.rs",
+      "line": 77
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_expiry_reaper",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/background_workers/expiry_workers.rs",
+      "line": 67
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_kv_cache_eviction",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/kv_cache_integration/mod.rs",
+      "line": 200
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_orphan_cleanup_worker_with_registry",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/background_workers/orphan_workers.rs",
+      "line": 183
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_orphan_reaper",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/background_workers/orphan_workers.rs",
+      "line": 207
+    },
+    {
+      "kind": "fn",
+      "symbol": "start_thermostat_reaper",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/background_workers/expiry_workers.rs",
+      "line": 106
+    },
+    {
+      "kind": "fn",
+      "symbol": "sync_dir_with_injector",
+      "krate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/lib.rs",
+      "line": 266
+    },
+    {
+      "kind": "fn",
+      "symbol": "validate_audit_payload_and_error",
+      "krate": "contextra-agent",
+      "file": "crates/contextra-agent/src/audit.rs",
+      "line": 50
+    },
+    {
+      "kind": "fn",
+      "symbol": "validate_iban_mod97",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_vault.rs",
+      "line": 323
+    },
+    {
+      "kind": "fn",
+      "symbol": "validate_luhn",
+      "krate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_vault.rs",
+      "line": 301
+    },
+    {
+      "kind": "struct",
+      "symbol": "AgentEngine",
+      "krate": "contextra-agent",
+      "file": "crates/contextra-agent/src/context.rs",
+      "line": 276
+    },
+    {
+      "kind": "struct",
+      "symbol": "CancelObserver",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/server_dispatch/cancellation.rs",
+      "line": 7
+    },
+    {
+      "kind": "struct",
+      "symbol": "ChatMessageResponse",
+      "krate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/client/wire.rs",
+      "line": 24
+    },
+    {
+      "kind": "struct",
+      "symbol": "CheckpointWiring",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/wiring.rs",
+      "line": 22
+    },
+    {
+      "kind": "struct",
+      "symbol": "CheckpointWiringDeps",
+      "krate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/wiring.rs",
+      "line": 15
+    },
+    {
+      "kind": "struct",
+      "symbol": "CompactionEngineWiring",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/wiring.rs",
+      "line": 10
+    },
+    {
+      "kind": "struct",
+      "symbol": "ExplainRequest",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/explain.rs",
+      "line": 10
+    },
+    {
+      "kind": "struct",
+      "symbol": "ForgetRequest",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/server_dispatch/forget_guard.rs",
+      "line": 16
+    },
+    {
+      "kind": "struct",
+      "symbol": "IpcProxy",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/ipc/proxy.rs",
+      "line": 9
+    },
+    {
+      "kind": "struct",
+      "symbol": "IpcServer",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/ipc/server.rs",
+      "line": 20
+    },
+    {
+      "kind": "struct",
+      "symbol": "PrimaryDetector",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/ipc/primary.rs",
+      "line": 48
+    },
+    {
+      "kind": "struct",
+      "symbol": "RecordDek",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 60
+    },
+    {
+      "kind": "struct",
+      "symbol": "SieveCacheBackend",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/block_cache.rs",
+      "line": 26
+    },
+    {
+      "kind": "struct",
+      "symbol": "TrustFrame",
+      "krate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/server_dispatch/trust_frame.rs",
+      "line": 20
+    },
+    {
+      "kind": "struct",
+      "symbol": "TtlMetadata",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction.rs",
+      "line": 23
+    },
+    {
+      "kind": "trait",
+      "symbol": "EvidenceInvariant",
+      "krate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/policy.rs",
+      "line": 10
+    },
+    {
+      "kind": "trait",
+      "symbol": "KvShreddingHook",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/kv_cache_integration/mod.rs",
+      "line": 87
+    },
+    {
+      "kind": "type",
+      "symbol": "BacklinkKey",
+      "krate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/arena.rs",
+      "line": 19
+    },
+    {
+      "kind": "type",
+      "symbol": "CascadeReport",
+      "krate": "contextra-graph",
+      "file": "crates/contextra-graph/src/cascade.rs",
+      "line": 153
+    },
+    {
+      "kind": "type",
+      "symbol": "ContextPrefixer",
+      "krate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+      "line": 62
+    },
+    {
+      "kind": "type",
+      "symbol": "FusionResult",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/temporal_filter.rs",
+      "line": 15
+    },
+    {
+      "kind": "type",
+      "symbol": "SequentialIds",
+      "krate": "contextra-ports",
+      "file": "crates/contextra-ports/src/id_gen.rs",
+      "line": 58
+    },
+    {
+      "kind": "type",
+      "symbol": "TenantCollectionMap",
+      "krate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 376
+    }
+  ],
+  "note": "Ein Fund heißt nicht automatisch \"löschen\". Mögliche Ursachen: geplante Verdrahtung fehlt, bewusste öffentliche API, Refactoring hat den letzten Aufrufer entfernt."
+}

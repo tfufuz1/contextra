@@ -1,0 +1,26 @@
+id = "T-2026-LB05"
+title = "Audit-Kette: verify_strict und Rollback-Anker (B05)"
+crate = "contextra-crypto"
+tier = 1
+risk = "high"
+goal = "Ersetzung von verify durch verify_strict in audit_chain.rs und Implementierung von verify_against_anchor(head_hash, head_counter) zur Rollback-Erkennung."
+non_goals = ["Keine Änderungen außerhalb des Arbeitsbereichs", "Keine neuen Dependencies", "Keine Public-API-Brüche"]
+scope = [
+    "crates/contextra-crypto/src/audit_chain.rs",
+    "crates/contextra-crypto/tests/audit_chain_strict_and_rollback.rs",
+    ".jules/tasks/T-2026-LB05.toml"
+]
+forbidden = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "xtask/**", "capabilities.toml", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic", "Fail-Closed", "Determinismus"]
+acceptance = [
+    "cargo test -p contextra-crypto --test audit_chain_strict_and_rollback",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint"
+]
+evidence_required = ["verify_strict wird in audit_chain.rs genutzt", "Rollback gegen externen Anker mit höherem Zähler schlägt fehl"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

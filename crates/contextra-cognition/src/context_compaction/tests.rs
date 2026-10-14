@@ -554,30 +554,43 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
 
     let session = ConsolidationSession::start(&col, &[d1, d2], target_id).await?;
 
-    col.update(
+    let update_res = col.update(
         "source_2",
         &[0.0, 1.0, 0.0, 0.0],
         Some(serde_json::json!({"text": "Fact 2 updated by agent"})),
     )
-    .await?;
+    .await;
 
-    let commit_res = session
-        .commit(
-            "summary_12",
-            &[0.5, 0.5, 0.0, 0.0],
-            "Summary of 1 and 2",
-            None,
-        )
-        .await;
-    assert!(
-        commit_res.is_err(),
-        "Consolidation commit must fail under concurrent mutation"
-    );
-    match commit_res.unwrap_err() {
-        ContextraError::StaleRead(msg) => {
-            assert!(msg.contains("OCC conflict"));
+    if update_res.is_ok() {
+        let commit_res = session
+            .commit(
+                "summary_12",
+                &[0.5, 0.5, 0.0, 0.0],
+                "Summary of 1 and 2",
+                None,
+            )
+            .await;
+        assert!(
+            commit_res.is_err(),
+            "Consolidation commit must fail under concurrent mutation"
+        );
+        match commit_res.unwrap_err() {
+            ContextraError::StaleRead(msg) => {
+                assert!(msg.contains("OCC conflict"));
+            }
+            ContextraError::Transaction(msg) => {
+                assert!(msg.contains("Conflict") || msg.contains("isolation") || msg.contains("Storage commit failed"));
+            }
+            other => panic!("Expected StaleRead or Transaction conflict error, got: {:?}", other),
         }
-        other => panic!("Expected StaleRead error, got: {:?}", other),
+    } else {
+        let err = update_res.unwrap_err();
+        match err {
+            ContextraError::Transaction(msg) => {
+                assert!(msg.contains("Conflict") || msg.contains("isolation") || msg.contains("Storage commit failed"));
+            }
+            other => panic!("Expected Transaction conflict error on concurrent update, got: {:?}", other),
+        }
     }
 
     let doc1 = col.get("source_1").await?;

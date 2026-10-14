@@ -12,12 +12,81 @@ use contextra_crypto::deletion_proof::proof_store::ProofStoreWarning;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::types::{DeletionScope, ExcludedScope};
 use contextra_crypto::deletion_witness::LayerWitness;
+use contextra_ports::Rng;
 use contextra_types::{ContextraError, Result, TxId};
 use tracing::error;
+use zeroize::Zeroizing;
 
 use super::copy_observer::DpiCopyObserverReport;
 use super::environment::observe_environment;
 use super::forget_options::{FonLogicalHandle, ForgetOptions};
+
+/// Trait for retrieving or generating Ed25519 signing key seed material.
+pub trait ProofSignerSource: Send + Sync {
+    /// Obtains the 32-byte Ed25519 secret seed wrapped in a [`Zeroizing`] buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContextraError::Crypto`] if key loading or CSPRNG key generation fails (fail-closed).
+    fn get_signer_seed(&self) -> Result<Zeroizing<[u8; 32]>>;
+}
+
+/// Default production signer source that loads an existing Ed25519 key file from `key_path`,
+/// or generates a new CSPRNG key using the Rng port and persists it with strict 0600 permissions.
+pub struct FileOrCsprngSignerSource {
+    key_path: PathBuf,
+}
+
+impl FileOrCsprngSignerSource {
+    /// Creates a new [`FileOrCsprngSignerSource`] targeting `key_path`.
+    #[must_use]
+    pub fn new(key_path: PathBuf) -> Self {
+        Self { key_path }
+    }
+}
+
+impl ProofSignerSource for FileOrCsprngSignerSource {
+    fn get_signer_seed(&self) -> Result<Zeroizing<[u8; 32]>> {
+        if self.key_path.exists() {
+            let _validated_signer =
+                ProofKeyPairSigner::load_from_file(&self.key_path).map_err(|e| {
+                    ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}"))
+                })?;
+
+            let raw_bytes = std::fs::read(&self.key_path).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to read key file: {e}"))
+            })?;
+
+            if raw_bytes.len() != 32 {
+                return Err(ContextraError::Crypto(format!(
+                    "Invalid key file length: expected 32 bytes, got {}",
+                    raw_bytes.len()
+                )));
+            }
+
+            let mut secret = [0u8; 32];
+            secret.copy_from_slice(&raw_bytes);
+            Ok(Zeroizing::new(secret))
+        } else {
+            if let Some(parent) = self.key_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    ContextraError::Crypto(format!("Failed to create signer key dir: {e}"))
+                })?;
+            }
+
+            let rng = contextra_ports::SystemRng::new();
+            let mut secret = [0u8; 32];
+            rng.fill_bytes(&mut secret);
+
+            let keypair = ProofKeyPairSigner::from_secret_bytes(secret);
+            keypair.save_to_file(&self.key_path).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to save Ed25519 signer key: {e}"))
+            })?;
+
+            Ok(Zeroizing::new(secret))
+        }
+    }
+}
 
 /// Warning counters for store anomalies detected during initialization.
 #[derive(Debug, Default)]
@@ -101,24 +170,23 @@ impl DpiDeletionRuntime {
             home.join(".contextra").join("proof_ed25519.key")
         };
 
-        let signer: Arc<dyn ProofSigner> = if key_path.exists() {
-            let keypair = ProofKeyPairSigner::load_from_file(&key_path).map_err(|e| {
-                ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}"))
-            })?;
-            Arc::new(keypair)
-        } else {
-            if let Some(parent) = key_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    ContextraError::Crypto(format!("Failed to create signer key dir: {e}"))
-                })?;
-            }
-            let keypair =
-                ProofKeyPairSigner::from_secret_bytes(db_instance_id_to_secret(&db_instance_id));
-            keypair.save_to_file(&key_path).map_err(|e| {
-                ContextraError::Crypto(format!("Failed to save Ed25519 signer key: {e}"))
-            })?;
-            Arc::new(keypair)
-        };
+        let source = FileOrCsprngSignerSource::new(key_path);
+        Self::open_with_source(db_dir, &source, db_instance_id)
+    }
+
+    /// Opens or initializes `DpiDeletionRuntime` at `db_dir` using an explicit [`ProofSignerSource`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContextraError::Crypto`] if key retrieval or store verification fails.
+    pub fn open_with_source(
+        db_dir: &Path,
+        source: &dyn ProofSignerSource,
+        db_instance_id: [u8; 16],
+    ) -> Result<Self> {
+        let secret = source.get_signer_seed()?;
+        let keypair = ProofKeyPairSigner::from_secret_bytes(*secret);
+        let signer: Arc<dyn ProofSigner> = Arc::new(keypair);
 
         let proof_dir = db_dir.join("proofs_v4");
         std::fs::create_dir_all(&proof_dir).map_err(|e| {
@@ -245,7 +313,10 @@ impl DpiDeletionRuntime {
     }
 }
 
-fn db_instance_id_to_secret(db_id: &[u8; 16]) -> [u8; 32] {
+/// Legacy ID-derivation helper retained strictly for negative security testing.
+#[doc(hidden)]
+#[must_use]
+pub fn db_instance_id_to_secret_legacy_test_only(db_id: &[u8; 16]) -> [u8; 32] {
     let hash = blake3::Hasher::new_derive_key("contextra/proof-signer-secret/v1")
         .update(db_id)
         .finalize();

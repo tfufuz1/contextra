@@ -42,6 +42,23 @@ impl PyContextra {
             tenant_id,
         }
     }
+
+    pub(crate) async fn get_target_collection(
+        &self,
+    ) -> Result<
+        Arc<
+            contextra_db::collection::Collection<
+                contextra_store::tenant_codec::TenantScopedStorage<
+                    Arc<contextra_store::LsmStorage>,
+                >,
+            >,
+        >,
+        contextra_core::ContextraError,
+    > {
+        self.inner
+            .collection_for_tenant("default", self.tenant_id)
+            .await
+    }
 }
 
 #[pymethods]
@@ -50,6 +67,19 @@ impl PyContextra {
     #[getter]
     pub fn tenant_id(&self) -> u64 {
         self.tenant_id.inner()
+    }
+
+    /// Returns a new Db instance bound to the specified tenant ID.
+    pub fn with_tenant(&self, tenant_id: u64) -> PyResult<PyContextra> {
+        let new_tenant = contextra_types::TenantId::try_new(tenant_id)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyContextra::new(
+            self.inner.clone(),
+            self.runtime.clone(),
+            self.worker_threads,
+            self.poisoned.clone(),
+            new_tenant,
+        ))
     }
 
     /// Returns the number of worker threads configured in this database's Tokio runtime.
@@ -99,17 +129,21 @@ impl PyContextra {
 
     // ── Collection Management ──
 
-    /// Returns a specific collection (namespace).
+    /// Returns a specific collection (namespace) bound to this database's tenant ID.
     /// Creates the collection if it does not already exist.
     pub fn collection(&self, name: &str, py: Python<'_>) -> PyResult<PyCollection> {
         validate_collection_name(name)?;
         let rt = &self.runtime;
         let name_owned = name.to_string();
+        let tenant_id = self.tenant_id;
+        let inner = self.inner.clone();
         let col = run_blocking_ffi(py, &self.poisoned, || {
-            rt.block_on(self.inner.collection(&name_owned))
+            rt.block_on(inner.collection_for_tenant(&name_owned, tenant_id))
                 .map_err(contextra_err)
         })?;
         Ok(PyCollection::new(
+            self.inner.clone(),
+            name_owned,
             col,
             self.runtime.clone(),
             self.poisoned.clone(),
@@ -117,16 +151,18 @@ impl PyContextra {
         ))
     }
 
-    /// Lists all existing collection names.
+    /// Lists all existing collection names for this database's tenant ID.
     pub fn list_collections(&self, py: Python<'_>) -> PyResult<Vec<String>> {
         let rt = &self.runtime;
+        let tenant_id = self.tenant_id;
+        let inner = self.inner.clone();
         run_blocking_ffi(py, &self.poisoned, || {
-            rt.block_on(self.inner.list_collections())
+            rt.block_on(inner.list_collections_for_tenant(tenant_id))
                 .map_err(contextra_err)
         })
     }
 
-    /// Drops a collection and returns a collection-scoped cryptographic `DeletionProof` as JSON.
+    /// Drops a collection for this database's tenant ID and returns a cryptographic `DeletionProof` as JSON.
     ///
     /// # Scope & Guarantees
     /// Execution tombstones the specified collection in the active LSM MemTable and commits
@@ -223,19 +259,25 @@ impl PyContextra {
         })
     }
 
-    /// Returns the number of documents.
+    /// Returns the number of documents in the tenant's default collection.
     pub fn len(&self, py: Python<'_>) -> PyResult<usize> {
         let rt = &self.runtime;
         run_blocking_ffi(py, &self.poisoned, || {
-            rt.block_on(self.inner.len()).map_err(contextra_err)
+            rt.block_on(async {
+                let col = self.get_target_collection().await.map_err(contextra_err)?;
+                Ok(col.len().await)
+            })
         })
     }
 
-    /// Returns true if the collection/database is empty.
+    /// Returns true if the tenant's default collection is empty.
     pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool> {
         let rt = &self.runtime;
         run_blocking_ffi(py, &self.poisoned, || {
-            rt.block_on(self.inner.is_empty()).map_err(contextra_err)
+            rt.block_on(async {
+                let col = self.get_target_collection().await.map_err(contextra_err)?;
+                Ok(col.is_empty().await)
+            })
         })
     }
 }

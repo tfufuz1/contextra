@@ -56,7 +56,11 @@ pub enum PurgeBlocked {
     Unimplemented,
     /// Scan timeout occurred.
     ScanTimeout,
+    /// Unknown free space.
+    UnknownFreeSpace,
 }
+
+use std::path::PathBuf;
 
 /// Report summarizing results of a successful purge compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,4 +71,6 @@ pub struct PurgeReport {
     pub bytes_reclaimed: u64,
     /// SSTable files removed/replaced.
     pub sstables_replaced: usize,
+    /// List of obsolete file paths replaced or made obsolete during purge.
+    pub obsolete_files: Vec<PathBuf>,
 }

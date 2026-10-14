@@ -1,0 +1,37 @@
+id                = "T-2026-LB14"
+title             = "RevocationLog: Crash-Tests, Rollback-Erkennung, Generationen"
+crate             = "contextra-crypto"
+tier              = 1
+risk              = "high"
+goal              = "Erweiterung des RevocationLog um Monoton-Generationen, Rollback-Erkennung mit Fail-Closed und Crash-Tests mit FaultInjector."
+non_goals         = ["Änderungen an anderen Crates oder fremden Dateien"]
+scope             = [
+  "crates/contextra-crypto/src/revocation_log.rs",
+  "crates/contextra-crypto/tests/revocation_log_crash_rollback.rs",
+  ".jules/tasks/T-2026-LB14.toml"
+]
+forbidden         = [
+  ".github/**",
+  "xtask/**",
+  "AGENTS.md",
+  "Cargo.toml",
+  "Cargo.lock",
+  "capabilities.toml",
+  "deny.toml",
+  "rust-toolchain.toml",
+  ".jules/setup/**"
+]
+invariants        = ["Zero-Panic", "Fail-Closed bei Rollback", "Monotone Generationen"]
+acceptance        = [
+  "cargo test -p contextra-crypto --test revocation_log_crash_rollback",
+  "cargo test -p contextra-crypto --test campaign_cov_revocation_log",
+  "cargo xtask doctrine-scan",
+  "cargo xtask check-result-dropped-io",
+  "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Tests in crates/contextra-crypto/tests/revocation_log_crash_rollback.rs"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12
