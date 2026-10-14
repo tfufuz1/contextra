@@ -3,7 +3,7 @@
 // INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::open, ContextraBuilder) zu.
 
 use contextra::performance_profile::PerformanceProfile;
-use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
+use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError, ContextraWiringReportExt};
 use contextra_store::lsm::DurabilityMode;
 use tempfile::TempDir;
 
