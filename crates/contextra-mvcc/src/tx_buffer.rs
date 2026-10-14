@@ -374,13 +374,7 @@ impl<T: Clone> TxBuffer<T> {
 
     /// Registers a read key and its snapshot sequence number for transaction `tx`.
     pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
-        let shard_idx = self.shard_idx(tx);
-        let mut shard = self.shards[shard_idx].write();
-        shard
-            .read_sets
-            .entry(tx)
-            .or_default()
-            .record_read(key, snapshot_seq);
+        let _ = self.try_register_read(tx, key, snapshot_seq, DEFAULT_MAX_READ_SET_KEYS);
     }
 
     /// Registers a range prefix read operation and its snapshot sequence number for transaction `tx`.

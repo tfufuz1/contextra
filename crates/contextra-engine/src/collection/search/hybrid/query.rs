@@ -210,6 +210,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     };
 
                     let elapsed_vec = vec_start.elapsed().as_secs_f64();
+                    let sink = self.metrics_sink();
+                    crate::metrics_names::record_gauge_safe(
+                        sink.as_ref(),
+                        crate::metrics_names::SEARCH_LATENCY_VECTOR,
+                        elapsed_vec,
+                        &[],
+                    );
                     if let Some(sink) = metrics {
                         sink.record_histogram(
                             crate::collection::query_builder::METRIC_SEARCH_LATENCY_VECTOR,
@@ -277,6 +284,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     };
 
                     let elapsed_text = text_start.elapsed().as_secs_f64();
+                    let sink = self.metrics_sink();
+                    crate::metrics_names::record_gauge_safe(
+                        sink.as_ref(),
+                        crate::metrics_names::SEARCH_LATENCY_TEXT,
+                        elapsed_text,
+                        &[],
+                    );
                     if let Some(sink) = metrics {
                         sink.record_histogram(
                             crate::collection::query_builder::METRIC_SEARCH_LATENCY_TEXT,
@@ -387,6 +401,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             };
 
             let elapsed_graph = graph_start.elapsed().as_secs_f64();
+            let sink = self.metrics_sink();
+            crate::metrics_names::record_gauge_safe(
+                sink.as_ref(),
+                crate::metrics_names::SEARCH_LATENCY_GRAPH,
+                elapsed_graph,
+                &[],
+            );
             if let Some(sink) = metrics {
                 sink.record_histogram(
                     crate::collection::query_builder::METRIC_SEARCH_LATENCY_GRAPH,
