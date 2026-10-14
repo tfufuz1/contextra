@@ -32,6 +32,12 @@ pub struct CompactionEngine {
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
+    purge_scope: parking_lot::RwLock<
+        Option<(
+            super::purge_filter::PurgeScope,
+            Option<Arc<dyn super::purge_filter::FreeSpaceProbe>>,
+        )>,
+    >,
 }
 
 impl CompactionEngine {
@@ -68,7 +74,22 @@ impl CompactionEngine {
             adaptive_planner,
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
+            purge_scope: parking_lot::RwLock::new(None),
         }
+    }
+
+    /// Sets an active purge scope and optional space probe to prioritize purge candidate SSTables.
+    pub fn set_purge_scope(
+        &self,
+        scope: super::purge_filter::PurgeScope,
+        space_probe: Option<Arc<dyn super::purge_filter::FreeSpaceProbe>>,
+    ) {
+        *self.purge_scope.write() = Some((scope, space_probe));
+    }
+
+    /// Clears the active purge scope.
+    pub fn clear_purge_scope(&self) {
+        *self.purge_scope.write() = None;
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -142,7 +163,9 @@ impl CompactionEngine {
         // happen atomically under one lock acquisition to prevent TOCTOU race conditions.
         let (mut input_ssts, is_full_compaction) = {
             let ssts = sstables.read().await;
-            if ssts.len() < self.config.min_sstables_per_tier {
+            if self.purge_scope.read().is_none()
+                && ssts.len() < self.config.min_sstables_per_tier
+            {
                 return Ok(false);
             }
 
@@ -170,7 +193,7 @@ impl CompactionEngine {
                     }
                 } else {
                     match self.select_compaction_candidates(&ssts) {
-                        Some(candidates) if candidates.len() >= 2 => {
+                        Some(candidates) if !candidates.is_empty() => {
                             let is_full = candidates.len() == ssts.len();
                             (candidates, is_full)
                         }
@@ -179,7 +202,7 @@ impl CompactionEngine {
                 }
             } else {
                 match self.select_compaction_candidates(&ssts) {
-                    Some(candidates) if candidates.len() >= 2 => {
+                    Some(candidates) if !candidates.is_empty() => {
                         let is_full = candidates.len() == ssts.len();
                         (candidates, is_full)
                     }
@@ -383,6 +406,19 @@ impl CompactionEngine {
         &self,
         ssts: &[Arc<SstableReader>],
     ) -> Option<Vec<Arc<SstableReader>>> {
+        if let Some((ref scope, ref probe)) = *self.purge_scope.read() {
+            let probe_ref = probe.as_ref().map(|p| &**p as &dyn super::purge_filter::FreeSpaceProbe);
+            if let Ok(candidates) = super::purge_select::select_purge_candidates(
+                ssts,
+                scope,
+                probe_ref,
+            ) {
+                if !candidates.is_empty() {
+                    return Some(candidates);
+                }
+            }
+        }
+
         super::adaptive::select_stcs_candidates(
             ssts,
             self.config.min_sstables_per_tier,
