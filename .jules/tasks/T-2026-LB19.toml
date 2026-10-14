@@ -1,0 +1,44 @@
+id = "T-2026-LB19"
+title = "Ed25519-Grenzfall-Testvektoren und Cross-Impl-Pruefung (Auftrag B19)"
+crate = "contextra-crypto"
+tier = 1
+risk = "high"
+goal = "Erzeugung und Verifikation von Ed25519-Grenzfall-Testvektoren fuer DeletionProof v3/v4 und AuditChain sowie Cross-Impl-Vergleich."
+non_goals = [
+    "Aenderungen an Produktionscode",
+    "Aenderungen an Cargo.toml oder Cargo.lock",
+    "Abschwaechung von Sicherheitsgates"
+]
+scope = [
+    "crates/contextra-crypto/tests/ed25519_strict_vectors.rs",
+    "crates/contextra-crypto/tests/golden/ed25519_strict_vectors.json",
+    ".jules/tasks/T-2026-LB19.toml"
+]
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "xtask/**",
+    "capabilities.toml",
+    "rust-toolchain.toml",
+    "deny.toml",
+    ".jules/setup/**"
+]
+invariants = [
+    "Zero-Panic in tests / strict edge case validation",
+    "No external dependencies added",
+    "Fail-closed on invalid signatures"
+]
+acceptance = [
+    "cargo test -p contextra-crypto --test ed25519_strict_vectors",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Erfolgreiche Ausfuehrung aller Pruef-Befehle"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

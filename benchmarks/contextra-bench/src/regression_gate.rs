@@ -191,6 +191,24 @@ mod tests {
     }
 
     #[test]
+    fn test_regression_gate_fails_on_empty_or_corrupt_metrics() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let results_path = temp_dir.path().join("empty_current.json");
+        let baseline_path = temp_dir.path().join("empty_baseline.json");
+
+        // Empty JSON object `{}` currently parses into CombinedMetrics { long_mem_eval: None, locomo: None }
+        fs::write(&results_path, "{}").unwrap();
+        fs::write(&baseline_path, "{}").unwrap();
+
+        let res = run_regression_gate(&results_path, &baseline_path, 0.05, false);
+        // Gate MUST fail-close when metrics are empty / missing!
+        match res {
+            Ok(gate_res) => assert!(!gate_res.passed, "Gate must NOT pass when metrics are empty!"),
+            Err(_) => (), // Returning Err is also valid fail-closed behavior
+        }
+    }
+
+    #[test]
     fn test_regression_gate_error_cases() {
         let temp_dir = tempfile::tempdir().unwrap();
         let missing_results = temp_dir.path().join("missing.json");

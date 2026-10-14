@@ -188,7 +188,8 @@ impl CandleLlmClient {
     }
 
     /// Configures optional `KvPrefixStore` context for stage B prefix reuse.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    ///
+    /// Opt-in builder method active when the `kv-stage-b` feature is enabled.
     #[cfg(feature = "kv-stage-b")]
     pub fn with_prefix_store(mut self, store: Arc<dyn contextra_ports::kv::KvPrefixStore>) -> Self {
         self.prefix_store = Some(crate::inference::KvPrefixContext { store });

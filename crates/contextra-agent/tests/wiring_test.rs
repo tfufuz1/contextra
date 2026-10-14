@@ -103,3 +103,30 @@ async fn test_agent_wiring_build_and_tool_retry() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_agent_wiring_build_with_event_source() -> Result<()> {
+    use contextra_agent::event_source::VecEventSource;
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let config = contextra_db::ContextraConfig::default();
+    let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+    let state_coll = db.collection("test_wiring_events").await?;
+
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+    let id_gen: Arc<dyn IdGenerator> = Arc::new(SequentialIdGen::new(1));
+
+    let custom_source = Box::new(VecEventSource::try_new(vec![])?);
+
+    let wiring = AgentWiring::build_with_event_source(
+        db,
+        state_coll,
+        TokenBudget::new(500, 0),
+        clock,
+        id_gen,
+        custom_source,
+    )?;
+
+    assert_eq!(wiring.budget.limit, 500);
+    Ok(())
+}

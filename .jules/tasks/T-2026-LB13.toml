@@ -1,0 +1,17 @@
+id        = "T-2026-LB13"
+title     = "KV-Shredding: Schlüsselkopien und vollständiger Widerrufspfad (Feld 3)"
+crate     = "contextra-crypto"
+tier      = 1
+risk      = "high"
+goal      = "Eliminierung vermeidbarer Schlüsselkopien, Absicherung der Zeroize-Eigenschaften, Implementierung der Zwei-Phasen-Revokation (request/finalize/cancel) und Testabdeckung der Vanish-Lehre."
+non_goals = ["Keine Änderungen außerhalb des Arbeitsbereichs", "Keine neuen Dependencies", "Keine Public-API-Brüche"]
+scope     = ["crates/contextra-crypto/src/kv_shredding.rs", "crates/contextra-crypto/tests/kv_shredding_key_copies.rs", ".jules/tasks/T-2026-LB13.toml"]
+forbidden = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "xtask/**", "capabilities.toml", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["INV-VAULT-1", "INV-VAULT-2", "INV-VAULT-3"]
+acceptance = ["cargo test -p contextra-crypto --test kv_shredding_key_copies", "cargo xtask doctrine-scan", "cargo xtask check-result-dropped-io", "cargo xtask fast-diff-lint"]
+evidence_required = ["Widerruf entzieht Schlüssel permanent", "Zwei-Phasen-API funktioniert erwartungskonform", "Vanish-Lehre / DEK-Persistenz geschützt"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

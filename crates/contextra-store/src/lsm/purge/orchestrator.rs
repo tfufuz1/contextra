@@ -281,6 +281,7 @@ impl<'a> PurgeOrchestrator<'a> {
                 records_purged: 0,
                 bytes_reclaimed: 0,
                 sstables_replaced: 0,
+                obsolete_files: Vec::new(),
             };
 
             if intent.phase <= PurgePhase::PurgeCompaction {

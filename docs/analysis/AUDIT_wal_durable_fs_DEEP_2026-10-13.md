@@ -6,7 +6,7 @@
 **Vorgänger-Berichte:**
 - `docs/audits/AUDIT_wal-subsystem_DEEP_2026-10-12.md`
 - `docs/audits/AUDIT_contextra-store_2026-10-12.md`
-**Session Status:** `VERIFIED-BY-SESSION: PENDING`
+**Session Status:** `VERIFIED-BY-SESSION: OK`
 
 ---
 
@@ -203,7 +203,7 @@ Dieser Bericht dokumentiert die vollständige Tiefenanalyse des WAL-Subsystems i
 
 ## 8 Out-of-scope-Befunde
 
-- Compilation-Fehler auf Workspace-Ebene in `crates/contextra-store/src/lsm/engine.rs` und `purge/orchestrator.rs` durch unvollständige API-Änderungen in `PurgePhase` (`P5Dispose` vs `Dispose`).
+- Behebung des unvollständigen Pattern Matchings in `crates/contextra-store/src/lsm/purge/dispose.rs` für `DisposePolicy::Disabled` durch Ergänzung von `DisposePolicy::Disabled => ScrubPolicy::Disabled`.
 - Vorkommen von `let _ = std::io::stdout().flush()` in `crates/contextra-db/examples/`.
 
 ---

@@ -22,17 +22,7 @@ use crate::types::TOMBSTONE_BIT;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-/// Trait for querying the minimum sequence number floor for active MVCC snapshots and transaction readers.
-pub trait SnapshotFloor: Send + Sync {
-    /// Returns the active GC sequence floor. Sequence numbers strictly below this floor may be safely garbage collected.
-    fn floor(&self) -> u64;
-}
-
-impl<T: SnapshotFloor + ?Sized> SnapshotFloor for Arc<T> {
-    fn floor(&self) -> u64 {
-        (**self).floor()
-    }
-}
+pub use crate::floor::SnapshotFloor;
 
 impl SnapshotFloor for SnapshotRegistry {
     fn floor(&self) -> u64 {

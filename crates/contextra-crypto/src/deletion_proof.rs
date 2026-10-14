@@ -41,6 +41,8 @@ pub mod proof_v2;
 pub mod proof_v3;
 pub mod proof_v4;
 pub mod signer;
+pub mod timestamp_anchor;
+pub mod transparency_log;
 pub mod types;
 pub mod unverified;
 pub mod verify;

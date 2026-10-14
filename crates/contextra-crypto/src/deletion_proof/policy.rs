@@ -31,6 +31,26 @@ pub struct ProofPolicy {
     pub trusted_signer_key_ids: HashSet<[u8; 32]>,
 }
 
+/// Helper constructor for relaxed policy configuration used in tests only.
+pub struct PolicyRelaxed;
+
+impl PolicyRelaxed {
+    /// Constructs a relaxed [`ProofPolicy`] with empty required layers for test harnesses only.
+    pub fn for_tests_only() -> ProofPolicy {
+        ProofPolicy {
+            required_layers: Vec::new(),
+            ..ProofPolicy::default()
+        }
+    }
+}
+
+impl ProofPolicy {
+    /// Constructs a relaxed policy with empty required layers for test harnesses only.
+    pub fn relaxed_for_tests_only() -> Self {
+        PolicyRelaxed::for_tests_only()
+    }
+}
+
 impl Default for ProofPolicy {
     fn default() -> Self {
         let mut allowed = HashSet::new();
@@ -40,7 +60,7 @@ impl Default for ProofPolicy {
         Self {
             allowed_claim_text_ids: allowed,
             mandatory_excluded_scopes: super::exclusions::mandatory_ids(),
-            required_layers: Vec::new(),
+            required_layers: vec![1, 3, 20, 21, 26],
             evidence_invariant: None,
             trusted_anchor: false,
             expected_prev_chain_hash: None,

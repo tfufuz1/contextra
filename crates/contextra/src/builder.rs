@@ -44,6 +44,19 @@ pub struct ContextraBuilder {
     kms_enabled: bool,
     kv_shredding_enabled: bool,
     checkpoint_enabled: bool,
+
+    #[cfg(feature = "sovereign")]
+    pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
+    #[cfg(feature = "audit-export")]
+    pub audit_wiring: Option<Arc<crate::wiring_audit::AuditWiringBundle>>,
+    #[cfg(feature = "onnx")]
+    pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
+    #[cfg(feature = "sandbox")]
+    pub sandbox_wiring: Option<Arc<crate::wiring_sandbox::SandboxWiringBundle>>,
+    #[cfg(feature = "cognition")]
+    pub cognition_wiring: Option<Arc<crate::wiring_cognition::CognitionWiringBundle>>,
+    #[cfg(feature = "router")]
+    pub retrieval_wiring: Option<Arc<crate::wiring_retrieval::RetrievalWiringBundle>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -96,6 +109,18 @@ impl Clone for ContextraBuilder {
             kms_enabled: self.kms_enabled,
             kv_shredding_enabled: self.kv_shredding_enabled,
             checkpoint_enabled: self.checkpoint_enabled,
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: self.sovereign_wiring.clone(),
+            #[cfg(feature = "audit-export")]
+            audit_wiring: self.audit_wiring.clone(),
+            #[cfg(feature = "onnx")]
+            onnx_wiring: self.onnx_wiring.clone(),
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: self.sandbox_wiring.clone(),
+            #[cfg(feature = "cognition")]
+            cognition_wiring: self.cognition_wiring.clone(),
+            #[cfg(feature = "router")]
+            retrieval_wiring: self.retrieval_wiring.clone(),
         }
     }
 }
@@ -146,6 +171,19 @@ impl ContextraBuilder {
             kms_enabled: true,
             kv_shredding_enabled: true,
             checkpoint_enabled: true,
+
+            #[cfg(feature = "sovereign")]
+            sovereign_wiring: None,
+            #[cfg(feature = "audit-export")]
+            audit_wiring: None,
+            #[cfg(feature = "onnx")]
+            onnx_wiring: None,
+            #[cfg(feature = "sandbox")]
+            sandbox_wiring: None,
+            #[cfg(feature = "cognition")]
+            cognition_wiring: None,
+            #[cfg(feature = "router")]
+            retrieval_wiring: None,
         }
     }
 

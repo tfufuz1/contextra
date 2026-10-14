@@ -5,7 +5,7 @@ use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
-use crate::wal::{Wal, WalOp};
+use crate::wal::{Wal, WalOp, WalReplayOptions};
 use contextra_core::{
     ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
     TOMBSTONE_BIT,
@@ -274,9 +274,30 @@ impl LsmStorage {
         let mut replayed_hmac_set = std::collections::HashSet::new();
         replayed_hmac_set.insert([0u8; 32]);
 
+        let salt_bytes: [u8; 32] = salt.as_slice().try_into().unwrap_or([0u8; 32]);
+        let ledger_key = crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes);
+        let db_has_data = !directory_is_pristine(&config.path).await?;
+        let (ledger_opt, ledger_status) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
+            &config.path,
+            ledger_key,
+            db_has_data,
+            None,
+        ).await?;
+
+        let read_only = !matches!(
+            ledger_status,
+            crate::erasure_ledger::LedgerOpenStatus::Ok | crate::erasure_ledger::LedgerOpenStatus::Fresh
+        );
+
+        let erasure_ledger_handle = ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
+
+        let mut replay_options = WalReplayOptions::default();
+        if let Some(ref handle) = erasure_ledger_handle {
+            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(Arc::clone(handle))));
+        }
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let wal_entries = wal.replay().await?;
+            let (wal_entries, _report) = wal.replay_with_filter(replay_options.filter.as_deref()).await?;
 
             if let Some((_, last_entry, _)) = wal_entries.last() {
                 last_replayed_hmac = Some(last_entry.checksum);
@@ -519,6 +540,62 @@ impl LsmStorage {
             manifest.append_batch(&add_entries).await?;
         }
 
+        // --- Recovery Bausteine Wiring ---
+        // 1. Resumption von unterbrochenen Purge-Operationen (Verdrahtung Punkt 2 & 3)
+        let purge_wiring = crate::lsm::purge::PurgeWiring::build_default(&config.path)?;
+        if let Err(e) = purge_wiring.resume_pending().await {
+            tracing::error!(
+                error = %e,
+                path = ?config.path,
+                "Interrupted purge resumption failed during LsmStorage recovery"
+            );
+            return Err(ContextraError::Storage(format!("Purge resumption failed: {e}")));
+        }
+
+        // 2. Witness Scan über SSTable Dateiklassen (Verdrahtung Punkt 4)
+        let sst_read = sstables.read().await;
+        let live_sst_paths: Vec<_> = sst_read.iter().map(|s| s.file_path().to_path_buf()).collect();
+        drop(sst_read);
+
+        let witness_res = crate::sstable::collect_witnesses(
+            &config.path,
+            live_sst_paths.clone(),
+            1,
+            max_tx,
+            Vec::new(),
+            Vec::new(),
+            key_manager.clone(),
+        );
+        if let Err(e) = witness_res {
+            tracing::warn!(
+                error = %e,
+                path = ?config.path,
+                "Witness scan encountered unclassifiable or unwitnessable file during recovery"
+            );
+        }
+
+        // 3. Orphan GC gegen Manifest-Sicht (Verdrahtung Punkt 5)
+        let witness_inputs = crate::sstable::witness_types::SstScanInputs {
+            data_dirs: vec![config.path.clone()],
+            live_files: live_sst_paths,
+            pending_delete_files: Vec::new(),
+            manifest_generation: 1,
+            as_of_tx: max_tx,
+            depth: 1,
+        };
+        if let Ok(inventory) = crate::sstable::witness_inventory::SstInventory::build(&witness_inputs) {
+            let orphan_plan = crate::sstable::orphan_gc::plan_orphan_removal(&inventory, &[]);
+            if !orphan_plan.files_to_remove.is_empty() {
+                tracing::info!(
+                    files_to_remove = orphan_plan.files_to_remove.len(),
+                    "Cleaning up orphaned/temp SSTable files via scrub_and_remove"
+                );
+                crate::sstable::orphan_gc::remove_orphans(&orphan_plan).map_err(|e| {
+                    ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
+                })?;
+            }
+        }
+
         let snapshot_registry = Arc::new(SnapshotRegistry::new());
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
@@ -633,6 +710,9 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
             erasure_fence: Arc::new(super::fence::ErasureFence::new()),
+            erasure_ledger_handle,
+            read_only,
+            ledger_status,
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);

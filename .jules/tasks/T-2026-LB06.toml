@@ -1,0 +1,46 @@
+id = "T-2026-LB06"
+title = "Externer Zeitanker (RFC 3161) und Transparenzlog (RFC 9162)"
+crate = "contextra-crypto"
+tier = 1
+risk = "high"
+goal = "Implement external RFC 3161 timestamp anchor parsing/validation and RFC 9162 transparency log merkle tree with inclusion/consistency proofs for salted proof ID hashes."
+non_goals = [
+    "Adding new external dependencies",
+    "Modifying files outside assigned scope"
+]
+scope = [
+    "crates/contextra-crypto/src/deletion_proof.rs",
+    "crates/contextra-crypto/src/deletion_proof/timestamp_anchor.rs",
+    "crates/contextra-crypto/src/deletion_proof/transparency_log.rs",
+    "crates/contextra-crypto/tests/timestamp_anchor_and_log.rs",
+    ".jules/tasks/T-2026-LB06.toml"
+]
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    ".jules/setup/**",
+    "xtask/**",
+    "capabilities.toml",
+    "deny.toml"
+]
+invariants = [
+    "Zero panic (no unwrap/expect/panic in production code)",
+    "RFC 3161 DER parser must reject truncated/oversized input without recursion or unsafe code",
+    "Transparency log stores only salted proof ID hashes (SDM 60, EDPB 02/2025)",
+    "Fail-closed behavior on missing/invalid timestamps or proofs"
+]
+acceptance = [
+    "cargo test -p contextra-crypto --test timestamp_anchor_and_log",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Tests in crates/contextra-crypto/tests/timestamp_anchor_and_log.rs"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

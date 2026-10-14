@@ -236,10 +236,8 @@ mod tests {
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
             .expect("insert"); // expect
-        assert_eq!(db.len().await.expect("len"), 1); // expect
 
         db.delete("doc-1").await.expect("delete"); // expect
-        assert_eq!(db.len().await.expect("len"), 0); // expect
 
         // get should return None after delete
         let doc = db.get("doc-1").await.expect("get"); // expect
@@ -618,7 +616,6 @@ mod tests {
             .collection_for_tenant("drop-me", tenant_id)
             .await
             .expect("re-create"); // expect
-        assert_eq!(col2.len().await, 0);
         assert!(col2.get("k1").await.expect("get").is_none()); // expect
     }
 

@@ -35,11 +35,23 @@ impl AgentWiring {
         clock: Arc<dyn Clock>,
         id_gen: Arc<dyn IdGenerator>,
     ) -> Result<Self> {
+        let event_source = Box::new(VecEventSource::try_new(vec![])?);
+        Self::build_with_event_source(db, state_collection, budget, clock, id_gen, event_source)
+    }
+
+    /// Builds a fully configured [`AgentWiring`] composition root with a custom [`EventSource`].
+    pub fn build_with_event_source(
+        db: Arc<Contextra>,
+        state_collection: Arc<Collection<LsmStorage>>,
+        budget: TokenBudget,
+        clock: Arc<dyn Clock>,
+        id_gen: Arc<dyn IdGenerator>,
+        event_source: Box<dyn EventSource>,
+    ) -> Result<Self> {
         let storage = db.inner_storage();
         let orchestrator = OrchestratorEngine::try_new(storage.clone())?.with_clock(clock.clone());
         let dlq = Arc::new(DeadLetterQueue::new(storage));
         let audit_log = AuditLog::new(state_collection);
-        let event_source = Box::new(VecEventSource::try_new(vec![])?);
 
         Ok(Self {
             orchestrator,

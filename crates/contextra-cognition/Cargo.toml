@@ -15,7 +15,7 @@ ring = "3"
 [dependencies]
 contextra-engine = { workspace = true }
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ports = { workspace = true, features = ["test-utils"] }
 contextra-store = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }

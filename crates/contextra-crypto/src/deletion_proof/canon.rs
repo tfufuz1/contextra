@@ -1,5 +1,7 @@
 //! Deterministic TLV (Type-Length-Value) canonical encoding for deletion proof v4 (ADR-13).
 
+#![forbid(unsafe_code)]
+
 use crate::error::{CryptoError, Result};
 
 /// TLV element representing tag (u16 BE), length (u32 BE), and payload value.
@@ -23,11 +25,15 @@ impl TlvField {
     }
 
     /// Encodes this field to byte stream: tag(u16 BE) | len(u32 BE) | value.
-    pub fn encode(&self, buf: &mut Vec<u8>) {
+    /// Fails closed with `CryptoError` if payload length exceeds `u32::MAX`.
+    pub fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
+        let len = u32::try_from(self.value.len()).map_err(|_| {
+            CryptoError::Crypto("TLV field payload length overflow u32::MAX".to_string())
+        })?;
         buf.extend_from_slice(&self.tag.to_be_bytes());
-        let len = u32::try_from(self.value.len()).unwrap_or(u32::MAX);
         buf.extend_from_slice(&len.to_be_bytes());
         buf.extend_from_slice(&self.value);
+        Ok(())
     }
 }
 
@@ -92,13 +98,23 @@ impl TlvEncoder {
     }
 
     /// Encodes all fields in sorted tag order for strict canonical determinism.
-    pub fn finish(mut self) -> Vec<u8> {
+    /// Fails closed if any field length exceeds `u32::MAX`.
+    pub fn try_finish(mut self) -> Result<Vec<u8>> {
         self.fields.sort_by_key(|f| f.tag);
         let mut out = Vec::new();
         for field in &self.fields {
-            field.encode(&mut out);
+            field.encode(&mut out)?;
         }
-        out
+        Ok(out)
+    }
+
+    /// Backwards-compatible finish returning a byte vector.
+    /// Returns an empty vector on encoding error (fail-closed).
+    pub fn finish(self) -> Vec<u8> {
+        match self.try_finish() {
+            Ok(buf) => buf,
+            Err(_) => Vec::new(),
+        }
     }
 }
 
@@ -118,7 +134,8 @@ impl<'a> TlvDecoder<'a> {
     pub fn decode_all(&mut self) -> Result<Vec<TlvField>> {
         let mut fields = Vec::new();
         while self.offset < self.data.len() {
-            if self.data.len() - self.offset < 6 {
+            let remaining = self.data.len() - self.offset;
+            if remaining < 6 {
                 return Err(CryptoError::Crypto("Truncated TLV header".to_string()));
             }
 
@@ -133,7 +150,8 @@ impl<'a> TlvDecoder<'a> {
 
             self.offset += 6;
 
-            if self.data.len() - self.offset < len {
+            let remaining_payload = self.data.len() - self.offset;
+            if remaining_payload < len {
                 return Err(CryptoError::Crypto("Truncated TLV payload".to_string()));
             }
 
@@ -144,6 +162,21 @@ impl<'a> TlvDecoder<'a> {
         }
         Ok(fields)
     }
+}
+
+/// Encodes a sequence of byte slices into a deterministic, length-prefixed stream.
+/// Uses 4-byte BE length prefix per item.
+/// Guarantees prefix freedom (distinct inputs yield distinct byte representations).
+pub fn encode_length_prefixed_slices(items: &[impl AsRef<[u8]>]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    for item in items {
+        let slice = item.as_ref();
+        let len = u32::try_from(slice.len())
+            .map_err(|_| CryptoError::Crypto("Slice length exceeds u32::MAX".to_string()))?;
+        out.extend_from_slice(&len.to_be_bytes());
+        out.extend_from_slice(slice);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -158,7 +191,7 @@ mod tests {
         encoder.add_u16(0x0001, 7);
         encoder.add_string(0x0003, "contextra");
 
-        let encoded = encoder.finish();
+        let encoded = encoder.try_finish().expect("decode failed");
 
         let mut decoder = TlvDecoder::new(&encoded);
         let fields = decoder.decode_all().expect("decode failed");
@@ -181,5 +214,16 @@ mod tests {
 
         assert!(!normal_field.is_critical());
         assert!(critical_field.is_critical());
+    }
+
+    #[test]
+    fn test_length_prefixed_slices_prefix_freedom() {
+        let item_a = vec![b"ab".to_vec(), b"c".to_vec()];
+        let item_b = vec![b"a".to_vec(), b"bc".to_vec()];
+
+        let enc_a = encode_length_prefixed_slices(&item_a).expect("encode a");
+        let enc_b = encode_length_prefixed_slices(&item_b).expect("encode b");
+
+        assert_ne!(enc_a, enc_b);
     }
 }

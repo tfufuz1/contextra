@@ -4,7 +4,7 @@ use super::canon::{TlvDecoder, TlvEncoder};
 use super::signer::ProofSigner;
 use super::types::DeletionScope;
 use crate::error::{CryptoError, Result};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
 /// Domain tag prefix for version 4 deletion proof signature input.
@@ -122,9 +122,58 @@ mod serde_64_bytes {
     }
 }
 
+/// Encodes a DeletionScope to canonical TLV format with salted BLAKE3 hashes for IDs.
+pub fn encode_scope_tlv(scope: &DeletionScope, proof_id: &[u8; 32]) -> Result<Vec<u8>> {
+    let salt = *blake3::keyed_hash(b"contextra/deletion-proof/v4/salt", proof_id).as_bytes();
+    let mut enc = TlvEncoder::new();
+
+    // Tag 0x0001: Salt (32 bytes)
+    enc.add_bytes32(0x0001, &salt);
+
+    match scope {
+        DeletionScope::Document { doc_id, tenant_id } => {
+            // Tag 0x0002: Scope type 1 (Document)
+            enc.add_u8(0x0002, 1);
+            // Tag 0x0003: Salted Tenant ID Hash
+            let tenant_bytes = tenant_id.as_u64().to_be_bytes();
+            let tenant_hash = *blake3::keyed_hash(&salt, &tenant_bytes).as_bytes();
+            enc.add_bytes32(0x0003, &tenant_hash);
+            // Tag 0x0004: Salted Document ID Hash
+            let doc_bytes = doc_id.0.to_be_bytes();
+            let id_hash = *blake3::keyed_hash(&salt, &doc_bytes).as_bytes();
+            enc.add_bytes32(0x0004, &id_hash);
+        }
+        DeletionScope::Collection {
+            collection_id,
+            tenant_id,
+        } => {
+            // Tag 0x0002: Scope type 2 (Collection)
+            enc.add_u8(0x0002, 2);
+            // Tag 0x0003: Salted Tenant ID Hash
+            let tenant_bytes = tenant_id.as_u64().to_be_bytes();
+            let tenant_hash = *blake3::keyed_hash(&salt, &tenant_bytes).as_bytes();
+            enc.add_bytes32(0x0003, &tenant_hash);
+            // Tag 0x0004: Salted Collection ID Hash
+            let coll_bytes = collection_id.0.to_be_bytes();
+            let id_hash = *blake3::keyed_hash(&salt, &coll_bytes).as_bytes();
+            enc.add_bytes32(0x0004, &id_hash);
+        }
+        DeletionScope::Tenant { tenant_id } => {
+            // Tag 0x0002: Scope type 3 (Tenant)
+            enc.add_u8(0x0002, 3);
+            // Tag 0x0003: Salted Tenant ID Hash
+            let tenant_bytes = tenant_id.as_u64().to_be_bytes();
+            let tenant_hash = *blake3::keyed_hash(&salt, &tenant_bytes).as_bytes();
+            enc.add_bytes32(0x0003, &tenant_hash);
+        }
+    }
+
+    Ok(enc.finish())
+}
+
 impl ProofV4 {
-    /// Constructs the canonical TLV encoding of all payload fields.
-    pub fn construct_canonical_payload(&self) -> Vec<u8> {
+    /// Fallible canonical TLV payload construction without bincode or unwrap_or_default.
+    pub fn try_construct_canonical_payload(&self) -> Result<Vec<u8>> {
         let mut enc = TlvEncoder::new();
 
         enc.add_u16(0x8001, self.version);
@@ -133,7 +182,7 @@ impl ProofV4 {
         enc.add_u8(0x8004, self.stage);
         enc.add_option_bytes32(0x8005, self.supersedes.as_ref());
 
-        let scope_bytes = bincode::serialize(&self.scope).unwrap_or_default();
+        let scope_bytes = encode_scope_tlv(&self.scope, &self.proof_id)?;
         enc.add_field(0x8006, scope_bytes);
 
         enc.add_string(0x8007, &self.storage_scope);
@@ -145,10 +194,9 @@ impl ProofV4 {
         let mut claims_tlv = Vec::new();
         for claim in &self.claims {
             let claim_bytes = claim.to_canonical_tlv();
-            let len_bytes = u32::try_from(claim_bytes.len())
-                .unwrap_or(u32::MAX)
-                .to_be_bytes();
-            claims_tlv.extend_from_slice(&len_bytes);
+            let len = u32::try_from(claim_bytes.len())
+                .map_err(|_| CryptoError::Crypto("Claim TLV length overflow".to_string()))?;
+            claims_tlv.extend_from_slice(&len.to_be_bytes());
             claims_tlv.extend_from_slice(&claim_bytes);
         }
         enc.add_field(0x800C, claims_tlv);
@@ -177,22 +225,38 @@ impl ProofV4 {
         enc.add_u64(0x8013, self.issued_mono_ctr);
         enc.add_bytes32(0x8014, &self.signer_key_id);
 
-        enc.finish()
+        Ok(enc.finish())
+    }
+
+    /// Constructs the canonical TLV encoding of all payload fields.
+    pub fn construct_canonical_payload(&self) -> Vec<u8> {
+        match self.try_construct_canonical_payload() {
+            Ok(bytes) => bytes,
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// Fallible signed bytes construction: PROOF_V4_DOMAIN_TAG || CANONICAL_TLV.
+    pub fn try_signed_bytes(&self) -> Result<Vec<u8>> {
+        let canon = self.try_construct_canonical_payload()?;
+        let mut buf = Vec::with_capacity(PROOF_V4_DOMAIN_TAG.len() + canon.len());
+        buf.extend_from_slice(PROOF_V4_DOMAIN_TAG);
+        buf.extend_from_slice(&canon);
+        Ok(buf)
     }
 
     /// Computes the exact signed bytes input: PROOF_V4_DOMAIN_TAG || CANONICAL_TLV.
     pub fn signed_bytes(&self) -> Vec<u8> {
-        let canon = self.construct_canonical_payload();
-        let mut buf = Vec::with_capacity(PROOF_V4_DOMAIN_TAG.len() + canon.len());
-        buf.extend_from_slice(PROOF_V4_DOMAIN_TAG);
-        buf.extend_from_slice(&canon);
-        buf
+        match self.try_signed_bytes() {
+            Ok(bytes) => bytes,
+            Err(_) => Vec::new(),
+        }
     }
 
     /// Signs this proof using the provided `ProofSigner`, updating `signer_key_id` and `signature`.
     pub fn sign_with_signer(&mut self, signer: &dyn ProofSigner) -> Result<()> {
         self.signer_key_id = signer.key_id();
-        let msg = self.signed_bytes();
+        let msg = self.try_signed_bytes()?;
         self.signature = signer.sign(&msg)?;
         Ok(())
     }
@@ -213,7 +277,7 @@ impl ProofV4 {
         *outer_hasher.finalize().as_bytes()
     }
 
-    /// Verifies the Ed25519 signature of this proof using `public_key`.
+    /// Verifies the Ed25519 signature of this proof using `public_key` with strict verification.
     pub fn verify_signature(&self, public_key: &[u8; 32]) -> Result<bool> {
         let expected_key_id = *blake3::hash(public_key).as_bytes();
         if self.signer_key_id != expected_key_id {
@@ -223,10 +287,10 @@ impl ProofV4 {
         let vk = VerifyingKey::from_bytes(public_key)
             .map_err(|e| CryptoError::Crypto(format!("Invalid public key: {e}")))?;
 
-        let msg = self.signed_bytes();
+        let msg = self.try_signed_bytes()?;
         let sig = Signature::from_bytes(&self.signature);
 
-        Ok(vk.verify(&msg, &sig).is_ok())
+        Ok(vk.verify_strict(&msg, &sig).is_ok())
     }
 
     /// Verifies that no unknown critical tag (0x8000 bit set) exists in `raw_canonical_tlv`.

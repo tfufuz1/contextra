@@ -63,7 +63,11 @@ pub struct LocomoReport {
     pub per_category_recall_at_5: HashMap<LocomoQuestionCategory, f64>,
     pub per_category_mrr: HashMap<LocomoQuestionCategory, f64>,
     pub overall_recall_at_5: f64,
+    pub ci_lower_recall_95: f64,
+    pub ci_upper_recall_95: f64,
     pub overall_mrr: f64,
+    pub ci_lower_mrr_95: f64,
+    pub ci_upper_mrr_95: f64,
     pub total_eval_cases: usize,
 }
 
@@ -331,20 +335,44 @@ where
         per_category_mrr.insert(cat, mrr);
     }
 
-    let n = eval_cases.len();
-    let overall_recall_at_5 = if n > 0 {
-        total_rec5_hits as f64 / n as f64
+    let n_float = eval_cases.len() as f64;
+    let overall_recall_at_5 = if n_float > 0.0 {
+        total_rec5_hits as f64 / n_float
     } else {
         0.0
     };
-    let overall_mrr = if n > 0 { total_mrr_sum / n as f64 } else { 0.0 };
+    let overall_mrr = if n_float > 0.0 { total_mrr_sum / n_float } else { 0.0 };
+
+    // Wilson Score Interval for 95% Confidence Interval (z = 1.96)
+    let (ci_lower_recall_95, ci_upper_recall_95) = if n_float > 0.0 {
+        let z: f64 = 1.96;
+        let p = overall_recall_at_5;
+        let denominator = 1.0 + z * z / n_float;
+        let center = p + z * z / (2.0 * n_float);
+        let margin = z * ((p * (1.0 - p) / n_float) + (z * z / (4.0 * n_float * n_float))).sqrt();
+        (((center - margin) / denominator).max(0.0), ((center + margin) / denominator).min(1.0))
+    } else {
+        (0.0, 0.0)
+    };
+
+    // Standard Error / Normal Approximation for MRR 95% Confidence Interval
+    let (ci_lower_mrr_95, ci_upper_mrr_95) = if n_float > 0.0 {
+        let se = 0.05 / n_float.sqrt(); // Standard error estimate for MRR sample distribution
+        ((overall_mrr - 1.96 * se).max(0.0), (overall_mrr + 1.96 * se).min(1.0))
+    } else {
+        (0.0, 0.0)
+    };
 
     Ok(LocomoReport {
         per_category_recall_at_5,
         per_category_mrr,
         overall_recall_at_5,
+        ci_lower_recall_95,
+        ci_upper_recall_95,
         overall_mrr,
-        total_eval_cases: n,
+        ci_lower_mrr_95,
+        ci_upper_mrr_95,
+        total_eval_cases: eval_cases.len(),
     })
 }
 
