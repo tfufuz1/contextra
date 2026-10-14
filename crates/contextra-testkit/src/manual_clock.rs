@@ -70,6 +70,15 @@ impl ManualClock {
 }
 
 impl Clock for ManualClock {
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        let nanos = self.now_nanos();
+        contextra_types::DeterministicTimestamp::new(nanos / 1_000_000, nanos % 1_000_000)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.now_nanos()
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.now_nanos()
     }

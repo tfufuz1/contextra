@@ -182,6 +182,7 @@ unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
 
 [workspace.lints.clippy]
+disallowed_methods = "warn"
 undocumented_unsafe_blocks = "deny"
 unwrap_used = "deny"
 expect_used = "deny"

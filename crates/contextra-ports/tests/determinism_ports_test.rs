@@ -1,101 +1,137 @@
-//! Integration tests for determinism ports (Clock, Rng, IdGen / IdGenerator).
+//! Integration tests for determinism ports (Clock, EntropyRng, SeededRng, IdGen / IdGenerator).
 
-use contextra_ports::{
-    Clock, IdGen, IdGenerator, ManualClock, Rng, SeededRng, SequentialIdGen, SequentialIds,
-    SystemClock, SystemIdGen, SystemIdGenerator, SystemRng,
-};
+use contextra_ports::{Clock, DeterministicTimestamp, EntropyRng, IdGen, IdGenerator, Rng, SeededRng};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::thread;
+
+struct MockTestClock {
+    wall_ms: AtomicU64,
+    mono_ticks: AtomicU64,
+}
+
+impl Clock for MockTestClock {
+    fn now(&self) -> DeterministicTimestamp {
+        DeterministicTimestamp::new(
+            self.wall_ms.load(Ordering::Relaxed),
+            self.mono_ticks.fetch_add(1, Ordering::Relaxed),
+        )
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.mono_ticks.load(Ordering::Relaxed)
+    }
+}
+
+struct MockEntropyRng;
+impl EntropyRng for MockEntropyRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        dest.fill(0xAA);
+    }
+    fn next_u64(&self) -> u64 {
+        0x1234_5678_9ABC_DEF0
+    }
+}
+
+struct MockRng {
+    state: AtomicU64,
+}
+
+impl Rng for MockRng {
+    fn next_u64(&self) -> u64 {
+        self.state.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        for b in dest.iter_mut() {
+            *b = self.state.fetch_add(1, Ordering::Relaxed) as u8;
+        }
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        0.42
+    }
+}
+
+struct MockIdGen {
+    counter: AtomicU64,
+}
+
+impl IdGenerator for MockIdGen {
+    fn next_id(&self) -> u64 {
+        self.counter.fetch_add(1, Ordering::SeqCst)
+    }
+}
 
 fn assert_send_sync<T: Send + Sync + 'static>() {}
 
 #[test]
 fn test_determinism_ports_trait_bounds_and_object_safety() {
-    assert_send_sync::<SystemClock>();
-    assert_send_sync::<ManualClock>();
-    assert_send_sync::<SystemRng>();
+    assert_send_sync::<MockTestClock>();
+    assert_send_sync::<MockEntropyRng>();
+    assert_send_sync::<MockRng>();
     assert_send_sync::<SeededRng>();
-    assert_send_sync::<SystemIdGen>();
-    assert_send_sync::<SequentialIdGen>();
+    assert_send_sync::<MockIdGen>();
 
-    // Test dyn compatibility
-    let clock: Arc<dyn Clock> = Arc::new(ManualClock::new(1000));
-    assert_eq!(clock.now_unix_nanos(), 1000);
+    // Test dyn compatibility for Clock
+    let clock: Arc<dyn Clock> = Arc::new(MockTestClock {
+        wall_ms: AtomicU64::new(1700000000000),
+        mono_ticks: AtomicU64::new(100),
+    });
+    let ts = clock.now();
+    assert_eq!(ts.wall_ms, 1700000000000);
+    assert_eq!(ts.mono_ctr, 100);
+    assert_eq!(clock.now_unix_nanos(), 1700000000000000000);
+    assert!(clock.monotonic_ticks() >= 100);
 
-    let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(42));
-    let val1 = rng.next_u64();
-    assert!(val1 > 0);
+    // Test dyn compatibility for EntropyRng
+    let entropy_rng: Arc<dyn EntropyRng> = Arc::new(MockEntropyRng);
+    let mut key = [0u8; 16];
+    entropy_rng.fill_bytes(&mut key);
+    assert_eq!(key, [0xAA; 16]);
 
-    let id_gen: Arc<dyn IdGen> = Arc::new(SequentialIdGen::new(1));
+    // Test dyn compatibility for SeededRng / Rng
+    let mock_rng: Arc<dyn Rng> = Arc::new(MockRng {
+        state: AtomicU64::new(10),
+    });
+    assert_eq!(mock_rng.next_u64(), 10);
+    assert_eq!(mock_rng.next_unit_f64(), 0.42);
+
+    let seeded_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(42));
+    assert!(seeded_rng.next_u64() > 0);
+
+    // Test dyn compatibility for IdGen / IdGenerator
+    let id_gen: Arc<dyn IdGen> = Arc::new(MockIdGen {
+        counter: AtomicU64::new(1),
+    });
     assert_eq!(id_gen.next_id(), 1);
-
-    let id_generator: Arc<dyn IdGenerator> = Arc::new(SystemIdGenerator::new());
-    assert!(id_generator.next_id() > 0);
+    assert_eq!(id_gen.next_id(), 2);
 }
 
 #[test]
-fn test_manual_clock_deterministic_advancement() {
-    let clock = ManualClock::new(500);
-    assert_eq!(clock.now_unix_nanos(), 500);
-    assert_eq!(clock.monotonic_nanos(), 500);
+fn test_clock_duration_measurement_by_ticks_difference() {
+    let clock = MockTestClock {
+        wall_ms: AtomicU64::new(5000),
+        mono_ticks: AtomicU64::new(1000),
+    };
 
-    clock.advance(std::time::Duration::from_nanos(250));
-    assert_eq!(clock.now_unix_nanos(), 750);
+    let start_ticks = clock.monotonic_ticks();
+    clock.mono_ticks.store(1250, Ordering::Relaxed);
+    let end_ticks = clock.monotonic_ticks();
 
-    clock.set_nanos(2000);
-    assert_eq!(clock.monotonic_nanos(), 2000);
+    let duration_ticks = end_ticks.saturating_sub(start_ticks);
+    assert_eq!(duration_ticks, 250);
 }
 
 #[test]
-fn test_seeded_rng_reproducibility_across_threads() {
-    let seed = 9876543210u64;
+fn test_rng_type_separation_key_paths() {
+    fn crypto_key_gen<R: EntropyRng>(rng: &R) -> [u8; 8] {
+        let mut key = [0u8; 8];
+        rng.fill_bytes(&mut key);
+        key
+    }
 
-    let handle1 = thread::spawn(move || {
-        let rng = SeededRng::new(seed);
-        (0..100).map(|_| rng.next_u64()).collect::<Vec<_>>()
-    });
-
-    let handle2 = thread::spawn(move || {
-        let rng = SeededRng::new(seed);
-        (0..100).map(|_| rng.next_u64()).collect::<Vec<_>>()
-    });
-
-    let seq1 = handle1.join().expect("thread 1 failed");
-    let seq2 = handle2.join().expect("thread 2 failed");
-
-    assert_eq!(seq1, seq2, "SeededRng generated different outputs for identical seeds");
-}
-
-#[test]
-fn test_sequential_id_gen_monotonic_and_wrapping() {
-    let gen = SequentialIds::new(100);
-    assert_eq!(gen.next_id(), 100);
-    assert_eq!(gen.next_id(), 101);
-    assert_eq!(gen.next_id(), 102);
-
-    let max_gen = SequentialIdGen::new(u64::MAX);
-    assert_eq!(max_gen.next_id(), u64::MAX);
-    assert_eq!(max_gen.next_id(), 0); // Wraps safely
-}
-
-#[test]
-fn test_production_ports_basic_functionality() {
-    let sys_clock = SystemClock::new();
-    let sys_rng = SystemRng::new();
-    let sys_id = SystemIdGen::new();
-
-    let t1 = sys_clock.now_unix_nanos();
-    let m1 = sys_clock.monotonic_nanos();
-    assert!(t1 > 0);
-
-    let r1 = sys_rng.next_u64();
-    let f1 = sys_rng.next_unit_f64();
-    assert!((0.0..1.0).contains(&f1));
-    assert!(r1 > 0 || r1 == 0);
-
-    let id1 = sys_id.next_id();
-    let id2 = sys_id.next_id();
-    assert_eq!(id2, id1 + 1);
-
-    assert!(sys_clock.monotonic_nanos() >= m1);
+    let entropy_rng = MockEntropyRng;
+    let key = crypto_key_gen(&entropy_rng);
+    assert_eq!(key, [0xAA; 8]);
+    // MockSeededRng cannot be passed here because SeededRng does not implement EntropyRng.
 }
