@@ -37,20 +37,26 @@ pub mod clock;
 pub mod embedding;
 /// Automated sanity checks for embedding providers.
 pub mod embedding_sanity;
+/// Erasure and deletion guarantee port traits (§5.3, §5.4, §5.5, §8.3, §8.4).
+pub mod erasure;
 /// Graph mutation and CSR traversal port traits.
 pub mod graph;
 /// Graph index traits and CSR statistics.
 pub mod graph_index;
+/// Graph persistence port traits (§4.3).
+pub mod graph_persistence;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
 /// Key-value prefix store traits and types.
 pub mod kv;
 /// Key-value bridge storage port trait.
 pub mod kv_bridge_port;
-/// License and activation gate port traits.
+/// License and activation gate port traits (§4.3, §15).
 pub mod license;
 /// Grounding validator traits and context preparer contracts.
 pub mod lifecycle;
+/// Merge operator and factory port traits (§4.3).
+pub mod merge_operator;
 /// Metrics reporting port trait.
 pub mod metrics;
 /// Observability and lifecycle re-exports.
@@ -63,8 +69,8 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Erasure and deletion guarantee port traits (§8.3, §8.4, ADR-01, ADR-02, ADR-14).
-pub mod erasure;
+/// Read snapshot and snapshot reader port traits (§7.2).
+pub mod snapshot;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -81,17 +87,20 @@ pub use embedding::*;
 pub use erasure::*;
 pub use graph::*;
 pub use graph_index::*;
+pub use graph_persistence::*;
 pub use id_gen::*;
 pub use kv::*;
 pub use kv_bridge_port::*;
 pub use license::*;
 pub use lifecycle::*;
+pub use merge_operator::*;
 pub use metrics::*;
 pub use observability::*;
 pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
+pub use snapshot::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
@@ -108,6 +117,7 @@ mod dyn_safety {
     fn _assert_dyn_kv_lifecycle_hooks(_: Option<&dyn KvLifecycleHooks>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
+    fn _assert_dyn_graph_persistence(_: Option<&dyn GraphPersistence>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
@@ -123,6 +133,10 @@ mod dyn_safety {
     fn _assert_dyn_layer_scan(_: Option<&dyn LayerScan>) {}
     fn _assert_dyn_restore_guard(_: Option<&dyn RestoreGuard>) {}
     fn _assert_dyn_write_gate(_: Option<&dyn WriteGate>) {}
+    fn _assert_dyn_free_space_probe(_: Option<&dyn FreeSpaceProbe>) {}
+    fn _assert_dyn_snapshot_reader(_: Option<&dyn SnapshotReader>) {}
+    fn _assert_dyn_merge_operator(_: Option<&dyn MergeOperator>) {}
+    fn _assert_dyn_merge_operator_factory(_: Option<&dyn MergeOperatorFactory>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -133,6 +147,7 @@ mod dyn_safety {
         _assert_dyn_kv_lifecycle_hooks(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
+        _assert_dyn_graph_persistence(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
         _assert_dyn_rng(None);
@@ -147,15 +162,9 @@ mod dyn_safety {
         _assert_dyn_layer_scan(None);
         _assert_dyn_restore_guard(None);
         _assert_dyn_write_gate(None);
+        _assert_dyn_free_space_probe(None);
+        _assert_dyn_snapshot_reader(None);
+        _assert_dyn_merge_operator(None);
+        _assert_dyn_merge_operator_factory(None);
     }
 }
-
-// =============================================================================
-// ÄNDERUNGSNOTIZ / CHANGELOG (v17 Teil 2.2 Cleanup)
-// =============================================================================
-// Bereinigung verwaister und überholter Port-Definitionen gemäß Spec v17 Teil 2.2:
-// - `DistanceCalculator`: Verwaister Trait, ersetzt durch `DistanceMetric::compute` in `contextra-types`.
-// - `MemoryLifecycleManager`: Verwaister Trait ohne Implementierung im Workspace.
-// - `StorageRead`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
-// - `StorageWrite`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
-// =============================================================================

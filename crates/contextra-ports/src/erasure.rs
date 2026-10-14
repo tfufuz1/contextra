@@ -1,25 +1,22 @@
-//! Erasure and deletion guarantee port traits and types (§8.3, §8.4, ADR-01, ADR-02, ADR-14).
+//! Erasure and deletion guarantee port traits and types (§5.3, §5.4, §5.5, §8.3, §8.4).
 //!
-//! Provides the abstract contracts for multi-tier document erasure:
+//! Provides abstract contracts for multi-tier document erasure:
 //! - [`ErasureMode`]: System-wide erasure watermark (`Off`, `Assured`, `Attested`).
 //! - [`ErasureBackend`]: Storage-level physical scope derivation and purge execution.
 //! - [`ErasureHooks`]: Lifecycle callbacks during coordinator execution.
 //! - [`LayerScan`]: Verification scan contracts for storage/index layers.
 //! - [`RestoreGuard`]: Anti-resurrection guard for checkpoint restoration.
-//! - [`PhysicalScope`]: Concrete tenant-encoded physical keys and prefixes.
+//! - [`PhysicalScope`]: Opaque tenant-encoded physical keys and prefixes.
 
 #![forbid(unsafe_code)]
 
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use contextra_types::{CollectionId, DocId, Result, TenantId, TxId};
-use crate::BoxFuture;
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 
-/// Operational mode for document erasure and deletion guarantees (§8.2).
-///
-/// Persistent watermark: opening with a lower mode than previously recorded
-/// fails closed with a policy violation.
+/// Operational mode for document erasure and deletion guarantees (§5.1, §8.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 pub enum ErasureMode {
     /// Off (Default): Standard tombstone delete. No ledger, no fence, no footprint scan.
@@ -45,63 +42,243 @@ impl ErasureMode {
     }
 }
 
-/// Logical scope of a deletion request before physical tenant encoding.
+/// Unique identifier for a purge operation (§5.5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PurgeId(pub [u8; 16]);
+
+impl PurgeId {
+    /// Creates a new `PurgeId` wrapping raw 16-byte identifier.
+    pub const fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+}
+
+/// Logical scope of a deletion request specified by the caller (§5.4).
+///
+/// Every variant carries the owning [`TenantId`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogicalScope {
-    /// A single document within a tenant.
+    /// Target document within a collection and tenant.
     Document {
-        /// Target document identifier.
-        doc_id: DocId,
         /// Tenant owning the document.
         tenant_id: TenantId,
+        /// Collection containing the document.
+        collection_id: CollectionId,
+        /// Document identifier.
+        doc_id: DocId,
     },
     /// An entire collection within a tenant.
     Collection {
-        /// Target collection identifier.
-        collection_id: CollectionId,
         /// Tenant owning the collection.
         tenant_id: TenantId,
+        /// Collection identifier.
+        collection_id: CollectionId,
     },
-    /// Explicit list of logical key bytes.
-    Keys(Vec<Vec<u8>>),
-    /// List of logical key prefix bytes.
-    Prefixes(Vec<Vec<u8>>),
+    /// An entire tenant.
+    Tenant {
+        /// Tenant identifier.
+        tenant_id: TenantId,
+    },
 }
 
-/// Physical, tenant-encoded keys and prefixes (§8.4, ADR-14).
+impl LogicalScope {
+    /// Returns the [`TenantId`] associated with this scope.
+    #[must_use]
+    pub fn tenant_id(&self) -> TenantId {
+        match self {
+            Self::Document { tenant_id, .. }
+            | Self::Collection { tenant_id, .. }
+            | Self::Tenant { tenant_id } => *tenant_id,
+        }
+    }
+}
+
+/// Opaque physical, tenant-encoded keys and prefixes (§5.4).
 ///
-/// Structural invariant: `purge_keys` only accepts `PhysicalScope` to prevent
-/// prefix-mismatch bugs (N-K) where logical prefixes are passed to raw storage.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Fields are strictly private. The constructor is gated behind feature `backend-impl`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PhysicalScope {
-    /// Explicit physical keys.
-    pub keys: Vec<Vec<u8>>,
-    /// Physical key prefixes.
-    pub prefixes: Vec<Vec<u8>>,
+    keys: Vec<Vec<u8>>,
+    prefixes: Vec<Vec<u8>>,
 }
 
 impl PhysicalScope {
-    /// Creates a new `PhysicalScope` from explicit keys and prefixes.
-    #[must_use]
-    pub fn new(keys: Vec<Vec<u8>>, prefixes: Vec<Vec<u8>>) -> Self {
-        Self { keys, prefixes }
+    /// Creates a new validated, canonical `PhysicalScope` (§5.4).
+    ///
+    /// # Invariants
+    /// 1. Must not be empty (at least one key or prefix required).
+    /// 2. Every key and prefix MUST start with `t:<tenant_id>:`.
+    /// 3. Canonical: sorted, deduplicated, and subsumed keys/prefixes removed.
+    #[cfg(feature = "backend-impl")]
+    pub fn try_new(
+        tenant_id: TenantId,
+        keys: Vec<Vec<u8>>,
+        prefixes: Vec<Vec<u8>>,
+    ) -> std::result::Result<Self, ContextraError> {
+        if keys.is_empty() && prefixes.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "PhysicalScope cannot be empty".to_string(),
+            ));
+        }
+
+        let tenant_prefix_bytes = format!("t:{}:", tenant_id.0).into_bytes();
+
+        for k in &keys {
+            if !k.starts_with(&tenant_prefix_bytes) {
+                return Err(ContextraError::InvalidInput(format!(
+                    "Key {:?} does not start with expected tenant prefix 't:{}:'",
+                    k, tenant_id.0
+                )));
+            }
+        }
+
+        for p in &prefixes {
+            if !p.starts_with(&tenant_prefix_bytes) {
+                return Err(ContextraError::InvalidInput(format!(
+                    "Prefix {:?} does not start with expected tenant prefix 't:{}:'",
+                    p, tenant_id.0
+                )));
+            }
+        }
+
+        let mut sorted_prefixes = prefixes;
+        sorted_prefixes.sort();
+        sorted_prefixes.dedup();
+
+        let mut canonical_prefixes: Vec<Vec<u8>> = Vec::new();
+        for p in sorted_prefixes {
+            let is_subsumed = canonical_prefixes
+                .iter()
+                .any(|existing| p.starts_with(existing.as_slice()));
+            if !is_subsumed {
+                canonical_prefixes.push(p);
+            }
+        }
+
+        let mut sorted_keys = keys;
+        sorted_keys.sort();
+        sorted_keys.dedup();
+
+        let canonical_keys: Vec<Vec<u8>> = sorted_keys
+            .into_iter()
+            .filter(|k| {
+                !canonical_prefixes
+                    .iter()
+                    .any(|p| k.starts_with(p.as_slice()))
+            })
+            .collect();
+
+        Ok(Self {
+            keys: canonical_keys,
+            prefixes: canonical_prefixes,
+        })
     }
 
-    /// Checks if a physical storage key matches this scope.
+    /// Returns the explicit physical keys in this scope.
+    #[must_use]
+    pub fn keys(&self) -> &[Vec<u8>] {
+        &self.keys
+    }
+
+    /// Returns the physical key prefixes in this scope.
+    #[must_use]
+    pub fn prefixes(&self) -> &[Vec<u8>] {
+        &self.prefixes
+    }
+
+    /// Checks whether a physical storage key matches this scope in O(|key|) time.
     #[must_use]
     pub fn matches_key(&self, key: &[u8]) -> bool {
-        self.keys.iter().any(|k| k.as_slice() == key)
-            || self.prefixes.iter().any(|p| key.starts_with(p.as_slice()))
+        if self.keys.binary_search_by(|k| k.as_slice().cmp(key)).is_ok() {
+            return true;
+        }
+
+        let idx = match self.prefixes.binary_search_by(|p| p.as_slice().cmp(key)) {
+            Ok(_exact) => return true,
+            Err(insertion_point) => insertion_point,
+        };
+
+        if idx > 0 {
+            if key.starts_with(self.prefixes[idx - 1].as_slice()) {
+                return true;
+            }
+        }
+
+        false
     }
 
-    /// Returns true if the scope contains no keys and no prefixes.
+    /// Returns false since a valid `PhysicalScope` is guaranteed to be non-empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.keys.is_empty() && self.prefixes.is_empty()
+        false
+    }
+
+    /// Computes the canonical BLAKE3 scope digest using domain tag `contextra/physical-scope/v1` (§5.4).
+    #[must_use]
+    pub fn scope_digest(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new_derive_key("contextra/physical-scope/v1");
+
+        hasher.update(&(self.keys.len() as u64).to_le_bytes());
+        for key in &self.keys {
+            hasher.update(&(key.len() as u64).to_le_bytes());
+            hasher.update(key);
+        }
+
+        hasher.update(&(self.prefixes.len() as u64).to_le_bytes());
+        for prefix in &self.prefixes {
+            hasher.update(&(prefix.len() as u64).to_le_bytes());
+            hasher.update(prefix);
+        }
+
+        *hasher.finalize().as_bytes()
     }
 }
 
-/// Output report produced by an [`ErasureBackend::purge`] operation (§8.5).
+/// Linear token representing an active erasure lifecycle invocation (§5.5).
+///
+/// Neither `Copy` nor `Clone`. Consumed by `finish` and `abort`.
+#[must_use]
+#[derive(Debug, PartialEq, Eq)]
+pub struct HookToken {
+    id: u64,
+}
+
+impl HookToken {
+    /// Sentinel token representing no-op or inactive hooks.
+    pub const NONE: Self = Self { id: 0 };
+
+    /// Creates a new `HookToken` wrapping raw numeric identifier.
+    pub const fn new(id: u64) -> Self {
+        Self { id }
+    }
+
+    /// Returns raw numeric ID.
+    pub const fn id(&self) -> u64 {
+        self.id
+    }
+}
+
+/// Context passed when beginning an erasure lifecycle (§5.5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EraseCtx<'a> {
+    /// Target tenant ID.
+    pub tenant_id: TenantId,
+    /// Collection ID if collection or document scoped.
+    pub collection_id: Option<CollectionId>,
+    /// Document ID if document scoped.
+    pub doc_id: Option<DocId>,
+    /// Underlying logical scope.
+    pub scope: &'a LogicalScope,
+}
+
+/// Active write fence guard held during purge execution.
+#[derive(Debug)]
+pub struct FenceGuard {
+    /// Identifier of purge holding the fence.
+    pub purge_id: PurgeId,
+}
+
+/// Output report produced by an [`ErasureBackend::purge_physical`] operation (§5.5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct PurgeOutput {
     /// Number of records/versions physically dropped.
@@ -112,112 +289,226 @@ pub struct PurgeOutput {
     pub sstables_replaced: usize,
     /// Obsolete files identified for disposal.
     pub obsolete_files: Vec<PathBuf>,
+    /// Execution duration in clock ticks.
+    pub duration_ticks: u64,
 }
 
-/// Storage backend contract for erasure operations (§8.3, ADR-01).
-///
-/// Replaces downcasts to concrete storage types (`LsmStorage`).
+/// Error during purge compaction (§5.5).
+#[derive(Debug, Error)]
+pub enum PurgeError {
+    /// Insufficient free disk space to write rewritten SSTable segments.
+    #[error("Insufficient disk space: needed {needed} bytes, available {available:?}")]
+    InsufficientDiskSpace {
+        /// Disk space needed in bytes.
+        needed: u64,
+        /// Available disk space in bytes (None = probe unknown).
+        available: Option<u64>,
+    },
+    /// Write fence conflict detected during purge execution.
+    #[error("Fence conflict")]
+    FenceConflict,
+    /// Read error during SSTable segment processing.
+    #[error("Read error at file {file}, offset {offset}: {source_details}")]
+    ReadError {
+        /// Segment path.
+        file: String,
+        /// Offset in file.
+        offset: u64,
+        /// Error detail string.
+        source_details: String,
+    },
+    /// I/O error wrapper.
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+    /// Manifest log processing error.
+    #[error("Manifest error: {0}")]
+    Manifest(String),
+    /// Free space probe failed.
+    #[error("Probe failed: {0}")]
+    ProbeFailed(String),
+    /// Long-lived snapshot pin prevents physical deletion.
+    #[error("Snapshot pinned: oldest pin age {oldest_pin_age} ticks")]
+    SnapshotPinned {
+        /// Oldest snapshot pin age in clock ticks.
+        oldest_pin_age: u64,
+    },
+}
+
+/// Storage backend contract for erasure operations (§5.5).
 pub trait ErasureBackend: Send + Sync {
     /// Translates a logical scope into a tenant-encoded physical scope.
-    fn physical_scope(&self, scope: &LogicalScope) -> Result<PhysicalScope>;
+    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError>;
 
-    /// Executes physical purge compaction for `scope` as of `as_of_tx`.
-    fn purge<'a>(
-        &'a self,
-        scope: &'a PhysicalScope,
+    /// Acquires write drain fence for `scope`.
+    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError>;
+
+    /// Executes physical purge compaction for `scope` as of `as_of`.
+    fn purge_physical(
+        &self,
+        scope: &PhysicalScope,
         as_of: TxId,
-    ) -> BoxFuture<'a, Result<PurgeOutput>>;
+        probe: &dyn FreeSpaceProbe,
+    ) -> std::result::Result<PurgeOutput, PurgeError>;
 }
 
-/// Context information passed when beginning an erasure lifecycle.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EraseCtx {
-    /// Target document ID if document-scoped.
-    pub doc_id: Option<DocId>,
-    /// Target tenant ID.
-    pub tenant_id: TenantId,
-    /// Collection name if applicable.
-    pub collection: Option<String>,
+/// Extension trait providing erasure capabilities on storage engines.
+pub trait StorageErasureExt {
+    /// Returns reference to [`ErasureBackend`] if supported.
+    fn as_erasure_backend(&self) -> Option<&dyn ErasureBackend>;
 }
 
-/// Token identifying an active erasure lifecycle invocation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct HookToken(pub u64);
-
-impl HookToken {
-    /// Sentinel token representing no-op or inactive hooks.
-    pub const NONE: Self = Self(0);
-}
-
-/// Evidence observation produced by a [`LayerScan`] (§8.4).
+/// Finish artifact generated upon erasure completion.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LayerObservation {
-    /// Numeric identifier of the scanned layer.
-    pub layer_id: u8,
-    /// Whether the layer was observed empty of scoped keys.
-    pub observed_empty: bool,
-    /// Human-readable observation details.
-    pub details: String,
+pub enum FinishArtifact {
+    /// No proof required (e.g. Assured mode).
+    None,
+    /// Attestation proof bytes (Attested mode).
+    Proof(Vec<u8>),
 }
 
-/// Attestation produced upon completion of an attested erasure lifecycle (§8.4).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ErasureAttestation {
-    /// Proof identifier (BLAKE3 / SHA-256 digest).
-    pub proof_id: [u8; 32],
-    /// Mode under which the attestation was generated.
-    pub mode: ErasureMode,
-    /// Timestamp of attestation.
-    pub timestamp_ms: u64,
-}
-
-/// Scanner contract implemented by layer owners (Store, Vector, Text, Graph) (§8.3).
-pub trait LayerScan: Send + Sync {
-    /// Numeric layer identifier.
-    fn layer_id(&self) -> u8;
-
-    /// Scans the layer for presence of keys in `scope`. Must fail closed on error.
-    fn scan(&self, scope: &PhysicalScope) -> Result<LayerObservation>;
-}
-
-/// Lifecycle hooks invoked by the engine during erasure execution (§8.4).
+/// Lifecycle hooks invoked by engine during erasure execution (§5.5).
 pub trait ErasureHooks: Send + Sync + 'static {
-    /// Invoked before locking and footprint computation.
-    fn begin(&self, _ctx: &EraseCtx) -> Result<HookToken> {
-        Ok(HookToken::NONE)
-    }
+    /// Invoked before commit point; appends `ErasureIntent` to ledger.
+    fn on_begin(&self, ctx: &EraseCtx<'_>) -> std::result::Result<HookToken, ContextraError>;
 
-    /// Invoked immediately after tombstones have been committed.
-    fn tombstoned(&self, _token: &HookToken, _tx: TxId) -> Result<()> {
-        Ok(())
-    }
+    /// Invoked after tombstone commit in MVCC.
+    fn on_tombstoned(&self, tok: &HookToken, tx: TxId) -> std::result::Result<(), ContextraError>;
 
-    /// Invoked after physical purge has been executed.
-    fn purged(&self, _token: &HookToken, _scans: &[&dyn LayerScan]) -> Result<()> {
-        Ok(())
-    }
+    /// Invoked after physical purge completed.
+    fn on_purged(&self, tok: &HookToken, out: &PurgeOutput) -> std::result::Result<(), ContextraError>;
 
-    /// Finalizes erasure and produces an attestation if in Attested mode.
-    fn finish(&self, token: HookToken) -> Result<Option<ErasureAttestation>>;
+    /// Finalizes erasure and yields finish artifact (consumes `HookToken`).
+    fn finish(&self, tok: HookToken) -> std::result::Result<FinishArtifact, ContextraError>;
+
+    /// Aborts erasure lifecycle (consumes `HookToken`).
+    fn abort(&self, tok: HookToken);
 }
 
-/// Verdict returned by a [`RestoreGuard`] when filtering restored keys.
+/// Error returned when write operation hits an active write fence (§5.5).
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("Write operation fenced for key range")]
+pub struct WriteFenced;
+
+/// Write gate checking if mutations are permitted (§5.5).
+pub trait WriteGate: Send + Sync {
+    /// Fast-path check: returns true if any fence is active.
+    fn is_active(&self) -> bool;
+
+    /// Checks whether write batch is allowed.
+    fn check_batch(&self, keys: &mut dyn Iterator<Item = &[u8]>) -> std::result::Result<(), WriteFenced>;
+}
+
+/// Error returned by free space probe (§5.5).
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[error("Free space probe failed: {0}")]
+pub struct ProbeError(pub String);
+
+/// Disk space probe contract (§5.5).
+pub trait FreeSpaceProbe: Send + Sync {
+    /// Returns available disk space in bytes. None = unknown (never 0 bytes).
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, ProbeError>;
+}
+
+/// Anti-resurrection guard verdict (§5.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestoreVerdict {
     /// Key is admitted for restore.
     Allow,
-    /// Key was erased and must be rejected (anti-resurrection).
+    /// Key was erased and must be rejected.
     Reject,
 }
 
-/// Anti-resurrection guard preventing restored snapshots from resurrecting erased keys (§8.7).
+/// Anti-resurrection guard preventing restored snapshots from resurrecting erased keys (§5.5).
 pub trait RestoreGuard: Send + Sync {
-    /// Checks whether `key` is allowed to be restored from checkpoint at `cp_tx`.
-    fn admit(&self, key: &[u8], cp_tx: TxId) -> RestoreVerdict;
+    /// Checks whether `key` is permitted to be restored from snapshot at `source_tx`.
+    fn admit(&self, key: &[u8], source_tx: TxId) -> RestoreVerdict;
 }
 
-/// Gate controlling whether writes are permitted into protected key ranges (§8.6).
-pub trait WriteGate: Send + Sync {
-    /// Returns true if writes to `key` are currently permitted.
-    fn check_allowed(&self, key: &[u8]) -> bool;
+/// Scan error for layer scan (§5.5).
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[error("Scan error on layer {layer_id}: {reason}")]
+pub struct ScanError {
+    /// Layer identifier.
+    pub layer_id: u16,
+    /// Reason string.
+    pub reason: String,
+}
+
+/// Layer observation evidence produced by [`LayerScan`] (§5.5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LayerObservation {
+    /// Numeric identifier of scanned layer (u16).
+    pub layer_id: u16,
+    /// Whether layer is clean (empty of scoped keys).
+    pub clean: bool,
+    /// BLAKE3 digest of scanned layer state.
+    pub state_digest: [u8; 32],
+    /// Number of items scanned (proof against empty scans).
+    pub item_count: u64,
+}
+
+/// Scanner contract implemented by layer owners (§5.5).
+pub trait LayerScan: Send + Sync {
+    /// Numeric layer identifier (u16).
+    fn layer_id(&self) -> u16;
+
+    /// Scans layer for presence of keys in `scope`.
+    fn scan(&self, scope: &PhysicalScope) -> std::result::Result<LayerObservation, ScanError>;
+}
+
+/// Outcome of a deletion request (§5.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeleteOutcome {
+    /// Mode Off: Tombstone committed.
+    Logical {
+        /// Transaction ID of committed tombstone.
+        tx: TxId,
+    },
+    /// Mode Assured: Ledger durable, tombstone committed, purge scheduled or running.
+    Assured {
+        /// Transaction ID of committed tombstone.
+        tx: TxId,
+        /// Purge operation handle.
+        purge_id: PurgeId,
+    },
+}
+
+/// Error returned by erasure operations (§5.3).
+#[derive(Debug, Error)]
+pub enum EraseError {
+    /// Failed before commit point (retry is safe).
+    #[error("Deletion failed before commit point: {0}")]
+    NotStarted(#[source] ContextraError),
+
+    /// State indeterminate after commit point (deletion will roll forward).
+    #[error("Deletion state indeterminate after commit point (purge_id: {purge_id:?}): {cause}")]
+    Indeterminate {
+        /// Identifier of purge operation.
+        purge_id: PurgeId,
+        /// Cause of failure after commit point.
+        #[source]
+        cause: ContextraError,
+    },
+}
+
+/// Purge operation phase state machine (§5.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum PurgeState {
+    /// Operation admitted into coordinator.
+    Admitted = 0,
+    /// Memtable flush triggered.
+    Flush = 1,
+    /// Physical purge compaction executing.
+    PurgeCompaction = 2,
+    /// Obsolete files disposed.
+    Dispose = 3,
+    /// WAL segments retired.
+    WalRetire = 4,
+    /// Witness evidence collected.
+    Witness = 5,
+    /// State finalized.
+    Finalize = 6,
+    /// Fences released.
+    Release = 7,
 }

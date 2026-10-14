@@ -1,4 +1,6 @@
-//! License and activation gate port trait definitions (§14.6, §15).
+//! License and activation gate port trait definitions (§4.3, §14.6, §15).
+
+#![forbid(unsafe_code)]
 
 /// Vector deletion mode for vector index maintenance (§15).
 #[non_exhaustive]
@@ -64,9 +66,7 @@ pub enum LicenseError {
     Expired(i64),
 }
 
-/// Dyn-kompatibler Port (P27) für Lizenzprüfung — Implementierung (Lizenzserver-Anbindung,
-/// Ed25519-Signaturprüfung analog zum Löschbeweis-Pfad §14.1) ist NICHT Teil dieses Tickets
-/// und folgt in einem eigenen, separat zu beauftragenden Schritt.
+/// Dyn-kompatibler Port für Lizenzprüfung.
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError>;
@@ -78,7 +78,7 @@ pub trait LicenseGate: Send + Sync {
     }
 }
 
-/// Default open activation gate allowing `Fast` ring features without restriction.
+/// Default open activation gate allowing `Fast` ring features without restriction (§4.3).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OpenFastGate;
 
@@ -90,6 +90,9 @@ impl LicenseGate for OpenFastGate {
         }
     }
 }
+
+/// Alias for default open activation gate.
+pub type DefaultOpenGate = OpenFastGate;
 
 #[cfg(test)]
 mod dyn_safety {
