@@ -3,7 +3,7 @@
 
 ## 1. Zweck
 
-Systemnahe OS-Bindings, mmap, mlock/VirtualLock und Platten-/ACL-Grenzflächen in Ring 0. Der Crate bildet eine Unsafe-Insel, die OS-Systemaufrufe und FFI-Operationen kapselt und als 100% sichere Rust-API für höhere Ringe bereitstellt.
+Systemnahe OS-Bindings, mmap, mlock/VirtualLock, Prozess-Härtung (Dumpability/Core-Limits) und 64-Byte ausgerichtete Speicherallokation in Ring 0. Der Crate bildet eine Unsafe-Insel, die OS-Systemaufrufe und FFI-Operationen kapselt und als 100% sichere Rust-API für höhere Ringe bereitstellt.
 
 ## 2. Modul-Karte
 
@@ -11,10 +11,16 @@ Systemnahe OS-Bindings, mmap, mlock/VirtualLock und Platten-/ACL-Grenzflächen i
 |---|---|
 | `src/lib.rs` | Ring-0 Export-Schnittstelle und Re-Exports aller Systemmodul-Funktionen |
 | `src/acl_win32.rs` | Windows Win32 ACL-Sicherheitsfunktionen (`set_restrictive_file_acl`, `verify_file_acl_owner_only`) |
+| `src/aligned.rs` | `AlignedBuf` — 64-Byte ausgerichtete Puffer-Allokation für KV-Cache und SIMD |
+| `src/determinism.rs` | System-Implementierungen für Uhrzeit (`SystemClock`), Zufall (`SystemRng`) und ID-Generierung (`SystemIdGen`) |
+| `src/durability.rs` | Plattenantworten, durable rename und Directory Flushes (`flush_file`, `flush_dir`) |
+| `src/env_observe.rs` | Umgebungserkennung und Systemmetriken-Beobachtung (`observe_environment`) |
+| `src/hardening.rs` | Prozess-Härtung gegen Core-Dumps und Debugger (`harden_process`, `RLIMIT_CORE`, `PR_SET_DUMPABLE`) |
 | `src/mlock.rs` | RAM-Speichersperre gegen OS-Swap (`mem_lock`, `mem_unlock`) für Unix, Windows und Fallback |
 | `src/mmap.rs` | Zero-Copy Read-Only Memory-Mapping (`mmap_readonly`, `MmapChunk`) |
-| `src/posix.rs` | POSIX System-Call Abstraktionen für File Descriptor Re-Open/Dup2 (`reopen_file_read_only`) |
+| `src/posix.rs` | POSIX System-Call Abstraktionen für File Descriptor Re-Open/Dup2 (`reopen_and_dup2`) |
 | `src/vault.rs` | `VolatileVault` — Speichersichere Speicherung sensibler Secrets im gesperrten RAM |
+| `src/wiring.rs` | Composition-Root Facade Wiring (`SysWiring`) |
 
 ## 3. Invarianten
 
@@ -44,4 +50,3 @@ cargo xtask check-ring0-async-purity
 ## 7. Bekannte Lücken / SOLL
 
 - `mem_lock` erfolgt als "Best-Effort" und schlägt ohne erhöhte Rechte (`RLIMIT_MEMLOCK`) fehl, was mit einer `tracing::warn!`-Meldung protokolliert wird.
-
