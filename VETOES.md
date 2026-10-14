@@ -1,5 +1,10 @@
 # Contextra — Feature-Veto-Register (VETOES.md)
 
+> **Governance-Eskalationsvermerk (2026-10-14, M1a / TP-22):**
+> Die ursprüngliche Review-Frist (2026-10-07) für VETO-F02 und VETO-OP03 war formal abgelaufen.
+> Gemäß Mandat M1a wird der Status in VETOES.md NICHT eigenmächtig geändert.
+> Die Bestätigung der Veto-Sperren ohne Statusänderung erfolgte über ADR-VETO-REVIEW-F02-OP03-2026-10.md mit neuer Fälligkeit 2027-10-12. Dieser Sachverhalt wird als formale Eskalation im PR und Feature-Register vermerkt.
+
 ## VETO-F02
 
 feature_id: F-02
