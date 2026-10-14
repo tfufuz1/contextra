@@ -1,4 +1,10 @@
 //! Physical purge driver and two-phase purge execution (§C5.3, §C5.7, ADR-14, C4.8).
+//!
+//! # Production Caller Notice
+//! `run_physical` and `run_physical_checked` coordinate low-level compaction and Stage-2
+//! proof issuance. Note that `run_physical` has no production callers outside of tests and
+//! the `DpiPurgeDriver` implementation itself; higher-level orchestrators use `forget_document`
+//! or `run_purge`.
 
 #![forbid(unsafe_code)]
 
@@ -7,7 +13,7 @@ use std::time::Duration;
 use contextra_crypto::deletion_proof::claim_text::WitClaimText;
 use contextra_crypto::deletion_proof::issuer::IssRequest;
 use contextra_crypto::deletion_proof::probe::WitStoreProbe;
-use contextra_crypto::deletion_proof::types::DeletionScope;
+use contextra_crypto::deletion_proof::types::{hash_deleted_keys_length_prefixed, DeletionScope};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_store::lsm::purge::PurgeOrchestrator;
@@ -22,7 +28,9 @@ use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 
 use super::copy_observer::DpiCopyObserver;
 use super::footprint::ErasureFootprint;
-use super::forget_options::{FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode};
+use super::forget_options::{
+    FonLogicalHandle, ForgetOptions, ForgetOutcome, PurgeHandle, PurgeMode,
+};
 use super::proof_issue::{DpiDeletionRuntime, DpiLogicalInput};
 use super::registry::KeyFamilyRegistry;
 use super::relations_witness::issue_relations_witness;
@@ -64,6 +72,49 @@ impl<'a> DpiPurgeDriver<'a> {
             runtime,
             config,
         }
+    }
+
+    /// Checked entry point for physical purge sequence.
+    ///
+    /// Validates preconditions (presence of required services such as `copy_registry`) before
+    /// executing [`run_physical`]. Fails closed with [`ContextraError::InvalidInput`] or
+    /// [`ContextraError::Storage`] if prerequisites are missing or unsatisfied.
+    pub async fn run_physical_checked(
+        &self,
+        scope: PurgeScope,
+        scope_file_names: &[String],
+        as_of_tx: TxId,
+        logical_handle: &FonLogicalHandle,
+        opts: &ForgetOptions,
+        space_probe: Option<&dyn FreeSpaceProbe>,
+        probes: &[&dyn WitStoreProbe],
+        copy_registry: Option<&CopyRegistry>,
+    ) -> Result<PurgeHandle> {
+        if scope_file_names.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "run_physical_checked: scope_file_names must not be empty".to_string(),
+            ));
+        }
+
+        // Validate copy registry if purge scrub mode requires verification
+        if opts.purge == PurgeMode::PurgeWithScrub && copy_registry.is_none() {
+            return Err(ContextraError::InvalidInput(
+                "run_physical_checked: copy_registry is required when PurgeWithScrub is active"
+                    .to_string(),
+            ));
+        }
+
+        self.run_physical(
+            scope,
+            scope_file_names,
+            as_of_tx,
+            logical_handle,
+            opts,
+            space_probe,
+            probes,
+            copy_registry,
+        )
+        .await
     }
 
     /// Executes physical purge sequence run_physical(...) (§C5.3, C4.8, ADR-14).
@@ -169,8 +220,8 @@ impl<'a> DpiPurgeDriver<'a> {
         };
 
         let zeu_req = ZeuIssueRequest {
-            scope_keys,
-            scope_prefixes,
+            scope_keys: scope_keys.clone(),
+            scope_prefixes: scope_prefixes.clone(),
             as_of_tx,
             scanned_at_tx: as_of_tx,
             assurance: opts.assurance,
@@ -188,22 +239,35 @@ impl<'a> DpiPurgeDriver<'a> {
 
         let supersedes_32 = logical_handle.full_proof_id;
 
-        let doc_id_str = scope_file_names.first().cloned().unwrap_or_default();
-        let doc_id = doc_id_str
-            .parse::<u64>()
-            .map(DocId::new)
-            .unwrap_or_else(|_| DocId::new(0));
+        // Compute real non-zero hashes for Stage 2 proof
+        let mut all_keys_sorted = scope_keys;
+        for p in &scope_prefixes {
+            all_keys_sorted.push(p.clone());
+        }
+        all_keys_sorted.sort();
 
-        let phys_scope = DeletionScope::Document {
-            doc_id,
-            tenant_id: TenantId::SYSTEM,
-        };
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&all_keys_sorted);
+
+        let mut fp_hasher = blake3::Hasher::new();
+        fp_hasher.update(&deleted_keys_hash);
+        for name in scope_file_names {
+            let name_bytes = name.as_bytes();
+            let len_u32 = u32::try_from(name_bytes.len()).unwrap_or(u32::MAX);
+            fp_hasher.update(&len_u32.to_le_bytes());
+            fp_hasher.update(name_bytes);
+        }
+        let footprint_hash = *fp_hasher.finalize().as_bytes();
+
+        let doc_id_str = scope_file_names.first().cloned().unwrap_or_default();
+        let (doc_id, tenant_id) = parse_doc_id_and_tenant(&doc_id_str)?;
+
+        let phys_scope = DeletionScope::Document { doc_id, tenant_id };
 
         let req = IssRequest {
             scope: phys_scope,
             storage_scope: "lsm".to_string(),
-            deleted_keys_hash: [0u8; 32],
-            footprint_hash: [0u8; 32],
+            deleted_keys_hash,
+            footprint_hash,
             observed_empty: true,
             deleted_after_tx: as_of_tx.inner(),
             stage: 2, // Stage 2 = Physical
@@ -266,13 +330,7 @@ impl<'a> DpiPurgeDriver<'a> {
             )
             .await?;
 
-        let sweep_report = reverse_sweep(
-            sweep_source,
-            needles,
-            footprint,
-            registry,
-            depth,
-        )?;
+        let sweep_report = reverse_sweep(sweep_source, needles, footprint, registry, depth)?;
 
         let outcome = ForgetOutcome {
             logical: logical_handle.clone(),
@@ -295,19 +353,12 @@ pub async fn forget_document<S: FprSweepSource>(
     footprint: &ErasureFootprint,
     registry: &KeyFamilyRegistry,
 ) -> Result<ForgetOutcome> {
-    let doc_id = doc_id_str
-        .parse::<u64>()
-        .map(DocId::new)
-        .unwrap_or_else(|_| DocId::from_key(doc_id_str).unwrap_or(DocId::new(0)));
+    let (doc_id, tenant_id) = parse_doc_id_and_tenant(doc_id_str)?;
 
-    let scope = DeletionScope::Document {
-        doc_id,
-        tenant_id: TenantId::SYSTEM,
-    };
+    let scope = DeletionScope::Document { doc_id, tenant_id };
 
-    let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(
-        &footprint.keys.explicit,
-    );
+    let scope_hash = hash_deleted_keys_length_prefixed(&footprint.keys.explicit);
+    let footprint_hash = footprint.hash;
 
     let zeu_req = ZeuIssueRequest {
         scope_keys: footprint.keys.explicit.clone(),
@@ -326,7 +377,10 @@ pub async fn forget_document<S: FprSweepSource>(
         .await
         .unwrap_or_default();
 
-    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::HnswIndex) {
+    if !witnesses
+        .iter()
+        .any(|w| *w.layer() == DeletionLayer::HnswIndex)
+    {
         if let Ok(hnsw_witness) = LayerWitness::issue(WitIssueArgs {
             layer: DeletionLayer::HnswIndex,
             scope_hash,
@@ -334,7 +388,7 @@ pub async fn forget_document<S: FprSweepSource>(
             as_of_tx,
             assurance: opts.assurance,
             claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: 0,
             scanner_name: "hnsw_scanner",
             scanner_version: 1,
@@ -352,7 +406,10 @@ pub async fn forget_document<S: FprSweepSource>(
         }
     }
 
-    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::TextIndex) {
+    if !witnesses
+        .iter()
+        .any(|w| *w.layer() == DeletionLayer::TextIndex)
+    {
         if let Ok(text_witness) = issue_text_index_witness(
             doc_id,
             &footprint.ram.term_bytes,
@@ -364,20 +421,22 @@ pub async fn forget_document<S: FprSweepSource>(
         }
     }
 
-    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::Relations) {
+    if !witnesses
+        .iter()
+        .any(|w| *w.layer() == DeletionLayer::Relations)
+    {
         let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
-        if let Ok(rel_witness) = issue_relations_witness(
-            doc_id,
-            scanned_edges,
-            scope_hash,
-            as_of_tx,
-            None,
-        ) {
+        if let Ok(rel_witness) =
+            issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, None)
+        {
             witnesses.push(rel_witness);
         }
     }
 
-    if !witnesses.iter().any(|w| *w.layer() == DeletionLayer::ErasureLedger) {
+    if !witnesses
+        .iter()
+        .any(|w| *w.layer() == DeletionLayer::ErasureLedger)
+    {
         if let Ok(ledger_witness) = LayerWitness::issue(WitIssueArgs {
             layer: DeletionLayer::ErasureLedger,
             scope_hash,
@@ -385,7 +444,7 @@ pub async fn forget_document<S: FprSweepSource>(
             as_of_tx,
             assurance: opts.assurance,
             claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: 0,
             scanner_name: "ledger_scanner",
             scanner_version: 1,
@@ -405,7 +464,7 @@ pub async fn forget_document<S: FprSweepSource>(
         scope,
         storage_scope: "lsm".to_string(),
         deleted_keys_hash: scope_hash,
-        footprint_hash: [0u8; 32],
+        footprint_hash,
         observed_empty: true,
         deleted_after_tx: as_of_tx,
         witnesses,
@@ -422,7 +481,10 @@ pub async fn forget_document<S: FprSweepSource>(
         doc_id_bytes: doc_id_str.as_bytes().to_vec(),
         collection_id: None,
         collection_name: String::new(),
-        tenant_prefix: Vec::new(),
+        tenant_prefix: match footprint.storage {
+            super::footprint::StorageScope::Tenant(t) => t.inner().to_le_bytes().to_vec(),
+            super::footprint::StorageScope::Untenanted => Vec::new(),
+        },
     };
 
     let (outcome, _) = driver
@@ -444,6 +506,26 @@ pub async fn forget_document<S: FprSweepSource>(
         .await?;
 
     Ok(outcome)
+}
+
+fn parse_doc_id_and_tenant(doc_id_str: &str) -> Result<(DocId, TenantId)> {
+    if let Some((tenant_part, id_part)) = doc_id_str.split_once('/') {
+        let tenant_num = tenant_part.parse::<u64>().map_err(|_| {
+            ContextraError::InvalidInput(format!("Invalid tenant in doc_id_str: {tenant_part}"))
+        })?;
+        let tenant_id = TenantId::try_new(tenant_num)?;
+        let doc_id_num = id_part.parse::<u64>().map_err(|_| {
+            ContextraError::InvalidInput(format!("Invalid doc_id in doc_id_str: {id_part}"))
+        })?;
+        let doc_id = DocId::new(doc_id_num);
+        Ok((doc_id, tenant_id))
+    } else {
+        let doc_id = doc_id_str
+            .parse::<u64>()
+            .map(DocId::new)
+            .unwrap_or_else(|_| DocId::from_key(doc_id_str).unwrap_or(DocId::new(0)));
+        Ok((doc_id, TenantId::SYSTEM))
+    }
 }
 
 fn hex_encode_32(bytes: &[u8; 32]) -> String {
