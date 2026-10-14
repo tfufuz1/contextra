@@ -52,6 +52,7 @@ Für dieses Repository gilt ausschließlich E.1–E.13 der CIAI-Vollspezifikatio
 | `20-migrationsplan-und-adr.md` | ## 20. Migrationsplan v2 und ADR-Übersicht (neu) | Workspace / `docs/decisions/` |
 | `21-sota-algorithmen-erweiterung-a.md` | ## 21. Normative SOTA-Algorithmen-Erweiterung (Teil A: §21.1–§21.2 TL-HFD, DiBud) | Ring 0/1 (`contextra-graph`, `contextra-rank`) |
 | `21-sota-algorithmen-erweiterung-b.md` | ## 21. Normative SOTA-Algorithmen-Erweiterung (Teil B: §21.3–§21.4 FC-TS, LeanRAG) | Ring 0/3 (`contextra-adapt`, `contextra-cognition`) |
+| `22-jules-autonomous-agent-specification.md` | ## 22. Google-Jules Autonome Agenten- und Umgebungs-Spezifikation (v1.0) | Global / Tooling / Agent |
 | `90-anhang-b-begruendungen-a.md` | # Anhang B — Begründungen, Ist-Zustand, Literatur (Teil A: §B.5.1–§B.5.2) | Ring 0/3 (`contextra-graph`, `contextra-router`) |
 | `90-anhang-b-begruendungen-b.md` | # Anhang B — Begründungen, Ist-Zustand, Literatur (Teil B: §B.5.3–§B.7) | Ring 0/1 (`contextra-store`, `contextra-vector`) |
 | `91-anhang-c-aenderungsprotokoll-v2-1.md` | # Anhang C — Änderungsprotokoll Fassung 2.1 und Prüfnachweise | Meta / Dokumentenhistorie |
