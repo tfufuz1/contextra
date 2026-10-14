@@ -231,17 +231,39 @@ Hierarchical Navigable Small World, Eigenimplementierung.
 - **Off-Policy-Evaluation:** IPS mit Fehler `ZeroPropensityViolation`.
 - Lyapunov-Drift-Watcher, `ShadowMode`, Cross-Adapt-`DriftDetector`.
 
-## B.6 Löschung und Kryptografie
-- **Verschlüsselung at Rest:** ChaCha20-Poly1305 / AES-GCM-SIV (Feature `encryption-at-rest`), 12-Byte-Nonce, Per-File-Subkeys; KV-Segmente Format v2; Shred-Gruppen à 64 Records.
-- **KDF:** Argon2id (Header-Magic `MFKD`, Version 1). Minimum `m=19456 KiB, t=2, p=1`; Default `m=65536 KiB, t=3, p=1`; Salt ≥ 16 Byte.
-- **DeletionProof [V]:**
-  - `DeletionScope ∈ {Document, Collection, Tenant}`.
-  - `DeletionLayer ∈ {LsmMemtable, SsTableAllLevels, HnswIndex, WalAllSegments, CsrGraph, KvCacheSegments, EmbeddingCache}` (korrigiert gegenüber v9: 7 Layer).
-  - `ExcludedScope ∈ {ConsolidatedAndDistilled, LlmParameterMemory}` (explizit nicht abgedeckt, Referenz arXiv:2505.16831).
-  - `SignatureVersion`: V1 = HMAC-SHA256 nur Scope; V2 = HMAC-SHA256 Scope + Layer-Coverage; **V3 = Ed25519** mit längenpräfixierten Key-Hashes. Der Datei-Kopf von `contextra-crypto/src/deletion_proof.rs` nennt noch HMAC (veraltet).
-  - Schlüsselhash: Blake3 über sortierte Keys, je Key `(len as u32).to_le_bytes() ‖ key`.
-  - **INV-DELETION-1:** `create()` nur nach vollzogener physischer Bereinigung.
-  - Offener Tag: `signature_version` soll typisiert werden (`ed25519_proof.rs:109`).
+## B.6 Löschung, Kryptografie und Löschnachweis-Kette
+- **Verschlüsselung at Rest:** ChaCha20-Poly1305 / AES-GCM-SIV (Feature `encryption-at-rest`), 12-Byte-Nonce, Per-File-Subkeys; KV-Segmente Format v2; Shred-Gruppen à 64 Records. **[Ist]**
+- **KDF:** Argon2id (Header-Magic `MFKD`, Version 1). Minimum `m=19456 KiB, t=2, p=1`; Default `m=65536 KiB, t=3, p=1`; Salt ≥ 16 Byte. **[Ist]**
+- **Normative Spezifikation der Löschnachweis-Kette (DeletionProof Chain):**
+  1. **Beweis-Domain-Tags (v3 / v4) [Ist/Teilweise]:**
+     - Version 3 Domain-Tag: `b"contextra/deletion-proof/v3\0"` (30 Bytes, Ed25519-Signatur über Bincode/JSON-Payload) **[Ist]**.
+     - Version 4 Domain-Tag: `b"contextra/deletion-proof/v4\0"` (28 Bytes, Ed25519-Signatur über kanonischen TLV-Stream nach C7/ADR-13) **[Teilweise]**.
+     - Signierte Bytes werden strikt als `domain_tag || canonical_payload` gebildet.
+  2. **Signierschlüssel-Herkunft [Ist]:**
+     - Private Ed25519-Signierschlüssel MÜSSEN ausschließlich aus einem kryptografisch sicheren Zufallszahlengenerator (CSPRNG, z. B. OS-CSPRNG / `getrandom`) oder aus einem angebundenen Key Management System (KMS / HSM) stammen **[Ist]**.
+     - Der Signierschlüssel DARF NIEMALS aus öffentlichen oder vorhersagbaren Daten (Dokument-IDs, Public Keys, statischen Seeds) abgeleitet werden.
+  3. **Strikte Verifikation (`verify_strict`) [Ist]:**
+     - Alle Verifikationspfade MÜSSEN im Modus `verify_strict` ausführen **[Ist]**.
+     - Jede Abweichung bei Tag-Sortierung (nicht strikt aufsteigend), doppelten Tags, unbekannten kritischen TLV-Tags (`0x8000`), Längenfehlern, Ed25519-Signatur-Malleability (RFC 8032 Errata EID 5968) oder Mismatch von `signer_key_id == BLAKE3(public_key)` führt zum sofortigen Abbruch und Fail-Closed.
+  4. **Echtheitsgebot für Schicht-Claims (Realer Scan) [Ist]:**
+     - Ein `ProofClaim` für eine Speicherschicht (`LsmMemtable`, `SsTableAllLevels`, `WalAllSegments`, `TextIndex`, `Relations` etc.) DARF NUR enthalten sein, wenn er durch einen realen physischen Präfix-/Storage-Scan (`scan_and_issue_*`) mit konkreter Scan-Transaktionsgrenze (`scanned_at_tx >= deleted_after_tx`) belegt ist **[Ist]**.
+     - Fiktive Claims, ungeprüfte Defaults oder ungeprüfte Coverage-Deklarationen sind strikt verboten.
+  5. **Standardpolicy & Pflichtlayer [Ist]:**
+     - Die Standard-Verifikationspolicy fordert nicht-leere Pflichtlayer (`required_layers`) für den jeweiligen `DeletionScope` **[Ist]**.
+     - Nachweise ohne Schicht-Claims (`covered_layers = []`) oder mit fehlenden Kern-Layern werden durch die Standardpolicy abgelehnt.
+  6. **Statusfeld `proof_status` [Soll/Teilweise]:**
+     - Sowohl Einzeldokument-Löschungen (`contextra_delete`) als auch Collection-Löschungen (`contextra_drop_collection`, `contextra_forget`) MÜSSEN im Rückgabeobjekt ein explizites Statusfeld `proof_status` mit den Werten `Issued`, `Skipped`, `Failed` oder `Pending` bereitstellen **[Soll]**.
+  7. **Anti-Resurrection im Restore-Pfad [Ist]:**
+     - Bei der Wiederherstellung von Snapshots, Checkpoints oder Backups MUSS das Löschprotokoll angewendet werden (`CpyRestoreFilter` / Revokations-Log) **[Ist]**.
+     - Jeder Datensatz mit Löschtransaktion vor oder an der Wiederherstellungsgrenze (`last_tx <= deleted_after_tx`) MUSS gefiltert und verworfen werden, um eine Wiederauferstehung gelöschter Daten zu verhindern.
+  8. **Erfassung von Kopien, Derivaten und Caches (Kopienstatus) [Teilweise]:**
+     - Der Löschnachweis MUSS den Status von Sekundärstrukturen, Derivaten und Caches (Rerank-Caches, KV-Inferenz-Caches, Embedding-Caches, HNSW-Graph-Kanten, Inverted-Index-Postings) explizit erfassen **[Teilweise]**.
+     - Nicht physisch gelöschte oder abgrenzbare Bereiche MÜSSEN in `excluded_scopes` maschinenlesbar deklariert werden (z. B. destillierte Modellgewichte oder globale Konsolidierungen).
+  9. **Ehrlichkeit des Nachweises (Audit mit Toleranz statt physikalischer Abwesenheitsbeweis) [Ist]:**
+     - Ein DeletionProof ist ein logischer und struktureller Audit-Nachweis der physischen Bereinigung innerhalb der beobachtbaren Speicherschichten. Er behauptet NIEMALS eine quantenphysikalische oder zelluläre Nullstellung auf Flash/SSD-Speichermedien (Wear-Leveling macht dies unmöglich) **[Ist]**.
+     - Der verlässliche Anker für unwiderrufliche physische Unlesbarkeit ist Crypto-Erase (Schlüsselvernichtung via `RevocationLog` / KMS).
+  10. **Zeitanker & Transparenzlog [Soll]:**
+      - Der Soll-Zustand erfordert eine chronologische Verankerung des Löschnachweises über Wanduhr-Zeitstempel (`issued_wall_ms`), monotone Zähler (`issued_mono_ctr`) und fälschungssichere Audit-Ledger / Transparenzlogs (RFC 3161 Time-Stamp Protocol / RFC 9162 Merkle-Trees) **[Soll]**.
 - Schlüssel-Env: `CONTEXTRA_DELETION_PROOF_KEY`, `CONTEXTRA_PROOF_KEY`.
 
 ## B.7 Privacy, Egress, MCP
@@ -606,7 +628,7 @@ Gelesen habe ich Manifeste, `Cargo.toml`-Features, `contextra-crypto/src/deletio
 | 9.5 | `CacheDirective` (`types/src/error.rs:70`) | `Pin{ttl: Option<Duration>}` (None = unbegrenzt), `NeverCache`, `Auto` (Default), `ReleaseAfterStep{step_id: StepId}`. `StepId` ist ein Newtype über `u64` mit `From<u64>` **[V]** |
 | 4.8 / 13.11 | `AutoExtractionMode` (`types/.../misc.rs:542`) | `Enabled`, `Disabled`; `is_enabled()`. `Default` hängt an Feature `auto-extraction-opt-out`: ohne das Feature `Enabled` (Code-Struktur `cfg(not(feature…))`), mit dem Feature vermutlich `Disabled` **[V/D]**. Tier-Defaults (#3950) nicht im Einzelnen gelesen |
 | 10.14 | `ContextraErrorDto` | Serialisierbares Fehler-DTO mit `with_details(...)`, erzeugt über `From<&ContextraError>`; Verwendung in `contextra-py/src/bindings/common.rs` **[V]** |
-| 6.18 | Ports `Clock`, `Rng`, `IdGenerator` | siehe Teil 8 / A.1; Clock-Injektion in Checkpoint und License **[D]** |
+| 6.18 | Ports `Clock`, `Rng`, `IdGenerator` | siehe A.1; Clock-Injektion in Checkpoint und License **[D]** |
 | 6.15 / 13.8 | `docid-128` | Ein Feature, das in `types`, `text` (Posting-Liste, WAND, Inverted-Index), `store`, `vector`, `graph`, `engine` mitgeschaltet wird; CI-Gate vorhanden. DocId = BLAKE3-Ableitung. **Kein Rückwärtspfad für 64-Bit-Datenbestände** (Aussage des Audit-Dokuments, nicht geprüft) **[D]** |
 
 ## I.2 Kognition, Lebenszyklus (Lückenliste Abschnitt 2)
