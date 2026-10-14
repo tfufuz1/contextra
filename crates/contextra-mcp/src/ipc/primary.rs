@@ -55,7 +55,7 @@ impl PrimaryDetector {
     ) -> Result<ProcessRole, PrimaryDetectionError> {
         let endpoint_file_path = db_path.join(ENDPOINT_FILE_NAME);
 
-        match Contextra::open(db_path).await {
+        match crate::open_db_from_env(db_path).await {
             Ok(db) => {
                 let db_arc = Arc::new(db);
                 let actual_endpoint = if let Some(p) = custom_endpoint {

@@ -16,7 +16,7 @@ pub enum DisposePolicy {
     RequireScrub,
     /// Refusal permits falling back to durable removal without zero-overwriting.
     AllowRemoveUnscrubbed,
-    /// Secure overwrite disabled, standard durable removal.
+    /// Scrubbing disabled.
     Disabled,
 }
 

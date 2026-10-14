@@ -29,7 +29,7 @@ fn create_valid_v4_proof(
         scanned_at_tx: 10,
         evidence_tlv: vec![],
     }];
-    proof.excluded_scopes = vec![1];
+    proof.excluded_scopes = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     proof.sign_with_signer(signer).expect("sign failed");
     proof
 }

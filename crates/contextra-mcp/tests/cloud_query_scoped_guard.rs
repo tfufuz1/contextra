@@ -74,6 +74,7 @@ async fn setup_app() -> (McpServer, TempDir) {
         allow_code_execution: false,
         allow_cloud_egress: true,
         max_execution_ms: 5_000,
+        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
     let server = McpServer::with_sandbox(Arc::new(db), embedder, sandbox);

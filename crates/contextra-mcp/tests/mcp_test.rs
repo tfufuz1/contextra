@@ -77,6 +77,7 @@ async fn test_sandbox_policy_enforcement() {
         allow_code_execution: false,
         allow_cloud_egress: false,
         max_execution_ms: 5000,
+        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
     let server = McpServer::with_sandbox(Arc::new(db), embedder, sandbox);

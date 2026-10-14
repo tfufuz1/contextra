@@ -40,7 +40,8 @@ fn setup_py_contextra(name: &str) -> (PyContextra, PathBuf, Arc<Runtime>) {
     });
 
     let poisoned = Arc::new(AtomicBool::new(false));
-    let py_db = PyContextra::new(Arc::new(db), rt.clone(), 2, poisoned);
+    let tenant_id = contextra_types::TenantId::try_new(1).expect("tenant id");
+    let py_db = PyContextra::new(Arc::new(db), rt.clone(), 2, poisoned, tenant_id);
     (py_db, dir, rt)
 }
 

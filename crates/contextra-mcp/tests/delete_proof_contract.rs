@@ -10,27 +10,76 @@ use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+#[derive(Debug)]
+struct MockEmbedder;
+
+impl contextra_ports::EmbeddingProvider for MockEmbedder {
+    fn provider_name(&self) -> &str {
+        "mock"
+    }
+
+    fn embed<'a>(
+        &'a self,
+        _text: &'a str,
+    ) -> contextra_ports::BoxFuture<
+        'a,
+        std::result::Result<Vec<f32>, contextra_ports::EmbeddingError>,
+    > {
+        Box::pin(async move { Ok(vec![0.1f32; 768]) })
+    }
+
+    fn embedding_dim(&self) -> usize {
+        768
+    }
+
+    fn embed_batch<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> contextra_ports::BoxFuture<
+        'a,
+        std::result::Result<Vec<Vec<f32>>, contextra_ports::EmbeddingError>,
+    > {
+        Box::pin(async move { Ok(vec![vec![0.1f32; 768]; texts.len()]) })
+    }
+}
+
 async fn create_test_server() -> (Arc<McpServer>, TempDir) {
     let tmp = TempDir::new().expect("temp dir creation");
     let db = Contextra::open(tmp.path()).await.expect("open db");
-    let server = McpServer::with_write_permission(Arc::new(db), None, true)
+    let server = McpServer::with_write_permission(Arc::new(db), Arc::new(MockEmbedder), true)
         .expect("mcp server initialization");
     (Arc::new(server), tmp)
+}
+
+fn make_request(method: &str, params: serde_json::Value) -> contextra_mcp::protocol::JsonRpcRequest {
+    contextra_mcp::protocol::JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(1)),
+        method: method.into(),
+        params,
+    }
 }
 
 #[tokio::test]
 async fn test_delete_returns_proof_status_and_no_null_proof() {
     let (server, _tmp) = create_test_server().await;
 
-    let delete_args = json!({
-        "collection": "default",
-        "id": "doc_123"
-    });
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_delete",
+            "arguments": {
+                "collection": "default",
+                "id": "doc_123"
+            }
+        }),
+    );
 
-    let res = server
-        .handle_delete(&delete_args)
-        .await
-        .expect("handle_delete should succeed");
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_ne!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    let res: serde_json::Value = serde_json::from_str(text).unwrap();
 
     // Invariante F4: Kein proof: null ohne Statusfeld!
     assert!(
@@ -54,18 +103,22 @@ async fn test_delete_returns_proof_status_and_no_null_proof() {
 async fn test_delete_engine_error_propagation() {
     let (server, _tmp) = create_test_server().await;
 
-    // Ungültige ID (z.B. leer oder überschreitet Max-Länge) -> muss MCP-Fehler liefern
-    let invalid_args = json!({
-        "collection": "default",
-        "id": ""
-    });
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_delete",
+            "arguments": {
+                "collection": "default",
+                "id": ""
+            }
+        }),
+    );
 
-    let err = server
-        .handle_delete(&invalid_args)
-        .await
-        .expect_err("handle_delete with empty ID must fail");
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
 
-    let err_msg = err.to_string();
+    let err_msg = res_val["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
         err_msg.contains("cannot be empty"),
         "Error message should reflect invalid parameter: {err_msg}"
@@ -75,14 +128,14 @@ async fn test_delete_engine_error_propagation() {
 #[tokio::test]
 async fn test_mcp_classify_tool_category_maintained() {
     // INV-MCP-CLASSIFY-1
-    let cat_delete = McpSandbox::classify_method("contextra_delete");
+    let cat_delete = McpSandbox::try_classify_method("contextra_delete").unwrap();
     assert_eq!(
         cat_delete,
         ToolCategory::DatabaseWrite,
         "contextra_delete category MUST remain DatabaseWrite"
     );
 
-    let cat_drop = McpSandbox::classify_method("contextra_drop_collection");
+    let cat_drop = McpSandbox::try_classify_method("contextra_drop_collection").unwrap();
     assert_eq!(
         cat_drop,
         ToolCategory::DatabaseWrite,
