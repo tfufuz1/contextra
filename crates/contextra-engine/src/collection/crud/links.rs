@@ -62,7 +62,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         if let Some(bytes) = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, tx.inner())
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?
         {
             let mut doc_id_str = None;
@@ -136,7 +136,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     let user_key = self.namespaced_key(id_str.as_bytes(), 0);
                     if let Some(user_bytes) = self
                         .storage
-                        .get_at_seq_tracked(tx, &user_key, tx.inner())
+                        .get_at_seq_tracked(tx, &user_key, u64::MAX)
                         .await?
                     {
                         if let Ok(mut full_doc) =
