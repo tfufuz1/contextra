@@ -17,8 +17,7 @@ pub use dispatch::{
     euclidean_distance_f32_bytes, euclidean_distance_sq_u8, CpuFeatures,
 };
 pub use kernels::scalar::{
-    dot_product_f32_u8, euclidean_distance_sq_f32_u8, normalize_inplace,
-    CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
+    dot_product_f32_u8, euclidean_distance_sq_f32_u8, normalize_inplace, CosineSimilarityPartsU8,
 };
 pub use wiring::SimdWiring;
 

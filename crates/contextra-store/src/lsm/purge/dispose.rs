@@ -16,6 +16,8 @@ pub enum DisposePolicy {
     RequireScrub,
     /// Refusal permits falling back to durable removal without zero-overwriting.
     AllowRemoveUnscrubbed,
+    /// Scrubbing disabled, fall back to standard durable removal.
+    Disabled,
 }
 
 /// Report summarizing file disposal outcome.
@@ -92,7 +94,7 @@ pub async fn dispose_obsolete_files_with_policy(
                             std::io::ErrorKind::PermissionDenied,
                             format!("Scrubbing refused for {:?}: {:?}", path, refusal),
                         )),
-                        DisposePolicy::AllowRemoveUnscrubbed => {
+                        DisposePolicy::AllowRemoveUnscrubbed | DisposePolicy::Disabled => {
                             durable_remove(path)?;
                             report.files_removed += 1;
                             report.removed_unscrubbed += 1;

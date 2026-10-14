@@ -1,3 +1,11 @@
+<!-- STATUS BLOCK -->
+> **Stand der Befunde gegen Commit 2738b208:**
+> - **FINDING-GOV-01:** BEHOBEN (Inkonsistenz bei `contextra-crypto` in `rules/simd_safety.md` durch Entfernung aus Unsafe-Inseln behoben in PR #4710).
+> - **FINDING-GOV-02:** BEHOBEN (`[crates.xtask-heavy]` in `capabilities.toml` eingetragen in Commit 4bc8862b).
+> - **FINDING-GOV-03:** BEHOBEN (`apply_all_fixes.py` und `clean_patch.py` aus Wurzelverzeichnis entfernt).
+> - **FINDING-GOV-04:** TEILWEISE (Crate-AGENTS.md und Doku-Referenzen werden aktualisiert, `WORKING_STATE.md` via `sync-docs`).
+<!-- END STATUS BLOCK -->
+
 # Deep-Dive Audit-Bericht: Governance, Entwicklersystem (Harness) und Dokumentationsdrift
 
 **Rolle:** Spezialist für Governance, Entwicklungssystem (Harness) und Dokumentationsdrift
