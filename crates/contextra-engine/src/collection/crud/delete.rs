@@ -218,23 +218,29 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
-        // (g) Scope Write Seq verification
-        if let Some(lsm) = maybe_lsm {
+        // (g) Scope Write Seq verification (L3 fix: don't return Err after successful commit)
+        let final_scope_write_seq = if let Some(lsm) = maybe_lsm {
             let scope_write_seq_after = lsm
                 .erasure_fence
                 .snapshot_write_seq(&footprint.keys.prefixes);
             if scope_write_seq_before != scope_write_seq_after {
-                return Err(ContextraError::InvalidInput(
-                    "ConcurrentModification during erase_document execution".to_string(),
-                ));
+                tracing::warn!(
+                    "Concurrent modification detected during erase_document (write_seq changed from {} to {}). Deletion committed at tx {}.",
+                    scope_write_seq_before,
+                    scope_write_seq_after,
+                    erased_at_tx.inner()
+                );
             }
-        }
+            scope_write_seq_after
+        } else {
+            scope_write_seq_before
+        };
 
         Ok(DocErasure {
             footprint_hash: footprint.hash,
             scope_hash,
             as_of_tx: erased_at_tx,
-            scope_write_seq: scope_write_seq_before,
+            scope_write_seq: final_scope_write_seq,
             witnesses,
             observed_empty: footprint.observed_empty,
             prefixes: footprint.keys.prefixes,
@@ -245,7 +251,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID (delegating to `erase_document`).
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let opts = DocEraseOptions::default();
+        let opts = DocEraseOptions {
+            options: ForgetOptions {
+                assurance: contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
+                ..ForgetOptions::default()
+            },
+        };
         self.erase_document(id, &opts).await.map(|_| ())
     }
 

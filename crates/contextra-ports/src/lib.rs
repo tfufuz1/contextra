@@ -63,6 +63,8 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+/// Erasure and deletion guarantee port traits (§8.3, §8.4, ADR-01, ADR-02, ADR-14).
+pub mod erasure;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -76,6 +78,7 @@ pub use attention::*;
 pub use checkpoint::*;
 pub use clock::*;
 pub use embedding::*;
+pub use erasure::*;
 pub use graph::*;
 pub use graph_index::*;
 pub use id_gen::*;
@@ -115,6 +118,11 @@ mod dyn_safety {
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
+    fn _assert_dyn_erasure_backend(_: Option<&dyn ErasureBackend>) {}
+    fn _assert_dyn_erasure_hooks(_: Option<&dyn ErasureHooks>) {}
+    fn _assert_dyn_layer_scan(_: Option<&dyn LayerScan>) {}
+    fn _assert_dyn_restore_guard(_: Option<&dyn RestoreGuard>) {}
+    fn _assert_dyn_write_gate(_: Option<&dyn WriteGate>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -134,6 +142,11 @@ mod dyn_safety {
         _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
+        _assert_dyn_erasure_backend(None);
+        _assert_dyn_erasure_hooks(None);
+        _assert_dyn_layer_scan(None);
+        _assert_dyn_restore_guard(None);
+        _assert_dyn_write_gate(None);
     }
 }
 

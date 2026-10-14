@@ -1,7 +1,7 @@
 //! Ed25519 signer and key rotation attestations for deletion proofs (ADR-12, C7).
 
 use crate::error::{CryptoError, Result};
-use ed25519_dalek::{Signature, Signer as DalekSigner, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer as DalekSigner, SigningKey, VerifyingKey};
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -296,7 +296,7 @@ impl KeyRotationStatement {
         payload.extend_from_slice(&self.rotated_at_unix_ms.to_le_bytes());
 
         let sig = Signature::from_bytes(&self.signature);
-        vk.verify(&payload, &sig).map_err(|e| {
+        vk.verify_strict(&payload, &sig).map_err(|e| {
             CryptoError::Crypto(format!("Invalid rotation statement signature: {e}"))
         })?;
 
@@ -390,7 +390,7 @@ impl ProofRotationAttestation {
         msg.extend_from_slice(&self.new_key_id);
 
         let sig = Signature::from_bytes(&self.signature);
-        vk.verify(&msg, &sig).map_err(|e| {
+        vk.verify_strict(&msg, &sig).map_err(|e| {
             CryptoError::Crypto(format!("Invalid rotation attestation signature: {e}"))
         })?;
 

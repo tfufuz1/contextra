@@ -907,6 +907,8 @@ fn update_current_metrics_long_mem_eval(
 
     combined.long_mem_eval = Some(LongMemEvalMetricsSummary {
         overall_accuracy,
+        ci_lower_95: None,
+        ci_upper_95: None,
         total_cases,
     });
 
@@ -935,7 +937,11 @@ fn update_current_metrics_locomo(
 
     combined.locomo = Some(LocomoMetricsSummary {
         overall_recall_at_5,
+        ci_lower_recall_95: None,
+        ci_upper_recall_95: None,
         overall_mrr,
+        ci_lower_mrr_95: None,
+        ci_upper_mrr_95: None,
         total_eval_cases,
     });
 

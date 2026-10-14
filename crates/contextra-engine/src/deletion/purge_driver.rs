@@ -208,6 +208,10 @@ impl<'a> DpiPurgeDriver<'a> {
                         "Scan timeout during purge compaction".to_string(),
                         "Retry with smaller batch size or increased timeout".to_string(),
                     ),
+                    PurgeBlocked::UnknownFreeSpace => (
+                        "Free space probe unavailable or returned unknown".to_string(),
+                        "Provide a FreeSpaceProbe implementation or ensure disk space is queryable".to_string(),
+                    ),
                 };
                 return Ok(PurgeHandle::Blocked { reason, retry_hint });
             }

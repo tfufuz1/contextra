@@ -80,26 +80,24 @@ impl DeletionProof {
                     .construct_v3_payload()
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
 
-                use ed25519_dalek::Verifier;
                 let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
                     Ok(s) => s,
                     Err(_) => return Ok(false),
                 };
 
-                Ok(verifying_key.verify(&payload, &sig).is_ok())
+                Ok(verifying_key.verify_strict(&payload, &sig).is_ok())
             }
             (SignatureVersion::V4, VerificationKey::Ed25519(verifying_key)) => {
                 let payload = self
                     .construct_v4_payload()
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
 
-                use ed25519_dalek::Verifier;
                 let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
                     Ok(s) => s,
                     Err(_) => return Ok(false),
                 };
 
-                Ok(verifying_key.verify(&payload, &sig).is_ok())
+                Ok(verifying_key.verify_strict(&payload, &sig).is_ok())
             }
             _ => Err(ContextraError::Internal(format!(
                 "VerificationKey version mismatch: key version {:?} does not match DeletionProof signature_version {:?}",
@@ -183,12 +181,11 @@ impl DeletionProof {
             self.construct_v3_payload()?
         };
 
-        use ed25519_dalek::Verifier;
         let sig = ed25519_dalek::Signature::from_slice(&self.signature)
             .map_err(|_| CryptoError::InvalidProofSignature)?;
 
         public_key
-            .verify(&payload, &sig)
+            .verify_strict(&payload, &sig)
             .map_err(|_| CryptoError::InvalidProofSignature)
     }
 

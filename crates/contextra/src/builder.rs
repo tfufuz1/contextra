@@ -609,13 +609,62 @@ impl ContextraBuilder {
         )
         .await?;
 
+        #[cfg_attr(not(feature = "router"), allow(unused_mut))]
         let mut engine_wiring = EngineWiring::default();
 
         #[cfg(feature = "router")]
         let _router_wiring_keepalive = if self.router_enabled {
+            // Dummy providers for router wiring when concrete providers are not available.
+            // The router subsystem requires these trait objects but the builder may not
+            // have them — use no-op stubs so the router can at least be instantiated.
+            struct NoOpHybridSearch;
+            impl contextra_ports::HybridSearchProvider for NoOpHybridSearch {
+                fn search_hybrid<'a>(
+                    &'a self,
+                    _query_text: &'a str,
+                    _query_embedding: &'a [f32],
+                    _top_k: usize,
+                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Vec<contextra_ports::ContextChunk>>> {
+                    Box::pin(async move { Ok(Vec::new()) })
+                }
+            }
+
+            struct NoOpCommunityResolver;
+            impl contextra_ports::CommunityResolver for NoOpCommunityResolver {
+                fn get_community<'a>(
+                    &'a self,
+                    _entity_id: contextra_ports::EntityId,
+                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+                    Box::pin(async move { Ok(None) })
+                }
+            }
+
+            struct NoOpContextPreparer;
+            impl contextra_ports::ContextPreparer for NoOpContextPreparer {
+                fn prepare_context(
+                    &self,
+                    _chunks: Vec<contextra_ports::ContextChunk>,
+                    _budget: &contextra_ports::TokenBudget,
+                    _relevance_threshold: f32,
+                ) -> contextra_core::Result<contextra_ports::ContextWindow> {
+                    Ok(contextra_ports::ContextWindow {
+                        chunks: Vec::new(),
+                        total_tokens: 0,
+                        truncated: false,
+                    })
+                }
+            }
+
             let router_deps = contextra_router::RouterWiringDeps {
-                clock: Some(self.clock.clone()),
-                ..Default::default()
+                search_provider: Arc::new(NoOpHybridSearch),
+                community_resolver: Arc::new(NoOpCommunityResolver),
+                context_preparer: Arc::new(NoOpContextPreparer),
+                catalog: Vec::new(),
+                clock: self.clock.clone(),
+                arm_registry: None,
+                calibration_store_path: None,
+                transport: None,
+                route_timeout: None,
             };
             if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
                 let arc_rw = Arc::new(router_wiring);

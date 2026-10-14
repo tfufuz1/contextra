@@ -90,6 +90,7 @@ impl From<OrxPurgeError> for PurgeBlocked {
 #[macro_export]
 macro_rules! purge_failpoint {
     ($name:expr) => {
+        #[cfg(any(test, feature = "fault-injection"))]
         if std::env::var(concat!("PURGE_FAILPOINT_", $name)).is_ok() {
             return Err(
                 $crate::lsm::purge::failpoint::OrxPurgeError::FailpointTriggered(

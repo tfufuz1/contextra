@@ -47,9 +47,17 @@ impl LsmStorage {
             .map(|sst| sst.metadata().file_size)
             .sum();
 
-        // 3. Disk space probe check
+        // 3. Disk space probe check (L8/W16 fix)
+        // None probe means "unknown", not "0 bytes free".
+        // Consistent with purge_select.rs which returns UnknownFreeSpace for missing probes.
         let needed_space = total_bytes.max(1024 * 1024);
-        let free_space = space_probe.and_then(|p| p.free_space_bytes()).unwrap_or(0);
+        let free_space = match space_probe {
+            Some(p) => match p.free_space_bytes() {
+                Some(free) => free,
+                None => return Err(PurgeBlocked::UnknownFreeSpace),
+            },
+            None => return Err(PurgeBlocked::UnknownFreeSpace),
+        };
 
         if free_space < needed_space {
             return Err(PurgeBlocked::InsufficientDiskSpace {
@@ -67,10 +75,16 @@ impl LsmStorage {
                 .await
                 .map_err(|_| PurgeBlocked::CompactionBusy)?;
             let mut matches = false;
-            while let Ok(Some((key, _val, _seq, _tx))) = stream.next_entry().await {
-                if scope.matches_key(&key) {
-                    matches = true;
-                    break;
+            loop {
+                match stream.next_entry().await {
+                    Ok(Some((key, _val, _seq, _tx))) => {
+                        if scope.matches_key(&key) {
+                            matches = true;
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => return Err(PurgeBlocked::CompactionBusy),
                 }
             }
             if matches {
@@ -105,12 +119,18 @@ impl LsmStorage {
 
             let mut valid_entries = Vec::new();
 
-            while let Ok(Some((key, val, seq, tx))) = stream.next_entry().await {
-                if scope.matches_key(&key) {
-                    records_purged += 1;
-                    bytes_reclaimed += (key.len() + val.len()) as u64;
-                } else {
-                    valid_entries.push((key, val, seq, tx));
+            loop {
+                match stream.next_entry().await {
+                    Ok(Some((key, val, seq, tx))) => {
+                        if scope.matches_key(&key) {
+                            records_purged += 1;
+                            bytes_reclaimed += (key.len() + val.len()) as u64;
+                        } else {
+                            valid_entries.push((key, val, seq, tx));
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => return Err(PurgeBlocked::CompactionBusy),
                 }
             }
 
@@ -186,18 +206,50 @@ impl LsmStorage {
             .await
             .map_err(|_| PurgeBlocked::CompactionBusy)?;
 
-        // 5. In-Memory SSTable Set Update
+        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix)
+        //
+        // The read path iterates `sstables.iter().rev()` and takes the first match.
+        // Appending rewritten readers at the end would give them the highest priority,
+        // causing newer versions of non-purged keys (in other SSTables) to be shadowed
+        // by older versions carried over from the rewritten file.
+        //
+        // Fix: replace each old SSTable in-place at its original position.
         {
             let mut sst_guard = self.sstables.write().await;
-            let mut updated_sstables: Vec<Arc<SstableReader>> = Vec::new();
+            let mut updated_sstables: Vec<Arc<SstableReader>> = sst_guard.clone();
 
-            for sst in sst_guard.iter() {
-                if !replaced_old_paths.iter().any(|p| p == sst.file_path()) {
-                    updated_sstables.push(Arc::clone(sst));
+            // Build a map from old path → new reader
+            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
+                std::collections::HashMap::new();
+            for old_path in &replaced_old_paths {
+                // Default to None (removal) — will be overwritten if a replacement reader exists
+                replacement_map.insert(old_path.clone(), None);
+            }
+            // Associate new readers with old paths in order
+            let mut reader_iter = new_readers.into_iter();
+            for old_path in &replaced_old_paths {
+                // If we have a replacement reader, map it; otherwise the SSTable was empty
+                // and should be removed (already None in the map)
+                if let Some(new_reader) = reader_iter.next() {
+                    replacement_map.insert(old_path.clone(), Some(new_reader));
                 }
             }
 
-            updated_sstables.extend(new_readers);
+            // Rebuild the list: replace in-place or remove
+            updated_sstables = updated_sstables
+                .into_iter()
+                .filter_map(|sst| {
+                    let path = sst.file_path().to_path_buf();
+                    if let Some(replacement) = replacement_map.remove(&path) {
+                        // This was a replaced SSTable — substitute or remove
+                        replacement
+                    } else {
+                        // Not replaced — keep as-is
+                        Some(sst)
+                    }
+                })
+                .collect();
+
             *sst_guard = updated_sstables;
         }
 

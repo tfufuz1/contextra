@@ -470,9 +470,12 @@ impl Contextra {
                 tenant_id,
             };
 
+            // N-K fix: The underlying LsmStorage keys are physically prefixed with `t:{tenant_id}:`
+            // by TenantScopedStorage. We must pass physical prefixes to purge_keys.
+            let tenant_prefix = format!("t:{}:", tenant_id.inner());
             let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
-                col_data_prefix.as_bytes().to_vec(),
-                txt_data_prefix.as_bytes().to_vec(),
+                format!("{}{}", tenant_prefix, col_data_prefix).into_bytes(),
+                format!("{}{}", tenant_prefix, txt_data_prefix).into_bytes(),
             ]);
 
             let purge_res = self
