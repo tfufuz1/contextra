@@ -1,62 +1,19 @@
 # AGENTS.md — contextra-mcp
-> Ring 4 · stable · Quelle: capabilities.toml · Spec: III.23 / K.17 / K.34 / L.7
+> Ring 4 · Produkt: EP1 · Target Spec: SOLL-Zustand v1.0 (§3.1)
 
-## 1. Zweck
-Model Context Protocol Server & Cloud Egress Gateway für Contextra.
-Exponiert Datenbank- und Agentenfunktionen über Stdio JSON-RPC 2.0 für KI-Assistenten (Claude, Cursor, Jules).
-Erzwingt strikte Sandbox-Richtlinien, Egress-Gateway-Grenzen und Quarantäne durch den PromptInjectionGuard.
+## 1. Zweck & Rolle
+Model Context Protocol Server (stdio, Single-Tenant Bindung, spawn_blocking, Tool-Klassifikation).
+Spezifikation und Invarianten richten sich nach `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`.
 
-## 2. Modul-Karte
+## 2. Invarianten & Regeln (REG-01 bis REG-17)
+- **REG-01 (Zero-Panic):** Kein unwrap, expect, panic! in Produktionscode.
+- **REG-02 (Ring-DAG):** Strikte Einhaltung der Ring-Ordnung. Keine Aufrufe höherer Ringe.
+- **REG-03 (Determinismus):** Zeit-, Zufall- und ID-Quellen ausschließlich über contextra-ports.
+- **REG-06 (Wirksamkeit):** Jedes pub-Symbol benötigt Produktionsaufrufer und End-to-End Test.
 
-| Datei / Verzeichnis | Verantwortung |
-|---|---|
-| `lib.rs` | `McpServer` Initialisierung und öffentliche Re-Exports |
-| `server.rs`, `server_dispatch.rs`, `server_tools.rs` | JSON-RPC 2.0 Handler, Dispatcher und Tool-Registrierung (`TOOL_REGISTRY`) |
-| `sandbox.rs` | `SandboxPolicy`, Timeouts und RAM-verschlüsselte `VolatileToolResult`-Verwaltung |
-| `prompt_injection/` | `PromptInjectionGuard`, `SecurityAuditLogger`, Richtlinien und Quarantäne |
-| `egress_gateway.rs`, `egress_guard.rs` | Validierung und Schutz ausgehender Netzwerk- und Cloud-Egress-Anfragen |
-| `bulk_exfiltration_detector.rs` | Erkennung und Blockade von unbefugter Massendaten-Exfiltration |
-| `io.rs`, `protocol.rs`, `routing.rs` | Stdio-Framing, JSON-RPC Nachrichtenprotokoll und Aufrufer-Routing |
-| `config.rs`, `validation.rs`, `tools_crud.rs` | Server-Konfiguration, Parameter-Schema-Validierung und CRUD-Tool-Logik |
-| `bin/contextra-mcp-server.rs` | Executable Entrypoint für Stdio-MCP-Server |
-
-## 3. Invarianten
-
-- **INV-MCP-STDIO-ONLY**: Kommuniziert ausschließlich über Stdio JSON-RPC 2.0; HTTP-Server sind aus Sicherheitsgründen verboten (ADR-010).
-  *Prüfung*: `cargo test -p contextra-mcp --lib`
-- **INV-MCP-CLASSIFY-1**: Jedes Werkzeug in `TOOL_REGISTRY` ist kategorisiert und validiert (`check_mcp_tool_classification`).
-  *Prüfung*: `cargo test -p contextra-mcp --lib`
-- **INV-MCP-SANDBOX-DEFAULT**: Schreibzugriffe (`allow_db_writes`) und Cloud-Egress (`allow_cloud_egress`) sind standardmäßig verboten.
-  *Prüfung*: `cargo test -p contextra-mcp --lib`
-- **INV-MCP-VOLATILE-CONTAINMENT**: Tool-Ausgaben über `MAX_VOLATILE_OUTPUT_BYTES` (16 MB) werden RAM-verschlüsselt in `VolatileToolResult` gehalten.
-  *Prüfung*: `cargo test -p contextra-mcp --lib`
-
-## 4. Verboten / Anti-Patterns
-
-- **Keine HTTP-Endpunkte**: Der Einbau von HTTP-Servern (`axum`, `hyper`) ist im MCP-Server ein Security-Blocker.
-- **Keine unbehandelte Executortimeouts**: Tool-Ausführungen müssen zwingend über `sandbox.execute_with_timeout(...)` geleitet werden.
-- **Kein Bypass des InjectionGuards**: Ungefilterter Import von Prompt-Inhalten ohne `PromptInjectionGuard` ist untersagt.
-
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- Multi-Threaded Tokio-Runtime steuert Stdio-I/O und Hintergrundaufgaben.
-- `McpSandbox` schützt `VolatileToolResult` über ein einzelnes, ungeschachteltes `parking_lot::Mutex`.
-- Geschachtelte Sperren über Crate-Grenzen hinweg sind strikt verboten.
-
-## 6. Verifikation
-
+## 3. Verifikation
 ```bash
 cargo xtask crate-context contextra-mcp
+cargo test -p contextra-mcp
 cargo xtask doctrine-scan --crate contextra-mcp
-cargo xtask check-unsafe-islands
-cargo test -p contextra-mcp --locked
-cargo test -p contextra-mcp --test egress_guard_fail_closed
 ```
-
-## 7. Bekannte Lücken / SOLL (EP6 & Phase 6 Roadmap)
-
-- **Behebung B1 (Fail-Closed EgressGuard)**: Zwingende EgressGuard-Prüfung vor jedem Aufruf von `contextra_cloud_query` (kein ungeschützter Egress).
-- **Behebung B4 (DeletionProofV4 Durchreichung)**: `contextra_delete_with_proof` gibt echten `DeletionProofV4` an den Aufrufer zurück statt `proof: null`.
-- **Behebung B9 (Dual-Path Eliminierung)**: Alle CRUD- und Suchoperationen delegieren strikt an `ContextraDb`; keine Re-Implementierung von Collection-Logik im MCP-Server.
-- Dynamisches Hinzufügen externer WASM-MCP-Plugins erfordert Neustart der Stdio-Session.
-

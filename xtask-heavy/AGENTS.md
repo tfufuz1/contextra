@@ -1,43 +1,19 @@
 # AGENTS.md — xtask-heavy
+> Ring Tooling · Produkt: Tooling · Target Spec: SOLL-Zustand v1.0 (§3.1)
 
-> Ring tooling · stable · Quelle: capabilities.toml
+## 1. Zweck & Rolle
+Heavyweight xtask tasks (benchmarking, loom, fuzzing, release automation).
+Spezifikation und Invarianten richten sich nach `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`.
 
-## 1. Zweck
+## 2. Invarianten & Regeln (REG-01 bis REG-17)
+- **REG-01 (Zero-Panic):** Kein unwrap, expect, panic! in Produktionscode.
+- **REG-02 (Ring-DAG):** Strikte Einhaltung der Ring-Ordnung. Keine Aufrufe höherer Ringe.
+- **REG-03 (Determinismus):** Zeit-, Zufall- und ID-Quellen ausschließlich über contextra-ports.
+- **REG-06 (Wirksamkeit):** Jedes pub-Symbol benötigt Produktionsaufrufer und End-to-End Test.
 
-Schwere xtask-Befehle mit Domain-Build-Abhängigkeit: Benchmark-Gates und Latenz-Budget-Prüfungen.
-Wird von `cargo xtask bench-gate` und `cargo xtask check-bandit-latency-budget` aufgerufen.
-Darf Domain-Crates als Cargo-Dependency haben (im Gegensatz zu Tier-0/Tier-1-Harness-Modulen).
-
-## 2. Modul-Karte
-
-| Datei | Verantwortung |
-|---|---|
-| `src/main.rs` | Entrypoint und Subcommand-Dispatcher |
-| `src/bench_gate.rs` | `bench-gate`: Benchmark-Ergebnisse gegen Toleranz-Schwellenwert prüfen |
-| `src/check_bandit_latency_budget.rs` | `check-bandit-latency-budget`: Bandit-Routing-Latenz-Budget-Validierung |
-
-## 3. Invarianten
-
-- **Tier-2-Constraint:** Darf Domain-Crates importieren, aber KEINE neuen xtask-Registry-Einträge ohne Eintrag in `xtask/registry.toml`.
-- **Kein Gate-Weakening:** Toleranz-Schwellenwerte (`--tolerance`) dürfen nicht ohne ADR abgesenkt werden.
-
-## 4. Verboten / Anti-Patterns
-
-- Keine Tier-0/1-Logik in diesen Build-abhängigen Modulen (Tier-0/1-Analyse → `xtask/src/harness/`).
-- Kein direkter `std::process::exit` ohne Fehlermeldung.
-
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- Rein synchrone Ausführung. Keine Async-Runtime.
-
-## 6. Verifikation
-
+## 3. Verifikation
 ```bash
-cargo xtask bench-gate --tolerance 0.05
-cargo xtask check-bandit-latency-budget
-cargo xtask check-agents-integrity
+cargo xtask crate-context xtask-heavy
+cargo test -p xtask-heavy
+cargo xtask doctrine-scan --crate xtask-heavy
 ```
-
-## 7. Bekannte Lücken / SOLL
-
-- Benchmark-Baseline-Aktualisierung (`ratchet`) ist über `cargo xtask ratchet` im Haupt-xtask geregelt.

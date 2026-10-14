@@ -1,40 +1,19 @@
 # AGENTS.md — contextra-durable-fs
-> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.8 · Stand: 2026-10-13
+> Ring 0 · Produkt: EP1 · Target Spec: SOLL-Zustand v1.0 (§3.1)
 
-## 1. Zweck
-Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`fsync`/`fdatasync`, atomare Ersetzung, sichere Löschung) für Contextra-Komponenten.
+## 1. Zweck & Rolle
+Durable Filesystem-Operationen, fsync-Disziplin, scrub_and_remove, sync_dir, Journaling.
+Spezifikation und Invarianten richten sich nach `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`.
 
-## 2. Modul-Karte
-| Datei/Verzeichnis | Verantwortung |
-|---|---|
-| `src/lib.rs` | Dateisystem-Hilfsfunktionen für atomares Ersetzen (`atomic_replace`) und dauerhaftes Löschen (`durable_remove`) |
-| `src/fault_injector.rs` | Trait `FaultInjector` und Zero-Cost `NoFault` Injektor für I/O-Fehlerinjektion |
+## 2. Invarianten & Regeln (REG-01 bis REG-17)
+- **REG-01 (Zero-Panic):** Kein unwrap, expect, panic! in Produktionscode.
+- **REG-02 (Ring-DAG):** Strikte Einhaltung der Ring-Ordnung. Keine Aufrufe höherer Ringe.
+- **REG-03 (Determinismus):** Zeit-, Zufall- und ID-Quellen ausschließlich über contextra-ports.
+- **REG-06 (Wirksamkeit):** Jedes pub-Symbol benötigt Produktionsaufrufer und End-to-End Test.
 
-## 3. Invarianten
-
-- `INV-DURABLE-FS-SAFE`: Rein sichere Dateisystem-Verwaltung; Fehler werden deterministisch als `std::io::Result` propagiert.
-- `INV-DURABLE-FS-NO-PANIC`: Keine `panic!`, `unwrap()`, oder `expect()` in Produktions-Dateisystem-Pfaden.
-- `INV-FSYNC-1`: Handle-Poisoning bei fsync-Fehlern in `DurableHandle`; verhindert weitere Flush- oder Schreibzugriffe nach I/O-Fehlern.
-- `INV-ENOSPC-1`: Fail-closed ENOSPC-/Disk-Full- und I/O-Fehlerbehandlung bei Schreiben, fsync, rename und Verzeichnis-Sync; saubere Fehlerpropagation via `std::io::Error` ohne Panics.
-
-## 4. Verboten / Anti-Patterns
-
-- Nicht-atomares Überschreiben von Daten-Dateien ohne `.tmp` Staging.
-- Ignorieren von Dateisystem-Flush-Fehlern.
-
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- Die Dateisystem-Operationen laufen synchron ab.
-- Lock-Sperren werden auf Aufrufer-Ebene in den jeweiligen Storage-/Index-Crates gehalten.
-
-## 6. Verifikation
-
+## 3. Verifikation
 ```bash
+cargo xtask crate-context contextra-durable-fs
 cargo test -p contextra-durable-fs
-cargo xtask check-agents-integrity
-cargo xtask check-unsafe-islands
+cargo xtask doctrine-scan --crate contextra-durable-fs
 ```
-
-## 7. Bekannte Lücken / SOLL
-
-- Keine.

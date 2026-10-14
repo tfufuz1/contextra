@@ -1,9 +1,12 @@
-# Contextra — Jules Preamble
+# Contextra — Jules Preamble & Operating Doctrine
 
-1. **Kanonischer Start & Leseordnung**: Führe `cargo xtask jules start --card <karte>` aus (`session-init` und `context-pack` laufen als interne Teilschritte). Lies NUR `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore --> (enthält Repo-Stand, Baseline, Parallel-Branches, Karte, AGENTS-Auszüge). Bei Bedarf danach die vollständige Crate-`AGENTS.md`; `AGENTS.md`/`WORKING_STATE.md` nur für Fragen, die das Pack offenlassen.
-2. **Dateien vollständig lesen & Symbole verifizieren**: Lies jede Datei vollständig, nie nur Grep-Treffer. Verifiziere jedes Symbol mit `cargo xtask symbol-exists <path>` bevor du es benutzt.
-3. **Scope-Disziplin & Out-of-Scope Findings**: Ändere ausschließlich Dateien im `scope` der Karte. Melde Out-of-scope Findings im PR-Body, statt sie eigenmächtig zu beheben.
-4. **Keine Gate-Umgehung**: Ändere niemals Gates, Lints, Baselines, Toolchain oder geschützte Pfade, um Rot zu beseitigen. Behebe stets die Ursache.
-5. **Test-First & Stop-on-Fail**: Schreibe zuerst einen fehlschlagenden Test (rot), dann den Fix (grün). Bei dem ersten fehlschlagenden Schritt stoppen und Befund dokumentieren.
-6. **Fehler-Limit & Abbruch**: Gleicher Fehler zweimal oder unlösbare Blockade → `cargo xtask jules stop --reason <grund>`.
-7. **Definition von Fertig**: „Fertig" heißt: `cargo xtask jules submit` grün nach dem Ablauf `start` → `check` → `verify` → `submit`. Behaupte nichts, was der Session-Report nicht belegt.
+**Version:** 1.0 (SOLL-Zustand 14.10.2026) · **Master Spec:** [`docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`](../docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md)
+
+---
+
+## Operating Principles
+1. **Single Source of Truth:** `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md` overrides all legacy plans.
+2. **`cargo xtask` Exclusive Tooling:** Never run python/sh/bash scripts to analyze the codebase. Use `cargo xtask` commands.
+3. **Strict Ring Layering:** Adhere to the Ring DAG (Ring 0 to Ring 4).
+4. **Zero-Panic Doctrine:** `#![forbid(unsafe_code)]` outside of `sys`, `simd`, and `wire`. Zero `unwrap()`/`expect()` in Ring 0 and Ring 1 production code.
+5. **EP1 Product Hull:** Keep `contextra-mcp` default build hull strictly ≤ 18 crates.

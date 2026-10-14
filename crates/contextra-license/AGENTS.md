@@ -1,48 +1,19 @@
 # AGENTS.md — contextra-license
-> Ring 4 · experimental · Quelle: capabilities.toml · Spec: III.20 / K.16
+> Ring 4 · Produkt: EP6 · Target Spec: SOLL-Zustand v1.0 (§3.1)
 
-## 1. Zweck
-Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe (`Fast`, `Sovereign`, `Compliance`).
-Validiert kryptographisch signierte Lizenz-Payloads (Ed25519) und stellt Implementierungen des `LicenseGate`-Traits bereit.
-Gewährleistet den lizenzfreien Betrieb im Open-Source-Fast-Ring, während höherwertige Enterprise-Ringe geschützt werden.
+## 1. Zweck & Rolle
+Lizenz- & Aktivierungsprüfung (LicenseGate).
+Spezifikation und Invarianten richten sich nach `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`.
 
-## 2. Modul-Karte
+## 2. Invarianten & Regeln (REG-01 bis REG-17)
+- **REG-01 (Zero-Panic):** Kein unwrap, expect, panic! in Produktionscode.
+- **REG-02 (Ring-DAG):** Strikte Einhaltung der Ring-Ordnung. Keine Aufrufe höherer Ringe.
+- **REG-03 (Determinismus):** Zeit-, Zufall- und ID-Quellen ausschließlich über contextra-ports.
+- **REG-06 (Wirksamkeit):** Jedes pub-Symbol benötigt Produktionsaufrufer und End-to-End Test.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | Öffentliche Re-Exports (`SignedLicenseGate`, `OpenFastGate`) und Modul-Dokumentation |
-| `signed_gate.rs` | Ed25519-basierte Signaturprüfung von `LicensePayload` mit Bincode-Deserialisierung |
-
-## 3. Invarianten
-
-- **INV-LICENSE-2**: Der Fast-Ring ist ohne Lizenzschlüssel bedingungslos gültig (`OpenFastGate` / Fast Ring Bypass in `SignedLicenseGate::check_ring`).
-  *Prüfung*: `cargo test -p contextra-license --lib`
-- **INV-LICENSE-PAYLOAD-STRICT**: Deserialisierung verwendet `bincode::options().with_fixint_encoding().reject_trailing_bytes()`, um manipulierte Payloads abzulehnen.
-  *Prüfung*: `cargo test -p contextra-license --lib`
-- **INV-LICENSE-CONSTANT-TIME**: Installations-ID Hash-Vergleich erfolgt ohne Timing-Leaks.
-  *Prüfung*: `cargo test -p contextra-license --lib`
-
-## 4. Verboten / Anti-Patterns
-
-- **Keine unbeabsichtigte Fehlerlecks**: Bei ungültigen Lizenzen keine Detailgründe an unvollständige Aufrufer weitergeben, die Aufschluss über Aktivierungsdetails geben.
-- **Keine variablen Bincode-Header**: Bincode-Parsing darf niemals nachgelagerte Byte-Reste akzeptieren (`reject_trailing_bytes`).
-- **Keine Unsafe-Operationen**: `#![forbid(unsafe_code)]` ist im gesamten Crate strikt erzwungen.
-
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- `SignedLicenseGate` ist immutable und FFI-/Thread-sicher (`Send + Sync`).
-- Keine internen Mutexes oder Sperren vorhanden; Prüfungen sind rein zustandslos bzw. schreibgeschützt.
-- Zeitstempelvergleiche nutzen die injizierte `Clock`-Abstraktion oder Systemzeit ohne zeitkritische Blockaden.
-
-## 6. Verifikation
-
+## 3. Verifikation
 ```bash
+cargo xtask crate-context contextra-license
 cargo test -p contextra-license
-cargo check -p contextra-license
-cargo xtask check-agents-integrity
 cargo xtask doctrine-scan --crate contextra-license
 ```
-
-## 7. Bekannte Lücken / SOLL
-
-- Offline-Aktivierungstoken-Verlängerung ohne Systemuhr-Abweichung noch nicht als automatisches Dynamic-Renewal implementiert.

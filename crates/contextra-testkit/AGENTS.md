@@ -1,44 +1,19 @@
 # AGENTS.md — contextra-testkit
-> Ring Tooling · stable · Quelle: capabilities.toml · Spec: K.28, §0, §3, §4, §20
+> Ring Tooling · Produkt: Tooling · Target Spec: SOLL-Zustand v1.0 (§3.1)
 
-## 1. Zweck
+## 1. Zweck & Rolle
+Test Fixtures, ManualClock, SeededRng, FaultVfs, Mock Engines, Chaos Harness.
+Spezifikation und Invarianten richten sich nach `docs/SOLL_ZUSTAND_SPEZIFIKATION_1.0.md`.
 
-`contextra-testkit` stellt Determinismus- und Testinfrastruktur bereit (`ManualClock` für Zeit-Injektion gemäß P28, `FaultVfs` für Crash- und I/O-Fehlerinjektion, `InMemoryStorageEngine` für speicherbasierte Tests und `ReferenceModel`).
-Die Crate dient ausschließlich als Testinfrastruktur.
+## 2. Invarianten & Regeln (REG-01 bis REG-17)
+- **REG-01 (Zero-Panic):** Kein unwrap, expect, panic! in Produktionscode.
+- **REG-02 (Ring-DAG):** Strikte Einhaltung der Ring-Ordnung. Keine Aufrufe höherer Ringe.
+- **REG-03 (Determinismus):** Zeit-, Zufall- und ID-Quellen ausschließlich über contextra-ports.
+- **REG-06 (Wirksamkeit):** Jedes pub-Symbol benötigt Produktionsaufrufer und End-to-End Test.
 
-## 2. Modul-Karte
-
-| Datei / Verzeichnis | Verantwortung |
-| :--- | :--- |
-| `src/lib.rs` | Re-Exporte der Test-Utilities (`ManualClock`, `FaultVfs`, `InMemoryStorageEngine`, `ReferenceModel`). |
-| `src/manual_clock.rs` | `ManualClock` zur exakten manuellen Zeitsteuerung in Tests. |
-| `src/fault_vfs.rs` | `FaultVfs` für Fehlersimulation (Bitrot, Partial Writes, Sync Failures, Crash Simulation). |
-| `src/in_memory_store.rs` | `InMemoryStorageEngine` für Null-I/O In-Memory Transaktions- und Storage-Testing. |
-| `src/reference_model.rs` | Referenzmodell zur Validierung von Invarianten und Resultaten gegen eine vereinfachte Vergleichsimplementierung. |
-
-## 3. Invarianten
-
-- **INV-TOOLING-ONLY:** `contextra-testkit` darf NIEMALS als reguläre Abhängigkeit (`[dependencies]`) einer Produktions-Crate eingebunden werden, sondern AUSSCHLIESSLICH als Test-Abhängigkeit (`[dev-dependencies]`).
-- **INV-DETERMINISTIC-TIME:** `ManualClock` gewährt nanosekundengenaue deterministische Zeitfortschaltung über `.advance_nanos()` / `.advance_secs()`.
-
-## 4. Verboten / Anti-Patterns
-
-- **VERBOTEN:** Einbindung von `contextra-testkit` in Produktions-Binaries oder Produktions-Bibliotheken (`Cargo.toml` `[dependencies]`).
-- **VERBOTEN:** Verwendung von `InMemoryStorageEngine` für Tests, die explizit SSI-Tracking erwarten (`supports_ssi_tracking()` gibt `false` zurück).
-
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- Thread-safe für parallele Testausführung durch `parking_lot::{Mutex, RwLock}`.
-- Frei von Async-Runtimes im Crate-Kern; nutzt Tokio nur in Dev-Dependencies / Tests.
-
-## 6. Verifikation
-
+## 3. Verifikation
 ```bash
+cargo xtask crate-context contextra-testkit
 cargo test -p contextra-testkit
-cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-testkit
 ```
-
-## 7. Bekannte Lücken / SOLL
-
-- `InMemoryStorageEngine` unterstützt beabsichtigt kein SSI-Tracking, um einfachen Unit-Tests ohne Lock-Overhead zu dienen.
-
