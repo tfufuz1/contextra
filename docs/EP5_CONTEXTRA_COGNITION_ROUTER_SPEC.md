@@ -5,10 +5,10 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für Kognition, Routing & Agenten  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Adaption & Bandits):** [`contextra-adapt`](file:///home/freddy/Projekte/contextra/crates/contextra-adapt)  
-- **Ring 3 (Routing & Kaskaden):** [`contextra-router`](file:///home/freddy/Projekte/contextra/crates/contextra-router)  
-- **Ring 3 (Kognition & Konsolidierung):** [`contextra-cognition`](file:///home/freddy/Projekte/contextra/crates/contextra-cognition)  
-- **Ring 3 (Agenten & Event-Loop):** [`contextra-agent`](file:///home/freddy/Projekte/contextra/crates/contextra-agent)
+- **Ring 0 (Adaption & Bandits):** [`contextra-adapt`](../crates/contextra-adapt)
+- **Ring 3 (Routing & Kaskaden):** [`contextra-router`](../crates/contextra-router)
+- **Ring 3 (Kognition & Konsolidierung):** [`contextra-cognition`](../crates/contextra-cognition)
+- **Ring 3 (Agenten & Event-Loop):** [`contextra-agent`](../crates/contextra-agent)
 
 ---
 
@@ -28,8 +28,8 @@ Contextra Cognition & Adaptive Routing (EP5) umfasst alle autonomen Lern-, Regel
 ### 2.1 Komponente 1: Kapselung von `AgentStatus` & Eliminierung von `AgentEngine`
 
 #### Problem
-1. **AGT-STATUS-001:** `pub status: AgentStatus` in [`crates/contextra-agent/src/context.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-agent/src/context.rs) erlaubte unkontrollierte Statusänderungen.
-2. **Orphan-Symbol:** `AgentEngine` in [`crates/contextra-agent/src/context.rs:223`](file:///home/freddy/Projekte/contextra/crates/contextra-agent/src/context.rs#L223) war eine verwaiste Hüllstruktur ohne Konsumenten.
+1. **AGT-STATUS-001:** `pub status: AgentStatus` in [`crates/contextra-agent/src/context.rs`](../crates/contextra-agent/src/context.rs) erlaubte unkontrollierte Statusänderungen.
+2. **Orphan-Symbol:** `AgentEngine` in [`crates/contextra-agent/src/context.rs:223`](../crates/contextra-agent/src/context.rs#L223) war eine verwaiste Hüllstruktur ohne Konsumenten.
 
 #### Datei: `crates/contextra-agent/src/context.rs`
 **IST-Zustand (Auszug):**
@@ -108,7 +108,7 @@ impl AgentContext {
 ### 2.2 Komponente 2: Router-Wiring & Clock-Injektion in `ContextraBuilder` (Behebung N-O)
 
 #### Problem
-In [`crates/contextra/src/builder.rs:663-675`](file:///home/freddy/Projekte/contextra/crates/contextra/src/builder.rs#L663-L675) scheiterte der Workspace-Build mit `--features router`, weil `clock` als `Option<Arc<dyn Clock>>` vorlag, `RouterWiringDeps` jedoch ein konkretes `Arc<dyn Clock>` verlangte.
+In [`crates/contextra/src/builder.rs:663-675`](../crates/contextra/src/builder.rs#L663-L675) scheiterte der Workspace-Build mit `--features router`, weil `clock` als `Option<Arc<dyn Clock>>` vorlag, `RouterWiringDeps` jedoch ein konkretes `Arc<dyn Clock>` verlangte.
 
 #### Datei: `crates/contextra/src/builder.rs`
 **SOLL-Blueprint:**

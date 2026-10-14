@@ -5,9 +5,9 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für lokale Inferenz, Reranking & KV-Cache  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 2 (Inferenz-Provider):** [`contextra-infer-candle`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-candle), [`contextra-infer-onnx`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-onnx), [`contextra-infer-ollama`](file:///home/freddy/Projekte/contextra/crates/contextra-infer-ollama)  
-- **Ring 1 / Persistenz-nah:** [`contextra-kvcache`](file:///home/freddy/Projekte/contextra/crates/contextra-kvcache)  
-- **Ring 0 (Port-Verträge):** [`contextra-ports`](file:///home/freddy/Projekte/contextra/crates/contextra-ports) (Module `src/embedding.rs`, `src/attention.rs`, `src/reranker.rs`, `src/kv_bridge_port.rs`)
+- **Ring 2 (Inferenz-Provider):** [`contextra-infer-candle`](../crates/contextra-infer-candle), [`contextra-infer-onnx`](../crates/contextra-infer-onnx), [`contextra-infer-ollama`](../crates/contextra-infer-ollama)
+- **Ring 1 / Persistenz-nah:** [`contextra-kvcache`](../crates/contextra-kvcache)
+- **Ring 0 (Port-Verträge):** [`contextra-ports`](../crates/contextra-ports) (Module `src/embedding.rs`, `src/attention.rs`, `src/reranker.rs`, `src/kv_bridge_port.rs`)
 
 ---
 
@@ -27,7 +27,7 @@ Contextra Inference (EP4) kapselt alle Machine-Learning-Ausführungen (lokale Em
 ### 2.1 Komponente 1: Port-Bereinigung & `MockEmbedder` Gating
 
 #### Problem
-In [`crates/contextra-ports/src/embedding.rs:171`](file:///home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs#L171) war `MockEmbedder` als `pub struct` deklariert, ohne dass ein Test-Gate existierte. Dadurch verblieb Test-Mock-Code im Release-Artefakt von Ring 0 (`AUDIT_composition-root_DEEP_2026-10-13.md`).
+In [`crates/contextra-ports/src/embedding.rs:171`](../crates/contextra-ports/src/embedding.rs#L171) war `MockEmbedder` als `pub struct` deklariert, ohne dass ein Test-Gate existierte. Dadurch verblieb Test-Mock-Code im Release-Artefakt von Ring 0 (`AUDIT_composition-root_DEEP_2026-10-13.md`).
 
 #### Datei: `crates/contextra-ports/src/embedding.rs`
 **IST-Zustand (Zeilen 170–195):**

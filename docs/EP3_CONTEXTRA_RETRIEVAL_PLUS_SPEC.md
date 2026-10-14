@@ -5,9 +5,9 @@
 **Autor:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche, normative Implementierungsanweisung für Wissensgraphen, PPR & PathRAG  
 **Geltungsbereich (Disjunktive Crates):**  
-- **Ring 0 (Graph Foundation):** [`contextra-graph`](file:///home/freddy/Projekte/contextra/crates/contextra-graph)  
-- **Ring 3 (Orchestration & Extraktion):** [`contextra-engine`](file:///home/freddy/Projekte/contextra/crates/contextra-engine) (Module `src/collection/relate.rs`, `src/extraction/`, `src/no_graph_stubs.rs`)  
-- **Ring 4 (MCP Graph Protocol):** [`contextra-mcp`](file:///home/freddy/Projekte/contextra/crates/contextra-mcp) (Module `src/explain.rs`, `src/tools_crud.rs`)
+- **Ring 0 (Graph Foundation):** [`contextra-graph`](../crates/contextra-graph)
+- **Ring 3 (Orchestration & Extraktion):** [`contextra-engine`](../crates/contextra-engine) (Module `src/collection/relate.rs`, `src/extraction/`, `src/no_graph_stubs.rs`)
+- **Ring 4 (MCP Graph Protocol):** [`contextra-mcp`](../crates/contextra-mcp) (Module `src/explain.rs`, `src/tools_crud.rs`)
 
 ---
 
