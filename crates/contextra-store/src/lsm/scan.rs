@@ -39,7 +39,7 @@ pub(super) fn check_in_range(
 
 impl LsmStorage {
     /// Evaluates detailed traversal metrics (evaluated_sstables, bloom_passes, range_passes, block_reads, found) for point lookups.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
+    #[doc(hidden)]
     pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {
         self.compaction_engine.record_read_op();
         let sstables = self.sstables.read().await;
@@ -96,6 +96,8 @@ impl LsmStorage {
         let sstables = self.sstables.read().await;
 
         let last_tx = self.last_committed_tx.load(Ordering::Acquire);
+        let max_accumulator_limit = contextra_core::MAX_SCAN_MERGE_ACCUMULATOR
+            .saturating_mul(self.config.max_internal_merge_factor);
 
         if let SstableScanMode::Range(s, e) = mode {
             if !is_valid_range_bounds(s, e) {
@@ -154,11 +156,11 @@ impl LsmStorage {
                     if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (v, seq);
                     }
-                    if check_accumulator && map.len() > contextra_core::MAX_SCAN_MERGE_ACCUMULATOR {
+                    if check_accumulator && map.len() > max_accumulator_limit {
                         return Err(ContextraError::LimitExceeded {
-                            limit: contextra_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                            limit: max_accumulator_limit,
                             context: format!(
-                                "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                                "{context_name}: internal merge accumulator exceeded ({max_accumulator_limit}) — range too wide, narrow the scan range"
                             ),
                         });
                     }
@@ -195,11 +197,11 @@ impl LsmStorage {
         // 2. Immutable memtables (older -> newer)
         for mt in &state.immutable_memtables {
             scan_memtable(mt, &mut map);
-            if check_accumulator && map.len() > contextra_core::MAX_SCAN_MERGE_ACCUMULATOR {
+            if check_accumulator && map.len() > max_accumulator_limit {
                 return Err(ContextraError::LimitExceeded {
-                    limit: contextra_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                    limit: max_accumulator_limit,
                     context: format!(
-                        "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                        "{context_name}: internal merge accumulator exceeded ({max_accumulator_limit}) — range too wide, narrow the scan range"
                     ),
                 });
             }
@@ -207,11 +209,11 @@ impl LsmStorage {
 
         // 3. Active memtable
         scan_memtable(&state.memtable, &mut map);
-        if check_accumulator && map.len() > contextra_core::MAX_SCAN_MERGE_ACCUMULATOR {
+        if check_accumulator && map.len() > max_accumulator_limit {
             return Err(ContextraError::LimitExceeded {
-                limit: contextra_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                limit: max_accumulator_limit,
                 context: format!(
-                    "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                    "{context_name}: internal merge accumulator exceeded ({max_accumulator_limit}) — range too wide, narrow the scan range"
                 ),
             });
         }

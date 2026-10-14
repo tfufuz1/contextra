@@ -49,8 +49,18 @@ impl LsmStorage {
         self.cleanup_intent_locks_where(|t| tx_ids.contains(&t));
     }
 
-    /// Suspends execution briefly if memory usage exceeds 80% to apply backpressure.
+    /// Suspends execution briefly if system pressure is elevated/critical or memory usage exceeds 80% to apply backpressure.
     pub(super) async fn apply_backpressure(&self) {
+        let level = self.pressure_rx.borrow().pressure_level;
+        match level {
+            crate::system_pressure::PressureLevel::Normal => {}
+            crate::system_pressure::PressureLevel::Elevated => {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            crate::system_pressure::PressureLevel::Critical => {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        }
         if self.budget.memory_used()
             >= (self.config.max_ram_mb as f64 * 1024.0 * 1024.0 * 0.80) as u64
         {

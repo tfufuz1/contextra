@@ -84,7 +84,6 @@ impl LsmStorage {
     }
 
     /// Opens or recovers an LSM storage instance with the given configuration and a `MergeOperator`.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn open_with_merge_operator(
         config: LsmConfig,
         merge_operator: Arc<dyn MergeOperator>,
@@ -93,7 +92,6 @@ impl LsmStorage {
     }
 
     /// Returns a watch receiver for monitoring system pressure levels.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn pressure_receiver(
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
@@ -125,7 +123,6 @@ impl LsmStorage {
     }
 
     /// Spawns a background task tracked by this storage instance.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn spawn_tracked<F>(&self, future: F)
     where
         F: std::future::Future<Output = ()> + Send + 'static,
@@ -287,11 +284,23 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Sets the `wal_queue_depth` value for testing backpressure transitions.
+    #[doc(hidden)]
+    pub fn set_wal_queue_depth_for_test(&self, depth: usize) {
+        self.wal_queue_depth
+            .store(depth, std::sync::atomic::Ordering::SeqCst);
+    }
+
     /// Returns the current `segment_counter` value for testing verification.
     #[doc(hidden)]
     pub fn segment_counter_for_test(&self) -> u64 {
         self.segment_counter
             .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    #[doc(hidden)]
+    pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
+        Arc::clone(&self.compaction_engine)
     }
 
     #[doc(hidden)]
@@ -377,7 +386,6 @@ impl LsmStorage {
     /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
     /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
     /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn has_pending_legacy_wal_migration(&self) -> Result<bool> {
         Self::has_pending_legacy_wal_migration_path(&self.config.path).await
     }
@@ -389,7 +397,6 @@ impl LsmStorage {
     /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
     /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
     /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub async fn migrate_legacy_wal_keys(
         config: &LsmConfig,
         clock: Arc<dyn contextra_ports::Clock>,

@@ -16,7 +16,7 @@ pub enum DisposePolicy {
     RequireScrub,
     /// Refusal permits falling back to durable removal without zero-overwriting.
     AllowRemoveUnscrubbed,
-    /// Scrubbing disabled, fall back to standard durable removal.
+    /// Secure overwrite disabled, standard durable removal.
     Disabled,
 }
 
@@ -35,6 +35,14 @@ pub struct OrxDisposeReport {
     pub residual_risk: Vec<(PathBuf, ScrubRefusal)>,
 }
 
+/// Disposes obsolete files durably using an explicit [`DisposePolicy`].
+///
+/// Records paths in `PendingDeleteJournal` before removal.
+/// Attempts `scrub_if_safe` if `secure_delete` is `true`.
+/// If scrubbing is refused:
+/// - Under [`DisposePolicy::RequireScrub`], returns an I/O error and keeps the file in the journal.
+/// - Under [`DisposePolicy::AllowRemoveUnscrubbed`], falls back to standard durable removal,
+///   records refusal in `residual_risk`, and increments `removed_unscrubbed`.
 /// Disposes obsolete files durably using a specified [`DisposePolicy`].
 ///
 /// Records paths in `PendingDeleteJournal` before removal.
