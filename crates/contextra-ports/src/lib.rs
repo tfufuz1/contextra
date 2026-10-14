@@ -111,6 +111,8 @@ mod dyn_safety {
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
+    fn _assert_dyn_entropy_rng(_: Option<&dyn EntropyRng>) {}
+    fn _assert_dyn_seeded_rng(_: Option<&dyn SeededRng>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
     fn _assert_dyn_id_generator(_: Option<&dyn IdGenerator>) {}
@@ -135,6 +137,8 @@ mod dyn_safety {
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
+        _assert_dyn_entropy_rng(None);
+        _assert_dyn_seeded_rng(None);
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
         _assert_dyn_id_generator(None);
