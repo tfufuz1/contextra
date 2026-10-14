@@ -143,6 +143,7 @@ fn test_h9_relate_n_ary_participant_limits_boundary() {
         allow_code_execution: false,
         allow_cloud_egress: true,
         max_execution_ms: 5000,
+        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = McpSandbox::new(write_policy).expect("sandbox init");
 

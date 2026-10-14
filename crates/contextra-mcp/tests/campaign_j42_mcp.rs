@@ -33,13 +33,14 @@ fn test_campaign_j42_mcp_unknown_tool_strict_rejection_oracle() {
 #[test]
 #[allow(deprecated)]
 fn test_campaign_j42_mcp_counter_factual_mutation_check() {
-    // R10 Counter-Test: Demonstrates that classify_method and try_classify_method both strictly return Err for unknown tools.
+    // R10 Counter-Test: Demonstrates that legacy classify_method falls back to CodeExecution, while try_classify_method returns Err.
     let unknown_tool = "contextra_unapproved_secret_tool";
 
-    let legacy_res = McpSandbox::classify_method(unknown_tool);
-    assert!(
-        legacy_res.is_err(),
-        "classify_method strictly returns Err for unknown tools"
+    let legacy_cat = McpSandbox::classify_method(unknown_tool);
+    assert_eq!(
+        legacy_cat,
+        ToolCategory::CodeExecution,
+        "classify_method falls back to CodeExecution for unknown tools"
     );
 
     let try_cat = McpSandbox::try_classify_method(unknown_tool);

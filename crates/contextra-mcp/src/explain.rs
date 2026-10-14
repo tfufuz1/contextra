@@ -155,6 +155,7 @@ mod tests {
             allow_code_execution: true,
             allow_cloud_egress: false,
             max_execution_ms: 5_000,
+            sidecar_limits: crate::sandbox::SidecarLimits::default(),
         };
         let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
         let server = Arc::new(McpServer::with_sandbox(Arc::new(db), embedder, sandbox));

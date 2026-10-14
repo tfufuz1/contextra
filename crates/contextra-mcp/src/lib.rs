@@ -26,6 +26,7 @@
 pub mod bulk_exfiltration_detector;
 pub mod cli;
 pub mod config;
+pub mod db_open;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod explain;
@@ -54,6 +55,7 @@ pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
 pub use config::*;
+pub use db_open::open_db_from_env;
 
 pub use egress_gateway::{
     CloudQueryRequest, CloudQueryResponse, DefaultEgressClassifier, EgressClassification,
