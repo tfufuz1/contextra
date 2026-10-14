@@ -72,9 +72,10 @@ pub fn run_tag_health_impl(
 
         // Check concern 1: FileModifiedAfterTag
         if is_line_untouched {
+            let tag_since_arg = format!("--since={}", item.tag_ts);
             let file_log = Command::new("git")
                 .current_dir(root)
-                .args(["log", &since_arg, "--format=%H|%cI", "--", &item.file_path])
+                .args(["log", &tag_since_arg, "--format=%H|%cI", "--", &item.file_path])
                 .output();
 
             if let Ok(fl_out) = file_log {

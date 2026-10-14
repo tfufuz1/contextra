@@ -471,7 +471,6 @@ owner_tier = "agent-gate"
 summary = "Erzeugt den kartenspezifischen Abschnitt des CONTEXT_PACK und prüft dessen Frische"
 blocking = false
 phase = "Phase 0"
-planned = true
 
 [[commands]]
 name = "context-pack"
@@ -512,6 +511,13 @@ phase = "Phase 0"
 name = "dependency-graph-audit"
 owner_tier = "tool"
 summary = "Harness Modul: Zyklenerkennung und Ring-Distanz-Report im Crate-Abhängigkeitsgraphen (dependency-graph-audit)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "detect-silent-reverts"
+owner_tier = "ci-gate"
+summary = "Harness Modul zur Erkennung von stiller Rückgängigmachung von Code (detect-silent-reverts)."
 blocking = false
 phase = "Phase 0"
 
@@ -568,6 +574,13 @@ phase = "Phase 0"
 name = "fast-diff-lint"
 owner_tier = "tool"
 summary = "Harness Modul: build-freier Diff-Scope-Linter für die häufigsten Doktrin-Verstöße (fast-diff-lint)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "find-unwired-gaps"
+owner_tier = "tool"
+summary = "Harness Modul zur Lücken- und Verdrahtungsanalyse im Workspace (find-unwired-gaps)."
 blocking = false
 phase = "Phase 0"
 
@@ -694,6 +707,13 @@ phase = "Phase 0"
 name = "generate-markers"
 owner_tier = "generator"
 summary = "Generiert automatische Marker-Kommentare im Code."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-interface-spec"
+owner_tier = "tool"
+summary = "Harness Modul zur Erzeugung der Schnittstellenspezifikation (generate-interface-spec)."
 blocking = false
 phase = "Phase 0"
 

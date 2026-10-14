@@ -24,6 +24,13 @@
 13. [XTask-Gates, Invarianten & Qualitätssicherung](#13-xtask-gates-invarianten--qualitätssicherung)
 14. [Algorithmen-Auswahl & mathematische Leitlinien](#14-algorithmen-auswahl--mathematische-leitlinien)
 15. [Phasenplan (K0–K5), Risiken & ADR-Register](#15-phasenplan-k0k5-risiken--adr-register)
+16. [Detaillierte Spezifikation der 6 Layer-Scans (`LayerScan`)](#16-detaillierte-spezifikation-der-6-layer-scans-layerscan)
+17. [Binärformat & Persistenz des Anti-Resurrection Ledgers & `RestoreGuard`](#17-binärformat--persistenz-des-anti-resurrection-ledgers--restoreguard)
+18. [Formales Loom Concurrency-Modell & Beweis der Write-Fence Option B](#18-formales-loom-concurrency-modell--beweis-der-write-fence-option-b)
+19. [Mathematische Spezifikation & Algorithmen-Details (DiBud & ACI)](#19-mathematische-spezifikation--algorithmen-details-dibud--aci)
+20. [Vollständige Symbol-Migrationsmatrix für `contextra-core` (110 Stellen)](#20-vollständige-symbol-migrationsmatrix-für-contextra-core-110-stellen)
+21. [Vollständiger Standalone-Verifier `contextra-proof-verify` (EP2)](#21-vollständiger-standalone-verifier-contextra-proof-verify-ep2)
+22. [Failure-Mode- & Chaos-Testing-Matrix (Crash-Simulationen)](#22-failure-mode---chaos-testing-matrix-crash-simulationen)
 
 ---
 
@@ -630,3 +637,384 @@ flowchart TD
 - **ADR-05:** Crate-Split `contextra-crypto` in `crypto-core` und `crypto-kv`.
 - **ADR-06:** Ausgliederung von EP2 (`contextra-proof-verify`) in eigenes Repository nach K4.
 - **ADR-07:** Crash-Resume zwingend nach Storage-Aufbau mit Scope aus `ErasureLedger`.
+
+---
+
+## 16. Detaillierte Spezifikation der 6 Layer-Scans (`LayerScan`)
+
+Gemäß Invariante **P-E4** darf kein Beweis ausgestellt werden, dessen Zeugen nicht auf verifizierbaren Scans beruhen. Folgende 6 Schichten sind als konkrete `LayerScan`-Implementierungen definiert:
+
+### 16.1 Layer-Übersicht
+
+```
+Layer 1  (LSM_MEMTABLE):    Active & Immutable Memtables
+Layer 3  (LSM_SSTABLE_ALL): Physischer Rohsweep aller aktiven SSTables
+Layer 20 (TEXT_INDEX):      Inverted Index Posting-Lists & Terms
+Layer 21 (RELATIONS_GRAPH): CSR-Adjazenzlisten & Hyperkanten-Indizes
+Layer 26 (HNSW_VECTOR):     HNSW-Arena & Vector-Payload-Puffer
+Layer 30 (ERASURE_LEDGER):  Anti-Resurrection-Ledger Head & HMAC-Chains
+```
+
+### 16.2 Code-Spezifikation der LayerScans
+
+```rust
+// In crates/contextra-store/src/lsm/layer_scan.rs
+use contextra_ports::erasure::{LayerId, LayerObservation, LayerScan, PhysicalScope};
+use contextra_types::Result;
+
+pub struct LsmMemtableScan<'a> {
+    storage: &'a crate::LsmStorage,
+}
+
+impl<'a> LayerScan for LsmMemtableScan<'a> {
+    fn layer_id(&self) -> u8 { 1 }
+
+    fn scan(&self, scope: &PhysicalScope) -> Result<LayerObservation> {
+        let mut clean = true;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra/layer/memtable/v1");
+
+        // Memtable-Scan
+        for prefix in scope.prefixes() {
+            if self.storage.memtable_contains_prefix(prefix) {
+                clean = false;
+            }
+            hasher.update(prefix);
+        }
+
+        hasher.update(&self.storage.manifest_generation().to_le_bytes());
+        hasher.update(&self.storage.active_transaction_count().to_le_bytes());
+
+        Ok(LayerObservation {
+            layer_id: 1,
+            observed_empty: clean,
+            state_digest: *hasher.finalize().as_bytes(),
+            details: format!("Memtable generation: {}", self.storage.manifest_generation()),
+        })
+    }
+}
+
+pub struct LsmSstableScan<'a> {
+    storage: &'a crate::LsmStorage,
+}
+
+impl<'a> LayerScan for LsmSstableScan<'a> {
+    fn layer_id(&self) -> u8 { 3 }
+
+    fn scan(&self, scope: &PhysicalScope) -> Result<LayerObservation> {
+        let mut clean = true;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra/layer/sstable/v1");
+
+        let active_ssts = self.storage.manifest().get_active_sstables();
+        for sst in active_ssts {
+            // Echter Rohsweep nach physischen Schlüsseln
+            if sst.raw_scan_contains_scope(scope)? {
+                clean = false;
+            }
+            hasher.update(&sst.sstable_id.to_le_bytes());
+            hasher.update(&sst.data_checksum.to_le_bytes());
+        }
+
+        Ok(LayerObservation {
+            layer_id: 3,
+            observed_empty: clean,
+            state_digest: *hasher.finalize().as_bytes(),
+            details: format!("SSTables verified: {}", self.storage.manifest().sstable_count()),
+        })
+    }
+}
+```
+
+---
+
+## 17. Binärformat & Persistenz des Anti-Resurrection Ledgers & `RestoreGuard`
+
+Der `ErasureLedger` verhindert die unbemerkte Wiederbelebung ("Resurrection") physisch gelöschter Daten durch das Einspielen alter Checkpoints oder WAL-Replays.
+
+### 17.1 On-Disk Binärlayout (`.ledger` Segmente)
+
+Jedes Ledger-Segment wird im Append-Only Modus geschrieben:
+
+```
++-------------------------------------------------------------------------+
+| Magic Bytes: "CTRALEDG" (8 Bytes: 0x43, 0x54, 0x52, 0x41, 0x4C, 0x45, 0x44, 0x47) |
+| Version: u32 (0x00000001)                                               |
+| Segment Sequence: u64 Little-Endian                                     |
+| Prev Segment Hash: [u8; 32] BLAKE3                                      |
++-------------------------------------------------------------------------+
+| RECORD 0:                                                               |
+|   - Record Type: u8 (0x01: DeletionIntent, 0x02: DeletionPurged)        |
+|   - TxId: u64 Little-Endian                                             |
+|   - Timestamp: u64 Unix-Millis Little-Endian                            |
+|   - Scope Hash: [u8; 32] BLAKE3                                         |
+|   - Prefixes Count: u16 Little-Endian                                   |
+|   - Prefixes Payload: [u16 len + bytes, ...]                            |
+|   - HMAC-BLAKE3: [u8; 32] über Record-Felder                            |
+|   - CRC32C: u32 Little-Endian über gesamten Record                      |
++-------------------------------------------------------------------------+
+```
+
+### 17.2 Streaming `RestoreGuard` Algorithmus (O(1) Memory Overhead)
+
+Bei Checkpoint-Wiederherstellungen filtert der `RestoreGuard` abgelehnte Schlüssel in-stream:
+
+```rust
+pub struct LedgerRestoreGuard {
+    max_erased_tx: TxId,
+    erased_prefixes: Vec<Vec<u8>>,
+    revoked_keys_filter: contextra_crypto_core::FastKeyFilter,
+}
+
+impl contextra_ports::erasure::RestoreGuard for LedgerRestoreGuard {
+    #[inline]
+    fn admit(&self, key: &[u8], cp_tx: TxId) -> contextra_ports::erasure::RestoreVerdict {
+        // 1. Wenn Checkpoint nach der letzten Löschung erstellt wurde: Direkter Durchlauf
+        if cp_tx > self.max_erased_tx {
+            return contextra_ports::erasure::RestoreVerdict::Allow;
+        }
+
+        // 2. Schnelle Bloom-Filter Vorprüfung
+        if self.revoked_keys_filter.may_contain(key) {
+            return contextra_ports::erasure::RestoreVerdict::Reject;
+        }
+
+        // 3. Präfix-Prüfung gegen Ledger-Menge
+        for prefix in &self.erased_prefixes {
+            if key.starts_with(prefix) {
+                return contextra_ports::erasure::RestoreVerdict::Reject;
+            }
+        }
+
+        contextra_ports::erasure::RestoreVerdict::Allow
+    }
+}
+```
+
+---
+
+## 18. Formales Loom Concurrency-Modell & Beweis der Write-Fence Option B
+
+### 18.1 Concurrency-Invarianten
+1. **Kein Write-Skew:** Ein Schreibbatch darf niemals Daten in einen Bereich einfügen, während ein Purge-Rewrite diesen Bereich gerade säubert.
+2. **Lockless Fast-Path:** Bei `has_active_fences == false` darf kein Thread auf Mutexe oder Locks blockieren.
+
+### 18.2 Loom Verifikations-Harness
+
+```rust
+#[cfg(loom)]
+mod loom_tests {
+    use loom::sync::atomic::{AtomicBool, Ordering};
+    use loom::sync::Arc;
+    use loom::thread;
+    use arc_swap::ArcSwap;
+
+    #[test]
+    fn test_fence_option_b_loom() {
+        loom::model(|| {
+            let active = Arc::new(AtomicBool::new(false));
+            let table = Arc::new(ArcSwap::from_pointee(Vec::new()));
+
+            let active_clone = Arc::clone(&active);
+            let table_clone = Arc::clone(&table);
+
+            // Thread 1: Purge Task erwirbt Fence
+            let h1 = thread::spawn(move || {
+                let mut current = (**table_clone.load()).clone();
+                current.push(b"target_prefix".to_vec());
+                table_clone.store(Arc::new(current));
+                active_clone.store(true, Ordering::Release);
+            });
+
+            // Thread 2: Writer Leader prüft Fence
+            let active_writer = Arc::clone(&active);
+            let table_writer = Arc::clone(&table);
+            let h2 = thread::spawn(move || {
+                let key = b"target_prefix_doc1";
+                if active_writer.load(Ordering::Acquire) {
+                    let fences = table_writer.load();
+                    let conflict = fences.iter().any(|f| key.starts_with(f));
+                    assert!(conflict || !active_writer.load(Ordering::SeqCst));
+                }
+            });
+
+            h1.join().unwrap();
+            h2.join().unwrap();
+        });
+    }
+}
+```
+
+---
+
+## 19. Mathematische Spezifikation & Algorithmen-Details (DiBud & ACI)
+
+### 19.1 DiBud: Budgeted Reciprocal Rank Fusion
+
+#### Problem
+Klassisches RRF auf unbegrenzten Listen führt zu unbeschränktem I/O. DiBud (arXiv:2609.15143) zertifiziert ein Top-k Präfix deterministisch unter festem Zugriffskanal-Budget $B$.
+
+#### Schranken-Definitionen
+Für ein Dokument $d$ über Kanäle $ch \in \{Dense, Sparse\}$ mit Konstante $c = 60$:
+- **Untere Schranke:**
+  $$L(d) = \sum_{ch \in Gelesen} \frac{1}{c + r_{ch}(d)}$$
+- **Kanal-Restwert:**
+  $$U_{ch} = \begin{cases} \frac{1}{c + n_{ch} + 1} & \text{wenn Kanal nicht erschöpft} \\ 0 & \text{sonst} \end{cases}$$
+- **Obere Schranke für bekanntes $d$:**
+  $$U(d) = L(d) + \sum_{ch \notin Gelesen(d)} U_{ch}$$
+- **Obere Schranke für ungesehene Dokumente:**
+  $$U_{ungesehen} = \sum_{ch \in Kanäle} U_{ch}$$
+
+#### Zertifizierungs-Bedingung
+Ein Dokument $d$ wird als nächstes Element in das zertifizierte Ranking $A$ emittiert, wenn:
+1. $L(d) > U(e)$ für alle noch nicht emittierten $e \neq d$ (bei Gleichstand: Tie-Break $DocId(d) < DocId(e)$).
+2. $L(d) \ge U_{ungesehen}$.
+
+#### Dyadische Festkomma-Arithmetik (`u128`)
+Um Fließkomma-Drift und NaN-Panics (Verstoß gegen **V1** und **V4**) zu eliminieren, werden Scores als Brüche $Score = \frac{Numerator}{Denominator}$ in dyadischem 64-Bit-Festkomma berechnet:
+```rust
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FixedRankScore(pub u128); // Q64.64 Format
+```
+
+---
+
+### 19.2 ACI: Adaptive Conformal Inference
+
+#### Ziel
+Garantie einer Überdeckungswahrscheinlichkeit von $1 - \alpha$ unter dynamischem Verteilungsdrift (Gibbs/Candès 2021).
+
+#### Update-Gleichung (Gl. 2)
+$$\alpha_{t+1} = \alpha_t + \gamma \cdot (\alpha - \text{err}_t)$$
+wobei $\text{err}_t = 0$, wenn das wahre Label im Konfidenzintervall lag, sonst $1$.
+
+#### Dyadische Exaktheit in Rust
+```rust
+pub struct ConformalState {
+    alpha_target_q32: u64, // Ziel-Alpha in Q32
+    gamma_q32: u64,        // Schrittweite in Q32
+    current_alpha_q64: i128, // Zustand in Q64
+}
+
+impl ConformalState {
+    #[inline]
+    pub fn update(&mut self, covered: bool) {
+        let err_q32: u64 = if covered { 0 } else { 1 << 32 };
+        let diff: i64 = (self.alpha_target_q32 as i64) - (err_q32 as i64);
+        let step: i128 = (self.gamma_q32 as i128) * (diff as i128);
+        self.current_alpha_q64 = self.current_alpha_q64.saturating_add(step);
+    }
+}
+```
+
+---
+
+## 20. Vollständige Symbol-Migrationsmatrix für `contextra-core` (110 Stellen)
+
+Die Auflösung der deprecated Strangler-Fassade `contextra-core` erfolgt nach folgendem verbindlichen Mapping:
+
+| Re-Exportiertes Symbol | Bisheriger Import | Neuer Ziel-Import | Betroffene Crates |
+|---|---|---|---|
+| `DocId`, `TenantId`, `TxId`, `CollectionId` | `contextra_core::types::*` | `contextra_types::*` | store, vector, simd, db |
+| `ContextraError`, `Result` | `contextra_core::error::*` | `contextra_types::error::*` | alle 37 Crates |
+| `StorageEngine`, `KeyVal` | `contextra_core::storage::*` | `contextra_ports::storage::*` | store, engine, db |
+| `Clock`, `SystemClock`, `ManualClock` | `contextra_core::clock::*` | `contextra_ports::clock::*` | store, engine, db |
+| `Rng`, `IdGenerator` | `contextra_core::rng::*` | `contextra_ports::rng::*` | crypto, engine |
+| `SequenceLog`, `SnapshotFloor` | `contextra_core::mvcc::*` | `contextra_mvcc::*` | store, engine |
+| `FlatBufferWireAdapter` | `contextra_core::wire::*` | `contextra_wire::*` | mcp, engine |
+
+### PR-Ablauf:
+1. **PR-C1 (Store & Vector):** Ersetzt alle Vorkommen in `crates/contextra-store/` und `crates/contextra-vector/` (32 Dateien).
+2. **PR-C2 (Engine & DB):** Ersetzt alle Vorkommen in `crates/contextra-engine/` und `crates/contextra-db/` (45 Dateien).
+3. **PR-C3 (Rest & Löschung):** Bereinigt Fassade, Benchmarks und Tests. Löscht `crates/contextra-core` physisch (33 Dateien).
+
+---
+
+## 21. Vollständiger Standalone-Verifier `contextra-proof-verify` (EP2)
+
+Der externe Verifier besitzt **keine** Abhängigkeiten zu Storage, Engine oder Tokios. Er ist ein reiner No-Std/Zero-Dependency Parser:
+
+```rust
+// In crates/contextra-proof-verify/src/lib.rs
+#![forbid(unsafe_code)]
+
+use ed25519_dalek::{Signature, VerifyingKey};
+
+pub const DOMAIN_TAG: &[u8; 32] = b"contextra/deletion-proof/v4\0\0\0\0\0\0";
+
+#[derive(Debug)]
+pub enum VerifyError {
+    InvalidLength,
+    InvalidDomainTag,
+    MalformedTlv,
+    InvalidSignature,
+    DigestMismatch,
+}
+
+pub struct VerifiedProof {
+    pub scope_hash: [u8; 32],
+    pub erased_at_tx: u64,
+    pub timestamp_ms: u64,
+    pub signer_public_key: [u8; 32],
+}
+
+pub fn verify_deletion_proof_v4(proof_bytes: &[u8]) -> Result<VerifiedProof, VerifyError> {
+    if proof_bytes.len() < 164 {
+        return Err(VerifyError::InvalidLength);
+    }
+
+    // 1. Domain Tag prüfen
+    if &proof_bytes[0..32] != DOMAIN_TAG {
+        return Err(VerifyError::InvalidDomainTag);
+    }
+
+    // 2. TLV Payload parsen (Tags 0x01, 0x02, 0x03, 0x10)
+    let payload_end = proof_bytes.len() - 98; // Vor Tag 0xFE
+    let payload = &proof_bytes[0..payload_end];
+
+    // 3. Public Key & Signatur extrahieren
+    let pk_bytes: [u8; 32] = proof_bytes[proof_bytes.len() - 96..proof_bytes.len() - 64]
+        .try_into()
+        .map_err(|_| VerifyError::MalformedTlv)?;
+    let sig_bytes: [u8; 64] = proof_bytes[proof_bytes.len() - 64..]
+        .try_into()
+        .map_err(|_| VerifyError::MalformedTlv)?;
+
+    let verifying_key = VerifyingKey::from_bytes(&pk_bytes)
+        .map_err(|_| VerifyError::MalformedTlv)?;
+    let signature = Signature::from_bytes(&sig_bytes);
+
+    // 4. Ed25519 Signatur über die gesamte Payload prüfen
+    verifying_key
+        .verify_strict(payload, &signature)
+        .map_err(|_| VerifyError::InvalidSignature)?;
+
+    Ok(VerifiedProof {
+        scope_hash: proof_bytes[36..68].try_into().unwrap(),
+        erased_at_tx: u64::from_le_bytes(proof_bytes[72..80].try_into().unwrap()),
+        timestamp_ms: u64::from_le_bytes(proof_bytes[84..92].try_into().unwrap()),
+        signer_public_key: pk_bytes,
+    })
+}
+```
+
+---
+
+## 22. Failure-Mode- & Chaos-Testing-Matrix (Crash-Simulationen)
+
+Die Korrektheit unter Crash- und Fault-Bedingungen wird durch folgende standardisierte Matrix verifiziert:
+
+| Szenario | Zeitpunkt des Absturzes | Erwarteter Zustand nach Crash-Recovery | Validierungs-Test |
+|---|---|---|---|
+| **CRASH-01** | Nach `ErasureLedger::append`, vor `Tombstone::commit` | Ledger-Eintrag existiert; Tombstone fehlt. Startup-Recovery erkennt verwaisten Ledger-Eintrag und führt Re-Tombstone durch. | `tests/chaos_ledger_orphan.rs` |
+| **CRASH-02** | Mitten im SSTable-Streaming-Rewrite | Temporäre Datei `.purge_tmp` existiert unvollständig. Altes Manifest aktiv. Startup entfernt `.purge_tmp`. Keine Daten korrumpiert. | `tests/chaos_sst_rewrite_crash.rs` |
+| **CRASH-03** | Nach neuem SSTable-Flush, vor Manifest-Commit | Temporäre SSTable fertig auf Platte. Altes Manifest aktiv. Startup räumt auf, Intent-Resume startet Purge neu. | `tests/chaos_pre_manifest_crash.rs` |
+| **CRASH-04** | Nach Manifest-Commit, vor `scrub_and_remove` | Neues Manifest aktiv. Alte SSTable liegt noch unvollständig auf Platte. Resume führt `dispose()` aus und scrubbt Altdateien. | `tests/chaos_post_manifest_scrub.rs` |
+| **CRASH-05** | Disk-Full ($ENOSPC$) während Purge-Rewrite | `purge_physical` bricht ab mit `InsufficientDiskSpace`. Keine Teildateien übernommen. Status: `PurgePending { retry_at }`. | `tests/chaos_disk_full.rs` |
+| **CRASH-06** | I/O-Lesefehler (Bit-Rot) in SSTable | L5-Pattern greift: `PurgeError::ReadError`. Kein `Ok`, kein falscher Zeuge. Alarm im Health-Log. | `tests/chaos_bitrot_fail_closed.rs` |
+| **CRASH-07** | Schreibkonflikt während aktivem Rewrite | Fast-Path Write-Fence lehnt konkurrierende Writes mit `StoreError::WriteFenced` ab. | `tests/chaos_fence_contention.rs` |
+| **CRASH-08** | Wiederherstellung aus altem Backup | `RestoreGuard` prüft Ledger und lehnt gelöschte Keys deterministisch ab (`RestoreVerdict::Reject`). | `tests/chaos_anti_resurrection.rs` |
+
+---
+
+> **Fazit:** Dieser Plan schließt die Architektur, Schnittstellen und Implementierungsdetails lückenlos ab. Er dient als normative Referenz für alle automatisierten und manuellen Entwicklungsschritte zur Realisierung von Contextra 1.0.

@@ -714,7 +714,10 @@ impl CompactionEngine {
                 floor_emitted = false;
             }
 
-            // AI-TAG[BOUND_UNIFICATION]
+            // AI-TAG[CORRECTNESS][MINOR] BOUND_UNIFICATION: Standardize boundary check (ID: AGT-STORE-c7e14a2b) (TS: 2026-10-12T17:20:27Z) (SESSION: a832a6e7)
+            // BEFUND: Boundary check for version retention in multi-way merge.
+            // RISIKO: Inconsistent retention if `<` vs `<=` is mixed across compactions.
+            // EMPFEHLUNG: Keep standardized to `<= min_snapshot_seq`.
             // Standardize boundary check for version retention and multi-way merging to `<=` min_snapshot_seq.
             // Versions strictly greater than min_snapshot_seq are visible to active/future snapshots and must remain separate.
             // Versions `<= min_snapshot_seq` belong to the floor and are candidates for folding into a single entry.
