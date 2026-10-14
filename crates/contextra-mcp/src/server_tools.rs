@@ -923,17 +923,9 @@ impl McpServer {
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
             "contextra_plugin_status" => {
-                let registry = self.plugin_registry.as_ref().map(|r| r.as_ref());
-                let empty_registry;
-                let reg_ref = match registry {
-                    Some(r) => r,
-                    None => {
-                        empty_registry = contextra_ports::plugin::PluginRegistry::new(
-                            std::sync::Arc::new(contextra_license::OpenFastGate),
-                        );
-                        &empty_registry
-                    }
-                };
+                let reg_ref = self.plugin_registry.as_ref().map(|r| r.as_ref()).ok_or_else(|| {
+                    McpError::internal_error("Plugin registry or license gate is not configured")
+                })?;
                 let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
                 serde_json::to_value(&status).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))

@@ -3,9 +3,24 @@
 // INVARIANTEN: CryptoShred vernichtet KEK (Gruppenlöschung) oder DEK-Wrap (Einzellöschung) in O(1).
 // Fail-Closed bei Revokationsprüfungen und verifiziertem RevocationLog-Status.
 // Zufälliges KEK/DEK-Material via OsRng (keine deterministische Ableitung rein aus group_id).
+// Vanish-Lehre: DEKs dürfen niemals unverschlüsselt/unwrapped in dauerhaften oder externen Stores verbleiben.
 // HOTSPOTS: [SubKey, KeyRegistry, revoke_group, revoke_record, encrypt_record, decrypt_record]
 
 //! Envelope encryption and thread-safe key registry for KV crypto-shredding.
+//!
+//! # Grenzen der Speicherbereinigung via `zeroize` (Zeroize Limitations)
+//! `Zeroize` bzw. `ZeroizeOnDrop` garantiert die physische Bereinigung (Umschreiben mit Nullbytes)
+//! des aktuell zugewiesenen RAM-Puffers (insbesondere auf dem Heap oder aktiven Stack-Frame).
+//! Diese Garantie ist jedoch technisch auf den kontrollierten Speicherpuffer beschränkt:
+//! - **Moves & Stack-Kopien**: Beim Verschieben oder Kopieren von Werten auf dem Stack verbleiben
+//!   nicht-zeroisierte Alt-Exemplare in früheren Stack-Frames.
+//! - **Reallokationen**: Bei Vektor-Vergrößerungen verbleibt die ursprüngliche Heap-Allokation unbereinigt im RAM.
+//! - **CPU-Register**: Schlüsselwerte in CPU-Registern werden von `zeroize` nicht erfasst.
+//! - **Hardware & Seitenkanäle**: Caches, Swap, Hardware-Betriebssystem-Puffer und Seitenkanäle fallen
+//!   außerhalb des Einflussbereichs von `zeroize`.
+//!
+//! Die Aussage „RAM bereinigt“ / „Crypto-Erase erbracht“ bezieht sich daher ausschließlich auf den gezielten
+//! Heap- bzw. Puffer-Inhalt, der von den `Zeroize`-Typen umschlossen ist.
 
 #![forbid(unsafe_code)]
 
@@ -20,7 +35,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Default size of a shred key group (number of records sharing one KEK).
 pub const DEFAULT_SHRED_KEY_GROUP_SIZE: usize = 64;
@@ -56,6 +71,11 @@ impl std::fmt::Debug for GroupKek {
 }
 
 /// Record Data Encryption Key (DEK) - 256 bits, zeroized on drop.
+///
+/// # Invariante (Vanish-Lehre / DEK Isolation)
+/// DEKs dürfen NIEMALS im Klartext oder unverschlüsselt in replizierten, externen oder dauerhaften
+/// Speichern abgelegt werden. Eine Persistierung von DEKs ist ausschließlich in Form von `wrapped_dek`
+/// (mittels KEK verschlüsselt) zulässig.
 #[derive(ZeroizeOnDrop)]
 pub struct RecordDek(pub [u8; 32]);
 
@@ -139,6 +159,7 @@ pub trait GroupRevocationListener: Send + Sync {
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
+    pending_revocations: RwLock<HashSet<u64>>,
     ever_registered_groups: RwLock<HashSet<u64>>,
     pub revocation_log: Option<Arc<RevocationLog>>,
     listeners: Vec<Arc<dyn GroupRevocationListener>>,
@@ -164,6 +185,7 @@ impl KeyRegistry {
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            pending_revocations: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
             listeners: Vec::new(),
@@ -189,6 +211,7 @@ impl KeyRegistry {
         Ok(Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
+            pending_revocations: RwLock::new(HashSet::new()),
             ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: Some(Arc::new(log)),
             listeners: Vec::new(),
@@ -329,30 +352,69 @@ impl KeyRegistry {
         }
 
         // Generate a random 32-byte Group KEK (never derived from group_id)
-        let mut kek_bytes = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut kek_bytes);
+        let mut kek_bytes = Zeroizing::new([0u8; 32]);
+        rand::rngs::OsRng.fill_bytes(&mut *kek_bytes);
 
         // AEAD wrap the KEK using Master Key
-        let (wrapped_kek, kek_nonce) = master_key.encrypt_auto_nonce(&kek_bytes)?;
+        let (wrapped_kek, kek_nonce) = master_key.encrypt_auto_nonce(&*kek_bytes)?;
 
         let entry = GroupEntry {
-            kek: GroupKek(kek_bytes),
+            kek: GroupKek(*kek_bytes),
             wrapped_kek,
             kek_nonce,
             record_deks: HashMap::new(),
         };
 
+        let subkey = SubKey(*kek_bytes);
+
         write_guard.insert(group_id, entry);
         if let Ok(mut ever_guard) = self.ever_registered_groups.write() {
             ever_guard.insert(group_id);
         }
-        Ok(SubKey(kek_bytes))
+        Ok(subkey)
     }
 
-    /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
-    /// Returns `true` if the group was active and is now revoked.
-    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
-    pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
+    /// Phase 1: Initiates a revocation request for `group_id` (Zwei-Phasen-Modell).
+    /// Marks the group as pending revocation.
+    /// Returns `Ok(true)` if request was registered, `Ok(false)` if already finalized/revoked or pending.
+    pub fn request_revoke(&self, group_id: u64) -> Result<bool> {
+        if self.is_group_revoked(group_id) {
+            return Ok(false);
+        }
+
+        let mut pending_guard = self.pending_revocations.write().map_err(|_| {
+            CryptoError::Crypto("KeyRegistry pending_revocations write lock poisoned".to_string())
+        })?;
+
+        if pending_guard.contains(&group_id) {
+            return Ok(false);
+        }
+
+        pending_guard.insert(group_id);
+        Ok(true)
+    }
+
+    /// Cancels a pending revocation request for `group_id` prior to `finalize_revoke`.
+    /// Returns `Ok(true)` if pending revocation was canceled, `Ok(false)` if not pending,
+    /// or `Err(CryptoError::KeyRevoked)` if group was already finalized/revoked.
+    pub fn cancel_revoke(&self, group_id: u64) -> Result<bool> {
+        if self.is_group_revoked(group_id) {
+            return Err(CryptoError::KeyRevoked(format!(
+                "Cannot cancel revocation: group {group_id} has already been finalized and revoked"
+            )));
+        }
+
+        let mut pending_guard = self.pending_revocations.write().map_err(|_| {
+            CryptoError::Crypto("KeyRegistry pending_revocations write lock poisoned".to_string())
+        })?;
+
+        Ok(pending_guard.remove(&group_id))
+    }
+
+    /// Phase 2: Finalizes the revocation and physically destroys (zeroizes) KEK/DEKs for `group_id`.
+    /// Appends the revocation to `RevocationLog` and notifies listeners.
+    /// Returns `Ok(true)` if newly revoked, `Ok(false)` if already revoked.
+    pub fn finalize_revoke(&self, group_id: u64) -> Result<bool> {
         if let Some(ref log) = self.revocation_log {
             log.append(RevocationTarget::Group(group_id))
                 .map_err(|e| CryptoError::Crypto(e.to_string()))?;
@@ -367,6 +429,10 @@ impl KeyRegistry {
         }
 
         revoked_guard.insert(group_id);
+
+        if let Ok(mut pending_guard) = self.pending_revocations.write() {
+            pending_guard.remove(&group_id);
+        }
 
         let mut groups_guard = match self.groups.write() {
             Ok(g) => g,
@@ -394,6 +460,23 @@ impl KeyRegistry {
         }
 
         Ok(true)
+    }
+
+    /// Checks if a group revocation is currently requested / pending.
+    pub fn is_revoke_pending(&self, group_id: u64) -> bool {
+        if let Ok(guard) = self.pending_revocations.read() {
+            guard.contains(&group_id)
+        } else {
+            false
+        }
+    }
+
+    /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
+    /// Fully compatible with callers expecting direct group revocation (immediately finalizes).
+    /// Returns `true` if the group was active and is now revoked.
+    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
+    pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
+        self.finalize_revoke(group_id)
     }
 
     /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
@@ -491,8 +574,8 @@ impl KeyRegistry {
         let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
 
-        let mut dek_bytes = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut dek_bytes);
+        let mut dek_bytes = Zeroizing::new([0u8; 32]);
+        rand::rngs::OsRng.fill_bytes(&mut *dek_bytes);
 
         let mut dek_nonce = [0u8; 12];
         rand::rngs::OsRng.fill_bytes(&mut dek_nonce);
@@ -500,7 +583,7 @@ impl KeyRegistry {
             .encrypt(Nonce::from_slice(&dek_nonce), dek_bytes.as_slice())
             .map_err(|e| CryptoError::Crypto(format!("DEK wrapping failed: {e}")))?;
 
-        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&*dek_bytes)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;
         let mut nonce = [0u8; 12];
         rand::rngs::OsRng.fill_bytes(&mut nonce);
@@ -571,12 +654,14 @@ impl KeyRegistry {
         let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
 
-        let dek_bytes = kek_cipher
-            .decrypt(
-                Nonce::from_slice(&payload.dek_nonce),
-                payload.wrapped_dek.as_slice(),
-            )
-            .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?;
+        let dek_bytes = Zeroizing::new(
+            kek_cipher
+                .decrypt(
+                    Nonce::from_slice(&payload.dek_nonce),
+                    payload.wrapped_dek.as_slice(),
+                )
+                .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?,
+        );
 
         let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;

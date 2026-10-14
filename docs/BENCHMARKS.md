@@ -10,9 +10,9 @@
 
 | Claim / Metrik | Quelle (Datei / Befehl) | Status | Befund / Anmerkung |
 |---|---|---|---|
-| **1k Chunks Search p50 = ~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Widerspricht §4 (~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) und neuem VM-Messlauf (2.61 ms). |
-| **5k Chunks Search p50 = ~~809.15 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.11 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
-| **10k Chunks Search p50 = ~~337.77 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.13 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
+| **1k Chunks Search p50 = 2.61 ms** | `benches/scale_bench.rs` | `reproduziert` | VM-Messlauf 2026-09-21. |
+| **5k Chunks Search p50 = 5.11 ms** | `benches/scale_bench.rs` | `reproduziert` | VM-Messlauf 2026-09-21. |
+| **10k Chunks Search p50 = 5.13 ms** | `benches/scale_bench.rs` | `reproduziert` | VM-Messlauf 2026-09-21. |
 | **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `Messung in Arbeit (extrapoliert, unbestätigt)` | Mathematische Extrapolation; gemessen bis 10.000 Dokumente. |
 | **Recall@5 / @10 / @20 = 1.0000** | `crates/contextra-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
 | **Hybrid Search p50 = ~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) sowie VM-Messlauf (2.61 ms). |

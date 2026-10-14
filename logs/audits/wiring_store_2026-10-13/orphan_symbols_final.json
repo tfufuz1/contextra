@@ -123,13 +123,6 @@
     },
     {
       "kind": "fn",
-      "symbol": "collect_witnesses",
-      "krate": "contextra-store",
-      "file": "crates/contextra-store/src/sstable/witness_scan.rs",
-      "line": 195
-    },
-    {
-      "kind": "fn",
       "symbol": "cosine_similarity_parts_f32_u8",
       "krate": "contextra-simd",
       "file": "crates/contextra-simd/src/kernels/scalar.rs",
@@ -186,13 +179,6 @@
     },
     {
       "kind": "fn",
-      "symbol": "plan_orphan_removal",
-      "krate": "contextra-store",
-      "file": "crates/contextra-store/src/sstable/orphan_gc.rs",
-      "line": 28
-    },
-    {
-      "kind": "fn",
       "symbol": "record_counter_safe",
       "krate": "contextra-engine",
       "file": "crates/contextra-engine/src/metrics_names.rs",
@@ -246,13 +232,6 @@
       "krate": "contextra-durable-fs",
       "file": "crates/contextra-durable-fs/src/lib.rs",
       "line": 58
-    },
-    {
-      "kind": "struct",
-      "symbol": "WalReplayOptions",
-      "krate": "contextra-store",
-      "file": "crates/contextra-store/src/wal/replay_filter.rs",
-      "line": 14
     },
     {
       "kind": "type",
@@ -327,6 +306,13 @@
       "krate": "contextra-vector",
       "file": "crates/contextra-vector/src/hnsw/arena.rs",
       "line": 14
+    },
+    {
+      "kind": "const",
+      "symbol": "ASSURANCE_LEVEL",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/witness_scan.rs",
+      "line": 18
     },
     {
       "kind": "const",
@@ -467,6 +453,13 @@
       "krate": "contextra-engine",
       "file": "crates/contextra-engine/src/collection/crud/read.rs",
       "line": 12
+    },
+    {
+      "kind": "const",
+      "symbol": "LAYER_ID_WAL_ALL_SEGMENTS",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/witness_scan.rs",
+      "line": 20
     },
     {
       "kind": "const",
@@ -1009,10 +1002,24 @@
     },
     {
       "kind": "fn",
+      "symbol": "plan_orphan_removal",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/orphan_gc.rs",
+      "line": 28
+    },
+    {
+      "kind": "fn",
       "symbol": "record_importance_outcome",
       "krate": "contextra-infer-ollama",
       "file": "crates/contextra-infer-ollama/src/importance.rs",
       "line": 229
+    },
+    {
+      "kind": "fn",
+      "symbol": "remove_orphans",
+      "krate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/orphan_gc.rs",
+      "line": 55
     },
     {
       "kind": "fn",

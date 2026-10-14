@@ -1,0 +1,26 @@
+id                = "T-2026-LA03"
+title             = "A03: erase_document: Optionen auswerten, Ledger vor Tombstone, Zeugen (F4, N4)"
+crate             = "contextra-engine"
+tier              = 1
+risk              = "high"
+goal              = "DocEraseOptions in erase_document auswerten, Erasure Ledger Eintrag vor Tombstone-Commit schreiben, und Vollständigkeit der Zeugen sicherstellen."
+non_goals         = ["Anderen Crates ändern", "Public-API-Schnittstellen brechen"]
+scope             = [
+  "crates/contextra-engine/src/collection/crud/delete.rs",
+  "crates/contextra-engine/tests/erase_document_ledger_and_witnesses.rs",
+  ".jules/tasks/T-2026-LA03.toml"
+]
+forbidden         = [".github/**", "AGENTS.md", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "capabilities.toml", "xtask/**", ".jules/setup/**"]
+invariants        = ["Zero-Panic (P2)", "Ledger-Eintrag mit fsync zwingend VOR Tombstone-Commit", "Fail-Closed bei unzureichenden Zeugen oder VerifyDepth"]
+acceptance        = [
+  "cargo test -p contextra-engine --test erase_document_ledger_and_witnesses",
+  "cargo xtask doctrine-scan",
+  "cargo xtask check-result-dropped-io",
+  "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Tests in crates/contextra-engine/tests/erase_document_ledger_and_witnesses.rs"]
+
+[budget]
+files      = 25
+lines      = 1000
+iterations = 12

@@ -1,54 +1,114 @@
-// FILE-CONTEXT (STAND: 2026-10-13, ZWECK: Cross-Version-Replay und Domänentrennungs-Test für Proof v3 und v4, INVARIANTEN: INV-DELETION-1, Fail-Closed)
+// FILE-CONTEXT (STAND 2026-10-13, ZWECK: Verifikation der Domänentrennung v3 vs v4 und Cross-Version Replay-Schutz, INVARIANTEN: INV-DELETION-1, INV-DELETION-2, F7-Domain-Separation)
 
-use contextra_crypto::deletion_proof::{DeletionProof, DeletionScope, DurabilityProof};
+use contextra_crypto::deletion_proof::{
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+    ExcludedScope, LayerCleanupProof,
+};
 use contextra_types::{DocId, TenantId, TxId};
-use ed25519_dalek::SigningKey;
-use rand::rngs::OsRng;
 
 #[test]
-fn test_cross_version_replay_v3_signature_rejected_as_v4() {
-    let mut signing_key_bytes = [0u8; 32];
-    rand::RngCore::fill_bytes(&mut OsRng, &mut signing_key_bytes);
-    let signing_key = SigningKey::from_bytes(&signing_key_bytes);
-    let verifying_key = signing_key.verifying_key();
-
+#[allow(deprecated)]
+fn test_proof_v3_v4_domain_tag_prefix_separation() {
+    let keypair = DeletionProofKeyPair::generate();
+    let tenant_id = TenantId::try_new(100).unwrap();
     let scope = DeletionScope::Document {
-        doc_id: DocId(102),
-        tenant_id: TenantId::try_new(1).expect("valid tenant"),
+        doc_id: DocId::from(42u64),
+        tenant_id,
     };
-    let deleted_keys = vec![b"key1".to_vec(), b"key2".to_vec()];
-    let deleted_after_tx = TxId(100);
+
+    let layer_proofs = vec![
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
+    ];
+
     let durability = DurabilityProof::new(100);
 
-    #[allow(deprecated)]
-    let proof_v3 = DeletionProof::create_v3(
+    let v3_proof = DeletionProof::create_v3(
         scope,
-        deleted_keys,
-        deleted_after_tx,
-        vec![],
-        vec![],
-        2000,
+        vec![b"doc_key_1".to_vec()],
+        TxId(100),
+        layer_proofs,
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
         &[],
         Some(&durability),
-        &signing_key,
+        keypair.signing_key(),
     )
-    .expect("v3 proof creation");
+    .expect("v3 proof creation should succeed with valid layer cleanup proofs");
 
-    // Authentic v3 proof must verify successfully with verifying_key
-    let v3_verified = proof_v3
-        .verify(&verifying_key)
-        .expect("v3 verification succeeded");
-    assert!(v3_verified, "Authentic v3 proof must verify under v3");
-
-    // Cross-version replay attack: alter signature_version to V4 (4)
-    let mut cross_version_v4_proof = proof_v3.clone();
-    cross_version_v4_proof.signature_version = 4;
-
-    let v4_replayed_verified = cross_version_v4_proof
-        .verify(&verifying_key)
-        .expect("v4 verification call completed");
+    assert_eq!(v3_proof.signature_version, 3);
     assert!(
-        !v4_replayed_verified,
-        "Cross-version replay: v3 signature MUST fail when evaluated as v4 due to domain separation tag mismatch"
+        v3_proof.verify(&keypair.verifying_key).unwrap(),
+        "v3 proof must verify under its correct v3 domain tag"
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn test_cross_version_replay_prevention() {
+    let keypair = DeletionProofKeyPair::generate();
+    let tenant_id = TenantId::try_new(100).unwrap();
+    let scope = DeletionScope::Document {
+        doc_id: DocId::from(42u64),
+        tenant_id,
+    };
+
+    let layer_proofs =
+        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+
+    let durability = DurabilityProof::new(100);
+
+    let v3_proof = DeletionProof::create_v3(
+        scope,
+        vec![b"doc_key_1".to_vec()],
+        TxId(100),
+        layer_proofs,
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
+        Some(&durability),
+        keypair.signing_key(),
+    )
+    .expect("v3 proof creation should succeed");
+
+    // Replay attack: attempt to pass a v3 signature off as a v4 proof.
+    let mut replayed_as_v4 = v3_proof.clone();
+    replayed_as_v4.signature_version = 4;
+
+    let verify_result = replayed_as_v4.verify(&keypair.verifying_key);
+    match verify_result {
+        Ok(valid) => {
+            assert!(
+                !valid,
+                "Cross-version replay MUST fail: v3 signature cannot verify under v4 domain tag"
+            );
+        }
+        Err(err) => {
+            // Rejection via error is also acceptable fail-closed behavior
+            assert!(
+                err.to_string().contains("VerificationKey")
+                    || err.to_string().contains("InvalidProofSignature")
+                    || err.to_string().contains("version")
+            );
+        }
+    }
+}
+
+#[test]
+fn test_v3_physical_cleanup_layer_claim_enforcement() {
+    // Attempting to construct LayerCleanupProof with remaining live entries MUST fail (INV-DELETION-1)
+    let invalid_layer_proof =
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 5);
+    assert!(
+        invalid_layer_proof.is_err(),
+        "LayerCleanupProof MUST refuse construction if remaining live entries > 0"
+    );
+
+    // Valid zero-remaining construction succeeds
+    let valid_layer_proof =
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0);
+    assert!(
+        valid_layer_proof.is_ok(),
+        "LayerCleanupProof construction MUST succeed when remaining live entries == 0"
     );
 }

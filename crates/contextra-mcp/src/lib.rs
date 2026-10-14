@@ -43,6 +43,9 @@ pub mod server_dispatch;
 pub mod server_tools;
 pub mod tools_crud;
 pub mod validation;
+pub mod wiring;
+
+pub use wiring::{McpWiring, McpWiringDeps};
 
 #[cfg(test)]
 mod tests;

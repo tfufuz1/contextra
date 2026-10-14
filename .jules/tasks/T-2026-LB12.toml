@@ -1,0 +1,41 @@
+id = "T-2026-LB12"
+title = "Proof-Key-Konfiguration: Mindestqualität erzwingen (F3)"
+crate = "contextra-mcp"
+tier = 1
+risk = "high"
+goal = "Enforcing proof-key quality rules and supporting proof-key files with strict permissions."
+non_goals = ["Changing crates outside contextra-mcp", "Adding new dependencies"]
+scope = [
+    "crates/contextra-mcp/src/proof_key_env.rs",
+    "crates/contextra-mcp/src/proof_key.rs",
+    "crates/contextra-mcp/tests/proof_key_quality.rs",
+    ".jules/tasks/T-2026-LB12.toml"
+]
+forbidden = [
+    ".github/**",
+    "AGENTS.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    ".jules/setup/**",
+    "xtask/**",
+    "capabilities.toml",
+    "deny.toml"
+]
+invariants = [
+    "Zero-Panic im Produktionscode",
+    "Fail-Closed bei schwacher/ungültiger Schlüsselkonfiguration",
+    "Keine Schlüsselmaterial-Sichtbarkeit in Logs oder Fehlertexten"
+]
+acceptance = [
+    "cargo test -p contextra-mcp --test proof_key_quality",
+    "cargo xtask doctrine-scan",
+    "cargo xtask check-result-dropped-io",
+    "cargo xtask fast-diff-lint"
+]
+evidence_required = ["Tests in crates/contextra-mcp/tests/proof_key_quality.rs"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 12

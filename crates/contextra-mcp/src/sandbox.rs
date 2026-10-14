@@ -279,6 +279,28 @@ pub enum ToolCategory {
     CloudEgress,
 }
 
+/// Resource limits, execution timeouts, and exponential backoff parameters for sidecar processes.
+#[derive(Debug, Clone)]
+pub struct SidecarLimits {
+    pub max_request_bytes: usize,
+    pub max_response_bytes: usize,
+    pub timeout_ms: u64,
+    pub max_retries: u32,
+    pub backoff_initial_ms: u64,
+}
+
+impl Default for SidecarLimits {
+    fn default() -> Self {
+        Self {
+            max_request_bytes: 4 * 1024 * 1024,   // 4 MiB
+            max_response_bytes: 16 * 1024 * 1024, // 16 MiB
+            timeout_ms: 5_000,                    // 5000 ms
+            max_retries: 3,
+            backoff_initial_ms: 100,
+        }
+    }
+}
+
 /// Konfiguration der Sandbox-Policy.
 #[derive(Debug, Clone)]
 pub struct SandboxPolicy {
@@ -289,6 +311,8 @@ pub struct SandboxPolicy {
     pub allow_cloud_egress: bool,
     /// Maximale Ausführungszeit pro Tool-Call in Millisekunden.
     pub max_execution_ms: u64,
+    /// Resource limits and backoff configuration for sidecar execution contexts.
+    pub sidecar_limits: SidecarLimits,
 }
 
 impl Default for SandboxPolicy {
@@ -299,6 +323,7 @@ impl Default for SandboxPolicy {
             allow_code_execution: false, // Code-Ausführung standardmäßig gesperrt
             allow_cloud_egress: false, // Cloud-Egress gesperrt (erfordert explizites Opt-in via allow_cloud_egress)
             max_execution_ms: 5_000,
+            sidecar_limits: SidecarLimits::default(),
         }
     }
 }
@@ -575,6 +600,7 @@ mod tests {
             allow_code_execution: false,
             allow_cloud_egress: true,
             max_execution_ms: 5_000,
+            sidecar_limits: SidecarLimits::default(),
         };
         let permitting_sandbox = McpSandbox::new(policy).unwrap(); // unwrap
         assert!(permitting_sandbox
@@ -630,6 +656,7 @@ mod tests {
             allow_code_execution: true,
             allow_cloud_egress: true,
             max_execution_ms: 5_000,
+            sidecar_limits: SidecarLimits::default(),
         };
         let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
 
@@ -702,6 +729,7 @@ mod tests {
             allow_code_execution: true,
             allow_cloud_egress: true,
             max_execution_ms: 50,
+            sidecar_limits: SidecarLimits::default(),
         };
         let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
 
@@ -812,6 +840,7 @@ mod tests {
             allow_code_execution: true,
             allow_cloud_egress: true,
             max_execution_ms: 5_000,
+            sidecar_limits: SidecarLimits::default(),
         };
         let sandbox = McpSandbox::new(policy).unwrap();
         let err = sandbox.validate_tool_call("unknown_unlisted_method", &Value::Null);
@@ -825,6 +854,7 @@ mod tests {
             allow_code_execution: true, // code execution explicitly enabled!
             allow_cloud_egress: false,
             max_execution_ms: 5_000,
+            sidecar_limits: SidecarLimits::default(),
         };
         let permissive_sandbox = McpSandbox::new(permissive_code_exec_policy).unwrap();
         let code_exec_err =

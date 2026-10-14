@@ -20,6 +20,28 @@ pub struct ForgetRequest {
     pub dry_run: bool,
 }
 
+impl ForgetRequest {
+    pub fn new_single_doc(collection: impl Into<String>, doc_id: impl Into<String>) -> Self {
+        let col = collection.into();
+        Self {
+            scope: ForgetScope::SingleDoc(doc_id.into()),
+            collection: col,
+            matched_count: 1,
+            dry_run: false,
+        }
+    }
+
+    pub fn new_collection(collection: impl Into<String>, matched_count: u64) -> Self {
+        let col = collection.into();
+        Self {
+            scope: ForgetScope::Collection(col.clone()),
+            collection: col,
+            matched_count,
+            dry_run: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForgetPreview {
     pub matched_count: u64,

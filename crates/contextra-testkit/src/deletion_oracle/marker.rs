@@ -1,8 +1,57 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-13
 // ZWECK: Hoch-entropische Marker-Generierung fuer die Loeschgarantie (Spezifikation T1).
 // INVARIANTEN: No unsafe code allowed (#![forbid(unsafe_code)]).
 // DOKTRIN: Zero-Panic (keine unwrap/expect/panic in Produktionscode).
+
+use super::rawsweep::expand_needle_encodings;
+
+/// Canonical storage and engine layers for deletion canary tracking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OracleLayer {
+    /// RAM Memtable buffer layer.
+    Memtable,
+    /// On-disk SSTable file layer.
+    SSTable,
+    /// Write-Ahead Log segment layer.
+    WAL,
+    /// Checkpoint and snapshot state layer.
+    Checkpoint,
+    /// HNSW vector graph index layer.
+    HNSW,
+    /// Inverted BM25 and text index layer.
+    Text,
+    /// Entity and relation graph store layer.
+    Graph,
+}
+
+impl OracleLayer {
+    /// Returns the canonical string label for this layer.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            OracleLayer::Memtable => "memtable",
+            OracleLayer::SSTable => "sstable",
+            OracleLayer::WAL => "wal",
+            OracleLayer::Checkpoint => "checkpoint",
+            OracleLayer::HNSW => "hnsw",
+            OracleLayer::Text => "text",
+            OracleLayer::Graph => "graph",
+        }
+    }
+
+    /// Returns all 7 canonical layers.
+    pub const fn all() -> &'static [OracleLayer] {
+        &[
+            OracleLayer::Memtable,
+            OracleLayer::SSTable,
+            OracleLayer::WAL,
+            OracleLayer::Checkpoint,
+            OracleLayer::HNSW,
+            OracleLayer::Text,
+            OracleLayer::Graph,
+        ]
+    }
+}
 
 /// Single field marker containing the field name and its CTXMARK string.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +133,22 @@ impl OrcMarkerSet {
         }
     }
 
+    /// Generates canary markers for all 7 canonical storage and index layers.
+    pub fn generate_per_layer(run_label: &str, seed: u64) -> Self {
+        let layers = OracleLayer::all();
+        let field_names: Vec<&str> = layers.iter().map(|l| l.as_str()).collect();
+        Self::generate(run_label, seed, &field_names)
+    }
+
+    /// Returns the marker string for a specific layer if present.
+    pub fn layer_marker(&self, layer: OracleLayer) -> Option<&str> {
+        let label = layer.as_str();
+        self.fields
+            .iter()
+            .find(|f| f.field_name == label)
+            .map(|f| f.marker_string.as_str())
+    }
+
     /// Generates a vector marker of length `dim` with an 8-byte signature at position 0.
     ///
     /// The floats at position 0 (if `dim >= 2`) produce the exact 8-byte LE signature
@@ -108,6 +173,11 @@ impl OrcMarkerSet {
         }
         needles.push(self.vector_signature.to_vec());
         needles
+    }
+
+    /// Returns all raw byte needles expanded into raw, hex, base64, and UTF-16LE representations.
+    pub fn needles_multi_encoding(&self) -> Vec<Vec<u8>> {
+        expand_needle_encodings(&self.needles())
     }
 
     /// Returns the run label.

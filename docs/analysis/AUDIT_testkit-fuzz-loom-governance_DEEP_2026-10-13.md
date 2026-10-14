@@ -1,3 +1,9 @@
+<!-- STATUS BLOCK -->
+> **Stand der Befunde gegen Commit 2738b208:**
+> - **[BEFUND-01]:** UNGEPRÜFT (Ratchet Monotonie Baseline)
+> - **[BEFUND-02]:** UNGEPRÜFT (Loom Test Suite unter `--cfg loom`)
+<!-- END STATUS BLOCK -->
+
 # Deep Audit-Bericht: `contextra-testkit`, Fuzz-Targets, Loom-Tests & Gate-Konfiguration (`governance/`)
 
 **Auditor:** Spezialist für Teststrategie, deterministisches Chaos-Testing und Verifikation

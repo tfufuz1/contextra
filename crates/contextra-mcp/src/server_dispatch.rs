@@ -173,7 +173,7 @@ impl McpServer {
                     principal,
                     token,
                     channel,
-                    |_scope, collection| {
+                    |_scope, collection| async move {
                         let tenant_id = crate::validation::extract_tenant_from_args_or_env(None);
                         let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                             .key
@@ -183,15 +183,11 @@ impl McpServer {
                                     "deletion proof key not configured",
                                 )
                             })?;
-                        let rt = tokio::runtime::Handle::current();
                         let db = self.db.clone();
-                        let col_name = collection.to_string();
-                        let proof_res = tokio::task::block_in_place(|| {
-                            rt.block_on(async move {
-                                db.drop_collection(&col_name, tenant_id, proof_key.as_bytes())
-                                    .await
-                            })
-                        });
+                        let col_name = collection;
+                        let proof_res = db
+                            .drop_collection(&col_name, tenant_id, proof_key.as_bytes())
+                            .await;
                         match proof_res {
                             Ok(_) => Ok(1),
                             Err(e) => {
@@ -199,7 +195,8 @@ impl McpServer {
                             }
                         }
                     },
-                );
+                )
+                .await;
                 match res {
                     Ok(val) => JsonRpcResponse::ok(id, val),
                     Err(e) => response_from_error(id, Self::error_to_mcp(e.code, e.message)),

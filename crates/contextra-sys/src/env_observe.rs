@@ -1,4 +1,4 @@
-//! Environment observation for Ring 0 system interfaces (§C8).
+//! Environment observation and runtime process hardening for Ring 0 system interfaces (§C8, B16).
 //!
 //! # Observation vs Guarantee (INV-D10)
 //!
@@ -9,8 +9,8 @@
 //! behavior.
 //!
 //! Process hardening (`harden_runtime`, e.g. setting `RLIMIT_CORE=0` or `PR_SET_DUMPABLE=0`)
-//! is deliberately **omitted** from this module, as process state modification requires
-//! architecture-level ADR approval and baseline policy updates.
+//! is available via [`harden_runtime`] and returns an explicit per-measure result report
+//! ([`HardenRuntimeReport`]).
 //!
 //! # Copy-On-Write (CoW) Evaluation Rules
 //!
@@ -48,6 +48,29 @@
 //! | `EnvFsKind` | `Other` | `8` |
 
 use std::path::Path;
+
+/// Status outcome of an individual runtime hardening measure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HardeningStatus {
+    /// Measure successfully applied.
+    Applied,
+    /// Measure failed with standard OS errno value.
+    Failed {
+        /// System error number (errno).
+        errno: i32,
+    },
+    /// Measure is not supported on the target OS or platform architecture.
+    NotSupported,
+}
+
+/// Comprehensive report for runtime hardening operations (`harden_runtime`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HardenRuntimeReport {
+    /// Result of restricting process core dump size to 0 (`RLIMIT_CORE`).
+    pub rlimit_core: HardeningStatus,
+    /// Result of setting process dumpable flag to 0 (`PR_SET_DUMPABLE`).
+    pub pr_set_dumpable: HardeningStatus,
+}
 
 /// Tri-state observation result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -161,6 +184,121 @@ pub struct EnvObservation {
     pub swap_active: EnvTri,
     /// Core dumps are possible (non-zero size limit).
     pub core_dumps_possible: EnvTri,
+}
+
+/// Explicitly applies process-level runtime hardening measures (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).
+///
+/// Returns a [`HardenRuntimeReport`] containing the outcome of each individual measure.
+///
+/// # Operating System Behavior
+/// - Linux: Sets `RLIMIT_CORE` limit to zero and executes `prctl(PR_SET_DUMPABLE, 0)`.
+/// - Non-Linux: Returns [`HardeningStatus::NotSupported`] for platform-unsupported measures.
+#[must_use]
+pub fn harden_runtime() -> HardenRuntimeReport {
+    #[cfg(target_os = "linux")]
+    {
+        harden_runtime_linux()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        HardenRuntimeReport {
+            rlimit_core: HardeningStatus::NotSupported,
+            pr_set_dumpable: HardeningStatus::NotSupported,
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn harden_runtime_linux() -> HardenRuntimeReport {
+    let rlim = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+
+    // SAFETY:
+    // 1. `rlim` is valid and resides on the stack.
+    // 2. `libc::RLIMIT_CORE` is a standard Linux resource limit constant.
+    let res_rlim = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
+
+    let rlimit_core = if res_rlim == 0 {
+        HardeningStatus::Applied
+    } else {
+        let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        HardeningStatus::Failed { errno }
+    };
+
+    // SAFETY:
+    // 1. `libc::PR_SET_DUMPABLE` is a standard Linux prctl operation.
+    // 2. Passing `0` disables core dumps and ptrace attachments.
+    let res_prctl = unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
+
+    let pr_set_dumpable = if res_prctl == 0 {
+        HardeningStatus::Applied
+    } else {
+        let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        HardeningStatus::Failed { errno }
+    };
+
+    HardenRuntimeReport {
+        rlimit_core,
+        pr_set_dumpable,
+    }
+}
+
+/// Feature-detection helper for kernel `memfd_secret` support (Linux >= 5.14).
+///
+/// **IMPORTANT NOTE ON SECURITY LIMITATIONS**:
+/// `memfd_secret` creates secret memory areas hidden from host process memory maps.
+/// However, per Linux man-pages (`memfd_secret(2)`), `memfd_secret` does NOT provide 100% protection
+/// against direct kernel-space inspection, hardware DMA access, or privileged kernel exploits.
+/// It is checked purely as feature detection without mandatory usage enforcement.
+#[must_use]
+pub fn check_memfd_secret_support() -> EnvTri {
+    #[cfg(target_os = "linux")]
+    {
+        // Check availability via syscall. SYS_memfd_secret syscall ID on Linux.
+        #[cfg(target_arch = "x86_64")]
+        const SYS_MEMFD_SECRET: libc::c_long = 447;
+        #[cfg(target_arch = "aarch64")]
+        const SYS_MEMFD_SECRET: libc::c_long = 447;
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        const SYS_MEMFD_SECRET: libc::c_long = -1;
+
+        if SYS_MEMFD_SECRET < 0 {
+            return EnvTri::No;
+        }
+
+        // SAFETY:
+        // Invokes syscall with invalid flag (0) or check errno.
+        // `syscall` with SYS_MEMFD_SECRET creates an anonymous file descriptor.
+        // Calling with invalid flags (e.g., 0) returns ENOSYS if missing or EINVAL if supported.
+        let res = unsafe { libc::syscall(SYS_MEMFD_SECRET, 0u32) };
+
+        if res >= 0 {
+            // Secret fd opened successfully (must be closed)
+            // SAFETY: `res` is a valid file descriptor returned by syscall.
+            unsafe {
+                libc::close(res as libc::c_int);
+            }
+            EnvTri::Yes
+        } else {
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            if errno == libc::ENOSYS {
+                EnvTri::No
+            } else if errno == libc::EINVAL || errno == libc::EPERM {
+                // Syscall exists but rejected flags/permissions => kernel supports memfd_secret
+                EnvTri::Yes
+            } else {
+                EnvTri::Unknown
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        EnvTri::No
+    }
 }
 
 /// Evaluates Copy-on-Write (`cow_fs`) behavior for a given filesystem type and mount options string.

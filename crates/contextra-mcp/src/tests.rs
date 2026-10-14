@@ -302,6 +302,7 @@ async fn test_contextra_forget_single_doc() {
 }
 
 #[tokio::test]
+#[cfg(feature = "encryption-at-rest")]
 async fn test_contextra_forget_collection_with_proof() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
 

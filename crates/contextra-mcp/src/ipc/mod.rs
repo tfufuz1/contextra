@@ -6,4 +6,7 @@ pub mod primary;
 pub mod proxy;
 pub mod server;
 
-pub use channel::Channel;
+pub use channel::{configure_channel_bounds, Channel};
+pub use primary::PrimaryDetector;
+pub use proxy::IpcProxy;
+pub use server::IpcServer;

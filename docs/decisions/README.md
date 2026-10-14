@@ -6,6 +6,14 @@ Das Verzeichnis `docs/decisions/` ist die einzige kanonische Quelle (Single Sour
 - Jede Entscheidung wird als `ADR-NNN-slug.md` <!-- doc-ref-ignore --> in diesem Verzeichnis geführt.
 - Der Status jeder ADR (z. B. `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded`) ist im YAML/Markdown-Front-Matter der jeweiligen Datei dokumentiert.
 
+## Wiring-Richtlinie & Definition von "verdrahtet"
+- **Definition "verdrahtet":** Ein Symbol oder Subsystem gilt nur dann als *verdrahtet*, wenn:
+  1. mindestens ein **Produktionsaufrufer** in einem anderen Modul oder Crate existiert UND
+  2. ein **Integrationstest/Verdrahtungstest** den echten Produktionspfad durchläuft.
+  Re-Exporte, Selbstreferenzen, Test-only-Aufrufer oder Fuzz-Aufrufer zählen *nicht* als Verdrahtung.
+- **Verbot von Scheinverdrahtung / hohlen Wiring-Typen:**
+  Ein `<Name>Wiring`-Typ ohne Inhalt (z. B. leeres Struct, `build(_deps: ())` ohne Funktion) oder ohne echten Produktionskonsumenten ist als Scheinverdrahtung unzulässig. Jeder Wiring-Einstieg muss echte Abhängigkeiten injizieren und im Composition Root aufgerufen werden.
+
 ## Wichtige Architektur-Entscheidungen (Auswahl)
 - [ADR-SCOPE-FREEZE-2026-10](./ADR-SCOPE-FREEZE-2026-10.md): Scope Freeze & Verbindliche Crate-Klassifikation (Klasse K: Kern, Klasse R: Rand, Klasse E: Experimentell gemäß Spezifikation §6.0).
 

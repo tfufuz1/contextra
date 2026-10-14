@@ -278,7 +278,7 @@ impl AuditChain {
         })
     }
 
-    /// Verifiziert eine periodische Kettenkopf-Signatur gegen den angegebenen VerifyingKey.
+    /// Verifiziert eine periodische Kettenkopf-Signatur gegen den angegebenen VerifyingKey strikt.
     pub fn verify_head_signature(
         head_sig: &AuditChainHeadSignature,
         verifying_key: &ed25519_dalek::VerifyingKey,
@@ -287,13 +287,12 @@ impl AuditChain {
         payload.extend_from_slice(&head_sig.chain_index.to_le_bytes());
         payload.extend_from_slice(&head_sig.head_hash);
 
-        use ed25519_dalek::Verifier;
         let sig = match ed25519_dalek::Signature::from_slice(&head_sig.signature) {
             Ok(s) => s,
             Err(_) => return Ok(false),
         };
 
-        Ok(verifying_key.verify(&payload, &sig).is_ok())
+        Ok(verifying_key.verify_strict(&payload, &sig).is_ok())
     }
 
     /// Verifiziert die vollständige Kette auf Integrität.
@@ -394,5 +393,54 @@ impl AuditChain {
             return Ok(false);
         }
         Self::verify_head_signature(head_sig, verifying_key)
+    }
+
+    /// Verifiziert die Kette gegen einen externen Anker (head_hash, head_counter).
+    ///
+    /// Ein externer Anker mit größerem Zähler als die vorgelegte Kette deutet auf ein Rollback hin
+    /// und liefert ein `Err(CryptoError::Crypto(...))`.
+    /// Ebenso führen Lücken, Neuordnungen oder abweichende Hashes zu einem Fehler.
+    pub fn verify_against_anchor(&self, head_hash: &[u8; 32], head_counter: u64) -> Result<()> {
+        if !self.verify_chain()? {
+            return Err(CryptoError::Crypto(
+                "Audit chain integrity check failed: chain contains invalid entry, gap, or hash mismatch"
+                    .to_string(),
+            ));
+        }
+
+        if self.entries.is_empty() {
+            if head_counter == 0 && head_hash == &[0u8; 32] {
+                return Ok(());
+            }
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain rollback detected: chain is empty but external anchor specified head_counter {head_counter}"
+            )));
+        }
+
+        let last_index = self.entries.last().map(|e| e.index).unwrap_or(0);
+        if head_counter > last_index {
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain rollback detected: anchor counter {head_counter} is greater than chain head index {last_index}"
+            )));
+        }
+
+        let idx = usize::try_from(head_counter).map_err(|e| {
+            CryptoError::Crypto(format!("Invalid head_counter index overflow: {e}"))
+        })?;
+
+        let entry = self.entries.get(idx).ok_or_else(|| {
+            CryptoError::Crypto(format!(
+                "Audit chain entry at index {head_counter} is missing"
+            ))
+        })?;
+
+        if entry.entry_hash != *head_hash {
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain anchor mismatch at index {head_counter}: expected head_hash {:?}, got {:?}",
+                head_hash, entry.entry_hash
+            )));
+        }
+
+        Ok(())
     }
 }
