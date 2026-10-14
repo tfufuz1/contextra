@@ -1328,6 +1328,51 @@ Alle ADRs aus allen Plänen, unifiziert:
 
 ---
 
+## 19. Synthese der Tiefenaudits vom 13./14.10. & Beseitigung der Schnittstellen-Lücken
+
+Die Tiefenaudits (`docs/analysis/` und `logs/audits/`) sowie die statische Harness-Analyse (`cargo xtask find-unwired-gaps`) vom 14.10.2026 identifizierten **512 öffentliche Funktionen ohne Aufrufer** (`docs/gaps/pub_fn_ohne_aufrufer.csv`) und **1.057 undokumentierte Schnittstellen** (`docs/gaps/undokumentiert_streng.csv`). 
+
+### 19.1 Kritische Befunde & Korrektur-Entscheidungen
+
+| Subsystem / Crate | Befund-ID / Audit | Ursache & Risiko | Architektonische Entscheidung & Korrektur |
+|---|---|---|---|
+| **`contextra-engine`** | `ENG-FILTER-001` (`AUDIT_collection-...`) | `apply_temporal_validity_filter_at` castet Unix-Timestamp (`u64`) direkt in `TxId`, vermengt System- und Geschäftszeit | Signatur trennen: `as_of_tx: TxId` und `as_of_business: Option<u64>` als getrennte Parameter. |
+| **`contextra-engine`** | `FINDING-ORPHAN-REAPERS` (`pub_fn_...`) | 4 Background-Reaper (`start_expiry_reaper`, `start_orphan_reaper`, `start_thermostat_reaper`, `start_kv_cache_eviction`) werden im `Contextra::open`-Pfad nie gestartet | Reapers in `EngineLifecycle`-Manager bündeln und kontrolliert mit Shutdown-Signal instanziieren. |
+| **`contextra-engine`** | `FINDING-REVERSE-SWEEP` (`AUDIT_collection-...`) | `reverse_sweep` und `DpiPurgeDriver` sind verwaiste Code-Artefakte ohne Aufrufer | `DpiPurgeDriver` auf `pub(crate)` reduzieren; `reverse_sweep` in Purge v2 integrieren oder tilgen. |
+| **`contextra-agent`** | `AGT-STATUS-001` (`AUDIT_collection-...`) | `pub status: AgentStatus` auf `AgentContext` erlaubt unkontrollierte Status-Mutationen von außen | Kapselung als privates Feld; Zustandsübergänge ausschließlich über typisierte Methoden der `OrchestratorEngine`. |
+| **`contextra-crypto`** | `FINDING-CRYPTO-01` (`AUDIT_contextra-crypto`) | `KmsProvider` und `LocalKmsProvider` sind nirgends in Ring 4 verdrahtet | Im `ContextraBuilder` als Standard-KMS-Port registrieren (`with_kms(LocalKmsProvider::new(...))`). |
+| **`contextra-crypto`** | `FINDING-KV-REVOCATION` (`AUDIT_contextra-crypto`) | Offenes TODO in `kv_shredding.rs:247` für Lock-freie Gruppen-Revokation | Ersetzen durch atomare Bitmaske (`AtomicU64`-Slices) für O(1) Zero-Lock Revokationsprüfungen. |
+| **`contextra-mcp`** | `FINDING-MCP-BLOCKING` (`AUDIT_mcp_py_facade`) | `server_dispatch.rs` nutzt `tokio::task::block_in_place(|| rt.block_on(...))` in async-Kontext | JSON-RPC Dispatcher vollständig auf rein asynchrone Bearbeitung umstellen. |
+| **`contextra-mcp`** | `FINDING-MCP-TENANT` (`AUDIT_mcp_py_facade`) | Feste Kodierung von `TenantId(1)` oder `TenantId::SYSTEM` in Tool-Handlern | Mandanten-ID aus RPC-Session-Header bzw. TLS-Token extrahieren und an `ContextraDb` durchreichen. |
+| **`contextra-sandbox`** | `FINDING-SANDBOX-RING` (`AUDIT_governance_harness`) | Ring-Verletzung: `contextra-engine` und `contextra-store` binden `contextra-sandbox` (Ring 2) direkt ein | Entkopplung über Port-Trait `MergeOperatorFactory` in `contextra-ports`; Sandbox implementiert den Port. |
+| **`contextra-durable-fs`** | `FINDING-JOURNAL-FLUSH` (`AUDIT_wal_durable_fs`) | `PendingDeleteJournal::process` verwirft `let _ = self.flush()` im Fehlerfall | Strikte Fehlerpropagation via `self.flush()?` (INV-FSYNC-1). |
+
+### 19.2 Crate-Übergreifende Verdrahtungs-Doktrin
+
+1. **Kein Shim ohne Konsument:** Öffentliche Symbole in `pub_fn_ohne_aufrufer.csv` werden entweder:
+   - Im entsprechenden Composition Root (`contextra::builder` oder `contextra-mcp`) produktiv verdrahtet.
+   - Auf `pub(crate)` bzw. `pub(in crate::...)` eingeschränkt.
+   - Ersatzlos entfernt, wenn es sich um verwaiste Code-Duplikate handelt.
+2. **Dokumentations-Pflicht:** Alle 1.057 Symbole aus `undokumentiert_streng.csv`, die öffentlich verbleiben, erhalten vollständige `///`-Dokumentation mit Fehler-, Panik- und Sicherheitsgarantien.
+3. **Disjunktive Produkt-Spezifikationen:** Jedes Endprodukt (EP1 bis EP6) wird als disjunktives, mikrofeingranulares Implementierungsdokument in `docs/14-10-26/specs/` formalisiert.
+
+---
+
+## 20. Mikrofeingranulare Produkt-Spezifikationsmatrix (EP1–EP6)
+
+Die Gesamtarchitektur wird in 6 disjunktive, unabhängig auditierbare Implementierungsspezifikationen zerlegt:
+
+| ID | Dokumentenpfad | Produkt / Modul | Disjunktive Crates / Komponenten | Zielzustand |
+|---|---|---|---|---|
+| **EP1** | [`docs/14-10-26/specs/EP1_CONTEXTRA_MEMORY_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP1_CONTEXTRA_MEMORY_SPEC.md) | **Contextra Memory (Core 1.0)** | `types`, `ports`, `store`, `vector`, `text`, `rank`, `mvcc`, `durable-fs`, `simd`, `sys`, `engine` (Core), `contextra` (Facade), `mcp` (Core) | Lauffähige, hochperformante Hybrid-DB mit Mandantentrennung, Zero-Panic, Purge v2, HNSW-Zeroisierung und verifizierter Builder-API. |
+| **EP2** | [`docs/14-10-26/specs/EP2_CONTEXTRA_PROOF_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP2_CONTEXTRA_PROOF_SPEC.md) | **Contextra Proof (Löschnachweis)** | `crypto`, `contextra-erasure`, `contextra-evidence`, `contextra-verify`, `audit-export`, `avv-generator` | Mathematisch unanfechtbare, rechtsverbindliche Löschung nach DSGVO Art. 17 / ZPO § 371a, v4-TLV Proofs, autonome Verifikation. |
+| **EP3** | [`docs/14-10-26/specs/EP3_CONTEXTRA_RETRIEVAL_PLUS_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP3_CONTEXTRA_RETRIEVAL_PLUS_SPEC.md) | **Contextra Retrieval+ (Graph & PathRAG)** | `contextra-graph`, `engine` (Graph-Modul), `mcp` (`relate`, `explain`) | Wissensgraphen, Vorwärts-Push PPR, Hyperkanten, Dijkstra `find_path`, OpenIE Triple-Extraktion und kaskadierende Kanten-Invalidierung. |
+| **EP4** | [`docs/14-10-26/specs/EP4_CONTEXTRA_INFERENCE_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP4_CONTEXTRA_INFERENCE_SPEC.md) | **Contextra Inference & KV-Cache** | `infer-candle`, `infer-onnx`, `infer-ollama`, `contextra-kvcache` | 2-Bit KIVI Quantisierung, SnapKV Attention Pooling, Irminsul Radix-Prefix-Baum mit Tier-2 NVMe/mmap-Spillover. |
+| **EP5** | [`docs/14-10-26/specs/EP5_CONTEXTRA_COGNITION_ROUTER_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP5_CONTEXTRA_COGNITION_ROUTER_SPEC.md) | **Contextra Cognition & Agenten** | `contextra-adapt`, `contextra-router`, `contextra-cognition`, `contextra-agent` | PID Latency Controller, LinUCB/Thompson Sampling Routing, Konsolidierungsschlafzyklen, gekapselte Agent-State-Machine und DLQ. |
+| **EP6** | [`docs/14-10-26/specs/EP6_CONTEXTRA_GUARD_SANDBOX_SPEC.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/specs/EP6_CONTEXTRA_GUARD_SANDBOX_SPEC.md) | **Contextra Guard & Sandbox** | `contextra-privacy`, `contextra-sandbox`, `contextra-license` | DLP Surrogate Vault, Fail-Closed Egress Gateway, WASI Merge-Operatoren mit Fuel/Timeout-Budget und kryptografische Lizenzprüfung. |
+
+---
+
 ## Anhang A: Dokumenten-Genealogie
 
 | Vorgänger | Abgedeckte Abschnitte | Status |
