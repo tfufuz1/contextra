@@ -1,12 +1,12 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-Stand: 2026-10-14 · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
+Stand: 2026-10-14 (Update Governance M1a / TP-22) · Gilt für alle Agenten (Jules, Claude Code, Codex, manuelle Sessions)
 
 ## 1. Rangfolge
 
 1. Grüne Gates und Code-Realität
 2. `AGENTS.md` (diese Datei)
-3. `docs/IMPLEMENTIERUNGSSPEZIFIKATION_ENDPRODUKTE_DISJUNKTIV.md` & `docs/SPEZIFIKATION_EP*.md`
+3. `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` & <!-- doc-ref-ignore --> `docs/SPEZIFIKATION_EP*.md`
 4. `docs/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md` & `docs/14-10-26/specs/*`
 5. `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` (bzw. `docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`)
 6. Übrige Vorgaben in `docs/`
@@ -55,9 +55,9 @@ Geplante Befehle sind mit `<!-- harness:planned -->` markiert. Ein Agent darf si
 | `cargo xtask harness-help <name>` | ✅ | Hilfe zu einem einzelnen Harness-Befehl |
 | `cargo xtask fast-diff-lint` | ✅ | Build-freier Diff-Scope-Linter für häufige Doktrin-Verstöße |
 | `cargo xtask repo-doctor` | ✅ | Session-Start-Dashboard: Git, Workspace, Unsafe/Panic, Branch |
-| `cargo xtask env-validate` | ✅ | Toolchain- und Umgebungsvalidierung |
+| `cargo xtask env-validate` | 🔲 <!-- harness:planned --> | Toolchain- und Umgebungsvalidierung |
 | `cargo xtask env-attest` | ✅ | Environment Attestation: Toolchain-Pinning und Build-Tools |
-| `cargo xtask workspace-verify` | ✅ | Workspace-Vollständigkeit und Konsistenz |
+| `cargo xtask workspace-verify` | 🔲 <!-- harness:planned --> | Workspace-Vollständigkeit und Konsistenz |
 | `cargo xtask registry-check` | ✅ | Vollständigkeit und Konsistenz aller xtask-Befehle gegen registry.toml |
 | `cargo xtask explain <gate>` | ✅ | Qualitätsgates und Invarianten erklären |
 | `cargo xtask verify [--tier kernel|full]` | ✅ | Einzelbefehl zur Verifikation und Evidenzerzeugung |
@@ -73,34 +73,34 @@ Geplante Befehle sind mit `<!-- harness:planned -->` markiert. Ein Agent darf si
 | `cargo xtask stub-impls [--min-severity hoch]` | ✅ | Stub-Implementierungen (`HOCH`, `MITTEL`, `NIEDRIG`) | 2 bei `HOCH` |
 | `cargo xtask doctrine-scan [--crate <name>] [--json]` | ✅ | Zero-Panic-Verstöße, Unsafe-Insel-Verstöße, `#[allow]`-Durchbrechungen | 2 bei Verstoß |
 | `cargo xtask dependency-graph-audit [--json]` | ✅ | DAG-Invariante (P5), Ring-0-`tokio` (P26), Zyklen | 2 bei Verstoß |
-| `cargo xtask check-ring-layering` | ✅ | Ring-Layering (Kurzfassung) | 2 bei Verstoß |
-| `cargo xtask check-ring-layering-full` | ✅ | Ring-Layering (vollständige Analyse) | 2 bei Verstoß |
-| `cargo xtask check-ring0-async-purity` | ✅ | Ring-0-Async-Reinheit (P26) | 2 bei Verstoß |
-| `cargo xtask check-unsafe-islands` | ✅ | Unsafe nur in deklarierten Inseln | 2 bei Verstoß |
-| `cargo xtask check-ring-capabilities-consistency` | ✅ | `capabilities.toml` als einzige Ring-Quelle (P12) | 2 bei Verstoß |
+| `cargo xtask check-ring-layering` | 🔲 <!-- harness:planned --> | Ring-Layering (Kurzfassung) | 2 bei Verstoß |
+| `cargo xtask check-ring-layering-full` | 🔲 <!-- harness:planned --> | Ring-Layering (vollständige Analyse) | 2 bei Verstoß |
+| `cargo xtask check-ring0-async-purity` | 🔲 <!-- harness:planned --> | Ring-0-Async-Reinheit (P26) | 2 bei Verstoß |
+| `cargo xtask check-unsafe-islands` | 🔲 <!-- harness:planned --> | Unsafe nur in deklarierten Inseln | 2 bei Verstoß |
+| `cargo xtask check-ring-capabilities-consistency` | 🔲 <!-- harness:planned --> | `capabilities.toml` als einzige Ring-Quelle (P12) | 2 bei Verstoß |
 | `cargo xtask determinism-check` | ✅ | Determinismus via Ports (P28) | 2 bei Verstoß |
-| `cargo xtask check-duplicate-symbols` | ✅ | Doppelte Funktions-/Struktursymbole über Dateigrenzen | 2 bei Verstoß |
-| `cargo xtask check-result-dropped-io` | ✅ | Ignorierte I/O-Fehler-Results (INV-DURABILITY-RING) | 2 bei Verstoß |
-| `cargo xtask check-nan-hot-loop` | ✅ | NaN-Validierung in Vektorberechnungs-Hotpaths | 2 bei Verstoß |
+| `cargo xtask check-duplicate-symbols` | 🔲 <!-- harness:planned --> | Doppelte Funktions-/Struktursymbole über Dateigrenzen | 2 bei Verstoß |
+| `cargo xtask check-result-dropped-io` | 🔲 <!-- harness:planned --> | Ignorierte I/O-Fehler-Results (INV-DURABILITY-RING) | 2 bei Verstoß |
+| `cargo xtask check-nan-hot-loop` | 🔲 <!-- harness:planned --> | NaN-Validierung in Vektorberechnungs-Hotpaths | 2 bei Verstoß |
 | `cargo xtask symbol-exists <pfad>` | ✅ | Einzelnes Symbol-Pfad-Existenz prüfen | 2 bei fehlendem Symbol |
-| `cargo xtask claim` | ✅ | Claim-Integrität für Agent-Gates | 2 bei Verstoß |
-| `cargo xtask gc-floor-single-source` | ✅ | Verhindert unerlaubte Aufrufe von `min_active_seqno()` außerhalb von `mvcc/floor.rs` | 2 bei Verstoß |
+| `cargo xtask claim` | 🔲 <!-- harness:planned --> | Claim-Integrität für Agent-Gates | 2 bei Verstoß |
+| `cargo xtask gc-floor-single-source` | ✅ | Verhindert unerlaubte Aufrufe von `min_active_seqno()` außerhalb von `crates/contextra-mvcc/src/floor.rs` | 2 bei Verstoß |
 
 ### 4.3 Tier 2 — Build-Abhängigkeit
 
 | Befehl | Status | Zweck |
 |---|---|---|
-| `cargo xtask check-compile` | ✅ | Workspace kompiliert fehlerfrei |
-| `cargo xtask check-dag` | ✅ | DAG-Prüfung über Cargo-Graph |
-| `cargo xtask bench-gate --tolerance 0.05` | ✅ | Benchmark-Gate (`xtask-heavy`) |
-| `cargo xtask bench-trend` | ✅ | Benchmark-Trendanalyse |
-| `cargo xtask feature-matrix` | ✅ | Feature-Kombinationen prüfen |
-| `cargo xtask loom-run` | ✅ | Concurrency-Tests mit loom |
-| `cargo xtask panic-inventory` | ✅ | Vollständiges Panic-Inventar |
-| `cargo xtask security-scan` | ✅ | Sicherheitsscan (audit, Advisories) |
-| `cargo xtask audit-integrity-check` | ✅ | Audit-Ketten-Integrität |
-| `cargo xtask check-fbs-drift` | ✅ | FlatBuffers-Schema-Drift-Erkennung |
-| `cargo xtask reproducible-build-check` | ✅ | Reproduzierbarkeit des Builds |
+| `cargo xtask check-compile` | 🔲 <!-- harness:planned --> | Workspace kompiliert fehlerfrei |
+| `cargo xtask check-dag` | 🔲 <!-- harness:planned --> | DAG-Prüfung über Cargo-Graph |
+| `cargo xtask bench-gate --tolerance 0.05` | 🔲 <!-- harness:planned --> | Benchmark-Gate (`xtask-heavy`) |
+| `cargo xtask bench-trend` | 🔲 <!-- harness:planned --> | Benchmark-Trendanalyse |
+| `cargo xtask feature-matrix` | 🔲 <!-- harness:planned --> | Feature-Kombinationen prüfen |
+| `cargo xtask loom-run` | 🔲 <!-- harness:planned --> | Concurrency-Tests mit loom |
+| `cargo xtask panic-inventory` | 🔲 <!-- harness:planned --> | Vollständiges Panic-Inventar |
+| `cargo xtask security-scan` | 🔲 <!-- harness:planned --> | Sicherheitsscan (audit, Advisories) |
+| `cargo xtask audit-integrity-check` | 🔲 <!-- harness:planned --> | Audit-Ketten-Integrität |
+| `cargo xtask check-fbs-drift` | 🔲 <!-- harness:planned --> | FlatBuffers-Schema-Drift-Erkennung |
+| `cargo xtask reproducible-build-check` | 🔲 <!-- harness:planned --> | Reproduzierbarkeit des Builds |
 | `cargo xtask fuzz-smoke` | ✅ | Fuzz-Smoke über berührte Crates mit Fuzz-Targets |
 | `cargo xtask mutants-diff` | ✅ | Diff-scopierter Mutation-Testing-Score |
 | `cargo xtask wal-replay-verify` | ✅ | WAL-Replay Crash-Konsistenz-Verifikation (INV-WAL-*) |
@@ -122,21 +122,21 @@ Geplante Befehle sind mit `<!-- harness:planned -->` markiert. Ein Agent darf si
 
 | Befehl | Status | Zweck |
 |---|---|---|
-| `cargo xtask sync-docs [--check]` | ✅ | Generierte Doku synchron halten |
-| `cargo xtask check-type-registry` | ✅ | `docs/TYPE_REGISTRY.md` vollständig |
-| `cargo xtask check-vetoes` | ✅ | Veto-Sperren |
-| `cargo xtask check-adr-deadlines` | ✅ | ADR-Fristen |
-| `cargo xtask check-veto-deadlines` | ✅ | Veto-Fristen |
-| `cargo xtask check-agents-integrity` | ✅ | Diese Datei ist konsistent |
-| `cargo xtask check-agents-freshness` | ✅ | Diese Datei ist aktuell |
-| `cargo xtask check-doc-references` | ✅ | Querverweise in Doku gültig |
-| `cargo xtask check-workflow-commands` | ✅ | Workflow-Befehle existieren |
-| `cargo xtask check-stale-tags` | ✅ | Veraltete Tags erkennen |
-| `cargo xtask check-toc-integrity` | ✅ | Inhaltsverzeichnis-Integrität |
-| `cargo xtask consolidate-adrs` | ✅ | ADRs zusammenführen |
-| `cargo xtask gen-arch-docs` | ✅ | Architektur-Dokumentation generieren |
-| `cargo xtask context-pack` | ✅ | Agent-Kontext-Paket erstellen |
-| `cargo xtask crate-context <crate>` | ✅ | Crate-Kontext-Report |
+| `cargo xtask sync-docs [--check]` | 🔲 <!-- harness:planned --> | Generierte Doku synchron halten |
+| `cargo xtask check-type-registry` | 🔲 <!-- harness:planned --> | `docs/TYPE_REGISTRY.md` vollständig |
+| `cargo xtask check-vetoes` | 🔲 <!-- harness:planned --> | Veto-Sperren |
+| `cargo xtask check-adr-deadlines` | 🔲 <!-- harness:planned --> | ADR-Fristen |
+| `cargo xtask check-veto-deadlines` | 🔲 <!-- harness:planned --> | Veto-Fristen |
+| `cargo xtask check-agents-integrity` | 🔲 <!-- harness:planned --> | Diese Datei ist konsistent |
+| `cargo xtask check-agents-freshness` | 🔲 <!-- harness:planned --> | Diese Datei ist aktuell |
+| `cargo xtask check-doc-references` | 🔲 <!-- harness:planned --> | Querverweise in Doku gültig |
+| `cargo xtask check-workflow-commands` | 🔲 <!-- harness:planned --> | Workflow-Befehle existieren |
+| `cargo xtask check-stale-tags` | 🔲 <!-- harness:planned --> | Veraltete Tags erkennen |
+| `cargo xtask check-toc-integrity` | 🔲 <!-- harness:planned --> | Inhaltsverzeichnis-Integrität |
+| `cargo xtask consolidate-adrs` | 🔲 <!-- harness:planned --> | ADRs zusammenführen |
+| `cargo xtask gen-arch-docs` | 🔲 <!-- harness:planned --> | Architektur-Dokumentation generieren |
+| `cargo xtask context-pack` | 🔲 <!-- harness:planned --> | Agent-Kontext-Paket erstellen |
+| `cargo xtask crate-context <crate>` | 🔲 <!-- harness:planned --> | Crate-Kontext-Report |
 | `cargo xtask gates-catalog-sync` | ✅ | Konsistenz zwischen gates.toml und harness-Phasen |
 
 ---
@@ -185,7 +185,7 @@ Agenten müssen **vor und nach jeder Modifikation** zielgerichtet die relevanten
 
 ## 6. Roadmap der geplanten Architektur-Änderungen (`docs/14-10-26/`)
 
-Die Evolution des Gesamtsystems erfolgt streng phasenbasiert gemäß [`docs/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md`](file:///home/freddy/Projekte/contextra/docs/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md) und den disjunktiven Spezifikationen in [`docs/14-10-26/`](file:///home/freddy/Projekte/contextra/docs/14-10-26/):
+Die Evolution des Gesamtsystems erfolgt streng phasenbasiert gemäß [`docs/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md`](<!-- doc-ref-ignore -->) und den disjunktiven Spezifikationen in [`docs/14-10-26/`](file:///home/freddy/Projekte/contextra/docs/14-10-26/):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -233,7 +233,7 @@ Die Evolution des Gesamtsystems erfolgt streng phasenbasiert gemäß [`docs/14-1
 
 ## 7. Vor jeder Änderung
 
-1. Task-Karte und zugehörige Komponentenspezifikation ([`docs/SPEZIFIKATION_EP*.md`](file:///home/freddy/Projekte/contextra/docs/SPEZIFIKATION_EP1_CONTEXTRA_MEMORY.md)) lesen.
+1. Task-Karte und zugehörige Komponentenspezifikation ([<!-- doc-ref-ignore --> `docs/SPEZIFIKATION_EP*.md`](file:///home/freddy/Projekte/contextra/docs/SPEZIFIKATION_EP1_CONTEXTRA_MEMORY.md)) lesen.
 2. Existenz prüfen: `capabilities.toml`, `docs/TYPE_REGISTRY.md`, `cargo xtask symbol-exists <pfad>`.
 3. Verfügbare Befehle prüfen: `cargo xtask harness-list` — **niemals** Ad-hoc-Befehle nutzen.
 4. Plan mit Dateiliste und Akzeptanzbefehlen erstellen. Akzeptanzbefehle **nur** aus Abschnitt 4 und 5 mit Status ✅ oder 🟡.
@@ -274,13 +274,26 @@ Die Evolution des Gesamtsystems erfolgt streng phasenbasiert gemäß [`docs/14-1
 | Snapshot-Isolation | Alle Signale einer Anfrage lesen denselben Sequenzstand (`max_seq`) | `cargo test -p contextra-text` |
 | Fail-Closed | Fail-closed für SSI, Sandbox, Egress-Timeout und Egress-Indexausfall | `cargo test -p contextra-mcp` |
 
+### 9.1 Vorgeschlagene Invarianten (Entwurf / Vorschläge — KEIN aktives Gate)
+
+> **Hinweis**: Die folgenden Invarianten stellen Entwürfe/Vorschläge dar (ADR-T01 bis ADR-T06) und sind **noch keine** verbindlich geschalteten Qualitätsgates in der CI.
+
+| ID | Vorschlag / Regel | Zugehöriger ADR-T Entwurf | Status |
+|---|---|---|---|
+| P29 | Kein globaler veränderlicher Zustand (`static mut`, globale mutable Einzellokationen verboten) | [ADR-T01](docs/decisions/ADR-T01-P29-kein-globaler-veraenderlicher-zustand.md) | Entwurf (Kein Gate) |
+| INV-KMS-1 | Strikte KMS-Provider-Verdrahtung in Crypto- und Schlüssel-Modulen | [ADR-T02](docs/decisions/ADR-T02-INV-KMS-1-kms-provider-verdrahtung.md) | Entwurf (Kein Gate) |
+| INV-DELETION-WIRE-1 | Durchgängige Löschpfad-Verdrahtung über alle Speicher-Layer | [ADR-T03](docs/decisions/ADR-T03-INV-DELETION-WIRE-1-loeschpfad-verdrahtung.md) | Entwurf (Kein Gate) |
+| INV-SSI-ACTIVE-1 | Strikte Durchsetzung von Serializable Snapshot Isolation (SSI) | [ADR-T04](docs/decisions/ADR-T04-INV-SSI-ACTIVE-1-ssi-durchsetzung.md) | Entwurf (Kein Gate) |
+| INV-DOC-SINGLE-SOURCE-1 | Dokumentationsreferenzen strictly gegen Primärquellen | [ADR-T05](docs/decisions/ADR-T05-INV-DOC-SINGLE-SOURCE-1-doc-single-source.md) | Entwurf (Kein Gate) |
+| INV-RING0-DETERMINISM-1 | Ring-0 Determinismus ohne ungekapselte Zeit/RNG-Aufrufe | [ADR-T06](docs/decisions/ADR-T06-INV-RING0-DETERMINISM-1-ring0-determinismus.md) | Entwurf (Kein Gate) |
+
 ---
 
 ## 10. Architektur-Karte
 
 - `capabilities.toml`: verbindliches Crate- und Ring-Verzeichnis, einzige Quelle für Ringe, Composition-Root-Menge und Unsafe-Inseln.
-- `docs/IMPLEMENTIERUNGSSPEZIFIKATION_ENDPRODUKTE_DISJUNKTIV.md`: Gesamtsynthese der disjunktiven Produktkomponenten (EP1–EP6).
-- `docs/SPEZIFIKATION_EP*.md`: Einzel-Feinspezifikationen pro Komponente.
+- `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`: Gesamtsynthese der disjunktiven Produktkomponenten (EP1–EP6).
+- <!-- doc-ref-ignore --> `docs/SPEZIFIKATION_EP*.md`: Einzel-Feinspezifikationen pro Komponente.
 - `docs/TYPE_REGISTRY.md`: alle Domänen-Typen.
 - `docs/decisions/README.md`: ADRs und Veto-Sperren.
 - `xtask/registry.toml`: alle Harness-Befehle mit `owner_tier`, `phase` und `summary` — **verbindliche Befehlswahrheit**.
