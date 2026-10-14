@@ -15,8 +15,9 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
+use contextra_core::{CollectionId, ContextraError, DocId, StorageStats, TenantId, TxId};
 use contextra_crypto::deletion_witness::LayerWitness;
+use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope, PurgeOutput};
 use contextra_ports::{BoxFuture, Result, StorageEngine};
 use std::ops::Bound;
 use std::sync::Arc;
@@ -191,6 +192,9 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         prefixes: &'a [Vec<u8>],
         as_of_tx: TxId,
     ) -> BoxFuture<'a, Result<LayerWitness>>;
+    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
+        None
+    }
 }
 
 impl StorageEngineHandle for LsmStorage {
@@ -342,6 +346,9 @@ impl StorageEngineHandle for LsmStorage {
     ) -> BoxFuture<'a, Result<LayerWitness>> {
         Box::pin(self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx))
     }
+    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
+        Some(self)
+    }
 }
 
 impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
@@ -492,6 +499,9 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         as_of_tx: TxId,
     ) -> BoxFuture<'a, Result<LayerWitness>> {
         (**self).issue_memtable_witness_handle(deleted_keys, prefixes, as_of_tx)
+    }
+    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
+        (**self).erasure_capabilities_handle()
     }
 }
 
@@ -868,11 +878,154 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
             Ok((stripped_batch, stripped_cursor))
         })
     }
+
+    fn erasure_capabilities(&self) -> Option<&dyn ErasureBackend> {
+        Some(self)
+    }
+}
+
+impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
+    fn physical_scope(&self, scope: &LogicalScope) -> Result<PhysicalScope> {
+        match scope {
+            LogicalScope::Document { doc_id, tenant_id } => {
+                if *tenant_id != self.codec.tenant_id {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
+                        self.codec.tenant_id, tenant_id
+                    )));
+                }
+                let prefix = self.codec.scan_prefix().to_vec();
+                let doc_key = self.make_key(format!("doc:{}", doc_id.0).as_bytes());
+                Ok(PhysicalScope::new(vec![doc_key], vec![prefix]))
+            }
+            LogicalScope::Collection {
+                collection_id,
+                tenant_id,
+            } => {
+                if *tenant_id != self.codec.tenant_id {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
+                        self.codec.tenant_id, tenant_id
+                    )));
+                }
+                let col_prefix = self.codec.collection_prefix(collection_id);
+                Ok(PhysicalScope::new(vec![], vec![col_prefix]))
+            }
+            LogicalScope::Keys(keys) => {
+                let physical_keys = keys.iter().map(|k| self.make_key(k)).collect();
+                Ok(PhysicalScope::new(physical_keys, vec![]))
+            }
+            LogicalScope::Prefixes(prefixes) => {
+                let physical_prefixes = prefixes.iter().map(|p| self.make_key(p)).collect();
+                Ok(PhysicalScope::new(vec![], physical_prefixes))
+            }
+        }
+    }
+
+    fn purge<'a>(
+        &'a self,
+        scope: &'a PhysicalScope,
+        as_of: TxId,
+    ) -> BoxFuture<'a, Result<PurgeOutput>> {
+        Box::pin(async move {
+            if let Some(backend) = self.inner.erasure_capabilities_handle() {
+                backend.purge(scope, as_of).await
+            } else {
+                Err(ContextraError::capability_unsupported(
+                    "purge",
+                    "Underlying storage engine does not support ErasureBackend",
+                ))
+            }
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_erasure_backend_tenant_matrix() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config = crate::lsm::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm = Arc::new(LsmStorage::open(config).await.unwrap());
+
+        let tenant_1 = TenantId::try_new(101).unwrap();
+        let tenant_2 = TenantId::try_new(202).unwrap();
+
+        let storage_t1 = TenantScopedStorage::new(lsm.clone(), tenant_1);
+        let storage_t2 = TenantScopedStorage::new(lsm.clone(), tenant_2);
+
+        // 1. Verify erasure_capabilities()
+        assert!(lsm.erasure_capabilities().is_some());
+        assert!(storage_t1.erasure_capabilities().is_some());
+
+        let eb_t1 = storage_t1.erasure_capabilities().unwrap();
+
+        // 2. Physical scope resolution with matching TenantId
+        let doc_scope = LogicalScope::Document {
+            doc_id: DocId(1),
+            tenant_id: tenant_1,
+        };
+        let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
+        assert_eq!(phys_scope.prefixes.len(), 1);
+        assert_eq!(phys_scope.prefixes[0], b"t:101:");
+        assert_eq!(phys_scope.keys.len(), 1);
+        assert_eq!(phys_scope.keys[0], b"t:101:doc:1");
+
+        // 3. Physical scope resolution with mismatched TenantId MUST fail closed
+        let mismatched_scope = LogicalScope::Document {
+            doc_id: DocId(1),
+            tenant_id: tenant_2,
+        };
+        let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
+        match err {
+            ContextraError::InvalidInput(msg) => {
+                assert!(msg.contains("TenantId mismatch"));
+            }
+            _ => panic!("Expected InvalidInput error, got {:?}", err),
+        }
+
+        // 4. Collection scope with matching TenantId
+        let col_scope = LogicalScope::Collection {
+            collection_id: CollectionId(55),
+            tenant_id: tenant_1,
+        };
+        let phys_col_scope = eb_t1.physical_scope(&col_scope).unwrap();
+        assert_eq!(phys_col_scope.prefixes, vec![b"t:101:55:"]);
+
+        // 5. Raw keys/prefixes scope
+        let raw_keys_scope = LogicalScope::Keys(vec![b"my_key".to_vec()]);
+        let phys_raw_keys = eb_t1.physical_scope(&raw_keys_scope).unwrap();
+        assert_eq!(phys_raw_keys.keys, vec![b"t:101:my_key".to_vec()]);
+
+        // 6. Put data for both tenants
+        let tx1 = TxId::try_new(10).unwrap();
+        storage_t1.put(tx1, b"doc:1", b"val_tenant1").await.unwrap();
+        storage_t2.put(tx1, b"doc:1", b"val_tenant2").await.unwrap();
+        storage_t1.commit(tx1).await.unwrap();
+
+        // Flush memtable to SSTable
+        storage_t1.flush().await.unwrap();
+
+        // 7. Purge tenant 1 doc
+        let tx_purge = TxId::try_new(20).unwrap();
+        let purge_out = eb_t1.purge(&phys_scope, tx_purge).await.unwrap();
+        assert_eq!(purge_out.records_purged, 1);
+
+        // Verify tenant 1 value is purged
+        let get_t1 = storage_t1.get(b"doc:1").await.unwrap();
+        assert!(get_t1.is_none());
+
+        // Verify tenant 2 value remains untouched
+        let get_t2 = storage_t2.get(b"doc:1").await.unwrap();
+        assert_eq!(get_t2.unwrap().as_ref(), b"val_tenant2");
+
+        lsm.close().await.unwrap();
+    }
 
     #[test]
     fn test_encode_decode_roundtrip() {
