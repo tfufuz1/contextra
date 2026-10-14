@@ -69,6 +69,9 @@ pub struct LsmStorage {
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
     pub erasure_fence: Arc<super::fence::ErasureFence>,
+    pub erasure_ledger_handle: Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>>,
+    pub(super) read_only: bool,
+    pub(super) ledger_status: crate::erasure_ledger::LedgerOpenStatus,
 }
 
 impl Drop for LsmStorage {
@@ -98,6 +101,30 @@ impl LsmStorage {
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
         self.pressure_rx.clone()
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    pub fn ledger_state(&self) -> crate::erasure_ledger::LedgerOpenStatus {
+        self.ledger_status.clone()
+    }
+
+    /// Appends entries to the erasure ledger with atomic fsync durability.
+    pub async fn ledger_append(
+        &self,
+        entries: &[crate::erasure_ledger::LedgerEntry],
+    ) -> Result<()> {
+        if self.read_only {
+            return Err(contextra_core::ContextraError::Storage(
+                "Storage engine is read-only due to erasure ledger anomaly".into(),
+            ));
+        }
+        if let Some(ref handle) = self.erasure_ledger_handle {
+            handle.append(entries).await?;
+        }
+        Ok(())
     }
 
     /// Signals the background compaction engine to stop.
