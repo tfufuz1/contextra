@@ -1,4 +1,4 @@
-//! Environment observation and attestation TLV encoding (§C8, §C9, WP-1.1).
+//! Environment observation and attestation TLV encoding (§C8, §C9, WP-1.1, B16).
 //!
 //! # Observation vs Guarantee (INV-D10)
 //!
@@ -9,17 +9,17 @@
 //! behavior without cryptographic erasure (S4).
 //!
 //! Process-level hardening (`harden_runtime`, e.g., setting `RLIMIT_CORE=0` or `PR_SET_DUMPABLE=0`)
-//! is deliberately **omitted** from this module, as process state modification requires
-//! architecture-level ADR approval and baseline policy updates.
+//! is re-exported from [`contextra_sys::env_observe`] for composition-root orchestration.
 
 #![forbid(unsafe_code)]
 
 use std::path::Path;
 
 pub use contextra_sys::env_observe::{
-    self, cow_fs_from_fs_kind_and_options, observe, parse_core_pattern, parse_dm_uuid,
-    parse_limits, parse_mountinfo, parse_proc_swaps, parse_rotational, EnvFsKind, EnvObservation,
-    EnvOsKind, EnvTri,
+    self, check_memfd_secret_support, cow_fs_from_fs_kind_and_options, harden_runtime, observe,
+    parse_core_pattern, parse_dm_uuid, parse_limits, parse_mountinfo, parse_proc_swaps,
+    parse_rotational, EnvFsKind, EnvObservation, EnvOsKind, EnvTri, HardenRuntimeReport,
+    HardeningStatus,
 };
 
 /// Encodes an empirical [`EnvObservation`] snapshot along with security flags into canonical TLV bytes (§C9).
