@@ -12,6 +12,10 @@ description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine,
 [package.metadata.contextra]
 ring = "tooling"
 
+[features]
+default = ["fault-injection"]
+fault-injection = []
+
 [dependencies]
 contextra-ports = { workspace = true }
 contextra-types = { workspace = true }

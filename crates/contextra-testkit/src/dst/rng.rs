@@ -3,6 +3,43 @@
 // ZWECK: Seedable, deterministic PRNG for Deterministic Simulation Testing (DST).
 // INVARIANTEN: Bit-identical random streams for identical seeds across executions.
 
+use contextra_ports::{Rng, SystemRng};
+
+/// Type-separated entropy RNG source for non-deterministic runtime entropy.
+///
+/// Unlike [`SeededRng`], `EntropyRng` CANNOT be initialized with a fixed seed value.
+/// This enforces type-level separation between deterministic test generators ([`SeededRng`])
+/// and real non-deterministic entropy sources ([`EntropyRng`]).
+#[derive(Debug, Default)]
+pub struct EntropyRng {
+    inner: SystemRng,
+}
+
+impl EntropyRng {
+    /// Creates a new `EntropyRng` instance seeded from system / runtime entropy.
+    pub fn new() -> Self {
+        Self {
+            inner: SystemRng::new(),
+        }
+    }
+}
+
+impl Rng for EntropyRng {
+    fn next_u64(&self) -> u64 {
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        self.inner.next_unit_f64()
+    }
+}
+
+pub use contextra_ports::SeededRng as PortSeededRng;
+
 /// Seedable pseudo-random number generator (SplitMix64 algorithm).
 #[derive(Debug, Clone)]
 pub struct DstRng {
@@ -64,5 +101,19 @@ mod tests {
             assert_eq!(rng1.next_range(10, 50), rng2.next_range(10, 50));
             assert_eq!(rng1.next_bytes(16), rng2.next_bytes(16));
         }
+    }
+
+    #[test]
+    fn test_entropy_rng_and_seeded_rng_separation() {
+        let seeded = PortSeededRng::new(42);
+        let seeded_same = PortSeededRng::new(42);
+        assert_eq!(seeded.next_u64(), seeded_same.next_u64());
+
+        let entropy1 = EntropyRng::new();
+        let entropy2 = EntropyRng::new();
+        let v1 = entropy1.next_u64();
+        let v2 = entropy2.next_u64();
+        // Non-deterministic streams from process/system entropy should differ
+        assert_ne!(v1, v2);
     }
 }

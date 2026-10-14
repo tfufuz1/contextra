@@ -102,6 +102,11 @@ impl ReferenceModel {
         commit_seq
     }
 
+    /// Returns a reference to the raw MVCC version history map (`BTreeMap<Key, Vec<(seq, Value|Tombstone)>>`).
+    pub fn history(&self) -> &BTreeMap<Vec<u8>, Vec<(u64, Option<Vec<u8>>)>> {
+        &self.history
+    }
+
     /// Returns the current high water mark sequence number.
     pub fn snapshot_seq(&self) -> u64 {
         self.current_seq
