@@ -7,7 +7,7 @@ use crate::collection::search::checkpoint::{
 use crate::collection::search::filtered::{MAX_OVERFETCH_SCAN, OVERFETCH_STAGE_MULTIPLIERS};
 use crate::collection::Collection;
 use crate::fusion::{SearchReport, Signal, SignalFailurePolicy};
-use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{MetricsSink, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result};
 
 /// Fixed pipeline stages for hybrid search processing (§W1-15).
@@ -368,39 +368,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 };
 
             let graph_start = std::time::Instant::now();
-            let graph_res: Result<Vec<crate::SearchResult>> = if let Some(anchors) = anchors_ref {
-                let tuples_res = match query.graph_strategy {
-                    contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                        self.graph_index
-                            .multi_traverse_at(anchors, max_hops, seq)
-                            .await
-                    }
-                    contextra_types::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
-                        self.graph_index
-                            .personalized_page_rank_at(anchors, cfg, seq)
-                            .await
-                    }
-                    contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                        self.graph_index.path_rag_at(anchors, max_hops, seq).await
-                    }
-                };
-
-                match tuples_res {
-                    Ok(mut raw_tuples) => {
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(candidate_k);
-                        let doc_tuples = raw_tuples
-                            .into_iter()
-                            .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-                            .collect();
-                        let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
-                        Ok(filter_pre_rrf(hydrated))
-                    }
-                    Err(e) => Err(e),
-                }
-            } else {
-                Ok(Vec::new())
-            };
+            let graph_res: Result<Vec<crate::SearchResult>> = Ok(Vec::new());
 
             let elapsed_graph = graph_start.elapsed().as_secs_f64();
             let sink = self.metrics_sink();

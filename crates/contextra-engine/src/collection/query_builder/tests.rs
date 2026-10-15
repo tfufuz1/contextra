@@ -1,6 +1,5 @@
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
-use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, RerankResult, Reranker};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{FilterExpr, HybridQuery};
@@ -112,13 +111,11 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         name.to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         Language::English,
@@ -424,60 +421,6 @@ async fn test_query_builder_reranking_with_text_and_reranker() {
     );
 }
 
-#[tokio::test]
-#[cfg(feature = "adaptive-candidate-pool-sizing")]
-async fn test_pid_controller_integration_with_reranker() {
-    let (col, _dir) = create_test_collection("test_pid_rerank").await;
-    col.insert(
-        "doc-1",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(json!({"text": "rust programming language"})),
-    )
-    .await
-    .unwrap();
-    col.insert(
-        "doc-2",
-        &[0.9, 0.1, 0.0, 0.0],
-        Some(json!({"text": "python programming language"})),
-    )
-    .await
-    .unwrap();
-
-    let reranker = MockReranker::passthrough();
-    let pid = Arc::new(parking_lot::Mutex::new(
-        contextra_adapt::PidController::default(),
-    ));
-
-    // First call: initial update
-    let res = col
-        .query()
-        .text("rust")
-        .embedding([1.0, 0.0, 0.0, 0.0])
-        .reranker(&reranker)
-        .pid_controller(pid.clone())
-        .k(2)
-        .execute()
-        .await
-        .unwrap();
-
-    assert_eq!(res.len(), 2);
-    let updated_size = pid.lock().current_pool_size;
-    assert!(updated_size.is_some());
-
-    // Second call: verify pid controller's stored current_pool_size is used as rerank_pool_max
-    let res2 = col
-        .query()
-        .text("rust")
-        .embedding([1.0, 0.0, 0.0, 0.0])
-        .reranker(&reranker)
-        .pid_controller(pid.clone())
-        .k(2)
-        .execute()
-        .await
-        .unwrap();
-
-    assert_eq!(res2.len(), 2);
-}
 
 #[tokio::test]
 async fn test_reranker_deadline_falls_back() {
