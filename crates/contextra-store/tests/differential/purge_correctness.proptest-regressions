@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 27debad8e172458b597b2b21d4a1067ca881cb6770a8ef8b15ba5652dd40875b # shrinks to ops = [Put([0], [0]), Put([12], [152, 81, 113, 155, 204, 144, 83, 139, 75, 156, 72, 144, 255, 15, 141, 128, 129, 86, 112, 181, 177, 81, 135, 72, 192, 164, 49, 201, 172, 201, 192, 243, 245, 101, 21, 194, 58, 83, 17, 117, 156, 55, 38, 212, 36, 18, 168, 67, 160, 4, 73, 8, 95, 29, 71, 67, 207, 109, 153, 145, 125]), Put([107, 73, 220, 227, 251, 111, 15, 210, 79, 74, 0], [53, 162, 13, 215, 57, 244, 66, 184, 138, 229, 209, 211, 176, 238, 201])]
