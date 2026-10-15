@@ -4,7 +4,7 @@
 //! Evaluates systemic resiliency across Candle embedding inference and LsmStorage disk I/O faults.
 
 use contextra_db::collection::Collection;
-use contextra_graph::csr::CsrGraph;
+use contextra_ports::graph_index::GraphIndexPlaceholder;
 use contextra_ports::EmbeddingError;
 use contextra_ports::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
 use contextra_ports::{StorageEngine, VectorIndex};
@@ -196,7 +196,7 @@ async fn chaos_gpu_busy_disk_full_no_orphaned_embedding() {
         })
         .expect("hnsw init"),
     );
-    let graph_index = Arc::new(CsrGraph::new());
+    let graph_index = Arc::new(GraphIndexPlaceholder);
 
     let embedder = MockCandleEmbedder::new(16, Duration::from_millis(5));
     let collection = Arc::new(Collection::new(
