@@ -82,7 +82,7 @@ Nach Abschluss der Entkopplung (W3-01) besteht der aktive Workspace aus **17 EP1
 
 ---
 
-## 3. Abhängigkeitsdiagramm
+## 3. Abhängigkeitsdiagramm (EP1 Kern & LAB post-W3-01)
 
 Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwischen den 17 EP1-Kern-Crates ab:
 
@@ -165,7 +165,7 @@ graph TD
 
 ### 5.1 Zero-Panic-Doctrine & Unsafe-Inseln
 
-Standardmäßig gilt in allen Nicht-Insel-Crates `#![forbid(unsafe_code)]`. Es gibt genau **drei zulässige Unsafe-Inseln** im Produktionscode, die per `#![allow(unsafe_code)]` ausgenommen sind:
+Standardmäßig gilt in allen Nicht-Insel-Crates `#![forbid(unsafe_code)]`. Es gibt genau **drei zulässige Unsafe-Inseln** im EP1-Produktionscode:
 
 1. **`contextra-sys`**: Abstraktionen für Low-Level-OS-Operationen (`mmap`, `mlock`, Win32-ACLs).
 2. **`contextra-simd`**: SIMD-Vektordistanzberechnungskerne (AVX2, AVX-512, NEON) mit Laufzeit-Dispatch.
@@ -194,13 +194,11 @@ Die folgenden Struct-Felder in `contextra-engine` halten Mutex- oder RwLock-Inst
    - `tenant_collections`: `tokio::sync::RwLock<TenantCollectionMap>`
    - `embedder`: `parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>`
    - `metrics_sink`: `parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>`
-   - `kv_hooks`: `parking_lot::RwLock<Option<Arc<dyn contextra_ports::KvLifecycleHooks>>>`
 
 2. **`Collection` & `KvKeyLocks` (`crates/contextra-engine/src/collection/`):**
    - `kv_locks.shards`: `[tokio::sync::Mutex<()>; 16]` (`kv_lock.rs`)
    - `embedder`: `parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>` (`mod.rs`)
    - `consolidation_guard`: `Arc<tokio::sync::Mutex<()>>` (`mod.rs`)
-   - `kv_hooks`: `parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>` (`mod.rs`)
    - `config`: `parking_lot::RwLock<CollectionConfig>` (`mod.rs`)
    - `pressure_rx`: `parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>` (`mod.rs`)
    - `clock`: `parking_lot::RwLock<Arc<dyn Clock>>` (`mod.rs`)
