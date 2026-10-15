@@ -186,6 +186,10 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan(start, end, limit)
     }
+
+    fn erasure_backend(&self) -> Option<&dyn contextra_ports::ErasureBackend> {
+        self.inner.erasure_backend()
+    }
 }
 
 async fn create_faulty_collection() -> (

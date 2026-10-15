@@ -72,4 +72,8 @@ impl ErasureBackend for LsmStorage {
             duration_ticks: 0,
         })
     }
+
+    fn snapshot_write_seq(&self, prefixes: &[Vec<u8>]) -> u64 {
+        self.erasure_fence.snapshot_write_seq(prefixes)
+    }
 }

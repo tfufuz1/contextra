@@ -2,8 +2,8 @@ use crate::collection::Collection;
 use crate::deletion::forget_options::ForgetOptions;
 use crate::deletion::forget_options::VerifyDepth;
 use contextra_crypto::deletion_witness::LayerWitness;
+use contextra_ports::erasure::EraseError;
 use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use serde::Serialize;
 
@@ -88,11 +88,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Compute Footprint first to get exact keys/prefixes
         let footprint = self.erasure_footprint(doc_id).await?;
 
-        let maybe_lsm = (self.storage.as_ref() as &dyn std::any::Any).downcast_ref::<LsmStorage>();
+        let maybe_backend = self.storage.erasure_backend();
 
-        let scope_write_seq_before = if let Some(lsm) = maybe_lsm {
-            lsm.erasure_fence
-                .snapshot_write_seq(&footprint.keys.prefixes)
+        if maybe_backend.is_none()
+            && (opts.options.assurance != contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
+                || opts.options.purge != crate::deletion::forget_options::PurgeMode::None)
+        {
+            return Err(EraseError::NotAvailable.into());
+        }
+
+        let scope_write_seq_before = if let Some(backend) = maybe_backend {
+            backend.snapshot_write_seq(&footprint.keys.prefixes)
         } else {
             0
         };
@@ -148,9 +154,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let witnesses = Vec::new();
 
         // (g) Scope Write Seq verification
-        let final_scope_write_seq = if let Some(lsm) = maybe_lsm {
-            let scope_write_seq_after = lsm
-                .erasure_fence
+        let final_scope_write_seq = if let Some(backend) = maybe_backend {
+            let scope_write_seq_after = backend
                 .snapshot_write_seq(&footprint.keys.prefixes);
             if scope_write_seq_before != scope_write_seq_after {
                 tracing::warn!(

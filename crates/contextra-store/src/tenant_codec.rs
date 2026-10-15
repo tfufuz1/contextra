@@ -193,8 +193,11 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         prefixes: &'a [Vec<u8>],
         as_of_tx: TxId,
     ) -> BoxFuture<'a, Result<LayerWitness>>;
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
+    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
         None
+    }
+    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
+        self.erasure_backend_handle()
     }
 }
 
@@ -346,6 +349,9 @@ impl StorageEngineHandle for LsmStorage {
         as_of_tx: TxId,
     ) -> BoxFuture<'a, Result<LayerWitness>> {
         Box::pin(self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx))
+    }
+    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
+        Some(self)
     }
     fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
         Some(self)
@@ -500,6 +506,9 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         as_of_tx: TxId,
     ) -> BoxFuture<'a, Result<LayerWitness>> {
         (**self).issue_memtable_witness_handle(deleted_keys, prefixes, as_of_tx)
+    }
+    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
+        (**self).erasure_backend_handle()
     }
     fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
         (**self).erasure_capabilities_handle()
@@ -880,8 +889,17 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
         })
     }
 
+    fn erasure_backend(&self) -> Option<&dyn ErasureBackend> {
+        if self.inner.erasure_backend_handle().is_some() {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    #[allow(deprecated)]
     fn erasure_capabilities(&self) -> Option<&dyn ErasureBackend> {
-        Some(self)
+        self.erasure_backend()
     }
 }
 
@@ -950,13 +968,21 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
         as_of: TxId,
         probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
     ) -> std::result::Result<contextra_ports::erasure::PurgeOutput, contextra_ports::erasure::PurgeError> {
-        if let Some(backend) = self.inner.erasure_capabilities_handle() {
+        if let Some(backend) = self.inner.erasure_backend_handle() {
             backend.purge_physical(scope, as_of, probe)
         } else {
             Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Underlying storage engine does not support ErasureBackend",
             )))
+        }
+    }
+
+    fn snapshot_write_seq(&self, prefixes: &[Vec<u8>]) -> u64 {
+        if let Some(backend) = self.inner.erasure_backend_handle() {
+            backend.snapshot_write_seq(prefixes)
+        } else {
+            0
         }
     }
 }
