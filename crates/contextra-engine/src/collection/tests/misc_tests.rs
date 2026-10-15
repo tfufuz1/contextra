@@ -24,7 +24,7 @@ async fn test_collection_embedder_async_embed() {
 
 #[tokio::test]
 async fn test_input_guards_boundary_validation() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -130,7 +130,7 @@ async fn test_input_guards_boundary_validation() {
 
 #[tokio::test]
 async fn test_doc_id_collision_rejected() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
@@ -342,7 +342,7 @@ fn test_importance_metadata_integration_and_filtering() {
 
 #[tokio::test]
 async fn test_invalid_doc_ids_rejected() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -394,7 +394,7 @@ async fn test_invalid_doc_ids_rejected() {
 #[tokio::test]
 async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_types::Result<()>
 {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -445,7 +445,7 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
 
 #[tokio::test]
 async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -487,7 +487,7 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Res
 
 #[tokio::test]
 async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -535,7 +535,7 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Resu
 
 #[tokio::test]
 async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;

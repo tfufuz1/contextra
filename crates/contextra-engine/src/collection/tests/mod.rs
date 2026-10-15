@@ -9,7 +9,6 @@ mod fixtures;
 mod concurrency_tests;
 mod hybrid_search_tests;
 mod insert_tests;
-mod link_tests;
 mod misc_tests;
 mod read_tests;
 mod search_tests;

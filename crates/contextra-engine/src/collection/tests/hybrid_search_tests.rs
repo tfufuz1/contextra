@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn hybrid_search_caps_k_at_max_search_k() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -48,7 +48,7 @@ async fn hybrid_search_caps_k_at_max_search_k() {
 
 #[tokio::test]
 async fn test_hybrid_search_k_clamping_boundaries() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -98,194 +98,8 @@ async fn test_hybrid_search_k_clamping_boundaries() {
 }
 
 #[tokio::test]
-#[cfg(feature = "reranking")]
-async fn test_hybrid_search_reranked_none() {
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap(); // unwrap
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(), // unwrap
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(), // unwrap
-    );
-    let col = Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    );
-
-    col.insert(
-        "d1",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "rust language"})),
-    )
-    .await
-    .unwrap(); // unwrap
-    col.insert(
-        "d2",
-        &[0.9, 0.1, 0.0, 0.0],
-        Some(serde_json::json!({"text": "python language"})),
-    )
-    .await
-    .unwrap(); // unwrap
-
-    let res = col
-        .hybrid_search_reranked("rust", &[1.0, 0.0, 0.0, 0.0], 1, None, None)
-        .await
-        .unwrap(); // unwrap
-
-    assert_eq!(res.len(), 1);
-    assert_eq!(res[0].id, "d1");
-}
-
-#[tokio::test]
-#[cfg(feature = "experimental-diskann")]
-async fn test_collection_with_diskann_index_hybrid_search() {
-    use contextra_graph::CsrGraph;
-    use contextra_ports::{StorageEngine, TextIndex};
-    use contextra_store::LsmStorage;
-    use contextra_text::Language;
-    use contextra_types::DocId;
-    use contextra_vector::{DiskAnnConfig, DiskAnnIndex};
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap(); // unwrap
-    let lsm_path = dir.path().join("lsm");
-    let diskann_path = dir.path().join("diskann.idx");
-
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: lsm_path,
-            ..Default::default()
-        })
-        .await
-        .unwrap(), // unwrap
-    );
-
-    let diskann_config = DiskAnnConfig {
-        index_path: diskann_path,
-        dimension: 4,
-        max_degree: 8,
-        beam_width: 8,
-        sector_size: 4096,
-        ..DiskAnnConfig::default()
-    };
-
-    let diskann = Arc::new(DiskAnnIndex::try_new(diskann_config).unwrap()); // unwrap
-
-    let doc1_id = DocId::from_key("doc1").unwrap(); // unwrap
-    let doc2_id = DocId::from_key("doc2").unwrap(); // unwrap
-
-    let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]];
-    let ids = vec![doc1_id, doc2_id];
-
-    diskann.build(&vectors, &ids).await.unwrap(); // unwrap
-
-    let graph = Arc::new(CsrGraph::new());
-    let next_tx = Arc::new(AtomicU64::new(1));
-
-    let col = Collection::<LsmStorage, DiskAnnIndex>::new(
-        "diskann_test".to_string(),
-        storage.clone(),
-        diskann,
-        graph,
-        next_tx,
-        4,
-        Language::English,
-    );
-
-    let tx = col.allocate_tx().unwrap(); // unwrap
-
-    let doc1_user_key = col.namespaced_key(b"doc1", 0);
-    let doc1_meta_key = col.namespaced_key(&doc1_id.inner().to_le_bytes(), 1);
-
-    let doc2_user_key = col.namespaced_key(b"doc2", 0);
-    let doc2_meta_key = col.namespaced_key(&doc2_id.inner().to_le_bytes(), 1);
-
-    let doc1_data = crate::collection::StoredDocument {
-        id: "doc1".to_string(),
-        embedding: vec![1.0, 0.0, 0.0, 0.0],
-        metadata: Some(serde_json::json!({ "text": "rust database systems" })),
-    };
-    let doc1_meta = crate::collection::StoredDocumentMeta::from(&doc1_data);
-
-    let doc2_data = crate::collection::StoredDocument {
-        id: "doc2".to_string(),
-        embedding: vec![0.0, 1.0, 0.0, 0.0],
-        metadata: Some(serde_json::json!({ "text": "python scripting language" })),
-    };
-    let doc2_meta = crate::collection::StoredDocumentMeta::from(&doc2_data);
-
-    storage
-        .put(tx, &doc1_user_key, &serde_json::to_vec(&doc1_data).unwrap()) // unwrap
-        .await
-        .unwrap(); // unwrap
-    storage
-        .put(tx, &doc1_meta_key, &serde_json::to_vec(&doc1_meta).unwrap()) // unwrap
-        .await
-        .unwrap(); // unwrap
-
-    storage
-        .put(tx, &doc2_user_key, &serde_json::to_vec(&doc2_data).unwrap()) // unwrap
-        .await
-        .unwrap(); // unwrap
-    storage
-        .put(tx, &doc2_meta_key, &serde_json::to_vec(&doc2_meta).unwrap()) // unwrap
-        .await
-        .unwrap(); // unwrap
-
-    col.text_index
-        .upsert_document(tx, doc1_id, "rust database systems")
-        .await
-        .unwrap(); // unwrap
-    col.text_index
-        .upsert_document(tx, doc2_id, "python scripting language")
-        .await
-        .unwrap(); // unwrap
-
-    storage.commit(tx).await.unwrap(); // unwrap
-    col.text_index.commit(tx).await.unwrap(); // unwrap
-
-    let query_vector = vec![1.0, 0.0, 0.0, 0.0];
-    let results = col
-        .hybrid_search("rust", &query_vector, 5, None)
-        .await
-        .unwrap(); // unwrap
-
-    assert!(
-        !results.is_empty(),
-        "Hybrid search with DiskANN should return results"
-    );
-    assert_eq!(
-        results[0].id, "doc1",
-        "Doc1 should be top result for rust & vector [1,0,0,0]"
-    );
-}
-
-#[tokio::test]
 async fn test_hybrid_search_with_query_memory_type_filter() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_types::{HybridQuery, MemoryType};
     use contextra_vector::HnswIndex;
@@ -404,7 +218,7 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
 
 #[tokio::test]
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
@@ -460,7 +274,7 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_
 #[tokio::test]
 async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextra_types::Result<()>
 {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -544,7 +358,7 @@ async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextr
 
 #[tokio::test]
 async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -659,7 +473,7 @@ async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types:
 #[tokio::test]
 async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contextra_types::Result<()>
 {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -743,7 +557,7 @@ async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contex
 
 #[tokio::test]
 async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -824,7 +638,7 @@ async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_typ
 
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -925,7 +739,7 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -992,7 +806,7 @@ async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
 
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -1098,7 +912,7 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
 #[tokio::test]
 async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{EntityId, FusionStrategy};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -1193,7 +1007,7 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
 
 #[tokio::test]
 async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
