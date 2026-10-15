@@ -607,78 +607,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-adapt"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "contextra-ports",
- "contextra-types",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tracing",
-]
-
-[[package]]
-name = "contextra-agent"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "contextra-checkpoint",
- "contextra-db",
- "contextra-graph",
- "contextra-ports",
- "contextra-router",
- "contextra-store",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "contextra-audit-export"
-version = "0.1.0"
-dependencies = [
- "contextra-crypto",
- "contextra-ports",
- "contextra-types",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "contextra-avv-generator"
-version = "0.1.0"
-dependencies = [
- "contextra-ports",
- "contextra-types",
- "serde",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "contextra-core",
  "contextra-crypto",
  "contextra-db",
- "contextra-graph",
- "contextra-infer-candle",
- "contextra-infer-onnx",
- "contextra-kvcache",
  "contextra-ports",
  "contextra-store",
  "contextra-text",
@@ -704,7 +639,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-core",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
@@ -719,42 +653,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "contextra-cognition"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "contextra-engine",
- "contextra-graph",
- "contextra-infer-candle",
- "contextra-ports",
- "contextra-store",
- "contextra-types",
- "contextra-vector",
- "parking_lot 0.12.5",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "contextra-core"
-version = "0.1.0"
-dependencies = [
- "contextra-mvcc",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
- "proptest",
- "tokio",
 ]
 
 [[package]]
@@ -799,11 +697,9 @@ dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "contextra-adapt",
  "contextra-checkpoint",
  "contextra-crypto",
  "contextra-engine",
- "contextra-graph",
  "contextra-ports",
  "contextra-rank",
  "contextra-store",
@@ -841,18 +737,11 @@ dependencies = [
  "bincode",
  "blake3",
  "bytes",
- "contextra-adapt",
  "contextra-checkpoint",
- "contextra-core",
  "contextra-crypto",
- "contextra-graph",
- "contextra-infer-candle",
- "contextra-kvcache",
- "contextra-license",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",
- "contextra-sandbox",
  "contextra-store",
  "contextra-sys",
  "contextra-testkit",
@@ -871,139 +760,6 @@ dependencies = [
  "tracing",
  "wat",
  "zeroize",
-]
-
-[[package]]
-name = "contextra-graph"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "arc-swap",
- "bincode",
- "blake3",
- "contextra-adapt",
- "contextra-ports",
- "contextra-testkit",
- "contextra-types",
- "criterion",
- "futures",
- "parking_lot 0.12.5",
- "proptest",
- "scc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "contextra-infer-candle"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bytes",
- "candle-core",
- "candle-nn",
- "candle-transformers",
- "contextra-crypto",
- "contextra-ports",
- "contextra-rank",
- "contextra-types",
- "criterion",
- "futures-util",
- "half",
- "parking_lot 0.12.5",
- "proptest",
- "serde",
- "sha2",
- "tempfile",
- "tokenizers 0.21.4",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "contextra-infer-ollama"
-version = "0.1.0"
-dependencies = [
- "contextra-infer-onnx",
- "contextra-ports",
- "contextra-rank",
- "contextra-types",
- "futures",
- "futures-util",
- "parking_lot 0.12.5",
- "proptest",
- "quick-xml",
- "rand 0.8.8",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-test",
-]
-
-[[package]]
-name = "contextra-infer-onnx"
-version = "0.1.0"
-dependencies = [
- "contextra-infer-candle",
- "contextra-ports",
- "contextra-rank",
- "contextra-types",
- "criterion",
- "ndarray 0.15.6",
- "ort",
- "parking_lot 0.12.5",
- "proptest",
- "reqwest",
- "serde",
- "tempfile",
- "tokenizers 0.19.1",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "contextra-kvcache"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bincode",
- "blake3",
- "bytes",
- "contextra-crypto",
- "contextra-kvcache",
- "contextra-ports",
- "contextra-types",
- "lru",
- "parking_lot 0.12.5",
- "proptest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "contextra-license"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "blake3",
- "contextra-ports",
- "contextra-types",
- "ed25519-dalek",
- "rand 0.8.8",
- "serde",
- "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
@@ -1068,48 +824,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-privacy"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "contextra-crypto",
- "contextra-ports",
- "contextra-types",
- "parking_lot 0.12.5",
- "rand 0.8.8",
- "regex",
- "scc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "contextra-py"
-version = "0.1.0"
-dependencies = [
- "contextra",
- "contextra-adapt",
- "contextra-core",
- "contextra-db",
- "contextra-rank",
- "contextra-router",
- "contextra-store",
- "contextra-types",
- "flatbuffers",
- "numpy",
- "parking_lot 0.12.5",
- "pyo3",
- "pythonize",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
@@ -1125,53 +839,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-router"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "bytes",
- "contextra-adapt",
- "contextra-db",
- "contextra-graph",
- "contextra-ports",
- "contextra-privacy",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
- "contextra-wire",
- "criterion",
- "parking_lot 0.12.5",
- "proptest",
- "serde",
- "serde_json",
- "shlex 1.3.0",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "contextra-sandbox"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ed25519-dalek",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "wasmtime",
- "wat",
- "zeroize",
-]
-
-[[package]]
 name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-core",
  "criterion",
  "proptest",
  "thiserror 2.0.20",
@@ -1186,7 +857,6 @@ dependencies = [
  "arc-swap",
  "blake3",
  "bytes",
- "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
  "contextra-mvcc",
@@ -1285,7 +955,6 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
- "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
  "contextra-ports",
@@ -6137,7 +5806,6 @@ name = "xtask-heavy"
 version = "0.1.0"
 dependencies = [
  "contextra-bench",
- "contextra-router",
 ]
 
 [[package]]
