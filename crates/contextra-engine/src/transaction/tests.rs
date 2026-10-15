@@ -1,7 +1,6 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
-use contextra_graph::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_types::DocId;
 use contextra_vector::HnswIndex;
@@ -23,14 +22,12 @@ async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     Collection::new(
         "tx_test".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -240,11 +237,13 @@ async fn test_rollback_completeness_and_compensation_idempotency() {
     assert!(rollback_res1.is_ok());
 
     // Executing compensating action repeatedly must be idempotent and succeed
-    let comp_action =
-        CompensateHnswAction::new(col.clone(), tenant, Arc::new(vec![doc_id]));
+    let comp_action = CompensateHnswAction::new(col.clone(), tenant, Arc::new(vec![doc_id]));
     let comp_res1 = comp_action.execute().await;
     assert!(comp_res1.is_ok());
 
     let comp_res2 = comp_action.execute().await;
-    assert!(comp_res2.is_ok(), "Second compensating execution must be idempotent");
+    assert!(
+        comp_res2.is_ok(),
+        "Second compensating execution must be idempotent"
+    );
 }

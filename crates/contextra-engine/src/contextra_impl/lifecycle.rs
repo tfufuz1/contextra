@@ -1,36 +1,11 @@
 use crate::*;
-use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate};
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
 impl Contextra {
-    /// Opens or creates a `Contextra` instance at `path` using explicit `Arc<dyn LicenseGate>`.
-    #[tracing::instrument(level = "trace", skip(path, gate))]
-    pub async fn open_with_gate(path: impl AsRef<Path>, gate: Arc<dyn LicenseGate>) -> Result<Self> {
-        let config = ContextraConfig {
-            erasure_mode: contextra_ports::erasure::ErasureMode::Off,
-            ..Default::default()
-        };
-        Self::open_with_config_and_gate(path, config, gate).await
-    }
-
-    /// Opens or creates a `Contextra` instance at `path` with explicit `config` and `Arc<dyn LicenseGate>`.
-    #[tracing::instrument(level = "trace", skip(path, config, gate))]
-    pub async fn open_with_config_and_gate(
-        path: impl AsRef<Path>,
-        mut config: ContextraConfig,
-        gate: Arc<dyn LicenseGate>,
-    ) -> Result<Self> {
-        config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
-        let token = gate
-            .authorize(FeatureRing::Fast)
-            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
-        Self::open_authorized(path, config, &token, gate).await
-    }
-
-    /// Opens or creates a `Contextra` instance at `path` enforcing default license mode.
+    /// Opens or creates a `Contextra` instance at `path`.
     #[tracing::instrument(level = "trace", skip(path))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_config(path, ContextraConfig::default()).await
@@ -38,97 +13,18 @@ impl Contextra {
 
     /// Opens or creates a `Contextra` instance at `path` with explicit `config`.
     #[tracing::instrument(level = "trace", skip(path, config))]
-    pub async fn open_with_config(
-        path: impl AsRef<Path>,
-        config: ContextraConfig,
-    ) -> Result<Self> {
-        #[cfg(any(test, debug_assertions))]
-        let gate: Arc<dyn LicenseGate> = Arc::new(contextra_license::SignedLicenseGate::unactivated_local(
-            Some(path.as_ref()),
-        ));
-
-        #[cfg(not(any(test, debug_assertions)))]
-        let gate: Arc<dyn LicenseGate> = {
-            let local_gate = contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref()));
-            if local_gate.check_ring(FeatureRing::Fast).is_err() {
-                return Err(contextra_types::ContextraError::PolicyViolation(
-                    "Valid license activation required in release mode".to_string(),
-                ));
-            }
-            Arc::new(local_gate)
-        };
-
-        Self::open_with_config_and_gate(path, config, gate).await
+    pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {
+        Self::open_with_config_and_wiring(path, config, EngineWiring::default()).await
     }
 
-    /// Opens or creates a `Contextra` instance with explicit config, wiring, and `Arc<dyn LicenseGate>`.
-    #[tracing::instrument(level = "trace", skip(path, config, wiring, gate))]
-    pub async fn open_with_config_wiring_and_gate(
-        path: impl AsRef<Path>,
-        config: ContextraConfig,
-        wiring: EngineWiring,
-        gate: Arc<dyn LicenseGate>,
-    ) -> Result<Self> {
-        let token = gate
-            .authorize(FeatureRing::Fast)
-            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
-        Self::open_authorized_with_wiring(path, config, wiring, &token, gate).await
-    }
-
-    /// Opens or creates a `Contextra` instance with explicit config and wiring using default local gate.
+    /// Opens or creates a `Contextra` instance with explicit config and wiring.
     #[tracing::instrument(level = "trace", skip(path, config, wiring))]
     pub async fn open_with_config_and_wiring(
         path: impl AsRef<Path>,
-        config: ContextraConfig,
-        wiring: EngineWiring,
-    ) -> Result<Self> {
-        #[cfg(any(test, debug_assertions))]
-        let gate: Arc<dyn LicenseGate> = Arc::new(
-            contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref())),
-        );
-
-        #[cfg(not(any(test, debug_assertions)))]
-        let gate: Arc<dyn LicenseGate> = {
-            let local_gate =
-                contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref()));
-            if local_gate.check_ring(FeatureRing::Fast).is_err() {
-                return Err(contextra_types::ContextraError::PolicyViolation(
-                    "Valid license activation required in release mode".to_string(),
-                ));
-            }
-            Arc::new(local_gate)
-        };
-
-        Self::open_with_config_wiring_and_gate(path, config, wiring, gate).await
-    }
-
-    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token,
-    /// attached [`LicenseGate`], and explicit [`EngineWiring`].
-    #[tracing::instrument(level = "trace", skip(path, config, wiring, authorized_ring, gate))]
-    pub async fn open_authorized_with_wiring(
-        path: impl AsRef<Path>,
-        config: ContextraConfig,
-        wiring: EngineWiring,
-        authorized_ring: &AuthorizedRing,
-        gate: Arc<dyn LicenseGate>,
-    ) -> Result<Self> {
-        let db = Self::open_authorized(path, config, authorized_ring, gate).await?;
-        db.apply(wiring);
-        Ok(db)
-    }
-
-    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token
-    /// and attached [`LicenseGate`].
-    #[tracing::instrument(level = "trace", skip(path, config, authorized_ring, gate))]
-    pub async fn open_authorized(
-        path: impl AsRef<Path>,
         mut config: ContextraConfig,
-        authorized_ring: &AuthorizedRing,
-        gate: Arc<dyn LicenseGate>,
+        wiring: EngineWiring,
     ) -> Result<Self> {
-        if authorized_ring.ring() == FeatureRing::Fast {
-            config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
-        }
+        config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
 
         if config.dimension == 0 {
             return Err(contextra_types::ContextraError::invalid_input(
@@ -204,20 +100,6 @@ impl Contextra {
             &orphan_path,
         ));
 
-        let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
-        let key_registry = Arc::new(contextra_crypto::kv_shredding::KeyRegistry::new());
-        let shredding_wiring = Arc::new(contextra_kvcache::KvShreddingWiring::build(
-            contextra_kvcache::KvShreddingWiringDeps { key_registry },
-        )?);
-
-        let kv_integration = crate::kv_cache_integration::wiring::KvCacheIntegrationWiring::build(
-            crate::kv_cache_integration::wiring::KvCacheIntegrationWiringDeps {
-                kv_store: Some(kv_store),
-                shredding_wiring,
-                attention_exporter: None,
-            },
-        )?;
-
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
             .clone()
@@ -231,14 +113,11 @@ impl Contextra {
             &[("status", "normal")],
         );
 
-        let kv_hooks_arc = kv_integration.kv_hooks();
-
         let db = Self {
             storage,
             next_tx,
             dimension: config.dimension,
             config: config.clone(),
-            license_gate: gate,
             expiry_reaper_interval: config.expiry_reaper_interval,
             community_detection_threshold: config.community_detection.auto_trigger_threshold,
             collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
@@ -249,13 +128,11 @@ impl Contextra {
             orphan_registry: orphan_registry.clone(),
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
-            pid_controller: parking_lot::RwLock::new(None),
-            kv_eviction_worker: parking_lot::RwLock::new(kv_integration.eviction_worker),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
-            kv_hooks: parking_lot::RwLock::new(Some(
-                kv_hooks_arc as Arc<dyn contextra_ports::KvLifecycleHooks>,
-            )),
+            kv_hooks: parking_lot::RwLock::new(None),
         };
+
+        db.apply(wiring);
 
         let storage_ref = db.storage.as_ref();
         if let Err(err) = db.orphan_registry.recover_and_clean(storage_ref).await {
@@ -298,51 +175,7 @@ impl Contextra {
         Ok(db)
     }
 
-    async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
-        match backend {
-            EmbeddingBackend::Onnx {
-                model_name,
-                cache_dir,
-            } => {
-                #[cfg(feature = "onnx")]
-                {
-                    let model_dir = contextra_infer_onnx::ensure_onnx_model_download(
-                        model_name,
-                        cache_dir.as_deref(),
-                    )
-                    .await?;
-                    let embedder = contextra_infer_onnx::OnnxEmbedder::load(model_dir)?;
-                    let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
-                    self.set_embedder(embedder_arc).await?;
-                }
-                #[cfg(not(feature = "onnx"))]
-                {
-                    let _ = (model_name, cache_dir);
-                    tracing::debug!(
-                        "EmbeddingBackend::Onnx requested, but 'onnx' feature is disabled in this build. \
-                         Recompile with feature 'onnx' to enable local ONNX embeddings."
-                    );
-                }
-            }
-            EmbeddingBackend::Candle {
-                model_dir,
-                quantization,
-            } => {
-                let client =
-                    contextra_infer_candle::CandleEmbedClient::from_dir(model_dir, *quantization)?;
-                let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(client);
-                self.set_embedder(embedder_arc).await?;
-            }
-            EmbeddingBackend::Ollama { .. } => {
-                return Err(contextra_types::ContextraError::CapabilityUnsupported {
-                    capability: "embedding-backend-ollama".to_string(),
-                    reason:
-                        "Ollama-Backend wird im MCP-Provider-Pfad aufgelöst, nicht in der Engine"
-                            .to_string(),
-                });
-            }
-            EmbeddingBackend::None => {}
-        }
+    async fn init_embedding_backend(&self, _backend: &EmbeddingBackend) -> Result<()> {
         Ok(())
     }
 
