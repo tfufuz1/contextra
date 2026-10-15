@@ -990,7 +990,8 @@ async fn test_multi_tenant_isolation_mcp() {
     let tenant2 = TenantId::try_new(20).expect("tenant 20");
 
     let embedder = Arc::new(MockEmbedder { dimension: 768 });
-    let server = McpServer::with_write_permission(Arc::new(db), embedder, true).expect("server new");
+    let server =
+        McpServer::with_write_permission(Arc::new(db), embedder, true).expect("server new");
 
     // Insert doc into Tenant 10
     let req_t1 = JsonRpcRequest {

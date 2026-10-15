@@ -407,7 +407,10 @@ impl McpServer {
                 if let Some(id) = id_opt {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
                     let opts = contextra::collection::crud::DocEraseOptions::default();
-                    let erasure = col.erase_document(id, &opts).await.map_err(McpError::from)?;
+                    let erasure = col
+                        .erase_document(id, &opts)
+                        .await
+                        .map_err(McpError::from)?;
 
                     Ok(json!({
                         "status": "logically_deleted",
@@ -453,9 +456,15 @@ impl McpServer {
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
             "contextra_plugin_status" => {
-                let reg_ref = self.plugin_registry.as_ref().map(|r| r.as_ref()).ok_or_else(|| {
-                    McpError::internal_error("Plugin registry or license gate is not configured")
-                })?;
+                let reg_ref = self
+                    .plugin_registry
+                    .as_ref()
+                    .map(|r| r.as_ref())
+                    .ok_or_else(|| {
+                        McpError::internal_error(
+                            "Plugin registry or license gate is not configured",
+                        )
+                    })?;
                 let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
                 serde_json::to_value(&status).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))

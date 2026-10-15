@@ -5,9 +5,7 @@
 
 use contextra::Contextra;
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy};
-use contextra_mcp::{
-    deletion_proof_key_from_env, LlmConfig, McpServer, PromptInjectionGuard,
-};
+use contextra_mcp::{deletion_proof_key_from_env, LlmConfig, McpServer, PromptInjectionGuard};
 use contextra_ports::MockEmbedder;
 use serde_json::json;
 use std::sync::Arc;

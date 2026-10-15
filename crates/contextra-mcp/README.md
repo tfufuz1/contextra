@@ -24,7 +24,7 @@ cargo run -p contextra-mcp --bin contextra-mcp -- --db-path ~/.contextra --allow
 
 ### Voraussetzungen & Provider
 
-- Standardmäßig nutzt `contextra-mcp` den Mock-Provider (oder Candle/ONNX). Optional kann über das Opt-in Feature `ollama` eine laufende Ollama-Instanz angebunden werden.
+- Standardmäßig nutzt `contextra-mcp` den integrierten Embedding-Provider (oder Mock in Testumgebungen).
 
 ### Entwicklermodus (Kompilierung aus Quellcode)
 
@@ -48,10 +48,6 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 | `--db-path <PFAD>` | `./contextra_data` | Pfad zum Contextra-Datenbankverzeichnis |
 | `--allow-write` | *deaktiviert* | Schreibende Operationen (`contextra_insert`) erlauben |
 | `--read-only` | *aktiviert* | Erzwingt Read-Only-Modus (Schreibzugriffe gesperrt) |
-| `--provider <TYPE>` | `mock` | Embedding-Provider (`mock`, `candle`, `onnx`, `ollama` [opt-in]) |
-| `--ollama-url <URL>` | `http://localhost:11434` | Ollama-Server URL |
-| `--embed-model <NAME>` | `nomic-embed-text` | Name des Ollama Embedding-Modells |
-| `--onnx-model-path <PFAD>` | *keiner* | Pfad zum ONNX-Modell (nur bei ONNX-Feature) |
 
 ### Umgebungsvariablen
 
@@ -60,9 +56,6 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 | `CONTEXTRA_MCP_BINARY` | Absolute Path | Expliziter Pfad zum `contextra-mcp` Binary (überschreibt PATH und Downloads) |
 | `CONTEXTRA_MCP_ALLOW_REPO_BUILD` | `1` | Erlaubt automatischen `cargo build` Fallback im Repo-Baum (Entwicklermodus) |
 | `CONTEXTRA_MCP_ALLOW_WRITE` | `1`, `true`, `yes` | Schreibende Operationen aktivieren (falls kein CLI-Flag angegeben) |
-| `CONTEXTRA_OLLAMA_URL` | z. B. `http://localhost:11434` | Alternativer Ollama Endpoint |
-| `CONTEXTRA_EMBED_MODEL` | z. B. `nomic-embed-text` | Alternativname für Embedding-Modell |
-| `CONTEXTRA_EMBEDDING_PROVIDER` | `ollama`, `onnx`, `mock` | Alternative Provider-Spezifikation |
 
 ---
 
@@ -263,13 +256,6 @@ Der Server exponiert folgende Kern-Tools:
 ### Fehler: `Sandbox: DB-Schreibzugriff gesperrt`
 - **Ursache:** Schreibende Operationen (`contextra_insert`) werden von der `McpSandbox` standardmäßig blockiert.
 - **Lösung:** Starten Sie das Binary mit dem Flag `--allow-write` oder setzen Sie die Umgebungsvariable `CONTEXTRA_MCP_ALLOW_WRITE=1`.
-
-### Fehler: Ollama-Verbindung fehlgeschlagen (`connection refused`)
-- **Ursache:** Ollama läuft nicht oder ist unter der angegebenen URL nicht erreichbar.
-- **Lösung:**
-  1. Stellen Sie sicher, dass Ollama läuft (`ollama serve` oder Ollama App gestartet).
-  2. Überprüfen Sie, ob das Embedding-Modell vorhanden ist: `ollama pull nomic-embed-text`.
-  3. Prüfen Sie die URL via `--ollama-url http://localhost:11434`.
 
 ### Fehler: Protokollstörung durch Log-Ausgaben (JSON Parse Error in Claude)
 - **Ursache:** stdout ist ausschließlich für JSON-RPC-Protokollnachrichten reserviert.
