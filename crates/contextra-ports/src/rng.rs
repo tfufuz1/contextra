@@ -65,59 +65,6 @@ impl<T: SeededRng + ?Sized> SeededRng for Arc<T> {
     }
 }
 
-/// Standard production non-cryptographic [`SeededRng`] implementation.
-#[derive(Debug)]
-pub struct SystemRng {
-    state: std::sync::atomic::AtomicU64,
-}
-
-impl SystemRng {
-    /// Creates a new [`SystemRng`].
-    pub fn new() -> Self {
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
-            .unwrap_or(1);
-        Self {
-            state: std::sync::atomic::AtomicU64::new(seed),
-        }
-    }
-}
-
-impl Default for SystemRng {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SeededRng for SystemRng {
-    fn next_u64(&self) -> u64 {
-        let z = self
-            .state
-            .fetch_add(0x9e37_79b9_7f4a_7c15, std::sync::atomic::Ordering::SeqCst)
-            .wrapping_add(0x9e37_79b9_7f4a_7c15);
-        let mut z = z;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        z ^ (z >> 31)
-    }
-
-    fn fill_bytes(&self, mut dest: &mut [u8]) {
-        while !dest.is_empty() {
-            let val = self.next_u64();
-            let bytes = val.to_le_bytes();
-            let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
-        }
-    }
-
-    fn next_unit_f64(&self) -> f64 {
-        let mantissa = self.next_u64() >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

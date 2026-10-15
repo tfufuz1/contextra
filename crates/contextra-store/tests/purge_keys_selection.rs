@@ -14,6 +14,10 @@ struct TestFreeSpaceProbe {
 }
 
 impl FreeSpaceProbe for TestFreeSpaceProbe {
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::ProbeError> {
+        Ok(self.free_bytes)
+    }
+
     fn free_space_bytes(&self) -> Option<u64> {
         self.free_bytes
     }

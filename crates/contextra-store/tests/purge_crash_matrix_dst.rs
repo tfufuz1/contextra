@@ -7,7 +7,8 @@
 // 3. Gelöschte Schlüssel kehren nicht zurück (Anti-Resurrection).
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
-use contextra_ports::{ManualClock, Rng, SeededRng, StorageEngine};
+use contextra_ports::{Rng, SeededRng, StorageEngine};
+use contextra_testkit::ManualClock;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;
@@ -25,6 +26,10 @@ use tempfile::tempdir;
 
 struct TestSpaceProbe;
 impl FreeSpaceProbe for TestSpaceProbe {
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::ProbeError> {
+        Ok(Some(100 * 1024 * 1024 * 1024))
+    }
+
     fn free_space_bytes(&self) -> Option<u64> {
         Some(100 * 1024 * 1024 * 1024) // 100 GB sufficient space
     }
