@@ -1,7 +1,7 @@
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_core::{TxId, TOMBSTONE_BIT};
+use contextra_types::{TOMBSTONE_BIT, TxId};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 
 impl LsmStorage {

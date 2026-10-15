@@ -3,7 +3,7 @@
 // ZWECK: Datenstrukturen und Framing-/Krypto-Logik für den Erasure-Ledger.
 // INVARIANTEN: Zero-Panic, Fail-Closed, BLAKE3-Keyed MAC Chaining, CRC32 Checksumming.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 pub const ERASED_LEDGER_DOMAIN: &[u8] = b"contextra/erasure-ledger/v1";
 pub const MAX_LEDGER_PAYLOAD_SIZE: usize = 1024;

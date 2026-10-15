@@ -7,7 +7,7 @@
 
 #![cfg(not(loom))]
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 
 use super::{classify_wal_filename, Wal, WalFileType};

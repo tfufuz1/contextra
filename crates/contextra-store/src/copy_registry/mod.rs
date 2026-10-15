@@ -3,7 +3,7 @@
 // ZWECK: CopyRegistry Modul-Einstieg und Implementierung der Kopienregister-Persistenz.
 // INVARIANTEN: Zero-Panic, Fail-Closed, Frame-Chaining.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs::OpenOptions;

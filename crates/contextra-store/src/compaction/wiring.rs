@@ -2,7 +2,7 @@
 // ZWECK: Entrypoint für die spätere Verdrahtung in contextra/src/builder.rs (Regel 7 / Einstiegspunkt-Vertrag).
 
 use crate::compaction::{CompactionConfig, CompactionEngine};
-use contextra_core::{ResourceTracker, Result};
+use contextra_types::{ResourceTracker, Result};
 use contextra_mvcc::snapshot::SnapshotFloor;
 use std::sync::Arc;
 
@@ -41,9 +41,9 @@ mod tests {
 
     #[test]
     fn test_compaction_engine_wiring_build() {
-        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
+        let registry = Arc::new(contextra_mvcc::SnapshotRegistry::new());
         let bc = create_block_cache(1);
-        let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
+        let budget = Arc::new(ResourceTracker::new(contextra_types::ResourceBudget {
             memory_limit: 1024 * 1024,
         }));
         let config = CompactionConfig::default();

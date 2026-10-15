@@ -7,7 +7,7 @@ use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
 use super::resume::resume_pending_with_policy;
 use crate::compaction::purge_filter::PurgeReport;
-use contextra_core::Result;
+use contextra_types::Result;
 use contextra_ports::Clock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

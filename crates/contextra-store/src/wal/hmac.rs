@@ -1,6 +1,6 @@
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};

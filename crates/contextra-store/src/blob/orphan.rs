@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 

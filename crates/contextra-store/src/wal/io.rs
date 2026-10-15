@@ -5,7 +5,7 @@
 //! - I-1: HMAC-Verkettung muss intakt sein. Nach verworfenem Tail dürfen keine weiteren Frames verarbeitet werden.
 //! - I-3: End-of-File Partial Entries werden als Tail Truncation behandelt.
 
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::{Path, PathBuf};

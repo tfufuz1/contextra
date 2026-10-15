@@ -672,7 +672,7 @@ fn parse_block_entries(
         }
 
         let val_bytes = Bytes::copy_from_slice(&block_data[pos_val..end_val]);
-        let is_tombstone = (seq_no & contextra_core::TOMBSTONE_BIT) != 0;
+        let is_tombstone = (seq_no & contextra_types::TOMBSTONE_BIT) != 0;
 
         entries.push(WitnessEntry {
             key: key_bytes,

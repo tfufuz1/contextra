@@ -4,7 +4,7 @@ use crate::lsm::LsmStorage;
 use crate::sstable::witness_scan::scan_sstables;
 use crate::sstable::witness_types::{SstScanEvidence, SstScanInputs, SstScopeSpec};
 use crate::wal::witness_scan::{scan_wal_directory, WalScanInputs, WalScopeSpec};
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed;

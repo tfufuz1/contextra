@@ -1,7 +1,7 @@
 // ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};
-use contextra_core::{ContextraError, TxId};
+use contextra_types::{ContextraError, TxId};
 use contextra_ports::{Clock, SystemClock};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, RecvTimeoutError, SyncSender};
@@ -97,7 +97,7 @@ pub trait WalObserver: Send + Sync {
         batch: &CommittedBatch<'_>,
         seq_no: u64,
         tx_id: TxId,
-    ) -> contextra_core::Result<()> {
+    ) -> contextra_types::Result<()> {
         self.on_commit(batch, seq_no, tx_id);
         Ok(())
     }
@@ -113,7 +113,7 @@ struct CommitEvent {
 enum WorkResult {
     Completed {
         elapsed_nanos: u64,
-        res: contextra_core::Result<()>,
+        res: contextra_types::Result<()>,
     },
     Panicked(String),
 }
@@ -258,7 +258,7 @@ impl WalObserver for AsyncObserverAdapter {
         batch: &CommittedBatch<'_>,
         seq_no: u64,
         tx_id: TxId,
-    ) -> contextra_core::Result<()> {
+    ) -> contextra_types::Result<()> {
         self.sender
             .try_send((seq_no, tx_id, batch.origin))
             .map_err(|e| ContextraError::Storage(format!("AsyncObserverAdapter queue full: {e}")))
@@ -375,7 +375,7 @@ impl ObserverRegistry {
         entries: &[WalEntry],
         seq_no: u64,
         ctx: CommitContext,
-    ) -> contextra_core::Result<()> {
+    ) -> contextra_types::Result<()> {
         let observers_snapshot = {
             let guard = self.observers.read();
             if guard.is_empty() {
@@ -394,7 +394,7 @@ impl ObserverRegistry {
 
         let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
 
-        let mut run_notify = || -> contextra_core::Result<()> {
+        let mut run_notify = || -> contextra_types::Result<()> {
             for worker in &observers_snapshot {
                 if !ctx.durable && worker.inner.requires_durability() {
                     continue;
@@ -541,7 +541,7 @@ impl ObserverRegistry {
         seq_no: u64,
         tx_id: TxId,
         origin: WriteOrigin,
-    ) -> contextra_core::Result<()> {
+    ) -> contextra_types::Result<()> {
         self.notify_with_context(
             entries,
             seq_no,
