@@ -31,13 +31,13 @@
 | `DefaultOpenGate` | `contextra_ports` | `contextra_ports::license` | `contextra_core::traits::DefaultOpenGate` | `contextra_ports` | KLAR |
 | `DeleteOutcome` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::DeleteOutcome` | `contextra_ports` | KLAR |
 | `DeterministicTimestamp` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::DeterministicTimestamp` | `contextra_types` | KLAR |
-| `DistanceMetric` | `contextra_types` | `contextra_types::types::domain::document` | `contextra_core::traits::DistanceMetric` | `contextra_ports` | KLAR |
+| `DistanceMetric` | `contextra_types` | `contextra_types::types::domain::document` | `contextra_core::traits::DistanceMetric` | `contextra_types` | KLAR |
 | `DocId` | `contextra_types` | `contextra_types::types::domain::ids` | `contextra_core::traits::DocId` | `contextra_types` | KLAR |
 | `DocIdWidth` | `contextra_types` | `contextra_types::schema` | `contextra_core::contextra_types::schema::DocIdWidth` | `contextra_types` | KLAR |
 | `DriftStatusProvider` | `contextra_ports` | `contextra_ports::observability` | `contextra_core::traits::DriftStatusProvider` | `contextra_ports` | KLAR |
 | `EXPIRY_METADATA_KEY` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::EXPIRY_METADATA_KEY` | `contextra_types` | KLAR |
 | `Edge` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::Edge` | `contextra_types` | KLAR |
-| `Embedding` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::Embedding` | `contextra_wire` | KLAR |
+| `Embedding` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::Embedding` | `contextra_types` | KLAR |
 | `EmbeddingArgs` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::EmbeddingArgs` | `contextra_wire` | KLAR |
 | `EmbeddingBuilder` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::EmbeddingBuilder` | `contextra_wire` | KLAR |
 | `EmbeddingError` | `contextra_ports` | `contextra_ports::embedding` | `contextra_core::traits::EmbeddingError` | `contextra_ports` | KLAR |
@@ -101,7 +101,7 @@
 | `LlmTextGeneratorStreaming` | `contextra_ports` | `contextra_ports::embedding` | `contextra_core::traits::LlmTextGeneratorStreaming` | `contextra_ports` | KLAR |
 | `LogicalScope` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::LogicalScope` | `contextra_ports` | KLAR |
 | `MAX_SCAN_MERGE_ACCUMULATOR` | `contextra_ports` | `contextra_ports::storage` | `contextra_core::traits::MAX_SCAN_MERGE_ACCUMULATOR` | `contextra_ports` | KLAR |
-| `MAX_SEARCH_K` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::MAX_SEARCH_K` | `contextra_ports` | KLAR |
+| `MAX_SEARCH_K` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::MAX_SEARCH_K` | `contextra_types` | KLAR |
 | `ManifestSchemaVersion` | `contextra_types` | `contextra_types::schema` | `contextra_core::contextra_types::schema::ManifestSchemaVersion` | `contextra_types` | KLAR |
 | `MemoryImportance` | `contextra_types` | `contextra_types::types::importance` | `contextra_core::traits::MemoryImportance` | `contextra_types` | KLAR |
 | `MemoryLink` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::MemoryLink` | `contextra_types` | KLAR |
@@ -138,8 +138,8 @@
 | `RerankResult` | `contextra_types` | `contextra_types::types::domain::document` | `contextra_core::traits::RerankResult` | `contextra_types` | KLAR |
 | `Reranker` | `contextra_ports` | `contextra_ports::reranker` | `contextra_core::traits::Reranker` | `contextra_ports` | KLAR |
 | `Reservation` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::Reservation` | `contextra_types` | KLAR |
-| `ResourceBudget` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::ResourceBudget` | `contextra_ports` | KLAR |
-| `ResourceTracker` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::ResourceTracker` | `contextra_ports` | KLAR |
+| `ResourceBudget` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::ResourceBudget` | `contextra_types` | KLAR |
+| `ResourceTracker` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::ResourceTracker` | `contextra_types` | KLAR |
 | `ResponseGroundingValidator` | `contextra_ports` | `contextra_ports::lifecycle` | `contextra_core::traits::ResponseGroundingValidator` | `contextra_ports` | KLAR |
 | `RestoreGuard` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::RestoreGuard` | `contextra_ports` | KLAR |
 | `RestoreVerdict` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::RestoreVerdict` | `contextra_ports` | KLAR |
@@ -159,7 +159,7 @@
 | `SaturatingU16` | `contextra_types` | `contextra_types::types::saturating` | `contextra_core::traits::SaturatingU16` | `contextra_types` | KLAR |
 | `SaturatingU8` | `contextra_types` | `contextra_types::types::math` | `contextra_core::traits::SaturatingU8` | `contextra_types` | KLAR |
 | `ScanError` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::ScanError` | `contextra_ports` | KLAR |
-| `ScoredDocument` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::ScoredDocument` | `contextra_wire` | KLAR |
+| `ScoredDocument` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::ScoredDocument` | `contextra_types` | KLAR |
 | `ScoredDocumentArgs` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::ScoredDocumentArgs` | `contextra_wire` | KLAR |
 | `ScoredDocumentBuilder` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::ScoredDocumentBuilder` | `contextra_wire` | KLAR |
 | `ScoredDocumentOffset` | `contextra_wire` | `contextra_wire::contextra_generated` | `contextra_core::ipc::ScoredDocumentOffset` | `contextra_wire` | KLAR |
@@ -184,7 +184,7 @@
 | `StorageEngine` | `contextra_ports` | `contextra_ports::storage` | `contextra_core::traits::StorageEngine` | `contextra_ports` | KLAR |
 | `StorageErasureExt` | `contextra_ports` | `contextra_ports::erasure` | `contextra_core::traits::StorageErasureExt` | `contextra_ports` | KLAR |
 | `StorageStats` | `contextra_ports` | `contextra_ports::storage` | `contextra_core::traits::StorageStats` | `contextra_ports` | KLAR |
-| `TOMBSTONE_BIT` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::TOMBSTONE_BIT` | `contextra_ports` | KLAR |
+| `TOMBSTONE_BIT` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::TOMBSTONE_BIT` | `contextra_types` | KLAR |
 | `TenantId` | `contextra_types` | `contextra_types::types::domain::ids` | `contextra_core::traits::TenantId` | `contextra_types` | KLAR |
 | `TenantScopeViolation` | `contextra_types` | `contextra_types::tenant_scope` | `contextra_core::traits::TenantScopeViolation` | `contextra_types` | KLAR |
 | `TenantScoped` | `contextra_types` | `contextra_types::tenant_scope` | `contextra_core::traits::TenantScoped` | `contextra_types` | KLAR |
@@ -193,7 +193,7 @@
 | `TextIndex` | `contextra_ports` | `contextra_ports::text_index` | `contextra_core::traits::TextIndex` | `contextra_ports` | KLAR |
 | `TextIndexStats` | `contextra_ports` | `contextra_ports::text_index` | `contextra_core::traits::TextIndexStats` | `contextra_ports` | KLAR |
 | `TlHfdParams` | `contextra_types` | `contextra_types::types::domain::misc` | `contextra_core::traits::TlHfdParams` | `contextra_types` | KLAR |
-| `TokenBudget` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::TokenBudget` | `contextra_ports` | KLAR |
+| `TokenBudget` | `contextra_types` | `contextra_types::types::budget` | `contextra_core::traits::TokenBudget` | `contextra_types` | KLAR |
 | `TombstoneSemanticsCheck` | `contextra_types` | `contextra_types::tombstone` | `contextra_core::contextra_types::tombstone::TombstoneSemanticsCheck` | `contextra_types` | KLAR |
 | `TxBuffer` | `contextra_mvcc` | `contextra_mvcc::tx_buffer` | `contextra_core::contextra_mvcc::tx_buffer::TxBuffer` | `contextra_mvcc` | KLAR |
 | `TxId` | `contextra_types` | `contextra_types::types::domain::ids` | `contextra_core::traits::TxId` | `contextra_types` | KLAR |

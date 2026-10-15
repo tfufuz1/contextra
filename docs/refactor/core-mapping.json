@@ -192,7 +192,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::domain::document",
       "core_reexport_path": "contextra_core::traits::DistanceMetric",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -240,7 +240,7 @@
       "original_crate": "contextra_wire",
       "original_module": "contextra_wire::contextra_generated",
       "core_reexport_path": "contextra_core::ipc::Embedding",
-      "suggested_target_crate": "contextra_wire",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -752,7 +752,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::domain::misc",
       "core_reexport_path": "contextra_core::traits::MAX_SEARCH_K",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -1048,7 +1048,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::budget",
       "core_reexport_path": "contextra_core::traits::ResourceBudget",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -1056,7 +1056,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::budget",
       "core_reexport_path": "contextra_core::traits::ResourceTracker",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -1216,7 +1216,7 @@
       "original_crate": "contextra_wire",
       "original_module": "contextra_wire::contextra_generated",
       "core_reexport_path": "contextra_core::ipc::ScoredDocument",
-      "suggested_target_crate": "contextra_wire",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -1416,7 +1416,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::domain::misc",
       "core_reexport_path": "contextra_core::traits::TOMBSTONE_BIT",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
@@ -1488,7 +1488,7 @@
       "original_crate": "contextra_types",
       "original_module": "contextra_types::types::budget",
       "core_reexport_path": "contextra_core::traits::TokenBudget",
-      "suggested_target_crate": "contextra_ports",
+      "suggested_target_crate": "contextra_types",
       "status": "KLAR"
     },
     {
