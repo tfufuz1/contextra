@@ -265,18 +265,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         }
 
-        let hyperedges = {
-            let mut guard = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for hyperedge in hyperedges {
-            self.collection.graph_index.insert_hyperedge(hyperedge);
-        }
-
         Ok(())
     }
 
@@ -350,10 +338,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            let hyperedgs = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
             let e_seq = match self.staged_graph_entity_sequence.lock() {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
@@ -362,7 +346,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 || !edgs.is_empty()
                 || !e_dels.is_empty()
                 || !ent_dels.is_empty()
-                || !hyperedgs.is_empty()
                 || !e_seq.is_empty()
         };
 

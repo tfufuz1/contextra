@@ -7,9 +7,9 @@
 //! # Database Transactions
 //!
 //! This module provides `DbTransaction`, an orchestrator for atomic multi-index commits
-//! between LSM-Tree storage engine (`contextra-store`), HNSW vector index (`contextra-index`),
-//! BM25 inverted text index (`contextra-text`), and CSR graph index (`contextra-graph`).
-//! It implements a 4-index 2-phase commit protocol and provides compensating transactions for rollbacks.
+//! between LSM-Tree storage engine (`contextra-store`), HNSW vector index (`contextra-vector`),
+//! BM25 inverted text index (`contextra-text`), and CSR graph index.
+//! It implements a multi-index 2-phase commit protocol and provides compensating transactions for rollbacks.
 //!
 //! # Safety & Reliability Invariants
 //! - **[INV-DB-3] Strict Error Visibility in Rollbacks**: Compensating transactions during

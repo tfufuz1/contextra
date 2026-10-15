@@ -58,7 +58,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let user_prefix = self.namespaced_key(b"", 0);
             if let Ok(entries) = self.storage.scan_prefix(&user_prefix).await {
                 for (k, v) in entries {
-                    if let Ok(full) = serde_json::from_slice::<crate::collection::StoredDocument>(&v) {
+                    if let Ok(full) =
+                        serde_json::from_slice::<crate::collection::StoredDocument>(&v)
+                    {
                         if DocId::from_key(&full.id).ok() == Some(doc_id) {
                             actual_user_id = full.id;
                             break;
@@ -66,7 +68,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     } else {
                         let prefix_len = self.prefix.len() + 1;
                         if k.len() >= prefix_len {
-                            let candidate_id = String::from_utf8_lossy(&k[prefix_len..]).to_string();
+                            let candidate_id =
+                                String::from_utf8_lossy(&k[prefix_len..]).to_string();
                             if DocId::from_key(&candidate_id).ok() == Some(doc_id) {
                                 actual_user_id = candidate_id;
                                 break;
