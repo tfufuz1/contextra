@@ -12,4 +12,3 @@ ring = "tooling"
 
 [dependencies]
 contextra-bench = { path = "../benchmarks/contextra-bench" }
-contextra-router = { path = "../crates/contextra-router", features = ["bandit-routing"] }
