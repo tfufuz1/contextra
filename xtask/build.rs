@@ -24,6 +24,8 @@ const ALLOWED_COLLISIONS: &[&str] = &[
     "gc-floor-single-source",
     "verify",
     "check-loom-mocks",
+    "check-port-names",
+    "check-no-stubs",
 ];
 
 #[derive(Debug, Clone)]

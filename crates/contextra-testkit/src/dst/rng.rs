@@ -3,7 +3,7 @@
 // ZWECK: Seedable, deterministic PRNG for Deterministic Simulation Testing (DST).
 // INVARIANTEN: Bit-identical random streams for identical seeds across executions.
 
-use contextra_ports::{Rng, SystemRng};
+use contextra_ports::{EntropyRng as EntropyRngPort, SeededRng, SystemRng};
 
 /// Type-separated entropy RNG source for non-deterministic runtime entropy.
 ///
@@ -24,17 +24,13 @@ impl EntropyRng {
     }
 }
 
-impl Rng for EntropyRng {
+impl EntropyRngPort for EntropyRng {
     fn next_u64(&self) -> u64 {
-        self.inner.next_u64()
+        EntropyRngPort::next_u64(&self.inner)
     }
 
     fn fill_bytes(&self, dest: &mut [u8]) {
-        self.inner.fill_bytes(dest);
-    }
-
-    fn next_unit_f64(&self) -> f64 {
-        self.inner.next_unit_f64()
+        EntropyRngPort::fill_bytes(&self.inner, dest);
     }
 }
 

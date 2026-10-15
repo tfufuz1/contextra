@@ -92,7 +92,8 @@ pub use contextra_mvcc::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
     note = "Moved to contextra_mvcc::snapshot as part of Ring-Modell Phase 1b"
 )]
 #[allow(deprecated)]
-pub use contextra_mvcc::snapshot::{SnapshotGuard, SnapshotRegistry};
+pub use contextra_mvcc::lease::SnapshotLease as SnapshotGuard;
+pub use contextra_mvcc::snapshot::SnapshotRegistry;
 
 #[deprecated(
     since = "0.1.0",
