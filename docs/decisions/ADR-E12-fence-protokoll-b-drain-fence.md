@@ -1,7 +1,7 @@
-# ADR-E12: fence-protokoll-b-drain-fence
+# ADR-E12: **Fence-Protokoll B als Drain-Fence** mit `inflight`-Zähler
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E12)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 **Fence-Protokoll B als Drain-Fence** mit `inflight`-Zähler (§5.8), Loom mit 3 Szenarien als Merge-Blocker.

@@ -1,7 +1,7 @@
-# ADR-E05: beweisformat-v4-tlv
+# ADR-E05: Beweisformat v4: TLV, `u16`-Tag/`u32`-Länge Big-Endian, Crit
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E05)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 Beweisformat v4: TLV, `u16`-Tag/`u32`-Länge Big-Endian, Critical-Bit `0x8000`, Domain-Tag 28 Byte; Tag-Tabelle generiert; `layer_id: u16`; Signatur Pflicht in `Attested`; zwei Beweisstufen über `stage`/`supersedes`.

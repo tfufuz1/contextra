@@ -1,7 +1,7 @@
-# ADR-E32: licensegate-port-contextra-license-ausserhalb-ep1
+# ADR-E32: `LicenseGate`-Port; `contextra-license` nicht in EP1.
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E32)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 `LicenseGate`-Port; `contextra-license` nicht in EP1.

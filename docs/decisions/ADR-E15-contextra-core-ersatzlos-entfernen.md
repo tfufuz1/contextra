@@ -1,7 +1,7 @@
-# ADR-E15: contextra-core-ersatzlos-entfernen
+# ADR-E15: `contextra-core` wird ersatzlos entfernt, ohne Shim; Skript-
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E15)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 `contextra-core` wird ersatzlos entfernt, ohne Shim; Skript-PRs über Kartenbudget.

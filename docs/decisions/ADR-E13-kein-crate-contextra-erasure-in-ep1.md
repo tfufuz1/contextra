@@ -1,7 +1,7 @@
-# ADR-E13: kein-crate-contextra-erasure-in-ep1
+# ADR-E13: Kein Crate `contextra-erasure` in EP1; Ledger, Purge, Resume
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E13)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 Kein Crate `contextra-erasure` in EP1; Ledger, Purge, Resume, RestoreGuard bleiben im Store. Crate-Schnitt von Crypto in M5, Evidence/Verifier in EP2.

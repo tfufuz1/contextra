@@ -45,6 +45,7 @@ pub mod check_commit_diff_integrity;
 pub mod check_commit_messages;
 pub mod check_compile;
 pub mod check_coverage_gate;
+pub mod check_doc_links;
 pub mod check_doc_references;
 pub mod check_duplicate_core_primitives;
 pub mod check_duplicate_intent;

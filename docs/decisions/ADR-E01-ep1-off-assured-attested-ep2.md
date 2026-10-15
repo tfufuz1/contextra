@@ -1,7 +1,7 @@
-# ADR-E01: ep1-off-assured-attested-ep2
+# ADR-E01: EP1 liefert `Off` und `Assured`; `Attested` ist EP2. Erstes
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E01)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 EP1 liefert `Off` und `Assured`; `Attested` ist EP2. Erstes Release v0.1.0; 1.0.0 ist ein Gate (§1.3).

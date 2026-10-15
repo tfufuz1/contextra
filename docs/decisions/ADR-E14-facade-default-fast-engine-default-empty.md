@@ -1,7 +1,7 @@
-# ADR-E14: facade-default-fast-engine-default-empty
+# ADR-E14: `facade.default = ["fast"]`, `engine.default = []`; `candle`
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E14)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 `facade.default = ["fast"]`, `engine.default = []`; `candle` opt-in; `rank` Pflicht.

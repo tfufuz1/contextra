@@ -1,7 +1,7 @@
-# ADR-E19: mcp-dispatcher-spawn-blocking
+# ADR-E19: MCP-Dispatcher nutzt `spawn_blocking` mit begrenztem Pool; L
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E19)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 MCP-Dispatcher nutzt `spawn_blocking` mit begrenztem Pool; Löschpfad nach Commit nicht abbrechbar.

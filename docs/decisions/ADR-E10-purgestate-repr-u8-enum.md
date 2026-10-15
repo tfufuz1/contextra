@@ -1,7 +1,7 @@
-# ADR-E10: purgestate-repr-u8-enum
+# ADR-E10: `PurgeState` als persistiertes `#[repr(u8)]`-Enum mit Golden
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E10)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 `PurgeState` als persistiertes `#[repr(u8)]`-Enum mit Golden-Test (§5.6).

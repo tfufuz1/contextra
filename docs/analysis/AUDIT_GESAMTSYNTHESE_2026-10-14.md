@@ -3,13 +3,13 @@
 **Datum:** 14.10.2026  
 **Verfasser:** Principal Senior Rust Architect für Contextra  
 **Status:** Verbindliche Audit-Auswertung & Konsolidierung aller Fachanalysen vom 13. & 14. Oktober 2026  
-**Referenzdokument:** [`docs/ARCHITEKTUR_MASTERPLAN_v2.md`](file:///home/freddy/Projekte/contextra/docs/ARCHITEKTUR_MASTERPLAN_v2.md)
+**Referenzdokument:** [`docs/archive/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md`](docs/archive/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md)
 
 ---
 
 ## 1. Übersicht der analysierten Berichte und Artefakte
 
-In den Verzeichnissen [`docs/analysis/`](file:///home/freddy/Projekte/contextra/docs/analysis/) und [`logs/audits/`](file:///home/freddy/Projekte/contextra/logs/audits/) liegen 20 spezialisierte Tiefenanalysen und Test-Logs vor:
+In den Verzeichnissen [`docs/analysis/`](docs/analysis/) und [`logs/audits/`](logs/audits/) liegen 20 spezialisierte Tiefenanalysen und Test-Logs vor:
 
 | Subsystem / Domäne | Analysedokumente | Verantwortlicher Spezialist | Status |
 |---|---|---|---|
@@ -92,7 +92,7 @@ Am 13.10. wurden 12 gravierende Mängel im Store- und Purge-Pfad dokumentiert:
 ### 2.4 `contextra-vector` & Unsafe-Inseln (S2 & S5-Audit)
 
 #### Unsafe-Inseln Status:
-Gemäß [`capabilities.toml`](file:///home/freddy/Projekte/contextra/capabilities.toml) sind genau 3 Unsafe-Inseln deklariert:
+Gemäß [`capabilities.toml`](capabilities.toml) sind genau 3 Unsafe-Inseln deklariert:
 1. `contextra-vector`: SIMD Intrinsics (ADR-007, `src/simd.rs`)
 2. `contextra-store`: mmap I/O (ADR-012, `src/mmap.rs`, `src/wal/mmap_segment.rs`)
 3. `contextra-kvcache`: Aligned Allocations (ADR-019, `src/aligned_alloc.rs`)
@@ -144,7 +144,7 @@ Dies ist der **kritischste Schwachstellenbereich** der Geschäftslogik:
 
 ## 3. Querverweis auf den Masterplan v2
 
-Alle Befunde aus den 20 Audits wurden im [`docs/ARCHITEKTUR_MASTERPLAN_v2.md`](file:///home/freddy/Projekte/contextra/docs/ARCHITEKTUR_MASTERPLAN_v2.md) lückenlos adressiert:
+Alle Befunde aus den 20 Audits wurden im [`docs/archive/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md`](docs/archive/14-10-26/ARCHITEKTUR_MASTERPLAN_v2.md) lückenlos adressiert:
 
 | Audit-Befund | Masterplan-Kapitel | Vorgesehene architektonische Lösung |
 |---|---|---|

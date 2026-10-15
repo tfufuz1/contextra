@@ -1,7 +1,7 @@
-# ADR-E04: kryptosuite-nach-sec6-1
+# ADR-E04: Kryptosuite nach §6.1 (AES-256-GCM-SIV, Argon2id, HKDF-SHA-2
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E04)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 Kryptosuite nach §6.1 (AES-256-GCM-SIV, Argon2id, HKDF-SHA-256, HMAC-SHA-256, BLAKE3, Ed25519 `verify_strict`). Kein Claim „BSI-konform".

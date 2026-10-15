@@ -1,7 +1,7 @@
-# ADR-E16: contextra-crypto-ohne-shim-splitten
+# ADR-E16: `contextra-crypto` wird ohne Shim gesplittet (§4.8).
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E16)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 `contextra-crypto` wird ohne Shim gesplittet (§4.8).

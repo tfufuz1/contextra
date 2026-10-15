@@ -1,7 +1,7 @@
-# ADR-E09: commit-punkt-durables-ledger-append
+# ADR-E09: Commit-Punkt = durables Ledger-Append; danach Roll-forward;
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E09)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 Commit-Punkt = durables Ledger-Append; danach Roll-forward; `Indeterminate`-Semantik; Cancellation-sicher (§5.3).

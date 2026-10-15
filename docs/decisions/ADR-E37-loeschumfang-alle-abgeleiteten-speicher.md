@@ -1,7 +1,7 @@
-# ADR-E37: loeschumfang-alle-abgeleiteten-speicher
+# ADR-E37: Löschumfang umfasst alle abgeleiteten Speicher (§5.10); ein
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E37)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 Löschumfang umfasst alle abgeleiteten Speicher (§5.10); ein neues Artefakt braucht Eintrag und Scan-Layer.

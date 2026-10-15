@@ -43,6 +43,18 @@ fn main() {
     let extra_args = if args.len() >= 2 { &args[2..] } else { &[] };
     let start_time = Instant::now();
 
+    if subcommand == "check-doc-links" {
+        let code = xtask::check_doc_links::run_check_doc_links(extra_args);
+        if timing_requested {
+            eprintln!(
+                "[timings] Command '{}' took {:?}",
+                subcommand,
+                start_time.elapsed()
+            );
+        }
+        process::exit(code);
+    }
+
     if let Some(code) = xtask::harness::dispatch_with_builtin(subcommand, extra_args) {
         if timing_requested {
             eprintln!(

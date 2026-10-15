@@ -65,7 +65,7 @@ writeln!(out, "\n**Verantwortlicher (Auftraggeber):** {}", ctx.controller_name)
 - **Ergebnis:** **SSTI nicht möglich**. Da keine Ausführung von Template-Ausdrücken (z. B. `{{ ... }}`, `${ ... }`, `{% ... %}`) stattfindet, können Angreifer über Eingabefelder wie `controller_name` keine Code-Ausführung erzwingen.
 
 ### 3.3 Markdown / HTML Injection Betrachtung
-- **Befund:** Wenn Felder wie `controller_name` Steuerzeichen wie Markdown-Syntax (`#`, `**`, `[link](url)`) oder HTML-Tags (`<script>`, `<iframe>`) enthalten, werden diese unbereinigt in das generierte Markdown-Dokument übernommen.
+- **Befund:** Wenn Felder wie `controller_name` Steuerzeichen wie Markdown-Syntax (`#`, `**`, `[link](url)`) oder HTML-Tags (`<script>`, `<iframe>`) enthalten, werden diese unbereinigt in das generierte Markdown-Dokument übernommen. <!-- doc-ref-ignore -->
 - **Risikobewertung:** Niedrig im Crate selbst (rein synthetische Markdown-Erzeugung). Falls die nachgelagerte Pipeline das Markdown in HTML konvertiert und im Browser rendert, muss der HTML-Renderer (z. B. via `pulldown-cmark` mit HTML-Sanitizer / DOMPurify) HTML-Tags maskieren.
 
 ---

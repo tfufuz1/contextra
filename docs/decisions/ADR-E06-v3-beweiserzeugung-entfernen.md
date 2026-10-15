@@ -1,7 +1,7 @@
-# ADR-E06: v3-beweiserzeugung-entfernen
+# ADR-E06: v3-Beweiserzeugung wird gelöscht, v2/v3 bleiben verify-only;
 
 * **Status:** Akzeptiert (aus Spezifikation §13 E06)
-* **Datum:** 2026-10-14
+* **Datum:** 2026-10-15
 
 ## Entscheidung
 v3-Beweiserzeugung wird gelöscht, v2/v3 bleiben verify-only; kein Feature `legacy-proofs`.
