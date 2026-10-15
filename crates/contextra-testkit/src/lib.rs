@@ -7,6 +7,7 @@
 
 pub mod deletion_oracle;
 pub mod dst;
+pub mod erasure_harness;
 pub mod fault_vfs;
 pub mod in_memory_store;
 pub mod manual_clock;
@@ -17,6 +18,12 @@ pub mod wiring;
 
 pub use deletion_oracle::{raw_sweep, OrcFieldMarker, OrcHit, OrcMarkerSet, OrcSweepReport};
 pub use dst::{EntropyRng, SeededRng};
+pub use erasure_harness::{
+    KeyState, ReferenceStore, SweepHit, SweepReport, TenantMatrixContext, TenantMatrixMode,
+    TenantMatrixRunner,
+};
+#[cfg(feature = "fault-injection")]
+pub use erasure_harness::FailpointHelper;
 #[cfg(feature = "fault-injection")]
 pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_store::InMemoryStorageEngine;
