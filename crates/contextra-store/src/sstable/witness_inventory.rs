@@ -95,11 +95,13 @@ impl SstInventory {
                     || file_name.contains("ledger")
                     || file_name == "purge.intent"
                     || file_name == "pending_delete.journal"
+                    || file_name == "integrity.key"
                     || file_name.ends_with(".wal")
                     || file_name.ends_with(".log")
                     || file_name.starts_with("wal")
                     || file_name.ends_with(".wal_integrity_key")
                     || file_name.ends_with(".rekeyed")
+                    || file_name.ends_with(".key")
                     || file_name.contains(".uuid")
                     || file_name.contains(".sealed")
                     || file_name.contains(".archived")

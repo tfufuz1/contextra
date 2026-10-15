@@ -3,6 +3,33 @@ use crate::*;
 use std::path::{Path, PathBuf};
 use std::process;
 
+pub fn run_check_claims(args: &[String]) -> i32 {
+    let root = crate::find_root_dir();
+    match check_claims::run_check_claims(&root) {
+        Ok(violations) => {
+            if !violations.is_empty() {
+                eprintln!(
+                    "❌ check-claims failed: {} prohibited claim(s) found:",
+                    violations.len()
+                );
+                for v in &violations {
+                    eprintln!(
+                        "  {}:{} [{}] matched '{}' — {}",
+                        v.file_path, v.line_num, v.rule_id, v.matched_text, v.description
+                    );
+                }
+                return 1;
+            }
+            println!("✅ No prohibited claims found (check-claims)");
+        }
+        Err(e) => {
+            eprintln!("❌ check-claims error: {}", e);
+            return 1;
+        }
+    }
+    0
+}
+
 pub fn run_check_commit_diff_integrity(args: &[String]) -> i32 {
     let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
     if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
@@ -664,6 +691,34 @@ pub fn run_check_marker_drift(args: &[String]) -> i32 {
     }
     println!("✅ check-marker-drift passed");
     0
+}
+
+pub fn run_check_exception_ledger(args: &[String]) -> i32 {
+    match check_exception_ledger::run_check_exception_ledger() {
+        Ok(exceptions) => {
+            println!(
+                "✅ check-exception-ledger (G-21) passed: {} active exception(s) verified:",
+                exceptions.len()
+            );
+            for ex in &exceptions {
+                println!(
+                    "  [{}] {} -> {} (expires: {}, reason: {})",
+                    ex.id, ex.from, ex.to, ex.expiry, ex.reason
+                );
+            }
+            0
+        }
+        Err(errors) => {
+            eprintln!(
+                "❌ check-exception-ledger (G-21) failed: {} error(s) found:",
+                errors.len()
+            );
+            for err in &errors {
+                eprintln!("  {}", err);
+            }
+            1
+        }
+    }
 }
 
 pub fn run_check_ring_capabilities_consistency(args: &[String]) -> i32 {

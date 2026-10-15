@@ -427,16 +427,15 @@ impl McpServer {
 
                 if let Some(id) = id_opt {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
-                    col.delete(id).await.map_err(McpError::from)?;
+                    let opts = contextra::collection::crud::DocEraseOptions::default();
+                    let erasure = col.erase_document(id, &opts).await.map_err(McpError::from)?;
 
-                    // Single document deletion in Contextra does not generate a DeletionProof.
-                    // In accordance with honesty rules, we return proof: null and proof_scope: "collection_only".
+                    // Single document deletion in Off mode per Spec §8.5:
+                    // Returns { "status": "logically_deleted", "tx": erasure.as_of_tx.inner() }.
+                    // No unverified proof claims.
                     Ok(json!({
-                        "ok": true,
-                        "collection": col_name,
-                        "id": id,
-                        "proof": null,
-                        "proof_scope": "collection_only"
+                        "status": "logically_deleted",
+                        "tx": erasure.as_of_tx.inner(),
                     }))
                 } else {
                     let proof_key = crate::proof_key_env::resolve_proof_key_from_env()

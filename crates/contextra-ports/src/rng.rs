@@ -15,6 +15,54 @@ use std::sync::Arc;
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///
 /// MUST be backed by genuine system/OS entropy or KMS. Test PRNGs MUST NOT implement this trait.
+/// Standard non-cryptographic system entropy generator backed by system/process entropy.
+#[derive(Debug, Default)]
+pub struct SystemRng;
+
+impl SystemRng {
+    /// Creates a new [`SystemRng`].
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        let mut written = 0;
+        while written < dest.len() {
+            let val = RandomState::new().build_hasher().finish();
+            let bytes = val.to_le_bytes();
+            let chunk = (dest.len() - written).min(8);
+            dest[written..written + chunk].copy_from_slice(&bytes[..chunk]);
+            written += chunk;
+        }
+    }
+
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+}
+
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        EntropyRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = EntropyRng::next_u64(self) >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
+
+/// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 pub trait EntropyRng: Send + Sync + 'static {
     /// Fills `dest` with cryptographically secure random bytes.
     fn fill_bytes(&self, dest: &mut [u8]);
@@ -39,6 +87,9 @@ pub trait SeededRng: Send + Sync + 'static {
 }
 
 /// Alias for [`SeededRng`] trait for specification and backward naming compatibility.
+///
+/// Deprecated per E55 / §7.4: `Rng` is ambiguous. Use [`EntropyRng`] or [`SeededRng`] explicitly.
+#[deprecated(since = "0.1.0", note = "Use SeededRng or EntropyRng per §7.4 / E55")]
 pub use SeededRng as Rng;
 
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {

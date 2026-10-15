@@ -11,6 +11,7 @@ pub mod fault_vfs;
 pub mod in_memory_store;
 pub mod manual_clock;
 pub mod reference_model;
+pub mod seeded_rng;
 pub mod sim_fs;
 pub mod wiring;
 
@@ -21,4 +22,5 @@ pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_store::InMemoryStorageEngine;
 pub use manual_clock::ManualClock;
 pub use reference_model::{RefOp, ReferenceModel};
+pub use seeded_rng::SeededRng as TestkitSeededRng;
 pub use wiring::{TestkitWiring, TestkitWiringDeps};

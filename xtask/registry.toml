@@ -11,6 +11,14 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "baseline-measure"
+owner_tier = "ci-gate"
+summary = "Sicherheits- und Architektur-Messungen der Baseline"
+blocking = false
+phase = "Phase 0"
+planned = true
+
+[[commands]]
 name = "bench-compile"
 owner_tier = "bench"
 summary = "Misst Kompilierzeiten der Workspace-Crates."
@@ -79,6 +87,14 @@ owner_tier = "ci-gate"
 summary = "Validiert Format und Struktur von AGENTS.md Dateien."
 blocking = true
 phase = "Phase 0"
+
+[[commands]]
+name = "check-claims"
+owner_tier = "ci-gate"
+summary = "Prüft Konsistency von Behauptungen und Invarianten-Claims"
+blocking = false
+phase = "Phase 0"
+planned = true
 
 [[commands]]
 name = "check-audit-duplication"
@@ -165,6 +181,14 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "check-doc-links"
+owner_tier = "ci-gate"
+summary = "Prüft Verweise und Links in Dokumentationsdateien"
+blocking = false
+phase = "Phase 0"
+planned = true
+
+[[commands]]
 name = "check-doc-references"
 owner_tier = "ci-gate"
 summary = "Validiert Links und Referenzen in Doku-Dateien."
@@ -198,6 +222,14 @@ owner_tier = "tool"
 summary = "Scanner für doppelte Symbole über Dateigrenzen."
 blocking = false
 phase = "Phase 0"
+
+[[commands]]
+name = "check-exception-ledger"
+owner_tier = "ci-gate"
+summary = "Prüft Ausnahmen-Register auf ungenehmigte Einträge"
+blocking = false
+phase = "Phase 0"
+planned = true
 
 [[commands]]
 name = "check-fbs-drift"
@@ -291,6 +323,13 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
+name = "check-no-downcast"
+owner_tier = "ci-gate"
+summary = "Scanner für downcast_ref::<LsmStorage> und Downcasts im Workspace"
+blocking = false
+phase = "Phase 2"
+
+[[commands]]
 name = "check-mutation-score-gate"
 owner_tier = "ci-gate"
 summary = "Prüft Einhaltung des Mutations-Test-Score-Schwellenwerts."
@@ -317,6 +356,13 @@ owner_tier = "ci-gate"
 summary = "Prüft Repository auf nicht verfolgte Phantom-Dateien."
 blocking = true
 phase = "Phase 0"
+
+[[commands]]
+name = "check-port-features"
+owner_tier = "ci-gate"
+summary = "Prüft Port-Features (backend-impl nur in store, test-utils nur in dev-dependencies)"
+blocking = false
+phase = "Phase 1"
 
 [[commands]]
 name = "check-placeholder-refs"
@@ -497,6 +543,13 @@ phase = "Phase 0"
 name = "debt-audit"
 owner_tier = "tool"
 summary = "Analysiert technische Schulden und TODO-Kommentare im Repository."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "deletion-guarantee-gate"
+owner_tier = "ci-gate"
+summary = "Rohsweep nach Purge, Marker-/Claim-Prüfung, Differenztest (Stub)"
 blocking = false
 phase = "Phase 0"
 
@@ -707,6 +760,13 @@ phase = "Phase 0"
 name = "generate-markers"
 owner_tier = "generator"
 summary = "Generiert automatische Marker-Kommentare im Code."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-core-mapping"
+owner_tier = "tool"
+summary = "Harness Modul zur Erzeugung des Mapping-Reports für die Entfernung von contextra-core (generate-core-mapping)."
 blocking = false
 phase = "Phase 0"
 

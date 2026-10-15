@@ -15,6 +15,10 @@ pub type CmdFn = fn(&[String]) -> i32;
 
 pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
+        "check-claims",
+        crate::cli::checks::run_check_claims,
+    ),
+    (
         "reproducible-build",
         crate::cli::misc::run_reproducible_build,
     ),
@@ -271,6 +275,10 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     ("feature-matrix", crate::cli::misc::run_feature_matrix),
     ("workspace-verify", crate::cli::misc::run_workspace_verify),
     (
+        "check-exception-ledger",
+        crate::cli::checks::run_check_exception_ledger,
+    ),
+    (
         "check-ring-capabilities-consistency",
         crate::cli::checks::run_check_ring_capabilities_consistency,
     ),
@@ -293,5 +301,13 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
         "check-loom-mocks",
         crate::cli::check_loom_mocks::run_check_loom_mocks,
+    ),
+    (
+        "check-port-names",
+        crate::harness::check_port_names::run_check_port_names,
+    ),
+    (
+        "check-no-stubs",
+        crate::harness::check_no_stubs::run_check_no_stubs,
     ),
 ];
