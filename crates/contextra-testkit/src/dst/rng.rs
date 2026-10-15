@@ -3,43 +3,42 @@
 // ZWECK: Seedable, deterministic PRNG for Deterministic Simulation Testing (DST).
 // INVARIANTEN: Bit-identical random streams for identical seeds across executions.
 
-use contextra_ports::EntropyRng as PortEntropyRng;
-use std::sync::atomic::{AtomicU64, Ordering};
+use contextra_ports::{Rng, SystemRng};
 
-/// Type-separated entropy RNG source for non-deterministic runtime entropy in tests.
+/// Type-separated entropy RNG source for non-deterministic runtime entropy.
 ///
 /// Unlike [`SeededRng`], `EntropyRng` CANNOT be initialized with a fixed seed value.
 /// This enforces type-level separation between deterministic test generators ([`SeededRng`])
 /// and real non-deterministic entropy sources ([`EntropyRng`]).
 #[derive(Debug, Default)]
-pub struct EntropyRng;
+pub struct EntropyRng {
+    inner: SystemRng,
+}
 
 impl EntropyRng {
-    /// Creates a new `EntropyRng` instance.
+    /// Creates a new `EntropyRng` instance seeded from system / runtime entropy.
     pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PortEntropyRng for EntropyRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        static COUNTER: AtomicU64 = AtomicU64::new(0x1234_5678_9ABC_DEF0);
-        for chunk in dest.chunks_mut(8) {
-            let val = COUNTER.fetch_add(0x9e37_79b9_7f4a_7c15, Ordering::Relaxed);
-            let bytes = val.to_le_bytes();
-            let take = chunk.len().min(8);
-            chunk[..take].copy_from_slice(&bytes[..take]);
+        Self {
+            inner: SystemRng::new(),
         }
     }
+}
 
+impl Rng for EntropyRng {
     fn next_u64(&self) -> u64 {
-        let mut bytes = [0u8; 8];
-        self.fill_bytes(&mut bytes);
-        u64::from_le_bytes(bytes)
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        self.inner.next_unit_f64()
     }
 }
 
-pub use DstRng as PortSeededRng;
+pub use contextra_ports::SeededRng as PortSeededRng;
 
 /// Seedable pseudo-random number generator (SplitMix64 algorithm).
 #[derive(Debug, Clone)]
@@ -106,8 +105,8 @@ mod tests {
 
     #[test]
     fn test_entropy_rng_and_seeded_rng_separation() {
-        let mut seeded = PortSeededRng::new(42);
-        let mut seeded_same = PortSeededRng::new(42);
+        let seeded = PortSeededRng::new(42);
+        let seeded_same = PortSeededRng::new(42);
         assert_eq!(seeded.next_u64(), seeded_same.next_u64());
 
         let entropy1 = EntropyRng::new();
