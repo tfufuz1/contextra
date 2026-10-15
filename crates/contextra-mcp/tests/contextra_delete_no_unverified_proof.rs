@@ -164,6 +164,15 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
         forget_val
     );
 
+    let content_text_f = forget_val["result"]["content"][0]["text"]
+        .as_str()
+        .ok_or("missing content text")?;
+    let content_json_f: Value = serde_json::from_str(content_text_f)?;
+
+    assert_eq!(content_json_f["status"], "logically_deleted");
+    assert!(content_json_f.get("tx").is_some());
+    assert!(content_json_f.get("proof").is_none());
+
     // 4. Verify tool descriptions in tools/list
     let list_req = contextra_mcp::protocol::JsonRpcRequest {
         jsonrpc: "2.0".into(),

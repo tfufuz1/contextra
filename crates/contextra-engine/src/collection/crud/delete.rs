@@ -1,14 +1,8 @@
 use crate::collection::Collection;
 use crate::deletion::forget_options::ForgetOptions;
 use crate::deletion::forget_options::VerifyDepth;
-use crate::deletion::relations_witness::issue_relations_witness;
-use crate::deletion::text_witness::issue_text_index_witness;
-use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
-use contextra_crypto::deletion_proof::types::DeletionLayer;
-use contextra_crypto::deletion_proof::WitStoreGeneration;
-use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
+use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_store::lsm::witness::ZeuIssueRequest;
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use serde::Serialize;
@@ -53,10 +47,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// # Execution Order
     /// (a) Lock document key and scope erasure fence;
     /// (b) Compute ErasureFootprint;
-    /// (c) Write Erasure Ledger entry (`ledger_append`) with `erased_at_tx` and fsync VOR Tombstone Commit;
+    /// (c) Validate assurance capabilities;
     /// (d) Write and commit tombstones for all footprint keys in a single transaction;
     /// (e) Clear RAM indices (HNSW, InvertedIndex, Graph/Relations, KV-Hooks);
-    /// (f) Collect layer witnesses (Memtable, HNSW, Text, Relations, Ledger);
+    /// (f) Return empty witnesses (no witness fabrication without real scan per REG-14);
     /// (g) Verify scope write sequence for concurrent modification.
     pub async fn erase_document(&self, id: &str, opts: &DocEraseOptions) -> Result<DocErasure> {
         if id.is_empty() {
@@ -67,6 +61,24 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         // Validate execution options (§C9)
         opts.options.validate()?;
+
+        // Assurance above S0 requires real storage scans which are implemented in M5.
+        // Return CapabilityUnsupported per REG-14 until real scans are wired.
+        if opts.options.assurance
+            > contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
+        {
+            return Err(ContextraError::capability_unsupported(
+                "real_scan_erasure",
+                "Assurance levels above S0 require real storage scans",
+            ));
+        }
+
+        if opts.options.verify_depth == VerifyDepth::FullSweep {
+            return Err(ContextraError::capability_unsupported(
+                "full_sweep_verify_depth",
+                "FullSweep verify depth requires real storage scans and erasure ledger",
+            ));
+        }
 
         let doc_id = DocId::from_key(id)?;
 
@@ -94,19 +106,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             &footprint.keys.explicit,
         );
 
-        // (c) Ledger Append BEFORE Tombstone Commit
-        // When running on a storage engine without Erasure Ledger capabilities and assurance >= S1,
-        // fail closed per doctrine rule (symbol/capability missing).
-        if maybe_lsm.is_none()
-            && opts.options.assurance
-                >= contextra_crypto::deletion_proof::claim_text::WitAssurance::S1
-        {
-            return Err(ContextraError::capability_unsupported(
-                "erasure_ledger",
-                "Storage engine does not support Erasure Ledger append",
-            ));
-        }
-
         // (d) Tombstones for ALL Footprint Keys in single transaction
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
@@ -122,8 +121,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         db_tx.stage_text_delete(doc_id);
 
-        if let Ok(eid) = EntityId::from_key(id) {
-            db_tx.stage_graph_entity_delete(eid);
+        match EntityId::from_key(id) {
+            Ok(eid) => db_tx.stage_graph_entity_delete(eid),
+            Err(_) => {}
         }
 
         // Tombstone explicit footprint keys
@@ -144,81 +144,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             kv_hooks.remove_doc_segments(tenant, doc_id);
         }
 
-        // (f) Witnesses
-        let mut witnesses = Vec::new();
+        // (f) No witness fabrication without real scan (REG-14, Hotfix F-01)
+        let witnesses = Vec::new();
 
-        if let Some(lsm) = maybe_lsm {
-            let req = ZeuIssueRequest {
-                scope_keys: footprint.keys.explicit.clone(),
-                scope_prefixes: footprint.keys.prefixes.clone(),
-                as_of_tx: erased_at_tx,
-                scanned_at_tx: erased_at_tx,
-                assurance: opts.options.assurance,
-                claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-                scanner_name: "engine_document_eraser",
-                scanner_version: 1,
-                key_identifiers_claimed: true,
-            };
-            if let Ok(lsm_witnesses) = lsm.issue_witnesses_v2(req).await {
-                witnesses.extend(lsm_witnesses);
-            }
-        }
-
-        if let Ok(text_witness) = issue_text_index_witness(
-            doc_id,
-            &footprint.ram.term_bytes,
-            scope_hash,
-            erased_at_tx,
-            None,
-        ) {
-            witnesses.push(text_witness);
-        }
-
-        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
-        if let Ok(rel_witness) =
-            issue_relations_witness(doc_id, scanned_edges, scope_hash, erased_at_tx, None)
-        {
-            witnesses.push(rel_witness);
-        }
-
-        // Add Erasure Ledger witness if Erasure Ledger was appended
-        if maybe_lsm.is_some() {
-            if let Ok(ledger_witness) = LayerWitness::issue(WitIssueArgs {
-                layer: DeletionLayer::ErasureLedger,
-                scope_hash,
-                scanned_at_tx: erased_at_tx,
-                as_of_tx: erased_at_tx,
-                assurance: opts.options.assurance,
-                claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-                footprint_hash: footprint.hash,
-                scope_write_seq: scope_write_seq_before,
-                scanner_name: "engine_erasure_ledger",
-                scanner_version: 1,
-                store_generation: WitStoreGeneration(1),
-                layer_evidence: WitLayerEvidence::ErasureLedger {
-                    ledger_head_seq: erased_at_tx.inner(),
-                    decision_chain_mac: [0u8; 32],
-                    entry_confirmed: true,
-                },
-                key_identifiers_claimed: true,
-            }) {
-                witnesses.push(ledger_witness);
-            }
-        }
-
-        // Verify options.verify_depth (§C9)
-        if opts.options.verify_depth == VerifyDepth::FullSweep {
-            let has_ledger = witnesses
-                .iter()
-                .any(|w| *w.layer() == DeletionLayer::ErasureLedger);
-            if !has_ledger {
-                return Err(ContextraError::InvalidInput(
-                    "FullSweep verify depth failed: missing ErasureLedger witness".to_string(),
-                ));
-            }
-        }
-
-        // (g) Scope Write Seq verification (L3 fix: don't return Err after successful commit)
+        // (g) Scope Write Seq verification
         let final_scope_write_seq = if let Some(lsm) = maybe_lsm {
             let scope_write_seq_after = lsm
                 .erasure_fence
@@ -282,8 +211,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         db_tx.stage_text_delete(doc_id);
 
-        if let Ok(eid) = EntityId::from_key(id) {
-            db_tx.stage_graph_entity_delete(eid);
+        match EntityId::from_key(id) {
+            Ok(eid) => db_tx.stage_graph_entity_delete(eid),
+            Err(_) => {}
         }
 
         self.storage.delete(tx, &user_key).await?;

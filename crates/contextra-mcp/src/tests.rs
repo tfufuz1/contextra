@@ -285,10 +285,9 @@ async fn test_contextra_forget_single_doc() {
     assert_ne!(res_f["result"]["isError"], true);
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], true);
-    assert_eq!(json_res["id"], "forget_doc_1");
-    assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert_eq!(json_res["proof_scope"], "collection_only");
+    assert_eq!(json_res["status"], "logically_deleted");
+    assert!(json_res.get("tx").is_some());
+    assert!(json_res.get("proof").is_none());
 
     // 4. Verify contextra_get returns null
     let get_req = make_request(
