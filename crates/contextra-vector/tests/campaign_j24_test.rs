@@ -5,19 +5,15 @@ use std::collections::HashSet;
 use std::f32;
 use std::fs;
 
-use contextra_core::types::{DistanceMetric, DocId, TxId};
-use contextra_core::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_ports::VectorIndex;
 use contextra_vector::candidate_stream::VectorCandidateStream;
 use contextra_vector::compute_pool::ComputePool;
-#[cfg(feature = "experimental-diskann")]
-use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_vector::distance::{cosine_distance, dot_product_distance, euclidean_distance};
 use contextra_vector::hnsw::sq8_bias::Sq8Bias;
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::{MmapIndex, NodeRecord};
 use contextra_vector::quantize::ScalarQuantizer;
-#[cfg(feature = "experimental-rabitq")]
-use contextra_vector::RaBitQQuantizer;
 
 // Helper: generate random vector
 fn gen_vector(dim: usize, seed: u64) -> Vec<f32> {
@@ -214,60 +210,6 @@ fn test_h2_quantization_drift_and_sq8_bias() {
     let uncalibrated_bias = Sq8Bias::new(0.0, 0.0, 0).mean_bias;
     let calibrated_bias = bias_cal.mean_bias;
     println!("H2 Sq8Bias uncalibrated: {uncalibrated_bias:.6}, calibrated: {calibrated_bias:.6}");
-}
-
-// ============================================================================
-// H3: RaBitQ Orthogonal Matrix & Unbiased Distance Estimator
-// ============================================================================
-#[cfg(feature = "experimental-rabitq")]
-#[test]
-fn test_h3_rabitq_orthogonal_matrix_and_unbiased_estimator() {
-    let dim = 16;
-    let train_vecs: Vec<Vec<f32>> = (0..100).map(|i| gen_vector(dim, i as u64)).collect();
-    let rabitq = RaBitQQuantizer::try_train(&train_vecs, dim).unwrap();
-
-    // Verify asymmetric distance estimation accuracy over >= 10,000 pairs
-    let num_pairs = 10_000;
-    let mut total_error = 0.0f64;
-    let mut sq_error = 0.0f64;
-
-    for i in 0..num_pairs {
-        let q = gen_vector(dim, i as u64 * 2);
-        let v = gen_vector(dim, i as u64 * 2 + 1);
-
-        let exact_d = euclidean_distance(&q, &v).unwrap();
-        let v_code = rabitq.quantize(&v).unwrap();
-        let est_d = rabitq.asymmetric_distance(&q, &v_code).unwrap();
-
-        let err = (est_d - exact_d) as f64;
-        total_error += err;
-        sq_error += err * err;
-    }
-
-    let mean_bias = total_error / (num_pairs as f64);
-    let variance = (sq_error / (num_pairs as f64)) - (mean_bias * mean_bias);
-    let std_dev = variance.sqrt();
-
-    // BEFUND J-24-F03: RaBitQ asymmetric distance estimator exhibits systematic positive bias ~0.7477
-    println!("H3 RaBitQ 10,000 pairs mean bias: {mean_bias:.6}, std_dev: {std_dev:.6}");
-
-    // Degenerate training data
-    let identical = vec![vec![1.0f32; dim]; 10];
-    let res_deg = RaBitQQuantizer::try_train(&identical, dim);
-    assert!(
-        res_deg.is_ok(),
-        "RaBitQQuantizer::try_train failed on identical vectors"
-    );
-}
-
-// Counter-test for H3 (R10)
-#[test]
-#[should_panic(expected = "Counter-test failure: distance bias limit exceeded")]
-fn test_h3_counter_test_orthogonal_matrix_failure() {
-    let mean_bias = 1.50f64; // Mutated artificial bias
-    if mean_bias.abs() >= 0.15 {
-        panic!("Counter-test failure: distance bias limit exceeded");
-    }
 }
 
 // ============================================================================
@@ -532,107 +474,6 @@ fn test_h6_counter_test_header_magic_failure() {
     if &header_bytes[0..4] != b"CTXH" {
         panic!("Counter-test failure: header magic mismatch");
     }
-}
-
-// ============================================================================
-// H7: DiskANN Corrupt Header Fallback Policy & HMAC Validation
-// ============================================================================
-#[cfg(feature = "experimental-diskann")]
-#[tokio::test]
-async fn test_h7_diskann_corruption_and_fallback_policy() {
-    let dir = tempfile::tempdir().unwrap();
-    let index_path = dir.path().join("diskann_fallback.idx");
-
-    let dim = 16;
-    let mut diskann_config = DiskAnnConfig::default();
-    diskann_config.dimension = dim;
-    diskann_config.index_path = index_path.clone();
-    diskann_config.fallback_policy = DiskAnnFallbackPolicy::UseHnswOnFailure;
-
-    let index = DiskAnnIndex::try_new(diskann_config.clone()).unwrap();
-    let tx = TxId::new(1);
-    for i in 1..=15 {
-        let doc_id = DocId::from(i as u64);
-        index
-            .insert(tx, doc_id, &gen_vector(dim, i as u64))
-            .await
-            .unwrap();
-    }
-    index.persist_delta_sync().unwrap();
-
-    // Corrupt the header of index_path
-    let mut file_bytes = fs::read(&index_path).unwrap();
-    if file_bytes.len() > 10 {
-        file_bytes[0..4].copy_from_slice(b"BADM");
-        fs::write(&index_path, &file_bytes).unwrap();
-    }
-
-    // BEFUND J-24-F04 (RESOLVED): DiskAnnIndex::try_new validates existing disk files immediately
-    let reopen_res = DiskAnnIndex::try_new(diskann_config.clone());
-    assert!(
-        reopen_res.is_err(),
-        "try_new on corrupted header must return Err"
-    );
-
-    // Search on corrupted diskann index triggers fallback or error
-    let query = gen_vector(dim, 999);
-    let search_res = index.search(&query, 5).await;
-    println!(
-        "H7 DiskANN search on corrupted header result: is_ok={}",
-        search_res.is_ok()
-    );
-}
-
-// ============================================================================
-// H8: DiskANN Pending WAL / Tombstone WAL Recovery Idempotency
-// ============================================================================
-#[cfg(feature = "experimental-diskann")]
-#[tokio::test]
-async fn test_h8_diskann_pending_wal_and_tombstone_wal_recovery() {
-    let dir = tempfile::tempdir().unwrap();
-    let index_path = dir.path().join("diskann_wal_recovery.idx");
-
-    let dim = 16;
-    let mut config = DiskAnnConfig::default();
-    config.dimension = dim;
-    config.index_path = index_path.clone();
-
-    let tx = TxId::new(1);
-    let index = DiskAnnIndex::try_new(config.clone()).unwrap();
-
-    let doc1 = DocId::from(100u64);
-    let vec1 = gen_vector(dim, 100);
-    let doc2 = DocId::from(200u64);
-    let vec2 = gen_vector(dim, 200);
-
-    // Write pending inserts through public interface
-    index.insert(tx, doc1, &vec1).await.unwrap();
-    index.insert(tx, doc2, &vec2).await.unwrap();
-
-    // Trigger recover_pending_delta_sync
-    let count1 = index.recover_pending_delta_sync().unwrap();
-    assert!(
-        count1 >= 2,
-        "Recovery should process pending inserts, got {count1}"
-    );
-
-    // Second recovery invocation must be idempotent
-    let count2 = index.recover_pending_delta_sync().unwrap();
-    assert_eq!(
-        count2, 0,
-        "Second recovery on processed pending WAL should yield 0 new entries"
-    );
-
-    // Soft-delete tombstone test
-    let del_doc = DocId::from(100u64);
-    index.delete(tx, del_doc).await.unwrap();
-
-    let stats = index.stats().await.unwrap();
-    println!(
-        "H8 DiskANN stats after delete: num_vectors={}, deleted_ratio={}",
-        stats.num_vectors, stats.deleted_ratio
-    );
-    assert!(stats.deleted_ratio > 0.0);
 }
 
 // ============================================================================

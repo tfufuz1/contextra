@@ -1,4 +1,5 @@
-use contextra_core::{DistanceMetric, DocId, Result, TxId, VectorIndex};
+use contextra_types::{DistanceMetric, DocId, Result, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::VectorCandidateStream;
 

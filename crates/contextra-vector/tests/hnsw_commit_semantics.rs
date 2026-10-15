@@ -1,4 +1,6 @@
-use contextra_core::{DocId, IndexOp, Result, TxId, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{VectorIndex};
+use contextra_mvcc::{IndexOp};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex, VectorData};
 
 fn create_test_index(dim: usize) -> Result<HnswIndex> {

@@ -1,4 +1,4 @@
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_vector::quantize::ScalarQuantizer;
 
 #[test]
@@ -67,7 +67,7 @@ fn test_train_on_invalid_input_returns_untrained_quantizer() {
     let res_asym = sq.asymmetric_dist(
         &vec_to_quant,
         &dummy_quant,
-        contextra_core::DistanceMetric::Euclidean,
+        contextra_types::DistanceMetric::Euclidean,
     );
     assert!(
         matches!(res_asym, Err(ContextraError::InvalidInput(_))),
@@ -77,7 +77,7 @@ fn test_train_on_invalid_input_returns_untrained_quantizer() {
     let res_sym = sq.symmetric_dist(
         &dummy_quant,
         &dummy_quant,
-        contextra_core::DistanceMetric::Euclidean,
+        contextra_types::DistanceMetric::Euclidean,
     );
     assert!(
         matches!(res_sym, Err(ContextraError::InvalidInput(_))),

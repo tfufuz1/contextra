@@ -1,4 +1,5 @@
-use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_crypto::deletion_proof::claim_text::WitAssurance;
 use contextra_vector::hnsw::{
     witness::HnwIssueArgs, GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth,
