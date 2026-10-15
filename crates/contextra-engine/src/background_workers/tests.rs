@@ -161,7 +161,6 @@ async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_worker_task_cleans_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -187,7 +186,6 @@ async fn test_expiry_cleanup_worker_task_cleans_documents() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -270,7 +268,6 @@ async fn test_orphan_cleanup_worker_removes_expired() {
 
 #[tokio::test]
 async fn trigger_expiry_cleanup_deletes_expired_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -290,14 +287,12 @@ async fn trigger_expiry_cleanup_deletes_expired_documents() {
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = crate::Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -324,7 +319,6 @@ async fn trigger_expiry_cleanup_deletes_expired_documents() {
 
 #[tokio::test]
 async fn test_worker_immediate_cancellation() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -350,7 +344,6 @@ async fn test_worker_immediate_cancellation() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
