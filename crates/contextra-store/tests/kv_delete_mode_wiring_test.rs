@@ -88,6 +88,7 @@ fn test_default_config_crypto_shred_end_to_end() {
     // Default configuration uses KvDeleteMode::TombstoneOnly
     let default_config = KvSegmentConfig::default();
     assert_eq!(default_config.delete_mode, KvDeleteMode::TombstoneOnly);
+    assert_eq!(KvDeleteMode::default(), KvDeleteMode::TombstoneOnly);
 
     let config = KvSegmentConfig {
         delete_mode: KvDeleteMode::CryptoShred,
