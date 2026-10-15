@@ -24,7 +24,6 @@ async fn test_collection_embedder_async_embed() {
 
 #[tokio::test]
 async fn test_input_guards_boundary_validation() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -42,33 +41,18 @@ async fn test_input_guards_boundary_validation() {
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,
     );
 
     let vec = vec![1.0, 0.0, 0.0, 0.0];
-
-    // 0. Empty inputs in relate()
-    let err_relate_empty_from = col.relate("", "doc2", "knows").await;
-    assert!(matches!(
-        err_relate_empty_from,
-        Err(contextra_types::ContextraError::InvalidInput(_))
-    ));
-
-    let err_relate_empty_to = col.relate("doc1", "", "knows").await;
-    assert!(matches!(
-        err_relate_empty_to,
-        Err(contextra_types::ContextraError::InvalidInput(_))
-    ));
 
     // 1. Empty ID guard on insert / upsert
     let err_empty_id = col.insert("", &vec, None).await;
@@ -130,7 +114,6 @@ async fn test_input_guards_boundary_validation() {
 
 #[tokio::test]
 async fn test_doc_id_collision_rejected() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
@@ -152,14 +135,12 @@ async fn test_doc_id_collision_rejected() {
         })
         .unwrap(), // unwrap
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx.clone(),
         4,
         contextra_text::Language::English,
@@ -342,7 +323,6 @@ fn test_importance_metadata_integration_and_filtering() {
 
 #[tokio::test]
 async fn test_invalid_doc_ids_rejected() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -369,7 +349,6 @@ async fn test_invalid_doc_ids_rejected() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -394,7 +373,6 @@ async fn test_invalid_doc_ids_rejected() {
 #[tokio::test]
 async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_types::Result<()>
 {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -417,7 +395,6 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
         "matrix_happy".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -445,7 +422,6 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
 
 #[tokio::test]
 async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Result<()> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -468,7 +444,6 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Res
         "matrix_empty".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -487,7 +462,6 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Res
 
 #[tokio::test]
 async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Result<()> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -510,7 +484,6 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Resu
         "matrix_errors".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -535,7 +508,6 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Resu
 
 #[tokio::test]
 async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result<()> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -558,7 +530,6 @@ async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result
         "apm7_utf8".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::German,
