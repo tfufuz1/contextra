@@ -3,7 +3,7 @@
 
 ## 1. Zweck
 Eigenständiges, reproduzierbares Benchmark-Harness zur Messung von Retrieval-Genauigkeit und Performance.
-Evaluiert Recall@K, MRR, RRF-Fusion und Reranking über LoCoMo, BEIR und synthetische Datensätze.
+Evaluiert Recall@K, MRR und RRF-Fusion über LoCoMo, BEIR und synthetische Datensätze.
 Bietet Regressions-Gates und Baseline-Vergleiche für CI-Sicherheitsprüfungen (`compare_baseline`).
 
 ## 2. Modul-Karte

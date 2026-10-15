@@ -8,10 +8,8 @@ use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
 use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
 };
-use contextra_core::{EmbeddingProvider, Result};
 use contextra_db::{Contextra, ContextraConfig};
-#[cfg(feature = "onnx-bench")]
-use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -193,9 +191,9 @@ fn build_evaluation_corpus() -> Vec<SyntheticDocument> {
         },
         SyntheticDocument {
             id: "doc_ml_16".into(),
-            title: "Conformal Prediction".into(),
-            raw_content: "Conformal prediction provides distribution-free coverage guarantees for any model.".into(),
-            context_prefix: "Dokument: Statistik & ML. Thema: Conformal Uncertainty Intervals. ".into(),
+            title: "Statistical Uncertainty Estimation".into(),
+            raw_content: "Statistical uncertainty estimation provides distribution-free coverage guarantees for any model.".into(),
+            context_prefix: "Dokument: Statistik & ML. Thema: Uncertainty Intervals. ".into(),
             embedding: pad_vector(&[0.16, 0.84, 0.0, 0.0], DIM),
         },
         SyntheticDocument {
@@ -214,9 +212,9 @@ fn build_evaluation_corpus() -> Vec<SyntheticDocument> {
         },
         SyntheticDocument {
             id: "doc_ml_19".into(),
-            title: "ONNX Runtime Inference".into(),
-            raw_content: "ONNX runtime enables cross-platform inference of machine learning models.".into(),
-            context_prefix: "Dokument: Machine Learning Ops. Thema: ONNX Model Execution. ".into(),
+            title: "Runtime Model Execution".into(),
+            raw_content: "High performance runtimes enable cross-platform inference of machine learning models.".into(),
+            context_prefix: "Dokument: Machine Learning Ops. Thema: Model Execution. ".into(),
             embedding: pad_vector(&[0.11, 0.89, 0.0, 0.0], DIM),
         },
         SyntheticDocument {
@@ -491,7 +489,7 @@ fn create_synthetic_corpus() -> (
         },
     ];
 
-    // Scenario B Queries (Cross-Encoder Reranking)
+    // Scenario B Queries (Reranking testing)
     let scenario_b_queries = vec![
         GroundTruthQuery {
             query_id: "q_b_1".into(),
@@ -697,114 +695,16 @@ async fn run_scenario_a(
     })
 }
 
-#[cfg(feature = "onnx-bench")]
-async fn run_scenario_b(
-    docs: &[SyntheticDocument],
-    queries: &[GroundTruthQuery],
-) -> Result<ScenarioComparison> {
-    let db_cfg = ContextraConfig {
-        dimension: 768,
-        ..Default::default()
-    };
-
-    let temp_dir = TempDir::new()?;
-    let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
-    let col = db.collection("rerank_test").await?;
-
-    for doc in docs {
-        let metadata = serde_json::json!({
-            "title": doc.title,
-            "text": doc.raw_content,
-        });
-        col.insert(&doc.id, &doc.embedding, Some(metadata)).await?;
-    }
-
-    // 1. Without Reranking (Standard RRF)
-    let mut no_rerank_retrieved = Vec::with_capacity(queries.len());
-    for q in queries {
-        let res = col
-            .query()
-            .text(&q.query_text)
-            .embedding(&q.query_embedding)
-            .k(5)
-            .execute()
-            .await?;
-        no_rerank_retrieved.push(res.into_iter().map(|r| r.id).collect());
-    }
-
-    // 2. With Cross-Encoder Reranking
-    let reranker_config = RerankConfig::default();
-    let (reranker, is_passthrough) = match CrossEncoderReranker::new(reranker_config) {
-        Ok(r) => (r, false),
-        Err(_) => {
-            println!("[INFO] ONNX model weights not found at models/bge-reranker-base.onnx. Using Passthrough CrossEncoder for benchmark.");
-            (CrossEncoderReranker::passthrough(), true)
-        }
-    };
-
-    let mut with_rerank_retrieved = Vec::with_capacity(queries.len());
-    for q in queries {
-        let res = col
-            .query()
-            .text(&q.query_text)
-            .embedding(&q.query_embedding)
-            .reranker(&reranker)
-            .k(5)
-            .execute()
-            .await?;
-        with_rerank_retrieved.push(res.into_iter().map(|r| r.id).collect());
-    }
-
-    let base_metrics = calculate_metrics(queries, &no_rerank_retrieved);
-    let feat_metrics = calculate_metrics(queries, &with_rerank_retrieved);
-
-    let recall_1_delta = if base_metrics.recall_at_1 > 0.0 {
-        ((feat_metrics.recall_at_1 - base_metrics.recall_at_1) / base_metrics.recall_at_1) * 100.0
-    } else if feat_metrics.recall_at_1 > 0.0 {
-        100.0
-    } else {
-        0.0
-    };
-
-    let recall_5_delta = if base_metrics.recall_at_5 > 0.0 {
-        ((feat_metrics.recall_at_5 - base_metrics.recall_at_5) / base_metrics.recall_at_5) * 100.0
-    } else if feat_metrics.recall_at_5 > 0.0 {
-        100.0
-    } else {
-        0.0
-    };
-
-    let err_reduction = if base_metrics.error_rate_at_1 > 0.0 {
-        ((base_metrics.error_rate_at_1 - feat_metrics.error_rate_at_1)
-            / base_metrics.error_rate_at_1)
-            * 100.0
-    } else {
-        0.0
-    };
-
-    // Sanity check: If passthrough reranker was used or retrieved results are identical, mechanism is not active.
-    let mechanism_active = !is_passthrough && no_rerank_retrieved != with_rerank_retrieved;
-
-    Ok(ScenarioComparison {
-        scenario_name: "Ohne vs. mit Cross-Encoder-Reranking".into(),
-        baseline_metrics: base_metrics,
-        feature_metrics: feat_metrics,
-        recall_at_1_delta_pct: recall_1_delta,
-        recall_at_5_delta_pct: recall_5_delta,
-        error_rate_reduction_pct: err_reduction,
-        mechanism_active,
-    })
-}
-
-#[cfg(not(feature = "onnx-bench"))]
 async fn run_scenario_b(
     _docs: &[SyntheticDocument],
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
-    eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
-        capability: "onnx-bench".to_string(),
-        reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
+    eprintln!(
+        "[WARN] Scenario B (Reranking) is disabled because reranking dependencies are removed."
+    );
+    Err(ContextraError::CapabilityUnsupported {
+        capability: "reranking".to_string(),
+        reason: "Reranking benchmark is disabled.".to_string(),
     })
 }
 
@@ -1053,7 +953,6 @@ async fn run_locomo_cmd(
     println!("Dataset: {}", dataset_path.display());
     println!("Output : {}", output_path.display());
 
-    let start_time = std::time::Instant::now();
     let dataset = load_locomo_dataset(dataset_path)?;
     println!(
         "Loaded {} evaluation cases (conversation index samples: {}).",
@@ -1061,19 +960,8 @@ async fn run_locomo_cmd(
         dataset.conversation_index.len()
     );
 
-    let embed_dir = Path::new("models/candle-embed");
-    let _ = fs::create_dir_all(embed_dir);
-    let embedder = std::sync::Arc::new(contextra_infer_candle::CandleEmbedClient::from_dir(
-        embed_dir,
-        contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
-    )?);
-    let dim = EmbeddingProvider::embedding_dim(embedder.as_ref());
-    println!(
-        "Initialized Candle embedding provider (dim={}, provider={}) in {:.2?}",
-        dim,
-        EmbeddingProvider::provider_name(embedder.as_ref()),
-        start_time.elapsed()
-    );
+    let dim = 768;
+    let dummy_vec = pad_vector(&[0.5, 0.5, 0.0, 0.0], dim);
 
     let db_cfg = ContextraConfig {
         dimension: dim,
@@ -1090,15 +978,12 @@ async fn run_locomo_cmd(
         for (sample_id, turns_map) in &dataset.conversation_index {
             for (dia_id, turn_text) in turns_map {
                 let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": turn_text,
                     "dia_id": dia_id,
                     "sample_id": sample_id,
                 });
-                batch.push((doc_id, vec, Some(metadata)));
+                batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
                 if batch.len() >= 50 {
                     col.insert_many(&batch).await?;
                     batch.clear();
@@ -1109,15 +994,12 @@ async fn run_locomo_cmd(
         for (case_idx, case) in dataset.cases.iter().enumerate() {
             for (ev_idx, ev) in case.evidence.iter().enumerate() {
                 let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": ev,
                     "case_id": case.question_id,
                     "sample_id": case.sample_id,
                 });
-                batch.push((doc_id, vec, Some(metadata)));
+                batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
                 if batch.len() >= 50 {
                     col.insert_many(&batch).await?;
                     batch.clear();
@@ -1134,20 +1016,10 @@ async fn run_locomo_cmd(
     );
 
     let col_ref = &col;
-    let embedder_ref = &embedder;
     let report = run_locomo_eval(&dataset.cases, &dataset.conversation_index, |q| {
         let q_owned = q.to_string();
         Box::pin(async move {
-            let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
-                .await
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
-            let res = col_ref
-                .query()
-                .text(&q_owned)
-                .embedding(&q_vec)
-                .k(5)
-                .execute()
-                .await?;
+            let res = col_ref.query().text(&q_owned).k(5).execute().await?;
             let chunks = res
                 .into_iter()
                 .map(|r| {
@@ -1535,14 +1407,6 @@ mod tests {
         assert_eq!(sc_a.baseline_metrics.total_queries, q_a.len());
         // Prepending context prefix changes BM25 indexing in Scenario A, making the mechanism active
         assert!(sc_a.mechanism_active);
-
-        #[cfg(feature = "onnx-bench")]
-        {
-            let sc_b = run_scenario_b(&docs, &_q_b).await.unwrap();
-            assert_eq!(sc_b.baseline_metrics.total_queries, _q_b.len());
-            // Scenario B using passthrough cross-encoder produces identical ordering, so mechanism is inactive (false)
-            assert!(!sc_b.mechanism_active);
-        }
     }
 
     #[test]
