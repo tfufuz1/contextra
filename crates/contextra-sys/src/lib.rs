@@ -4,6 +4,7 @@
 
 pub mod acl_win32;
 pub mod aligned;
+pub mod clock;
 pub mod determinism;
 pub mod durability;
 pub mod env_observe;
@@ -11,6 +12,7 @@ pub mod hardening;
 pub mod mlock;
 pub mod mmap;
 pub mod posix;
+pub mod rng;
 pub mod vault;
 pub mod wiring;
 

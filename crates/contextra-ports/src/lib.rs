@@ -47,6 +47,8 @@ pub mod graph_index;
 pub mod graph_persistence;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
+/// Unique ID generator port traits (§7.4).
+pub mod ids;
 /// Key-value prefix store traits and types.
 pub mod kv;
 /// Key-value bridge storage port trait.
@@ -73,6 +75,8 @@ pub mod rng;
 pub mod snapshot;
 /// Key-value storage engine traits.
 pub mod storage;
+/// Time port traits (§7.4).
+pub mod time;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
 pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.

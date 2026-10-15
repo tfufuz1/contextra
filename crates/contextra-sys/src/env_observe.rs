@@ -279,6 +279,7 @@ pub fn check_memfd_secret_support() -> EnvTri {
             // Secret fd opened successfully (must be closed)
             // SAFETY: `res` is a valid file descriptor returned by syscall.
             unsafe {
+                #[allow(clippy::cast_possible_truncation)]
                 libc::close(res as libc::c_int);
             }
             EnvTri::Yes

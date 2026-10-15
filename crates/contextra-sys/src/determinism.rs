@@ -19,6 +19,8 @@ pub struct SystemClock {
 
 impl SystemClock {
     /// Creates a new [`SystemClock`] with current instant as monotonic baseline.
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-sys
+    #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         Self {
             start_instant: Instant::now(),
@@ -28,7 +30,8 @@ impl SystemClock {
     /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
     ///
     /// Returns `0` if system time is before the Unix epoch.
-    #[allow(clippy::cast_possible_truncation)]
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-sys
+    #[allow(clippy::cast_possible_truncation, clippy::disallowed_methods)]
     pub fn now_unix_nanos(&self) -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -37,7 +40,8 @@ impl SystemClock {
     }
 
     /// Returns nanoseconds elapsed since monotonic baseline reference point.
-    #[allow(clippy::cast_possible_truncation)]
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-sys
+    #[allow(clippy::cast_possible_truncation, clippy::disallowed_methods)]
     pub fn monotonic_nanos(&self) -> u64 {
         u64::try_from(
             Instant::now()
@@ -158,6 +162,8 @@ pub struct SystemIdGen {
 
 impl SystemIdGen {
     /// Creates a new [`SystemIdGen`] starting at wall-clock nanoseconds.
+    // DETERMINISM-EXCEPTION: SystemIdGen port implementation in contextra-sys
+    #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         let start = SystemTime::now()
             .duration_since(UNIX_EPOCH)
