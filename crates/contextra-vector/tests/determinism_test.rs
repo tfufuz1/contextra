@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{VectorIndex};
 
 use contextra_ports::{Rng, SeededRng};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};

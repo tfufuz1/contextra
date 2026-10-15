@@ -1,4 +1,5 @@
-use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
 
 /// Helper function to count stale incoming ghost edges across all nodes and layers in RAM.

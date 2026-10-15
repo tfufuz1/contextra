@@ -3,7 +3,8 @@
 // ZWECK: Integrationstest zur Verifikation von Allokationsfehlern im HNSW-Arena-Allocator und atomarem Verhalten beim Einfügen (Review P03 / F-01).
 // INVARIANTEN: Zero-Panic Guarantee (I-8), Kantensymmetrie (I-3), Atomares Einfügen bei Fehlern.
 
-use contextra_core::{DocId, Result, TxId, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{HnswArena, HnswConfig, HnswIndex};
 
 #[tokio::test]

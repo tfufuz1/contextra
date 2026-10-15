@@ -1,8 +1,9 @@
-use contextra_core::{ContextraError, DocId, TxId, VectorIndex};
+use contextra_types::{ContextraError, DocId, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
 
 #[tokio::test]
-async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_core::Result<()> {
+async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("mmap_repair_test.hnsw");
 
@@ -54,7 +55,7 @@ async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_core::Result<(
 }
 
 #[tokio::test]
-async fn test_overlay_cleared_on_reload() -> contextra_core::Result<()> {
+async fn test_overlay_cleared_on_reload() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("mmap_reload_test.hnsw");
 
@@ -91,7 +92,7 @@ async fn test_overlay_cleared_on_reload() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_concurrent_search_during_repair() -> contextra_core::Result<()> {
+async fn test_concurrent_search_during_repair() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("mmap_concurrent_test.hnsw");
 

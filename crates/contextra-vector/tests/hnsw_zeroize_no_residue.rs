@@ -3,7 +3,7 @@
 // ZWECK: Integrationstest für HNSW-Zeroisierung, Canary-Analyse, deferred-State bei Reader-Pin und Rückstandsfreiheit nach Rebuild.
 // INVARIANTEN: Zero-Panic, VETO-F02 Einhaltung, INV-DELETION-2.
 
-use contextra_core::{DocId, Result};
+use contextra_types::{DocId, Result};
 use contextra_crypto::deletion_proof::claim_text::WitAssurance;
 use contextra_ports::VectorIndex;
 use contextra_types::TxId;
@@ -33,11 +33,11 @@ async fn test_hnsw_zeroize_canary_and_deferred_pin_behavior() -> Result<()> {
     let doc_id2 = DocId::new(102);
 
     let tx1 = TxId::try_new(1)
-        .map_err(|e| contextra_core::ContextraError::InvalidInput(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
     let tx2 = TxId::try_new(2)
-        .map_err(|e| contextra_core::ContextraError::InvalidInput(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
     let tx3 = TxId::try_new(3)
-        .map_err(|e| contextra_core::ContextraError::InvalidInput(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
 
     index.insert(tx1, doc_id1, &canary_vec).await?;
     index.insert(tx2, doc_id2, &vec![1.0; dim]).await?;

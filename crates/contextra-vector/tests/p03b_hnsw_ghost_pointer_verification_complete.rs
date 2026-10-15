@@ -3,7 +3,8 @@
 // ZWECK: Complete verification tests for P03/F-02 HNSW ghost pointer verification.
 // INVARIANTEN: INV-DELETION-2: After Ok(..) of remove_with_graph_repair(doc_id), no neighborhood pointer points to doc_id.
 
-use contextra_core::{DocId, Result, TxId, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{GhostFreeVectorIndex, GhostScan, HnswConfig, HnswIndex};
 
 #[tokio::test]

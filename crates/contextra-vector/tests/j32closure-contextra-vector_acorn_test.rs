@@ -1,4 +1,4 @@
-use contextra_core::DocId;
+use contextra_types::DocId;
 use contextra_vector::acorn::NaiveReferenceIndex;
 
 #[test]
