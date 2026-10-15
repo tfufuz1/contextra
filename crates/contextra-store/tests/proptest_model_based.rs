@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 #[tokio::test]
 #[allow(clippy::unwrap_used)]
-async fn test_failing_proptest_sequence() -> contextra_core::Result<()> {
+async fn test_failing_proptest_sequence() -> contextra_types::Result<()> {
     let tmp = TempDir::new().unwrap();
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
