@@ -1,6 +1,6 @@
 // INVARIANT: The MCP server entry point defaults to opening the database in Fast-Ring mode
 // via Contextra::open() with OpenFastGate license enforcement. Without a valid signed
-// license gate (SignedLicenseGate in contextra-license), no configuration or environment
+// license gate (SignedLicenseGate), no configuration or environment
 // variable (CONTEXTRA_*) can activate a higher feature ring (Sovereign or Compliance).
 // Furthermore, DeletionProof active mode is strictly disabled in Fast-Ring.
 

@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
+// STAND:       2026-10-15
 // ZWECK:       Binary Entry Point for Contextra MCP Stdio JSON-RPC Server
 // INVARIANTEN: Logs exclusively to stderr; stdout strictly reserved for JSON-RPC transport
 // HOTSPOTS:    main()
@@ -29,21 +29,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(i) = args.iter().position(|a| a == "--provider") {
         if let Some(val) = args.get(i + 1) {
             config.provider = val.clone();
-        }
-    }
-    if let Some(i) = args.iter().position(|a| a == "--ollama-url") {
-        if let Some(val) = args.get(i + 1) {
-            config.ollama_url = val.clone();
-        }
-    }
-    if let Some(i) = args.iter().position(|a| a == "--embed-model") {
-        if let Some(val) = args.get(i + 1) {
-            config.embed_model = val.clone();
-        }
-    }
-    if let Some(i) = args.iter().position(|a| a == "--onnx-model-path") {
-        if let Some(val) = args.get(i + 1) {
-            config.onnx_model_path = Some(std::path::PathBuf::from(val));
         }
     }
 
