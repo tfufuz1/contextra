@@ -7,6 +7,10 @@ use tempfile::tempdir;
 
 struct TestFreeSpaceProbe;
 impl FreeSpaceProbe for TestFreeSpaceProbe {
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::ProbeError> {
+        Ok(Some(100 * 1024 * 1024))
+    }
+
     fn free_space_bytes(&self) -> Option<u64> {
         Some(100 * 1024 * 1024)
     }

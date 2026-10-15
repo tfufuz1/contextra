@@ -522,10 +522,10 @@ impl McpServer {
 
                 let turns_scanned = turns.len();
                 let (consolidation_res, synthesis_res) =
-                    contextra::execute_background_consolidation(
+                    contextra_cognition::execute_background_consolidation(
                         col.as_ref(),
                         &turns,
-                        &contextra::memory_consolidation::ConsolidationConfig::default(),
+                        &contextra_cognition::memory_consolidation::ConsolidationConfig::default(),
                         None,
                         None,
                         None,

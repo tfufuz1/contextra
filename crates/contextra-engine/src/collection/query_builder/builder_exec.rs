@@ -111,7 +111,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             ));
         }
 
-        let snapshot = contextra_ports::ReadSnapshot::new(seq_no);
+        let snapshot = contextra_ports::ReadSnapshot::from_seq(seq_no);
 
         #[allow(deprecated)]
         let (mut results, report) = self

@@ -4,6 +4,7 @@
 
 use contextra_store::sstable::witness_scan::scan_sstables;
 use contextra_store::sstable::witness_types::{SstScanInputs, SstScopeSpec};
+use contextra_testkit::erasure_harness::raw_sweep;
 use std::path::Path;
 
 pub fn verify_purge_oracle(dir_path: &Path, scope: &SstScopeSpec, as_of_tx: u64) {
@@ -41,5 +42,15 @@ pub fn verify_purge_oracle(dir_path: &Path, scope: &SstScopeSpec, as_of_tx: u64)
         evidence.tombstones_remaining, 0,
         "Oracle check failed: tombstones_remaining == {} (expected 0)",
         evidence.tombstones_remaining
+    );
+}
+
+/// Verifies using the erasure harness raw sweep that none of the provided needles exist in any store file.
+pub fn verify_purge_raw_sweep_clean(dir_path: &Path, needles: &[Vec<u8>]) {
+    let report = raw_sweep(dir_path, needles).expect("Raw sweep failed to execute");
+    assert!(
+        report.is_clean(),
+        "Raw sweep found residual key/value occurrences after purge: {:?}",
+        report.hits
     );
 }

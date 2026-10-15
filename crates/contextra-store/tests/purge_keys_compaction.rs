@@ -12,6 +12,10 @@ use tempfile::TempDir;
 
 struct DummyProbe(u64);
 impl FreeSpaceProbe for DummyProbe {
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::ProbeError> {
+        Ok(Some(self.0))
+    }
+
     fn free_space_bytes(&self) -> Option<u64> {
         Some(self.0)
     }

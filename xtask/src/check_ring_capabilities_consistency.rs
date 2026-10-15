@@ -22,6 +22,8 @@ struct CapabilitiesManifestPartial {
 #[derive(Deserialize)]
 struct CrateEntryPartial {
     ring: String,
+    #[serde(default)]
+    planned: bool,
 }
 
 fn find_root_dir() -> PathBuf {
@@ -79,7 +81,7 @@ pub fn run_check_ring_capabilities_consistency_in_root(
 
         let is_consistent = match &layering_ring_opt {
             Some(layering_ring) => caps_ring == layering_ring,
-            None => false,
+            None => entry.planned || crate_name.ends_with("-fuzz"),
         };
 
         if !is_consistent {

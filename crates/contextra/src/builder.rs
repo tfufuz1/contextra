@@ -16,6 +16,7 @@ use contextra_ports::id_gen::{IdGen, SystemIdGen};
 use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::rng::{Rng, SystemRng};
 use contextra_ports::wiring::PortsWiring;
+use contextra_store::kv::KvDeleteMode;
 use contextra_store::lsm::DurabilityMode;
 
 /// Error types emitted during contextra build/wiring verification (§4.7).
@@ -137,6 +138,12 @@ impl ContextraBuilder {
         let rng = ports_wiring.rng;
         let id_gen = ports_wiring.id_gen;
         let license_gate: Arc<dyn LicenseGate> = Arc::new(OpenFastGate);
+
+        let kv_delete_mode = if cfg!(feature = "encryption-at-rest") {
+            KvDeleteMode::CryptoShred
+        } else {
+            KvDeleteMode::TombstoneOnly
+        };
 
         Self {
             storage_path,

@@ -10,11 +10,7 @@ pub trait CompactionRecordFilter: Send + Sync {
     fn drop_record(&self, key: &[u8], tx: u64) -> bool;
 }
 
-/// Trait probing available disk space for Purge-Compaction pre-flight checks.
-pub trait FreeSpaceProbe: Send + Sync {
-    /// Returns available disk space in bytes, or None if space estimation failed/unsupported.
-    fn free_space_bytes(&self) -> Option<u64>;
-}
+pub use contextra_ports::{FreeSpaceProbe, ProbeError};
 
 /// Production disk space probe using `statvfs` via `contextra-sys`.
 pub struct StatvfsSpaceProbe {
@@ -29,8 +25,8 @@ impl StatvfsSpaceProbe {
 }
 
 impl FreeSpaceProbe for StatvfsSpaceProbe {
-    fn free_space_bytes(&self) -> Option<u64> {
-        contextra_sys::statvfs_available_bytes(&self.path).ok()
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, ProbeError> {
+        Ok(contextra_sys::statvfs_available_bytes(&self.path).ok())
     }
 }
 

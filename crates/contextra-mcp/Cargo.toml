@@ -26,6 +26,7 @@ contextra-license = { workspace = true }
 contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
+contextra-cognition = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
 contextra-infer-onnx = { workspace = true, optional = true }

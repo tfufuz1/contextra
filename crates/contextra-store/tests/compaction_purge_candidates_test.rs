@@ -12,6 +12,10 @@ use tempfile::TempDir;
 struct LargeFreeSpaceProbe;
 
 impl FreeSpaceProbe for LargeFreeSpaceProbe {
+    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::ProbeError> {
+        Ok(Some(1_000_000_000))
+    }
+
     fn free_space_bytes(&self) -> Option<u64> {
         Some(1_000_000_000)
     }

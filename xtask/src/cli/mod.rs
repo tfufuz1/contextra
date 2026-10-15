@@ -275,6 +275,10 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     ("feature-matrix", crate::cli::misc::run_feature_matrix),
     ("workspace-verify", crate::cli::misc::run_workspace_verify),
     (
+        "check-exception-ledger",
+        crate::cli::checks::run_check_exception_ledger,
+    ),
+    (
         "check-ring-capabilities-consistency",
         crate::cli::checks::run_check_ring_capabilities_consistency,
     ),

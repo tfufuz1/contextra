@@ -48,6 +48,7 @@ pub mod check_compile;
 pub mod check_coverage_gate;
 pub mod check_doc_references;
 pub mod check_duplicate_core_primitives;
+pub mod check_exception_ledger;
 pub mod check_duplicate_intent;
 pub mod check_duplicate_symbols;
 pub mod check_duplicate_symbols_cross_file;
@@ -109,6 +110,7 @@ pub mod security_scan;
 pub mod session_history;
 pub mod session_init;
 pub mod shell_commit_audit;
+pub mod sync_docs;
 pub mod tag_health;
 pub mod validate_pr_checklist;
 pub mod verify;
@@ -1079,6 +1081,15 @@ pub fn severity_weight(sev: Option<&str>) -> usize {
 pub fn run_sync_docs(check_only: bool) -> bool {
     println!("=== xtask sync-docs ===");
     let root = find_root_dir();
+
+    if let Err(errors) = sync_docs::verify_capabilities_against_spec(&root) {
+        eprintln!("❌ G-04 capabilities.toml verification failed:");
+        for err in errors {
+            eprintln!("  {}", err);
+        }
+        return false;
+    }
+    println!("✅ capabilities.toml is fully aligned with Spec §4.1 (G-04).");
 
     let tags = scan_tags(&root);
     let crates = get_workspace_crates();
