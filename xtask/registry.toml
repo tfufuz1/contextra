@@ -711,6 +711,13 @@ blocking = false
 phase = "Phase 0"
 
 [[commands]]
+name = "generate-core-mapping"
+owner_tier = "tool"
+summary = "Harness Modul zur Erzeugung des Mapping-Reports für die Entfernung von contextra-core (generate-core-mapping)."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
 name = "generate-interface-spec"
 owner_tier = "tool"
 summary = "Harness Modul zur Erzeugung der Schnittstellenspezifikation (generate-interface-spec)."

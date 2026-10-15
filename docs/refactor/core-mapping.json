@@ -1,0 +1,463 @@
+{
+  "generated_at_sha": "4ecbb9f55fdf41d7892da9ab22fcc5909b629df5",
+  "total_symbols": 57,
+  "open_count": 0,
+  "entries": [
+    {
+      "symbol": "AttentionExporter",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::attention",
+      "core_reexport_path": "contextra_core::traits::AttentionExporter",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "BoxFuture",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports",
+      "core_reexport_path": "contextra_core::traits::BoxFuture",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "BoxStream",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports",
+      "core_reexport_path": "contextra_core::traits::BoxStream",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "Clock",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::clock",
+      "core_reexport_path": "contextra_core::traits::Clock",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ContextraError",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::error",
+      "core_reexport_path": "contextra_core::contextra_types::error::ContextraError",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ContextraErrorDto",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::error_dto",
+      "core_reexport_path": "contextra_core::contextra_types::error_dto::ContextraErrorDto",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "DocIdWidth",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::schema",
+      "core_reexport_path": "contextra_core::contextra_types::schema::DocIdWidth",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "EntropyRng",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::rng",
+      "core_reexport_path": "contextra_core::traits::EntropyRng",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ErasureBackend",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::ErasureBackend",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ErasureHooks",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::ErasureHooks",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "FreeSpaceProbe",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::FreeSpaceProbe",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "GraphCollectionMutation",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::graph",
+      "core_reexport_path": "contextra_core::traits::GraphCollectionMutation",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "GraphIndex",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::graph_index",
+      "core_reexport_path": "contextra_core::traits::GraphIndex",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "GraphPersistence",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::graph_persistence",
+      "core_reexport_path": "contextra_core::traits::GraphPersistence",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "IdGen",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::id_gen",
+      "core_reexport_path": "contextra_core::traits::IdGen",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "IdGenerator",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::id_gen",
+      "core_reexport_path": "contextra_core::traits::IdGenerator",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "IndexOp",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::tx_buffer",
+      "core_reexport_path": "contextra_core::contextra_mvcc::tx_buffer::IndexOp",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "JsonRpcError",
+      "original_crate": "contextra_wire",
+      "original_module": "contextra_wire::jsonrpc",
+      "core_reexport_path": "contextra_core::ipc::JsonRpcError",
+      "suggested_target_crate": "contextra_wire",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "JsonRpcRequest",
+      "original_crate": "contextra_wire",
+      "original_module": "contextra_wire::jsonrpc",
+      "core_reexport_path": "contextra_core::ipc::JsonRpcRequest",
+      "suggested_target_crate": "contextra_wire",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "JsonRpcResponse",
+      "original_crate": "contextra_wire",
+      "original_module": "contextra_wire::jsonrpc",
+      "core_reexport_path": "contextra_core::ipc::JsonRpcResponse",
+      "suggested_target_crate": "contextra_wire",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "KvBridgeStorage",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::kv_bridge_port",
+      "core_reexport_path": "contextra_core::traits::KvBridgeStorage",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "KvPrefixStore",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::kv",
+      "core_reexport_path": "contextra_core::traits::KvPrefixStore",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "LayerScan",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::LayerScan",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "LicenseGate",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::license",
+      "core_reexport_path": "contextra_core::traits::LicenseGate",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ManifestSchemaVersion",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::schema",
+      "core_reexport_path": "contextra_core::contextra_types::schema::ManifestSchemaVersion",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "MergeOperator",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::merge_operator",
+      "core_reexport_path": "contextra_core::traits::MergeOperator",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "MergeOperatorFactory",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::merge_operator_factory",
+      "core_reexport_path": "contextra_core::traits::MergeOperatorFactory",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "MetricsSink",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::metrics",
+      "core_reexport_path": "contextra_core::traits::MetricsSink",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "ModelFingerprint",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::model_fingerprint",
+      "core_reexport_path": "contextra_core::contextra_types::model_fingerprint::ModelFingerprint",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "QueryRewriter",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::query_rewriter",
+      "core_reexport_path": "contextra_core::traits::QueryRewriter",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "Reranker",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::reranker",
+      "core_reexport_path": "contextra_core::traits::Reranker",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "RestoreGuard",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::RestoreGuard",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "Result",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::error",
+      "core_reexport_path": "contextra_core::contextra_types::error::Result",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "Rng",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::rng",
+      "core_reexport_path": "contextra_core::traits::Rng",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SeededRng",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::rng",
+      "core_reexport_path": "contextra_core::traits::SeededRng",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SeqBitTombstone",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::tombstone",
+      "core_reexport_path": "contextra_core::contextra_types::tombstone::SeqBitTombstone",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SeqLogChange",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::seq_log",
+      "core_reexport_path": "contextra_core::contextra_mvcc::seq_log::SeqLogChange",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SeqLogEntry",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::seq_log",
+      "core_reexport_path": "contextra_core::contextra_mvcc::seq_log::SeqLogEntry",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SequenceLog",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::seq_log",
+      "core_reexport_path": "contextra_core::contextra_mvcc::seq_log::SequenceLog",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SnapshotGuard",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::snapshot",
+      "core_reexport_path": "contextra_core::contextra_mvcc::snapshot::SnapshotGuard",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SnapshotReader",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::snapshot",
+      "core_reexport_path": "contextra_core::traits::SnapshotReader",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "SnapshotRegistry",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::snapshot",
+      "core_reexport_path": "contextra_core::contextra_mvcc::snapshot::SnapshotRegistry",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "StorageEngine",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::storage",
+      "core_reexport_path": "contextra_core::traits::StorageEngine",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "TextEmbeddingEngine",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::embedding",
+      "core_reexport_path": "contextra_core::traits::TextEmbeddingEngine",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "TombstoneSemanticsCheck",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types::tombstone",
+      "core_reexport_path": "contextra_core::contextra_types::tombstone::TombstoneSemanticsCheck",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "TxBuffer",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc::tx_buffer",
+      "core_reexport_path": "contextra_core::contextra_mvcc::tx_buffer::TxBuffer",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "WireWiring",
+      "original_crate": "contextra_wire",
+      "original_module": "contextra_wire::wiring",
+      "core_reexport_path": "contextra_core::ipc::WireWiring",
+      "suggested_target_crate": "contextra_wire",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "WriteGate",
+      "original_crate": "contextra_ports",
+      "original_module": "contextra_ports::erasure",
+      "core_reexport_path": "contextra_core::traits::WriteGate",
+      "suggested_target_crate": "contextra_ports",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "error",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::error",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "error_dto",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::error_dto",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "model_fingerprint",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::model_fingerprint",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "schema",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::schema",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "seq_log",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc",
+      "core_reexport_path": "contextra_core::contextra_mvcc::seq_log",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "snapshot",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc",
+      "core_reexport_path": "contextra_core::contextra_mvcc::snapshot",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "tombstone",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::tombstone",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "tx_buffer",
+      "original_crate": "contextra_mvcc",
+      "original_module": "contextra_mvcc",
+      "core_reexport_path": "contextra_core::contextra_mvcc::tx_buffer",
+      "suggested_target_crate": "contextra_mvcc",
+      "status": "KLAR"
+    },
+    {
+      "symbol": "types",
+      "original_crate": "contextra_types",
+      "original_module": "contextra_types",
+      "core_reexport_path": "contextra_core::contextra_types::types",
+      "suggested_target_crate": "contextra_types",
+      "status": "KLAR"
+    }
+  ]
+}
