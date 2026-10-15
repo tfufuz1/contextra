@@ -134,8 +134,14 @@ pub fn classify_wal_filename(filename: &str) -> WalFileType {
             | "purge.intent"
             | "pending_delete.journal"
             | ".wal_integrity_key"
+            | "integrity.key"
+            | "erasure.ledger"
+            | "ledger.head"
     ) || filename.ends_with(".rekeyed")
         || filename.ends_with(".uuid")
+        || filename.ends_with(".ledger")
+        || filename.ends_with(".head")
+        || filename.ends_with(".key")
     {
         WalFileType::Sidecar
     } else if filename.contains(".sealed.") || filename.ends_with(".sealed") {
