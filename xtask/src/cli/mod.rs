@@ -15,6 +15,10 @@ pub type CmdFn = fn(&[String]) -> i32;
 
 pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
+        "check-claims",
+        crate::cli::checks::run_check_claims,
+    ),
+    (
         "reproducible-build",
         crate::cli::misc::run_reproducible_build,
     ),

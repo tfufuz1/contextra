@@ -35,6 +35,7 @@ pub mod audit_integrity_check;
 pub mod bench_compile;
 pub mod bench_download;
 pub mod check_action_pinning;
+pub mod check_claims;
 pub mod check_adr_deadlines;
 pub mod check_agents_freshness;
 pub mod check_agents_integrity;

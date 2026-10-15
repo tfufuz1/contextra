@@ -3,6 +3,33 @@ use crate::*;
 use std::path::{Path, PathBuf};
 use std::process;
 
+pub fn run_check_claims(args: &[String]) -> i32 {
+    let root = crate::find_root_dir();
+    match check_claims::run_check_claims(&root) {
+        Ok(violations) => {
+            if !violations.is_empty() {
+                eprintln!(
+                    "❌ check-claims failed: {} prohibited claim(s) found:",
+                    violations.len()
+                );
+                for v in &violations {
+                    eprintln!(
+                        "  {}:{} [{}] matched '{}' — {}",
+                        v.file_path, v.line_num, v.rule_id, v.matched_text, v.description
+                    );
+                }
+                return 1;
+            }
+            println!("✅ No prohibited claims found (check-claims)");
+        }
+        Err(e) => {
+            eprintln!("❌ check-claims error: {}", e);
+            return 1;
+        }
+    }
+    0
+}
+
 pub fn run_check_commit_diff_integrity(args: &[String]) -> i32 {
     let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
     if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
