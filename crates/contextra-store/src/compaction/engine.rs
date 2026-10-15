@@ -1037,7 +1037,7 @@ mod tests {
         let tmp = TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
         let registry = Arc::new(contextra_core::SnapshotRegistry::new());
         let bc = create_block_cache(1);
-        let manual_clock = Arc::new(contextra_ports::ManualClock::new(1_000_000));
+        let manual_clock = Arc::new(contextra_ports::SystemClock::new());
 
         let config = CompactionConfig {
             min_sstables_per_tier: 2,

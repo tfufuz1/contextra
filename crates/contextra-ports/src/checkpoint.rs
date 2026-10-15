@@ -5,37 +5,6 @@ use crate::types::*;
 use crate::Result;
 use std::future::Future;
 
-/// Represents an immutable read snapshot bound to a specific sequence number / version.
-///
-/// Guarantees that all search signals (vector, text, graph) reading under the same
-/// `ReadSnapshot` observe the exact same sequence state (`max_seq`) (REG-10, §7.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ReadSnapshot {
-    max_seq: u64,
-}
-
-impl ReadSnapshot {
-    /// Creates a new `ReadSnapshot` bound to the given maximum sequence number.
-    pub fn new(max_seq: u64) -> Self {
-        Self { max_seq }
-    }
-
-    /// Returns the maximum sequence number for this snapshot.
-    pub fn max_seq(&self) -> u64 {
-        self.max_seq
-    }
-
-    /// Returns the sequence number for this snapshot (alias for `max_seq`).
-    pub fn seq(&self) -> u64 {
-        self.max_seq
-    }
-}
-
-impl From<u64> for ReadSnapshot {
-    fn from(seq: u64) -> Self {
-        Self::new(seq)
-    }
-}
 
 /// Abstract contract for generating consistent checkpoints.
 pub trait Checkpoint: Send + Sync + 'static {

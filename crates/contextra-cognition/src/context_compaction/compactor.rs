@@ -1,7 +1,7 @@
 use contextra_engine::collection::Collection;
 use contextra_engine::ProvenanceRecord;
 use contextra_ports::{
-    ContextSegment, LlmTextGenerator, Rng, SeededRng, StorageEngine, VectorIndex,
+    ContextSegment, LlmTextGenerator, Rng, StorageEngine, VectorIndex,
 };
 use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use std::sync::Arc;
@@ -34,7 +34,7 @@ impl ContextCompactor {
         Self {
             budget,
             strategy,
-            rng: Arc::new(SeededRng::new(0x434F_4E54_5854_5241)),
+            rng: Arc::new(contextra_ports::SystemRng::new()),
         }
     }
 
@@ -246,7 +246,7 @@ impl ContextCompactor {
         V: VectorIndex,
         G: LlmTextGenerator + ?Sized,
     {
-        let default_rng = SeededRng::new(0x434F_4E54_5854_5241);
+        let default_rng = contextra_ports::SystemRng::new();
         Self::consolidate_with_retry_with_rng(
             collection,
             source_doc_ids,

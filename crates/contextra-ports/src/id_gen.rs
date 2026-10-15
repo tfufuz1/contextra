@@ -19,6 +19,67 @@ impl<T: IdGenerator + ?Sized> IdGenerator for Arc<T> {
     }
 }
 
+/// A thread-safe, sequential 64-bit ID generator for deterministic testing.
+#[derive(Debug)]
+pub struct SequentialIdGen {
+    next: std::sync::atomic::AtomicU64,
+}
+
+impl SequentialIdGen {
+    /// Creates a new [`SequentialIdGen`] starting at `start_id`.
+    pub fn new(start_id: u64) -> Self {
+        Self {
+            next: std::sync::atomic::AtomicU64::new(start_id),
+        }
+    }
+}
+
+impl Default for SequentialIdGen {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
+impl IdGenerator for SequentialIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// Standard production ID generator.
+#[derive(Debug)]
+pub struct SystemIdGen {
+    next: std::sync::atomic::AtomicU64,
+}
+
+impl SystemIdGen {
+    /// Creates a new [`SystemIdGen`].
+    pub fn new() -> Self {
+        let start = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
+            .unwrap_or(1);
+        Self {
+            next: std::sync::atomic::AtomicU64::new(start),
+        }
+    }
+}
+
+impl Default for SystemIdGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IdGenerator for SystemIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// Alias for [`SystemIdGen`].
+pub use SystemIdGen as SystemIdGenerator;
+
 #[cfg(test)]
 mod tests {
     use super::*;

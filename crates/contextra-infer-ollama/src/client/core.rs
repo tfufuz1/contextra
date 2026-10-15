@@ -7,16 +7,12 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use contextra_ports::{Rng, SeededRng};
+use contextra_ports::Rng;
 use contextra_types::{ContextraError, Result};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
-
-/// Default RNG seed for deterministic fallback.
-/// The Composition Root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
-const DEFAULT_RNG_SEED: u64 = 0x4f4c_4c41_4d41_524e; // "OLLAMARN"
 
 /// Private helper to calculate retry jitter bounded to 0..100 ms using the injected RNG port.
 #[inline]
@@ -71,9 +67,9 @@ impl OllamaClient {
                 reqwest::Client::new()
             }
         };
-        // Default RNG uses SeededRng with a deterministic default seed.
+        // Default RNG uses SystemRng.
         // The composition root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
-        let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(DEFAULT_RNG_SEED));
+        let rng: Arc<dyn Rng> = Arc::new(contextra_ports::SystemRng::new());
         Self {
             config,
             client,

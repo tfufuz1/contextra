@@ -268,7 +268,6 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use contextra_ports::Rng;
             use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
@@ -276,7 +275,7 @@ impl Wal {
             // CSPRNG EXCEPTION (P28): Secret key/salt generation requires cryptographically secure OS entropy via OsRng.
             rand::rngs::OsRng.fill_bytes(&mut key);
 
-            let rng = contextra_ports::SystemRng::default();
+            let rng = contextra_sys::SystemRng::default();
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
@@ -397,10 +396,9 @@ impl Wal {
             parent
         };
 
-        use contextra_ports::Rng;
         use tokio::io::AsyncWriteExt;
 
-        let rng = contextra_ports::SystemRng::default();
+        let rng = contextra_sys::SystemRng::default();
         let tmp_path = parent_dir.join(format!(
             "{}.tmp.{}.{}",
             marker_path
@@ -483,13 +481,12 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use contextra_ports::Rng;
             use tokio::io::AsyncWriteExt;
 
             let uuid = uuid::Uuid::new_v4();
             let bytes = *uuid.as_bytes();
 
-            let rng = contextra_ports::SystemRng::default();
+            let rng = contextra_sys::SystemRng::default();
             let uuid_filename = uuid_path
                 .file_name()
                 .map(|s| s.to_string_lossy())

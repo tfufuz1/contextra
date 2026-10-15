@@ -107,7 +107,7 @@ impl PhysicalScope {
     ///
     /// # Invariants
     /// 1. Must not be empty (at least one key or prefix required).
-    /// 2. Every key and prefix MUST start with `t:<tenant_id>:`.
+    /// 2. Every key and prefix MUST start with `t:<tenant_id>:`. Empty prefix is rejected.
     /// 3. Canonical: sorted, deduplicated, and subsumed keys/prefixes removed.
     #[cfg(feature = "backend-impl")]
     pub fn try_new(
@@ -133,7 +133,7 @@ impl PhysicalScope {
         }
 
         for p in &prefixes {
-            if !p.starts_with(&tenant_prefix_bytes) {
+            if p.is_empty() || !p.starts_with(&tenant_prefix_bytes) {
                 return Err(ContextraError::InvalidInput(format!(
                     "Prefix {:?} does not start with expected tenant prefix 't:{}:'",
                     p, tenant_id.0
@@ -241,15 +241,16 @@ impl PhysicalScope {
 #[derive(Debug, PartialEq, Eq)]
 pub struct HookToken {
     id: u64,
+    _no_copy: (),
 }
 
 impl HookToken {
     /// Sentinel token representing no-op or inactive hooks.
-    pub const NONE: Self = Self { id: 0 };
+    pub const NONE: Self = Self { id: 0, _no_copy: () };
 
     /// Creates a new `HookToken` wrapping raw numeric identifier.
     pub const fn new(id: u64) -> Self {
-        Self { id }
+        Self { id, _no_copy: () }
     }
 
     /// Returns raw numeric ID.
@@ -407,6 +408,11 @@ pub struct ProbeError(pub String);
 pub trait FreeSpaceProbe: Send + Sync {
     /// Returns available disk space in bytes. None = unknown (never 0 bytes).
     fn available_bytes(&self) -> std::result::Result<Option<u64>, ProbeError>;
+
+    /// Convenience helper returning available bytes as `Option<u64>`, ignoring probe errors.
+    fn free_space_bytes(&self) -> Option<u64> {
+        self.available_bytes().ok().flatten()
+    }
 }
 
 /// Anti-resurrection guard verdict (§5.5).
@@ -491,24 +497,51 @@ pub enum EraseError {
     },
 }
 
-/// Purge operation phase state machine (§5.3).
+/// Purge operation phase state machine (§5.3, §5.6, E67).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum PurgeState {
-    /// Operation admitted into coordinator.
-    Admitted = 0,
-    /// Memtable flush triggered.
-    Flush = 1,
-    /// Physical purge compaction executing.
-    PurgeCompaction = 2,
-    /// Obsolete files disposed.
-    Dispose = 3,
-    /// WAL segments retired.
-    WalRetire = 4,
-    /// Witness evidence collected.
-    Witness = 5,
-    /// State finalized.
-    Finalize = 6,
-    /// Fences released.
-    Release = 7,
+    /// Step 0: hooks.begin() invoked.
+    Begun = 0,
+    /// Step 1: Ledger record fsync-ed (commit point).
+    LedgerAppended = 1,
+    /// Step 2: Tombstone committed.
+    Tombstoned = 2,
+    /// Step 3: Pending purge execution.
+    PurgePending = 3,
+    /// Step 4: Fence held, rewrite active.
+    Purging = 4,
+    /// Step 5: Rewrite, scrub, and derived stores complete.
+    Purged = 5,
+    /// Step 6: Crypto-erase stage 1 complete (§5.13).
+    KeyQuarantined = 6,
+    /// Step 7: Assured phase complete (EP1 terminal state).
+    Completed = 7,
+    /// Step 8: Scans and proofs complete (EP2).
+    Attested = 8,
+}
+
+impl PurgeState {
+    /// Converts PurgeState to u8 representation.
+    #[must_use]
+    pub const fn to_u8(self) -> u8 {
+        self as u8
+    }
+
+    /// Parses PurgeState from u8 code.
+    #[must_use]
+    pub fn from_u8(val: u8) -> Option<Self> {
+        match val {
+            0 => Some(Self::Begun),
+            1 => Some(Self::LedgerAppended),
+            2 => Some(Self::Tombstoned),
+            3 => Some(Self::PurgePending),
+            4 => Some(Self::Purging),
+            5 => Some(Self::Purged),
+            6 => Some(Self::KeyQuarantined),
+            7 => Some(Self::Completed),
+            8 => Some(Self::Attested),
+            _ => None,
+        }
+    }
 }

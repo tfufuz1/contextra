@@ -183,10 +183,13 @@ impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
     pub fn new(dimension: usize) -> Self {
         let storage_path = PathBuf::from("./contextra_data");
-        let ports_wiring = PortsWiring::build().unwrap_or_else(|_| PortsWiring {
-            clock: Arc::new(SystemClock::new()),
-            rng: Arc::new(SystemRng::new()),
-            id_gen: Arc::new(SystemIdGen::new()),
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let rng: Arc<dyn Rng> = Arc::new(SystemRng::new());
+        let id_gen: Arc<dyn IdGen> = Arc::new(SystemIdGen::new());
+        let ports_wiring = PortsWiring::new(clock.clone(), rng.clone(), id_gen.clone()).unwrap_or_else(|_| PortsWiring {
+            clock: clock.clone(),
+            rng: rng.clone(),
+            id_gen: id_gen.clone(),
         });
         let clock = ports_wiring.clock;
         let rng = ports_wiring.rng;

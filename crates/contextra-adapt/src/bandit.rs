@@ -172,12 +172,12 @@ impl SketchMatrix {
         }
 
         let scale = 1.0f32 / (projected_dim as f32).sqrt();
-        let rng = contextra_ports::SeededRng::new(seed);
+        let mut rng = crate::flow_thompson::SplitMix64::new(seed);
         let total_elements = projected_dim * original_dim;
         let mut data = Vec::with_capacity(total_elements);
 
         for _ in 0..total_elements {
-            let bit = (contextra_ports::Rng::next_u64(&rng) & 1) == 0;
+            let bit = (crate::flow_thompson::FcTsRng::next_u64(&mut rng) & 1) == 0;
             data.push(if bit { scale } else { -scale });
         }
 

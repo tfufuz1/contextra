@@ -1027,6 +1027,7 @@ dependencies = [
  "contextra",
  "contextra-adapt",
  "contextra-agent",
+ "contextra-cognition",
  "contextra-crypto",
  "contextra-infer-candle",
  "contextra-infer-ollama",

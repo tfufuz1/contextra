@@ -39,6 +39,24 @@ impl ReadSnapshot {
     pub fn new(id: SnapshotId, max_seq: TxId) -> Self {
         Self { id, max_seq }
     }
+
+    /// Convenience constructor for sequence-bound snapshots.
+    pub fn from_seq(seq_no: u64) -> Self {
+        Self {
+            id: SnapshotId::new(seq_no),
+            max_seq: TxId::try_new(seq_no).unwrap_or(TxId(seq_no)),
+        }
+    }
+
+    /// Returns numeric sequence value for this snapshot.
+    pub fn seq(&self) -> u64 {
+        self.max_seq.0
+    }
+
+    /// Returns numeric sequence value for this snapshot (alias for `seq`).
+    pub fn max_seq(&self) -> u64 {
+        self.max_seq.0
+    }
 }
 
 /// Trait implemented by storage engines or snapshot providers to supply consistent point-in-time snapshots (§7.2).
