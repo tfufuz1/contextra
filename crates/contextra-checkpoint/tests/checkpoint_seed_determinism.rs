@@ -42,7 +42,13 @@ async fn test_same_seed_produces_bit_identical_checkpoint() {
         .with_id_generator(id_gen1);
 
     let meta1 = store1
-        .create_checkpoint("cp_det", "col_1", 1, TxId::new(100), serde_json::json!({"version": 1}))
+        .create_checkpoint(
+            "cp_det",
+            "col_1",
+            1,
+            TxId::new(100),
+            serde_json::json!({"version": 1}),
+        )
         .await
         .unwrap();
 
@@ -56,7 +62,13 @@ async fn test_same_seed_produces_bit_identical_checkpoint() {
         .with_id_generator(id_gen2);
 
     let meta2 = store2
-        .create_checkpoint("cp_det", "col_1", 1, TxId::new(100), serde_json::json!({"version": 1}))
+        .create_checkpoint(
+            "cp_det",
+            "col_1",
+            1,
+            TxId::new(100),
+            serde_json::json!({"version": 1}),
+        )
         .await
         .unwrap();
 
@@ -72,5 +84,8 @@ async fn test_same_seed_produces_bit_identical_checkpoint() {
     let key = "test_ns:checkpoint:cp_det";
     let bytes1 = storage1.get(key.as_bytes()).await.unwrap().unwrap();
     let bytes2 = storage2.get(key.as_bytes()).await.unwrap().unwrap();
-    assert_eq!(bytes1, bytes2, "Two-stage checkpoint serialization with identical seeds MUST be bit-identical!");
+    assert_eq!(
+        bytes1, bytes2,
+        "Two-stage checkpoint serialization with identical seeds MUST be bit-identical!"
+    );
 }

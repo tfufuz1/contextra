@@ -433,10 +433,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Setzt den ID-Generator für den `PersistentCheckpointStore`.
-    pub fn with_id_generator(
-        mut self,
-        id_gen: Arc<dyn contextra_ports::IdGenerator>,
-    ) -> Self {
+    pub fn with_id_generator(mut self, id_gen: Arc<dyn contextra_ports::IdGenerator>) -> Self {
         self.id_generator = id_gen;
         self
     }
@@ -475,7 +472,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
             // Zeroize stored payload before unlinking
             let dummy_payload = vec![0u8; 128];
-            if let Ok(()) = self.storage.put(unique_tx, key.as_bytes(), &dummy_payload).await {
+            if let Ok(()) = self
+                .storage
+                .put(unique_tx, key.as_bytes(), &dummy_payload)
+                .await
+            {
                 let _ = self.storage.commit(unique_tx).await;
             }
 
@@ -490,10 +491,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
 
             if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
-                tracing::warn!(
-                    seq = checkpoint.seq_no,
-                    "Unpin after scrub failed: {e}"
-                );
+                tracing::warn!(seq = checkpoint.seq_no, "Unpin after scrub failed: {e}");
             }
 
             self.index.write().remove_by_name(&checkpoint.name);

@@ -50,7 +50,9 @@ impl CopyStatus {
     #[must_use]
     pub fn art19_recipient(recipient_notice: &str) -> Self {
         CopyStatus::OutOfScope {
-            reason: format!("Art. 19 DSGVO: Empfänger-Benachrichtigung erforderlich ({recipient_notice})"),
+            reason: format!(
+                "Art. 19 DSGVO: Empfänger-Benachrichtigung erforderlich ({recipient_notice})"
+            ),
         }
     }
 
@@ -58,7 +60,9 @@ impl CopyStatus {
     #[must_use]
     pub fn art28_processor(processor_notice: &str) -> Self {
         CopyStatus::OutOfScope {
-            reason: format!("Art. 28 DSGVO: Auftragsverarbeiter-Weisung erforderlich ({processor_notice})"),
+            reason: format!(
+                "Art. 28 DSGVO: Auftragsverarbeiter-Weisung erforderlich ({processor_notice})"
+            ),
         }
     }
 
@@ -167,7 +171,11 @@ pub trait CpyCopyRegistry: Send + Sync {
 
     /// Updates the status of a registered copy.
     /// Default implementation is no-op returning `Ok(())`.
-    fn update_status<'a>(&'a mut self, _copy_id: &'a [u8; 16], _status: CopyStatus) -> BoxFuture<'a, Result<()>> {
+    fn update_status<'a>(
+        &'a mut self,
+        _copy_id: &'a [u8; 16],
+        _status: CopyStatus,
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
