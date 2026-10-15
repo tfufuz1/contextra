@@ -6,7 +6,8 @@
 
 mod support;
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::ReferenceModel;
 use support::{copy_dir_recursive, truncate_wal_file, verify_storage_against_reference_model};
