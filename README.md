@@ -11,8 +11,7 @@ Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für
 1. **Beweisbarkeit statt Zusage (EP2):** Das Löschen von Daten erzeugt im Modus `ErasureMode::Attested` einen signierten `DeletionProofV4` (Ed25519, BSI TR-02102 konform), der das physische Tilgen auf allen 7 Systemspeicherebenen testiert. Externe Verifikation ist über das autonome Crate `contextra-verify` mathematisch unabhängig ohne Datenbankzugriff möglich.
 2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys und ohne Telemetrie im selben Prozess wie die Anwendung.
 3. **Hardware-angepasste Inferenz (EP4):**
-   - **Ollama (`contextra-infer-ollama`):** Ressourcenschonender Standardtreiber für lokale LLMs (z. B. `qwen2.5-coder:1.5b`) auf Entwickler-Hardware (Ryzen 5 / AVX2).
-   - **Candle (`contextra-infer-candle`):** Pure-Rust GGUF-Inferenz als Opt-in für direkten KV-Tensoren-Zugriff.
+   - **Ollama / Candle (`park/EP4/v1`):** Inferenz-Treiber für lokale LLMs auf Entwickler-Hardware oder als Opt-in für direkten KV-Tensoren-Zugriff.
 4. **Deterministische Performance (P28):** Injektion aller Zeit-, Zufalls- und ID-Quellen über Ports (`contextra-ports`), konsequente `f64::total_cmp`-Gleitkomma-Sortierung und Zero-Panic-Doktrin (P2: 0 `unwrap()` im Produktionspfad).
 5. **Zero-Cost-Plugin-Doktrin:** Wer den Löschnachweis nicht benötigt (`ErasureMode::Off`), zahlt 0 Byte Binary-Overhead und 0 ns Lese-Overhead.
 
@@ -24,12 +23,12 @@ Contextra ist modular in sechs klar abgegrenzte Produktkomponenten aufgeteilt:
 
 | Komponente | Bezeichnung | Status | Kernversprechen & Disjunktive Crates |
 |---|---|---|---|
-| **EP1** | **Contextra Memory** | 🟢 **Release 1.0** | Lokaler Hybrid-Speicher, SSI-Transaktionen, Mandanten-Scoping, Purge v2 (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-mvcc`, `contextra-engine`, `contextra`). |
-| **EP2** | **Contextra Proof** | 🟢 **Spezifiziert** | 7-Layer-Löschnachweis (BSI TR-02102, Ed25519), Standalone-Verifier, Art. 30 / AVV-Generator (`contextra-crypto`, `contextra-proof-verify`, `contextra-audit-export`, `contextra-avv-generator`). |
-| **EP3** | **Contextra Retrieval+** | 🟢 **Spezifiziert** | Relationale Wissensgraphen (CSR), OpenIE Extraktion, Budgeted k-Path Diffusion (`PathRAG`), Conformal Fusion Calibration (`contextra-graph`, `contextra-rank`). |
-| **EP4** | **Contextra Inference** | 🟢 **Spezifiziert** | Irminsul Radix-Trie Prefix-Reuse, KIVI 2-Bit asymmetrische Quantisierung, SnapKV Attention Eviction (`contextra-kvcache`, `contextra-embedder`, `contextra-checkpoint`). |
-| **EP5** | **Contextra Cognition** | 🟢 **Spezifiziert** | Adaptive Kognition, Sketched LinUCB Bandits ($\mathcal{O}(k^2)$ Achlioptas-Projektion), PID Latency Controller, Hyperedge Spectral SVD (`contextra-cognition`, `contextra-adapt`, `contextra-agent`). |
-| **EP6** | **Contextra Guard** | 🟢 **Spezifiziert** | Egress-Firewall (Luhn/IBAN DLP), Fail-Closed MCP Gateway, Hash-Chained Audit Trace, WASM Sandbox Isolation (`contextra-privacy`, `contextra-sandbox`, `contextra-mcp`, `contextra-py`). |
+| **EP1** | **Contextra Memory** | 🟢 **Release 1.0** | Lokaler Hybrid-Speicher, SSI-Transaktionen, Mandanten-Scoping, Purge v2 (17 Kern-Crates: `contextra`, `contextra-engine`, `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-mvcc`, `contextra-crypto`, `contextra-ports`, `contextra-types`, `contextra-sys`, `contextra-wire`, `contextra-simd`, `contextra-durable-fs`, `contextra-rank`, `contextra-checkpoint`, `contextra-db`, `contextra-mcp`). |
+| **EP2** | **Contextra Proof** | 🟡 **Geparkt** (`park/EP2/v1`) | 7-Layer-Löschnachweis (BSI TR-02102, Ed25519), Standalone-Verifier, Art. 30 / AVV-Generator (`contextra-crypto`, Tag `park/EP2/v1`). |
+| **EP3** | **Contextra Retrieval+** | 🟡 **Geparkt** (`park/EP3/v1`) | Relationale Wissensgraphen (CSR), OpenIE Extraktion, Budgeted k-Path Diffusion (`PathRAG`), Conformal Fusion Calibration (`contextra-rank`, Tag `park/EP3/v1`). |
+| **EP4** | **Contextra Inference** | 🟡 **Geparkt** (`park/EP4/v1`) | Irminsul Radix-Trie Prefix-Reuse, KIVI 2-Bit asymmetrische Quantisierung, SnapKV Attention Eviction (`contextra-checkpoint`, Tag `park/EP4/v1`). |
+| **EP5** | **Contextra Cognition** | 🟡 **Geparkt** (`park/EP5/v1`) | Adaptive Kognition, Sketched LinUCB Bandits ($\mathcal{O}(k^2)$ Achlioptas-Projektion), PID Latency Controller, Hyperedge Spectral SVD (Tag `park/EP5/v1`). |
+| **EP6** | **Contextra Guard** | 🟡 **Geparkt** (`park/EP6/v1`) | Egress-Firewall (Luhn/IBAN DLP), Fail-Closed MCP Gateway, Hash-Chained Audit Trace, WASM Sandbox Isolation (`contextra-mcp`, Tag `park/EP6/v1`). |
 
 ---
 
