@@ -8,7 +8,7 @@ use contextra_crypto::deletion_proof::types::DeletionLayer;
 use contextra_engine::collection::crud::delete::DocEraseOptions;
 use contextra_engine::deletion::forget_options::{ForgetOptions, VerifyDepth};
 use contextra_engine::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::AtomicU64;
