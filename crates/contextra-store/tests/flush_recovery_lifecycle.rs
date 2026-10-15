@@ -1,4 +1,5 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalOp};
 use contextra_store::{CompactionConfig, LsmConfig, LsmStorage};
 use tempfile::TempDir;
