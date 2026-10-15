@@ -3,7 +3,7 @@
 // ZWECK: Tests für CopyRegistry Verankerung und purge_checkpoint Hardlink-Entfernung mit nlink==1 Garantie.
 
 use contextra_checkpoint::{purge_registered_checkpoint, CpyCopyRegistry, DefaultHardlinkCloner};
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::Result;

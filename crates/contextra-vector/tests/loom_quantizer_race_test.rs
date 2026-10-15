@@ -116,7 +116,7 @@ mod normal_tests {
                 let vec = vec![i as f32 * 10.0, i as f32 * -5.0, 1.0, 2.0];
                 index_clone.insert(tx, doc_id, &vec).await?;
                 index_clone.commit(tx).await?;
-                Ok::<(), contextra_core::ContextraError>(())
+                Ok::<(), contextra_types::ContextraError>(())
             }));
         }
 

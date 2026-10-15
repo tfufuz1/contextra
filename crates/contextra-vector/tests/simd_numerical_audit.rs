@@ -2,7 +2,7 @@
 // ZWECK: Audit-Testsuite für numerische Korrektheit (SIMD vs Skalar vs f64-Referenz)
 // STAND: TS:2026-08-31T00:00:00Z
 
-use contextra_core::DistanceMetric;
+use contextra_ports::DistanceMetric;
 use contextra_vector::distance::*;
 
 /// Independent f64 reference implementation for Cosine Distance

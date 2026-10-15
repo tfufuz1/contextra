@@ -8,8 +8,8 @@ use std::time::Duration;
 use contextra::performance_profile::PerformanceProfile;
 use contextra::query_rewriter::LlmQueryRewriter;
 use contextra::ContextraBuilder;
-use contextra_core::error::ContextraError;
-use contextra_core::DistanceMetric;
+use contextra_types::ContextraError;
+use contextra_ports::DistanceMetric;
 use contextra_db::{ContextraConfig, EmbeddingBackend};
 use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
@@ -19,7 +19,7 @@ impl LlmTextGenerator for DummyLlmGenerator {
     fn generate<'a>(
         &'a self,
         _prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
+    ) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async { Ok("subquery 1\nsubquery 2".to_string()) })
     }
 }

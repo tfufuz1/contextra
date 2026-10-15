@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "onnx")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "onnx")]
 use contextra_infer_onnx::wiring::{RerankWiring, RerankWiringDeps};
 #[cfg(feature = "onnx")]

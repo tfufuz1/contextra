@@ -296,7 +296,7 @@ impl SstableBuilder {
             )));
         }
 
-        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
+        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
 
         if let Some(prev_k) = &self.last_key {
             if key < prev_k.as_ref() {

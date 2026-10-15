@@ -186,9 +186,9 @@ macro_rules! contextra_crud_methods {
                     let meta_str = r.metadata.map(|m| m.to_string()).unwrap_or_default();
                     let meta_off = builder.create_string(&meta_str);
 
-                    let doc_res = contextra_core::ipc::ScoredDocument::create(
+                    let doc_res = contextra_wire::ScoredDocument::create(
                         &mut builder,
-                        &contextra_core::ipc::ScoredDocumentArgs {
+                        &contextra_wire::ScoredDocumentArgs {
                             id: Some(id_off),
                             score: r.score,
                             metadata: Some(meta_off),
@@ -199,9 +199,9 @@ macro_rules! contextra_crud_methods {
                 }
 
                 let results_vec_off = builder.create_vector(&res_offsets);
-                let response = contextra_core::ipc::SearchResponse::create(
+                let response = contextra_wire::SearchResponse::create(
                     &mut builder,
-                    &contextra_core::ipc::SearchResponseArgs {
+                    &contextra_wire::SearchResponseArgs {
                         version: 1,
                         results: Some(results_vec_off),
                         total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),
@@ -318,9 +318,9 @@ macro_rules! contextra_crud_methods {
                     let meta_str = r.metadata.map(|m| m.to_string()).unwrap_or_default();
                     let meta_off = builder.create_string(&meta_str);
 
-                    let doc_res = contextra_core::ipc::ScoredDocument::create(
+                    let doc_res = contextra_wire::ScoredDocument::create(
                         &mut builder,
-                        &contextra_core::ipc::ScoredDocumentArgs {
+                        &contextra_wire::ScoredDocumentArgs {
                             id: Some(id_off),
                             score: r.score,
                             metadata: Some(meta_off),
@@ -331,9 +331,9 @@ macro_rules! contextra_crud_methods {
                 }
 
                 let results_vec_off = builder.create_vector(&res_offsets);
-                let response = contextra_core::ipc::SearchResponse::create(
+                let response = contextra_wire::SearchResponse::create(
                     &mut builder,
-                    &contextra_core::ipc::SearchResponseArgs {
+                    &contextra_wire::SearchResponseArgs {
                         version: 1,
                         results: Some(results_vec_off),
                         total_hits: u32::try_from(res_offsets.len()).unwrap_or(u32::MAX),

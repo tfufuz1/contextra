@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "candle")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 use contextra_infer_candle::inference::CandleLlmClient;
 #[cfg(feature = "candle")]

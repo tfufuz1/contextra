@@ -16,7 +16,6 @@ ring = "0"
 contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
 contextra-sys = { workspace = true }

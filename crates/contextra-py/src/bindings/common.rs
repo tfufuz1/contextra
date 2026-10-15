@@ -318,8 +318,8 @@ pub fn results_to_py(
 }
 
 /// Maps a ContextraError into a structured Python PyErr with `kind`, `message`, and `details` attributes.
-pub fn contextra_err(e: contextra_core::ContextraError) -> PyErr {
-    let dto = contextra_core::ContextraErrorDto::from(&e);
+pub fn contextra_err(e: contextra_types::ContextraError) -> PyErr {
+    let dto = contextra_types::ContextraErrorDto::from(&e);
     Python::with_gil(|py| {
         let py_err = match dto.kind.as_str() {
             "NotFound" => PyKeyError::new_err(dto.message.clone()),

@@ -172,7 +172,7 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
         res_w.expect("writer task panicked");
         res_t.expect("truncater task panicked");
 
-        Ok::<(), contextra_core::ContextraError>(())
+        Ok::<(), contextra_types::ContextraError>(())
     })
     .await;
 

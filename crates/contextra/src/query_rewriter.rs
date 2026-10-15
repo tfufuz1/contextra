@@ -2,7 +2,7 @@
 // ZWECK: LLM-gestützter QueryRewriter für MultiStep-Retrieval in der Facade (Ring 4).
 // INVARIANTEN: Zero Panic; UTF-8-sichere Snippet-Kürzung; Prompt-Injection-Isolation via XML-Tags; keine Async Locks.
 
-use contextra_core::error::Result;
+use contextra_types::Result;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::ScoredEntry;

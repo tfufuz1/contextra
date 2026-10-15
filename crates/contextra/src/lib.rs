@@ -19,9 +19,9 @@ pub mod wiring_sovereign;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{BuildError, ContextraBuilder};
-pub use contextra_core::error::ContextraError;
-pub use contextra_core::types::domain::{DocId, ScoredDocument};
-pub use contextra_core::DistanceMetric;
+pub use contextra_types::ContextraError;
+pub use contextra_types::domain::{DocId, ScoredDocument};
+pub use contextra_ports::DistanceMetric;
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,

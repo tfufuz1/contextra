@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[cfg(feature = "sovereign")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "sovereign")]
 use contextra_crypto::deletion_proof::signer::ProofKeyPairSigner;
 #[cfg(feature = "sovereign")]

@@ -35,11 +35,9 @@ legacy-wal-key = []
 
 [dependencies]
 contextra-durable-fs = { path = "../contextra-durable-fs" }
-arc-swap = "1.7"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
-contextra-core = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
 arc-swap = "1.9.2"

@@ -5,7 +5,7 @@
 
 use contextra_checkpoint::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CopyStatus, CpyCopyRegistry};
 use contextra_checkpoint::{purge_registered_checkpoint, DefaultHardlinkCloner};
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::{ContextraError, Result};

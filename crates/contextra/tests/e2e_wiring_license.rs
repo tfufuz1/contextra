@@ -2,7 +2,7 @@
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::PerformanceProfile;
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::clock::ManualClock;
 use contextra_ports::license::FeatureRing;

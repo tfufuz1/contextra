@@ -7,7 +7,7 @@ use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 
 #[tokio::test]
 async fn test_p03d_diskann_pending_wal_crash_idempotency() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(contextra_core::ContextraError::Io)?;
+    let temp_dir = tempfile::tempdir().map_err(contextra_types::ContextraError::Io)?;
     let index_path = temp_dir.path().join("p03d_test.idx");
 
     let config = DiskAnnConfig {
@@ -33,7 +33,7 @@ async fn test_p03d_diskann_pending_wal_crash_idempotency() -> Result<()> {
     let new_vec = vec![3.0, 0.0, 0.0, 0.0];
     let new_id = DocId::from(3u64);
     index
-        .insert(contextra_core::TxId(1), new_id, &new_vec)
+        .insert(contextra_types::TxId(1), new_id, &new_vec)
         .await?;
 
     // Verify pending.wal exists
@@ -53,7 +53,7 @@ async fn test_p03d_diskann_pending_wal_crash_idempotency() -> Result<()> {
     // Re-create pending.wal containing DocId 3 using insert on a fresh un-loaded index instance
     let dummy_index = DiskAnnIndex::try_new(config.clone())?;
     dummy_index
-        .insert(contextra_core::TxId(2), new_id, &new_vec)
+        .insert(contextra_types::TxId(2), new_id, &new_vec)
         .await?;
     assert!(
         pending_wal_path.exists(),

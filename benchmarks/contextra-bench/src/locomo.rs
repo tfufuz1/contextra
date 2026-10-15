@@ -555,7 +555,7 @@ mod tests {
             })
                 as crate::long_mem_eval::BoxFuture<
                     'static,
-                    contextra_core::Result<Vec<ScoredChunk>>,
+                    contextra_types::Result<Vec<ScoredChunk>>,
                 >
         };
 

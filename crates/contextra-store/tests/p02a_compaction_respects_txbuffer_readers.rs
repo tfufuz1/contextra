@@ -16,7 +16,7 @@ async fn test_compaction_respects_txbuffer_active_reader() {
     let dir_path = temp_dir.path();
 
     let block_cache = create_block_cache_with_shards(16, 4);
-    let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
+    let budget = Arc::new(ResourceTracker::new(contextra_types::ResourceBudget {
         memory_limit: 128 * 1024 * 1024,
     }));
     let snapshot_registry = Arc::new(SnapshotRegistry::new());
@@ -120,7 +120,7 @@ async fn test_compaction_without_active_readers_purges_tombstone() {
     let dir_path = temp_dir.path();
 
     let block_cache = create_block_cache_with_shards(16, 4);
-    let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
+    let budget = Arc::new(ResourceTracker::new(contextra_types::ResourceBudget {
         memory_limit: 128 * 1024 * 1024,
     }));
     let snapshot_registry = Arc::new(SnapshotRegistry::new());

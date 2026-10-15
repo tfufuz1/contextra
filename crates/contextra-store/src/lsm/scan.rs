@@ -96,7 +96,7 @@ impl LsmStorage {
         let sstables = self.sstables.read().await;
 
         let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-        let max_accumulator_limit = contextra_core::MAX_SCAN_MERGE_ACCUMULATOR
+        let max_accumulator_limit = contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR
             .saturating_mul(self.config.max_internal_merge_factor);
 
         if let SstableScanMode::Range(s, e) = mode {

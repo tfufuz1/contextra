@@ -10,7 +10,6 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 ring = "4"
 
 [dependencies]
-contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-license = { workspace = true }

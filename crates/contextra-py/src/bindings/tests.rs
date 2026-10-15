@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use contextra_core::ContextraError;
+    use contextra_types::ContextraError;
     use numpy::PyArrayMethods;
     use pyo3::exceptions::*;
     use pyo3::prelude::*;

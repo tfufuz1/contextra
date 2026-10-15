@@ -109,7 +109,7 @@ async fn test_corrupted_diskann_use_hnsw_fallback_policy() {
     };
 
     // Dynamic operations (e.g. insert, search) on the HNSW fallback must now work seamlessly
-    let tx = contextra_core::TxId::new(1);
+    let tx = contextra_types::TxId::new(1);
     let doc_id = DocId::from(30u64);
     let new_vec = vec![0.5f32; 8];
 

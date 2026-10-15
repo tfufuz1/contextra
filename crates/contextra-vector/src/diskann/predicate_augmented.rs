@@ -29,10 +29,10 @@ impl DiskAnnIndex {
         filter: &(dyn Fn(DocId) -> bool + Send + Sync),
         gamma: usize,
     ) -> Result<Vec<ScoredDocument>> {
-        if k == 0 || k > contextra_core::MAX_SEARCH_K {
+        if k == 0 || k > contextra_ports::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({k}) is invalid or exceeds maximum allowed search limit ({})",
-                contextra_core::MAX_SEARCH_K
+                contextra_ports::MAX_SEARCH_K
             )));
         }
 

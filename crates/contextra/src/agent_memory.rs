@@ -2,7 +2,7 @@
 // ZWECK: Agent Memory Facade (Ring 4) — Provides a clean remember/recall/forget/relate API for AI Agents.
 // INVARIANTEN: #![forbid(unsafe_code)]; Zero panic doctrine (.unwrap/.expect forbidden); Wraps Contextra engine without changing business logic.
 
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 use contextra_db::{Contextra, ProvenanceRecord, SearchResult};
 use contextra_ports::IdGen;
 use serde::{Deserialize, Serialize};

@@ -1,5 +1,5 @@
 use super::*;
-use contextra_core::Result;
+use contextra_types::Result;
 
 impl LsmStorage {
     pub async fn force_flush(&self) -> Result<()> {

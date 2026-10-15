@@ -802,7 +802,7 @@ async fn run_scenario_b(
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
     eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
+    Err(contextra_types::ContextraError::CapabilityUnsupported {
         capability: "onnx-bench".to_string(),
         reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
     })
@@ -1092,7 +1092,7 @@ async fn run_locomo_cmd(
                 let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
                 let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
                     .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": turn_text,
                     "dia_id": dia_id,
@@ -1111,7 +1111,7 @@ async fn run_locomo_cmd(
                 let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
                 let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
                     .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": ev,
                     "case_id": case.question_id,
@@ -1140,7 +1140,7 @@ async fn run_locomo_cmd(
         Box::pin(async move {
             let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
                 .await
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
             let res = col_ref
                 .query()
                 .text(&q_owned)

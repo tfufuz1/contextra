@@ -593,7 +593,6 @@ dependencies = [
  "contextra-adapt",
  "contextra-agent",
  "contextra-cognition",
- "contextra-core",
  "contextra-crypto",
  "contextra-db",
  "contextra-engine",
@@ -686,7 +685,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "contextra-core",
  "contextra-crypto",
  "contextra-db",
  "contextra-graph",
@@ -718,7 +716,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-core",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
@@ -757,18 +754,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "contextra-core"
-version = "0.1.0"
-dependencies = [
- "contextra-mvcc",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
- "proptest",
- "tokio",
 ]
 
 [[package]]
@@ -857,7 +842,6 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-core",
  "contextra-crypto",
  "contextra-graph",
  "contextra-infer-candle",
@@ -1116,7 +1100,6 @@ version = "0.1.0"
 dependencies = [
  "contextra",
  "contextra-adapt",
- "contextra-core",
  "contextra-db",
  "contextra-rank",
  "contextra-router",
@@ -1194,7 +1177,6 @@ name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-core",
  "criterion",
  "proptest",
  "thiserror 2.0.20",
@@ -1209,7 +1191,6 @@ dependencies = [
  "arc-swap",
  "blake3",
  "bytes",
- "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
  "contextra-graph",
@@ -1309,7 +1290,6 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
- "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
  "contextra-ports",

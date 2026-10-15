@@ -5,7 +5,7 @@ use contextra_store::lsm::LsmStorage;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_memtable_residue_scanning() -> contextra_core::Result<()> {
+async fn test_memtable_residue_scanning() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

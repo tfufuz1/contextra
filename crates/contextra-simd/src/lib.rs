@@ -25,7 +25,7 @@ use contextra_core::{ContextraError, DistanceMetric};
 
 /// Validates that a vector contains no NaN or Infinite values.
 #[inline]
-pub fn validate_vector(vec: &[f32]) -> contextra_core::Result<()> {
+pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
         return Err(ContextraError::invalid_input(
             "NaN or Infinity detected in vector",
@@ -39,7 +39,7 @@ pub fn compute_distance(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
@@ -50,7 +50,7 @@ pub fn compute_distance_trusted(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
@@ -64,7 +64,7 @@ pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
     b_bytes: &[u8],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes),
         DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes),

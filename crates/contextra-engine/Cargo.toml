@@ -46,7 +46,6 @@ bincode = { workspace = true }
 loom = "0.7"
 
 [dev-dependencies]
-contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

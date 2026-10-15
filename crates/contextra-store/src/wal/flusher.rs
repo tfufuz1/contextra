@@ -858,7 +858,7 @@ impl Wal {
 mod flusher_injector_tests {
     use super::*;
     use crate::wal::{PreparedBatch, WalOp};
-    use contextra_core::TxId;
+    use contextra_types::TxId;
     use std::io::{Error, ErrorKind};
     use tempfile::tempdir;
 

@@ -12,11 +12,11 @@ use serde_json::json;
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
-    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, contextra_core::Result<Vec<f32>>> {
+    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, contextra_types::Result<Vec<f32>>> {
         Box::pin(async move { Ok(vec![0.1; 16]) })
     }
 
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_core::Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_types::Result<Vec<Vec<f32>>>> {
         Box::pin(async move { Ok(vec![vec![0.1; 16]; texts.len()]) })
     }
 }

@@ -1064,12 +1064,12 @@ mod tests {
         {
             let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
             let op_put1 = WalOp::Put {
-                tx_id: contextra_core::TxId::new(1),
+                tx_id: contextra_types::TxId::new(1),
                 key: b"key1".to_vec(),
                 value: b"val1".to_vec(),
             };
             let op_end1 = WalOp::TxEnd {
-                tx_id: contextra_core::TxId::new(1),
+                tx_id: contextra_types::TxId::new(1),
                 committed: true,
             };
             let (batch1, _) = old_wal
@@ -1080,12 +1080,12 @@ mod tests {
 
             let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
             let op_put2 = WalOp::Put {
-                tx_id: contextra_core::TxId::new(2),
+                tx_id: contextra_types::TxId::new(2),
                 key: b"key2".to_vec(),
                 value: b"val2".to_vec(),
             };
             let op_end2 = WalOp::TxEnd {
-                tx_id: contextra_core::TxId::new(2),
+                tx_id: contextra_types::TxId::new(2),
                 committed: true,
             };
             let (batch2, _) = active_wal

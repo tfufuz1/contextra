@@ -50,7 +50,7 @@ fn test_node_record_roundtrip_and_errors() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_index_boundary_checks() -> contextra_core::Result<()> {
+async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
     use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 
@@ -86,7 +86,7 @@ async fn test_mmap_index_boundary_checks() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_open_async() -> contextra_core::Result<()> {
+async fn test_mmap_open_async() -> contextra_types::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
     use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 

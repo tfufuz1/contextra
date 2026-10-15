@@ -1,4 +1,4 @@
-use contextra_core::ResourceTracker;
+use contextra_ports::ResourceTracker;
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use std::sync::Arc;
@@ -64,10 +64,10 @@ async fn test_compaction_candidate_selection_prefers_overlapping_key_ranges() {
     };
     let engine = CompactionEngine::new(
         config,
-        Arc::new(contextra_core::SnapshotRegistry::new()),
+        Arc::new(contextra_mvcc::SnapshotRegistry::new()),
         cache,
         None,
-        Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
+        Arc::new(ResourceTracker::new(contextra_types::ResourceBudget {
             memory_limit: 1024 * 1024 * 1024,
         })),
         None,

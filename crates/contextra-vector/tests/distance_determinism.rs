@@ -1,4 +1,4 @@
-use contextra_core::DistanceMetric;
+use contextra_ports::DistanceMetric;
 use contextra_vector::distance::{
     compute_distance, cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
 };

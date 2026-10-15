@@ -13,7 +13,6 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-contextra-core = { path = "../../contextra-core" }
 contextra-vector = { path = ".." }
 
 [[bin]]

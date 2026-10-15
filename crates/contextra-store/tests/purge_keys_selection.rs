@@ -20,7 +20,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_keys_selection_put_l0() -> contextra_core::Result<()> {
+async fn test_purge_keys_selection_put_l0() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -54,7 +54,7 @@ async fn test_purge_keys_selection_put_l0() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_prefix_isolation() -> contextra_core::Result<()> {
+async fn test_purge_keys_prefix_isolation() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -92,7 +92,7 @@ async fn test_purge_keys_prefix_isolation() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_preserves_newer_versions() -> contextra_core::Result<()> {
+async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -126,7 +126,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_core::Result<()
 }
 
 #[tokio::test]
-async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra_core::Result<()> {
+async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -156,7 +156,7 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
 }
 
 #[tokio::test]
-async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_core::Result<()> {
+async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

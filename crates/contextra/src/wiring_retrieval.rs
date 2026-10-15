@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[cfg(feature = "router")]
 use contextra_adapt::wiring::{AdaptWiring, AdaptWiringDeps};
 #[cfg(feature = "router")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "router")]
 use contextra_graph::csr::CsrGraph;
 #[cfg(feature = "router")]

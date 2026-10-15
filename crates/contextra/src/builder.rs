@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_core::error::ContextraError;
-use contextra_core::DistanceMetric;
+use contextra_types::ContextraError;
+use contextra_ports::DistanceMetric;
 use contextra_db::engine::{EngineWiring, EngineWiringExt};
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
 use contextra_license::signed_gate::SignedLicenseGate;
@@ -696,7 +696,7 @@ impl ContextraBuilder {
                     _query_text: &'a str,
                     _query_embedding: &'a [f32],
                     _top_k: usize,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Vec<contextra_ports::ContextChunk>>> {
+                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<contextra_ports::ContextChunk>>> {
                     Box::pin(async move { Ok(Vec::new()) })
                 }
             }
@@ -706,7 +706,7 @@ impl ContextraBuilder {
                 fn get_community<'a>(
                     &'a self,
                     _entity_id: contextra_ports::EntityId,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<u64>>> {
                     Box::pin(async move { Ok(None) })
                 }
             }
@@ -718,7 +718,7 @@ impl ContextraBuilder {
                     _chunks: Vec<contextra_ports::ContextChunk>,
                     _budget: &contextra_ports::TokenBudget,
                     _relevance_threshold: f32,
-                ) -> contextra_core::Result<contextra_ports::ContextWindow> {
+                ) -> contextra_types::Result<contextra_ports::ContextWindow> {
                     Ok(contextra_ports::ContextWindow {
                         chunks: Vec::new(),
                         total_tokens: 0,

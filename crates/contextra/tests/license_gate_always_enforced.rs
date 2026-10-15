@@ -2,7 +2,7 @@
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::DurabilityMode;

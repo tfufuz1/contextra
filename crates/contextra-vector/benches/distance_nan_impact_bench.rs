@@ -1,4 +1,4 @@
-use contextra_core::DistanceMetric;
+use contextra_ports::DistanceMetric;
 use contextra_vector::distance::{compute_distance, cosine_distance};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 

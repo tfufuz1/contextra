@@ -63,7 +63,7 @@ impl PyCollection {
                 >,
             >,
         >,
-        contextra_core::ContextraError,
+        contextra_types::ContextraError,
     > {
         Ok(self.inner.clone())
     }

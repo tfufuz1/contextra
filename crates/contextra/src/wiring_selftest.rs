@@ -4,7 +4,7 @@
 //! (Clock, Rng, IdGen, LicenseGate) gültige Implementierungen haben
 //! und Null-/Accept-All-Implementierungen nicht als Sicherheits-Port-Standard dienen.
 
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 use contextra_db::Contextra;
 use crate::builder::{BuildError, ContextraBuilder};
 

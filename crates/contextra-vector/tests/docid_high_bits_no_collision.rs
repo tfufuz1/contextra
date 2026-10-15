@@ -28,7 +28,7 @@ fn brute_force_search_oracle(
 }
 
 #[tokio::test]
-async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_core::Result<()> {
+async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_types::Result<()> {
     let dim = 4;
     let config = HnswConfigBuilder::new(dim)
         .m(16)
@@ -146,11 +146,11 @@ async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_core:
 
 #[cfg(feature = "experimental-diskann")]
 #[tokio::test]
-async fn test_diskann_docid_high_bits_isolation() -> contextra_core::Result<()> {
+async fn test_diskann_docid_high_bits_isolation() -> contextra_types::Result<()> {
     use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
     use tempfile::tempdir;
 
-    let dir = tempdir().map_err(contextra_core::ContextraError::Io)?;
+    let dir = tempdir().map_err(contextra_types::ContextraError::Io)?;
     let index_path = dir.path().join("high_bits_diskann.dann");
 
     let config = DiskAnnConfig {

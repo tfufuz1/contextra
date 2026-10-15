@@ -179,7 +179,7 @@ pub struct HnswColdCore {
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
     pub mmap_backlink_overlay: super::connections::MmapBacklinkOverlay,
-    pub seq_log: RwLock<contextra_core::SequenceLog>,
+    pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
@@ -249,7 +249,7 @@ impl HnswIndex {
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
                     mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
-                    seq_log: RwLock::new(contextra_core::SequenceLog::new()),
+                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -319,7 +319,7 @@ impl HnswIndex {
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
                     mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
-                    seq_log: RwLock::new(contextra_core::SequenceLog::new()),
+                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -413,7 +413,7 @@ impl HnswIndex {
         self.inner.connectivity_score()
     }
 
-    pub fn check_connectivity(&self) -> contextra_core::Result<()> {
+    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
         self.inner.check_connectivity()
     }
 

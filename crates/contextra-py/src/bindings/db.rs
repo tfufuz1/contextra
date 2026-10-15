@@ -53,7 +53,7 @@ impl PyContextra {
                 >,
             >,
         >,
-        contextra_core::ContextraError,
+        contextra_types::ContextraError,
     > {
         self.inner
             .collection_for_tenant("default", self.tenant_id)

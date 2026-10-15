@@ -223,11 +223,11 @@ impl DiskAnnIndex {
     }
 
     pub async fn search_internal(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_ports::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({}) exceeds maximum allowed search limit ({})",
                 k,
-                contextra_core::MAX_SEARCH_K
+                contextra_ports::MAX_SEARCH_K
             )));
         }
 

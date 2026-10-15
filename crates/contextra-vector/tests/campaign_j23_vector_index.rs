@@ -439,42 +439,42 @@ async fn test_h8_acorn_filtered_selectivity_sweeps() -> Result<()> {
     let f_100 = |_id: DocId| true;
     let res_100 = ref_index
         .search_knn_acorn(&query, 10, &f_100, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert_eq!(res_100.len(), 10);
 
     // Selectivity 50% (even IDs)
     let f_50 = |id: DocId| id.inner() % 2 == 0;
     let res_50 = ref_index
         .search_knn_acorn(&query, 10, &f_50, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert_eq!(res_50.len(), 10);
 
     // Selectivity 10% (divisible by 10)
     let f_10 = |id: DocId| id.inner() % 10 == 0;
     let res_10 = ref_index
         .search_knn_acorn(&query, 10, &f_10, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert_eq!(res_10.len(), 10);
 
     // Selectivity 1% (divisible by 100)
     let f_1 = |id: DocId| id.inner() % 100 == 0;
     let res_1 = ref_index
         .search_knn_acorn(&query, 10, &f_1, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert_eq!(res_1.len(), 10);
 
     // Selectivity 0.1% (divisible by 1000)
     let f_01 = |id: DocId| id.inner() == 1000;
     let res_01 = ref_index
         .search_knn_acorn(&query, 10, &f_01, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert_eq!(res_01.len(), 1);
 
     // Selectivity 0% -> empty without hang
     let f_0 = |_id: DocId| false;
     let res_0 = ref_index
         .search_knn_acorn(&query, 10, &f_0, 1)
-        .map_err(|e| contextra_core::ContextraError::Index(e.to_string()))?;
+        .map_err(|e| contextra_types::ContextraError::Index(e.to_string()))?;
     assert!(res_0.is_empty());
 
     // Gamma edge budget boundary checks

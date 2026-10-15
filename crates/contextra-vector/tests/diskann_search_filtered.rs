@@ -134,7 +134,7 @@ async fn test_diskann_search_filtered_highly_selective() {
 
     // Compute expected brute-force post-filter over full search
     let raw_all = index
-        .search(&query, contextra_core::MAX_SEARCH_K)
+        .search(&query, contextra_ports::MAX_SEARCH_K)
         .await
         .expect("search all failed");
 

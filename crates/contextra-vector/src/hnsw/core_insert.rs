@@ -454,11 +454,11 @@ impl HnswIndexCore {
         (1.0 - deleted as f64 / total as f64).max(0.0)
     }
 
-    pub fn check_connectivity(&self) -> contextra_core::Result<()> {
+    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
         let score = self.connectivity_score();
         if score < self.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            return Err(contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio });
+            return Err(contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio });
         }
         Ok(())
     }

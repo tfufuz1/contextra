@@ -30,7 +30,6 @@ name = "scale-100k"
 path = "src/bin/scale_100k.rs"
 
 [dependencies]
-contextra-core = { workspace = true }
 contextra-store = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }

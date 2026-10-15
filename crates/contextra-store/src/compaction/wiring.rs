@@ -41,9 +41,9 @@ mod tests {
 
     #[test]
     fn test_compaction_engine_wiring_build() {
-        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
+        let registry = Arc::new(contextra_mvcc::SnapshotRegistry::new());
         let bc = create_block_cache(1);
-        let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
+        let budget = Arc::new(ResourceTracker::new(contextra_types::ResourceBudget {
             memory_limit: 1024 * 1024,
         }));
         let config = CompactionConfig::default();

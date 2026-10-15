@@ -35,7 +35,6 @@ contextra-router = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
 parking_lot = { workspace = true }
-contextra-core = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
 flatbuffers = { workspace = true }

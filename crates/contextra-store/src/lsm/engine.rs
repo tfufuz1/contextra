@@ -115,7 +115,7 @@ impl LsmStorage {
         entries: &[crate::erasure_ledger::LedgerEntry],
     ) -> Result<()> {
         if self.read_only {
-            return Err(contextra_core::ContextraError::Storage(
+            return Err(contextra_types::ContextraError::Storage(
                 "Storage engine is read-only due to erasure ledger anomaly".into(),
             ));
         }
@@ -367,14 +367,14 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL check: {e}"
                 )))
             }
         };
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL check: {e}"
             ))
         })? {
@@ -432,7 +432,7 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL migration: {e}"
                 )))
             }
@@ -445,7 +445,7 @@ impl LsmStorage {
         }
 
         let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))
         })?;
@@ -463,7 +463,7 @@ impl LsmStorage {
         let mut migrated_count = 0usize;
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL migration: {e}"
             ))
         })? {

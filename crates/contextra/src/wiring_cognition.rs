@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[cfg(feature = "cognition")]
 use contextra_cognition::wiring::{CognitionWiring, CognitionWiringDeps};
 #[cfg(feature = "cognition")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "cognition")]
 use contextra_db::{ConsolidationLauncher, ContextraConfig};
 #[cfg(feature = "cognition")]

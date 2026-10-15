@@ -11,7 +11,7 @@
 
 use contextra_core::kv::{KvBlock, KvLayout, PrefixKey, RopeConfig};
 use contextra_core::model_fingerprint::ModelFingerprint;
-use contextra_core::TenantId;
+use contextra_types::TenantId;
 use contextra_crypto::kv_cipher::KvSegmentCipher;
 use contextra_crypto::KeyManager;
 use contextra_kvcache::{kivi_quantize, KiviQuantizeConfig, KvTensorView, TenantPrefixKvStore};

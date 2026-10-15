@@ -20,7 +20,7 @@ impl LlmTextGenerator for DummyLlmGenerator {
     fn generate<'a>(
         &'a self,
         _prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
+    ) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move { Ok("Subquery 1\nSubquery 2\nSubquery 3\nSubquery 4".to_string()) })
     }
 }
@@ -31,14 +31,14 @@ impl TextEmbeddingEngine for MockEmbedder {
     fn embed<'a>(
         &'a self,
         _text: &'a str,
-    ) -> BoxFuture<'a, contextra_core::error::Result<Vec<f32>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<f32>>> {
         Box::pin(async move { Ok(vec![0.1; 16]) })
     }
 
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
-    ) -> BoxFuture<'a, contextra_core::error::Result<Vec<Vec<f32>>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<Vec<f32>>>> {
         Box::pin(async move { Ok(vec![vec![0.1; 16]; texts.len()]) })
     }
 }

@@ -8,7 +8,7 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
 use crate::restore_filter::CpyRestoreFilter;
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;

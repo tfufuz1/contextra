@@ -10,7 +10,7 @@ use tempfile::tempdir;
 #[cfg(feature = "experimental-diskann")]
 #[tokio::test]
 async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
-    let dir = tempdir().map_err(contextra_core::ContextraError::Io)?;
+    let dir = tempdir().map_err(contextra_types::ContextraError::Io)?;
     let index_path = dir.path().join("docid128_tombstones.idx");
 
     let config = DiskAnnConfig {
@@ -45,7 +45,7 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
     assert!(all_before.contains(&id2));
 
     // Delete id1 only
-    index.delete(contextra_core::TxId(1), id1).await?;
+    index.delete(contextra_types::TxId(1), id1).await?;
 
     let all_after = index.all_doc_ids().await?;
     assert_eq!(all_after.len(), 1);

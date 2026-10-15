@@ -1,5 +1,5 @@
 use super::openable::FileKind;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FormatError {

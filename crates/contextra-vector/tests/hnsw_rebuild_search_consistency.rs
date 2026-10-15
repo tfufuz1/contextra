@@ -34,7 +34,7 @@ async fn run_hnsw_rebuild_snapshot_consistency_for_seed(seed: u64) {
         m: 16,
         ef_construction: 64,
         rebuild_threshold: 0.50,
-        distance_metric: contextra_core::DistanceMetric::Euclidean,
+        distance_metric: contextra_ports::DistanceMetric::Euclidean,
         ..Default::default()
     };
 

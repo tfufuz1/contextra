@@ -3,7 +3,7 @@
 //! Tests in this file are feature-gated until WAL V4 implementation is completed.
 #![cfg(feature = "wal-v4-wip")]
 
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp, WalVersion};
 use tempfile::TempDir;
 use tokio::fs;

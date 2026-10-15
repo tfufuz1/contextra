@@ -24,7 +24,7 @@ pub struct CompactionEngine {
     pub floor: Arc<dyn SnapshotFloor>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
-    budget: Arc<contextra_core::ResourceTracker>,
+    budget: Arc<contextra_ports::ResourceTracker>,
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
@@ -47,7 +47,7 @@ impl CompactionEngine {
         floor: Arc<dyn SnapshotFloor>,
         block_cache: Arc<BlockCache>,
         key_manager: Option<Arc<KeyManager>>,
-        budget: Arc<contextra_core::ResourceTracker>,
+        budget: Arc<contextra_ports::ResourceTracker>,
         manifest: Option<Arc<crate::manifest::Manifest>>,
     ) -> Self {
         let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> =
@@ -231,7 +231,7 @@ impl CompactionEngine {
                     limit_bytes,
                     limit_mb
                 );
-                return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
                     used_mb,
                     limit_mb,
                 });
@@ -651,7 +651,7 @@ impl CompactionEngine {
         while let Some(current_item) = heap.pop() {
             if let Some(ct) = cancel_token {
                 if ct.is_cancelled() {
-                    return Err(contextra_core::ContextraError::Internal(
+                    return Err(contextra_types::ContextraError::Internal(
                         "Compaction cancelled during merge stream processing".into(),
                     ));
                 }
@@ -685,14 +685,14 @@ impl CompactionEngine {
                                 "Compaction aborted: backpressure wait timeout exceeded ({:?}) while memory budget exhausted",
                                 self.config.max_backpressure_wait
                             );
-                            return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                            return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
                                 used_mb,
                                 limit_mb,
                             });
                         }
                         if let Some(ct) = cancel_token {
                             if ct.is_cancelled() {
-                                return Err(contextra_core::ContextraError::Internal(
+                                return Err(contextra_types::ContextraError::Internal(
                                     "Compaction cancelled during memory budget wait".into(),
                                 ));
                             }
@@ -778,7 +778,7 @@ impl CompactionEngine {
                                     .unwrap_or(u64::MAX);
 
                             let merge_res = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
-                                Err(contextra_core::ContextraError::Sandbox(
+                                Err(contextra_types::ContextraError::Sandbox(
                                     "Merge operator wall-clock timeout exceeded".into(),
                                 ))
                             } else {
@@ -933,8 +933,8 @@ mod tests {
     #[tokio::test]
     async fn test_durable_remove_compaction_resilience_and_manifest_integrity() -> Result<()> {
         let tmp =
-            TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
-        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
+            TempDir::new().map_err(|e| contextra_types::ContextraError::Storage(e.to_string()))?;
+        let registry = Arc::new(contextra_mvcc::SnapshotRegistry::new());
         let bc = create_block_cache(1);
         let manifest_path = tmp.path().join("MANIFEST-000001");
         let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
@@ -949,8 +949,8 @@ mod tests {
             registry as Arc<dyn SnapshotFloor>,
             Arc::clone(&bc),
             None,
-            Arc::new(contextra_core::ResourceTracker::new(
-                contextra_core::ResourceBudget {
+            Arc::new(contextra_ports::ResourceTracker::new(
+                contextra_types::ResourceBudget {
                     memory_limit: 1024 * 1024,
                 },
             )),
@@ -983,7 +983,7 @@ mod tests {
             let sidecar_path = PathBuf::from(format!("{}.uuid", sst_path.display()));
             tokio::fs::write(&sidecar_path, b"uuid-data")
                 .await
-                .map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| contextra_types::ContextraError::Storage(e.to_string()))?;
 
             old_sst_paths.push(sst_path);
             sidecar_paths.push(sidecar_path);
@@ -1034,8 +1034,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_manual_clock_rate_limiting_deterministic() -> Result<()> {
-        let tmp = TempDir::new().map_err(|e| contextra_core::ContextraError::Storage(e.to_string()))?;
-        let registry = Arc::new(contextra_core::SnapshotRegistry::new());
+        let tmp = TempDir::new().map_err(|e| contextra_types::ContextraError::Storage(e.to_string()))?;
+        let registry = Arc::new(contextra_mvcc::SnapshotRegistry::new());
         let bc = create_block_cache(1);
         let manual_clock = Arc::new(contextra_ports::ManualClock::new(1_000_000));
 
@@ -1050,8 +1050,8 @@ mod tests {
             registry as Arc<dyn SnapshotFloor>,
             Arc::clone(&bc),
             None,
-            Arc::new(contextra_core::ResourceTracker::new(
-                contextra_core::ResourceBudget {
+            Arc::new(contextra_ports::ResourceTracker::new(
+                contextra_types::ResourceBudget {
                     memory_limit: 1024 * 1024,
                 },
             )),

@@ -5,7 +5,7 @@
 
 //! Composition root wiring module for `contextra-py`.
 
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 
 /// Dependencies required to assemble a [`PyWiring`] instance.
 #[derive(Debug, Clone, Default)]

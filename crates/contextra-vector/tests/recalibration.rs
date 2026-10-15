@@ -12,7 +12,7 @@ async fn test_quantizer_recalibration() {
         ef_construction: 100,
         ef_search: 50,
         rebuild_threshold: 0.8,
-        distance_metric: contextra_core::DistanceMetric::Euclidean,
+        distance_metric: contextra_ports::DistanceMetric::Euclidean,
         quantize: true,
         quantizer_recalibration_sample_size: 1000,
         ..Default::default()

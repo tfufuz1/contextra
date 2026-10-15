@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 
 #[cfg(feature = "sandbox")]
-use contextra_core::error::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "sandbox")]
 use contextra_sandbox::wiring::{SandboxWiring, SandboxWiringConfig};
 

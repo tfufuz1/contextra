@@ -19,20 +19,20 @@ impl WalObserver for TestObserver {
         &self,
         _batch: &contextra_store::lsm::observer::CommittedBatch<'_>,
         _seq_no: u64,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
     ) {
     }
 }
 
 struct TestMergeOp;
 impl MergeOperator for TestMergeOp {
-    fn merge(&self, existing_value: &[u8], _new_value: &[u8]) -> contextra_core::Result<Vec<u8>> {
+    fn merge(&self, existing_value: &[u8], _new_value: &[u8]) -> contextra_types::Result<Vec<u8>> {
         Ok(existing_value.to_vec())
     }
 }
 
 #[tokio::test]
-async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
+async fn test_j07closure_all_16_symbols_wiring() -> contextra_types::Result<()> {
     // 1–4. KV Segment symbols: delete_segment, generate_deletion_proof, read_segment, write_segment
     let registry = Arc::new(KeyRegistry::new());
     let master_km = Arc::new(KeyManager::try_new(
@@ -75,11 +75,11 @@ async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
 
     let _engine = contextra_store::compaction::CompactionEngine::new(
         lsm_config.compaction.clone(),
-        Arc::new(contextra_core::SnapshotRegistry::new()),
+        Arc::new(contextra_mvcc::SnapshotRegistry::new()),
         Arc::new(contextra_store::sstable::BlockCache::new(16)),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_types::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),

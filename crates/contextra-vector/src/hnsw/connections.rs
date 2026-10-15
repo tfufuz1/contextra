@@ -4,7 +4,7 @@
 // INVARIANTEN: Zero-Panic, lock-free/shared-read access during concurrent graph traversal.
 
 use ahash::AHashMap;
-use contextra_core::Result;
+use contextra_types::Result;
 use parking_lot::RwLock;
 
 use super::types::HnswIndexCore;
