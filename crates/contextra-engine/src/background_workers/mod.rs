@@ -13,9 +13,6 @@ mod orphan_workers;
 mod tests;
 
 pub use config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
-#[cfg(feature = "background-maintenance")]
-#[allow(deprecated)]
-pub use expiry_workers::{start_decay_cleanup_worker, start_thermostat_reaper};
 #[allow(deprecated)]
 pub use expiry_workers::{start_expiry_cleanup_worker, start_expiry_reaper, MAX_EXPIRED_PER_TICK};
 pub use hyperedge_worker::{

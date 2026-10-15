@@ -3,7 +3,7 @@ use contextra_db::{Collection, MultiStepConfig};
 #[cfg(feature = "volatile-vault")]
 use contextra_db::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_engine::Language;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
 use std::sync::atomic::AtomicU64;

@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_collection_scan_prefix_batches_via_mock_storage() {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
@@ -145,7 +145,7 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
 
 #[tokio::test]
 async fn test_maintenance_pagination_over_10k_documents() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_vector::HnswIndex;
@@ -279,7 +279,7 @@ async fn test_maintenance_pagination_over_10k_documents() {
 
 #[tokio::test]
 async fn test_migrate_doc_keys_v1() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, TxId};

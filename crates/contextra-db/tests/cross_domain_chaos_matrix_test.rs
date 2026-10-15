@@ -4,7 +4,7 @@
 //! Evaluates systemic resiliency across Candle embedding inference and LsmStorage disk I/O faults.
 
 use contextra_db::collection::Collection;
-use contextra_graph::csr::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::EmbeddingError;
 use contextra_ports::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
 use contextra_ports::{StorageEngine, VectorIndex};

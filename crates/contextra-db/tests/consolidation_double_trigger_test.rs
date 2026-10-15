@@ -8,7 +8,7 @@ use contextra_db::maintenance_config::MaintenanceConfig;
 use contextra_db::maintenance_scheduler::MaintenanceScheduler;
 use contextra_db::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
 use contextra_db::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_vector::HnswIndex;
 use serde_json::json;

@@ -1,7 +1,7 @@
 #![cfg(not(loom))]
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};

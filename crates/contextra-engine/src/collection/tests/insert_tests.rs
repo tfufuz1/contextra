@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_insert_with_ttl_and_reap_expired_documents() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -71,7 +71,7 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
 
 #[tokio::test]
 async fn test_insert_typed_episodic_has_decay_metadata() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -122,7 +122,7 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
 
 #[tokio::test]
 async fn test_insert_typed_working_has_ttl_metadata() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -173,7 +173,7 @@ async fn test_insert_typed_working_has_ttl_metadata() {
 
 #[tokio::test]
 async fn test_insert_backward_compatible_has_semantic_default() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -224,7 +224,7 @@ async fn test_insert_backward_compatible_has_semantic_default() {
 
 #[tokio::test]
 async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};

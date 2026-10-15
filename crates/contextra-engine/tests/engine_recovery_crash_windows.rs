@@ -6,7 +6,7 @@
 
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};

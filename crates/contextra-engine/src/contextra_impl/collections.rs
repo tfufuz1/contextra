@@ -129,7 +129,7 @@ impl Contextra {
         let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
 
         let mut graph =
-            contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
+            no_graph_stubs::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
         graph.set_storage(tenant_storage.clone());
         let graph_index = Arc::new(graph);
 
@@ -247,7 +247,7 @@ impl Contextra {
         };
         let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
 
-        let mut graph = contextra_graph::CsrGraph::load_from_storage(self.storage.as_ref()).await?;
+        let mut graph = no_graph_stubs::CsrGraph::load_from_storage(self.storage.as_ref()).await?;
         graph.set_storage(self.storage.clone());
         let graph_index = Arc::new(graph);
 

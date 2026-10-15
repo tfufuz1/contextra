@@ -7,7 +7,6 @@ use std::sync::Weak;
 pub struct EngineWiring {
     pub router: Option<Weak<dyn DriftStatusProvider>>,
     pub calibrator: Option<Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
-    pub pid_controller: Option<Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
 }
 
 impl EngineWiring {
@@ -15,12 +14,10 @@ impl EngineWiring {
     pub fn build(
         router: Option<Weak<dyn DriftStatusProvider>>,
         calibrator: Option<Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
-        pid_controller: Option<Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
     ) -> Result<Self, ContextraError> {
         Ok(Self {
             router,
             calibrator,
-            pid_controller,
         })
     }
 }
@@ -38,9 +35,6 @@ impl EngineWiringExt for Contextra {
         }
         if let Some(c) = wiring.calibrator {
             self.set_calibrator(c);
-        }
-        if let Some(p) = wiring.pid_controller {
-            self.set_pid_controller(p);
         }
     }
 }
@@ -65,12 +59,5 @@ impl Contextra {
         calibrator: Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
     ) {
         *self.calibrator.write() = Some(calibrator);
-    }
-
-    pub fn set_pid_controller(
-        &self,
-        pid_controller: Weak<parking_lot::Mutex<contextra_adapt::PidController>>,
-    ) {
-        *self.pid_controller.write() = Some(pid_controller);
     }
 }

@@ -2,7 +2,8 @@
 // ZWECK: Unit-Tests für background_workers Submodule.
 
 use super::*;
-use contextra_graph::hyperedge::HyperEdgeId;
+use crate::no_graph_stubs::hyperedge::HyperEdgeId;
+use crate::no_graph_stubs::CsrGraph;
 use contextra_mvcc::tx_buffer::IndexOp;
 use contextra_types::{DocId, TxId};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -99,7 +100,6 @@ async fn test_deferred_hyperedge_queue_fifo_and_limits() {
 
 #[tokio::test]
 async fn test_deferred_hyperedge_worker_single_tick_processing() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -161,7 +161,6 @@ async fn test_deferred_hyperedge_worker_single_tick_processing() {
 
 #[tokio::test]
 async fn test_deferred_hyperedge_worker_fanout_multitick_processing() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -227,7 +226,6 @@ async fn test_deferred_hyperedge_worker_fanout_multitick_processing() {
 
 #[tokio::test]
 async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -386,7 +384,6 @@ async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_worker_task_cleans_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -495,7 +492,6 @@ async fn test_orphan_cleanup_worker_removes_expired() {
 
 #[tokio::test]
 async fn trigger_expiry_cleanup_deletes_expired_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -549,7 +545,6 @@ async fn trigger_expiry_cleanup_deletes_expired_documents() {
 
 #[tokio::test]
 async fn test_worker_immediate_cancellation() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -589,172 +584,3 @@ async fn test_worker_immediate_cancellation() {
     assert!(res.is_ok(), "Task should exit cleanly upon cancellation");
 }
 
-#[tokio::test]
-async fn test_decay_eviction_thresholds() {
-    use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
-    use contextra_vector::HnswIndex;
-    use serde_json::json;
-    use std::sync::atomic::Ordering;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
-
-    let col = Arc::new(crate::Collection::new(
-        "default".to_string(),
-        storage,
-        index.clone(),
-        Arc::new(CsrGraph::new()),
-        next_tx.clone(),
-        4,
-        contextra_text::Language::English,
-    ));
-
-    let vec = vec![1.0, 0.0, 0.0, 0.0];
-
-    for i in 0..10 {
-        let id = format!("old_low_{i}");
-        let imp = MemoryImportance::new(
-            ImportanceScore::new(0.02),
-            DecayFunction::Exponential { half_life_tx: 100 },
-            TxId::new(1),
-        );
-        col.insert(&id, &vec, Some(json!({ "importance": imp })))
-            .await
-            .unwrap();
-    }
-
-    for i in 0..5 {
-        let id = format!("fresh_high_{i}");
-        let imp = MemoryImportance::new(
-            ImportanceScore::new(0.95),
-            DecayFunction::Exponential {
-                half_life_tx: 100_000,
-            },
-            TxId::new(100_000),
-        );
-        col.insert(&id, &vec, Some(json!({ "importance": imp })))
-            .await
-            .unwrap();
-    }
-
-    next_tx.store(50_000, Ordering::SeqCst);
-
-    let decay_controller = AdaptiveDecayController::new(DecayControllerConfig {
-        kappa: 2.0,
-        base_half_life_tx: 1_000,
-        eviction_threshold: 0.01,
-    });
-
-    let evicted = col
-        .evict_decayed_chunks(&decay_controller, 100)
-        .await
-        .unwrap();
-    assert_eq!(evicted, 10, "All 10 old low-score chunks should be evicted");
-
-    for i in 0..10 {
-        let res = col.get(&format!("old_low_{i}")).await.unwrap();
-        assert!(res.is_none(), "old_low_{i} must be deleted");
-    }
-
-    for i in 0..5 {
-        let res = col.get(&format!("fresh_high_{i}")).await.unwrap();
-        assert!(res.is_some(), "fresh_high_{i} must remain");
-    }
-}
-
-#[cfg(feature = "background-maintenance")]
-#[tokio::test]
-async fn test_start_decay_cleanup_worker_background_task() {
-    use crate::decay_controller::DecayControllerConfig;
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
-    use contextra_vector::HnswIndex;
-    use serde_json::json;
-    use std::sync::atomic::Ordering;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
-
-    let col = Arc::new(crate::Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        next_tx.clone(),
-        4,
-        contextra_text::Language::English,
-    ));
-
-    let vec = vec![1.0, 0.0, 0.0, 0.0];
-    let imp = MemoryImportance::new(
-        ImportanceScore::new(0.01),
-        DecayFunction::Exponential { half_life_tx: 10 },
-        TxId::new(1),
-    );
-    col.insert("decay_target", &vec, Some(json!({ "importance": imp })))
-        .await
-        .unwrap();
-
-    next_tx.store(100_000, Ordering::SeqCst);
-
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let handle = start_decay_cleanup_worker(
-        col.clone(),
-        DecayControllerConfig::default(),
-        Duration::from_millis(10),
-        cancel_token.clone(),
-    );
-
-    let mut evicted = false;
-    for _ in 0..50 {
-        sleep(Duration::from_millis(10)).await;
-        if col.get("decay_target").await.unwrap().is_none() {
-            evicted = true;
-            break;
-        }
-    }
-
-    cancel_token.cancel();
-    let _ = handle.await;
-
-    assert!(
-        evicted,
-        "Decay controller worker task should evict low score document"
-    );
-}

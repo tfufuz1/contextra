@@ -5,7 +5,7 @@
 #![cfg(feature = "experimental-diskann")]
 
 use contextra_db::Collection;
-use contextra_graph::csr::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::VectorIndex;
 use contextra_store::LsmStorage;
 use contextra_text::Language;

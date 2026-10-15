@@ -57,16 +57,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             .unwrap_or(super::builder::DEFAULT_RERANK_POOL_MULTIPLIER);
         let base_pool = (raw_mult * k).clamp(50, 200);
 
-        #[cfg(feature = "adaptive-candidate-pool-sizing")]
-        let effective_pool_max = if let Some(ref pid) = self.pid_controller {
-            let pid_pool = pid.lock().current_pool_size().unwrap_or(base_pool);
-            base_pool.min(pid_pool).clamp(50, 200)
-        } else {
-            self.rerank_pool_max
-                .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200))
-        };
-
-        #[cfg(not(feature = "adaptive-candidate-pool-sizing"))]
         let effective_pool_max = self
             .rerank_pool_max
             .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200));
@@ -236,11 +226,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                     }
                 }
 
-                let _elapsed = start_time.elapsed();
-                #[cfg(feature = "adaptive-candidate-pool-sizing")]
-                if let Some(ref pid) = self.pid_controller {
-                    pid.lock().update(_elapsed, _elapsed.as_millis() as f32);
-                }
 
                 if !accumulated_ranked.is_empty() {
                     // Sort evaluated candidates by score descending

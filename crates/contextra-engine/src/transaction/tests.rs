@@ -1,7 +1,7 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
-use contextra_graph::CsrGraph;
+use crate::no_graph_stubs::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_types::DocId;
 use contextra_vector::HnswIndex;

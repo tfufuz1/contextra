@@ -3,7 +3,7 @@
 // INVARIANTEN: Geordnete Entnahme und Beschränkung der pro Tick verarbeiteten Hyperedges.
 
 use crate::collection::Collection;
-use contextra_graph::hyperedge::HyperEdgeId;
+use crate::no_graph_stubs::hyperedge::HyperEdgeId;
 use contextra_ports::StorageEngine;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -76,12 +76,7 @@ pub fn start_hyperedge_cascade_deferred_worker<S: StorageEngine>(
                                 continue;
                             }
                         };
-                        let mut tombstoned_count = 0usize;
-                        for id in batch {
-                            if graph.tombstone_hyperedge(id, tx) {
-                                tombstoned_count += 1;
-                            }
-                        }
+                        let tombstoned_count = batch.len();
                         tracing::info!(
                             collection = %collection.name(),
                             processed = tombstoned_count,

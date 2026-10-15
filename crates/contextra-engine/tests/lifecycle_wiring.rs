@@ -21,18 +21,12 @@ async fn test_open_with_config_and_wiring_populates_controllers() -> contextra_t
     let calibrator = std::sync::Arc::new(parking_lot::Mutex::new(
         contextra_rank::IsotonicCalibrator::new(10, 100),
     ));
-    let pid = std::sync::Arc::new(parking_lot::Mutex::new(
-        contextra_adapt::PidController::new(1.0, 10, 5, Some(20)),
-    ));
-
     let router_weak = std::sync::Arc::downgrade(&router) as std::sync::Weak<dyn DriftStatusProvider>;
     let calibrator_weak = std::sync::Arc::downgrade(&calibrator);
-    let pid_weak = std::sync::Arc::downgrade(&pid);
 
     let wiring = EngineWiring::build(
         Some(router_weak),
         Some(calibrator_weak),
-        Some(pid_weak),
     )?;
 
     let config = ContextraConfig {

@@ -5,15 +5,9 @@
 use crate::background_workers::{
     start_expiry_cleanup_worker, start_orphan_cleanup_worker,
 };
-#[cfg(feature = "background-maintenance")]
-use crate::background_workers::start_decay_cleanup_worker;
-#[cfg(feature = "background-maintenance")]
-use crate::decay_controller::DecayControllerConfig;
 use crate::collection::Collection;
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_ports::StorageEngine;
-#[cfg(feature = "background-maintenance")]
-use contextra_ports::VectorIndex;
 use contextra_vector::hnsw::HnswIndex;
 use parking_lot::Mutex;
 use std::fmt;
@@ -75,7 +69,6 @@ pub struct EngineLifecycle {
     cancel_token: CancellationToken,
     erasure_supervisor: ErasureSupervisor,
     handles: Mutex<Vec<JoinHandle<()>>>,
-    kv_eviction_worker: Mutex<Option<contextra_kvcache::EvictionWorker>>,
 }
 
 impl fmt::Debug for EngineLifecycle {
@@ -84,7 +77,6 @@ impl fmt::Debug for EngineLifecycle {
             .field("cancel_token", &self.cancel_token)
             .field("erasure_supervisor", &self.erasure_supervisor)
             .field("handles_count", &self.handles.lock().len())
-            .field("has_kv_eviction_worker", &self.kv_eviction_worker.lock().is_some())
             .finish()
     }
 }
@@ -98,7 +90,6 @@ impl EngineLifecycle {
             cancel_token,
             erasure_supervisor,
             handles: Mutex::new(Vec::new()),
-            kv_eviction_worker: Mutex::new(None),
         }
     }
 
@@ -138,23 +129,6 @@ impl EngineLifecycle {
         self.handles.lock().push(handle);
     }
 
-    /// Starts and registers the decay / thermostat cleanup reaper task.
-    #[cfg(feature = "background-maintenance")]
-    pub fn start_thermostat_reaper<S: StorageEngine + 'static, V: VectorIndex + 'static>(
-        &self,
-        collection: Arc<Collection<S, V>>,
-        decay_config: DecayControllerConfig,
-        interval: Duration,
-    ) {
-        let handle = start_decay_cleanup_worker(collection, decay_config, interval, self.cancel_token.clone());
-        self.handles.lock().push(handle);
-    }
-
-    /// Attaches the KV cache eviction worker to lifecycle management.
-    pub fn set_kv_eviction_worker(&self, worker: contextra_kvcache::EvictionWorker) {
-        *self.kv_eviction_worker.lock() = Some(worker);
-    }
-
     /// Triggers graceful cancellation across all background tasks and supervisor tasks.
     pub fn cancel(&self) {
         self.cancel_token.cancel();
@@ -169,18 +143,13 @@ impl EngineLifecycle {
     pub async fn close(&self) {
         self.cancel();
 
-        // 1. Shut down KV eviction worker if set
-        if let Some(kv_worker) = self.kv_eviction_worker.lock().take() {
-            kv_worker.shutdown();
-        }
-
-        // 2. Drain and await background worker handles
+        // 1. Drain and await background worker handles
         let handles: Vec<JoinHandle<()>> = std::mem::take(&mut *self.handles.lock());
         for handle in handles {
             let _ = handle.await;
         }
 
-        // 3. Shut down ErasureSupervisor (waiting for active purge tasks)
+        // 2. Shut down ErasureSupervisor (waiting for active purge tasks)
         self.erasure_supervisor.shutdown().await;
     }
 }

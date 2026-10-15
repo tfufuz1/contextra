@@ -1,5 +1,5 @@
 use contextra_db::{Collection, Language};
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::DistanceMetric;
 use contextra_vector::{HnswConfig, HnswIndex};

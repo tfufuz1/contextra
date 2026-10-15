@@ -5,7 +5,6 @@
 
 use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
-use contextra_adapt::PidController;
 pub use contextra_ports::QueryRewriter;
 use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
 use contextra_types::{EntityId, Result, ScoredEntry};
@@ -370,7 +369,7 @@ fn deduplicate_search_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
+    use contextra_engine::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;

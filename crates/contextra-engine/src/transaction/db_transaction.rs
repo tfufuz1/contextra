@@ -44,7 +44,7 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
     pub(super) staged_graph_entity_sequence: Mutex<Vec<StagedGraphEntityOp>>,
     pub(super) staged_graph_edge_sequence: Mutex<Vec<StagedGraphEdgeOp>>,
-    pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
+    pub(super) staged_hyperedges: Mutex<Vec<crate::no_graph_stubs::hyperedge::HyperEdge>>,
     pub(super) committed: AtomicBool,
 }
 
@@ -195,7 +195,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         seq.push(StagedGraphEdgeOp::Delete(from, to));
     }
 
-    pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
+    pub fn stage_hyperedge(&self, hyperedge: crate::no_graph_stubs::hyperedge::HyperEdge) {
         let mut guard = match self.staged_hyperedges.lock() {
             Ok(g) => g,
             Err(p) => p.into_inner(),

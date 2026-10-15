@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn hybrid_search_caps_k_at_max_search_k() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -48,7 +48,7 @@ async fn hybrid_search_caps_k_at_max_search_k() {
 
 #[tokio::test]
 async fn test_hybrid_search_k_clamping_boundaries() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -100,7 +100,7 @@ async fn test_hybrid_search_k_clamping_boundaries() {
 #[tokio::test]
 #[cfg(feature = "reranking")]
 async fn test_hybrid_search_reranked_none() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -160,7 +160,7 @@ async fn test_hybrid_search_reranked_none() {
 #[tokio::test]
 #[cfg(feature = "experimental-diskann")]
 async fn test_collection_with_diskann_index_hybrid_search() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::{StorageEngine, TextIndex};
     use contextra_store::LsmStorage;
     use contextra_text::Language;
@@ -285,7 +285,7 @@ async fn test_collection_with_diskann_index_hybrid_search() {
 
 #[tokio::test]
 async fn test_hybrid_search_with_query_memory_type_filter() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_types::{HybridQuery, MemoryType};
     use contextra_vector::HnswIndex;
@@ -404,7 +404,7 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
 
 #[tokio::test]
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
@@ -460,7 +460,7 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_
 #[tokio::test]
 async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextra_types::Result<()>
 {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -544,7 +544,7 @@ async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextr
 
 #[tokio::test]
 async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -659,7 +659,7 @@ async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types:
 #[tokio::test]
 async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contextra_types::Result<()>
 {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -743,7 +743,7 @@ async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contex
 
 #[tokio::test]
 async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -824,7 +824,7 @@ async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_typ
 
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -925,7 +925,7 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -992,7 +992,7 @@ async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
 
 #[tokio::test]
 async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -1098,7 +1098,7 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
 #[tokio::test]
 async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{EntityId, FusionStrategy};
     use contextra_vector::{HnswConfig, HnswIndex};
@@ -1193,7 +1193,7 @@ async fn test_hybrid_search_community_boost_consistency_across_fusion_strategies
 
 #[tokio::test]
 async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types::Result<()> {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;

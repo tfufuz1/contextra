@@ -5,9 +5,8 @@
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
-use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
-use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+use crate::no_graph_stubs::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 use std::sync::atomic::Ordering;
@@ -19,125 +18,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         &self.text_index
     }
 
-    /// Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch.
-    /// Evictet Chunks deren effective_score unter eviction_threshold liegt.
-    /// Gibt Anzahl der evictierten Dokumente zurück.
-    #[tracing::instrument(level = "trace", skip(self, decay_controller))]
-    pub async fn evict_decayed_chunks(
-        &self,
-        decay_controller: &AdaptiveDecayController,
-        max_per_tick: usize,
-    ) -> Result<usize> {
-        let tombstone_ratio = self
-            .index
-            .stats()
-            .await
-            .map(|s| s.deleted_ratio as f32)
-            .unwrap_or(0.0);
-
-        let inputs = DecaySignalInputs {
-            tombstone_ratio,
-            ..DecaySignalInputs::default()
-        };
-
-        let current_tx = self.next_tx.load(Ordering::SeqCst);
-        let user_prefix = self.namespaced_key(b"", 0);
-        let mut evicted_ids = Vec::new();
-        let mut cursor: Option<Vec<u8>> = None;
-        const BATCH_SIZE: usize = 1000;
-
-        'outer: loop {
-            let (batch, next_cursor) = self
-                .storage
-                .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
-                .await?;
-
-            if batch.is_empty() {
-                break;
-            }
-
-            for (k, v) in batch {
-                let key_str = String::from_utf8_lossy(&k).to_string();
-                let user_key = if self.name == "default" {
-                    key_str
-                } else {
-                    let prefix_len = self.prefix.len() + 1;
-                    if key_str.len() >= prefix_len {
-                        key_str[prefix_len..].to_string()
-                    } else {
-                        key_str
-                    }
-                };
-
-                if self.name == "default" && user_key.starts_with("__") {
-                    continue;
-                }
-
-                let Ok(val) = serde_json::from_slice::<serde_json::Value>(&v) else {
-                    continue;
-                };
-
-                let meta_obj = val
-                    .get("metadata")
-                    .and_then(|m| m.as_object())
-                    .or_else(|| val.as_object());
-
-                if let Some(obj) = meta_obj {
-                    if let Some(imp_val) = obj.get("importance") {
-                        let (base_score, created_tx) = if let Ok(imp) =
-                            serde_json::from_value::<contextra_types::MemoryImportance>(
-                                imp_val.clone(),
-                            ) {
-                            (imp.base_score.value(), imp.created_at_tx.inner())
-                        } else if let Some(raw_f64) = imp_val.as_f64() {
-                            let created = obj
-                                .get("created_at_tx")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0);
-                            (raw_f64 as f32, created)
-                        } else {
-                            continue;
-                        };
-
-                        let elapsed_tx = current_tx.saturating_sub(created_tx);
-
-                        if decay_controller.should_evict(base_score, elapsed_tx, &inputs) {
-                            evicted_ids.push(user_key);
-                            if evicted_ids.len() >= max_per_tick {
-                                break 'outer;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let Some(next) = next_cursor {
-                cursor = Some(next);
-                tokio::task::yield_now().await;
-            } else {
-                break;
-            }
-        }
-
-        let count = evicted_ids.len();
-        for id in &evicted_ids {
-            tracing::info!(
-                collection = %self.name,
-                id = %id,
-                "Decay controller evicting document"
-            );
-            if let Err(e) = self.delete(id).await {
-                tracing::error!(
-                    collection = %self.name,
-                    id = %id,
-                    error = %e,
-                    "Decay controller failed to delete document"
-                );
-            }
-        }
-
-        Ok(count)
-    }
 
     /// Repairs the index by re-syncing with the storage.
     ///
@@ -845,15 +725,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // 3. Reset text index RAM state
         self.text_index.resident_index().clear();
 
-        // 4. Reset graph index RAM state
-        {
-            let mut g_write = self.graph_index.write_state.lock();
-            *g_write = contextra_graph::csr::GraphInner::new();
-            self.graph_index
-                .inner
-                .store(Arc::new(contextra_graph::csr::GraphInner::new()));
-            self.graph_index.cascade_queue.lock().clear();
-        }
 
         // 5. Reset vector index RAM state
         if let Ok(active_doc_ids) = self.index.all_doc_ids().await {
@@ -883,78 +754,21 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     #[tracing::instrument(level = "trace", skip(self, config))]
     pub async fn run_percolation_check(
         &self,
-        config: &contextra_graph::percolation::PercolationConfig,
+        config: &crate::no_graph_stubs::percolation::PercolationConfig,
     ) -> Result<PercolationResult> {
         let stats = self.graph_index.stats().await?;
-        let health = contextra_graph::percolation::compute_percolation_health(
+        let health = crate::no_graph_stubs::percolation::compute_percolation_health(
             stats.num_entities,
             stats.num_edges,
         );
 
-        let rebonding_triggered = if let Some(phi) = health {
-            contextra_graph::percolation::should_trigger_rebonding(phi, config)
-        } else {
-            false
-        };
+        let rebonding_triggered =
+            crate::no_graph_stubs::percolation::should_trigger_rebonding(health, config);
 
-        let mut new_edges_added = 0;
-
-        if rebonding_triggered {
-            let user_prefix = self.namespaced_key(b"", 0);
-            let mut embeddings = std::collections::HashMap::new();
-            let mut id_map = std::collections::HashMap::new();
-            let mut cursor: Option<Vec<u8>> = None;
-            const BATCH_SIZE: usize = 1000;
-
-            loop {
-                let (batch, next_cursor) = self
-                    .storage
-                    .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
-                    .await?;
-
-                if batch.is_empty() {
-                    break;
-                }
-
-                for (_k, v) in batch {
-                    if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
-                        if let Ok(eid) = EntityId::from_key(&stored.id) {
-                            id_map.insert(eid, stored.id.clone());
-                            embeddings.insert(eid, stored.embedding);
-                        }
-                    }
-                }
-
-                if let Some(next) = next_cursor {
-                    cursor = Some(next);
-                    tokio::task::yield_now().await;
-                } else {
-                    break;
-                }
-            }
-
-            let candidate_pairs = contextra_graph::percolation::find_rebonding_candidates(
-                self.graph_index.as_ref(),
-                &embeddings,
-                config,
-            )
-            .await;
-
-            for (from_id, to_id, _sim) in candidate_pairs {
-                if let (Some(from_str), Some(to_str)) = (id_map.get(&from_id), id_map.get(&to_id)) {
-                    if self
-                        .relate_bidirectional(from_str, to_str, "rebonded")
-                        .await
-                        .is_ok()
-                    {
-                        new_edges_added += 2;
-                    }
-                }
-            }
-        }
+        let new_edges_added = 0;
 
         Ok(PercolationResult {
-            health,
+            health: Some(health),
             rebonding_triggered,
             new_edges_added,
         })

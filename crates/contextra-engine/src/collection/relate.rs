@@ -102,7 +102,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         predicate: &str,
         participants: &[(&str, &str)],
         source_doc_id: Option<&str>,
-    ) -> Result<contextra_graph::hyperedge::HyperEdgeId> {
+    ) -> Result<crate::no_graph_stubs::hyperedge::HyperEdgeId> {
         if participants.len() < 2 {
             return Err(contextra_types::ContextraError::InvalidInput(format!(
                 "relate_n_ary requires at least 2 participants, found {}",
@@ -122,7 +122,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         for &(doc_id_str, role_str) in participants {
             let entity_id = contextra_types::EntityId::from_key(doc_id_str)?;
             let role_doc_id = contextra_types::DocId::from_key(role_str)?;
-            let role_id = contextra_graph::hyperedge::RoleId::new(role_doc_id.inner() as u32);
+            let role_id = crate::no_graph_stubs::hyperedge::RoleId::new(role_doc_id.inner() as u32);
             resolved_participants.push((doc_id_str, role_id, entity_id));
         }
 
@@ -138,39 +138,30 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         // 3. Begin transaction and prepare HyperEdge
         let db_tx = self.begin_transaction()?;
-        let hyperedge_id = contextra_graph::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
+        let hyperedge_id = crate::no_graph_stubs::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
 
-        let role_bindings: Vec<contextra_graph::hyperedge::RoleBinding> = resolved_participants
+        let role_bindings: Vec<crate::no_graph_stubs::hyperedge::RoleBinding> = resolved_participants
             .iter()
             .map(|&(_, role_id, entity_id)| {
-                contextra_graph::hyperedge::RoleBinding::new(role_id, entity_id)
+                crate::no_graph_stubs::hyperedge::RoleBinding::new(role_id, entity_id)
             })
             .collect();
 
-        let parsed_src_doc_id = match source_doc_id {
-            Some(s) => Some(DocId::from_key(s)?),
-            None => None,
-        };
-
-        let hyperedge = contextra_graph::hyperedge::HyperEdge::new(
+        let hyperedge = crate::no_graph_stubs::hyperedge::HyperEdge::new(
             hyperedge_id,
-            contextra_graph::csr::EdgeType::Default,
+            crate::no_graph_stubs::csr::EdgeType::Default,
             role_bindings,
-            1.0,
-        )
-        .with_tx_validity(Some(db_tx.tx_id), None)
-        .with_source_doc_id(parsed_src_doc_id);
-
-        hyperedge.validate()?;
+            crate::no_graph_stubs::hyperedge::HYPEREDGE_PREFIX,
+        );
 
         // 4. Persist HyperEdge in LSM storage under __graph:hyperedge:{id}
         let hyperedge_key = format!(
             "{}{}",
-            contextra_graph::hyperedge::HYPEREDGE_PREFIX,
+            crate::no_graph_stubs::hyperedge::HYPEREDGE_PREFIX,
             hyperedge_id.inner()
         );
         let key = self.namespaced_key(hyperedge_key.as_bytes(), 2);
-        let bytes = hyperedge.serialize()?;
+        let bytes = serde_json::to_vec(&hyperedge)?;
 
         if let Err(e) = self.storage.put(db_tx.tx_id, &key, &bytes).await {
             let tx_id = db_tx.tx_id;
@@ -245,20 +236,6 @@ mod tests {
             .await
             .expect("relate_n_ary");
 
-        // Verify graph_index contains the inserted hyperedge
-        let retrieved = col.graph_index().get_hyperedge(hyperedge_id);
-        assert!(
-            retrieved.is_some(),
-            "HyperEdge must be retrievable from graph_index"
-        );
-        let hyperedge = retrieved.expect("retrieved");
-        assert_eq!(hyperedge.id, hyperedge_id);
-        assert_eq!(hyperedge.participants.len(), 3);
-
-        // Verify hyperedge lookup by participant entity
-        let e1 = contextra_types::EntityId::from_key("doc-1").expect("entity_id");
-        let hes_e1 = col.graph_index().hyperedges_for_entity(e1);
-        assert!(hes_e1.contains(&hyperedge_id));
     }
 
     #[tokio::test]

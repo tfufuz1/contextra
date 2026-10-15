@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_relate_success_visible_in_storage_and_graph() {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_types::EntityId;
     use contextra_vector::HnswIndex;
@@ -53,7 +53,7 @@ async fn test_relate_success_visible_in_storage_and_graph() {
 
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_storage_commit_failure() {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
@@ -164,7 +164,7 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
 
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_graph_commit_failure() {
-    use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_store::{LsmConfig, LsmStorage};
@@ -304,7 +304,7 @@ async fn test_relate_rollback_semantics_on_graph_commit_failure() {
 
 #[tokio::test]
 async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
@@ -401,7 +401,7 @@ async fn test_run_percolation_check_rebonding() -> contextra_types::Result<()> {
         col.insert(&id, &emb, None).await?;
     }
 
-    let config = contextra_graph::percolation::PercolationConfig {
+    let config = crate::no_graph_stubs::percolation::PercolationConfig {
         critical_threshold: 0.9,
         rebonding_similarity: 0.85,
         max_new_edges_per_pass: 10,

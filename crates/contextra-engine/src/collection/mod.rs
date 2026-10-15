@@ -29,7 +29,7 @@ pub mod tx;
 mod tests;
 
 #[cfg(not(loom))]
-use contextra_graph::CsrGraph;
+use crate::no_graph_stubs::CsrGraph;
 #[cfg(not(loom))]
 use contextra_ports::{
     Clock, KvLifecycleHooks, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock,

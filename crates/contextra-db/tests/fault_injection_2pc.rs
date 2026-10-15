@@ -3,7 +3,7 @@
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, EntityId, Result, ScoredDocument, TxId};

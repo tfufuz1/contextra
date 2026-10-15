@@ -1,6 +1,6 @@
 use contextra_db::transaction::DbTransaction;
 use contextra_db::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Edge, Entity, EntityId, PprConfig};

@@ -32,17 +32,9 @@ pub mod reaper {
     pub use contextra_engine::background_workers::*;
 }
 
-// mod Collection is used via pub mod collection
-pub mod decay_controller {
-    pub use contextra_adapt::decay_controller::*;
-}
 pub use contextra_engine::fusion;
-pub mod homeostat;
 pub mod multistep;
 pub mod wiring;
-pub mod pid_latency_controller {
-    pub use contextra_adapt::pid_latency_controller::*;
-}
 
 #[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
@@ -52,21 +44,15 @@ pub use volatile_vault::{
     VaultError, VolatileContextVault,
 };
 
-pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
-pub use homeostat::RerankDeadline;
-#[allow(deprecated)]
-pub use homeostat::RerankPidController;
-pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
-pub use wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage, PipelineStages};
-pub use pid_latency_controller::{
-    LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
-    MIN_SCALING_FACTOR,
+pub use multistep::{
+    LatencyBudgetGuard, MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter,
+    DEFAULT_TARGET_LATENCY_MS,
 };
+pub use wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage, PipelineStages};
 
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
+pub use contextra_engine::PercolationConfig;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;
@@ -314,9 +300,6 @@ mod tests {
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(
-            contextra_adapt::PidController::new(150.0, 50, 200, Some(100)),
-        ));
 
         // Warmup calibrator so ECE is populated
         {
@@ -329,18 +312,15 @@ mod tests {
 
         db.set_router(Arc::downgrade(&router_arc));
         db.set_calibrator(Arc::downgrade(&calibrator_arc));
-        db.set_pid_controller(Arc::downgrade(&pid_arc));
 
         let stats_attached = db.stats().await.expect("stats");
         assert_eq!(stats_attached.drift_status, "stabil");
         assert!(stats_attached.calibration_ece.is_some());
         assert!(stats_attached.last_calibration_at.is_some());
-        assert_eq!(stats_attached.pid_pool_size, Some(100));
 
         // 3. Drop strong references (simulating shutdown) -> stats() must not panic and fallback gracefully
         drop(router_arc);
         drop(calibrator_arc);
-        drop(pid_arc);
 
         let stats_dropped = db.stats().await.expect("stats after drop");
         assert_eq!(stats_dropped.drift_status, "nicht verfügbar");

@@ -3,7 +3,7 @@
 
 use contextra_db::multistep::{MultiStepConfig, MultiStepEngine};
 use contextra_db::Collection;
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::{BoxFuture, QueryRewriteOutput, QueryRewriter, TextEmbeddingEngine};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Result, ScoredEntry};
