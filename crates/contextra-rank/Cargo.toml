@@ -25,6 +25,5 @@ thiserror.workspace = true
 dibud = []
 
 [dev-dependencies]
-contextra-adapt.workspace = true
 proptest = "1"
 tokio = { workspace = true, features = ["full"] }
