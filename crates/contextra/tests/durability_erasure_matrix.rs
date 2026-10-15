@@ -3,7 +3,7 @@
 // INVARIANTEN: All 9 matrix cases must be explicitly tested.
 
 use contextra::builder::ContextraBuilder;
-use contextra_core::ContextraError;
+use contextra_types::error::ContextraError;
 use contextra_ports::erasure::ErasureMode;
 use contextra_store::lsm::DurabilityMode;
 use tempfile::TempDir;

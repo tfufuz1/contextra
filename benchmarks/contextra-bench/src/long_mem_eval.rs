@@ -3,8 +3,9 @@
 // ZWECK: Loader, Evaluation Harness und Regressions-Suite für das LongMemEval Benchmark (ICLR 2025 / arXiv:2410.10813)
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
-use contextra_core::{ContextraError, Result, StorageEngine, VectorIndex};
 use contextra_db::Collection;
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -1370,7 +1371,10 @@ where
         let denominator = 1.0 + z * z / n;
         let center = p + z * z / (2.0 * n);
         let margin = z * ((p * (1.0 - p) / n) + (z * z / (4.0 * n * n))).sqrt();
-        (((center - margin) / denominator).max(0.0), ((center + margin) / denominator).min(1.0))
+        (
+            ((center - margin) / denominator).max(0.0),
+            ((center + margin) / denominator).min(1.0),
+        )
     } else {
         (0.0, 0.0)
     };

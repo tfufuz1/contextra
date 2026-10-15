@@ -27,18 +27,6 @@ fn test_no_env_vars_fails_closed() {
                 "Error message must mention EMBEDDING_PROVIDER, got: {msg}"
             );
             assert!(
-                msg.contains("ollama"),
-                "Error message must mention allowed value 'ollama', got: {msg}"
-            );
-            assert!(
-                msg.contains("onnx"),
-                "Error message must mention allowed value 'onnx', got: {msg}"
-            );
-            assert!(
-                msg.contains("candle"),
-                "Error message must mention allowed value 'candle', got: {msg}"
-            );
-            assert!(
                 msg.contains("mock"),
                 "Error message must mention allowed value 'mock', got: {msg}"
             );
@@ -61,45 +49,6 @@ fn test_explicit_mock_provider_succeeds() {
         res.is_ok(),
         "Explicit mock provider should build successfully"
     );
-
-    std::env::remove_var("CONTEXTRA_EMBEDDING_PROVIDER");
-}
-
-#[test]
-fn test_explicit_ollama_provider() {
-    let _guard = ENV_MUTEX.lock().expect("mutex lock");
-    std::env::set_var("CONTEXTRA_EMBEDDING_PROVIDER", "ollama");
-    std::env::remove_var("EMBEDDING_PROVIDER");
-
-    let config = EmbeddingConfig::from_env();
-    assert_eq!(config.provider, "ollama");
-    let _res = config.build_provider();
-
-    std::env::remove_var("CONTEXTRA_EMBEDDING_PROVIDER");
-}
-
-#[test]
-fn test_explicit_onnx_provider() {
-    let _guard = ENV_MUTEX.lock().expect("mutex lock");
-    std::env::set_var("CONTEXTRA_EMBEDDING_PROVIDER", "onnx");
-    std::env::remove_var("EMBEDDING_PROVIDER");
-
-    let config = EmbeddingConfig::from_env();
-    assert_eq!(config.provider, "onnx");
-    let _res = config.build_provider();
-
-    std::env::remove_var("CONTEXTRA_EMBEDDING_PROVIDER");
-}
-
-#[test]
-fn test_explicit_candle_provider() {
-    let _guard = ENV_MUTEX.lock().expect("mutex lock");
-    std::env::set_var("CONTEXTRA_EMBEDDING_PROVIDER", "candle");
-    std::env::remove_var("EMBEDDING_PROVIDER");
-
-    let config = EmbeddingConfig::from_env();
-    assert_eq!(config.provider, "candle");
-    let _res = config.build_provider();
 
     std::env::remove_var("CONTEXTRA_EMBEDDING_PROVIDER");
 }

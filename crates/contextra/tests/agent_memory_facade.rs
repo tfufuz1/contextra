@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, Result};
+use contextra_ports::BoxFuture;
+use contextra_types::error::Result;
 use serde_json::json;
 use std::sync::Arc;
 

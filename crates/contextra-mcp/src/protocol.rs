@@ -3,7 +3,7 @@
 // ZWECK:       MCP JSON-RPC 2.0 Protokoll-Typen & DTO-Abbildung für Contextra
 // INVARIANTEN: DTO-Konvertierung aus ContextraError muss saubere JSON-RPC 2.0 Codes und Error-Data tragen
 // HOTSPOTS:    McpError::from(ContextraError), JsonRpcResponse::from_error
-// SIEHE AUCH:  ADR-010, contextra-core/src/error_dto.rs
+// SIEHE AUCH:  ADR-010
 
 //! MCP JSON-RPC 2.0 Protokoll-Typen (Model Context Protocol Spec v2024-11-05)
 

@@ -7,7 +7,7 @@ use contextra::builder::ContextraBuilder;
 use contextra::collection_profile::{CollectionProfile, DeploymentTier};
 use contextra::performance_profile::PerformanceProfile;
 use contextra::query_rewriter::LlmQueryRewriter;
-use contextra_core::DistanceMetric;
+use contextra_types::types::domain::DistanceMetric;
 use contextra_db::EmbeddingBackend;
 use contextra_ports::license::OpenFastGate;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
@@ -20,7 +20,7 @@ impl LlmTextGenerator for DummyLlmGenerator {
     fn generate<'a>(
         &'a self,
         _prompt: &'a str,
-    ) -> BoxFuture<'a, Result<String, contextra_core::error::ContextraError>> {
+    ) -> BoxFuture<'a, Result<String, contextra_types::error::ContextraError>> {
         Box::pin(async move { Ok("subquery 1\nsubquery 2".to_string()) })
     }
 }

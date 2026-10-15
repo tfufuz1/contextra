@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra::{open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::error::ContextraError;
+use contextra_types::types::domain::TenantId;
 use contextra_ports::clock::ManualClock;
 use contextra_ports::rng::SeededRng;
 use contextra_ports::Rng;

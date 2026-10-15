@@ -80,8 +80,7 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
-/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
+/// to HNSW and BM25 sub-searches. All upstream layers MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
@@ -358,8 +357,8 @@ impl std::fmt::Display for MemoryType {
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
 /// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
-/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
+/// Defined in `contextra-types` (Ring 0) to isolate domain configuration.
+/// Graph algorithms map this configuration to internal diffusion parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
@@ -565,13 +564,6 @@ impl AutoExtractionMode {
 
 impl Default for AutoExtractionMode {
     fn default() -> Self {
-        #[cfg(not(feature = "auto-extraction-opt-out"))]
-        {
-            Self::Enabled
-        }
-        #[cfg(feature = "auto-extraction-opt-out")]
-        {
-            Self::Disabled
-        }
+        Self::Enabled
     }
 }

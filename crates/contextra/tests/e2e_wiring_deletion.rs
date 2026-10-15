@@ -3,7 +3,8 @@
 use std::sync::Arc;
 use contextra::builder;
 use contextra::{AgentMemory, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, ContextraError};
+use contextra_ports::BoxFuture;
+use contextra_types::error::ContextraError;
 use contextra_ports::clock::ManualClock;
 use contextra_ports::rng::SeededRng;
 use contextra_ports::Rng;
@@ -12,11 +13,11 @@ use serde_json::json;
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
-    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, contextra_core::Result<Vec<f32>>> {
+    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, contextra_types::error::Result<Vec<f32>>> {
         Box::pin(async move { Ok(vec![0.1; 16]) })
     }
 
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_core::Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_types::error::Result<Vec<Vec<f32>>>> {
         Box::pin(async move { Ok(vec![vec![0.1; 16]; texts.len()]) })
     }
 }
