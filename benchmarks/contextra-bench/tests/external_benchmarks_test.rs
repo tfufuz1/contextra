@@ -8,8 +8,8 @@ use contextra_bench::long_mem_eval::{
     RegressionReport, RegressionSuite, ScoredChunk,
 };
 use contextra_bench::path_rag_sweep::{run_pathrag_sweep_locomo, run_pathrag_sweep_long_mem_eval};
-use contextra_core::Result;
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::Result;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -41,7 +41,7 @@ async fn test_long_mem_eval_fixture_parsing_and_eval() {
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_core::Result<Vec<ScoredChunk>>,
+                contextra_types::Result<Vec<ScoredChunk>>,
             >
     };
 
@@ -91,7 +91,7 @@ async fn test_locomo_fixture_parsing_and_eval() {
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_core::Result<Vec<ScoredChunk>>,
+                contextra_types::Result<Vec<ScoredChunk>>,
             >
     };
 
@@ -279,7 +279,7 @@ async fn test_empty_and_erroring_eval_runs() {
         Box::pin(async { Ok(vec![]) })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_core::Result<Vec<ScoredChunk>>,
+                contextra_types::Result<Vec<ScoredChunk>>,
             >
     };
     let locomo_report = run_locomo_eval(
@@ -302,13 +302,13 @@ async fn test_empty_and_erroring_eval_runs() {
     // Erroring search closure
     let mock_search_err = |_q: &str| {
         Box::pin(async {
-            Err(contextra_core::ContextraError::InvalidInput(
+            Err(contextra_types::ContextraError::InvalidInput(
                 "Search failed".into(),
             ))
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_core::Result<Vec<ScoredChunk>>,
+                contextra_types::Result<Vec<ScoredChunk>>,
             >
     };
     let dummy_case = contextra_bench::long_mem_eval::LongMemEvalCase {
