@@ -40,5 +40,20 @@ erasure = ["contextra-store/erasure", "contextra-engine/erasure", "contextra-por
 # Format-Features
 docid-128 = ["contextra-types/docid-128"]
 
+# No-op Features für Workspace-Kompatibilität (aktivieren KEINE Parkplatz-Crates)
+router = []
+ollama = []
+candle = []
+onnx = []
+privacy = []
+sandbox = []
+adapt = []
+cognition = []
+agent = []
+graph = []
+kvcache = []
+license = []
+sovereign = []
+
 [lints]
 workspace = true
