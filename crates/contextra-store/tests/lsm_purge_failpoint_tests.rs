@@ -17,7 +17,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_orchestrator_execution() -> contextra_core::Result<()> {
+async fn test_purge_orchestrator_execution() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
