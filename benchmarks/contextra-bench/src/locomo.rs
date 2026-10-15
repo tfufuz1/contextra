@@ -4,7 +4,7 @@
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
 use crate::long_mem_eval::{BoxFuture, ScoredChunk};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -555,7 +555,7 @@ mod tests {
             })
                 as crate::long_mem_eval::BoxFuture<
                     'static,
-                    contextra_core::Result<Vec<ScoredChunk>>,
+                    contextra_types::Result<Vec<ScoredChunk>>,
                 >
         };
 

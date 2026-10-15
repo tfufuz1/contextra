@@ -3,7 +3,8 @@
 // ZWECK: Loader, Evaluation Harness und Regressions-Suite für das LongMemEval Benchmark (ICLR 2025 / arXiv:2410.10813)
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
-use contextra_core::{ContextraError, Result, StorageEngine, VectorIndex};
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{ContextraError, Result};
 use contextra_db::Collection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

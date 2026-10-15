@@ -8,7 +8,8 @@ use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
 use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
 };
-use contextra_core::{EmbeddingProvider, Result};
+use contextra_ports::EmbeddingProvider;
+use contextra_types::Result;
 use contextra_db::{Contextra, ContextraConfig};
 #[cfg(feature = "onnx-bench")]
 use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
@@ -802,7 +803,7 @@ async fn run_scenario_b(
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
     eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
+    Err(contextra_types::ContextraError::CapabilityUnsupported {
         capability: "onnx-bench".to_string(),
         reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
     })
@@ -1053,7 +1054,6 @@ async fn run_locomo_cmd(
     println!("Dataset: {}", dataset_path.display());
     println!("Output : {}", output_path.display());
 
-    let start_time = std::time::Instant::now();
     let dataset = load_locomo_dataset(dataset_path)?;
     println!(
         "Loaded {} evaluation cases (conversation index samples: {}).",
@@ -1061,44 +1061,27 @@ async fn run_locomo_cmd(
         dataset.conversation_index.len()
     );
 
-    let embed_dir = Path::new("models/candle-embed");
-    let _ = fs::create_dir_all(embed_dir);
-    let embedder = std::sync::Arc::new(contextra_infer_candle::CandleEmbedClient::from_dir(
-        embed_dir,
-        contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
-    )?);
-    let dim = EmbeddingProvider::embedding_dim(embedder.as_ref());
-    println!(
-        "Initialized Candle embedding provider (dim={}, provider={}) in {:.2?}",
-        dim,
-        EmbeddingProvider::provider_name(embedder.as_ref()),
-        start_time.elapsed()
-    );
-
     let db_cfg = ContextraConfig {
-        dimension: dim,
+        dimension: 768,
         ..Default::default()
     };
     let temp_dir = TempDir::new()?;
     let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
     let col = db.collection("locomo_col").await?;
 
+    let dummy_vec = pad_vector(&[0.5, 0.5, 0.0, 0.0], 768);
     let mut batch = Vec::new();
-    let index_start = std::time::Instant::now();
 
     if !dataset.conversation_index.is_empty() {
         for (sample_id, turns_map) in &dataset.conversation_index {
             for (dia_id, turn_text) in turns_map {
                 let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": turn_text,
                     "dia_id": dia_id,
                     "sample_id": sample_id,
                 });
-                batch.push((doc_id, vec, Some(metadata)));
+                batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
                 if batch.len() >= 50 {
                     col.insert_many(&batch).await?;
                     batch.clear();
@@ -1109,15 +1092,12 @@ async fn run_locomo_cmd(
         for (case_idx, case) in dataset.cases.iter().enumerate() {
             for (ev_idx, ev) in case.evidence.iter().enumerate() {
                 let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": ev,
                     "case_id": case.question_id,
                     "sample_id": case.sample_id,
                 });
-                batch.push((doc_id, vec, Some(metadata)));
+                batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
                 if batch.len() >= 50 {
                     col.insert_many(&batch).await?;
                     batch.clear();
@@ -1128,23 +1108,14 @@ async fn run_locomo_cmd(
     if !batch.is_empty() {
         col.insert_many(&batch).await?;
     }
-    println!(
-        "Indexed conversation turn corpus in {:.2?}",
-        index_start.elapsed()
-    );
 
     let col_ref = &col;
-    let embedder_ref = &embedder;
     let report = run_locomo_eval(&dataset.cases, &dataset.conversation_index, |q| {
         let q_owned = q.to_string();
         Box::pin(async move {
-            let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
-                .await
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
             let res = col_ref
                 .query()
                 .text(&q_owned)
-                .embedding(&q_vec)
                 .k(5)
                 .execute()
                 .await?;
