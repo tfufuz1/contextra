@@ -9,6 +9,34 @@ Version 0.1.0 ist derzeit unveröffentlicht.
 
 ## [Unreleased]
 
+### Removed
+- Entkopplung und Entfernung von 16 Parkplatz-Crates aus dem Workspace gemäß ADR-PARK-001 (gesichert unter Git-Tags `park/EP1/v1` bis `park/EP6/v1`):
+  - `contextra-adapt`
+  - `contextra-agent`
+  - `contextra-audit-export`
+  - `contextra-avv-generator`
+  - `contextra-cognition`
+  - `contextra-core`
+  - `contextra-graph`
+  - `contextra-infer-candle`
+  - `contextra-infer-ollama`
+  - `contextra-infer-onnx`
+  - `contextra-kvcache`
+  - `contextra-license`
+  - `contextra-privacy`
+  - `contextra-py`
+  - `contextra-router`
+  - `contextra-sandbox`
+- Entfernung nicht-essentieller und experimenteller Cargo-Features gemäß Abschnitt 3.4 (Aktion E):
+  - `contextra-types`: `auto-extraction-opt-out`
+  - `contextra-crypto`: `cloud-egress-guard`
+  - `contextra-rank`: `dibud`
+  - `contextra-store`: `deletion-proof`
+  - `contextra-vector`: `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `graph`
+  - `contextra-engine`: `default`, `graph`, `adapt`, `kvcache`, `candle`, `sandbox`, `onnx`, `reranking`, `graph-connectivity-health`, `edge-reinforcement-learning`, `entity-extraction`, `auto-extraction-opt-out`, `coherence-bonus-fusion`, `adaptive-candidate-pool-sizing`, `experimental-diskann`
+  - `contextra-db`: `sandbox`, `reranking`, `onnx`, `experimental-diskann`, `graph-connectivity-health`, `coherence-bonus-fusion`, `adaptive-candidate-pool-sizing`, `volatile-vault`, `edge-reinforcement-learning`
+  - `contextra`: `router`, `ollama`, `candle`, `onnx`, `privacy`, `sandbox`, `adapt`, `cognition`, `agent`, `graph`, `kvcache`, `license`, `sovereign`
+
 ## [0.1.0] - unveröffentlicht
 
 ### Fixed
