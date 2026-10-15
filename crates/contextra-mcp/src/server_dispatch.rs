@@ -175,7 +175,7 @@ impl McpServer {
                     token,
                     channel,
                     |_scope, collection| async move {
-                        let tenant_id = crate::validation::extract_tenant_from_args_or_env(None);
+                        let tenant_id = self.tenant_id;
                         let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                             .key
                             .ok_or_else(|| {

@@ -2,34 +2,64 @@ use crate::protocol::McpError;
 use contextra_types::TenantId;
 use serde_json::Value;
 
-/// Resolves `TenantId` dynamically from request arguments (`tenant_id` or `tenant`),
-/// environment variable `CONTEXTRA_TENANT_ID`, or falls back to `TenantId::SYSTEM`.
-pub fn extract_tenant_from_args_or_env(args: Option<&Value>) -> TenantId {
+/// Validates that any tenant parameter provided in request arguments strictly matches the active session tenant.
+///
+/// Returns `Ok(session_tenant)` if valid or unprovided, or an `McpError` if a foreign tenant ID is supplied.
+pub fn validate_request_tenant(
+    session_tenant: TenantId,
+    args: Option<&Value>,
+) -> Result<TenantId, McpError> {
     if let Some(args_val) = args {
         if let Some(t_val) = args_val.get("tenant_id").or_else(|| args_val.get("tenant")) {
-            if let Some(num) = t_val.as_u64() {
-                if let Ok(tid) = TenantId::try_new(num) {
-                    return tid;
-                }
+            let req_tenant_num = if let Some(num) = t_val.as_u64() {
+                Some(num)
             } else if let Some(s) = t_val.as_str() {
-                if let Ok(num) = s.parse::<u64>() {
-                    if let Ok(tid) = TenantId::try_new(num) {
-                        return tid;
-                    }
+                s.parse::<u64>().ok()
+            } else {
+                None
+            };
+
+            if let Some(num) = req_tenant_num {
+                if num != session_tenant.inner() {
+                    return Err(McpError::invalid_params(format!(
+                        "Tenant ID mismatch: request requested tenant {num}, but server session is bound to tenant {}",
+                        session_tenant.inner()
+                    )));
                 }
+            } else {
+                return Err(McpError::invalid_params(
+                    "Invalid tenant parameter format in request arguments",
+                ));
             }
         }
     }
 
-    if let Ok(env_str) = std::env::var("CONTEXTRA_TENANT_ID") {
-        if let Ok(num) = env_str.trim().parse::<u64>() {
-            if let Ok(tid) = TenantId::try_new(num) {
-                return tid;
-            }
-        }
+    Ok(session_tenant)
+}
+
+/// Resolves session `TenantId` from environment (`CONTEXTRA_TENANT_ID`), failing closed if absent, invalid, or 0.
+pub fn resolve_session_tenant_from_env() -> Result<TenantId, contextra_types::ContextraError> {
+    let env_str = std::env::var("CONTEXTRA_TENANT_ID").map_err(|_| {
+        contextra_types::ContextraError::InvalidInput(
+            "CONTEXTRA_TENANT_ID environment variable is missing. Server requires an explicit non-zero session tenant.".to_string(),
+        )
+    })?;
+
+    let num = env_str.trim().parse::<u64>().map_err(|_| {
+        contextra_types::ContextraError::InvalidInput(format!(
+            "Invalid CONTEXTRA_TENANT_ID '{env_str}'. Must be a valid non-zero u64 integer."
+        ))
+    })?;
+
+    if num == 0 {
+        return Err(contextra_types::ContextraError::InvalidInput(
+            "TenantId 0 (SYSTEM) is prohibited for MCP server session (INV-TENANT-1).".to_string(),
+        ));
     }
 
-    TenantId::SYSTEM
+    TenantId::try_new(num).map_err(|e| {
+        contextra_types::ContextraError::InvalidInput(format!("Invalid TenantId: {e}"))
+    })
 }
 
 /// Checks whether database write access is explicitly enabled via environment variable `CONTEXTRA_MCP_ALLOW_WRITE`.

@@ -32,6 +32,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    if let Some(i) = args.iter().position(|a| a == "--tenant-id") {
+        if let Some(val) = args.get(i + 1) {
+            std::env::set_var("CONTEXTRA_TENANT_ID", val);
+        }
+    }
+
     let allow_write = if args.iter().any(|a| a == "--read-only") {
         false
     } else if args.iter().any(|a| a == "--allow-write") {
@@ -42,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let db = Arc::new(Contextra::open(&db_path).await?);
     let embedder = config.build_provider()?;
-    let server = Arc::new(McpServer::with_write_permission(db, embedder, allow_write)?);
+    let server = Arc::new(McpServer::from_env(db, embedder)?);
 
     tracing::info!(
         db_path,
