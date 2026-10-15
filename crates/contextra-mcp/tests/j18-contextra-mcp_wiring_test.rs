@@ -6,23 +6,11 @@
 use contextra::Contextra;
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy};
 use contextra_mcp::{
-    deletion_proof_key_from_env, EgressClassification, EgressClassifier, LlmConfig, McpServer,
-    PromptInjectionGuard,
+    deletion_proof_key_from_env, LlmConfig, McpServer, PromptInjectionGuard,
 };
 use contextra_ports::MockEmbedder;
 use serde_json::json;
 use std::sync::Arc;
-
-struct CustomEgressClassifier;
-
-impl EgressClassifier for CustomEgressClassifier {
-    fn classify<'a>(
-        &'a self,
-        _query: &'a str,
-    ) -> contextra_ports::BoxFuture<'a, EgressClassification> {
-        Box::pin(async move { EgressClassification::Allow })
-    }
-}
 
 #[tokio::test]
 async fn test_j18_llm_config_build_generator_integration() {
@@ -86,60 +74,37 @@ async fn test_j18_server_builder_wiring_integration() {
     );
     let embedder: Arc<dyn contextra_ports::EmbeddingProvider> = Arc::new(MockEmbedder::new(768));
 
-    // Construct custom builder options
     let policy = SandboxPolicy {
         allow_db_reads: true,
         allow_db_writes: false,
         allow_code_execution: false,
-        allow_cloud_egress: true,
+        allow_cloud_egress: false,
         max_execution_ms: 5_000,
         sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox"));
 
     let injection_guard = Arc::new(PromptInjectionGuard::from_env());
-    let egress_classifier: Arc<dyn EgressClassifier> = Arc::new(CustomEgressClassifier);
     let plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>> = None;
 
-    // Connect custom builder dependencies
     let server = Arc::new(
         McpServer::with_sandbox(db, embedder, sandbox)
             .with_injection_guard(injection_guard)
-            .with_egress_classifier(egress_classifier)
             .with_plugin_registry(plugin_registry),
     );
 
-    // Exercise enclosing production path: handle_value for contextra_plugin_status
-    let req_plugin_status = json!({
+    let req_collections = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "contextra_plugin_status",
+            "name": "contextra_collections",
             "arguments": {}
         }
     });
-    let resp_plugin = server.handle_value(req_plugin_status).await;
+    let resp_collections = server.handle_value(req_collections).await;
     assert!(
-        resp_plugin.is_some(),
-        "Expected response for contextra_plugin_status"
-    );
-
-    // Exercise enclosing production path: handle_value for contextra_cloud_query
-    let req_cloud_query = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/call",
-        "params": {
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "search query"
-            }
-        }
-    });
-    let resp_cloud = server.handle_value(req_cloud_query).await;
-    assert!(
-        resp_cloud.is_some(),
-        "Expected response for contextra_cloud_query"
+        resp_collections.is_some(),
+        "Expected response for contextra_collections"
     );
 }

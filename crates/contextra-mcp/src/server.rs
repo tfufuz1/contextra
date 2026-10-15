@@ -1,12 +1,8 @@
 use crate::config::LlmConfig;
-use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier, EgressGuardCheck};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
 use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
-#[cfg(feature = "kv-bridge")]
-use crate::routing::setup_kv_bridge;
-use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::server_dispatch::cancellation::ConcurrencyGovernor;
 use crate::server_dispatch::forget_guard::ForgetGuard;
@@ -25,12 +21,7 @@ pub struct McpServer {
     pub embedder: Arc<dyn EmbeddingProvider>,
     pub sandbox: Arc<McpSandbox>,
     pub injection_guard: Arc<PromptInjectionGuard>,
-    pub egress_classifier: Arc<dyn EgressClassifier>,
-    pub egress_guard: Option<Arc<dyn EgressGuardCheck>>,
-    pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
-    #[cfg(feature = "kv-bridge")]
-    pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
     pub forget_guard: Arc<ForgetGuard>,
     pub concurrency_governor: Arc<ConcurrencyGovernor>,
     pub recall_truncator: Arc<RecallTruncator>,
@@ -59,15 +50,12 @@ impl McpServer {
         let _deletion_key = deletion_proof_key_from_env().ok();
 
         let injection_guard = Arc::new(PromptInjectionGuard::from_env());
-        let egress_classifier: Arc<dyn EgressClassifier> =
-            Arc::new(DefaultEgressClassifier::default());
         let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
             server.db.license_gate(),
         )));
 
         Ok(server
             .with_injection_guard(injection_guard)
-            .with_egress_classifier(egress_classifier)
             .with_plugin_registry(plugin_registry))
     }
 
@@ -94,9 +82,6 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         sandbox: Arc<McpSandbox>,
     ) -> Self {
-        #[cfg(feature = "kv-bridge")]
-        let kv_bridge = setup_kv_bridge(&db);
-
         let clock = Arc::new(SystemClock::new());
         let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
             db.license_gate(),
@@ -106,44 +91,15 @@ impl McpServer {
             embedder,
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
-            egress_classifier: Arc::new(DefaultEgressClassifier::default()),
-            egress_guard: None,
-            routing: None,
             plugin_registry,
-            #[cfg(feature = "kv-bridge")]
-            kv_bridge,
             forget_guard: Arc::new(ForgetGuard::new(10, clock)),
             concurrency_governor: Arc::new(ConcurrencyGovernor::new(8)),
             recall_truncator: Arc::new(RecallTruncator::new(4000)),
         }
     }
 
-    #[cfg(feature = "kv-bridge")]
-    pub fn with_kv_bridge(
-        mut self,
-        kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
-    ) -> Self {
-        self.kv_bridge = kv_bridge;
-        self
-    }
-
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {
         self.injection_guard = injection_guard;
-        self
-    }
-
-    pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
-        self.egress_classifier = classifier;
-        self
-    }
-
-    pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self {
-        self.egress_guard = Some(guard);
-        self
-    }
-
-    pub fn with_routing(mut self, routing: Option<Arc<RoutingHandle>>) -> Self {
-        self.routing = routing;
         self
     }
 

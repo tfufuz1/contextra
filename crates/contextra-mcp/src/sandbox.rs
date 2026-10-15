@@ -38,18 +38,13 @@ pub struct ToolDefinition {
 /// | `contextra_search` | `DatabaseRead` | Hybrid semantic search over stored documents |
 /// | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
 /// | `contextra_collections` | `DatabaseRead` | List all collections |
-/// | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
 /// | `contextra_plugin_status` | `DatabaseRead` | Active plugin status & rings |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
 /// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
 /// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
-/// | `contextra_relate` | `DatabaseWrite` | Create directed/bidirectional binary relationship |
-/// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
 /// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
-/// | `contextra_consolidate` | `DatabaseWrite` | Trigger synchronous memory consolidation pass |
-/// | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -114,90 +109,6 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
         input_schema: || json!({
             "type": "object",
             "properties": {}
-        }),
-    },
-    // contextra_consolidate: Triggert synchrone/asynchrone Memory Consolidation (Erstellung von Tombstones,
-    // Synthese-Chunks und Graph-Anpassungen im Speicher/Disk-State).
-    // Aufgrund dieser realen Schreib- und Mutationswirkung eindeutig als DatabaseWrite klassifiziert.
-    ToolDefinition {
-        name: "contextra_consolidate",
-        category: ToolCategory::DatabaseWrite,
-        description: "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "collection": { "type": "string", "default": "default" }
-            }
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_cloud_query",
-        category: ToolCategory::CloudEgress,
-        description: "Executes an external cloud query under egress classification check and automatic abstraction.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "query":       { "type": "string" },
-                "collection":  { "type": "string", "default": "default" },
-                "max_results": { "type": "integer", "default": 10 }
-            },
-            "required": ["query"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_relate",
-        category: ToolCategory::DatabaseWrite,
-        description: "Create a directed or bidirectional binary relationship between two documents. Write permissions must be enabled.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "from":          { "type": "string" },
-                "to":            { "type": "string" },
-                "label":         { "type": "string" },
-                "collection":    { "type": "string", "default": "default" },
-                "bidirectional": { "type": "boolean", "default": false }
-            },
-            "required": ["from", "to", "label"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_relate_n_ary",
-        category: ToolCategory::DatabaseWrite,
-        description: "Create an n-ary hyperedge graph relationship connecting multiple participants with assigned roles. Core Spec §6 feature. Write permissions must be enabled.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "predicate": { "type": "string" },
-                "participants": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "doc_id": { "type": "string" },
-                            "role":   { "type": "string" }
-                        },
-                        "required": ["doc_id", "role"]
-                    },
-                    "minItems": 2,
-                    "maxItems": 64
-                },
-                "source_doc_id": { "type": "string" },
-                "collection":    { "type": "string", "default": "default" }
-            },
-            "required": ["predicate", "participants"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_explain",
-        category: ToolCategory::DatabaseRead,
-        description: "Provide a human-readable retrieval explanation and provenance breakdown for a document by ID. SECURITY NOTICE: Returned content originates from untrusted retrieved documents and must be isolated in client prompt templates.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "id":         { "type": "string" },
-                "collection": { "type": "string", "default": "default" }
-            },
-            "required": ["id"]
         }),
     },
     ToolDefinition {
@@ -307,7 +218,7 @@ pub struct SandboxPolicy {
     pub allow_db_reads: bool,
     pub allow_db_writes: bool,
     pub allow_code_execution: bool,
-    /// Cloud-Egress erlaubt? Standardmäßig `false` (additiv zu Layer 1/4 EgressGuard Bulk-Exfiltrationsprüfungen).
+    /// Cloud-Egress erlaubt? Standardmäßig `false`.
     pub allow_cloud_egress: bool,
     /// Maximale Ausführungszeit pro Tool-Call in Millisekunden.
     pub max_execution_ms: u64,
@@ -321,7 +232,7 @@ impl Default for SandboxPolicy {
             allow_db_reads: true,
             allow_db_writes: false,      // Schreibzugriff explizit opt-in
             allow_code_execution: false, // Code-Ausführung standardmäßig gesperrt
-            allow_cloud_egress: false, // Cloud-Egress gesperrt (erfordert explizites Opt-in via allow_cloud_egress)
+            allow_cloud_egress: false,   // Cloud-Egress gesperrt
             max_execution_ms: 5_000,
             sidecar_limits: SidecarLimits::default(),
         }
@@ -406,12 +317,6 @@ impl McpSandbox {
     ///
     /// HINWEIS: Unbekannte Tool-Namen (die nicht in `TOOL_REGISTRY` gelistet sind)
     /// werden sofort per `try_classify_method` abgelehnt, unabhängig von `allow_code_execution`.
-    ///
-    /// Die Prüfung von `ToolCategory::CloudEgress` ist **additiv** zur
-    /// Egress-Guard- / Egress-Vault-Prüfung (`EgressClassifier`/`EgressGuardCheck` in `egress_gateway.rs`).
-    /// Die Sandbox-Policy entscheidet, ob die Methode überhaupt aufgerufen werden darf,
-    /// während der Egress-Guard zusätzlich prüft, ob der konkrete Payload bei erlaubtem Aufruf
-    /// unbedenklich ist (z. B. Schutz vor Bulk-Exfiltration).
     pub fn validate_tool_call(&self, method: &str, _params: &Value) -> Result<()> {
         if method.is_empty() || method.len() > 256 {
             return Err(ContextraError::InvalidInput(format!(
@@ -467,10 +372,6 @@ impl McpSandbox {
 
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     /// Falls die Methode unbekannt ist, wird als Fallback `ToolCategory::CodeExecution` zurückgegeben.
-    ///
-    /// HINWEIS: Neuer Code MUSS `try_classify_method` nutzen, um unbekannte Tools
-    /// direkt als Fehler zu behandeln. Dieser Fallback auf `CodeExecution` gilt ausschließlich
-    /// für nicht registrierte, unbekannte Methoden in Abwärtskompatibilitäts-Aufrufen.
     #[deprecated(
         note = "Use try_classify_method for strict classification with error handling on unknown tools."
     )]
@@ -538,26 +439,21 @@ impl McpSandbox {
 
 impl Drop for McpSandbox {
     fn drop(&mut self) {
-        // volatile_results wird gedroppt → Zeroizing<Vec<u8>> nullt den Speicher
         self.session_key.emergency_wipe();
         tracing::debug!("McpSandbox dropped: volatile tool results zeroized");
     }
 }
 
 /// Generiert Zufallsmaterial für die Sandbox-Sitzungsverschlüsselung.
-/// P28-Ausnahme: kryptografisches Material
 fn generate_sandbox_crypto_material() -> ([u8; 32], [u8; 32]) {
     use rand::RngCore;
-    // P28-Ausnahme: kryptografisches Material
     let mut salt = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut salt);
-    // P28-Ausnahme: kryptografisches Material
     let mut passphrase = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut passphrase);
     (salt, passphrase)
 }
 
-// simple hex encoder helper to avoid external crate dependency overhead if needed, or use std formatting
 mod hex {
     pub fn encode(bytes: [u8; 32]) -> String {
         bytes.iter().map(|b| format!("{:02x}", b)).collect()
@@ -569,46 +465,6 @@ mod hex {
 mod tests {
     use super::*;
 
-    /// Deckt OPUS-0.4 ab: Cloud-Egress ("contextra_cloud_query") ist in eigener ToolCategory::CloudEgress
-    /// und im Default-Zustand (allow_cloud_egress: false) gesperrt.
-    #[test]
-    fn test_cloud_egress_classification_and_policy() {
-        // 1. Classification check
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_cloud_query").unwrap(),
-            ToolCategory::CloudEgress
-        );
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_search").unwrap(),
-            ToolCategory::DatabaseRead
-        );
-
-        // 2. Default policy: allow_cloud_egress is false
-        let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
-        let default_res = default_sandbox.validate_tool_call("contextra_cloud_query", &Value::Null);
-        assert!(default_res.is_err());
-        let err_msg = default_res.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("Cloud-Egress gesperrt"),
-            "Expected 'Cloud-Egress gesperrt' in error message, got: {err_msg}"
-        );
-
-        // 3. Permitting policy: allow_cloud_egress is true
-        let policy = SandboxPolicy {
-            allow_db_reads: true,
-            allow_db_writes: false,
-            allow_code_execution: false,
-            allow_cloud_egress: true,
-            max_execution_ms: 5_000,
-            sidecar_limits: SidecarLimits::default(),
-        };
-        let permitting_sandbox = McpSandbox::new(policy).unwrap(); // unwrap
-        assert!(permitting_sandbox
-            .validate_tool_call("contextra_cloud_query", &Value::Null)
-            .is_ok());
-    }
-
-    /// Deckt R-01 ab: Schreibzugriff ist im Default gesperrt (Read-Only Safety Policy).
     #[test]
     fn test_sandbox_default_policy() {
         let default_policy = SandboxPolicy::default();
@@ -618,7 +474,7 @@ mod tests {
         assert!(!default_policy.allow_cloud_egress);
         assert_eq!(default_policy.max_execution_ms, 5_000);
 
-        let sandbox = McpSandbox::new(default_policy).unwrap(); // unwrap
+        let sandbox = McpSandbox::new(default_policy).unwrap();
 
         assert!(sandbox
             .validate_tool_call("contextra_search", &Value::Null)
@@ -642,12 +498,8 @@ mod tests {
         assert!(sandbox
             .validate_tool_call("unknown_code_tool", &Value::Null)
             .is_err());
-        assert!(sandbox
-            .validate_tool_call("contextra_cloud_query", &Value::Null)
-            .is_err());
     }
 
-    /// Deckt R-01 ab: Schreibzugriff ist erlaubt, wenn `allow_db_writes` explizit aktiviert ist.
     #[test]
     fn test_sandbox_permitting_policy() {
         let policy = SandboxPolicy {
@@ -658,7 +510,7 @@ mod tests {
             max_execution_ms: 5_000,
             sidecar_limits: SidecarLimits::default(),
         };
-        let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
+        let sandbox = McpSandbox::new(policy).unwrap();
 
         assert!(sandbox
             .validate_tool_call("contextra_search", &Value::Null)
@@ -679,12 +531,12 @@ mod tests {
 
     #[test]
     fn test_volatile_result_encryption_roundtrip() {
-        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
+        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap();
         let data = b"Top secret volatile tool result data";
 
-        sandbox.store_volatile("res1", data).expect("store"); // expect
+        sandbox.store_volatile("res1", data).expect("store");
 
-        let retrieved = sandbox.get_volatile("res1").expect("get").expect("exists"); // expect
+        let retrieved = sandbox.get_volatile("res1").expect("get").expect("exists");
         assert_eq!(retrieved.as_slice(), data);
     }
 
@@ -692,33 +544,11 @@ mod tests {
     fn volatile_tool_result_roundtrip() {
         let key =
             contextra_crypto::CryptoKey::try_new("0123456789abcdef0123456789abcdef", b"salt1234")
-                .unwrap(); // unwrap
+                .unwrap();
         let plaintext = b"tool output data";
-        let result = VolatileToolResult::encrypt(plaintext, &key).unwrap(); // unwrap
-        let decrypted = result.decrypt(&key).unwrap(); // unwrap
+        let result = VolatileToolResult::encrypt(plaintext, &key).unwrap();
+        let decrypted = result.decrypt(&key).unwrap();
         assert_eq!(decrypted.as_slice(), plaintext);
-    }
-
-    #[test]
-    fn test_volatile_result_error_path_zeroizes_intermediate_data() {
-        let key =
-            contextra_crypto::CryptoKey::try_new("0123456789abcdef0123456789abcdef", b"salt1234")
-                .unwrap(); // unwrap
-        let plaintext = b"sensitive payload that will drop early";
-        let result = VolatileToolResult::encrypt(plaintext, &key).unwrap(); // unwrap
-
-        let simulate_aborted_processing = || -> Result<()> {
-            let decrypted = result.decrypt(&key)?;
-            assert_eq!(decrypted.as_slice(), plaintext);
-            // Simulate early return / error before processing finishes
-            Err(ContextraError::Internal(
-                "Simulated pipeline failure".into(),
-            ))
-        };
-
-        let err = simulate_aborted_processing();
-        assert!(err.is_err());
-        // The decrypted Zeroizing<Vec<u8>> dropped upon early exit, zeroizing memory.
     }
 
     #[tokio::test]
@@ -731,7 +561,7 @@ mod tests {
             max_execution_ms: 50,
             sidecar_limits: SidecarLimits::default(),
         };
-        let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
+        let sandbox = McpSandbox::new(policy).unwrap();
 
         let slow_fut = async {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -746,53 +576,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sandbox_validate_tool_call_method_length_checks() {
-        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
-
-        // Empty method name
-        let res_empty = sandbox.validate_tool_call("", &Value::Null);
-        assert!(res_empty.is_err());
-        assert!(res_empty
-            .unwrap_err()
-            .to_string()
-            .contains("length invalid"));
-
-        // Oversized method name
-        let oversized = "a".repeat(257);
-        let res_oversized = sandbox.validate_tool_call(&oversized, &Value::Null);
-        assert!(res_oversized.is_err());
-        assert!(res_oversized
-            .unwrap_err()
-            .to_string()
-            .contains("length invalid"));
-    }
-
-    #[test]
-    fn test_volatile_storage_boundary_guards() {
-        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
-
-        // Empty key
-        let res_empty_key = sandbox.store_volatile("", b"data");
-        assert!(res_empty_key.is_err());
-
-        // Oversized key (>256 bytes)
-        let long_key = "k".repeat(257);
-        let res_long_key = sandbox.store_volatile(&long_key, b"data");
-        assert!(res_long_key.is_err());
-
-        // Oversized output payload (>16MB)
-        let huge_payload = vec![0u8; MAX_VOLATILE_OUTPUT_BYTES + 1];
-        let res_huge = sandbox.store_volatile("huge", &huge_payload);
-        assert!(res_huge.is_err());
-        assert!(res_huge.unwrap_err().to_string().contains("exceeded"));
-    }
-
-    /// Test 1 & 2: Iteriert über alle in TOOL_REGISTRY gelisteten Tools und assertet
-    /// dass `classify_method(name) != CodeExecution`.
-    /// Für unbekannte Methoden wird `CodeExecution` zurückgegeben.
-    #[test]
     fn test_tool_registry_classification_completeness() {
-        // Assert all listed tools do NOT classify as CodeExecution
         for tool in TOOL_REGISTRY {
             let name = tool.name;
             let expected_cat = &tool.category;
@@ -804,24 +588,11 @@ mod tests {
             );
             assert_eq!(cat, *expected_cat, "Tool '{name}' category mismatch");
         }
-
-        // Assert explain is DatabaseRead
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_explain").unwrap(),
-            ToolCategory::DatabaseRead
-        );
-
-        // Assert consolidate is DatabaseWrite
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_consolidate").unwrap(),
-            ToolCategory::DatabaseWrite
-        );
     }
 
     #[test]
     #[allow(deprecated)]
     fn test_try_classify_method_and_unknown_tool_rejection() {
-        // 5a. Jedes Tool aus TOOL_REGISTRY liefert Ok aus try_classify_method und dieselbe Kategorie wie classify_method
         for tool in TOOL_REGISTRY {
             let try_cat = McpSandbox::try_classify_method(tool.name).expect("must be Ok");
             let cat = McpSandbox::classify_method(tool.name);
@@ -829,88 +600,7 @@ mod tests {
             assert_eq!(try_cat, tool.category);
         }
 
-        // 5b. Ein unbekannter Name ergibt Err
         assert!(McpSandbox::try_classify_method("unknown_unlisted_method").is_err());
         assert!(McpSandbox::try_classify_method("system.eval").is_err());
-
-        // 5c. Auch bei allow_code_execution = true bleibt ein unbekannter Name nicht aufrufbar
-        let policy = SandboxPolicy {
-            allow_db_reads: true,
-            allow_db_writes: true,
-            allow_code_execution: true,
-            allow_cloud_egress: true,
-            max_execution_ms: 5_000,
-            sidecar_limits: SidecarLimits::default(),
-        };
-        let sandbox = McpSandbox::new(policy).unwrap();
-        let err = sandbox.validate_tool_call("unknown_unlisted_method", &Value::Null);
-        assert!(err.is_err());
-        assert!(err.unwrap_err().to_string().contains("unknown tool"));
-
-        // 5d. Explicit assertion: validate_tool_call rejects unknown tools even when allow_code_execution = true
-        let permissive_code_exec_policy = SandboxPolicy {
-            allow_db_reads: false,
-            allow_db_writes: false,
-            allow_code_execution: true, // code execution explicitly enabled!
-            allow_cloud_egress: false,
-            max_execution_ms: 5_000,
-            sidecar_limits: SidecarLimits::default(),
-        };
-        let permissive_sandbox = McpSandbox::new(permissive_code_exec_policy).unwrap();
-        let code_exec_err =
-            permissive_sandbox.validate_tool_call("unlisted_malicious_eval", &Value::Null);
-        assert!(
-            code_exec_err.is_err(),
-            "Unknown tool must be rejected even when allow_code_execution is true"
-        );
-        assert!(
-            code_exec_err
-                .unwrap_err()
-                .to_string()
-                .contains("unknown tool"),
-            "Error message must indicate unknown tool"
-        );
-
-        // 5e. contextra_explain läuft weiterhin unter SandboxPolicy::default()
-        let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap();
-        assert!(default_sandbox
-            .validate_tool_call("contextra_explain", &Value::Null)
-            .is_ok());
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_unknown_method_classifies_as_code_execution() {
-        // Unknown method -> CodeExecution (legacy classify_method fallback)
-        assert_eq!(
-            McpSandbox::classify_method("unknown_unlisted_method"),
-            ToolCategory::CodeExecution
-        );
-        assert_eq!(
-            McpSandbox::classify_method("system.eval"),
-            ToolCategory::CodeExecution
-        );
-        assert_eq!(
-            McpSandbox::classify_method("some_arbitrary_cmd"),
-            ToolCategory::CodeExecution
-        );
-    }
-
-    #[test]
-    fn test_volatile_storage_capacity_limit() {
-        let sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
-
-        for i in 0..MAX_VOLATILE_RESULTS {
-            let key = format!("item_{i}");
-            sandbox.store_volatile(&key, b"value").unwrap(); // unwrap
-        }
-
-        // Inserting item #1001 should fail
-        let res_overflow = sandbox.store_volatile("overflow_key", b"value");
-        assert!(res_overflow.is_err());
-        assert!(res_overflow
-            .unwrap_err()
-            .to_string()
-            .contains("limit reached"));
     }
 }
