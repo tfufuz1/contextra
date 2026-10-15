@@ -3,7 +3,7 @@
 use contextra_checkpoint::{
     CheckpointRegistry, InstanceOrphanRegistry, OrphanRegistry, PersistentCheckpointStore,
 };
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
