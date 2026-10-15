@@ -6,7 +6,7 @@ use crate::dispatch::{
     euclidean_distance_with_features, CpuFeatures,
 };
 use crate::kernels::scalar::CosineSimilarityPartsU8;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 /// Wiring container for SIMD distance kernels and runtime feature dispatch.
 #[derive(Debug, Clone)]
