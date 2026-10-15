@@ -318,6 +318,17 @@ pub enum PurgeError {
         /// Error detail string.
         source_details: String,
     },
+    /// Write error during SSTable segment or temporary file writing.
+    #[error("Write error at file {file}: {source_details}")]
+    WriteError {
+        /// Target file path.
+        file: String,
+        /// Error detail string.
+        source_details: String,
+    },
+    /// Background compaction lease is currently busy.
+    #[error("Compaction busy")]
+    CompactionBusy,
     /// I/O error wrapper.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
