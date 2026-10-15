@@ -8,7 +8,7 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
 use crate::restore_filter::CpyRestoreFilter;
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
@@ -152,6 +152,17 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     Ok(())
 }
 
+#[derive(Debug, Default)]
+struct DefaultCheckpointIdGenerator {
+    next: AtomicU64,
+}
+
+impl contextra_ports::IdGenerator for DefaultCheckpointIdGenerator {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
 /// Registry für gespeicherte Checkpoints mit Thread-sicherem Zustand.
 ///
 /// # Invarianten
@@ -279,7 +290,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
         let clock = orphan_registry.clock().clone();
         let id_generator: Arc<dyn contextra_ports::IdGenerator> =
-            Arc::new(contextra_ports::SystemIdGenerator::new());
+            Arc::new(DefaultCheckpointIdGenerator::default());
 
         Ok(Self {
             storage,
@@ -422,10 +433,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Setzt den ID-Generator für den `PersistentCheckpointStore`.
-    pub fn with_id_generator(
-        mut self,
-        id_gen: Arc<dyn contextra_ports::IdGenerator>,
-    ) -> Self {
+    pub fn with_id_generator(mut self, id_gen: Arc<dyn contextra_ports::IdGenerator>) -> Self {
         self.id_generator = id_gen;
         self
     }
@@ -464,7 +472,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
             // Zeroize stored payload before unlinking
             let dummy_payload = vec![0u8; 128];
-            if let Ok(()) = self.storage.put(unique_tx, key.as_bytes(), &dummy_payload).await {
+            if let Ok(()) = self
+                .storage
+                .put(unique_tx, key.as_bytes(), &dummy_payload)
+                .await
+            {
                 let _ = self.storage.commit(unique_tx).await;
             }
 
@@ -479,10 +491,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
 
             if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
-                tracing::warn!(
-                    seq = checkpoint.seq_no,
-                    "Unpin after scrub failed: {e}"
-                );
+                tracing::warn!(seq = checkpoint.seq_no, "Unpin after scrub failed: {e}");
             }
 
             self.index.write().remove_by_name(&checkpoint.name);

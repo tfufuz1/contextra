@@ -590,25 +590,11 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
- "contextra-adapt",
- "contextra-agent",
- "contextra-cognition",
  "contextra-core",
- "contextra-crypto",
  "contextra-db",
  "contextra-engine",
- "contextra-graph",
- "contextra-infer-candle",
- "contextra-infer-ollama",
- "contextra-infer-onnx",
- "contextra-license",
  "contextra-ports",
- "contextra-privacy",
- "contextra-rank",
- "contextra-router",
- "contextra-sandbox",
  "contextra-store",
- "contextra-text",
  "contextra-types",
  "rand 0.8.8",
  "serde",
@@ -718,7 +704,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-core",
+ "contextra-mvcc",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
@@ -1025,16 +1011,8 @@ name = "contextra-mcp"
 version = "0.1.0"
 dependencies = [
  "contextra",
- "contextra-adapt",
- "contextra-agent",
  "contextra-crypto",
- "contextra-infer-candle",
- "contextra-infer-ollama",
- "contextra-infer-onnx",
- "contextra-license",
  "contextra-ports",
- "contextra-privacy",
- "contextra-rank",
  "contextra-types",
  "contextra-wire",
  "futures-util",
@@ -1136,7 +1114,6 @@ name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "contextra-adapt",
  "contextra-ports",
  "contextra-types",
  "proptest",
@@ -1212,7 +1189,6 @@ dependencies = [
  "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
- "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
