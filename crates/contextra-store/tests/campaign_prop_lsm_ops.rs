@@ -2,7 +2,8 @@
 //! Validates stateful LSM operations (`put`, `delete`, `put_batch`, `delete_prefix`, `get`, `get_at_seq`, `scan_prefix`, `scan_range`, `commit`, `rollback`, close/reopen)
 //! against an independent `BTreeMap`-based reference model tracking active transactions, MVCC versions, and committed history.
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;

@@ -64,7 +64,7 @@ struct DummyAdaptivePlanner;
 impl AdaptiveCompactionPlanner for DummyAdaptivePlanner {
     fn plan_compaction(
         &self,
-        _stats: &contextra_core::StorageStats,
+        _stats: &contextra_ports::StorageStats,
         _metrics: &WorkloadMetricsSnapshot,
         _sstables: &[Arc<contextra_store::sstable::SstableReader>],
         _min_active_seqno: u64,

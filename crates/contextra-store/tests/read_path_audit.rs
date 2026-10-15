@@ -1,5 +1,6 @@
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId, TOMBSTONE_BIT};
+use contextra_types::{TOMBSTONE_BIT, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::memtable::MemTable;
 use contextra_store::{LsmConfig, LsmStorage};
 use std::collections::BTreeMap;

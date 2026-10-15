@@ -1,4 +1,5 @@
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_types::{ContextraError, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_store::wal::Wal;

@@ -2,7 +2,8 @@
 // STAND: 2026-10-12
 // ZWECK: Tests für präzise Scope-Fences (ErasureFence) und Invarianten.
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::fence::{ErasureFence, FenceError};
 use contextra_store::{LsmConfig, LsmStorage};
 use tempfile::tempdir;

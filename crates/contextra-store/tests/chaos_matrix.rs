@@ -4,7 +4,8 @@
 //! Evaluates store durability, crash recovery, and non-corruption invariants under combined
 //! fault injection (task cancellation, memory pressure, bit-flips, crash cycles).
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_types::{ContextraError, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

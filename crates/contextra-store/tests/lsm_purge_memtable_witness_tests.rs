@@ -1,11 +1,12 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::witness::MemScopeSpec;
 use contextra_store::lsm::LsmStorage;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_memtable_residue_scanning() -> contextra_core::Result<()> {
+async fn test_memtable_residue_scanning() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

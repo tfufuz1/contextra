@@ -1,4 +1,5 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::PurgeOrchestrator;
@@ -17,7 +18,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_orchestrator_execution() -> contextra_core::Result<()> {
+async fn test_purge_orchestrator_execution() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

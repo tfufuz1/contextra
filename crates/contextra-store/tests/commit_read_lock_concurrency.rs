@@ -1,4 +1,5 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::Arc;
 use tempfile::TempDir;

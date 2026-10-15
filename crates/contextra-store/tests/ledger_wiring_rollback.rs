@@ -1,6 +1,7 @@
 //! Integration test for crash scenario between ledger_append and Tombstone commit.
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_types::{ContextraError, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::erasure_ledger::{
     compute_keyed_hash, LedgerEntry, LedgerEntryKind, LedgerKey,
 };

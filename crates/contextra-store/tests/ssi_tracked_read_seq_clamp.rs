@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::{ContextraError, TxId};
+use contextra_types::{ContextraError, TxId};
 use contextra_ports::StorageEngine;
 use contextra_store::{LsmConfig, LsmStorage};
 use std::sync::Arc;

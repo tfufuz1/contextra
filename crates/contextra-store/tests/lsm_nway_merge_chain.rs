@@ -1,7 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use bytes::Bytes;
-use contextra_core::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
+use contextra_types::Result;
+use contextra_ports::{ResourceBudget, ResourceTracker};
+use contextra_mvcc::SnapshotRegistry;
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_store::wal::KeyManager;
@@ -43,7 +45,7 @@ impl MergeOperator for ErrorOnSecondMergeOperator {
         let s1 = std::str::from_utf8(existing_val).unwrap_or("");
         let s2 = std::str::from_utf8(new_val).unwrap_or("");
         if s1.contains('b') || s2.contains('b') {
-            Err(contextra_core::ContextraError::Internal(
+            Err(contextra_types::ContextraError::Internal(
                 "Forced merge error on 'b'".into(),
             ))
         } else {
@@ -234,7 +236,7 @@ async fn test_nway_merge_tombstone_in_middle() {
     let path2 = dir.path().join("sst2.sst");
     let mut builder2 = SstableBuilder::create(&path2).await.unwrap();
     builder2
-        .add(b"key_tomb", &[], 2 | contextra_core::TOMBSTONE_BIT, 2)
+        .add(b"key_tomb", &[], 2 | contextra_types::TOMBSTONE_BIT, 2)
         .await
         .unwrap();
     builder2.finish().await.unwrap();

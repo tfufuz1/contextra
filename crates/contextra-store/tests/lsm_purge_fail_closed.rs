@@ -1,4 +1,5 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -33,7 +34,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_core::Result<()> {
+async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -62,7 +63,7 @@ async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_core::
 }
 
 #[tokio::test]
-async fn test_purge_keys_active_snapshot_precedence() -> contextra_core::Result<()> {
+async fn test_purge_keys_active_snapshot_precedence() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -89,7 +90,7 @@ async fn test_purge_keys_active_snapshot_precedence() -> contextra_core::Result<
 }
 
 #[tokio::test]
-async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_core::Result<()> {
+async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

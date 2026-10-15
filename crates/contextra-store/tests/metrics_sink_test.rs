@@ -1,4 +1,5 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::system_pressure::{

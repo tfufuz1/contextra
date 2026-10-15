@@ -4,7 +4,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

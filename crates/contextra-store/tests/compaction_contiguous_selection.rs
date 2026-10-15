@@ -3,7 +3,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId};
+use contextra_types::TxId;
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::adaptive::{CostBasedAdaptivePlanner, WorkloadMetricsSnapshot};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::{LsmConfig, LsmStorage};
@@ -82,7 +83,7 @@ async fn test_compaction_candidate_selection_is_contiguous() {
     // Test CostBasedAdaptivePlanner plan_compaction
     let planner = CostBasedAdaptivePlanner::new(0.70, 4, 4.0);
     use contextra_store::AdaptiveCompactionPlanner;
-    let stats = contextra_core::StorageStats {
+    let stats = contextra_ports::StorageStats {
         num_segments: sstables_guard.len(),
         total_size_bytes: sstables_guard.iter().map(|s| s.metadata().file_size).sum(),
         memtable_size_bytes: 0,
