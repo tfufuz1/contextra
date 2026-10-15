@@ -5,7 +5,7 @@
 #![allow(unsafe_code)]
 
 use crate::kernels::*;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 /// Opaque CPU feature token required to execute SIMD kernels.
 /// Private constructor enforces that instances can only be instantiated via [`CpuFeatures::detect`].
