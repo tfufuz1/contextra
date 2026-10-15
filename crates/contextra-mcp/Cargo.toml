@@ -14,7 +14,7 @@ default = []
 test-utils = []
 
 [dependencies]
-contextra = { workspace = true, default-features = false, features = ["encryption-at-rest"] }
+contextra = { workspace = true, features = ["encryption-at-rest"] }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true, features = ["test-utils"] }
 contextra-wire = { workspace = true }
