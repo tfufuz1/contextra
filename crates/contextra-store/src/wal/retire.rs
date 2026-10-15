@@ -8,7 +8,7 @@
 #![cfg(not(loom))]
 
 use contextra_types::{ContextraError, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{classify_wal_filename, Wal, WalFileType};
 
@@ -21,8 +21,44 @@ pub struct WalRetireReport {
     pub bytes_removed: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct WalDirEntry {
+    pub path: PathBuf,
+    pub is_dir: bool,
+}
+
+pub trait WalDirStream {
+    fn next_entry(&mut self) -> impl std::future::Future<Output = Result<Option<WalDirEntry>>> + Send;
+}
+
+pub struct TokioReadDirStream {
+    inner: tokio::fs::ReadDir,
+}
+
+impl TokioReadDirStream {
+    pub fn new(read_dir: tokio::fs::ReadDir) -> Self {
+        Self { inner: read_dir }
+    }
+}
+
+impl WalDirStream for TokioReadDirStream {
+    async fn next_entry(&mut self) -> Result<Option<WalDirEntry>> {
+        match self.inner.next_entry().await {
+            Ok(Some(entry)) => {
+                let file_type = entry.file_type().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
+                Ok(Some(WalDirEntry {
+                    path: entry.path(),
+                    is_dir: file_type.is_dir(),
+                }))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(ContextraError::Io(e)),
+        }
+    }
+}
+
 pub async fn retire_segments_up_to(wal_dir: &Path, checkpoint_tx: u64) -> Result<WalRetireReport> {
-    let mut entries = match tokio::fs::read_dir(wal_dir).await {
+    let entries = match tokio::fs::read_dir(wal_dir).await {
         Ok(e) => e,
         Err(err) => {
             return Err(ContextraError::Storage(format!(
@@ -32,30 +68,42 @@ pub async fn retire_segments_up_to(wal_dir: &Path, checkpoint_tx: u64) -> Result
             )));
         }
     };
+    retire_segments_with_stream(TokioReadDirStream::new(entries), checkpoint_tx).await
+}
 
+pub async fn retire_segments_with_stream<S: WalDirStream>(
+    mut stream: S,
+    checkpoint_tx: u64,
+) -> Result<WalRetireReport> {
     let mut report = WalRetireReport::default();
     let mut candidates = Vec::new();
 
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let path = entry.path();
-        if path.is_dir() {
-            continue;
-        }
+    loop {
+        match stream.next_entry().await {
+            Ok(Some(entry)) => {
+                let path = entry.path;
+                if entry.is_dir {
+                    continue;
+                }
 
-        let filename = match path.file_name().and_then(|f| f.to_str()) {
-            Some(f) => f,
-            None => continue,
-        };
+                let filename = match path.file_name().and_then(|f| f.to_str()) {
+                    Some(f) => f,
+                    None => continue,
+                };
 
-        let file_type = classify_wal_filename(filename);
-        match file_type {
-            WalFileType::Active
-            | WalFileType::Sealed
-            | WalFileType::Archived
-            | WalFileType::Backup => {
-                candidates.push((path, file_type));
+                let file_type = classify_wal_filename(filename);
+                match file_type {
+                    WalFileType::Active
+                    | WalFileType::Sealed
+                    | WalFileType::Archived
+                    | WalFileType::Backup => {
+                        candidates.push((path, file_type));
+                    }
+                    WalFileType::Sidecar | WalFileType::Unclassified => {}
+                }
             }
-            WalFileType::Sidecar | WalFileType::Unclassified => {}
+            Ok(None) => break,
+            Err(err) => return Err(err),
         }
     }
 
