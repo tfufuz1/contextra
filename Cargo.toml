@@ -1,78 +1,50 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/contextra-wire",
-    "crates/contextra-sys",
-    "crates/contextra-durable-fs",
-    "crates/contextra-simd",
-    "crates/contextra-core",
-    "crates/contextra-store",
-    "crates/contextra-vector",
-    "crates/contextra-db",
-    "crates/contextra-text",
-    "crates/contextra-checkpoint",
-    "crates/contextra-crypto",
-    "crates/contextra-privacy",
-    "crates/contextra-graph",
-    "crates/contextra-infer-onnx",
-    "crates/contextra-mcp",
-    "crates/contextra-agent",
-    "crates/contextra-infer-ollama",
-    "crates/contextra-router",
-    "benchmarks/contextra-bench",
-    "crates/contextra-infer-candle",
-    "crates/contextra-sandbox",
-    "crates/contextra-py",
-    "crates/contextra-testkit",
-    "crates/contextra",
     "crates/contextra-types",
     "crates/contextra-ports",
+    "crates/contextra-sys",
+    "crates/contextra-wire",
+    "crates/contextra-simd",
+    "crates/contextra-durable-fs",
+    "crates/contextra-crypto",
     "crates/contextra-mvcc",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
-    "crates/contextra-engine",
-    "crates/contextra-cognition",
+    "crates/contextra-text",
     "crates/contextra-rank",
-    "crates/contextra-audit-export",
-    "crates/contextra-avv-generator",
-    "crates/contextra-license",
+    "crates/contextra-store",
+    "crates/contextra-vector",
+    "crates/contextra-checkpoint",
+    "crates/contextra-engine",
+    "crates/contextra-db",
+    "crates/contextra",
+    "crates/contextra-mcp",
+    "crates/contextra-testkit",
+    "benchmarks/contextra-bench",
     "xtask",
     "xtask-heavy",
 ]
-# Excluded from default-members per Spezifikation Section 0.5 / A.3 ("Pure Rust, kein Server"):
-# - contextra-sandbox: WASM boundary (opt-in sandbox)
-# - contextra-py: PyO3/NumPy FFI bindings
-# - contextra-infer-ollama: External process provider dependency
-# - contextra-infer-onnx: Native ONNX runtime C-library dependency
-# - contextra-agent: Persistent agent workflow engine (experimental)
-# - contextra-router: Multi-candidate search routing engine (experimental)
-# - contextra-adapt: Model adaptation and PID latency controller (experimental)
-# - contextra-cognition: Background sleep cycle consolidation (experimental)
-# - contextra-kvcache: Tiered KV-cache storage (experimental)
-# - contextra-infer-candle: Native Candle LLM provider (experimental)
-# These crates remain in `members` and can be built explicitly via `cargo build -p <crate>`.
 default-members = [
-    "crates/contextra-wire",
-    "crates/contextra-sys",
-    "crates/contextra-durable-fs",
-    "crates/contextra-simd",
-    "crates/contextra-core",
-    "crates/contextra-store",
-    "crates/contextra-vector",
-    "crates/contextra-db",
-    "crates/contextra-text",
-    "crates/contextra-checkpoint",
-    "crates/contextra-crypto",
-    "crates/contextra-privacy",
-    "crates/contextra-graph",
-    "crates/contextra-mcp",
-    "crates/contextra-testkit",
-    "crates/contextra",
     "crates/contextra-types",
     "crates/contextra-ports",
+    "crates/contextra-sys",
+    "crates/contextra-wire",
+    "crates/contextra-simd",
+    "crates/contextra-durable-fs",
+    "crates/contextra-crypto",
     "crates/contextra-mvcc",
-    "crates/contextra-engine",
+    "crates/contextra-text",
     "crates/contextra-rank",
+    "crates/contextra-store",
+    "crates/contextra-vector",
+    "crates/contextra-checkpoint",
+    "crates/contextra-engine",
+    "crates/contextra-db",
+    "crates/contextra",
+    "crates/contextra-mcp",
+    "crates/contextra-testkit",
+    "benchmarks/contextra-bench",
+    "xtask",
+    "xtask-heavy",
 ]
 
 [workspace.package]
@@ -123,7 +95,6 @@ contextra-wire = { path = "crates/contextra-wire" }
 contextra-sys = { path = "crates/contextra-sys" }
 contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 contextra-simd = { path = "crates/contextra-simd" }
-contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
@@ -131,32 +102,14 @@ contextra-db = { path = "crates/contextra-db" }
 contextra-text = { path = "crates/contextra-text" }
 contextra-checkpoint = { path = "crates/contextra-checkpoint" }
 contextra-crypto = { path = "crates/contextra-crypto" }
-contextra-privacy = { path = "crates/contextra-privacy" }
-contextra-graph = { path = "crates/contextra-graph" }
-contextra-infer-onnx = { path = "crates/contextra-infer-onnx" }
-contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" } # <!-- crate-ref-ignore -->
 contextra-mcp   = { path = "crates/contextra-mcp" }
-contextra-agent = { path = "crates/contextra-agent" }
-contextra-infer-ollama = { path = "crates/contextra-infer-ollama" }
-contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" } # <!-- crate-ref-ignore -->
-contextra-router = { path = "crates/contextra-router" }
-contextra-infer-candle = { path = "crates/contextra-infer-candle" }
-contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" } # <!-- crate-ref-ignore -->
-contextra-sandbox = { path = "crates/contextra-sandbox" }
-contextra-py = { path = "crates/contextra-py" }
 contextra-testkit = { path = "crates/contextra-testkit" }
 contextra = { path = "crates/contextra" }
 contextra-types = { path = "crates/contextra-types" }
 contextra-ports = { path = "crates/contextra-ports" }
 contextra-mvcc = { path = "crates/contextra-mvcc" }
-contextra-adapt = { path = "crates/contextra-adapt" }
-contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-engine = { path = "crates/contextra-engine" }
-contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
-contextra-audit-export = { path = "crates/contextra-audit-export" }
-contextra-avv-generator = { path = "crates/contextra-avv-generator" }
-contextra-license = { path = "crates/contextra-license" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
