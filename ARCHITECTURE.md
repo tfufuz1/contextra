@@ -1,12 +1,12 @@
 # Contextra Memory Engine — Systemarchitektur & Ring-Modell
 
-Dieses Dokument ist die maßgebliche technische Architekturbeschreibung der Contextra Memory Engine. Es übersetzt die normative Gesamtspezifikation (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`) in eine vertiefte Systembeschreibung, dokumentiert den Crate-Bestand (17 EP1 Kern-Crates, LAB-Crates separat, geparkte Module via `park/<ID>/v1` Tags), das Ring-0–4-Modell, die Single-Node Ein-Prozess-Garantie (`cargo add contextra`) und die Layering-Invarianten.
+Dieses Dokument ist die maßgebliche technische Architekturbeschreibung der Contextra Memory Engine. Es übersetzt die normative Gesamtspezifikation (`docs/spec/GESAMTSPEZIFIKATION-v4.md`) in eine vertiefte Systembeschreibung, dokumentiert den aktiven EP1 Crate-Bestand (17 Kern-Crates, LAB-Crates separat), das Ring-0–4-Modell, die Single-Node Ein-Prozess-Garantie (`cargo add contextra`), die Layering-Invarianten und das Inferenz-Modell (Inferenz-Ports über `contextra-ports`).
 
 ---
 
 ## Inhaltsverzeichnis
 1. [Ring-Modell (Ring 0–4) & Layering-Invarianten](#1-ring-modell)
-2. [Crate-Inventar (Ist-Zustand)](#2-crate-inventar)
+2. [Crate-Inventar (Ist-Zustand nach W3-01)](#2-crate-inventar)
 3. [Abhängigkeitsdiagramm](#3-abhaengigkeitsdiagramm)
 4. [Bekannte Abweichungen IST vs. SOLL](#4-bekannte-abweichungen-ist-vs-soll)
 5. [Unsafe-Inseln, Invarianten & Locking-Disziplin](#5-unsafe-inseln-invarianten--locking-disziplin)
@@ -19,100 +19,72 @@ Dieses Dokument ist die maßgebliche technische Architekturbeschreibung der Cont
 
 Contextra gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4). Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen. Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten.
 
-### 1.1 Definition der Ringe
+### 1.1 Definition der Ringe (EP1 Umfang)
 
 * **Ring 0 — Foundation & Pure Numerics / Types**:
-  Enthält kerneigenen Datenstrukturen, Typdefinitionen, Traits, Kryptographie, Mathematik, Vektor- und Graph-Primitive. Ring 0 enthält **kein `tokio`** (Grundsatz *Sync-Kern, async-Schale*, P26).
+  Enthält kerneigenen Datenstrukturen, Typdefinitionen, Port-Traits, Kryptographie, System- und Durability-Abstraktionen, SIMD-Distanzberechnungen sowie BM25-Textsuche und 4-Signal-Fusion-Primitive. Ring 0 enthält **kein `tokio`** (Grundsatz *Sync-Kern, async-Schale*, P26).
+  *Crates:* `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-wire`, `contextra-simd`, `contextra-durable-fs`, `contextra-crypto`, `contextra-mvcc`, `contextra-text`, `contextra-rank`.
 * **Ring 1 — Persistence & Cache**:
-  Enthält Persistenz-Engines (LSM-Tree, WAL, Block-Cache, KV-Cache-Segmentdateien) und Time-Travel-Registries. Async-I/O ist an den Grenzen erlaubt.
+  Enthält Persistenz-Engines (LSM-Tree, WAL, Block-Cache, HNSW-Vektorindex, Checkpoint-Verwaltung). Async-I/O ist an den Grenzen erlaubt.
+  *Crates:* `contextra-store`, `contextra-vector`, `contextra-checkpoint`.
 * **Ring 2 — External Adapters & Sandboxing (Leaf Engines)**:
-  Isoliert externe Adapter (geparkt unter `park/EP4/v1` / `park/EP6/v1`).
-* **Ring 3 — Orchestration & Cognition**:
-  Enthält die Geschäfts- und Orchestrierungslogik (Transaktions-Management, Collection-Engine, Synthese).
+  Plattform- und Sandbox-Adapter. In EP1 sind keine externen Inferenz- oder WASM-Schwergewichte im Kern enthalten (externe Adapter gesichert im Tag `park/EP4/v1`).
+* **Ring 3 — Orchestration & Memory**:
+  Enthält die Geschäfts- und Orchestrierungslogik (Transaktions-Management, Collection-Engine, Synthese, embedded Hybrid-Search).
+  *Crates:* `contextra-engine`, `contextra-db`.
 * **Ring 4 — Boundary & Composition Roots**:
   Öffentliche Fassade (`contextra`) und MCP-Server (`contextra-mcp`). Bildet die einzige Composition Root.
+  *Crates:* `contextra`, `contextra-mcp`.
 
 ### 1.2 Verbot von Aufwärtskanten (DAG-Integrität, P5)
 
 Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 
-**Konkretes Negativ-Beispiel für eine verbotene Aufwärtskante:**
-In einer früheren Version hing das Datenbank-Crate `contextra-db` (damals Layer 2 / Ring 3) direkt von Inferenz-Adaptern (Tag `park/EP4/v1`) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
-Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn EmbeddingProvider>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
-
-### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
-
-Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
-
-1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
-   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
-2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
-   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
-
-**Vorrangordnung (Precedence):**
-`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
-
-*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
-
-**Deployment-Tier Defaults & Spec D.6 Status:**
-- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
-- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
+Die Engine erhält Inferenz-Provider über Trait-Objekte (`Arc<dyn EmbeddingProvider>`) aus `contextra-ports` (Ring 0). Konkrete Entkopplung stellt sicher, dass keine Kern-Engine von geparkten Inferenz-Adaptern abhängt.
 
 ---
 
 <!-- BEGIN GENERATED -->
-## 2. Crate-Inventar (Ist-Zustand post-W3-01)
+## 2. Crate-Inventar (Ist-Zustand nach W3-01)
+
+Nach Abschluss der Entkopplung (W3-01) besteht der aktive Workspace aus **17 EP1 Kern-Crates** (Ring 0–4) sowie **4 LAB-Crates** (Testkit, Benchmarks, build tooling):
 
 ### 2.1 EP1 Kern-Crates (17 Crates)
 
-Die folgende Tabelle führt die 17 im EP1-Umfang verbliebenen Kern-Crates auf, eingeordnet in das Ring-Modell:
-
 | Crate-Name | Ring | Verantwortlichkeit |
 |---|---|---|
-| `contextra-types` | Ring 0 | Kanonische Domänentypen, IDs, Budgets, Filter und Fehlertypen für Contextra |
-| `contextra-ports` | Ring 0 | Kanonische dyn-kompatible Port-Traits für Contextra-Subsysteme |
-| `contextra-sys` | Ring 0 | Low-level OS-Abstraktionen und FFI-Insel für Contextra (Unsafe-Insel) |
-| `contextra-wire` | Ring 0 | Auto-generierter FlatBuffers IPC-Code und Zero-Copy-Adapter für Contextra (Unsafe-Insel) |
-| `contextra-simd` | Ring 0 | SIMD-Vektordistanzberechnungskerne und Laufzeit-Dispatch für Contextra (Unsafe-Insel) |
-| `contextra-durable-fs` | Ring 0 | Dauerhafte Dateisystemoperationen und synchrone Disksynchronisation für Contextra |
-| `contextra-crypto` | Ring 0 | Verschlüsselung at Rest und kryptografische Hilfsfunktionen für Contextra |
-| `contextra-mvcc` | Ring 0 | Multi-Version Concurrency Control (MVCC), Sequenzlog und Transaktionspuffer für Contextra |
-| `contextra-text` | Ring 0 | Textverarbeitung und BM25-Suche für Hybridsuche |
-| `contextra-rank` | Ring 0 | 4-Signal-Fusion, kalibrierte Fusion und Drifterkennung |
-| `contextra-store` | Ring 1 | LSM-Tree Storage-Engine für Contextra |
-| `contextra-vector` | Ring 1 | HNSW Vektorindex mit SIMD-Distanzberechnung für Contextra |
-| `contextra-checkpoint` | Ring 1 | Backup- und Snapshot-Verwaltung für Contextra Speicher |
-| `contextra-engine` | Ring 3 | Kernspeicher-, Index- und Transaktionsorchestrator-Engine für Contextra |
-| `contextra-db` | Ring 3 | Embedded Hybrid-Search Fassade für AI Agenten |
-| `contextra` | Ring 4 | Embedded Hybrid-Search Einbettungsfassade für AI Agenten |
-| `contextra-mcp` | Ring 4 | Model Context Protocol (MCP) Server Gateway für Contextra |
+| `contextra-crypto` | Ring 0 | Encryption at Rest, Deletion Proof V4 and cryptographic primitives for Contextra |
+| `contextra-durable-fs` | Ring 0 | Durable filesystem operations and synchronous disk flushing for Contextra |
+| `contextra-mvcc` | Ring 0 | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra |
+| `contextra-ports` | Ring 0 | Canonical dyn-compatible port traits for Contextra subsystems |
+| `contextra-rank` | Ring 0 | 4-Signal Fusion and Isotonic & Platt Calibration primitives for Contextra |
+| `contextra-simd` | Ring 0 | Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island) |
+| `contextra-sys` | Ring 0 | Low-level unsafe system abstractions and FFI island for Contextra (Ring 0) |
+| `contextra-text` | Ring 0 | Contextra — Text processing and BM25 search for Hybrid Search |
+| `contextra-types` | Ring 0 | Canonical domain types, IDs, budgets, filters, and error types for Contextra |
+| `contextra-wire` | Ring 0 | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for Contextra |
+| `contextra-checkpoint` | Ring 1 | Backup and snapshot management for Contextra storage |
+| `contextra-store` | Ring 1 | LSM-Tree storage engine for Contextra |
+| `contextra-vector` | Ring 1 | HNSW vector index with SIMD distance computation for Contextra |
+| `contextra-db` | Ring 3 | Contextra — Embedded hybrid-search storage facade for AI agents |
+| `contextra-engine` | Ring 3 | Contextra — Core storage, index, and transaction orchestrator engine |
+| `contextra` | Ring 4 | Contextra — Embedded hybrid-search for AI agents (Facade) |
+| `contextra-mcp` | Ring 4 | Model Context Protocol server interface for Contextra |
 
-### 2.2 LAB-Crates (Tooling & Benchmarking)
+### 2.2 LAB-Crates (4 Crates)
 
-Die Werkzeug- und Benchmark-Crates sind im Ring LAB isoliert:
-
-| Crate-Name | Ring | Verantwortlichkeit |
+| Crate-Name | Kategorie | Verantwortlichkeit |
 |---|---|---|
-| `contextra-testkit` | LAB | Deterministische Testwerkzeuge, ManualClock, InMemoryStorageEngine und FaultVfs |
-| `contextra-bench` | LAB | Reproduzierbares Benchmark-Harness für Retrieval-Genauigkeit |
-| `xtask` | LAB | Automatisierungs- und Governance-Harness |
-| `xtask-heavy` | LAB | Erweiterte Integrations- und Schwergewichts-Test-Harnesses |
-
-### 2.3 Geparkte Module (`park/<EP>/v1` Tags)
-
-Geparkte Module wurden im Rahmen der Entkopplung aus dem aktiven Workspace entfernt und auf annotated Git-Tags gesichert:
-- **`park/EP1/v1`**: Deprecated `contextra-core` Strangler Facade und `contextra-py` Bindings.
-- **`park/EP2/v1`**: `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`.
-- **`park/EP3/v1`**: `contextra-graph`.
-- **`park/EP4/v1`**: `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-kvcache`.
-- **`park/EP5/v1`**: `contextra-cognition`, `contextra-adapt`, `contextra-router`, `contextra-agent`.
-- **`park/EP6/v1`**: `contextra-privacy`, `contextra-sandbox`.
+| `contextra-bench` | LAB (Bench) | Reproducible Benchmark Harness for Retrieval Accuracy |
+| `contextra-testkit` | LAB (Tooling) | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs |
+| `xtask` | LAB (Tooling) | Primary build, lint, and verification harness |
+| `xtask-heavy` | LAB (Tooling) | Heavy verification tasks and integration suites |
 
 ---
 
 ## 3. Abhängigkeitsdiagramm (EP1 Kern & LAB post-W3-01)
 
-Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` der 17 EP1 Kern-Crates und LAB-Crates ab:
+Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwischen den 17 EP1-Kern-Crates ab:
 
 ```mermaid
 graph TD
@@ -122,13 +94,6 @@ graph TD
     contextra[contextra] --> contextra_rank[contextra-rank]
     contextra[contextra] --> contextra_store[contextra-store]
     contextra[contextra] --> contextra_types[contextra-types]
-    contextra_bench[contextra-bench] --> contextra_crypto[contextra-crypto]
-    contextra_bench[contextra-bench] --> contextra_db[contextra-db]
-    contextra_bench[contextra-bench] --> contextra_ports[contextra-ports]
-    contextra_bench[contextra-bench] --> contextra_store[contextra-store]
-    contextra_bench[contextra-bench] --> contextra_text[contextra-text]
-    contextra_bench[contextra-bench] --> contextra_types[contextra-types]
-    contextra_bench[contextra-bench] --> contextra_vector[contextra-vector]
     contextra_checkpoint[contextra-checkpoint] --> contextra_mvcc[contextra-mvcc]
     contextra_checkpoint[contextra-checkpoint] --> contextra_ports[contextra-ports]
     contextra_checkpoint[contextra-checkpoint] --> contextra_types[contextra-types]
@@ -164,8 +129,6 @@ graph TD
     contextra_mvcc[contextra-mvcc] --> contextra_ports[contextra-ports]
     contextra_mvcc[contextra-mvcc] --> contextra_types[contextra-types]
     contextra_ports[contextra-ports] --> contextra_types[contextra-types]
-    contextra_rank[contextra-rank] --> contextra_ports[contextra-ports]
-    contextra_rank[contextra-rank] --> contextra_types[contextra-types]
     contextra_simd[contextra-simd] --> contextra_types[contextra-types]
     contextra_store[contextra-store] --> contextra_crypto[contextra-crypto]
     contextra_store[contextra-store] --> contextra_durable_fs[contextra-durable-fs]
@@ -173,9 +136,6 @@ graph TD
     contextra_store[contextra-store] --> contextra_ports[contextra-ports]
     contextra_store[contextra-store] --> contextra_sys[contextra-sys]
     contextra_store[contextra-store] --> contextra_types[contextra-types]
-    contextra_testkit[contextra-testkit] --> contextra_ports[contextra-ports]
-    contextra_testkit[contextra-testkit] --> contextra_store[contextra-store]
-    contextra_testkit[contextra-testkit] --> contextra_types[contextra-types]
     contextra_text[contextra-text] --> contextra_ports[contextra-ports]
     contextra_text[contextra-text] --> contextra_types[contextra-types]
     contextra_vector[contextra-vector] --> contextra_crypto[contextra-crypto]
@@ -185,8 +145,6 @@ graph TD
     contextra_vector[contextra-vector] --> contextra_simd[contextra-simd]
     contextra_vector[contextra-vector] --> contextra_sys[contextra-sys]
     contextra_vector[contextra-vector] --> contextra_types[contextra-types]
-    xtask[xtask] --> contextra_types[contextra-types]
-    xtask_heavy[xtask-heavy] --> contextra_bench[contextra-bench]
 ```
 <!-- END GENERATED -->
 
@@ -195,14 +153,10 @@ graph TD
 <a id="4-bekannte-abweichungen-ist-vs-soll"></a>
 ## 4. Bekannte Abweichungen IST vs. SOLL
 
-Gemäß `ADR-PARK-001` wurden alle geparkten Module entkoppelt und auf `park/<EP>/v1` Tags gesichert.
-
-1. **`contextra-core` Entfernung:**
-   * `contextra-core` wurde im Rahmen von W3-01 vollständig entkoppelt. Das Modul ist im Tag `park/EP1/v1` gesichert.
-2. **`contextra-db` Fassade:**
-   * `contextra-db` verbleibt als reine EP1-Embedded-Fassade.
-3. **Inferenz & Vektorindex:**
-   * Inferenz-Backends sind geparkt unter `park/EP4/v1`. `contextra-vector` agiert als EP1-Kern Vektorindex.
+1. **Entkopplung aller Parkplatz-Crates vollständig (W3-01):**
+   Geparkte Module wurden vollständig entkoppelt. Der Quellcode der entkoppelten Produktkomponenten (EP2 bis EP6) verbleibt gesichert in den Git-Tags `park/EP1/v1` bis `park/EP6/v1`.
+2. **`contextra-db` Fassadenrolle:**
+   `contextra-db` fungiert im Kern als Fassade für den eingebetteten Speicherbetrieb.
 
 ---
 
@@ -257,9 +211,6 @@ Die folgenden Struct-Felder in `contextra-engine` halten Mutex- oder RwLock-Inst
    - `staged_text_ops`: `std::sync::Mutex<Vec<(DocId, String)>>`
    - `staged_text_deletes`: `std::sync::Mutex<Vec<DocId>>`
 
-4. **Auto-Extraction Reentrancy-Guard (`crates/contextra-engine/src/collection/crud/auto_extraction.rs`):**
-   - `GLOBAL_REENTRANCY_GUARD`: `parking_lot::RwLock<ahash::AHashMap<...>>`
-
 Für alle Locks außerhalb der Hauptachse (`collections` → `kv_locks` → `embedder`) gilt: keine dokumentierte Ordnung, nicht verschachteln.
 
 ---
@@ -269,6 +220,3 @@ Für alle Locks außerhalb der Hauptachse (`collections` → `kv_locks` → `emb
 
 * **Normative Spezifikation**: `README.md`
 * **Entwickler- & Agent-Anweisungen**: `AGENTS.md`
-* **Refactoring- & Audit-Protokolle**:
-  * `docs/refactor/router-db-edge-audit.md` (Audit der `router` → `db` Abhängigkeit)
-  * `docs/refactor/mcp-upward-edges-audit.md` (Audit der MCP-Gateway-Schichten)
