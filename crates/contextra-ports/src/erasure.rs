@@ -361,12 +361,11 @@ pub trait ErasureBackend: Send + Sync {
         as_of: TxId,
         probe: &dyn FreeSpaceProbe,
     ) -> std::result::Result<PurgeOutput, PurgeError>;
-}
 
-/// Extension trait providing erasure capabilities on storage engines.
-pub trait StorageErasureExt {
-    /// Returns reference to [`ErasureBackend`] if supported.
-    fn as_erasure_backend(&self) -> Option<&dyn ErasureBackend>;
+    /// Returns the erasure fence snapshot write sequence number for the specified prefixes.
+    fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {
+        0
+    }
 }
 
 /// Finish artifact generated upon erasure completion.
@@ -493,6 +492,10 @@ pub enum DeleteOutcome {
 /// Error returned by erasure operations (§5.3).
 #[derive(Debug, Error)]
 pub enum EraseError {
+    /// Erasure backend or capability not available on storage engine.
+    #[error("Erasure backend not available")]
+    NotAvailable,
+
     /// Failed before commit point (retry is safe).
     #[error("Deletion failed before commit point: {0}")]
     NotStarted(#[source] ContextraError),
@@ -506,6 +509,19 @@ pub enum EraseError {
         #[source]
         cause: ContextraError,
     },
+}
+
+impl From<EraseError> for ContextraError {
+    fn from(err: EraseError) -> Self {
+        match err {
+            EraseError::NotAvailable => ContextraError::capability_unsupported(
+                "erasure_backend",
+                "Erasure backend not available on this storage engine",
+            ),
+            EraseError::NotStarted(cause) => cause,
+            EraseError::Indeterminate { cause, .. } => cause,
+        }
+    }
 }
 
 /// Purge operation phase state machine (§5.3, §5.6, E67).

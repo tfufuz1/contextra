@@ -52,6 +52,10 @@ wat = "1"
 name = "kv_delete_cascade_e2e"
 path = "tests/kv_delete_cascade_e2e.rs"
 
+[[test]]
+name = "erasure_backend_port_tests"
+path = "tests/erasure_backend_port_tests.rs"
+
 [features]
 default = []
 fast = []
