@@ -24,7 +24,8 @@ fn test_adapt_wiring_comprehensive_production_path() {
     }
     {
         let mut anti_windup = wiring.anti_windup_controller.lock().unwrap();
-        let pool_size = anti_windup.update_with_anti_windup(Duration::from_millis(100), 200.0, true);
+        let pool_size =
+            anti_windup.update_with_anti_windup(Duration::from_millis(100), 200.0, true);
         assert!(pool_size >= 50);
     }
 
@@ -54,7 +55,9 @@ fn test_adapt_wiring_comprehensive_production_path() {
         let inputs = contextra_adapt::decay_controller::DecaySignalInputs::default();
         let base_score = 0.8f32;
         let elapsed_tx = 100u64;
-        let should_evict = wiring.decay_controller.should_evict(base_score, elapsed_tx, &inputs);
+        let should_evict = wiring
+            .decay_controller
+            .should_evict(base_score, elapsed_tx, &inputs);
         assert!(!should_evict);
     }
 

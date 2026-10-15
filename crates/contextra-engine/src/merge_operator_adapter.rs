@@ -14,9 +14,7 @@
 //! Operatoren can be registered into a [`MergeOperatorRegistry`] after passing the fail-closed CRDT gate.
 
 use contextra_sandbox::merge::MergeOperatorRegistry;
-use contextra_sandbox::{
-    MergeOperatorCapabilities, SandboxError, WasmMergeFunction,
-};
+use contextra_sandbox::{MergeOperatorCapabilities, SandboxError, WasmMergeFunction};
 use contextra_store::MergeOperator;
 use contextra_types::{ContextraError, Result};
 use std::sync::mpsc;
@@ -171,7 +169,9 @@ impl MergeOperator for WasmMergeOperator {
                 )))
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                tracing::warn!("WasmMergeOperator execution timed out waiting for shared worker response");
+                tracing::warn!(
+                    "WasmMergeOperator execution timed out waiting for shared worker response"
+                );
                 Err(ContextraError::Sandbox(
                     "WASM merge function execution timed out".into(),
                 ))

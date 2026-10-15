@@ -74,10 +74,15 @@ fn test_two_tenant_isolation_no_cross_read_or_cross_invalidation() {
         data: Bytes::from_static(b"tenant_b_scratch"),
     };
 
-    prefix_store.insert(tenant_a, &key, &tokens, vec![block_a]).unwrap();
-    prefix_store.insert(tenant_b, &key, &tokens, vec![block_b]).unwrap();
+    prefix_store
+        .insert(tenant_a, &key, &tokens, vec![block_a])
+        .unwrap();
+    prefix_store
+        .insert(tenant_b, &key, &tokens, vec![block_b])
+        .unwrap();
 
-    let invalidator_a = PrefixStoreScratchpadInvalidator::new(&prefix_store).with_keys(vec![key.clone()]);
+    let invalidator_a =
+        PrefixStoreScratchpadInvalidator::new(&prefix_store).with_keys(vec![key.clone()]);
     let scope_a = ScratchpadCacheScope::new(tenant_a, tokens.clone());
     let scope_b = ScratchpadCacheScope::new(tenant_b, tokens.clone());
 
@@ -89,7 +94,9 @@ fn test_two_tenant_isolation_no_cross_read_or_cross_invalidation() {
     assert!(prefix_store.lookup(tenant_a, &key, &tokens).is_none());
 
     // Tenant B's entry MUST remain intact and retrievable (VETO-F10)
-    let hit_b = prefix_store.lookup(tenant_b, &key, &tokens).expect("Tenant B entry untouched");
+    let hit_b = prefix_store
+        .lookup(tenant_b, &key, &tokens)
+        .expect("Tenant B entry untouched");
     assert_eq!(hit_b.matched_tokens, 3);
     assert_eq!(invalidator_a.count_entries_in_scope(&scope_b).unwrap(), 1);
 }
@@ -121,7 +128,8 @@ fn test_segment_validation_length_bounds_and_bytecheck() {
         assert!(invalid_tensor.is_err());
 
         // Length mismatch (keys len 3 vs expected 4 for 2x2)
-        let mismatch_tensor = KvTensorView::new(vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0, 4.0], 2, 2);
+        let mismatch_tensor =
+            KvTensorView::new(vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0, 4.0], 2, 2);
         assert!(mismatch_tensor.is_err());
 
         // Non-finite bytecheck failure (NaN value)

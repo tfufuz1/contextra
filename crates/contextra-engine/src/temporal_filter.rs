@@ -300,7 +300,8 @@ mod tests {
         let results = vec![old_chunk, new_chunk];
 
         // Query historical point in time at t = 30 (when old chunk was active, before supersedes at t=50)
-        let historical_results = apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let historical_results =
+            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
         assert_eq!(
             historical_results.len(),
             1,
@@ -331,7 +332,8 @@ mod tests {
         // Business check: 10 <= 30 < 100 -> PASS.
         // Transaction check: 30 < tx_valid_from (50) -> FAIL.
         // Bi-temporal AND logic must filter out this candidate!
-        let filtered = apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let filtered =
+            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
         assert!(
             filtered.is_empty(),
             "Candidate with valid business window but invalid transaction window at query time must be filtered out"
@@ -350,27 +352,51 @@ mod tests {
         );
 
         // Before start (< 10) -> Invalid
-        let res_before = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(9));
+        let res_before = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(9),
+        );
         assert!(res_before.is_empty());
 
         // Exact start (10) -> Valid (inclusive lower bound)
-        let res_start = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(10));
+        let res_start = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(10),
+        );
         assert_eq!(res_start.len(), 1);
 
         // Inside window (50) -> Valid
-        let res_mid = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(50));
+        let res_mid = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(50),
+        );
         assert_eq!(res_mid.len(), 1);
 
         // One step before end (99) -> Valid
-        let res_before_end = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(99));
+        let res_before_end = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(99),
+        );
         assert_eq!(res_before_end.len(), 1);
 
         // Exact end (100) -> Invalid (exclusive upper bound)
-        let res_end = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(100));
+        let res_end = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(100),
+        );
         assert!(res_end.is_empty());
 
         // After end (> 100) -> Invalid
-        let res_after = apply_temporal_validity_filter_at_bitemporal(vec![candidate.clone()], TxId::new(1), Some(101));
+        let res_after = apply_temporal_validity_filter_at_bitemporal(
+            vec![candidate.clone()],
+            TxId::new(1),
+            Some(101),
+        );
         assert!(res_after.is_empty());
     }
 
@@ -389,12 +415,24 @@ mod tests {
 
         let results = vec![candidate];
         // Querying with as_of_tx = TxId::new(5) and as_of_business = Some(1700000000)
-        let filtered = apply_temporal_validity_filter_at_bitemporal(results.clone(), TxId::new(5), Some(1700000000));
-        assert_eq!(filtered.len(), 1, "Candidate must be valid when queried with correct TxId and business timestamp");
+        let filtered = apply_temporal_validity_filter_at_bitemporal(
+            results.clone(),
+            TxId::new(5),
+            Some(1700000000),
+        );
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Candidate must be valid when queried with correct TxId and business timestamp"
+        );
 
         // Querying via deprecated business time helper (as_of_timestamp = 1700000000)
         #[allow(deprecated)]
         let filtered_legacy = apply_temporal_validity_filter_at(results, 1700000000);
-        assert_eq!(filtered_legacy.len(), 1, "Legacy helper must treat as_of_timestamp as business time, not TxId");
+        assert_eq!(
+            filtered_legacy.len(),
+            1,
+            "Legacy helper must treat as_of_timestamp as business time, not TxId"
+        );
     }
 }

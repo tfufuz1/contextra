@@ -34,14 +34,22 @@ async fn test_kv_cache_crypto_shredding_and_tenant_isolation() -> contextra_type
     let key1 = ShreddableSegmentKey::try_new_random("pass-tenant-1").unwrap();
     let key2 = ShreddableSegmentKey::try_new_random("pass-tenant-2").unwrap();
 
-    let segment1 = Tier2EncryptedSegment::new(tenant1, 500, b"tenant 1 secret payload", key1.clone()).unwrap();
-    let segment2 = Tier2EncryptedSegment::new(tenant2, 500, b"tenant 2 secret payload", key2.clone()).unwrap();
+    let segment1 =
+        Tier2EncryptedSegment::new(tenant1, 500, b"tenant 1 secret payload", key1.clone()).unwrap();
+    let segment2 =
+        Tier2EncryptedSegment::new(tenant2, 500, b"tenant 2 secret payload", key2.clone()).unwrap();
 
     shredding_wiring.register_segment_key(tenant1, 500, key1);
     shredding_wiring.register_segment_key(tenant2, 500, key2);
 
-    assert_eq!(segment1.read_and_decrypt().unwrap(), b"tenant 1 secret payload");
-    assert_eq!(segment2.read_and_decrypt().unwrap(), b"tenant 2 secret payload");
+    assert_eq!(
+        segment1.read_and_decrypt().unwrap(),
+        b"tenant 1 secret payload"
+    );
+    assert_eq!(
+        segment2.read_and_decrypt().unwrap(),
+        b"tenant 2 secret payload"
+    );
 
     // Shred tenant1's key
     let adapter = db.kv_hooks().expect("kv_hooks configured on Contextra");
@@ -52,7 +60,10 @@ async fn test_kv_cache_crypto_shredding_and_tenant_isolation() -> contextra_type
     assert!(shredding_wiring.is_shredded(tenant1, 500));
 
     // Tenant 2 remains untouched and readable (INV-KDF-1)
-    assert_eq!(segment2.read_and_decrypt().unwrap(), b"tenant 2 secret payload");
+    assert_eq!(
+        segment2.read_and_decrypt().unwrap(),
+        b"tenant 2 secret payload"
+    );
     assert!(!shredding_wiring.is_shredded(tenant2, 500));
 
     db.close().await?;

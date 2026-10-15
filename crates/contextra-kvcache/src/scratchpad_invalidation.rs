@@ -99,7 +99,11 @@ impl<'a> PrefixStoreScratchpadInvalidator<'a> {
     /// Erzeugt einen detaillierten `CacheReport` für den gescannten Scope.
     pub fn cache_report(&self, scope: &ScratchpadCacheScope) -> Result<CacheReport> {
         let entries_found = self.count_entries_in_scope(scope)?;
-        let caches_checked = if self.keys.is_empty() { 1 } else { self.keys.len() };
+        let caches_checked = if self.keys.is_empty() {
+            1
+        } else {
+            self.keys.len()
+        };
 
         Ok(CacheReport {
             caches_checked,

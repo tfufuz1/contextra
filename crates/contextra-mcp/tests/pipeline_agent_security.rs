@@ -58,7 +58,8 @@ async fn test_forget_guard_thresholds_and_token_expiration() {
         &token,
         ChannelKind::HostStdio,
         |_scope, _coll| async { Ok(11) },
-    ).await;
+    )
+    .await;
     assert!(confirm_res_stdio.is_err());
     assert_eq!(
         confirm_res_stdio.unwrap_err().code,
@@ -72,7 +73,8 @@ async fn test_forget_guard_thresholds_and_token_expiration() {
         &token,
         ChannelKind::LocalIpc,
         |_scope, _coll| async { Ok(11) },
-    ).await;
+    )
+    .await;
     assert!(confirm_res_ipc.is_ok());
     assert_eq!(confirm_res_ipc.unwrap()["deleted"], 11);
 
@@ -83,7 +85,8 @@ async fn test_forget_guard_thresholds_and_token_expiration() {
         &token,
         ChannelKind::LocalIpc,
         |_scope, _coll| async { Ok(11) },
-    ).await;
+    )
+    .await;
     assert!(confirm_res_reuse.is_err());
 }
 

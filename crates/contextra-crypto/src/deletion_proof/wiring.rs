@@ -50,8 +50,9 @@ impl DeletionProofWiring {
         let public_key = deps.signer.public_key();
 
         // 1. Open or initialize ProofIssuer
-        let (issuer, _warnings) = ProofIssuer::open(&deps.storage_dir, deps.signer.clone(), deps.db_instance_id)
-            .map_err(|e| ContextraError::Crypto(e.to_string()))?;
+        let (issuer, _warnings) =
+            ProofIssuer::open(&deps.storage_dir, deps.signer.clone(), deps.db_instance_id)
+                .map_err(|e| ContextraError::Crypto(e.to_string()))?;
 
         // 2. Open or initialize AuditChain
         let audit_chain = AuditChain::new();
@@ -151,10 +152,7 @@ impl DeletionProofWiring {
 
     /// Verifies a version 4 deletion proof in a **completely autonomous, stateless manner**:
     /// Requires strictly the 32-byte public key and the proof document, without database state or KeyManager.
-    pub fn verify_external(
-        public_key: &[u8; 32],
-        proof: &ProofV4,
-    ) -> PolicyReport {
+    pub fn verify_external(public_key: &[u8; 32], proof: &ProofV4) -> PolicyReport {
         let policy = ProofPolicy::default();
         verify_with_policy(proof, public_key, &policy)
     }

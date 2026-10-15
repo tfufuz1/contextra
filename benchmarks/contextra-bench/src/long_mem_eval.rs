@@ -1370,7 +1370,10 @@ where
         let denominator = 1.0 + z * z / n;
         let center = p + z * z / (2.0 * n);
         let margin = z * ((p * (1.0 - p) / n) + (z * z / (4.0 * n * n))).sqrt();
-        (((center - margin) / denominator).max(0.0), ((center + margin) / denominator).min(1.0))
+        (
+            ((center - margin) / denominator).max(0.0),
+            ((center + margin) / denominator).min(1.0),
+        )
     } else {
         (0.0, 0.0)
     };

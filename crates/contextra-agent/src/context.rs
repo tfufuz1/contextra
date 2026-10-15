@@ -269,9 +269,7 @@ impl AgentContext {
 }
 
 /// Agent execution engine helper managing per-step cache directives during workflow execution.
-#[deprecated(
-    note = "AgentEngine is a deprecated wrapper struct. Use OrchestratorEngine instead."
-)]
+#[deprecated(note = "AgentEngine is a deprecated wrapper struct. Use OrchestratorEngine instead.")]
 #[derive(Debug, Clone, Default)]
 pub struct AgentEngine {
     /// Active cache directive set during step execution.

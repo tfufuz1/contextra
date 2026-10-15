@@ -1,7 +1,5 @@
 use contextra_agent::wiring::AgentWiring;
-use contextra_agent::{
-    AgentContext, AgentStatus, AgentTool, NodeType, StateGraph, StepResult,
-};
+use contextra_agent::{AgentContext, AgentStatus, AgentTool, NodeType, StateGraph, StepResult};
 use contextra_ports::{BoxFuture, Clock, IdGenerator, SequentialIdGen, SystemClock};
 use contextra_types::{ContextraError, Result, TokenBudget};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -33,7 +31,9 @@ impl AgentTool for IdempotentMockTool {
         Box::pin(async move {
             let cnt = call_count.fetch_add(1, Ordering::SeqCst);
             if cnt == 0 {
-                Err(ContextraError::Internal("Transient network error".to_string()))
+                Err(ContextraError::Internal(
+                    "Transient network error".to_string(),
+                ))
             } else {
                 Ok(StepResult {
                     node_id: "step1".to_string(),

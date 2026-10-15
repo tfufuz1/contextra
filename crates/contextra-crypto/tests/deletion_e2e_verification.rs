@@ -8,9 +8,7 @@ use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe}
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::types::{DeletionLayer, DeletionScope};
 use contextra_crypto::deletion_proof::wiring::{DeletionProofWiring, DeletionProofWiringDeps};
-use contextra_crypto::deletion_proof::{
-    IssRequest, ProofV4, WitAssurance, WitClaimText,
-};
+use contextra_crypto::deletion_proof::{IssRequest, ProofV4, WitAssurance, WitClaimText};
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 use contextra_crypto::error::CryptoError;
 use contextra_crypto::kv_shredding::{shred_segment_key, KeyRegistry};
@@ -42,7 +40,11 @@ impl WitStoreProbe for MockStoreProbe {
     }
 }
 
-fn create_witness(layer: DeletionLayer, deleted_keys_hash: [u8; 32], footprint_hash: [u8; 32]) -> LayerWitness {
+fn create_witness(
+    layer: DeletionLayer,
+    deleted_keys_hash: [u8; 32],
+    footprint_hash: [u8; 32],
+) -> LayerWitness {
     LayerWitness::issue(WitIssueArgs {
         layer,
         scope_hash: deleted_keys_hash,
@@ -95,7 +97,11 @@ fn test_e2e_deletion_proof_creation_serialization_verification_standalone() {
         write_seq: 10,
     };
 
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -172,7 +178,11 @@ fn test_e2e_negative_tampered_signature_rejected() {
         write_seq: 10,
     };
 
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -206,7 +216,11 @@ fn test_e2e_negative_tampered_signature_rejected() {
         !report.is_valid,
         "Tampered signature MUST fail external verification"
     );
-    let r1 = report.rule_results.iter().find(|r| r.rule_id == "R1").unwrap();
+    let r1 = report
+        .rule_results
+        .iter()
+        .find(|r| r.rule_id == "R1")
+        .unwrap();
     assert!(!r1.passed, "R1 rule MUST fail on tampered signature");
 }
 
@@ -240,7 +254,11 @@ fn test_e2e_negative_tampered_payload_rejected() {
         write_seq: 10,
     };
 
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -307,7 +325,11 @@ fn test_e2e_negative_wrong_public_key_rejected() {
         write_seq: 10,
     };
 
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -371,7 +393,11 @@ fn test_e2e_negative_untrusted_expired_signer_key_rejected() {
         write_seq: 10,
     };
 
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -415,8 +441,15 @@ fn test_e2e_negative_untrusted_expired_signer_key_rejected() {
         !report.is_valid,
         "Verification MUST fail when signer key ID is not trusted / expired"
     );
-    let r16 = report.rule_results.iter().find(|r| r.rule_id == "R16").unwrap();
-    assert!(!r16.passed, "R16 rule MUST fail on untrusted/expired signer key ID");
+    let r16 = report
+        .rule_results
+        .iter()
+        .find(|r| r.rule_id == "R16")
+        .unwrap();
+    assert!(
+        !r16.passed,
+        "R16 rule MUST fail on untrusted/expired signer key ID"
+    );
 }
 
 #[test]
@@ -431,9 +464,16 @@ fn test_e2e_negative_revoked_key_rejected() {
 
     // Any access attempt to revoked key MUST return error / key revoked status, NEVER Ok
     let kdf_hdr = contextra_crypto::KdfHeader::generate_default().unwrap();
-    let km = contextra_crypto::crypto::KeyManager::try_new_strict("passphrase-strict-policy-ok", &kdf_hdr).unwrap();
+    let km = contextra_crypto::crypto::KeyManager::try_new_strict(
+        "passphrase-strict-policy-ok",
+        &kdf_hdr,
+    )
+    .unwrap();
     let res = registry.get_or_derive(&km, segment_id);
-    assert!(res.is_err(), "Accessing revoked segment key MUST return error");
+    assert!(
+        res.is_err(),
+        "Accessing revoked segment key MUST return error"
+    );
     match res {
         Err(CryptoError::KeyRevoked(msg)) => {
             assert!(msg.contains("9999"));
@@ -460,16 +500,15 @@ fn test_e2e_negative_revoked_key_and_missing_log_fails_closed() {
 
     // Remove initialization marker file to test fail-closed behavior
     let marker_path = marker_path_for(&log_path);
-    assert!(marker_path.exists(), "Marker file must exist before deletion");
+    assert!(
+        marker_path.exists(),
+        "Marker file must exist before deletion"
+    );
     std::fs::remove_file(&marker_path).expect("remove marker failed");
 
     // Opening with has_existing_keys = true when marker is missing MUST fail closed
     let res = RevocationLog::open_or_create_if_fresh(
-        &log_path,
-        clock,
-        None,
-        rev_vk,
-        true, // has_existing_keys = true
+        &log_path, clock, None, rev_vk, true, // has_existing_keys = true
     );
 
     assert!(
@@ -508,7 +547,11 @@ fn test_e2e_kms_rotation_and_old_proof_verification() {
         generation: 1,
         write_seq: 10,
     };
-    let witness = create_witness(DeletionLayer::LsmMemtable, deleted_keys_hash, footprint_hash);
+    let witness = create_witness(
+        DeletionLayer::LsmMemtable,
+        deleted_keys_hash,
+        footprint_hash,
+    );
 
     let req = IssRequest {
         scope: DeletionScope::Document {
@@ -547,7 +590,8 @@ fn test_e2e_kms_rotation_and_old_proof_verification() {
         has_existing_keys: true,
     };
 
-    let rotated_wiring = DeletionProofWiring::build(deps_rotated).expect("rotated wiring build failed");
+    let rotated_wiring =
+        DeletionProofWiring::build(deps_rotated).expect("rotated wiring build failed");
     assert_ne!(rotated_wiring.public_key(), initial_public_key);
 
     // Old proof remains verifiably valid when checked against the initial_public_key

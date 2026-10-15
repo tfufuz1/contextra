@@ -37,8 +37,8 @@ impl CognitionWiringBundle {
         .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
         if config.consolidation_enabled {
-            let launcher: ConsolidationLauncher = Arc::new(
-                |collection, interval, max_calls, cancel_token| {
+            let launcher: ConsolidationLauncher =
+                Arc::new(|collection, interval, max_calls, cancel_token| {
                     tokio::spawn(async move {
                         let _ = contextra_db::execute_background_consolidation(
                             collection,
@@ -51,8 +51,7 @@ impl CognitionWiringBundle {
                         )
                         .await;
                     })
-                },
-            );
+                });
             config.consolidation_launcher = Some(launcher);
         }
 

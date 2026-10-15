@@ -12,9 +12,14 @@ async fn test_bitemporal_filter_facade_query() -> Result<(), ContextraError> {
     let seed: u64 = 20261013_06;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_pipeline bitemporal seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_pipeline bitemporal seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
-    let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_pipeline_bitemporal_{}", rng.next_u64()));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("e2e_wiring_pipeline_bitemporal_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
     let config = ContextraConfig {
@@ -69,9 +74,14 @@ async fn test_retrieval_rerank_egress_pipeline_decisions() -> Result<(), Context
     let seed: u64 = 20261013_07;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_pipeline router seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_pipeline router seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
-    let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_pipeline_router_{}", rng.next_u64()));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("e2e_wiring_pipeline_router_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
     // Egress classifier, router decision loop, and rerank policy injection on facade query path

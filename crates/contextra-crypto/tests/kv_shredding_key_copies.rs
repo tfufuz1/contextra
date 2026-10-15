@@ -6,8 +6,8 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::crypto::KeyManager;
-use contextra_crypto::kv_shredding::{GroupKek, KeyRegistry, RecordDek, SubKey};
 use contextra_crypto::error::Result;
+use contextra_crypto::kv_shredding::{GroupKek, KeyRegistry, RecordDek, SubKey};
 
 #[test]
 fn test_debug_output_redacts_key_bytes() {
@@ -41,12 +41,18 @@ fn test_two_phase_revocation_lifecycle() -> Result<()> {
 
     // Phase 1: Request revocation
     let requested = registry.request_revoke(group_id)?;
-    assert!(requested, "request_revoke must return Ok(true) on active group");
+    assert!(
+        requested,
+        "request_revoke must return Ok(true) on active group"
+    );
     assert!(registry.is_revoke_pending(group_id));
 
     // Cancel pending revocation
     let canceled = registry.cancel_revoke(group_id)?;
-    assert!(canceled, "cancel_revoke must return Ok(true) for pending group");
+    assert!(
+        canceled,
+        "cancel_revoke must return Ok(true) for pending group"
+    );
     assert!(!registry.is_revoke_pending(group_id));
     assert!(registry.is_group_active(group_id));
 

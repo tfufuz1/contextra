@@ -12,7 +12,11 @@ async fn test_two_tenant_isolation_facade() -> Result<(), ContextraError> {
     let seed: u64 = 20261013_02;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_ssi tenant seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_ssi tenant seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
     let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_ssi_tenant_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
@@ -42,10 +46,7 @@ async fn test_two_tenant_isolation_facade() -> Result<(), ContextraError> {
 
     // Tenant B cannot see Tenant A's doc1
     let doc_b = col_b.get("doc1").await?;
-    assert!(
-        doc_b.is_none(),
-        "Tenant B must NOT see Tenant A's document"
-    );
+    assert!(doc_b.is_none(), "Tenant B must NOT see Tenant A's document");
 
     // Tenant B inserts own doc1
     col_b
@@ -80,7 +81,11 @@ async fn test_write_skew_prevention_facade() -> Result<(), ContextraError> {
     let seed: u64 = 20261013_03;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_ssi skew seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_ssi skew seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
     let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_ssi_skew_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
@@ -95,8 +100,10 @@ async fn test_write_skew_prevention_facade() -> Result<(), ContextraError> {
     let col = db.collection("ssi_col").await?;
 
     // Initial setup: x = 100, y = 100
-    col.insert("x", &[1.0, 0.0, 0.0, 0.0], Some(json!({"val": 100}))).await?;
-    col.insert("y", &[0.0, 1.0, 0.0, 0.0], Some(json!({"val": 100}))).await?;
+    col.insert("x", &[1.0, 0.0, 0.0, 0.0], Some(json!({"val": 100})))
+        .await?;
+    col.insert("y", &[0.0, 1.0, 0.0, 0.0], Some(json!({"val": 100})))
+        .await?;
 
     // Simulation of transaction write-skew over facade:
     // Tx1 reads x and y, deducts 100 from x if x + y >= 100 -> writes x = 0

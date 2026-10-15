@@ -3,7 +3,9 @@
 // INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::open, ContextraBuilder) zu.
 
 use contextra::performance_profile::PerformanceProfile;
-use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
+use contextra::{
+    builder, open, open_with_config, ContextraConfig, ContextraError, ContextraWiringReportExt,
+};
 use contextra_store::lsm::DurabilityMode;
 use tempfile::TempDir;
 
@@ -44,7 +46,8 @@ async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Err
 }
 
 #[tokio::test]
-async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn std::error::Error>>
+{
     let res = contextra::wiring_selftest::verify_wiring(false, true, false);
     assert!(res.is_err());
     if let Err(ContextraError::PolicyViolation(msg)) = res {

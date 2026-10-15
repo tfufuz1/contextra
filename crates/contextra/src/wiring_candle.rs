@@ -25,7 +25,9 @@ pub struct CandleWiringBundle {
 #[cfg(feature = "candle")]
 impl CandleWiringBundle {
     /// Builds `CandleWiringBundle` attaching `prefix_store` if present.
-    pub fn build(#[allow(unused_variables)] prefix_store: Option<Arc<dyn KvPrefixStore>>) -> Result<Self, ContextraError> {
+    pub fn build(
+        #[allow(unused_variables)] prefix_store: Option<Arc<dyn KvPrefixStore>>,
+    ) -> Result<Self, ContextraError> {
         #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
         let client = prefix_store.and_then(|store| {
             CandleLlmClient::from_dir(

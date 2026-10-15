@@ -55,6 +55,8 @@ proptest = "1.4"
 loom = "0.7"
 wat = "1"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+ed25519-dalek = { version = "2.1", features = ["zeroize", "rand_core"] }
+rand = { workspace = true }
 
 [[test]]
 name = "kv_delete_cascade_e2e"

@@ -100,11 +100,11 @@ pub use homeostat::RerankDeadline;
 #[allow(deprecated)]
 pub use homeostat::RerankPidController;
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
-pub use wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage, PipelineStages};
 pub use pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
     MIN_SCALING_FACTOR,
 };
+pub use wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage, PipelineStages};
 
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;

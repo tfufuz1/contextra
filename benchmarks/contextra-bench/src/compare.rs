@@ -96,7 +96,9 @@ pub fn compare_metrics(
     // 2. Compare LoCoMo if baseline contains locomo
     if let Some(base_locomo) = &baseline.locomo {
         if let Some(curr_locomo) = &current.locomo {
-            let curr_recall = curr_locomo.ci_lower_recall_95.unwrap_or(curr_locomo.overall_recall_at_5);
+            let curr_recall = curr_locomo
+                .ci_lower_recall_95
+                .unwrap_or(curr_locomo.overall_recall_at_5);
             let base_recall = base_locomo.overall_recall_at_5;
             compare_single_metric(
                 "locomo.overall_recall_at_5",
@@ -108,7 +110,9 @@ pub fn compare_metrics(
                 &mut info_hints,
                 &mut pass_messages,
             );
-            let curr_mrr = curr_locomo.ci_lower_mrr_95.unwrap_or(curr_locomo.overall_mrr);
+            let curr_mrr = curr_locomo
+                .ci_lower_mrr_95
+                .unwrap_or(curr_locomo.overall_mrr);
             let base_mrr = base_locomo.overall_mrr;
             compare_single_metric(
                 "locomo.overall_mrr",
@@ -289,7 +293,10 @@ mod tests {
         };
 
         let res = compare_metrics(&current_with_ci, &baseline, 0.05);
-        assert!(res.has_regression, "Gate must evaluate regression based on lower CI bound!");
+        assert!(
+            res.has_regression,
+            "Gate must evaluate regression based on lower CI bound!"
+        );
     }
 
     #[test]
@@ -298,11 +305,13 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.85,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: Some(LocomoMetricsSummary {
                 overall_recall_at_5: 0.90,
                 overall_mrr: 0.88,
                 total_eval_cases: 50,
+                ..Default::default()
             }),
         };
 
@@ -318,6 +327,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -325,6 +335,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.70, // 12.5% drop > 5% threshold
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -341,6 +352,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -348,6 +360,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.78, // 2.5% drop <= 5% threshold
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -365,6 +378,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -372,6 +386,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.88, // Improvement
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -388,6 +403,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -395,6 +411,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: f64::NAN,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -407,6 +424,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: f64::INFINITY,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -422,6 +440,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -437,17 +456,20 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: Some(LocomoMetricsSummary {
                 overall_recall_at_5: 0.90,
                 overall_mrr: 0.88,
                 total_eval_cases: 50,
+                ..Default::default()
             }),
         };
         let current_missing_locomo = CombinedMetrics {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.80,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -463,6 +485,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.0,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -470,6 +493,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: 0.0,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };
@@ -477,6 +501,7 @@ mod tests {
             long_mem_eval: Some(LongMemEvalMetricsSummary {
                 overall_accuracy: -0.1,
                 total_cases: 100,
+                ..Default::default()
             }),
             locomo: None,
         };

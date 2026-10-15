@@ -3,7 +3,13 @@
 //! Each test function targets specific surviving mutants identified during mutation testing,
 //! referencing the source file, line number, mutant operator/replacement in comments.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::bool_assert_comparison, deprecated)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::bool_assert_comparison,
+    deprecated
+)]
 
 use contextra_crypto::deletion_proof::{
     builder::ProofBuilder,

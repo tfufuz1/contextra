@@ -9,15 +9,16 @@ use contextra::{builder, ContextraError};
 async fn test_wiring_feature_sovereign_fail_closed_without_passphrase() {
     #[cfg(feature = "sovereign")]
     {
-        let tmp_path = std::env::temp_dir().join(format!("sovereign_test_nopass_{}", std::process::id()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("sovereign_test_nopass_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
 
-        let res = builder(128)
-            .with_storage_path(&tmp_path)
-            .build()
-            .await;
+        let res = builder(128).with_storage_path(&tmp_path).build().await;
 
-        assert!(res.is_err(), "Sovereign build without passphrase must fail closed");
+        assert!(
+            res.is_err(),
+            "Sovereign build without passphrase must fail closed"
+        );
         if let Err(err) = res {
             assert!(matches!(err, ContextraError::PolicyViolation(_)));
         }
@@ -30,7 +31,8 @@ async fn test_wiring_feature_sovereign_fail_closed_without_passphrase() {
 async fn test_wiring_feature_sovereign_success_with_passphrase() {
     #[cfg(feature = "sovereign")]
     {
-        let tmp_path = std::env::temp_dir().join(format!("sovereign_test_pass_{}", std::process::id()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("sovereign_test_pass_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
 
         let res = builder(128)

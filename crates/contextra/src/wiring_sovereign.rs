@@ -51,7 +51,8 @@ impl SovereignWiringBundle {
     ) -> Result<Self, ContextraError> {
         let passphrase_str = passphrase.ok_or_else(|| {
             ContextraError::PolicyViolation(
-                "Sovereign feature requires an explicit encryption_passphrase (fail-closed)".to_string(),
+                "Sovereign feature requires an explicit encryption_passphrase (fail-closed)"
+                    .to_string(),
             )
         })?;
 

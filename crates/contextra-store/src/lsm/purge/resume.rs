@@ -3,9 +3,7 @@
 // ZWECK: Resume-Schnittstelle zur Wiederaufnahme nicht abgeschlossener Purge-Operationen nach Absturz (Anhang B).
 // INVARIANTEN: Erkennt Korruption (Err), führt verbleibende Phasen idempotent aus, reinigt PendingDeleteJournal.
 
-use super::dispose::{
-    dispose_obsolete_files_with_policy, DisposePolicy, OrxDisposeReport,
-};
+use super::dispose::{dispose_obsolete_files_with_policy, DisposePolicy, OrxDisposeReport};
 use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::intent::OrxPurgeIntent;
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
@@ -57,12 +55,8 @@ pub async fn resume_pending_with_policy(
         let journal = PendingDeleteJournal::open(&journal_file)?;
         let obsolete_files = journal.pending().to_vec();
 
-        let disp_rep = dispose_obsolete_files_with_policy(
-            storage_dir,
-            obsolete_files,
-            dispose_policy,
-        )
-        .await?;
+        let disp_rep =
+            dispose_obsolete_files_with_policy(storage_dir, obsolete_files, dispose_policy).await?;
 
         return Ok(Some((
             PurgeReport {
@@ -86,13 +80,9 @@ pub async fn resume_pending(
     hooks: &OrxHooks,
     failpoints: Option<&OrxFailpointSet>,
 ) -> Result<Option<PurgeReport>, OrxPurgeError> {
-    let result = resume_pending_with_policy(
-        storage_dir,
-        hooks,
-        failpoints,
-        DisposePolicy::RequireScrub,
-    )
-    .await?;
+    let result =
+        resume_pending_with_policy(storage_dir, hooks, failpoints, DisposePolicy::RequireScrub)
+            .await?;
 
     Ok(result.map(|(report, _disp_rep)| report))
 }

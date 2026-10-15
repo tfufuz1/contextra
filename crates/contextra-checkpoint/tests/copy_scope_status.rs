@@ -3,7 +3,9 @@
 // ZWECK: Tests für CopyStatus, CpyCopyRegistry Erweiterungen und B11 Kopien-Geltungsbereich Verifikation.
 // INVARIANTEN: Fail-Closed, Standard CopyStatus ist Unknown, Hardlink-Klon scheitert ohne Registrierung.
 
-use contextra_checkpoint::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CopyStatus, CpyCopyRegistry};
+use contextra_checkpoint::copy_registry::{
+    file_id_for_name, CopyKind, CopyRegEntry, CopyStatus, CpyCopyRegistry,
+};
 use contextra_checkpoint::{purge_registered_checkpoint, DefaultHardlinkCloner};
 use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
@@ -72,10 +74,17 @@ impl CpyCopyRegistry for FailingCopyRegistry {
     }
 
     fn status<'a>(&'a self, copy_id: &'a [u8; 16]) -> CopyStatus {
-        self.statuses.get(copy_id).cloned().unwrap_or(CopyStatus::Unknown)
+        self.statuses
+            .get(copy_id)
+            .cloned()
+            .unwrap_or(CopyStatus::Unknown)
     }
 
-    fn update_status<'a>(&'a mut self, copy_id: &'a [u8; 16], status: CopyStatus) -> BoxFuture<'a, Result<()>> {
+    fn update_status<'a>(
+        &'a mut self,
+        copy_id: &'a [u8; 16],
+        status: CopyStatus,
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.statuses.insert(*copy_id, status);
             Ok(())

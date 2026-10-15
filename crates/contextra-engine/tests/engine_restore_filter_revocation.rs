@@ -10,11 +10,13 @@ use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_engine::deletion::DpiRestoreFilter;
 use contextra_ports::SystemClock;
-use contextra_store::erasure_ledger::{ErasureLedger, ErasureRecord};
+use contextra_store::erasure_ledger::{
+    compute_keyed_hash, ErasureLedger, LedgerEntry, LedgerEntryKind, LedgerKey,
+};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 
 fn test_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     let sk = SigningKey::generate(&mut OsRng);
@@ -22,12 +24,19 @@ fn test_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (sk, vk)
 }
 
-#[test]
-fn test_restore_filter_revoked_group_drops() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_ledger() -> Result<ErasureLedger, Box<dyn std::error::Error>> {
+    let tmp = TempDir::new()?;
+    let key = LedgerKey::new([0xaa; 32]);
+    let (ledger_opt, _) = ErasureLedger::open_or_fail_closed(tmp.path(), key, false, None).await?;
+    Ok(ledger_opt.expect("Failed to open test ErasureLedger"))
+}
+
+#[tokio::test]
+async fn test_restore_filter_revoked_group_drops() -> Result<(), Box<dyn std::error::Error>> {
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
     let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+    let ledger = Arc::new(test_ledger().await?);
 
     // Revoke group 42
     log.append(RevocationTarget::Group(42))?;
@@ -44,12 +53,12 @@ fn test_restore_filter_revoked_group_drops() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-#[test]
-fn test_restore_filter_non_revoked_key_keeps() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn test_restore_filter_non_revoked_key_keeps() -> Result<(), Box<dyn std::error::Error>> {
     let (sk, vk) = test_keypair();
     let clock = Arc::new(SystemClock::new());
     let log = Arc::new(RevocationLog::new_in_memory(clock, Some(sk), vk));
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+    let ledger = Arc::new(test_ledger().await?);
 
     // Revoke group 99
     log.append(RevocationTarget::Group(99))?;
@@ -66,8 +75,9 @@ fn test_restore_filter_non_revoked_key_keeps() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-#[test]
-fn test_restore_filter_defective_log_fails_closed() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn test_restore_filter_defective_log_fails_closed() -> Result<(), Box<dyn std::error::Error>>
+{
     let tmp_file = NamedTempFile::new()?;
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_keypair();
@@ -103,11 +113,8 @@ fn test_restore_filter_defective_log_fails_closed() -> Result<(), Box<dyn std::e
 
     // Test fail-closed behaviour when RevocationLog integrity fails during drop_record
     let log_in_mem = Arc::new(RevocationLog::new_in_memory(clock, None, vk));
-    let filter = DpiRestoreFilter::from_runtime(
-        Arc::new(ErasureLedger::new_in_memory()),
-        Some(log_in_mem),
-        None,
-    );
+    let filter =
+        DpiRestoreFilter::from_runtime(Arc::new(test_ledger().await?), Some(log_in_mem), None);
 
     // Record for an active key is kept when log is valid
     assert!(!filter.drop_record(b"normal_key", 100));
@@ -115,18 +122,26 @@ fn test_restore_filter_defective_log_fails_closed() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-#[test]
-fn test_restore_filter_ledger_prefix_erasure_drops() -> Result<(), Box<dyn std::error::Error>> {
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+#[tokio::test]
+async fn test_restore_filter_ledger_prefix_erasure_drops() -> Result<(), Box<dyn std::error::Error>>
+{
+    let ledger_key = LedgerKey::new([0xaa; 32]);
+    let tmp = TempDir::new()?;
+    let (ledger_opt, _) =
+        ErasureLedger::open_or_fail_closed(tmp.path(), ledger_key.clone(), false, None).await?;
+    let mut ledger = ledger_opt.expect("Failed to open test ErasureLedger");
 
-    // Register erasure record in ledger covering scope "lsm", prefix "user:100", erased_at_tx = 500
-    ledger.record_erasure(ErasureRecord::for_prefix(
-        b"lsm".to_vec(),
-        b"user:100".to_vec(),
-        500,
-    ))?;
+    let prefix_hash = compute_keyed_hash(&ledger_key, b"lsm", b"user:100");
+    let entry = LedgerEntry {
+        ledger_seq: 1,
+        kind: LedgerEntryKind::Prefix { prefix_len: 8 },
+        keyed_hash: prefix_hash,
+        erased_at_tx: 500,
+        proof_id: [1u8; 16],
+    };
+    ledger.update_after_append([0u8; 32], vec![entry]);
 
-    let filter = DpiRestoreFilter::for_lsm(ledger);
+    let filter = DpiRestoreFilter::for_lsm(Arc::new(ledger));
 
     let key = b"user:100:profile";
 
@@ -145,9 +160,10 @@ fn test_restore_filter_ledger_prefix_erasure_drops() -> Result<(), Box<dyn std::
     Ok(())
 }
 
-#[test]
-fn test_restore_filter_trait_compatibility() {
-    let ledger = Arc::new(ErasureLedger::new_in_memory());
+#[tokio::test]
+async fn test_restore_filter_trait_compatibility() -> Result<(), Box<dyn std::error::Error>> {
+    let ledger = Arc::new(test_ledger().await?);
     let filter: Box<dyn CpyRestoreFilter> = Box::new(DpiRestoreFilter::for_lsm(ledger));
     assert!(!filter.drop_record(b"any_key", 10));
+    Ok(())
 }

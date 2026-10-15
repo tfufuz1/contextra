@@ -36,6 +36,12 @@ fn test_avv_wiring_end_to_end() {
     assert!(md.contains("Mandantengrundschutz"));
 
     let lines: Vec<&str> = md.trim().lines().map(|l| l.trim()).collect();
-    assert!(lines.first().unwrap().contains("Vorlage, keine Rechtsberatung"));
-    assert!(lines.last().unwrap().contains("Vorlage, keine Rechtsberatung"));
+    assert!(lines
+        .first()
+        .unwrap()
+        .contains("Vorlage, keine Rechtsberatung"));
+    assert!(lines
+        .last()
+        .unwrap()
+        .contains("Vorlage, keine Rechtsberatung"));
 }

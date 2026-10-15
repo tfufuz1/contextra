@@ -50,8 +50,18 @@ async fn test_search_with_deterministic_reranker() -> contextra_types::Result<()
     let db = Arc::new(Contextra::open_with_config(tmp_dir.path(), config).await?);
     let col = db.collection("default").await?;
 
-    db.insert("doc_1", &[0.1, 0.2, 0.3, 0.4], Some(json!({"text": "Alpha document content"}))).await?;
-    db.insert("doc_2", &[0.2, 0.3, 0.4, 0.5], Some(json!({"text": "Beta document content"}))).await?;
+    db.insert(
+        "doc_1",
+        &[0.1, 0.2, 0.3, 0.4],
+        Some(json!({"text": "Alpha document content"})),
+    )
+    .await?;
+    db.insert(
+        "doc_2",
+        &[0.2, 0.3, 0.4, 0.5],
+        Some(json!({"text": "Beta document content"})),
+    )
+    .await?;
 
     let reranker = DeterministicTestReranker;
 
@@ -63,11 +73,22 @@ async fn test_search_with_deterministic_reranker() -> contextra_types::Result<()
         .execute()
         .await?;
 
-    assert!(!search_results.is_empty(), "Search results should not be empty");
+    assert!(
+        !search_results.is_empty(),
+        "Search results should not be empty"
+    );
 
     for res in &search_results {
-        assert!(!res.score.is_nan(), "Score for document {} must not be NaN", res.id);
-        assert!(!res.score.is_infinite(), "Score for document {} must be finite", res.id);
+        assert!(
+            !res.score.is_nan(),
+            "Score for document {} must not be NaN",
+            res.id
+        );
+        assert!(
+            !res.score.is_infinite(),
+            "Score for document {} must be finite",
+            res.id
+        );
     }
 
     let db_owned = Arc::try_unwrap(db)

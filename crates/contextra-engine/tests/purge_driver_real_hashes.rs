@@ -244,6 +244,9 @@ async fn test_purge_driver_stage2_real_hashes_and_tenant() {
         PurgeHandle::Blocked { reason, .. } => {
             panic!("Expected PurgeHandle::Final, got Blocked: {}", reason);
         }
+        PurgeHandle::Pending { .. } => {
+            panic!("Expected PurgeHandle::Final, got Pending");
+        }
     }
 }
 

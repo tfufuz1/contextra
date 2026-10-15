@@ -593,7 +593,10 @@ impl ContextraBuilder {
         let has_license_gate = true;
         let license_gate_is_noop = requested_ring != FeatureRing::Fast
             && self.license_gate.check_ring(FeatureRing::Sovereign).is_ok()
-            && self.license_gate.check_ring(FeatureRing::Compliance).is_ok();
+            && self
+                .license_gate
+                .check_ring(FeatureRing::Compliance)
+                .is_ok();
 
         let _report = crate::wiring_selftest::verify_wiring(
             has_clock,
@@ -624,7 +627,10 @@ impl ContextraBuilder {
                     _query_text: &'a str,
                     _query_embedding: &'a [f32],
                     _top_k: usize,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Vec<contextra_ports::ContextChunk>>> {
+                ) -> contextra_ports::BoxFuture<
+                    'a,
+                    contextra_core::Result<Vec<contextra_ports::ContextChunk>>,
+                > {
                     Box::pin(async move { Ok(Vec::new()) })
                 }
             }
@@ -634,7 +640,8 @@ impl ContextraBuilder {
                 fn get_community<'a>(
                     &'a self,
                     _entity_id: contextra_ports::EntityId,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Option<u64>>>
+                {
                     Box::pin(async move { Ok(None) })
                 }
             }
@@ -820,10 +827,8 @@ mod tests {
     async fn test_builder_wiring_report_integration() -> Result<(), Box<dyn std::error::Error>> {
         use crate::wiring_selftest::ContextraWiringReportExt;
 
-        let tmp_path = std::env::temp_dir().join(format!(
-            "contextra_wiring_rep_test_{}",
-            std::process::id()
-        ));
+        let tmp_path =
+            std::env::temp_dir().join(format!("contextra_wiring_rep_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
 
         let db = ContextraBuilder::new(4)

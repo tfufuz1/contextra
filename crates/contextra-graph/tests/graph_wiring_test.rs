@@ -1,6 +1,5 @@
 use contextra_graph::{
-    CsrGraph, ExtractedRelation, GraphWiring, GraphWiringDependencies,
-    RuleBasedEntityExtractor,
+    CsrGraph, ExtractedRelation, GraphWiring, GraphWiringDependencies, RuleBasedEntityExtractor,
 };
 use contextra_ports::{BoxFuture, GraphIndex, LlmTextGenerator};
 use contextra_types::{DocId, Entity, EntityId, PprConfig, TxId};
@@ -65,8 +64,7 @@ async fn test_graph_wiring_ppr_pipeline_small_and_large_graph_determinism() {
     GraphIndex::add_edge(
         graph.as_ref(),
         tx,
-        contextra_types::Edge::new(EntityId::new(1), EntityId::new(2), "rel")
-            .with_weight(1.0),
+        contextra_types::Edge::new(EntityId::new(1), EntityId::new(2), "rel").with_weight(1.0),
     )
     .await
     .unwrap();
@@ -92,7 +90,10 @@ async fn test_graph_wiring_ppr_pipeline_small_and_large_graph_determinism() {
         .await
         .expect("ppr small graph repeat");
 
-    assert_eq!(ppr1, ppr2, "PPR results must be 100% bit-identically deterministic");
+    assert_eq!(
+        ppr1, ppr2,
+        "PPR results must be 100% bit-identically deterministic"
+    );
 
     // 2. Large graph PPR pipeline execution (triggers APPRH selector routing >= 100 nodes)
     let large_graph = Arc::new(CsrGraph::new());
@@ -197,7 +198,8 @@ async fn test_graph_wiring_suggest_and_validate_unconfigured_llm_port_returns_er
     assert!(res.is_err());
     let err = res.unwrap_err();
     assert!(
-        err.to_string().contains("No LLM text generator port configured"),
+        err.to_string()
+            .contains("No LLM text generator port configured"),
         "Expected error for unconfigured LLM port, got: {err}"
     );
 }

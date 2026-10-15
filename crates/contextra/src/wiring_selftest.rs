@@ -4,9 +4,9 @@
 //! (Clock, Rng, IdGen, LicenseGate) gültige Implementierungen haben
 //! und Null-/Accept-All-Implementierungen nicht als Sicherheits-Port-Standard dienen.
 
+use crate::builder::ContextraBuilder;
 use contextra_core::error::ContextraError;
 use contextra_db::Contextra;
-use crate::builder::ContextraBuilder;
 
 /// Liste der kritischen Pflicht-Ports (§22 Punkt 4).
 pub const REQUIRED_SECURITY_PORTS: &[&str] = &["Clock", "Rng", "IdGen", "LicenseGate"];
@@ -43,31 +43,41 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
     if builder.adapt_enabled() {
         report.wired_ports.push("AdaptController".to_string());
     } else {
-        report.missing_ports.push("AdaptController (disabled)".to_string());
+        report
+            .missing_ports
+            .push("AdaptController (disabled)".to_string());
     }
 
     if builder.privacy_enabled() {
         report.wired_ports.push("PrivacyEgress".to_string());
     } else {
-        report.missing_ports.push("PrivacyEgress (disabled)".to_string());
+        report
+            .missing_ports
+            .push("PrivacyEgress (disabled)".to_string());
     }
 
     if builder.sandbox_enabled() {
         report.wired_ports.push("WasmSandbox".to_string());
     } else {
-        report.missing_ports.push("WasmSandbox (disabled)".to_string());
+        report
+            .missing_ports
+            .push("WasmSandbox (disabled)".to_string());
     }
 
     if builder.audit_export_enabled() {
         report.wired_ports.push("AuditExport".to_string());
     } else {
-        report.missing_ports.push("AuditExport (disabled)".to_string());
+        report
+            .missing_ports
+            .push("AuditExport (disabled)".to_string());
     }
 
     if builder.avv_generator_enabled() {
         report.wired_ports.push("AvvGenerator".to_string());
     } else {
-        report.missing_ports.push("AvvGenerator (disabled)".to_string());
+        report
+            .missing_ports
+            .push("AvvGenerator (disabled)".to_string());
     }
 
     if builder.kms_enabled() {
@@ -79,13 +89,17 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
     if builder.kv_shredding_enabled() {
         report.wired_ports.push("KvShredding".to_string());
     } else {
-        report.missing_ports.push("KvShredding (disabled)".to_string());
+        report
+            .missing_ports
+            .push("KvShredding (disabled)".to_string());
     }
 
     if builder.checkpoint_enabled() {
         report.wired_ports.push("CheckpointRecovery".to_string());
     } else {
-        report.missing_ports.push("CheckpointRecovery (disabled)".to_string());
+        report
+            .missing_ports
+            .push("CheckpointRecovery (disabled)".to_string());
     }
 
     report
@@ -134,7 +148,9 @@ pub fn verify_wiring(
     }
 
     if license_gate_is_noop {
-        report.invalid_security_ports.push("LicenseGate (Noop/OpenFastGate used in strict mode)".to_string());
+        report
+            .invalid_security_ports
+            .push("LicenseGate (Noop/OpenFastGate used in strict mode)".to_string());
     }
 
     if !report.is_valid() {

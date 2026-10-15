@@ -146,8 +146,15 @@ impl KvShreddingWiring {
     }
 
     /// Löst Crypto-Shredding für eine einzelne Gruppe / Segment-ID aus.
-    pub fn shred_group(&self, tenant_id: TenantId, segment_id: u64) -> Result<bool, ContextraError> {
-        let key = self.registered_keys.write().remove(&(tenant_id, segment_id));
+    pub fn shred_group(
+        &self,
+        tenant_id: TenantId,
+        segment_id: u64,
+    ) -> Result<bool, ContextraError> {
+        let key = self
+            .registered_keys
+            .write()
+            .remove(&(tenant_id, segment_id));
         if let Some(key) = key {
             key.shred();
             let _ = shred_segment_key(&self.key_registry, tenant_id, segment_id);
@@ -192,8 +199,10 @@ mod tests {
         let key_a = ShreddableSegmentKey::try_new_random("secret-a").unwrap();
         let key_b = ShreddableSegmentKey::try_new_random("secret-b").unwrap();
 
-        let seg_a = Tier2EncryptedSegment::new(tenant_a, 1001, b"tenant-a-payload", key_a.clone()).unwrap();
-        let seg_b = Tier2EncryptedSegment::new(tenant_b, 2001, b"tenant-b-payload", key_b.clone()).unwrap();
+        let seg_a =
+            Tier2EncryptedSegment::new(tenant_a, 1001, b"tenant-a-payload", key_a.clone()).unwrap();
+        let seg_b =
+            Tier2EncryptedSegment::new(tenant_b, 2001, b"tenant-b-payload", key_b.clone()).unwrap();
 
         wiring.register_segment_key(tenant_a, 1001, key_a);
         wiring.register_segment_key(tenant_b, 2001, key_b);
@@ -237,7 +246,9 @@ mod tests {
         wiring.register_collection_segment(tenant, "collection_notes", 20);
 
         // Action: Delete collection_docs
-        let shredded = wiring.handle_collection_deletion(tenant, "collection_docs").unwrap();
+        let shredded = wiring
+            .handle_collection_deletion(tenant, "collection_docs")
+            .unwrap();
         assert_eq!(shredded, 1);
 
         // collection_docs segment is shredded

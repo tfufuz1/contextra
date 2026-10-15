@@ -37,9 +37,7 @@ impl SandboxWiring {
         let verifier: Arc<dyn ModuleVerifier + Send + Sync> = match config.verifier {
             Some(v) => v,
             None => match &config.capabilities.module_policy {
-                ModulePolicy::SignedBy(keys) => {
-                    Arc::new(Ed25519ModuleVerifier::new(keys.clone()))
-                }
+                ModulePolicy::SignedBy(keys) => Arc::new(Ed25519ModuleVerifier::new(keys.clone())),
                 _ => Arc::new(Ed25519ModuleVerifier::default()),
             },
         };

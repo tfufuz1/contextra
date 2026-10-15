@@ -36,17 +36,24 @@ fn test_rerank_wiring_enabled_missing_model_fails() {
     };
 
     let res = RerankWiring::build(deps);
-    assert!(res.is_err(), "Wiring build must fail on missing model when enabled");
+    assert!(
+        res.is_err(),
+        "Wiring build must fail on missing model when enabled"
+    );
     let err = res.err().unwrap();
     assert!(
-        matches!(err, ContextraError::InvalidInput(_) | ContextraError::NotFound(_)),
+        matches!(
+            err,
+            ContextraError::InvalidInput(_) | ContextraError::NotFound(_)
+        ),
         "Expected InvalidInput or NotFound error, got {:?}",
         err
     );
 }
 
 #[test]
-fn test_rerank_wiring_enabled_with_fake_model_or_passthrough() -> Result<(), Box<dyn std::error::Error>> {
+fn test_rerank_wiring_enabled_with_fake_model_or_passthrough(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;
     let model_path = dir.path().join("model.onnx");
     let tokenizer_path = dir.path().join("tokenizer.json");

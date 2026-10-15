@@ -38,10 +38,7 @@ async fn test_drop_collection_layer_claims_and_purge_status() -> Result<()> {
     let err_zero = engine
         .drop_collection_with_report(collection_name, tenant_id, &invalid_zero_key)
         .await;
-    assert!(
-        err_zero.is_err(),
-        "All-zero proof key must return an error"
-    );
+    assert!(err_zero.is_err(), "All-zero proof key must return an error");
 
     // 2. Create collection and write canary document
     let col = engine
@@ -65,14 +62,10 @@ async fn test_drop_collection_layer_claims_and_purge_status() -> Result<()> {
     engine.flush().await?;
 
     // Verify raw SSTable storage directly still contains canary data before drop
-    let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-        engine.inner_storage(),
-        tenant_id,
-    );
+    let tenant_storage =
+        contextra_store::tenant_codec::TenantScopedStorage::new(engine.inner_storage(), tenant_id);
     let col_prefix = format!("__col:{}:", collection_name);
-    let scan_before = tenant_storage
-        .scan_prefix(col_prefix.as_bytes())
-        .await?;
+    let scan_before = tenant_storage.scan_prefix(col_prefix.as_bytes()).await?;
     assert!(
         !scan_before.is_empty(),
         "Storage prefix must contain keys in SSTable"
@@ -90,7 +83,9 @@ async fn test_drop_collection_layer_claims_and_purge_status() -> Result<()> {
         "Expected physical purge to be NotPerformed on HEAD, got: {purge_str}"
     );
     assert!(
-        purge_str.contains("Unimplemented") || purge_str.contains("ActiveSnapshot") || purge_str.contains("InsufficientDiskSpace"),
+        purge_str.contains("Unimplemented")
+            || purge_str.contains("ActiveSnapshot")
+            || purge_str.contains("InsufficientDiskSpace"),
         "Expected physical purge reason to contain PurgeBlocked variant, got: {purge_str}"
     );
 
@@ -110,9 +105,7 @@ async fn test_drop_collection_layer_claims_and_purge_status() -> Result<()> {
     );
 
     // 6. Verify logical deletion
-    let scan_after = tenant_storage
-        .scan_prefix(col_prefix.as_bytes())
-        .await?;
+    let scan_after = tenant_storage.scan_prefix(col_prefix.as_bytes()).await?;
     assert!(
         scan_after.is_empty(),
         "Post-commit logical scan in active state must return empty"

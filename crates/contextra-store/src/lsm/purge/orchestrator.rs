@@ -309,8 +309,12 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::P5Dispose)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
-                let disp_rep =
-                    dispose_obsolete_files(&self.storage_dir, report.obsolete_files.clone(), secure_delete).await?;
+                let disp_rep = dispose_obsolete_files(
+                    &self.storage_dir,
+                    report.obsolete_files.clone(),
+                    secure_delete,
+                )
+                .await?;
                 refusals = disp_rep.refusals.len();
 
                 self.check_failpoint("mid_dispose_journal")?;

@@ -111,12 +111,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             ));
         }
 
+        let snapshot = contextra_ports::ReadSnapshot::new(seq_no);
+
         #[allow(deprecated)]
         let (mut results, report) = self
             .collection
             .hybrid_search_with_query_and_report_at(
                 &hybrid_query,
-                seq_no,
+                &snapshot,
                 self.on_signal_failure,
                 self.metrics.as_deref(),
             )
@@ -152,7 +154,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         // Executed NACH RRF-Fusion and VOR CrossEncoder Reranking to ensure high efficiency
         // (expensive CrossEncoder reranker is only invoked on temporally valid candidates).
         if let Some(as_of) = self.as_of_timestamp {
-            results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
+            let as_of_tx = self
+                .current_tx
+                .unwrap_or(contextra_types::TxId::new(seq_no));
+            results = crate::temporal_filter::apply_temporal_validity_filter_at_bitemporal(
+                results,
+                as_of_tx,
+                Some(as_of),
+            );
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
             let ctx = self
                 .current_tx
@@ -399,7 +408,14 @@ where
         }
 
         if let Some(as_of) = self.as_of_timestamp {
-            results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
+            let as_of_tx = self
+                .current_tx
+                .unwrap_or(contextra_types::TxId::new(seq_no));
+            results = crate::temporal_filter::apply_temporal_validity_filter_at_bitemporal(
+                results,
+                as_of_tx,
+                Some(as_of),
+            );
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
             let ctx = self
                 .current_tx

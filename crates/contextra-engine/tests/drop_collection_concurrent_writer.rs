@@ -33,7 +33,7 @@ async fn test_drop_collection_concurrent_writer_closed_window() {
         .await
         .expect("put_kv failed");
 
-    let _proof_key = [0x55u8; 32];
+    let proof_key = [0x55u8; 32];
 
     // Spawn a concurrent task attempting to access or write to the collection
     let engine_ref = Arc::clone(&engine);
@@ -52,7 +52,7 @@ async fn test_drop_collection_concurrent_writer_closed_window() {
             .drop_collection(col_name, tenant_id, &proof_key)
             .await
             .expect("drop_collection failed");
-        assert!(proof.proof_id != [0u8; 16] || !proof.signature.is_empty());
+        assert!(!proof.signature.is_empty());
     }
 
     let col_res = handle.await.expect("tokio task failed");

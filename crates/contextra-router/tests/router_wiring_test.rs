@@ -1,12 +1,10 @@
 use contextra_ports::{
-    BoxFuture, Clock, CommunityResolver, ContextPreparer, DriftStatusProvider, HybridSearchProvider,
-    SystemClock,
+    BoxFuture, Clock, CommunityResolver, ContextPreparer, DriftStatusProvider,
+    HybridSearchProvider, SystemClock,
 };
 use contextra_router::profile::SlmProfile;
 use contextra_router::wiring::{RouterWiring, RouterWiringDeps};
-use contextra_types::{
-    ContextChunk, ContextWindow, DocId, EntityId, Result, TokenBudget,
-};
+use contextra_types::{ContextChunk, ContextWindow, DocId, EntityId, Result, TokenBudget};
 use std::sync::Arc;
 
 struct MockSearchProvider;
@@ -123,7 +121,11 @@ async fn test_router_wiring_production_flow_success_dispatch() {
 
     // Execute route and dispatch
     let res = handle.route(&[0.1, 0.2, 0.3], "hello world").await;
-    assert!(res.is_ok(), "Expected successful route & dispatch: {:?}", res);
+    assert!(
+        res.is_ok(),
+        "Expected successful route & dispatch: {:?}",
+        res
+    );
     assert_eq!(res.unwrap(), "valid response");
 
     // Verify outcome was recorded and pending decisions cleared
@@ -244,5 +246,8 @@ async fn test_router_wiring_determinism_same_seed() {
         .expect("route B ok");
 
     assert_eq!(decision_a.profile.name, decision_b.profile.name);
-    assert_eq!(decision_a.decision_id.inner(), decision_b.decision_id.inner());
+    assert_eq!(
+        decision_a.decision_id.inner(),
+        decision_b.decision_id.inner()
+    );
 }

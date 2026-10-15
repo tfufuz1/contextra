@@ -63,7 +63,10 @@ fn test_seeded_rng_reproducibility_across_threads() {
     let seq1 = handle1.join().expect("thread 1 failed");
     let seq2 = handle2.join().expect("thread 2 failed");
 
-    assert_eq!(seq1, seq2, "SeededRng generated different outputs for identical seeds");
+    assert_eq!(
+        seq1, seq2,
+        "SeededRng generated different outputs for identical seeds"
+    );
 }
 
 #[test]

@@ -228,7 +228,11 @@ mod tests {
         };
 
         let texts = vec![
-            vec!["seg1_turn1".into(), "seg1_turn2".into(), "seg1_turn3".into()],
+            vec![
+                "seg1_turn1".into(),
+                "seg1_turn2".into(),
+                "seg1_turn3".into(),
+            ],
             vec![
                 "segment_2_turn1".into(),
                 "segment_2_turn2".into(),

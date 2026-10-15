@@ -375,7 +375,10 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                     }
 
                     if let Some(caps) = stand_re.captures(trimmed) {
-                        let ts = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+                        let ts = caps
+                            .get(1)
+                            .map(|m| m.as_str().to_string())
+                            .unwrap_or_default();
                         let sess = caps.get(2).map(|m| m.as_str().to_string());
                         tags.push(TagItem {
                             file_path: rel_path.clone(),
@@ -419,13 +422,16 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                         let b3 = caps.get(4).map(|m| m.as_str());
                         let rest = caps.get(5).map(|m| m.as_str()).unwrap_or("").trim();
 
-                        let id = id_re.captures(trimmed).map(|c| c[1].to_string()).or_else(|| {
-                            if tag_kind == "ANCHOR" && b1.contains(':') {
-                                Some(b1.to_string())
-                            } else {
-                                None
-                            }
-                        });
+                        let id = id_re
+                            .captures(trimmed)
+                            .map(|c| c[1].to_string())
+                            .or_else(|| {
+                                if tag_kind == "ANCHOR" && b1.contains(':') {
+                                    Some(b1.to_string())
+                                } else {
+                                    None
+                                }
+                            });
 
                         let ts = ts_re
                             .captures(trimmed)
@@ -439,8 +445,12 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                             || status.as_deref() == Some("CLOSED")
                             || status.as_deref() == Some("PASS")
                             || b1.eq_ignore_ascii_case("RESOLVED")
-                            || b2.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false)
-                            || b3.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false)
+                            || b2
+                                .map(|s| s.eq_ignore_ascii_case("RESOLVED"))
+                                .unwrap_or(false)
+                            || b3
+                                .map(|s| s.eq_ignore_ascii_case("RESOLVED"))
+                                .unwrap_or(false)
                             || rest.contains("RESOLVED:")
                             || rest.contains("[RESOLVED]");
 
@@ -450,7 +460,10 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                             } else {
                                 Some(b1.to_string())
                             };
-                            let sev = if b2.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false) {
+                            let sev = if b2
+                                .map(|s| s.eq_ignore_ascii_case("RESOLVED"))
+                                .unwrap_or(false)
+                            {
                                 b3.map(|s| s.to_string())
                             } else {
                                 b2.map(|s| s.to_string())

@@ -32,12 +32,15 @@ pub struct AuditWiringBundle {
 #[cfg(feature = "audit-export")]
 impl AuditWiringBundle {
     /// Constructs a new `AuditWiringBundle`.
-    pub fn build(
-        tenant_id: TenantId,
-        clock: Arc<dyn Clock>,
-    ) -> Result<Self, ContextraError> {
+    pub fn build(tenant_id: TenantId, clock: Arc<dyn Clock>) -> Result<Self, ContextraError> {
         #[cfg(feature = "avv-generator")]
-        let avv = AvvWiring::build("Contextra Controller", "Contextra Engine", tenant_id, clock.clone()).ok();
+        let avv = AvvWiring::build(
+            "Contextra Controller",
+            "Contextra Engine",
+            tenant_id,
+            clock.clone(),
+        )
+        .ok();
 
         Ok(Self {
             clock,

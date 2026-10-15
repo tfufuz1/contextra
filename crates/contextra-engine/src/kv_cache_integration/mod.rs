@@ -117,12 +117,10 @@ impl KvEngineShreddingAdapter {
                 let shredded = self.shredding_wiring.shred_group(tenant_id, segment_id)?;
                 Ok(if shredded { 1 } else { 0 })
             }
-            KvShredScope::Collection(ref col_name) => {
-                self.shredding_wiring.handle_collection_deletion(tenant_id, col_name)
-            }
-            KvShredScope::Tenant => {
-                self.shredding_wiring.handle_tenant_deletion(tenant_id)
-            }
+            KvShredScope::Collection(ref col_name) => self
+                .shredding_wiring
+                .handle_collection_deletion(tenant_id, col_name),
+            KvShredScope::Tenant => self.shredding_wiring.handle_tenant_deletion(tenant_id),
         }
     }
 }
@@ -219,10 +217,14 @@ mod tests {
 
         let tenant = TenantId::try_new(42).unwrap();
         let doc_id = DocId(1001);
-        let segment_id = match doc_id { DocId(id) => id as u64 };
+        let segment_id = match doc_id {
+            DocId(id) => id as u64,
+        };
 
         let key = ShreddableSegmentKey::try_new_random("secret-passphrase").unwrap();
-        let segment = Tier2EncryptedSegment::new(tenant, segment_id, b"sensitive KV payload", key.clone()).unwrap();
+        let segment =
+            Tier2EncryptedSegment::new(tenant, segment_id, b"sensitive KV payload", key.clone())
+                .unwrap();
 
         shredding_wiring.register_segment_key(tenant, segment_id, key);
 
@@ -250,10 +252,7 @@ mod tests {
         let req1 = RequestId(1);
         let req2 = RequestId(2);
 
-        let mut candidates = vec![
-            ("doc_a", 0.8f32),
-            ("doc_b", 0.9f32),
-        ];
+        let mut candidates = vec![("doc_a", 0.8f32), ("doc_b", 0.9f32)];
 
         let mut metrics = HashMap::new();
         metrics.insert(req1, 0.5f32); // boosts doc_a by 0.5 * 0.4 = 0.2 -> 1.0 total

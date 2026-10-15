@@ -30,7 +30,9 @@ fn test_kv_crypto_shred_instant_unrecoverable() {
     assert_eq!(decrypted.as_slice(), original_plaintext);
 
     // 3. Perform O(1) Crypto-Shredding by revoking (destroying) sub-key from registry
-    let revoked = registry.revoke_subkey(group_id);
+    let revoked = registry
+        .revoke_subkey(group_id)
+        .expect("revoke_subkey succeeded");
     assert!(revoked, "sub-key must be revoked successfully");
     assert!(!registry.is_key_active(group_id));
 

@@ -23,7 +23,10 @@ async fn test_wiring_feature_retrieval() {
         assert!(ret.router_wiring.is_some());
 
         let db = b.build().await;
-        assert!(db.is_ok(), "Retrieval feature Contextra build should succeed");
+        assert!(
+            db.is_ok(),
+            "Retrieval feature Contextra build should succeed"
+        );
 
         let _ = std::fs::remove_dir_all(&tmp_path);
     }

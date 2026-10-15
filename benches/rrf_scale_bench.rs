@@ -119,7 +119,8 @@ fn bench_rrf_scaling(c: &mut Criterion) {
         let rss_before = get_vm_rss_kb().unwrap_or(0);
 
         // Open-Loop Latency Distribution Measurement using HdrHistogram (fixed arrival schedule)
-        let mut hist = hdrhistogram::Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("Histogram creation failed");
+        let mut hist = hdrhistogram::Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
+            .expect("Histogram creation failed");
         let sample_runs = 20;
         let mut dur_samples = Vec::with_capacity(sample_runs);
 

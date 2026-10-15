@@ -1,11 +1,7 @@
 // STAND: 2026-10-13
 // ZWECK: Tests for Module Cache and WasmWorkerPool backpressure
 
-use contextra_sandbox::{
-    executor::WasmWorkerPool,
-    merge::WasmMergeFunction,
-    SandboxError,
-};
+use contextra_sandbox::{executor::WasmWorkerPool, merge::WasmMergeFunction, SandboxError};
 
 #[tokio::test]
 async fn test_module_cache_prevents_recompilation() -> Result<(), Box<dyn std::error::Error>> {

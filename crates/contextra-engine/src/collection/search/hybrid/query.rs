@@ -11,12 +11,8 @@ use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorI
 use contextra_types::{DocId, Result};
 
 /// Fixed pipeline stages for hybrid search processing (§W1-15).
-pub const HYBRID_PIPELINE_STAGES: &[&str] = &[
-    "signal_retrieval",
-    "fusion",
-    "rerank",
-    "egress_filter",
-];
+pub const HYBRID_PIPELINE_STAGES: &[&str] =
+    &["signal_retrieval", "fusion", "rerank", "egress_filter"];
 
 /// Typed pipeline stage identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -42,7 +38,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            self.hybrid_search_with_query_at(query, seq).await
+            let snapshot = contextra_ports::ReadSnapshot::new(seq);
+            self.hybrid_search_with_query_at(query, &snapshot).await
         })
         .await
     }
@@ -52,10 +49,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
     ) -> Result<Vec<crate::SearchResult>> {
         let (results, _) = self
-            .hybrid_search_with_query_and_report_at(query, seq, SignalFailurePolicy::Fail, None)
+            .hybrid_search_with_query_and_report_at(
+                query,
+                snapshot,
+                SignalFailurePolicy::Fail,
+                None,
+            )
             .await?;
         Ok(results)
     }
@@ -65,10 +67,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_and_report_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
         on_signal_failure: SignalFailurePolicy,
         metrics: Option<&dyn MetricsSink>,
     ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
+        let seq = snapshot.max_seq();
         if query.k == 0 {
             return Ok((Vec::new(), SearchReport::default()));
         }
@@ -152,7 +155,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     let vector_res: Result<(Vec<crate::SearchResult>, u8)> = if is_vector_zero {
                         Ok((Vec::new(), 0))
                     } else if is_filtered {
-                        let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;
+                        let matched_ids_opt =
+                            self.get_matching_doc_ids_for_query_at(query, seq).await?;
                         if let Some(ref matched_ids) = matched_ids_opt {
                             if matched_ids.is_empty() {
                                 Ok((Vec::new(), 0))
@@ -163,11 +167,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 let mut final_filtered = Vec::new();
                                 let mut max_stage = 0u8;
 
-                                for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
+                                for (stage_idx, &stage_mult) in
+                                    OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
+                                {
                                     max_stage = max_stage.max((stage_idx + 1) as u8);
                                     let oversample = (candidate_k * stage_mult).min(max_cap);
                                     let raw_vec_results = self
-                                        .search_filtered_at(vector, oversample, Some(&filter_fn), seq)
+                                        .search_filtered_at(
+                                            vector,
+                                            oversample,
+                                            Some(&filter_fn),
+                                            seq,
+                                        )
                                         .await?;
                                     let raw_len = raw_vec_results.len();
                                     final_filtered = filter_pre_rrf(raw_vec_results);
@@ -186,7 +197,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             let mut final_filtered = Vec::new();
                             let mut max_stage = 0u8;
 
-                            for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
+                            for (stage_idx, &stage_mult) in
+                                OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
+                            {
                                 max_stage = max_stage.max((stage_idx + 1) as u8);
                                 let oversample = (candidate_k * stage_mult).min(max_cap);
                                 let raw_vec_results = self
@@ -205,7 +218,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             Ok((final_filtered, max_stage))
                         }
                     } else {
-                        let res = self.search_filtered_at(vector, candidate_k, None, seq).await?;
+                        let res = self
+                            .search_filtered_at(vector, candidate_k, None, seq)
+                            .await?;
                         Ok((res, 1))
                     };
 
@@ -244,11 +259,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         let mut final_filtered = Vec::new();
                         let mut max_stage = 0u8;
 
-                        for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
+                        for (stage_idx, &stage_mult) in
+                            OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
+                        {
                             max_stage = max_stage.max((stage_idx + 1) as u8);
                             let oversample =
                                 (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
-                            let bm25_results = self.text_index.search_at(text, oversample, seq).await?;
+                            let bm25_results =
+                                self.text_index.search_at(text, oversample, seq).await?;
                             let bm25_len = bm25_results.len();
                             let hydrated = self
                                 .hydrate_from_tuples_at(
@@ -270,7 +288,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         }
                         Ok((final_filtered, max_stage))
                     } else {
-                        let bm25_results = self.text_index.search_at(text, candidate_k, seq).await?;
+                        let bm25_results =
+                            self.text_index.search_at(text, candidate_k, seq).await?;
                         let hydrated = self
                             .hydrate_from_tuples_at(
                                 bm25_results
@@ -533,13 +552,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_and_report_at_reranked(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
         on_signal_failure: SignalFailurePolicy,
         metrics: Option<&dyn MetricsSink>,
         reranker: Option<&dyn contextra_ports::Reranker>,
     ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
         let (mut results, report) = self
-            .hybrid_search_with_query_and_report_at(query, seq, on_signal_failure, metrics)
+            .hybrid_search_with_query_and_report_at(query, snapshot, on_signal_failure, metrics)
             .await?;
 
         if let Some(r) = reranker {

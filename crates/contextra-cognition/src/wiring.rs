@@ -7,7 +7,8 @@ use crate::maintenance_scheduler::MaintenanceScheduler;
 use crate::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
 use contextra_engine::collection::Collection;
 use contextra_ports::{
-    Clock, GroundingValidator, LlmTextGenerator, Rng, StorageEngine, SystemClock, SystemRng, VectorIndex,
+    Clock, GroundingValidator, LlmTextGenerator, Rng, StorageEngine, SystemClock, SystemRng,
+    VectorIndex,
 };
 use contextra_store::LsmStorage;
 use contextra_types::Result;
@@ -30,7 +31,10 @@ pub struct CognitionWiringDeps<S: StorageEngine = LsmStorage, V: VectorIndex = H
 }
 
 /// Composition Root wiring for `contextra-cognition`.
-pub struct CognitionWiring<S: StorageEngine + 'static = LsmStorage, V: VectorIndex + 'static = HnswIndex> {
+pub struct CognitionWiring<
+    S: StorageEngine + 'static = LsmStorage,
+    V: VectorIndex + 'static = HnswIndex,
+> {
     engine: Arc<ConsolidationEngine<S, V>>,
     scheduler: Arc<MaintenanceScheduler<S, V>>,
     clock: Arc<dyn Clock>,
@@ -40,9 +44,7 @@ pub struct CognitionWiring<S: StorageEngine + 'static = LsmStorage, V: VectorInd
 impl<S: StorageEngine + 'static, V: VectorIndex + 'static> CognitionWiring<S, V> {
     /// Builds `CognitionWiring` from dependencies conforming to Rule 7.
     pub fn build(deps: CognitionWiringDeps<S, V>) -> Result<Self> {
-        let clock = deps
-            .clock
-            .unwrap_or_else(|| Arc::new(SystemClock::new()));
+        let clock = deps.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
         let rng = deps.rng.unwrap_or_else(|| Arc::new(SystemRng::new()));
 
         let interval = Duration::from_secs(300);

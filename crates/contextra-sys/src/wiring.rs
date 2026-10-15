@@ -42,7 +42,10 @@ mod tests {
         std::fs::write(&test_file, b"secret data").expect("write failed");
 
         let set_res = wiring.set_restrictive_file_acl(&test_file);
-        assert!(set_res.is_ok(), "set_restrictive_file_acl failed: {set_res:?}");
+        assert!(
+            set_res.is_ok(),
+            "set_restrictive_file_acl failed: {set_res:?}"
+        );
 
         let verify_res = wiring.verify_file_acl_owner_only(&test_file);
         assert!(

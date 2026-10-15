@@ -66,8 +66,7 @@ impl LicenseWiring {
     pub fn build(deps: LicenseWiringDeps) -> Result<Self, ContextraError> {
         let clock = deps.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
 
-        let mut gate = SignedLicenseGate::no_activation_with_clock(clock)
-            .with_mode(deps.mode);
+        let mut gate = SignedLicenseGate::no_activation_with_clock(clock).with_mode(deps.mode);
 
         if let Some(keyring) = deps.keyring {
             gate = gate.with_keyring(keyring);

@@ -2,9 +2,9 @@
 // STAND: 2026-10-13
 // ZWECK: Composition Root Wiring for CrossEncoderReranker (§20.2 / Rule 7).
 
-use std::sync::Arc;
 use contextra_ports::Reranker;
 use contextra_types::{ContextraError, Result};
+use std::sync::Arc;
 
 use crate::reranker::{CrossEncoderReranker, RerankConfig};
 
@@ -53,7 +53,9 @@ impl RerankWiring {
         let enabled = deps.enabled;
 
         let reranker: Arc<dyn Reranker> = if !enabled {
-            Arc::new(CrossEncoderReranker::passthrough_with_config(config.clone()))
+            Arc::new(CrossEncoderReranker::passthrough_with_config(
+                config.clone(),
+            ))
         } else {
             // Check file existence explicitly to ensure a clear error when enabled
             if !config.model_path.exists() {

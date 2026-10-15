@@ -1,9 +1,8 @@
 use contextra_ports::Clock;
 use contextra_privacy::{
-    compute_audit_trace, extract_rule_id, BlockReason, BoxFuture,
-    EgressClassification, EgressClassifierTrace, EgressGuard,
-    EgressVault, TextSearchEngine, TextSearchResult, DEFAULT_EGRESS_GUARD_MIN_BYTES,
-    DEFAULT_EGRESS_GUARD_THRESHOLD,
+    compute_audit_trace, extract_rule_id, BlockReason, BoxFuture, EgressClassification,
+    EgressClassifierTrace, EgressGuard, EgressVault, TextSearchEngine, TextSearchResult,
+    DEFAULT_EGRESS_GUARD_MIN_BYTES, DEFAULT_EGRESS_GUARD_THRESHOLD,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

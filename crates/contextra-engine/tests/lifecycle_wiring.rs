@@ -25,15 +25,12 @@ async fn test_open_with_config_and_wiring_populates_controllers() -> contextra_t
         contextra_adapt::PidController::new(1.0, 10, 5, Some(20)),
     ));
 
-    let router_weak = std::sync::Arc::downgrade(&router) as std::sync::Weak<dyn DriftStatusProvider>;
+    let router_weak =
+        std::sync::Arc::downgrade(&router) as std::sync::Weak<dyn DriftStatusProvider>;
     let calibrator_weak = std::sync::Arc::downgrade(&calibrator);
     let pid_weak = std::sync::Arc::downgrade(&pid);
 
-    let wiring = EngineWiring::build(
-        Some(router_weak),
-        Some(calibrator_weak),
-        Some(pid_weak),
-    )?;
+    let wiring = EngineWiring::build(Some(router_weak), Some(calibrator_weak), Some(pid_weak))?;
 
     let config = ContextraConfig {
         consolidation_enabled: false,
@@ -67,11 +64,11 @@ async fn test_open_with_consolidation_enabled_without_launcher_returns_policy_vi
 }
 
 #[tokio::test]
-async fn test_open_with_consolidation_enabled_with_launcher_succeeds() -> contextra_types::Result<()> {
+async fn test_open_with_consolidation_enabled_with_launcher_succeeds() -> contextra_types::Result<()>
+{
     let tmp = tempdir().unwrap();
-    let launcher: ConsolidationLauncher = std::sync::Arc::new(|_col, _interval, _max_llm, _cancel| {
-        tokio::spawn(async {})
-    });
+    let launcher: ConsolidationLauncher =
+        std::sync::Arc::new(|_col, _interval, _max_llm, _cancel| tokio::spawn(async {}));
 
     let config = ContextraConfig {
         consolidation_enabled: true,

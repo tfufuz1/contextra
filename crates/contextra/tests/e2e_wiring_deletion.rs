@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use std::sync::Arc;
 use contextra::builder;
 use contextra::{AgentMemory, TextEmbeddingEngine};
 use contextra_core::{BoxFuture, ContextraError};
@@ -8,6 +7,7 @@ use contextra_ports::clock::ManualClock;
 use contextra_ports::rng::SeededRng;
 use contextra_ports::Rng;
 use serde_json::json;
+use std::sync::Arc;
 
 struct MockEmbedder;
 
@@ -16,7 +16,10 @@ impl TextEmbeddingEngine for MockEmbedder {
         Box::pin(async move { Ok(vec![0.1; 16]) })
     }
 
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, contextra_core::Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> BoxFuture<'a, contextra_core::Result<Vec<Vec<f32>>>> {
         Box::pin(async move { Ok(vec![vec![0.1; 16]; texts.len()]) })
     }
 }
@@ -26,7 +29,11 @@ async fn test_agent_memory_forget_flow_facade() -> Result<(), ContextraError> {
     let seed: u64 = 20261013_04;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_deletion seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_deletion seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
     let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_deletion_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
@@ -41,7 +48,10 @@ async fn test_agent_memory_forget_flow_facade() -> Result<(), ContextraError> {
 
     // 1. Remember memory
     let mem_id = memory_facade
-        .remember("System architecture design for vector store", Some(json!({"topic": "architecture"})))
+        .remember(
+            "System architecture design for vector store",
+            Some(json!({"topic": "architecture"})),
+        )
         .await?;
 
     // 2. Recall memory
@@ -61,7 +71,10 @@ async fn test_agent_memory_forget_flow_facade() -> Result<(), ContextraError> {
 
     // 5. Verify underlying document is deleted via engine reference
     let doc_check = memory_facade.engine().get(mem_id.as_str()).await?;
-    assert!(doc_check.is_none(), "Underlying document must be None after forget");
+    assert!(
+        doc_check.is_none(),
+        "Underlying document must be None after forget"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())
@@ -73,9 +86,14 @@ async fn test_forget_document_purge_driver_and_deletion_proof() -> Result<(), Co
     let seed: u64 = 20261013_05;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000);
-    println!("e2e_wiring_deletion proof seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_deletion proof seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
-    let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_deletion_proof_{}", rng.next_u64()));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("e2e_wiring_deletion_proof_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
     // Purge driver reverse sweep & DeletionProof generation require facade wiring for

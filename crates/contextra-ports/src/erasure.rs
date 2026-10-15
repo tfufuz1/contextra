@@ -10,17 +10,19 @@
 
 #![forbid(unsafe_code)]
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-use contextra_types::{CollectionId, DocId, Result, TenantId, TxId};
 use crate::BoxFuture;
+use contextra_types::{CollectionId, DocId, Result, TenantId, TxId};
 
 /// Operational mode for document erasure and deletion guarantees (§8.2).
 ///
 /// Persistent watermark: opening with a lower mode than previously recorded
 /// fails closed with a policy violation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum ErasureMode {
     /// Off (Default): Standard tombstone delete. No ledger, no fence, no footprint scan.
     #[default]

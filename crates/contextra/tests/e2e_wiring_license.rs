@@ -14,7 +14,11 @@ async fn test_license_wiring_matrix() -> Result<(), Box<dyn std::error::Error>> 
     let seed: u64 = 20261013_01;
     let rng = SeededRng::new(seed);
     let clock = ManualClock::new(1760390400_000_000_000); // fixed deterministic timestamp
-    println!("e2e_wiring_license seed: {}, clock_nanos: {}", seed, clock.now_nanos());
+    println!(
+        "e2e_wiring_license seed: {}, clock_nanos: {}",
+        seed,
+        clock.now_nanos()
+    );
 
     let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_license_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
@@ -100,7 +104,10 @@ async fn test_license_wiring_matrix() -> Result<(), Box<dyn std::error::Error>> 
         .build()
         .await;
 
-    assert!(res_tampered.is_err(), "Tampered license payload must be rejected");
+    assert!(
+        res_tampered.is_err(),
+        "Tampered license payload must be rejected"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())

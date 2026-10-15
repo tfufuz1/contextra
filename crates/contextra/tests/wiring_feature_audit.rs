@@ -31,7 +31,10 @@ async fn test_wiring_feature_audit_export_and_avv() {
             let markdown = audit_bundle.render_avv_markdown();
             assert!(markdown.is_ok(), "AVV markdown rendering should succeed");
             let text = markdown.unwrap();
-            assert!(text.contains("Auftragsverarbeitungsvertrag"), "AVV markdown should contain title header");
+            assert!(
+                text.contains("Auftragsverarbeitungsvertrag"),
+                "AVV markdown should contain title header"
+            );
         }
 
         let _ = std::fs::remove_dir_all(&tmp_path);

@@ -51,7 +51,10 @@ async fn create_test_server() -> (Arc<McpServer>, TempDir) {
     (Arc::new(server), tmp)
 }
 
-fn make_request(method: &str, params: serde_json::Value) -> contextra_mcp::protocol::JsonRpcRequest {
+fn make_request(
+    method: &str,
+    params: serde_json::Value,
+) -> contextra_mcp::protocol::JsonRpcRequest {
     contextra_mcp::protocol::JsonRpcRequest {
         jsonrpc: "2.0".into(),
         id: Some(json!(1)),

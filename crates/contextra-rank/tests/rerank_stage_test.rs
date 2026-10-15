@@ -16,7 +16,8 @@ impl Reranker for MockCountReranker {
         candidates: &'a [String],
     ) -> BoxFuture<'a, Result<Vec<RerankResult>>> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
-        self.candidate_count.fetch_add(candidates.len(), Ordering::SeqCst);
+        self.candidate_count
+            .fetch_add(candidates.len(), Ordering::SeqCst);
         Box::pin(async move {
             Ok(candidates
                 .iter()

@@ -61,7 +61,8 @@ impl RetrievalWiringBundle {
                     _query_text: &'a str,
                     _query_embedding: &'a [f32],
                     _top_k: usize,
-                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<ContextChunk>>> {
+                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<ContextChunk>>>
+                {
                     Box::pin(async move { Ok(Vec::new()) })
                 }
             }
@@ -71,7 +72,8 @@ impl RetrievalWiringBundle {
                 fn get_community<'a>(
                     &'a self,
                     _entity_id: EntityId,
-                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<u64>>> {
+                ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<u64>>>
+                {
                     Box::pin(async move { Ok(None) })
                 }
             }

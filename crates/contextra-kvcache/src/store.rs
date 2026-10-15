@@ -434,7 +434,11 @@ impl TenantIsolatedKvStore {
     }
 
     /// Versucht, ein Segment für einen bestimmten Tenant einzufügen und gibt eventuelle Validierungsfehler zurück.
-    pub fn try_insert_segment(&self, tenant: TenantId, segment: KvSegment) -> Result<(), ContextraError> {
+    pub fn try_insert_segment(
+        &self,
+        tenant: TenantId,
+        segment: KvSegment,
+    ) -> Result<(), ContextraError> {
         self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto)
     }
 

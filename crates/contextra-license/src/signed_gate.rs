@@ -547,7 +547,11 @@ impl LicenseGate for SignedLicenseGate {
             .activation
             .as_ref()
             .and_then(|a| a.key_id.as_deref())
-            .or_else(|| self.license_payload.as_ref().and_then(|p| p.key_id.as_deref()));
+            .or_else(|| {
+                self.license_payload
+                    .as_ref()
+                    .and_then(|p| p.key_id.as_deref())
+            });
 
         let resolved_key: Option<&VerifyingKey> = if let Some(key_id) = active_key_id {
             if let Some(ref keyring) = self.keyring {
@@ -560,14 +564,11 @@ impl LicenseGate for SignedLicenseGate {
         } else if let Some(ref vk) = self.verifying_key {
             Some(vk)
         } else if let Some(ref keyring) = self.keyring {
-            keyring
-                .resolve_key("default", now_secs)
-                .ok()
-                .or_else(|| {
-                    keyring
-                        .keys()
-                        .find_map(|k| keyring.resolve_key(&k.key_id, now_secs).ok())
-                })
+            keyring.resolve_key("default", now_secs).ok().or_else(|| {
+                keyring
+                    .keys()
+                    .find_map(|k| keyring.resolve_key(&k.key_id, now_secs).ok())
+            })
         } else {
             None
         };

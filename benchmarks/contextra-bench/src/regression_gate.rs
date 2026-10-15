@@ -203,7 +203,10 @@ mod tests {
         let res = run_regression_gate(&results_path, &baseline_path, 0.05, false);
         // Gate MUST fail-close when metrics are empty / missing!
         match res {
-            Ok(gate_res) => assert!(!gate_res.passed, "Gate must NOT pass when metrics are empty!"),
+            Ok(gate_res) => assert!(
+                !gate_res.passed,
+                "Gate must NOT pass when metrics are empty!"
+            ),
             Err(_) => (), // Returning Err is also valid fail-closed behavior
         }
     }

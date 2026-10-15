@@ -1224,11 +1224,9 @@ impl From<SsiError> for ContextraError {
             SsiError::UnknownTxState { tx_id, status } => {
                 ContextraError::InvalidInput(format!("Invalid state {:?} for tx {tx_id}", status))
             }
-            SsiError::TenantMismatch { expected, found } => {
-                ContextraError::PolicyViolation(format!(
-                    "Tenant mismatch: expected {expected:?}, found {found:?}"
-                ))
-            }
+            SsiError::TenantMismatch { expected, found } => ContextraError::PolicyViolation(
+                format!("Tenant mismatch: expected {expected:?}, found {found:?}"),
+            ),
             SsiError::SequenceLogDivergence { message } | SsiError::Internal { message } => {
                 ContextraError::Internal(message)
             }

@@ -316,14 +316,15 @@ async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
         alert_threshold: 3,
     };
 
-    let (handle, failures_counter) = start_orphan_cleanup_worker_with_config::<_, _, contextra_store::LsmStorage>(
-        buffer,
-        mock_index.clone(),
-        None,
-        Duration::from_millis(10),
-        backoff_config,
-        cancel_token.clone(),
-    );
+    let (handle, failures_counter) =
+        start_orphan_cleanup_worker_with_config::<_, _, contextra_store::LsmStorage>(
+            buffer,
+            mock_index.clone(),
+            None,
+            Duration::from_millis(10),
+            backoff_config,
+            cancel_token.clone(),
+        );
 
     sleep(Duration::from_millis(40)).await;
     assert_eq!(

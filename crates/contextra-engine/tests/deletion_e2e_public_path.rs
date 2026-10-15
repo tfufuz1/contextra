@@ -11,7 +11,9 @@ use tempfile::tempdir;
 async fn test_e2e_insert_erase_search_empty_proof_verified() {
     let tmp = tempdir().expect("tempdir failed");
 
-    let engine = Contextra::open(tmp.path()).await.expect("engine open failed");
+    let engine = Contextra::open(tmp.path())
+        .await
+        .expect("engine open failed");
     let tenant_id = TenantId::try_new(1).unwrap();
     let col = engine
         .collection_for_tenant("e2e_del_test", tenant_id)
@@ -23,11 +25,16 @@ async fn test_e2e_insert_erase_search_empty_proof_verified() {
     let metadata = serde_json::json!({
         "text": "Secret cryptographic content for e2e deletion test"
     });
-    col.insert(doc_id, &doc_vec, Some(metadata)).await.expect("insert failed");
+    col.insert(doc_id, &doc_vec, Some(metadata))
+        .await
+        .expect("insert failed");
 
     // Pre-condition vector search: document is present
     let pre_results = col.search(&doc_vec, 5).await.expect("search failed");
-    assert!(!pre_results.is_empty(), "Document MUST be found before erasure");
+    assert!(
+        !pre_results.is_empty(),
+        "Document MUST be found before erasure"
+    );
 
     // 1. Execute document erasure/forget
     let erase_opts = DocEraseOptions::default();

@@ -382,124 +382,124 @@ impl Contextra {
             ));
         }
 
-            if name == "default" {
-                return Err(contextra_types::ContextraError::invalid_input(
-                    "Cannot drop default collection",
-                ));
-            }
+        if name == "default" {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Cannot drop default collection",
+            ));
+        }
 
-            let collection_id = derive_collection_id(name)?;
+        let collection_id = derive_collection_id(name)?;
 
-            // Schließe das Scan-Commit-Fenster: Lock-Reihenfolge collections -> kv_locks -> embedder (INV-DELETION-1).
-            // Entfernen aus der Registry vor dem Scannen verhindert, dass ein nebenläufiger Schreiber
-            // eine neue Referenz zur Collection holt und während des Löschens schreibt.
-            self.collections.write().await.remove(name);
-            self.tenant_collections
-                .write()
-                .await
-                .remove(&(tenant_id, name.to_string()));
+        // Schließe das Scan-Commit-Fenster: Lock-Reihenfolge collections -> kv_locks -> embedder (INV-DELETION-1).
+        // Entfernen aus der Registry vor dem Scannen verhindert, dass ein nebenläufiger Schreiber
+        // eine neue Referenz zur Collection holt und während des Löschens schreibt.
+        self.collections.write().await.remove(name);
+        self.tenant_collections
+            .write()
+            .await
+            .remove(&(tenant_id, name.to_string()));
 
-            let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-                self.storage.clone(),
-                tenant_id,
-            );
+        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+            self.storage.clone(),
+            tenant_id,
+        );
 
-            let col_data_prefix = format!("__col:{}:", name);
-            let txt_data_prefix = format!("__txt:{}:", name);
-            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+        let col_data_prefix = format!("__col:{}:", name);
+        let txt_data_prefix = format!("__txt:{}:", name);
+        let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-            let tx = self.allocate_tx()?;
+        let tx = self.allocate_tx()?;
 
-            // Scanne Schlüssel am konsistenten Snapshot-Stand tx.inner()
-            let col_entries = tenant_storage
-                .scan_prefix_at(col_data_prefix.as_bytes(), tx.inner())
-                .await?;
-            let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
-            for (k, _) in col_entries {
-                deleted_keys.push(k);
-            }
+        // Scanne Schlüssel am konsistenten Snapshot-Stand tx.inner()
+        let col_entries = tenant_storage
+            .scan_prefix_at(col_data_prefix.as_bytes(), tx.inner())
+            .await?;
+        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
+        for (k, _) in col_entries {
+            deleted_keys.push(k);
+        }
 
-            let txt_entries = tenant_storage
-                .scan_prefix_at(txt_data_prefix.as_bytes(), tx.inner())
-                .await?;
-            for (k, _) in txt_entries {
-                deleted_keys.push(k);
-            }
+        let txt_entries = tenant_storage
+            .scan_prefix_at(txt_data_prefix.as_bytes(), tx.inner())
+            .await?;
+        for (k, _) in txt_entries {
+            deleted_keys.push(k);
+        }
 
-            deleted_keys.push(col_idx_key.clone());
+        deleted_keys.push(col_idx_key.clone());
 
-            tenant_storage
-                .delete_prefix(tx, col_data_prefix.as_bytes())
-                .await?;
+        tenant_storage
+            .delete_prefix(tx, col_data_prefix.as_bytes())
+            .await?;
 
-            tenant_storage
-                .delete_prefix(tx, txt_data_prefix.as_bytes())
-                .await?;
+        tenant_storage
+            .delete_prefix(tx, txt_data_prefix.as_bytes())
+            .await?;
 
-            tenant_storage.delete(tx, &col_idx_key).await?;
+        tenant_storage.delete(tx, &col_idx_key).await?;
 
-            tenant_storage.commit(tx).await?;
+        tenant_storage.commit(tx).await?;
 
-            // Durability Audit Note (Review P02 / F-03 / Invariante I-2 & I-5):
-            // `tenant_storage.commit(tx).await` executes `LsmStorage::commit`, which dispatches WAL ops to the WAL flusher
-            // actor and awaits oneshot ACK (`file.sync_all()`) before returning `Ok(())` (both in single commit and group
-            // commit leader/follower paths). Thus, disk durability (`fsync`) of all deletion tombstones is strictly
-            // guaranteed BEFORE `DeletionProof::create` is invoked and returned to caller.
+        // Durability Audit Note (Review P02 / F-03 / Invariante I-2 & I-5):
+        // `tenant_storage.commit(tx).await` executes `LsmStorage::commit`, which dispatches WAL ops to the WAL flusher
+        // actor and awaits oneshot ACK (`file.sync_all()`) before returning `Ok(())` (both in single commit and group
+        // commit leader/follower paths). Thus, disk durability (`fsync`) of all deletion tombstones is strictly
+        // guaranteed BEFORE `DeletionProof::create` is invoked and returned to caller.
 
-            let remaining_col_data = tenant_storage
-                .scan_prefix(col_data_prefix.as_bytes())
-                .await?;
-            let remaining_txt_data = tenant_storage
-                .scan_prefix(txt_data_prefix.as_bytes())
-                .await?;
+        let remaining_col_data = tenant_storage
+            .scan_prefix(col_data_prefix.as_bytes())
+            .await?;
+        let remaining_txt_data = tenant_storage
+            .scan_prefix(txt_data_prefix.as_bytes())
+            .await?;
 
-            let scope = DeletionScope::Collection {
-                collection_id,
-                tenant_id,
-            };
+        let scope = DeletionScope::Collection {
+            collection_id,
+            tenant_id,
+        };
 
-            // N-K fix: The underlying LsmStorage keys are physically prefixed with `t:{tenant_id}:`
-            // by TenantScopedStorage. We must pass physical prefixes to purge_keys.
-            let tenant_prefix = format!("t:{}:", tenant_id.inner());
-            let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
-                format!("{}{}", tenant_prefix, col_data_prefix).into_bytes(),
-                format!("{}{}", tenant_prefix, txt_data_prefix).into_bytes(),
-            ]);
+        // N-K fix: The underlying LsmStorage keys are physically prefixed with `t:{tenant_id}:`
+        // by TenantScopedStorage. We must pass physical prefixes to purge_keys.
+        let tenant_prefix = format!("t:{}:", tenant_id.inner());
+        let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
+            format!("{}{}", tenant_prefix, col_data_prefix).into_bytes(),
+            format!("{}{}", tenant_prefix, txt_data_prefix).into_bytes(),
+        ]);
 
-            let purge_res = self
-                .storage
-                .purge_keys(purge_scope.clone(), tx.inner(), None)
-                .await;
+        let purge_res = self
+            .storage
+            .purge_keys(purge_scope.clone(), tx.inner(), None)
+            .await;
 
-            let (physical_purge_status, claim_sstable) = match purge_res {
-                Ok(purge_report) => (
-                    PhysicalPurgeStatus::Performed {
-                        records_purged: purge_report.records_purged,
-                        bytes_reclaimed: purge_report.bytes_reclaimed,
-                    },
-                    true,
-                ),
-                Err(purge_blocked) => (
-                    PhysicalPurgeStatus::NotPerformed {
-                        reason: format!("{:?}", purge_blocked),
-                    },
-                    false,
-                ),
-            };
+        let (physical_purge_status, claim_sstable) = match purge_res {
+            Ok(purge_report) => (
+                PhysicalPurgeStatus::Performed {
+                    records_purged: purge_report.records_purged,
+                    bytes_reclaimed: purge_report.bytes_reclaimed,
+                },
+                true,
+            ),
+            Err(purge_blocked) => (
+                PhysicalPurgeStatus::NotPerformed {
+                    reason: format!("{:?}", purge_blocked),
+                },
+                false,
+            ),
+        };
 
-            let mut layer_proofs = vec![LayerCleanupProof::verify_and_create(
-                DeletionLayer::LsmMemtable,
-                || Ok(remaining_col_data.is_empty() && remaining_txt_data.is_empty()),
-            )?];
+        let mut layer_proofs = vec![LayerCleanupProof::verify_and_create(
+            DeletionLayer::LsmMemtable,
+            || Ok(remaining_col_data.is_empty() && remaining_txt_data.is_empty()),
+        )?];
 
-            if claim_sstable {
-                layer_proofs.push(LayerCleanupProof::verify_and_create(
-                    DeletionLayer::SsTableAllLevels,
-                    || Ok(true),
-                )?);
-            }
+        if claim_sstable {
+            layer_proofs.push(LayerCleanupProof::verify_and_create(
+                DeletionLayer::SsTableAllLevels,
+                || Ok(true),
+            )?);
+        }
 
-            let proof = DeletionProof::create(
+        let proof = DeletionProof::create(
                 scope,
                 deleted_keys.clone(),
                 tx,
@@ -514,68 +514,68 @@ impl Contextra {
                 ))
             })?;
 
-            // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
-            let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
-            let registry = deletion::KeyFamilyRegistry::default();
-            let sweep_needles = deletion::FprNeedles {
-                doc_id_bytes: Vec::new(),
-                collection_id: Some(collection_id),
-                collection_name: name.to_string(),
-                tenant_prefix: tenant_id.inner().to_le_bytes().to_vec(),
-            };
+        // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
+        let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
+        let registry = deletion::KeyFamilyRegistry::default();
+        let sweep_needles = deletion::FprNeedles {
+            doc_id_bytes: Vec::new(),
+            collection_id: Some(collection_id),
+            collection_name: name.to_string(),
+            tenant_prefix: tenant_id.inner().to_le_bytes().to_vec(),
+        };
 
-            let mut pid16 = [0u8; 16];
-            pid16.copy_from_slice(&proof.deleted_keys_hash[..16]);
+        let mut pid16 = [0u8; 16];
+        pid16.copy_from_slice(&proof.deleted_keys_hash[..16]);
 
-            let fon_handle = deletion::FonLogicalHandle {
-                proof_id: pid16,
-                proof_path: std::path::PathBuf::from(format!(
-                    "proofs/{}.json",
-                    hex_encode_32_col(&proof.deleted_keys_hash)
-                )),
-                full_proof_id: proof.deleted_keys_hash,
-            };
+        let fon_handle = deletion::FonLogicalHandle {
+            proof_id: pid16,
+            proof_path: std::path::PathBuf::from(format!(
+                "proofs/{}.json",
+                hex_encode_32_col(&proof.deleted_keys_hash)
+            )),
+            full_proof_id: proof.deleted_keys_hash,
+        };
 
-            let forget_opts = deletion::ForgetOptions::default();
+        let forget_opts = deletion::ForgetOptions::default();
 
-            let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
-            let deps = deletion::DeletionWiringDeps {
-                storage: self.storage.clone(),
-                db_dir: proof_dir,
-                signer_cfg_path: None,
-                db_instance_id: [0x33; 16],
-                ring_mode: deletion::wiring::RingMode::Sovereign,
-            };
+        let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
+        let deps = deletion::DeletionWiringDeps {
+            storage: self.storage.clone(),
+            db_dir: proof_dir,
+            signer_cfg_path: None,
+            db_instance_id: [0x33; 16],
+            ring_mode: deletion::wiring::RingMode::Sovereign,
+        };
 
-            if let Ok(deletion_wiring) = deletion::DeletionWiring::build(deps) {
-                let driver = deletion_wiring.purge_driver();
-                let zeu_probe = self.storage.store_probe();
-                let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
-                    &[zeu_probe.as_ref()];
+        if let Ok(deletion_wiring) = deletion::DeletionWiring::build(deps) {
+            let driver = deletion_wiring.purge_driver();
+            let zeu_probe = self.storage.store_probe();
+            let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
+                &[zeu_probe.as_ref()];
 
-                let _ = driver
-                    .run_purge(
-                        purge_scope,
-                        &[name.to_string()],
-                        tx,
-                        &fon_handle,
-                        &forget_opts,
-                        &deleted_keys,
-                        &sweep_needles,
-                        &footprint,
-                        &registry,
-                        deletion::SweepDepth::Standard,
-                        None,
-                        probes,
-                        None,
-                    )
-                    .await;
-            }
+            let _ = driver
+                .run_purge(
+                    purge_scope,
+                    &[name.to_string()],
+                    tx,
+                    &fon_handle,
+                    &forget_opts,
+                    &deleted_keys,
+                    &sweep_needles,
+                    &footprint,
+                    &registry,
+                    deletion::SweepDepth::Standard,
+                    None,
+                    probes,
+                    None,
+                )
+                .await;
+        }
 
-            Ok(DropCollectionReport {
-                proof,
-                physical_purge: physical_purge_status,
-            })
+        Ok(DropCollectionReport {
+            proof,
+            physical_purge: physical_purge_status,
+        })
     }
 
     /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.

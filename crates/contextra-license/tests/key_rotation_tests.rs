@@ -49,12 +49,8 @@ fn test_key_rotation_paths() {
     let inst_id = [7u8; 32];
 
     // 1. Valid signature with key-1
-    let mut act1 = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        inst_id,
-        2_000_000,
-        &sk1,
-    );
+    let mut act1 =
+        SignedActivation::create_signed(FeatureRing::Sovereign, inst_id, 2_000_000, &sk1);
     act1.key_id = Some("key-1".to_string());
 
     let gate1 = SignedLicenseGate::from_activation_with_clock(act1.clone(), vk1, clock.clone())
@@ -64,12 +60,8 @@ fn test_key_rotation_paths() {
     assert_eq!(gate1.check_ring(FeatureRing::Sovereign), Ok(()));
 
     // 2. Rotated key with key-2
-    let mut act2 = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        inst_id,
-        2_000_000,
-        &sk2,
-    );
+    let mut act2 =
+        SignedActivation::create_signed(FeatureRing::Sovereign, inst_id, 2_000_000, &sk2);
     act2.key_id = Some("key-2".to_string());
 
     let gate2 = SignedLicenseGate::from_activation_with_clock(act2.clone(), vk2, clock.clone())
@@ -82,9 +74,10 @@ fn test_key_rotation_paths() {
     let mut act_unknown = act1.clone();
     act_unknown.key_id = Some("unknown-key-99".to_string());
 
-    let gate_unknown = SignedLicenseGate::from_activation_with_clock(act_unknown, vk1, clock.clone())
-        .with_keyring(keyring.clone())
-        .with_local_installation_id(inst_id);
+    let gate_unknown =
+        SignedLicenseGate::from_activation_with_clock(act_unknown, vk1, clock.clone())
+            .with_keyring(keyring.clone())
+            .with_local_installation_id(inst_id);
 
     assert_eq!(
         gate_unknown.check_ring(FeatureRing::Sovereign),
@@ -95,9 +88,10 @@ fn test_key_rotation_paths() {
     let mut keyring_revoked = keyring.clone();
     keyring_revoked.revoke_key("key-1");
 
-    let gate_revoked = SignedLicenseGate::from_activation_with_clock(act1.clone(), vk1, clock.clone())
-        .with_keyring(keyring_revoked)
-        .with_local_installation_id(inst_id);
+    let gate_revoked =
+        SignedLicenseGate::from_activation_with_clock(act1.clone(), vk1, clock.clone())
+            .with_keyring(keyring_revoked)
+            .with_local_installation_id(inst_id);
 
     assert_eq!(
         gate_revoked.check_ring(FeatureRing::Sovereign),

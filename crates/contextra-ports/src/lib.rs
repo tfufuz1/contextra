@@ -37,6 +37,8 @@ pub mod clock;
 pub mod embedding;
 /// Automated sanity checks for embedding providers.
 pub mod embedding_sanity;
+/// Erasure and deletion guarantee port traits (§8.3, §8.4, ADR-01, ADR-02, ADR-14).
+pub mod erasure;
 /// Graph mutation and CSR traversal port traits.
 pub mod graph;
 /// Graph index traits and CSR statistics.
@@ -63,8 +65,6 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Erasure and deletion guarantee port traits (§8.3, §8.4, ADR-01, ADR-02, ADR-14).
-pub mod erasure;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).

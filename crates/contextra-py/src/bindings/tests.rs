@@ -313,7 +313,8 @@ mod tests {
 
         Python::with_gil(|py| {
             register_contextra_module(py);
-            let db = open(py, db_path, 128, None, None, None, None).expect("failed to open test db");
+            let db =
+                open(py, db_path, 128, None, None, None, None).expect("failed to open test db");
 
             // Insert sample documents with prefixes
             let dummy_v = vec![0.1f32; 128];
@@ -353,10 +354,10 @@ mod tests {
                                 match res {
                                     Ok(l) => {
                                         if l.len() != 10 {
-                                            errors_clone.lock().unwrap().push(format!(
-                                                "Expected 10 docs, got {}",
-                                                l.len()
-                                            ));
+                                            errors_clone
+                                                .lock()
+                                                .unwrap()
+                                                .push(format!("Expected 10 docs, got {}", l.len()));
                                         }
                                     }
                                     Err(e) => {
@@ -421,7 +422,8 @@ mod tests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             register_contextra_module(py);
-            let temp_dir = std::env::temp_dir().join(format!("contextra_tenant_iso_{}", std::process::id()));
+            let temp_dir =
+                std::env::temp_dir().join(format!("contextra_tenant_iso_{}", std::process::id()));
             let db_path = temp_dir.to_str().unwrap();
 
             // 1. Open database with tenant 1001
@@ -439,15 +441,24 @@ mod tests {
             let dummy_v = vec![0.1f32; 128];
             let py_v1 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
             let doc_id = "shared_doc_id";
-            db_t1.insert(py, &doc_id.into_pyobject(py).unwrap(), py_v1, None).expect("t1 insert");
+            db_t1
+                .insert(py, &doc_id.into_pyobject(py).unwrap(), py_v1, None)
+                .expect("t1 insert");
 
             // Tenant 1001 sees the document
-            let doc_t1 = db_t1.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t1 get");
+            let doc_t1 = db_t1
+                .get(py, &doc_id.into_pyobject(py).unwrap())
+                .expect("t1 get");
             assert!(doc_t1.is_some());
 
             // Tenant 2002 does NOT see tenant 1001's document
-            let doc_t2 = db_t2.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t2 get");
-            assert!(doc_t2.is_none(), "Tenant 2002 must not see Tenant 1001's document");
+            let doc_t2 = db_t2
+                .get(py, &doc_id.into_pyobject(py).unwrap())
+                .expect("t2 get");
+            assert!(
+                doc_t2.is_none(),
+                "Tenant 2002 must not see Tenant 1001's document"
+            );
 
             let py_v_search = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
             let search_t2 = db_t2.search(py, py_v_search, 10).expect("t2 search");
@@ -457,14 +468,27 @@ mod tests {
             let col_t1 = db_t1.collection("shared_catalog", py).expect("col_t1");
             assert_eq!(col_t1.tenant_id(), 1001);
 
-            let col_t2 = col_t1.with_tenant(2002, py).expect("col_t1 with_tenant 2002");
+            let col_t2 = col_t1
+                .with_tenant(2002, py)
+                .expect("col_t1 with_tenant 2002");
             assert_eq!(col_t2.tenant_id(), 2002);
 
             let py_v2 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
-            col_t1.insert(py, &"col_doc_id".into_pyobject(py).unwrap(), py_v2, None).expect("col_t1 insert");
+            col_t1
+                .insert(py, &"col_doc_id".into_pyobject(py).unwrap(), py_v2, None)
+                .expect("col_t1 insert");
 
-            assert!(col_t1.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_some());
-            assert!(col_t2.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_none(), "Tenant 2002 collection must not see Tenant 1001's collection document");
+            assert!(col_t1
+                .get(py, &"col_doc_id".into_pyobject(py).unwrap())
+                .unwrap()
+                .is_some());
+            assert!(
+                col_t2
+                    .get(py, &"col_doc_id".into_pyobject(py).unwrap())
+                    .unwrap()
+                    .is_none(),
+                "Tenant 2002 collection must not see Tenant 1001's collection document"
+            );
 
             let _ = std::fs::remove_dir_all(temp_dir);
         });

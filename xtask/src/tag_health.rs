@@ -75,7 +75,13 @@ pub fn run_tag_health_impl(
             let tag_since_arg = format!("--since={}", item.tag_ts);
             let file_log = Command::new("git")
                 .current_dir(root)
-                .args(["log", &tag_since_arg, "--format=%H|%cI", "--", &item.file_path])
+                .args([
+                    "log",
+                    &tag_since_arg,
+                    "--format=%H|%cI",
+                    "--",
+                    &item.file_path,
+                ])
                 .output();
 
             if let Ok(fl_out) = file_log {

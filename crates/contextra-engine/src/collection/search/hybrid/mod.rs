@@ -3,7 +3,7 @@
 
 mod query;
 
-pub use query::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
+pub use query::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};

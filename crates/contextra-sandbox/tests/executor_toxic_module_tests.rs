@@ -2,15 +2,13 @@
 // ZWECK: Toxic module isolation tests (infinite loop fuel, memory limit, guest trap, fuel determinism)
 
 use contextra_sandbox::{
-    admission::AdmittedModule,
-    capabilities::WasmCapabilities,
-    executor::WasmExecutor,
-    SandboxError,
+    admission::AdmittedModule, capabilities::WasmCapabilities, executor::WasmExecutor, SandboxError,
 };
 use std::time::Duration;
 
 #[tokio::test]
-async fn test_toxic_module_infinite_loop_fuel_exhausted_host_remains_intact() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_toxic_module_infinite_loop_fuel_exhausted_host_remains_intact(
+) -> Result<(), Box<dyn std::error::Error>> {
     let wat = r#"
         (module
             (func (export "_start")
@@ -43,13 +41,17 @@ async fn test_toxic_module_infinite_loop_fuel_exhausted_host_remains_intact() ->
     let ok_res = executor
         .execute_admitted(&echo_admitted, b"", &caps, Duration::from_secs(2))
         .await;
-    assert!(ok_res.is_ok(), "Host must remain intact after toxic module failure");
+    assert!(
+        ok_res.is_ok(),
+        "Host must remain intact after toxic module failure"
+    );
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_toxic_module_memory_limit_exceeded_host_remains_intact() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_toxic_module_memory_limit_exceeded_host_remains_intact(
+) -> Result<(), Box<dyn std::error::Error>> {
     let wat = r#"
         (module
             (memory 100)
@@ -81,7 +83,8 @@ async fn test_toxic_module_memory_limit_exceeded_host_remains_intact() -> Result
 }
 
 #[tokio::test]
-async fn test_toxic_module_trap_unreachable_host_remains_intact() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_toxic_module_trap_unreachable_host_remains_intact(
+) -> Result<(), Box<dyn std::error::Error>> {
     let wat = r#"
         (module
             (func (export "_start")

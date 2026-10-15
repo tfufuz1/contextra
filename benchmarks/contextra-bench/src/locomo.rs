@@ -341,7 +341,11 @@ where
     } else {
         0.0
     };
-    let overall_mrr = if n_float > 0.0 { total_mrr_sum / n_float } else { 0.0 };
+    let overall_mrr = if n_float > 0.0 {
+        total_mrr_sum / n_float
+    } else {
+        0.0
+    };
 
     // Wilson Score Interval for 95% Confidence Interval (z = 1.96)
     let (ci_lower_recall_95, ci_upper_recall_95) = if n_float > 0.0 {
@@ -350,7 +354,10 @@ where
         let denominator = 1.0 + z * z / n_float;
         let center = p + z * z / (2.0 * n_float);
         let margin = z * ((p * (1.0 - p) / n_float) + (z * z / (4.0 * n_float * n_float))).sqrt();
-        (((center - margin) / denominator).max(0.0), ((center + margin) / denominator).min(1.0))
+        (
+            ((center - margin) / denominator).max(0.0),
+            ((center + margin) / denominator).min(1.0),
+        )
     } else {
         (0.0, 0.0)
     };
@@ -358,7 +365,10 @@ where
     // Standard Error / Normal Approximation for MRR 95% Confidence Interval
     let (ci_lower_mrr_95, ci_upper_mrr_95) = if n_float > 0.0 {
         let se = 0.05 / n_float.sqrt(); // Standard error estimate for MRR sample distribution
-        ((overall_mrr - 1.96 * se).max(0.0), (overall_mrr + 1.96 * se).min(1.0))
+        (
+            (overall_mrr - 1.96 * se).max(0.0),
+            (overall_mrr + 1.96 * se).min(1.0),
+        )
     } else {
         (0.0, 0.0)
     };

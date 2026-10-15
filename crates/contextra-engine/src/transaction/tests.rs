@@ -240,11 +240,13 @@ async fn test_rollback_completeness_and_compensation_idempotency() {
     assert!(rollback_res1.is_ok());
 
     // Executing compensating action repeatedly must be idempotent and succeed
-    let comp_action =
-        CompensateHnswAction::new(col.clone(), tenant, Arc::new(vec![doc_id]));
+    let comp_action = CompensateHnswAction::new(col.clone(), tenant, Arc::new(vec![doc_id]));
     let comp_res1 = comp_action.execute().await;
     assert!(comp_res1.is_ok());
 
     let comp_res2 = comp_action.execute().await;
-    assert!(comp_res2.is_ok(), "Second compensating execution must be idempotent");
+    assert!(
+        comp_res2.is_ok(),
+        "Second compensating execution must be idempotent"
+    );
 }

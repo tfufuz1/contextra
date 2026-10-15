@@ -234,7 +234,10 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                     let update = match &dp[j] {
                         None => true,
                         Some(existing) => {
-                            if is_full_token && existing.segment_count == 1 && candidate.segment_count >= 2 {
+                            if is_full_token
+                                && existing.segment_count == 1
+                                && candidate.segment_count >= 2
+                            {
                                 true
                             } else if candidate.segment_count < existing.segment_count {
                                 true

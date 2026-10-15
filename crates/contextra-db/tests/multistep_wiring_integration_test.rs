@@ -98,8 +98,18 @@ fn test_volatile_context_vault_commit_receipt() {
         ..Default::default()
     });
 
-    let chunk1 = VaultChunk::new(DocId(1), b"hello".to_vec(), SignalModality::TextInput, TxId(1));
-    let chunk2 = VaultChunk::new(DocId(2), b"world".to_vec(), SignalModality::TextInput, TxId(1));
+    let chunk1 = VaultChunk::new(
+        DocId(1),
+        b"hello".to_vec(),
+        SignalModality::TextInput,
+        TxId(1),
+    );
+    let chunk2 = VaultChunk::new(
+        DocId(2),
+        b"world".to_vec(),
+        SignalModality::TextInput,
+        TxId(1),
+    );
 
     vault.ingest(chunk1).unwrap();
     vault.ingest(chunk2).unwrap();

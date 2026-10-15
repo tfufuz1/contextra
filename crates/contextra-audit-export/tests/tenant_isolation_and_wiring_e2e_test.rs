@@ -79,8 +79,14 @@ fn test_veto_f10_tenant_isolation_and_end_to_end_export_wiring() {
     assert!(!md_t1.contains("Graphsuche Tenant 200"));
 
     let lines_t1: Vec<&str> = md_t1.trim().lines().map(|l| l.trim()).collect();
-    assert!(lines_t1.first().unwrap().contains("Vorlage, keine Rechtsberatung"));
-    assert!(lines_t1.last().unwrap().contains("Vorlage, keine Rechtsberatung"));
+    assert!(lines_t1
+        .first()
+        .unwrap()
+        .contains("Vorlage, keine Rechtsberatung"));
+    assert!(lines_t1
+        .last()
+        .unwrap()
+        .contains("Vorlage, keine Rechtsberatung"));
 
     // 4. Test entry creation via Clock port
     let created_entry = wiring.create_entry(

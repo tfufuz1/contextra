@@ -2,7 +2,7 @@
 
 #![cfg(feature = "encryption-at-rest")]
 
-use contextra_engine::{CollectionScope, Contextra};
+use contextra_engine::Contextra;
 use contextra_types::TenantId;
 use tempfile::TempDir;
 
@@ -13,18 +13,14 @@ async fn test_drop_collection_scope_isolation_and_fail_closed(
     let db = Contextra::open(tmp.path()).await?;
     let proof_key = b"01234567890123456789012345678901";
 
-    // 1. Insert document into Untenanted scope
+    // 1. Insert document into Untenanted scope (TenantId::SYSTEM)
     let col_untenanted = db.collection("my_col").await?;
     col_untenanted.insert("doc1", &[0.1f32; 768], None).await?;
     db.flush().await?;
 
     // 2. Attempt to drop in Tenant scope (TenantId 1) -> mismatch: Untenanted data remains
     let _proof_tenant = db
-        .drop_collection_in_scope(
-            CollectionScope::Tenant(TenantId::try_new(1)?),
-            "my_col",
-            proof_key,
-        )
+        .drop_collection("my_col", TenantId::try_new(1)?, proof_key)
         .await?;
 
     // Untenanted document must STILL exist
@@ -33,9 +29,9 @@ async fn test_drop_collection_scope_isolation_and_fail_closed(
         "Untenanted document should remain after Tenant drop"
     );
 
-    // 3. Drop in Untenanted scope -> successfully removes data
+    // 3. Drop in Untenanted scope (SYSTEM) -> successfully removes data
     let proof_untenanted = db
-        .drop_collection_in_scope(CollectionScope::Untenanted, "my_col", proof_key)
+        .drop_collection("my_col", TenantId::SYSTEM, proof_key)
         .await?;
 
     // Document is gone

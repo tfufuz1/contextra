@@ -197,7 +197,10 @@ impl Default for ApprhSelector {
     fn default() -> Self {
         let config = ApprhSelectorConfig::default();
         Self::with_default_monitor(config).unwrap_or_else(|_| {
-            Self::new(ApprhSelectorConfig::default(), Arc::new(ApprhGateMonitor::default()))
+            Self::new(
+                ApprhSelectorConfig::default(),
+                Arc::new(ApprhGateMonitor::default()),
+            )
         })
     }
 }

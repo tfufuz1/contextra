@@ -29,8 +29,8 @@ pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 #[allow(deprecated)]
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{
-    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate,
-    SsiError, SsiValidator, TxSsiState, TxStateStatus,
+    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate, SsiError,
+    SsiValidator, TxSsiState, TxStateStatus,
 };
 pub use tx_buffer::{IndexOp, TxBuffer};
 pub use wiring::{MvccWiring, MvccWiringDeps};

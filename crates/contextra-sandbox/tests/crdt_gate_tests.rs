@@ -2,9 +2,7 @@
 // ZWECK: Tests for CRDT Admission Gate (Commutativity, Associativity, Idempotency)
 
 use contextra_sandbox::{
-    capabilities::WasmCapabilities,
-    merge::MergeOperatorRegistry,
-    SandboxError,
+    capabilities::WasmCapabilities, merge::MergeOperatorRegistry, SandboxError,
 };
 
 #[tokio::test]
@@ -77,14 +75,17 @@ async fn test_crdt_gate_admits_compliant_max_operator() -> Result<(), Box<dyn st
     let func = registry.admit(wasm_bytes).await?;
     assert!(registry.is_admitted(&hash));
 
-    let res = func.merge(&10u64.to_le_bytes(), &20u64.to_le_bytes()).await?;
+    let res = func
+        .merge(&10u64.to_le_bytes(), &20u64.to_le_bytes())
+        .await?;
     assert_eq!(res, 20u64.to_le_bytes());
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_crdt_gate_rejects_non_commutative_operator() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_crdt_gate_rejects_non_commutative_operator() -> Result<(), Box<dyn std::error::Error>>
+{
     // WASM module that concatenates input A + input B (Non-commutative!)
     let wat = r#"
         (module

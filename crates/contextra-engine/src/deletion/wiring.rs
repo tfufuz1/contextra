@@ -110,6 +110,10 @@ impl DeletionWiring {
     /// Creates a new [`DpiPurgeDriver`] attached to this deletion wiring.
     #[must_use]
     pub fn purge_driver(&self) -> DpiPurgeDriver<'_> {
-        DpiPurgeDriver::new(&self.storage, &self.runtime, DpiPurgeDriverConfig::default())
+        DpiPurgeDriver::new(
+            &self.storage,
+            &self.runtime,
+            DpiPurgeDriverConfig::default(),
+        )
     }
 }

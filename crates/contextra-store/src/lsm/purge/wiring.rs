@@ -71,7 +71,9 @@ impl PurgeWiring {
     }
 
     /// Resumes any pending or interrupted purge operation present in the storage directory.
-    pub async fn resume_pending(&self) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
+    pub async fn resume_pending(
+        &self,
+    ) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
         resume_pending_with_policy(
             &self.storage_dir,
             &self.hooks,

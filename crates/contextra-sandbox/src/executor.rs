@@ -67,9 +67,10 @@ impl WasmWorkerPool {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, SandboxError>>,
     {
-        let permit = self.semaphore.try_acquire().map_err(|_| {
-            SandboxError::Runtime("Busy: worker pool capacity reached".to_string())
-        })?;
+        let permit = self
+            .semaphore
+            .try_acquire()
+            .map_err(|_| SandboxError::Runtime("Busy: worker pool capacity reached".to_string()))?;
         let result = job().await;
         drop(permit);
         result
@@ -200,7 +201,10 @@ pub struct WasmExecutor {
 impl std::fmt::Debug for WasmExecutor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WasmExecutor")
-            .field("compilation_count", &self.compilation_count.load(Ordering::Relaxed))
+            .field(
+                "compilation_count",
+                &self.compilation_count.load(Ordering::Relaxed),
+            )
             .field("cache_hits", &self.cache_hits.load(Ordering::Relaxed))
             .field("cache_misses", &self.cache_misses.load(Ordering::Relaxed))
             .field("worker_pool", &self.worker_pool)
@@ -419,10 +423,7 @@ impl WasmExecutor {
         // Module Cache Lookup / Compilation
         let hash = WasmCapabilities::compute_sha256(wasm_bytes);
         let cached_module = {
-            let mut cache = self
-                .module_cache
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
+            let mut cache = self.module_cache.lock().unwrap_or_else(|e| e.into_inner());
             cache.get(&hash)
         };
 
@@ -452,10 +453,7 @@ impl WasmExecutor {
                 };
 
                 self.compilation_count.fetch_add(1, Ordering::Relaxed);
-                let mut cache = self
-                    .module_cache
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner());
+                let mut cache = self.module_cache.lock().unwrap_or_else(|e| e.into_inner());
                 cache.insert(hash, compiled.clone());
                 compiled
             }

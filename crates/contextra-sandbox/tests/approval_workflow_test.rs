@@ -3,7 +3,9 @@
 use std::sync::Arc;
 
 use contextra_sandbox::{
-    approval::{classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError},
+    approval::{
+        classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
+    },
     capabilities::{ModulePolicy, WasmCapabilities},
     wiring::{SandboxWiring, SandboxWiringConfig},
     Ed25519ModuleVerifier,
@@ -112,7 +114,11 @@ fn test_approval_request_rejection_and_expiration() -> Result<(), ApprovalTransi
     let caps = WasmCapabilities::default();
     let request_a = ApprovalRequest::new("req-103".to_string(), &caps, 1000, 5000);
 
-    let rejected = request_a.reject("auditor".to_string(), "unapproved capabilities".to_string(), 2000)?;
+    let rejected = request_a.reject(
+        "auditor".to_string(),
+        "unapproved capabilities".to_string(),
+        2000,
+    )?;
     assert_eq!(
         rejected.status,
         ApprovalStatus::Rejected {
@@ -182,7 +188,8 @@ fn test_sandbox_wiring_build_and_workflow_execution() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn test_sandbox_wiring_high_risk_requires_explicit_human_approval() -> Result<(), Box<dyn std::error::Error>> {
+fn test_sandbox_wiring_high_risk_requires_explicit_human_approval(
+) -> Result<(), Box<dyn std::error::Error>> {
     let high_risk_caps = WasmCapabilities {
         allow_network: true,
         ..Default::default()

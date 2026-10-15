@@ -83,8 +83,7 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     let insert_resp = server.handle(insert_req).await;
     let insert_val = serde_json::to_value(&insert_resp)?;
     assert_ne!(
-        insert_val["result"]["isError"],
-        true,
+        insert_val["result"]["isError"], true,
         "insert failed: {:?}",
         insert_val
     );
@@ -106,8 +105,7 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     let delete_resp = server.handle(delete_req).await;
     let delete_val = serde_json::to_value(&delete_resp)?;
     assert_ne!(
-        delete_val["result"]["isError"],
-        true,
+        delete_val["result"]["isError"], true,
         "delete returned error: {:?}",
         delete_val
     );
@@ -158,8 +156,7 @@ async fn test_contextra_delete_no_unverified_proof() -> Result<(), Box<dyn std::
     let forget_resp = server2.handle(forget_req).await;
     let forget_val = serde_json::to_value(&forget_resp)?;
     assert_ne!(
-        forget_val["result"]["isError"],
-        true,
+        forget_val["result"]["isError"], true,
         "forget failed: {:?}",
         forget_val
     );

@@ -81,9 +81,9 @@ fn test_ed25519_module_verifier_unsigned_payload_rejected() {
     let public_key = [0u8; 32];
 
     let verifier = Ed25519ModuleVerifier::new(vec![public_key]);
-    let err = verifier
-        .verify(&wasm_bytes)
-        .expect_err("unsigned raw wasm payload (<64 bytes header) must return UnsignedModule error");
+    let err = verifier.verify(&wasm_bytes).expect_err(
+        "unsigned raw wasm payload (<64 bytes header) must return UnsignedModule error",
+    );
 
     assert_eq!(err, AdmissionError::UnsignedModule);
 }
@@ -158,7 +158,9 @@ fn test_wasm_capabilities_signed_by_policy_integration() {
         "Valid signed module must satisfy SignedBy module policy"
     );
 
-    let unsigned_err = caps.verify_module_policy(&wasm_bytes).expect_err("Unsigned module must fail SignedBy policy");
+    let unsigned_err = caps
+        .verify_module_policy(&wasm_bytes)
+        .expect_err("Unsigned module must fail SignedBy policy");
     assert!(
         matches!(unsigned_err, SandboxError::InvalidModule(_)),
         "Expected InvalidModule error, got {unsigned_err:?}"

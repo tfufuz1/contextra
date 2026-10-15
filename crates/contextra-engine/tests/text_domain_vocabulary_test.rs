@@ -22,5 +22,8 @@ fn test_legal_domain_vocabulary_tokenization() {
     // Verify panic-freedom on arbitrary legal text
     let legal_text = "Gemäß § 12 Abs. 2 DSGVO i.V.m. Art. 6 Abs. 1 lit. f DS-GVO ist die Datenverarbeitung zulässig.";
     let legal_tokens = tokenizer.tokenize(legal_text);
-    assert!(!legal_tokens.is_empty(), "Legal text tokenization should return tokens");
+    assert!(
+        !legal_tokens.is_empty(),
+        "Legal text tokenization should return tokens"
+    );
 }

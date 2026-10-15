@@ -86,18 +86,18 @@ pub use collection::crud::MAX_SCAN_RESULTS;
 pub use collection::maintenance::PercolationResult;
 #[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
-pub use collection::search::hybrid::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
-pub use deletion::{
-    forget_document, reverse_sweep, DeletionWiring, DeletionWiringDeps, DpiDeletionRuntime,
-    DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
-    PurgeHandle, VerifyDepth, Wait,
-};
+pub use collection::search::hybrid::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
 #[cfg(feature = "graph-connectivity-health")]
 pub use contextra_graph::percolation::PercolationConfig;
 pub use contextra_text::Language;
+pub use deletion::{
+    forget_document, reverse_sweep, DeletionWiring, DeletionWiringDeps, DpiDeletionRuntime,
+    DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
+    PurgeHandle, VerifyDepth, Wait,
+};
 #[cfg(not(loom))]
 #[allow(deprecated)]
 pub use filter::MetadataFilter;
@@ -161,7 +161,7 @@ pub struct ContextraStats {
     pub storage_stats: contextra_ports::StorageStats,
 }
 
-pub use contextra_ports::DriftStatusProvider;
+pub use contextra_ports::{DriftStatusProvider, ReadSnapshot};
 pub type DbStats = ContextraStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

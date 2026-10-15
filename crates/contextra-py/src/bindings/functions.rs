@@ -84,7 +84,13 @@ pub fn open(
         .map_err(contextra_err)
     })?;
 
-    Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned, resolved_tenant))
+    Ok(PyContextra::new(
+        Arc::new(db),
+        rt,
+        worker_threads,
+        poisoned,
+        resolved_tenant,
+    ))
 }
 
 /// Internal helper function to trigger an unwinding panic inside `run_blocking_ffi` for testing FFI panic isolation.

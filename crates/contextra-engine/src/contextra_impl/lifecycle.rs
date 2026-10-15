@@ -8,7 +8,10 @@ use std::sync::Arc;
 impl Contextra {
     /// Opens or creates a `Contextra` instance at `path` using explicit `Arc<dyn LicenseGate>`.
     #[tracing::instrument(level = "trace", skip(path, gate))]
-    pub async fn open_with_gate(path: impl AsRef<Path>, gate: Arc<dyn LicenseGate>) -> Result<Self> {
+    pub async fn open_with_gate(
+        path: impl AsRef<Path>,
+        gate: Arc<dyn LicenseGate>,
+    ) -> Result<Self> {
         let config = ContextraConfig {
             deletion_proof_active: false,
             ..Default::default()
@@ -38,18 +41,16 @@ impl Contextra {
 
     /// Opens or creates a `Contextra` instance at `path` with explicit `config`.
     #[tracing::instrument(level = "trace", skip(path, config))]
-    pub async fn open_with_config(
-        path: impl AsRef<Path>,
-        config: ContextraConfig,
-    ) -> Result<Self> {
+    pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {
         #[cfg(any(test, debug_assertions))]
-        let gate: Arc<dyn LicenseGate> = Arc::new(contextra_license::SignedLicenseGate::unactivated_local(
-            Some(path.as_ref()),
-        ));
+        let gate: Arc<dyn LicenseGate> = Arc::new(
+            contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref())),
+        );
 
         #[cfg(not(any(test, debug_assertions)))]
         let gate: Arc<dyn LicenseGate> = {
-            let local_gate = contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref()));
+            let local_gate =
+                contextra_license::SignedLicenseGate::unactivated_local(Some(path.as_ref()));
             if local_gate.check_ring(FeatureRing::Fast).is_err() {
                 return Err(contextra_types::ContextraError::PolicyViolation(
                     "Valid license activation required in release mode".to_string(),
