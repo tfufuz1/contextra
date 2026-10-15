@@ -17,8 +17,6 @@ pub mod maintenance;
 #[cfg(not(loom))]
 pub mod query_builder;
 #[cfg(not(loom))]
-pub mod relate;
-#[cfg(not(loom))]
 pub mod search;
 #[cfg(not(loom))]
 pub mod tx;
@@ -28,8 +26,6 @@ pub mod tx;
 #[allow(deprecated)]
 mod tests;
 
-#[cfg(not(loom))]
-use contextra_graph::CsrGraph;
 #[cfg(not(loom))]
 use contextra_ports::{
     Clock, KvLifecycleHooks, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock,
@@ -290,7 +286,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) prefix: Vec<u8>,
     pub(super) index: Arc<V>,
     pub(super) text_index: InvertedIndex<S>,
-    pub(super) graph_index: Arc<CsrGraph>,
     pub(super) storage: Arc<S>,
     pub(super) next_tx: Arc<AtomicU64>,
     pub(super) dimension: usize,
@@ -302,10 +297,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) kv_store: Option<Arc<dyn KvLifecycleHooks>>,
     /// Feature-independent KV lifecycle hooks port.
     pub(super) kv_hooks: parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>,
-    /// Zählt Graph-Mutationen seit letzter Community Detection.
-    pub(super) mutations_since_community_detection: Arc<AtomicU64>,
-    /// Trigger-Schwelle: bei Überschreitung wird Community Detection geplant (Default: 100, 0 = deaktiviert).
-    pub(super) community_detection_trigger_threshold: Arc<AtomicU64>,
     /// Koordination des Konsolidierungslaufs zur Vermeidung von Double-Triggern (Engine + Scheduler).
     pub(super) consolidation_in_progress: Arc<AtomicBool>,
     /// Collection configuration (e.g. backpressure settings).
@@ -327,7 +318,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             prefix: self.prefix.clone(),
             index: self.index.clone(),
             text_index: self.text_index.clone(),
-            graph_index: self.graph_index.clone(),
             storage: self.storage.clone(),
             next_tx: self.next_tx.clone(),
             dimension: self.dimension,
@@ -337,10 +327,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             #[cfg(feature = "encryption-at-rest")]
             kv_store: self.kv_store.clone(),
             kv_hooks: parking_lot::RwLock::new(self.kv_hooks.read().as_ref().map(Arc::clone)),
-            mutations_since_community_detection: self.mutations_since_community_detection.clone(),
-            community_detection_trigger_threshold: self
-                .community_detection_trigger_threshold
-                .clone(),
             consolidation_in_progress: self.consolidation_in_progress.clone(),
             config: parking_lot::RwLock::new(self.config.read().clone()),
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
@@ -357,7 +343,6 @@ impl<S: StorageEngine> Collection<S, HnswIndex> {
         name: String,
         storage: Arc<S>,
         index: Arc<HnswIndex>,
-        graph_index: Arc<CsrGraph>,
         next_tx: Arc<AtomicU64>,
         dimension: usize,
         language: Language,
@@ -366,7 +351,6 @@ impl<S: StorageEngine> Collection<S, HnswIndex> {
             name,
             storage,
             index,
-            graph_index,
             next_tx,
             dimension,
             language,
@@ -388,7 +372,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         name: String,
         storage: Arc<S>,
         index: Arc<V>,
-        graph_index: Arc<CsrGraph>,
         next_tx: Arc<AtomicU64>,
         dimension: usize,
         language: Language,
@@ -408,7 +391,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             prefix,
             index,
             text_index,
-            graph_index,
             storage,
             next_tx,
             dimension,
@@ -418,8 +400,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             #[cfg(feature = "encryption-at-rest")]
             kv_store: None,
             kv_hooks: parking_lot::RwLock::new(None),
-            mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
-            community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
             config: parking_lot::RwLock::new(CollectionConfig::default()),
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
@@ -498,10 +478,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.consolidation_in_progress.clone()
     }
 
-    /// Returns the CSR graph index for this collection.
-    pub fn graph_index(&self) -> Arc<CsrGraph> {
-        self.graph_index.clone()
-    }
 
     /// Attaches KV lifecycle hooks port implementation to the collection.
     pub fn with_kv_hooks(self, hooks: Arc<dyn KvLifecycleHooks>) -> Self {
@@ -753,67 +729,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.text_index.load_stats().await
     }
 
-    /// Sets the mutation threshold for auto-triggered community detection (0 = disabled).
-    pub fn set_community_detection_trigger_threshold(&self, threshold: u64) {
-        self.community_detection_trigger_threshold
-            .store(threshold, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    /// Builder method to set the mutation threshold for auto-triggered community detection (0 = disabled).
-    pub fn with_community_detection_trigger_threshold(self, threshold: u64) -> Self {
-        self.set_community_detection_trigger_threshold(threshold);
-        self
-    }
-
-    /// Returns the configured mutation threshold for auto-triggered community detection.
-    pub fn community_detection_trigger_threshold(&self) -> u64 {
-        self.community_detection_trigger_threshold
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Returns the number of graph mutations since the last community detection execution.
-    pub fn mutations_since_community_detection(&self) -> u64 {
-        self.mutations_since_community_detection
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Delegates KV segment payload writing to `contextra_store::kv::KvSegmentManager`.
-    pub fn write_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-        plaintext: &[u8],
-    ) -> std::result::Result<contextra_store::kv::KvSegmentPayload, contextra_types::ContextraError>
-    {
-        manager.write_segment(group_id, plaintext)
-    }
-
-    /// Delegates KV segment reading/decryption to `contextra_store::kv::KvSegmentManager`.
-    pub fn read_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        segment: &contextra_store::kv::KvSegmentPayload,
-    ) -> std::result::Result<Vec<u8>, contextra_types::ContextraError> {
-        manager.read_segment(segment)
-    }
-
-    /// Delegates KV segment key revocation/deletion to `contextra_store::kv::KvSegmentManager`.
-    pub fn delete_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-    ) -> bool {
-        manager.delete_segment(group_id)
-    }
-
-    /// Delegates KV deletion proof generation to `contextra_store::kv::KvSegmentManager`.
-    pub fn generate_kv_deletion_proof(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-    ) -> std::result::Result<bool, contextra_types::ContextraError> {
-        manager.generate_deletion_proof(group_id)
-    }
 
     /// Generates a collection prefix using TenantKeyCodec.
     pub fn tenant_collection_prefix(
@@ -843,39 +758,4 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         storage.point_lookup_metrics(key).await
     }
 
-    /// Increments mutation counter and triggers background community detection if threshold is reached.
-    pub(super) fn check_and_trigger_community_detection(&self, count: usize) {
-        let threshold = self
-            .community_detection_trigger_threshold
-            .load(std::sync::atomic::Ordering::Relaxed);
-        if threshold == 0 || count == 0 {
-            return;
-        }
-
-        let prev = self
-            .mutations_since_community_detection
-            .fetch_add(count as u64, std::sync::atomic::Ordering::Relaxed);
-
-        if prev + (count as u64) >= threshold {
-            self.mutations_since_community_detection
-                .store(0, std::sync::atomic::Ordering::Relaxed);
-            let collection_clone = self.clone();
-            tokio::spawn(async move {
-                match collection_clone.run_community_detection().await {
-                    Ok(assignments) => {
-                        tracing::info!(
-                            communities = assignments.len(),
-                            "Auto-triggered community detection completed"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            error = %e,
-                            "Auto-triggered community detection failed"
-                        );
-                    }
-                }
-            });
-        }
-    }
 }

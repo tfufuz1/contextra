@@ -173,19 +173,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
 
-                // INVARIANT INV-GRAPH-PROV-1: Graph tombstone MUST precede LSM commit
-                // for Supersedes links. CSR is rebuilt from LSM on startup — tombstone state is recovered
-                // transitively.
-                if relation == contextra_types::domain::LinkRelation::Supersedes {
-                    contextra_graph::cascade_invalidate_edges_for_superseded_doc(
-                        &self.graph_index,
-                        to,
-                        tx.inner(),
-                    )
-                    .await?;
-                }
-
-                // Commit transaction to persist the link updates and edge tombstones atomically
+                // Commit transaction to persist the link updates atomically
                 self.storage.commit(tx).await?;
             }
         }
