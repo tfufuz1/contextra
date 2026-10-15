@@ -3,10 +3,11 @@
 // ZWECK: Implementation von LsmStorage::purge_keys (Compaction-basierte Bereinigung).
 // INVARIANTEN: Active snapshot pin check, Disk space pre-flight probe, atomic manifest transitions, Zero-panic.
 
-use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeReport, PurgeScope};
+use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeReport, PurgeScope};
 use crate::lsm::engine::LsmStorage;
 use crate::manifest::ManifestEntry;
 use crate::sstable::{SstableBuilder, SstableReader};
+use contextra_ports::erasure::PurgeError;
 use contextra_ports::StorageEngine;
 use std::sync::Arc;
 
@@ -21,19 +22,19 @@ impl LsmStorage {
         scope: PurgeScope,
         as_of_tx: u64,
         space_probe: Option<&dyn FreeSpaceProbe>,
-    ) -> std::result::Result<PurgeReport, PurgeBlocked> {
+    ) -> std::result::Result<PurgeReport, PurgeError> {
         // 1. Active snapshot pin check
         let min_active_seq = self.snapshot_registry.min_active_seqno();
         if min_active_seq <= as_of_tx {
-            return Err(PurgeBlocked::ActiveSnapshot {
-                min_seq: min_active_seq,
+            return Err(PurgeError::SnapshotPinned {
+                oldest_pin_age: as_of_tx.saturating_sub(min_active_seq),
             });
         }
 
         // 2. Active Memtable Flush to SSTable first
         StorageEngine::flush(self)
             .await
-            .map_err(|_| PurgeBlocked::CompactionBusy)?;
+            .map_err(|_| PurgeError::CompactionBusy)?;
 
         // Snapshot existing sstables list under read lock
         let snapshot_sstables = {
@@ -57,9 +58,9 @@ impl LsmStorage {
 
         if let Some(free_space) = free_space_opt {
             if free_space < needed_space || free_space == 0 {
-                return Err(PurgeBlocked::InsufficientDiskSpace {
+                return Err(PurgeError::InsufficientDiskSpace {
                     needed: needed_space,
-                    free: free_space,
+                    available: Some(free_space),
                 });
             }
         }
@@ -71,7 +72,11 @@ impl LsmStorage {
             let mut stream = sst
                 .stream()
                 .await
-                .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                .map_err(|e| PurgeError::ReadError {
+                    file: sst.file_path().to_string_lossy().to_string(),
+                    offset: 0,
+                    source_details: e.to_string(),
+                })?;
             let mut matches = false;
             loop {
                 match stream.next_entry().await {
@@ -82,7 +87,13 @@ impl LsmStorage {
                         }
                     }
                     Ok(None) => break,
-                    Err(_) => return Err(PurgeBlocked::CompactionBusy),
+                    Err(e) => {
+                        return Err(PurgeError::ReadError {
+                            file: sst.file_path().to_string_lossy().to_string(),
+                            offset: 0,
+                            source_details: e.to_string(),
+                        });
+                    }
                 }
             }
             if matches {
@@ -113,7 +124,11 @@ impl LsmStorage {
             let mut stream = old_sst
                 .stream()
                 .await
-                .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                .map_err(|e| PurgeError::ReadError {
+                    file: old_sst.file_path().to_string_lossy().to_string(),
+                    offset: 0,
+                    source_details: e.to_string(),
+                })?;
 
             let mut valid_entries = Vec::new();
 
@@ -128,7 +143,13 @@ impl LsmStorage {
                         }
                     }
                     Ok(None) => break,
-                    Err(_) => return Err(PurgeBlocked::CompactionBusy),
+                    Err(e) => {
+                        return Err(PurgeError::ReadError {
+                            file: old_sst.file_path().to_string_lossy().to_string(),
+                            offset: 0,
+                            source_details: e.to_string(),
+                        });
+                    }
                 }
             }
 
@@ -154,7 +175,10 @@ impl LsmStorage {
                 let mut builder =
                     SstableBuilder::create_with_key_manager(&tmp_path, self.key_manager.clone())
                         .await
-                        .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                        .map_err(|e| PurgeError::WriteError {
+                            file: tmp_path.to_string_lossy().to_string(),
+                            source_details: e.to_string(),
+                        })?;
 
                 builder.set_format_version(old_sst.format_version);
 
@@ -162,18 +186,27 @@ impl LsmStorage {
                     builder
                         .add(k, v, *seq, *tx)
                         .await
-                        .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                        .map_err(|e| PurgeError::WriteError {
+                            file: tmp_path.to_string_lossy().to_string(),
+                            source_details: e.to_string(),
+                        })?;
                 }
 
                 let meta = builder
                     .finish()
                     .await
-                    .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                    .map_err(|e| PurgeError::WriteError {
+                        file: tmp_path.to_string_lossy().to_string(),
+                        source_details: e.to_string(),
+                    })?;
 
                 // Atomic rename tmp -> final
                 tokio::fs::rename(&tmp_path, &final_path)
                     .await
-                    .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                    .map_err(|e| PurgeError::WriteError {
+                        file: final_path.to_string_lossy().to_string(),
+                        source_details: e.to_string(),
+                    })?;
 
                 if let Some(parent) = final_path.parent() {
                     let _ = crate::util::fsync_parent_dir(parent).await;
@@ -185,7 +218,11 @@ impl LsmStorage {
                     self.key_manager.clone(),
                 )
                 .await
-                .map_err(|_| PurgeBlocked::CompactionBusy)?;
+                .map_err(|e| PurgeError::ReadError {
+                    file: final_path.to_string_lossy().to_string(),
+                    offset: 0,
+                    source_details: e.to_string(),
+                })?;
 
                 new_readers.push(Arc::new(new_reader));
 
@@ -202,7 +239,7 @@ impl LsmStorage {
         self.manifest
             .append_batch(&manifest_entries)
             .await
-            .map_err(|_| PurgeBlocked::CompactionBusy)?;
+            .map_err(|e| PurgeError::Manifest(e.to_string()))?;
 
         // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix)
         //

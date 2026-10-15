@@ -62,13 +62,7 @@ impl ErasureBackend for LsmStorage {
             .map_err(|e| PurgeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
 
         let report = handle
-            .block_on(async { self.purge_keys(purge_scope, as_of.inner(), Some(probe)).await })
-            .map_err(|blocked| {
-                PurgeError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Purge compaction blocked: {:?}", blocked),
-                ))
-            })?;
+            .block_on(async { self.purge_keys(purge_scope, as_of.inner(), Some(probe)).await })?;
 
         Ok(PurgeOutput {
             records_purged: report.records_purged,

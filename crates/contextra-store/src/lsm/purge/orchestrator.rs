@@ -294,8 +294,8 @@ impl<'a> PurgeOrchestrator<'a> {
                         .await
                     {
                         Ok(rep) => report = rep,
-                        Err(blocked) => {
-                            return Err(OrxPurgeError::Blocked(blocked));
+                        Err(err) => {
+                            return Err(OrxPurgeError::Purge(err));
                         }
                     }
                 }

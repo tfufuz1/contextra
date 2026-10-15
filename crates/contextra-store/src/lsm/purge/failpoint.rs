@@ -56,11 +56,16 @@ impl OrxFailpointSet {
     }
 }
 
+use contextra_ports::erasure::PurgeError;
+
 /// Errors occurring during purge orchestration and recovery.
 #[derive(Debug, Error)]
 pub enum OrxPurgeError {
     #[error("I/O error during purge operation: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Purge error: {0:?}")]
+    Purge(#[from] PurgeError),
 
     #[error("Purge operation blocked: {0:?}")]
     Blocked(PurgeBlocked),
@@ -82,6 +87,16 @@ impl From<OrxPurgeError> for PurgeBlocked {
     fn from(err: OrxPurgeError) -> Self {
         match err {
             OrxPurgeError::Blocked(b) => b,
+            OrxPurgeError::Purge(PurgeError::InsufficientDiskSpace { needed, available }) => {
+                PurgeBlocked::InsufficientDiskSpace {
+                    needed,
+                    free: available.unwrap_or(0),
+                }
+            }
+            OrxPurgeError::Purge(PurgeError::SnapshotPinned { .. }) => {
+                PurgeBlocked::ActiveSnapshot { min_seq: 0 }
+            }
+            OrxPurgeError::Purge(PurgeError::CompactionBusy) => PurgeBlocked::CompactionBusy,
             _ => PurgeBlocked::UnclassifiedFiles { count: 1 },
         }
     }
