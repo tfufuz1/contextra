@@ -39,7 +39,6 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 [features]
 test-utils = []
 kv-encryption = []
-cloud-egress-guard = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
