@@ -185,6 +185,8 @@ pub async fn execute_migration(
             FileKind::Sstable => 0,
             FileKind::Blob => 1,
             FileKind::Manifest => 2,
+            FileKind::Wal => 3,
+            FileKind::Ledger => 4,
         };
         manifest
             .append(&ManifestEntry::FormatVersionRecord {

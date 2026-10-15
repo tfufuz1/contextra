@@ -8,15 +8,14 @@
 //! - [`SequenceLogSsiValidator`]: Reference validator implementation using MVCC sequence tracking.
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
+// STAND: 2026-10-15T00:00:00Z
 // ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
 // INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
 // HOTSPOTS: 35-220
 // NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock garantiert atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
-// SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
 use crate::error::{ContextraError, Result};
-use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
+use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION_TICKS};
 use crate::snapshot::SnapshotRegistry;
 use crate::sync::atomic::{AtomicU64, Ordering};
 use crate::sync::Arc;
@@ -25,22 +24,12 @@ use ahash::AHashMap;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 
 /// Tracked read keys, range prefixes, and their snapshot sequence numbers for Serializable Snapshot Isolation (SSI).
-///
-/// # Memory Overhead & Risk Analysis
-/// Memory consumption per transaction grows linearly $O(R + P)$ with the number of read keys $R$ and range prefixes $P$,
-/// where each entry retains a key/prefix byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
-/// High read-volume transactions should limit or monitor read-set size to avoid unbounded memory growth.
-/// Use [`crate::tx_buffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
-///
-/// # Range Reads & Phantom Protection
-/// SSI protects point reads directly via recorded keys. Range scans (e.g. prefix scans) MUST call
-/// [`ReadSet::record_prefix`] to enable phantom protection against concurrent key insertions matching the prefix.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadSet {
     keys: AHashMap<Vec<u8>, u64>,
@@ -59,9 +48,6 @@ impl ReadSet {
     }
 
     /// Records a read operation for `key` at snapshot sequence `snapshot_seq`.
-    ///
-    /// If the key was previously recorded in the same transaction, the lowest (earliest)
-    /// snapshot sequence number is preserved to enforce strict isolation boundaries.
     pub fn record_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let k = key.into();
@@ -81,9 +67,6 @@ impl ReadSet {
     }
 
     /// Records a range prefix read operation at `snapshot_seq` for phantom protection.
-    ///
-    /// SSI protects point reads directly; range scans are protected against phantoms
-    /// only when `record_prefix` is explicitly called.
     pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let p = prefix.into();
@@ -157,20 +140,8 @@ impl ReadSet {
 }
 
 /// Trait for Serializable Snapshot Isolation (SSI) validation.
-///
-/// Implementations evaluate whether concurrent committed write transactions have mutated
-/// any keys in the transaction's [`ReadSet`] after the snapshot sequence numbers recorded
-/// when those keys were read.
 pub trait SsiValidator {
     /// Validates the [`ReadSet`] for transaction `tx_id`.
-    ///
-    /// # Errors
-    /// Returns `Err(ContextraError::Conflict(...))` if a key in `read_set` was committed by a
-    /// concurrent transaction at a sequence number strictly greater than the key's snapshot sequence number.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` assumes serializable commit validation ordering (e.g. via `commit_mutex` or engine pipeline)
-    /// during `validate` and `record_commit_key` calls to guarantee atomic, write-skew-free commits.
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
@@ -207,20 +178,6 @@ pub struct PruningBlockerInfo {
     pub is_pin_expired: bool,
 }
 
-/// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
-///
-/// # Architecture Decision & Invariant (B-16 / INV-MVCC-SSI-1)
-/// To prevent total outage when `DEFAULT_MAX_TRACKED_COMMIT_KEYS` capacity is reached (finding B-16),
-/// individual exact keys in older sequence buckets are coarsened into prefix summaries.
-///
-/// ## Soundness Invariant (0% False Negatives)
-/// Coarsening guarantees that no real write-skew conflict is ever missed:
-/// - Every original key $k$ in a coarsened bucket starts with at least one extracted prefix $p$.
-/// - Any point read or range prefix read that would have conflicted with $k$ is guaranteed to overlap
-///   with $p$.
-/// - False positives may occur (a commit may be conservatively flagged as a conflict), but false
-///   negatives are mathematically impossible.
-/// - Fail-closed protection remains intact under `INV-MVCC-SSI-1`.
 fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8>> {
     if keys.is_empty() {
         return Vec::new();
@@ -468,12 +425,6 @@ impl CommittedWrites {
 }
 
 /// Reference implementation of [`SsiValidator`] backed by MVCC [`SequenceLog`] and committed key tracking.
-///
-/// Operates strictly in-memory without disk I/O or external storage dependencies.
-///
-/// # INVARIANT (INV-MVCC-SSI-1)
-/// Conflict resolution is strictly data-driven (sequence number comparison) and deterministic.
-/// Given identical commit sequences and read-sets, repeated executions yield identical outcomes.
 #[derive(Clone)]
 pub struct SequenceLogSsiValidator {
     committed_writes: Arc<RwLock<CommittedWrites>>,
@@ -482,13 +433,6 @@ pub struct SequenceLogSsiValidator {
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
     max_pin_duration: Duration,
-    /// Metrics sink container for observability reporting (v17 Teil 2.2 & Teil 4.3 B-16).
-    ///
-    /// # Architecture Decision & Invariant (Hot-Swap Consistency)
-    /// Uses `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
-    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
-    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
-    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
     metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
 }
 
@@ -513,8 +457,6 @@ impl Default for SequenceLogSsiValidator {
 }
 
 /// Builder for constructing a [`SequenceLogSsiValidator`].
-///
-/// Wires SSI validation parameters and dependencies for use in [`SsiCommitGate`] and [`MvccWiring`](crate::wiring::MvccWiring).
 #[derive(Default)]
 pub struct SequenceLogSsiValidatorBuilder {
     max_tracked_keys: Option<usize>,
@@ -618,7 +560,7 @@ impl SequenceLogSsiValidator {
             snapshot_registry: None,
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys,
-            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            max_pin_duration: Duration::from_nanos(DEFAULT_MAX_PIN_DURATION_TICKS),
             metrics_sink: None,
         }
     }
@@ -631,7 +573,7 @@ impl SequenceLogSsiValidator {
             snapshot_registry: None,
             pruned_through: Arc::new(AtomicU64::new(0)),
             max_tracked_keys: DEFAULT_MAX_TRACKED_COMMIT_KEYS,
-            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            max_pin_duration: Duration::from_nanos(DEFAULT_MAX_PIN_DURATION_TICKS),
             metrics_sink: None,
         }
     }
@@ -648,12 +590,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Attaches a metrics sink container to this validator for observability reporting.
-    ///
-    /// # Architecture Decision & Invariant (v17 Teil 2.2 & Teil 4.3 B-16)
-    /// Accepts an `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
-    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
-    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
-    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
     pub fn with_metrics_sink(
         mut self,
         sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
@@ -680,13 +616,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Prunes tracked committed writes with `commit_seq <= bound_seq`.
-    ///
-    /// Atomically updates `pruned_through` watermark monotonically under the `committed_writes` write lock.
-    /// Returns the number of entries removed.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` compaction workers compute `bound_seq` as `min(min_read_snapshot(), min_active_seqno())`
-    /// to ensure pruned keys can no longer conflict with any active or future transaction.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
         let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -696,13 +625,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Removes all committed key registrations with `commit_seq >= first_seq`.
-    ///
-    /// Used when WAL append or commit execution fails after keys were registered conservatively.
-    /// Returns the number of entries removed in $O(K_{\text{removed}})$ time using the sequence index.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` invokes `forget_from(first_seq)` during WAL append or commit execution rollbacks
-    /// to strip conservatively registered candidate keys. Earlier valid commits at `old_seq < first_seq` are restored.
     pub fn forget_from(&self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -740,6 +662,11 @@ impl SequenceLogSsiValidator {
             }
         }
 
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+
         if let Some(ref sink_lock) = self.metrics_sink {
             let sink = sink_lock.read().clone();
             let ratio = initial_len as f64 / self.max_tracked_keys as f64;
@@ -747,7 +674,7 @@ impl SequenceLogSsiValidator {
 
             if reached_threshold {
                 if let Some(ref blocker) =
-                    self.diagnose_pruning_blocker_internal(writes, Instant::now())
+                    self.diagnose_pruning_blocker_internal(writes, now_ticks)
                 {
                     sink.record_gauge(
                         "mvcc_ssi_coarsened_buckets_total",
@@ -766,7 +693,7 @@ impl SequenceLogSsiValidator {
         }
 
         if writes.len() >= threshold {
-            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes, Instant::now()) {
+            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes, now_ticks) {
                 tracing::warn!(
                     min_unpruned_seq = blocker.min_unpruned_seq,
                     pruned_through_seq = blocker.pruned_through_seq,
@@ -785,19 +712,23 @@ impl SequenceLogSsiValidator {
 
     /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning in this validator.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
-        self.diagnose_pruning_blocker_at(Instant::now())
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+        self.diagnose_pruning_blocker_at(now_ticks)
     }
 
-    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to timestamp `now`.
-    pub fn diagnose_pruning_blocker_at(&self, now: Instant) -> Option<PruningBlockerInfo> {
+    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to timestamp `now_ticks`.
+    pub fn diagnose_pruning_blocker_at(&self, now_ticks: u64) -> Option<PruningBlockerInfo> {
         let writes = self.committed_writes.read();
-        self.diagnose_pruning_blocker_internal(&writes, now)
+        self.diagnose_pruning_blocker_internal(&writes, now_ticks)
     }
 
     fn diagnose_pruning_blocker_internal(
         &self,
         writes: &CommittedWrites,
-        now: Instant,
+        now_ticks: u64,
     ) -> Option<PruningBlockerInfo> {
         let min_unpruned_seq = writes.seq_index.keys().copied().next()?;
         let total_seq_buckets = writes.seq_index.len();
@@ -807,13 +738,10 @@ impl SequenceLogSsiValidator {
             .filter(|b| matches!(b, SeqBucket::Coarsened { .. }))
             .count();
 
-        let longest_pin = self.snapshot_registry.as_ref().and_then(|reg| {
-            if now == Instant::now() {
-                reg.longest_active_pin()
-            } else {
-                reg.longest_active_pin_at(now)
-            }
-        });
+        let longest_pin = self
+            .snapshot_registry
+            .as_ref()
+            .and_then(|reg| reg.longest_active_pin_at(now_ticks));
 
         let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
         let longest_pin_duration = longest_pin.map(|(_, dur)| dur);
@@ -833,10 +761,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Records a committed write for `key` at sequence number `commit_seq`.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` assumes strict monotonic `commit_seq` assignment serialized by `commit_mutex`.
-    /// Registering keys must reflect durably committed WAL/engine sequence numbers.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
         self.record_commit_keys(Some(key), commit_seq);
     }
@@ -866,10 +790,13 @@ impl SequenceLogSsiValidator {
             return Ok(());
         }
 
-        // Fail-closed check if commit key capacity limit is reached or exceeded
         if committed_writes.len() >= self.max_tracked_keys {
+            let now_ticks = self
+                .snapshot_registry
+                .as_ref()
+                .map_or(0, |reg| reg.now_ticks());
             let blocker_msg = if let Some(blocker) =
-                self.diagnose_pruning_blocker_internal(committed_writes, Instant::now())
+                self.diagnose_pruning_blocker_internal(committed_writes, now_ticks)
             {
                 format!(
                     "; pruning blocker details: min_unpruned_seq={}, longest_pin_duration={:?}, is_pin_expired={}",
@@ -891,7 +818,6 @@ impl SequenceLogSsiValidator {
 
         let pruned_through = self.pruned_through.load(Ordering::SeqCst);
 
-        // Sort read keys deterministically by key bytes to guarantee reproducible validation order
         let mut entries: Vec<(&Vec<u8>, &u64)> = read_set.iter().collect();
         entries.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
@@ -906,7 +832,6 @@ impl SequenceLogSsiValidator {
                 )));
             }
 
-            // 1. Direct key commit sequence check & coarsened bucket prefix check
             if let Some(commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
                     return Err(ContextraError::Conflict(format!(
@@ -938,7 +863,6 @@ impl SequenceLogSsiValidator {
                 }
             }
 
-            // 2. SequenceLog entry check if attached
             if let Some(ref seq_log_lock) = self.sequence_log {
                 let seq_log = seq_log_lock.read();
                 let doc_id = derive_doc_id_for_key(key);
@@ -958,7 +882,6 @@ impl SequenceLogSsiValidator {
             }
         }
 
-        // Range scan phantom protection checks
         let mut prefixes: Vec<(&Vec<u8>, &u64)> = read_set.prefixes_iter().collect();
         prefixes.sort_unstable_by(|(p1, _), (p2, _)| p1.cmp(p2));
 
@@ -1254,18 +1177,11 @@ impl SsiCommitGate {
     }
 
     /// Atomically validates `tx` state and read set, and registers `tx` write keys if valid.
-    ///
-    /// # Fail-Closed Security
-    /// - If `tx.status != TxStateStatus::Active`, returns `Err(SsiError::UnknownTxState)`.
-    /// - If `tx.has_read_tracking == false`, returns `Err(SsiError::MissingReadTracking)`.
-    /// - If `tx.read_set` conflicts with concurrent committed writes, returns `Ok(CommitDecision::Aborted { ... })`.
-    /// - Otherwise, registers `write_keys` at `commit_seq` and returns `Ok(CommitDecision::Accepted { commit_seq })`.
     pub fn validate_and_register(
         &self,
         tx: &TxSsiState,
         _seq_log: &SequenceLog,
     ) -> std::result::Result<CommitDecision, SsiError> {
-        // Fail-closed checks on transaction lifecycle status
         if tx.status != TxStateStatus::Active {
             return Err(SsiError::UnknownTxState {
                 tx_id: tx.tx_id,
@@ -1273,14 +1189,12 @@ impl SsiCommitGate {
             });
         }
 
-        // Fail-closed check on read tracking enablement
         if !tx.has_read_tracking {
             return Err(SsiError::MissingReadTracking { tx_id: tx.tx_id });
         }
 
         let write_key_refs: Vec<&[u8]> = tx.write_keys.iter().map(|k| k.as_slice()).collect();
 
-        // Perform atomic validation against committed write history in SequenceLogSsiValidator
         match self.validator.validate_and_record(
             tx.tx_id,
             &tx.read_set,
@@ -1322,12 +1236,10 @@ mod tests {
         assert_eq!(rs.get(b"key3"), None);
         assert_eq!(rs.min_snapshot_seq(), Some(10));
 
-        // Lower snapshot sequence replaces higher
         rs.record_read(b"key1".to_vec(), 5);
         assert_eq!(rs.get(b"key1"), Some(5));
         assert_eq!(rs.min_snapshot_seq(), Some(5));
 
-        // Higher snapshot sequence ignored for key1, min remains 5
         rs.record_read(b"key1".to_vec(), 20);
         assert_eq!(rs.get(b"key1"), Some(5));
         assert_eq!(rs.min_snapshot_seq(), Some(5));
@@ -1345,7 +1257,6 @@ mod tests {
         let mut rs = ReadSet::new();
         rs.record_read(b"key1".to_vec(), 10);
 
-        // Record a commit for key1 at seq 10 (equal to snapshot_seq)
         validator.record_commit_key(b"key1", 10);
 
         assert!(validator.validate(tx, &rs).is_ok());
@@ -1359,7 +1270,6 @@ mod tests {
         let mut rs = ReadSet::new();
         rs.record_read(b"key1".to_vec(), 10);
 
-        // Record a commit for key1 at seq 11 (> snapshot_seq 10)
         validator.record_commit_key(b"key1", 11);
 
         let res = validator.validate(tx, &rs);
@@ -1374,15 +1284,13 @@ mod tests {
         let tx = TxId::new(3);
 
         let doc_key = "doc_alpha";
-        let doc_id = DocId::from_key(doc_key).expect("valid doc_id"); // #[cfg(test)]
+        let doc_id = DocId::from_key(doc_key).expect("valid doc_id");
 
         let mut rs = ReadSet::new();
         rs.record_read(doc_key.as_bytes(), 5);
 
-        // No changes in sequence log -> OK
         assert!(validator.validate(tx, &rs).is_ok());
 
-        // Record insert in sequence log at seq 8 (> snapshot_seq 5)
         seq_log.write().record_insert(doc_id, 8);
 
         let res = validator.validate(tx, &rs);

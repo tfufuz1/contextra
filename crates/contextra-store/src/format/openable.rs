@@ -6,6 +6,8 @@ pub enum FileKind {
     Sstable,
     Blob,
     Manifest,
+    Wal,
+    Ledger,
 }
 
 impl FileKind {
@@ -14,6 +16,8 @@ impl FileKind {
             FileKind::Sstable => *b"MFSX",
             FileKind::Blob => *b"MFBL",
             FileKind::Manifest => *b"MFMN",
+            FileKind::Wal => *b"MFW3",
+            FileKind::Ledger => *b"ELDG",
         }
     }
 
@@ -22,6 +26,8 @@ impl FileKind {
             FileKind::Sstable => "SSTable",
             FileKind::Blob => "Blob",
             FileKind::Manifest => "Manifest",
+            FileKind::Wal => "WAL",
+            FileKind::Ledger => "Ledger",
         }
     }
 }

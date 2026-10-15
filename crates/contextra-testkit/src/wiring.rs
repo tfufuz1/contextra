@@ -46,7 +46,9 @@ mod tests {
 
     #[test]
     fn test_testkit_wiring_build() {
-        let deps = TestkitWiringDeps { initial_nanos: 5000 };
+        let deps = TestkitWiringDeps {
+            initial_nanos: 5000,
+        };
         let wiring = TestkitWiring::build(deps).expect("build TestkitWiring");
         assert_eq!(wiring.clock.now_nanos(), 5000);
     }
