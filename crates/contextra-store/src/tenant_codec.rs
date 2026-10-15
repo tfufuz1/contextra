@@ -887,16 +887,20 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
 impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
     fn physical_scope(&self, scope: &LogicalScope) -> Result<PhysicalScope> {
         match scope {
-            LogicalScope::Document { doc_id, tenant_id } => {
+            LogicalScope::Document {
+                doc_id,
+                tenant_id,
+                collection_id,
+            } => {
                 if *tenant_id != self.codec.tenant_id {
                     return Err(ContextraError::InvalidInput(format!(
                         "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
                         self.codec.tenant_id, tenant_id
                     )));
                 }
-                let prefix = self.codec.scan_prefix().to_vec();
+                let col_prefix = self.codec.collection_prefix(collection_id);
                 let doc_key = self.make_key(format!("doc:{}", doc_id.0).as_bytes());
-                Ok(PhysicalScope::new(vec![doc_key], vec![prefix]))
+                PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![col_prefix])
             }
             LogicalScope::Collection {
                 collection_id,
@@ -909,34 +913,42 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
                     )));
                 }
                 let col_prefix = self.codec.collection_prefix(collection_id);
-                Ok(PhysicalScope::new(vec![], vec![col_prefix]))
+                PhysicalScope::try_new(*tenant_id, vec![], vec![col_prefix])
             }
-            LogicalScope::Keys(keys) => {
-                let physical_keys = keys.iter().map(|k| self.make_key(k)).collect();
-                Ok(PhysicalScope::new(physical_keys, vec![]))
-            }
-            LogicalScope::Prefixes(prefixes) => {
-                let physical_prefixes = prefixes.iter().map(|p| self.make_key(p)).collect();
-                Ok(PhysicalScope::new(vec![], physical_prefixes))
+            LogicalScope::Tenant { tenant_id } => {
+                if *tenant_id != self.codec.tenant_id {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
+                        self.codec.tenant_id, tenant_id
+                    )));
+                }
+                let prefix = self.codec.scan_prefix().to_vec();
+                PhysicalScope::try_new(*tenant_id, vec![], vec![prefix])
             }
         }
     }
 
-    fn purge<'a>(
-        &'a self,
-        scope: &'a PhysicalScope,
+    fn acquire_fence(&self, scope: &PhysicalScope, id: contextra_ports::erasure::PurgeId) -> Result<contextra_ports::erasure::FenceGuard> {
+        if let Some(backend) = self.inner.erasure_capabilities_handle() {
+            backend.acquire_fence(scope, id)
+        } else {
+            Ok(contextra_ports::erasure::FenceGuard { purge_id: id })
+        }
+    }
+
+    fn purge_physical(
+        &self,
+        scope: &PhysicalScope,
         as_of: TxId,
-    ) -> BoxFuture<'a, Result<PurgeOutput>> {
-        Box::pin(async move {
-            if let Some(backend) = self.inner.erasure_capabilities_handle() {
-                backend.purge(scope, as_of).await
-            } else {
-                Err(ContextraError::capability_unsupported(
-                    "purge",
-                    "Underlying storage engine does not support ErasureBackend",
-                ))
-            }
-        })
+        probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
+    ) -> std::result::Result<contextra_ports::erasure::PurgeOutput, contextra_ports::erasure::PurgeError> {
+        if let Some(backend) = self.inner.erasure_capabilities_handle() {
+            backend.purge_physical(scope, as_of, probe)
+        } else {
+            Err(contextra_ports::erasure::PurgeError::Manifest(
+                "Underlying storage engine does not support ErasureBackend".to_string(),
+            ))
+        }
     }
 }
 
@@ -969,17 +981,19 @@ mod tests {
         let doc_scope = LogicalScope::Document {
             doc_id: DocId(1),
             tenant_id: tenant_1,
+            collection_id: CollectionId(0),
         };
         let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-        assert_eq!(phys_scope.prefixes.len(), 1);
-        assert_eq!(phys_scope.prefixes[0], b"t:101:");
-        assert_eq!(phys_scope.keys.len(), 1);
-        assert_eq!(phys_scope.keys[0], b"t:101:doc:1");
+        assert_eq!(phys_scope.prefixes().len(), 1);
+        assert_eq!(phys_scope.prefixes()[0], b"t:101:0:");
+        assert_eq!(phys_scope.keys().len(), 1);
+        assert_eq!(phys_scope.keys()[0], b"t:101:doc:1");
 
         // 3. Physical scope resolution with mismatched TenantId MUST fail closed
         let mismatched_scope = LogicalScope::Document {
             doc_id: DocId(1),
             tenant_id: tenant_2,
+            collection_id: CollectionId(0),
         };
         let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
         match err {
@@ -995,12 +1009,14 @@ mod tests {
             tenant_id: tenant_1,
         };
         let phys_col_scope = eb_t1.physical_scope(&col_scope).unwrap();
-        assert_eq!(phys_col_scope.prefixes, vec![b"t:101:55:"]);
+        assert_eq!(phys_col_scope.prefixes(), vec![b"t:101:55:"]);
 
-        // 5. Raw keys/prefixes scope
-        let raw_keys_scope = LogicalScope::Keys(vec![b"my_key".to_vec()]);
-        let phys_raw_keys = eb_t1.physical_scope(&raw_keys_scope).unwrap();
-        assert_eq!(phys_raw_keys.keys, vec![b"t:101:my_key".to_vec()]);
+        // 5. Tenant scope
+        let tenant_scope = LogicalScope::Tenant {
+            tenant_id: tenant_1,
+        };
+        let phys_tenant_scope = eb_t1.physical_scope(&tenant_scope).unwrap();
+        assert_eq!(phys_tenant_scope.prefixes(), vec![b"t:101:"]);
 
         // 6. Put data for both tenants
         let tx1 = TxId::try_new(10).unwrap();

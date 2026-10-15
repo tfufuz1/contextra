@@ -41,6 +41,61 @@ pub trait SeededRng: Send + Sync + 'static {
 /// Alias for [`SeededRng`] trait for specification and backward naming compatibility.
 pub use SeededRng as Rng;
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Standard system pseudo-random generator implementing [`SeededRng`] and [`EntropyRng`].
+#[derive(Debug)]
+pub struct SystemRng {
+    counter: AtomicU64,
+}
+
+impl Default for SystemRng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SystemRng {
+    /// Creates a new [`SystemRng`].
+    pub fn new() -> Self {
+        Self {
+            counter: AtomicU64::new(0x1234_5678_9ABC_DEF0),
+        }
+    }
+}
+
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        let mut bytes = [0u8; 8];
+        SeededRng::fill_bytes(self, &mut bytes);
+        u64::from_le_bytes(bytes)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        for chunk in dest.chunks_mut(8) {
+            let val = self.counter.fetch_add(0x9e37_79b9_7f4a_7c15, Ordering::Relaxed);
+            let bytes = val.to_le_bytes();
+            let take = chunk.len().min(8);
+            chunk[..take].copy_from_slice(&bytes[..take]);
+        }
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let val = SeededRng::next_u64(self) >> 11;
+        (val as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
+
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SeededRng::fill_bytes(self, dest);
+    }
+
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
+    }
+}
+
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
     fn fill_bytes(&self, dest: &mut [u8]) {
         (**self).fill_bytes(dest);

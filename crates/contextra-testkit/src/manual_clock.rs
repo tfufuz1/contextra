@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use contextra_ports::Clock;
+use contextra_types::DeterministicTimestamp;
 
 /// A thread-safe, manually advanceable clock for deterministic tests.
 ///
@@ -70,6 +71,15 @@ impl ManualClock {
 }
 
 impl Clock for ManualClock {
+    fn now(&self) -> DeterministicTimestamp {
+        let nanos = self.now_nanos();
+        DeterministicTimestamp::new(nanos / 1_000_000, nanos)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.now_nanos()
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.now_nanos()
     }

@@ -21,8 +21,8 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [features]
-default = ["wal-integrity", "block-cache-v2"]
-erasure = ["wal-integrity"]
+default = ["wal-integrity", "block-cache-v2", "erasure"]
+erasure = ["wal-integrity", "contextra-ports/backend-impl"]
 encryption-at-rest = ["wal-integrity"]
 wal-integrity = []
 wal-v4-wip = []
@@ -35,7 +35,6 @@ legacy-wal-key = []
 
 [dependencies]
 contextra-durable-fs = { path = "../contextra-durable-fs" }
-arc-swap = "1.7"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }

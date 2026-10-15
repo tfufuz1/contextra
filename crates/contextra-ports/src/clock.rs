@@ -27,6 +27,52 @@ pub trait Clock: Send + Sync + 'static {
     }
 }
 
+/// Standard system clock implementation of [`Clock`].
+#[derive(Debug, Clone)]
+pub struct SystemClock {
+    start: std::time::Instant,
+}
+
+impl Default for SystemClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SystemClock {
+    /// Creates a new [`SystemClock`].
+    pub fn new() -> Self {
+        Self {
+            start: std::time::Instant::now(),
+        }
+    }
+}
+
+impl Clock for SystemClock {
+    fn now(&self) -> DeterministicTimestamp {
+        let wall_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+            .unwrap_or(0);
+        let mono_ctr = u64::try_from(
+            std::time::Instant::now()
+                .saturating_duration_since(self.start)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX);
+        DeterministicTimestamp::new(wall_ms, mono_ctr)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        u64::try_from(
+            std::time::Instant::now()
+                .saturating_duration_since(self.start)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX)
+    }
+}
+
 impl<T: Clock + ?Sized> Clock for Arc<T> {
     fn now(&self) -> DeterministicTimestamp {
         (**self).now()
