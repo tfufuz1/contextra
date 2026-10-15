@@ -1,4 +1,4 @@
-use contextra_core::{TenantId, TxId};
+use contextra_types::types::domain::ids::{TenantId, TxId};
 use contextra_crypto::deletion_proof::DeletionLayer;
 use contextra_crypto::deletion_witness::WitnessEvidence;
 use contextra_ports::StorageEngine;

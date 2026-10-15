@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup, Community detection).
+// ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup).
 // INVARIANTEN: repair() stellt LSM<->Index Synchronität nach Crash sicher; Reaping stützt sich auf Snapshot-Sequenzen.
 // NICHT-OFFENSICHTLICH: Pending TxIntents werden beim Start via Forward-Commit repariert und markiert.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
@@ -717,99 +717,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.storage.commit(tx).await?;
 
         Ok(())
-    }
-
-    /// Runs Leiden Community Detection on the collection's graph index
-    /// and persists the resulting assignments in storage using TxId allocation.
-    #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn run_community_detection(&self) -> Result<Vec<CommunityAssignment>> {
-        self.run_community_detection_with_config(&CommunityDetectionConfig::default())
-            .await
-    }
-
-    /// Runs Leiden Community Detection with custom configuration
-    /// and persists the resulting assignments in storage using TxId allocation.
-    #[tracing::instrument(level = "trace", skip(self, config))]
-    pub async fn run_community_detection_with_config(
-        &self,
-        config: &CommunityDetectionConfig,
-    ) -> Result<Vec<CommunityAssignment>> {
-        let assignments = detect_communities(&self.graph_index, config).await?;
-        if assignments.is_empty() {
-            return Ok(assignments);
-        }
-
-        let tx = self.allocate_tx()?;
-
-        for assignment in &assignments {
-            let key = self.namespaced_key(
-                format!("__graph:community:{}", assignment.entity_id.inner()).as_bytes(),
-                4,
-            );
-            let val = serde_json::to_vec(&assignment.community_id)?;
-            self.storage.put(tx, &key, &val).await?;
-        }
-
-        self.storage.commit(tx).await?;
-        self.graph_index.set_communities_batch(&assignments);
-        Ok(assignments)
-    }
-
-    /// Retrieves the persisted community ID for a given entity.
-    #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn get_community(&self, entity_id: EntityId) -> Result<Option<u64>> {
-        let key = self.namespaced_key(
-            format!("__graph:community:{}", entity_id.inner()).as_bytes(),
-            4,
-        );
-        // SSI: nicht tx-gebunden — reiner Lesezugriff für Community-Abfrage
-        if let Some(bytes) = self.storage.get(&key).await? {
-            let comm_id: u64 = serde_json::from_slice(&bytes).map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("community deserialize: {e}"))
-            })?;
-            Ok(Some(comm_id))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Retrieves community assignments for a batch of entity IDs in a single operation.
-    #[tracing::instrument(level = "trace", skip(self, entity_ids))]
-    pub async fn get_communities_batch(
-        &self,
-        entity_ids: &[EntityId],
-    ) -> Result<std::collections::HashMap<EntityId, u64>> {
-        if entity_ids.is_empty() {
-            return Ok(std::collections::HashMap::new());
-        }
-
-        // 1. First try graph_index in-memory batch lookup
-        let graph_map = self.graph_index.get_communities_batch(entity_ids).await?;
-        if !graph_map.is_empty() {
-            return Ok(graph_map);
-        }
-
-        // 2. Fallback: single batch scan over collection's community prefix in storage
-        let prefix = self.namespaced_key(b"__graph:community:", 4);
-        let entries = self.storage.scan_prefix(&prefix).await?;
-        let target_set: std::collections::HashSet<&EntityId> = entity_ids.iter().collect();
-        let mut map = std::collections::HashMap::new();
-
-        for (k, v) in entries {
-            let id_bytes = match k.strip_prefix(prefix.as_slice()) {
-                Some(b) => b,
-                None => continue,
-            };
-            if let Ok(id_str) = std::str::from_utf8(id_bytes) {
-                let eid = EntityId::from(id_str);
-                if target_set.contains(&eid) {
-                    if let Ok(comm_id) = serde_json::from_slice::<u64>(&v) {
-                        map.insert(eid, comm_id);
-                    }
-                }
-            }
-        }
-        Ok(map)
     }
 
     /// Removes all data belonging to this collection from storage and resets RAM state.

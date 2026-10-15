@@ -1,9 +1,7 @@
 use contextra_db::wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage};
 use contextra_db::{Collection, MultiStepConfig};
-#[cfg(feature = "volatile-vault")]
-use contextra_db::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_engine::Language;
-use contextra_graph::CsrGraph;
+use contextra_ports::graph_index::GraphIndexPlaceholder;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
 use std::sync::atomic::AtomicU64;
@@ -28,7 +26,7 @@ async fn test_multistep_wiring_build_and_execute_cascade() {
         })
         .expect("hnsw index"),
     );
-    let graph = Arc::new(CsrGraph::new());
+    let graph = Arc::new(GraphIndexPlaceholder);
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Arc::new(Collection::new(
@@ -86,25 +84,4 @@ async fn test_multistep_wiring_build_and_execute_cascade() {
 
     assert!(!res.results.is_empty());
     assert!(res.results.iter().all(|r| r.id != "doc2"));
-}
-
-#[test]
-#[cfg(feature = "volatile-vault")]
-fn test_volatile_context_vault_commit_receipt() {
-    use contextra_types::{DocId, TxId};
-
-    let mut vault = VolatileContextVault::open(VaultConfig {
-        attempt_mlock: false,
-        ..Default::default()
-    });
-
-    let chunk1 = VaultChunk::new(DocId(1), b"hello".to_vec(), SignalModality::TextInput, TxId(1));
-    let chunk2 = VaultChunk::new(DocId(2), b"world".to_vec(), SignalModality::TextInput, TxId(1));
-
-    vault.ingest(chunk1).unwrap();
-    vault.ingest(chunk2).unwrap();
-
-    let receipt = vault.commit().unwrap();
-    assert_eq!(receipt.chunks_committed, 2);
-    assert_eq!(receipt.bytes_committed, 10);
 }

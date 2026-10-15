@@ -3,7 +3,7 @@
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_graph::CsrGraph;
+use contextra_ports::graph_index::GraphIndexPlaceholder;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, EntityId, Result, ScoredDocument, TxId};
@@ -309,7 +309,7 @@ async fn create_faulty_collection(
     let real_hnsw = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());
     let faulty_hnsw = Arc::new(FaultyVectorIndex::new(real_hnsw));
 
-    let graph = CsrGraph::with_storage(faulty_storage.clone());
+    let graph = GraphIndexPlaceholder;
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = contextra_db::Collection::new(

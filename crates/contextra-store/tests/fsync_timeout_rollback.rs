@@ -1,6 +1,7 @@
 // FILE-CONTEXT: Integration test verifying fsync timeout handling, clean rollback, and intent file recovery. (TS: 2026-09-11)
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::time::Duration;
 use tempfile::tempdir;

@@ -136,7 +136,7 @@ pub struct KvPrefixHit {
 ///
 /// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
 /// |---|---|---|---|
-/// | `KvPrefixStore` | `TenantPrefixKvStore` (`contextra-kvcache`) | `contextra-db` | Aktiver Port für KV-Cache-Prefix-Lokalisierung |
+/// | `KvPrefixStore` | `TenantPrefixKvStore` (externer Prefix-Store-Adapter) | `contextra-db` | Aktiver Port für KV-Cache-Prefix-Lokalisierung |
 ///
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch synchrone Schnittstellen vtable-kompatibel (dyn-safe).
