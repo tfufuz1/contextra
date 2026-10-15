@@ -11,6 +11,9 @@ impl McpServer {
         self.sandbox
             .validate_tool_call(name, args)
             .map_err(McpError::from)?;
+
+        crate::validation::validate_request_tenant(self.tenant_id, Some(args))?;
+
         match name {
             "contextra_search" => {
                 let query = match args.get("query") {
@@ -408,7 +411,8 @@ impl McpServer {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
                     let mut opts = contextra::collection::crud::DocEraseOptions {
                         options: contextra::deletion::ForgetOptions {
-                            assurance: contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
+                            assurance:
+                                contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
                             ..Default::default()
                         },
                     };
@@ -423,7 +427,9 @@ impl McpServer {
                             match key.as_str() {
                                 "assurance" => {
                                     let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params("Invalid params: 'assurance' must be a string")
+                                        McpError::invalid_params(
+                                            "Invalid params: 'assurance' must be a string",
+                                        )
                                     })?;
                                     opts.options.assurance = match s {
                                         "S0" | "s0" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
@@ -440,12 +446,16 @@ impl McpServer {
                                 }
                                 "purge" => {
                                     let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params("Invalid params: 'purge' must be a string")
+                                        McpError::invalid_params(
+                                            "Invalid params: 'purge' must be a string",
+                                        )
                                     })?;
                                     opts.options.purge = match s {
                                         "None" | "none" => contextra::deletion::PurgeMode::None,
                                         "Purge" | "purge" => contextra::deletion::PurgeMode::Purge,
-                                        "PurgeWithScrub" | "purge_with_scrub" => contextra::deletion::PurgeMode::PurgeWithScrub,
+                                        "PurgeWithScrub" | "purge_with_scrub" => {
+                                            contextra::deletion::PurgeMode::PurgeWithScrub
+                                        }
                                         other => {
                                             return Err(McpError::invalid_params(format!(
                                                 "Invalid purge '{other}'. Valid options are: 'None', 'Purge', 'PurgeWithScrub'"
@@ -455,11 +465,17 @@ impl McpServer {
                                 }
                                 "verify_depth" => {
                                     let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params("Invalid params: 'verify_depth' must be a string")
+                                        McpError::invalid_params(
+                                            "Invalid params: 'verify_depth' must be a string",
+                                        )
                                     })?;
                                     opts.options.verify_depth = match s {
-                                        "Footprint" | "footprint" => contextra::deletion::VerifyDepth::Footprint,
-                                        "FullSweep" | "full_sweep" => contextra::deletion::VerifyDepth::FullSweep,
+                                        "Footprint" | "footprint" => {
+                                            contextra::deletion::VerifyDepth::Footprint
+                                        }
+                                        "FullSweep" | "full_sweep" => {
+                                            contextra::deletion::VerifyDepth::FullSweep
+                                        }
                                         other => {
                                             return Err(McpError::invalid_params(format!(
                                                 "Invalid verify_depth '{other}'. Valid options are: 'Footprint', 'FullSweep'"
@@ -469,7 +485,9 @@ impl McpServer {
                                 }
                                 "wait" => {
                                     let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params("Invalid params: 'wait' must be a string")
+                                        McpError::invalid_params(
+                                            "Invalid params: 'wait' must be a string",
+                                        )
                                     })?;
                                     opts.options.wait = match s {
                                         "No" | "no" => contextra::deletion::Wait::No,
@@ -493,20 +511,24 @@ impl McpServer {
                         }
                     }
 
-                    let erasure = col.erase_document(id, &opts).await.map_err(McpError::from)?;
+                    let erasure = col
+                        .erase_document(id, &opts)
+                        .await
+                        .map_err(McpError::from)?;
 
                     Ok(json!({
                         "status": "logically_deleted",
                         "tx": erasure.as_of_tx.inner(),
                     }))
                 } else {
+                    let tenant_id =
+                        crate::validation::validate_request_tenant(self.tenant_id, Some(args))?;
+
                     let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                         .key
                         .ok_or_else(|| {
                             McpError::invalid_params("deletion proof key not configured")
                         })?;
-
-                    let tenant_id = crate::validation::extract_tenant_from_args_or_env(Some(args));
 
                     let proof = self
                         .db
@@ -539,9 +561,15 @@ impl McpServer {
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
             "contextra_plugin_status" => {
-                let reg_ref = self.plugin_registry.as_ref().map(|r| r.as_ref()).ok_or_else(|| {
-                    McpError::internal_error("Plugin registry or license gate is not configured")
-                })?;
+                let reg_ref = self
+                    .plugin_registry
+                    .as_ref()
+                    .map(|r| r.as_ref())
+                    .ok_or_else(|| {
+                        McpError::internal_error(
+                            "Plugin registry or license gate is not configured",
+                        )
+                    })?;
                 let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
                 serde_json::to_value(&status).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))
