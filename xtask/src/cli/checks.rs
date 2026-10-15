@@ -666,6 +666,34 @@ pub fn run_check_marker_drift(args: &[String]) -> i32 {
     0
 }
 
+pub fn run_check_exception_ledger(args: &[String]) -> i32 {
+    match check_exception_ledger::run_check_exception_ledger() {
+        Ok(exceptions) => {
+            println!(
+                "✅ check-exception-ledger (G-21) passed: {} active exception(s) verified:",
+                exceptions.len()
+            );
+            for ex in &exceptions {
+                println!(
+                    "  [{}] {} -> {} (expires: {}, reason: {})",
+                    ex.id, ex.from, ex.to, ex.expiry, ex.reason
+                );
+            }
+            0
+        }
+        Err(errors) => {
+            eprintln!(
+                "❌ check-exception-ledger (G-21) failed: {} error(s) found:",
+                errors.len()
+            );
+            for err in &errors {
+                eprintln!("  {}", err);
+            }
+            1
+        }
+    }
+}
+
 pub fn run_check_ring_capabilities_consistency(args: &[String]) -> i32 {
     match check_ring_capabilities_consistency::run_check_ring_capabilities_consistency() {
         Ok(findings) => {
