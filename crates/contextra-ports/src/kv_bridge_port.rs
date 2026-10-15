@@ -13,7 +13,7 @@ use contextra_types::{Result, TxId};
 ///
 /// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
 /// |---|---|---|---|
-/// | `KvBridgeStorage` | `KvBridge` (`contextra-kvcache`) / `LsmStorageEngine` (`contextra-store`) | `contextra-db` | Aktiver Port für KV-Cache Tier-2 Persistence |
+/// | `KvBridgeStorage` | `KvBridge` (externer KV-Bridge-Adapter) / `LsmStorageEngine` (`contextra-store`) | `contextra-db` | Aktiver Port für KV-Cache Tier-2 Persistence |
 ///
 /// Implementierbar von Ring-1 Storage Engines (`contextra-store::LsmStorage`) oder Test-Mocks.
 pub trait KvBridgeStorage: Send + Sync {

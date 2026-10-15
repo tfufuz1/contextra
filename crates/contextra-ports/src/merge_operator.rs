@@ -17,7 +17,7 @@ pub trait MergeOperator: Send + Sync {
 
 /// Factory port for instantiating WASM or native merge operators (§4.3).
 ///
-/// Decouples `contextra-store` from `contextra-sandbox`.
+/// Decouples `contextra-store` from externer Sandbox-Adapter.
 pub trait MergeOperatorFactory: Send + Sync {
     /// Instantiates a merge operator identified by `operator_name`.
     fn create_operator(&self, operator_name: &str) -> Result<Box<dyn MergeOperator>>;

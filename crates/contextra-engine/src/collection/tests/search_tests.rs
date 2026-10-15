@@ -2,7 +2,6 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_search_dimension_mismatch_rejected() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -29,7 +28,6 @@ async fn test_search_dimension_mismatch_rejected() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -45,7 +43,6 @@ async fn test_search_dimension_mismatch_rejected() {
 
 #[tokio::test]
 async fn test_checkpoint_unpin_on_search_error_path() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{FilterExpr, Result, TxId};
@@ -160,7 +157,6 @@ async fn test_checkpoint_unpin_on_search_error_path() {
         "default".to_string(),
         storage.clone(),
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -195,7 +191,6 @@ async fn test_checkpoint_unpin_on_search_error_path() {
 #[tokio::test]
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -218,7 +213,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -254,7 +248,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
@@ -282,7 +275,6 @@ async fn test_query_builder_query_config_include_superseded_displacement(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -333,7 +325,6 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 #[tokio::test]
 async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Box<dyn std::error::Error>> {
     use contextra_ports::ReadSnapshot;
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -362,7 +353,6 @@ async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Bo
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -404,7 +394,6 @@ async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Bo
 
 #[tokio::test]
 async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::{BoxFuture, Reranker};
     use contextra_store::LsmStorage;
     use contextra_types::{RerankResult, Result};
@@ -456,7 +445,6 @@ async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -499,106 +487,8 @@ async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use crate::no_graph_stubs::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_types::EntityId;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    let dir = tempdir()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await?,
-    );
-    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
-        dimension: 4,
-        ..Default::default()
-    })?);
-    let graph = Arc::new(CsrGraph::new());
-    let next_tx = Arc::new(AtomicU64::new(1));
-
-    let col = Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        graph,
-        next_tx,
-        4,
-        contextra_text::Language::English,
-    );
-
-    // Insert doc_a (community member) and doc_b (non-community member)
-    col.insert(
-        "doc_a",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "alpha topic"})),
-    )
-    .await?;
-    col.insert(
-        "doc_b",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "alpha topic"})),
-    )
-    .await?;
-
-    let eid_a = EntityId::from_key("doc_a")?;
-
-    // Relate doc_a to doc_c and run community detection so get_community(eid_a) finds target_community_id
-    col.relate("doc_a", "doc_c", "knows").await?;
-    col.run_community_detection().await?;
-    assert!(col.get_community(eid_a).await?.is_some());
-
-    // Perform hybrid search with same_community_as = doc_a
-    let results_boosted = col
-        .hybrid_search_with_strategy(
-            "alpha",
-            &[1.0, 0.0, 0.0, 0.0],
-            10,
-            None,
-            None,
-            None,
-            Some(eid_a),
-            None,
-        )
-        .await?;
-
-    // Verification 1: Non-community doc_b is NOT eliminated and remains in results!
-    assert_eq!(
-        results_boosted.len(),
-        2,
-        "Non-community doc_b must not be filtered out"
-    );
-    let ids: Vec<&str> = results_boosted.iter().map(|r| r.id.as_str()).collect();
-    assert!(
-        ids.contains(&"doc_b"),
-        "doc_b must remain in search results"
-    );
-
-    // Verification 2: Community doc_a gets boosted post-RRF and ranks #1 ahead of doc_b
-    assert_eq!(
-        results_boosted[0].id, "doc_a",
-        "Community member doc_a must rank ahead after boost"
-    );
-    assert!(
-        results_boosted[0].score > results_boosted[1].score,
-        "Boosted community doc score ({}) must exceed non-community score ({})",
-        results_boosted[0].score,
-        results_boosted[1].score
-    );
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
 ) -> contextra_types::Result<()> {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
@@ -626,7 +516,6 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,

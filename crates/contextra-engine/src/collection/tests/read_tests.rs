@@ -2,7 +2,6 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_collection_scan_prefix_batches_via_mock_storage() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
@@ -131,7 +130,6 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
         "default".to_string(),
         mock_storage.clone(),
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(std::sync::atomic::AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -145,7 +143,6 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
 
 #[tokio::test]
 async fn test_maintenance_pagination_over_10k_documents() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_vector::HnswIndex;
@@ -174,7 +171,6 @@ async fn test_maintenance_pagination_over_10k_documents() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -279,7 +275,6 @@ async fn test_maintenance_pagination_over_10k_documents() {
 
 #[tokio::test]
 async fn test_migrate_doc_keys_v1() {
-    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, TxId};
@@ -310,7 +305,6 @@ async fn test_migrate_doc_keys_v1() {
         "default".to_string(),
         storage.clone(),
         index,
-        Arc::new(CsrGraph::new()),
         next_tx.clone(),
         4,
         contextra_text::Language::English,
