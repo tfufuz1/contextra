@@ -47,7 +47,6 @@ tempfile = { workspace = true }
 proptest = "1.4"
 loom = "0.7"
 wat = "1"
-contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [[test]]
 name = "kv_delete_cascade_e2e"
