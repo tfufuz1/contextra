@@ -20,7 +20,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_keys_crash_atomic_recovery() -> contextra_core::Result<()> {
+async fn test_purge_keys_crash_atomic_recovery() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let db_path = dir.path().to_path_buf();
 
@@ -76,7 +76,7 @@ async fn test_purge_keys_crash_atomic_recovery() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> contextra_core::Result<()>
+async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> contextra_types::Result<()>
 {
     let dir = tempdir()?;
     let db_path = dir.path().to_path_buf();

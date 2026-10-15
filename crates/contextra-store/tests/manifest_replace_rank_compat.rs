@@ -1,4 +1,4 @@
-use contextra_core::Result;
+use contextra_types::Result;
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use std::path::PathBuf;
 use tempfile::TempDir;

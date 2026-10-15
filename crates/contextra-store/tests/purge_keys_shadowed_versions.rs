@@ -26,7 +26,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 /// Older version in deeper SSTable level, shadowed by Tombstone in L0.
 /// After Purge, nothing remains in storage (oracle check: versions_found == 0 && tombstones_remaining == 0).
 #[tokio::test]
-async fn test_purge_keys_shadowed_versions_injection_row5() -> contextra_core::Result<()> {
+async fn test_purge_keys_shadowed_versions_injection_row5() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
