@@ -5,7 +5,7 @@
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use ahash::AHashSet;
-use contextra_core::{error::HnswDeletionError, ContextraError, DocId, Result};
+use contextra_types::{error::HnswDeletionError, ContextraError, DocId, Result};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
@@ -550,7 +550,8 @@ impl HnswIndex {
 mod tests {
     use super::*;
     use crate::hnsw::config::HnswConfig;
-    use contextra_core::{TxId, VectorIndex};
+    use contextra_ports::VectorIndex;
+use contextra_types::TxId;
 
     #[tokio::test]
     async fn test_injected_residual_ghost_pointer_detected_and_repaired() -> Result<()> {

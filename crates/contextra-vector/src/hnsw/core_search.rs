@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 
 use super::adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 use super::arena::BacklinkTable;
@@ -189,11 +189,11 @@ impl HnswIndex {
         if k == 0 {
             return Ok(Vec::new());
         }
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({k}) exceeds maximum allowed search limit ({}). \
                  Use Collection::query() with appropriate k bounds.",
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
         for (i, &val) in query.iter().enumerate() {
@@ -337,7 +337,7 @@ impl HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,
@@ -386,7 +386,7 @@ impl HnswIndex {
                 if let VectorData::U8(v) = &node.vector {
                     let guard = self.inner.cold.quantizer.read();
                     let q = guard.as_ref().ok_or_else(|| {
-                        contextra_core::ContextraError::Index("Quantizer not trained".into())
+                        contextra_types::ContextraError::Index("Quantizer not trained".into())
                     })?;
                     q.asymmetric_dist(query, v, self.inner.cold.config.distance_metric)?
                 } else {
@@ -484,10 +484,10 @@ impl HnswIndex {
             ));
         }
 
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({k}) exceeds maximum allowed search limit ({}).",
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
 
@@ -724,7 +724,7 @@ impl HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,

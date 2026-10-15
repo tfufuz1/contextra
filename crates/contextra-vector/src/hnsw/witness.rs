@@ -2,7 +2,7 @@
 // ZWECK: Witness-Ausstellung für HNSW Vektorindex gemäß Spezifikation C4.4.
 // INVARIANTEN: Zero-Panic. Unfälschbare Witness-Ausstellung über LayerWitness::issue.
 
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 use contextra_crypto::deletion_proof::{
     claim_text::{WitAssurance, WitClaimText},
     evidence::WitLayerEvidence,
