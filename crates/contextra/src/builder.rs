@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_core::error::ContextraError;
-use contextra_core::DistanceMetric;
+use contextra_types::error::ContextraError;
+use contextra_types::types::domain::DistanceMetric;
 use contextra_db::engine::{EngineWiring, EngineWiringExt};
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
 use contextra_ports::clock::{Clock, SystemClock};
@@ -81,6 +81,8 @@ pub struct ContextraBuilder {
     erasure_mode: ErasureMode,
     explicit_erasure_mode: bool,
     erasure_hooks: Option<Arc<dyn ErasureHooks>>,
+    kms: bool,
+    checkpoint: bool,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -101,6 +103,8 @@ impl std::fmt::Debug for ContextraBuilder {
                 "erasure_hooks",
                 &self.erasure_hooks.as_ref().map(|_| "<dyn ErasureHooks>"),
             )
+            .field("kms", &self.kms)
+            .field("checkpoint", &self.checkpoint)
             .finish()
     }
 }
@@ -121,6 +125,8 @@ impl Clone for ContextraBuilder {
             erasure_mode: self.erasure_mode,
             explicit_erasure_mode: self.explicit_erasure_mode,
             erasure_hooks: self.erasure_hooks.clone(),
+            kms: self.kms,
+            checkpoint: self.checkpoint,
         }
     }
 }
@@ -145,6 +151,8 @@ impl ContextraBuilder {
             KvDeleteMode::TombstoneOnly
         };
 
+        let _ = kv_delete_mode;
+
         Self {
             storage_path,
             config: ContextraConfig {
@@ -162,6 +170,8 @@ impl ContextraBuilder {
             erasure_mode: ErasureMode::Off,
             explicit_erasure_mode: false,
             erasure_hooks: None,
+            kms: false,
+            checkpoint: false,
         }
     }
 
@@ -289,6 +299,34 @@ impl ContextraBuilder {
         self
     }
 
+    /// Sets KMS configuration status (EP1 rule 7).
+    pub fn with_kms(mut self, enabled: bool) -> Self {
+        self.kms = enabled;
+        self
+    }
+
+    pub fn without_kms(self) -> Self {
+        self.with_kms(false)
+    }
+
+    pub fn kms_enabled(&self) -> bool {
+        self.kms
+    }
+
+    /// Sets CheckpointRecovery configuration status (EP1 rule 7).
+    pub fn with_checkpoint(mut self, enabled: bool) -> Self {
+        self.checkpoint = enabled;
+        self
+    }
+
+    pub fn without_checkpoint(self) -> Self {
+        self.with_checkpoint(false)
+    }
+
+    pub fn checkpoint_enabled(&self) -> bool {
+        self.checkpoint
+    }
+
     /// Sets the complete `ContextraConfig` directly.
     pub fn with_config(self, config: ContextraConfig) -> Self {
         let storage_path = self.storage_path;
@@ -299,6 +337,8 @@ impl ContextraBuilder {
         let clock = self.clock;
         let rng = self.rng;
         let id_gen = self.id_gen;
+        let kms = self.kms;
+        let checkpoint = self.checkpoint;
 
         let mut b = Self::from_config(config);
         b.storage_path = storage_path;
@@ -309,6 +349,8 @@ impl ContextraBuilder {
         b.clock = clock;
         b.rng = rng;
         b.id_gen = id_gen;
+        b.kms = kms;
+        b.checkpoint = checkpoint;
         b
     }
 

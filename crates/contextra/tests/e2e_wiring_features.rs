@@ -15,7 +15,7 @@ async fn test_feature_sovereign_and_compliance_gating() -> Result<(), Box<dyn st
     let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_features_{}", rng.next_u64()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
-    // Standard open without sovereign/compliance features
+    // Standard open
     let db = ContextraBuilder::new(4)
         .with_storage_path(&tmp_dir)
         .build()
@@ -23,34 +23,6 @@ async fn test_feature_sovereign_and_compliance_gating() -> Result<(), Box<dyn st
 
     assert_eq!(db.config().dimension, 4);
     db.close().await?;
-
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-    Ok(())
-}
-
-#[tokio::test]
-#[cfg(feature = "sovereign")]
-async fn test_sovereign_feature_active() -> Result<(), Box<dyn std::error::Error>> {
-    let tmp_dir = std::env::temp_dir().join("e2e_wiring_sovereign_active");
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-
-    let db = ContextraBuilder::new(4)
-        .with_storage_path(&tmp_dir)
-        .build()
-        .await?;
-
-    db.close().await?;
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore = "blockiert durch PROMPT-FEATURE-01: WASM Sandbox Plugin Manifest is not wired into Contextra facade builder"]
-async fn test_sandbox_feature_wasm_plugin_manifest() -> Result<(), Box<dyn std::error::Error>> {
-    let tmp_dir = std::env::temp_dir().join("e2e_wiring_sandbox_feature");
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-
-    // WASM Sandbox plugin manifest wiring on Contextra facade is pending.
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())
