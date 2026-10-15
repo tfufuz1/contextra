@@ -26,9 +26,10 @@
 //! 22. `encode_graph_key`
 
 use bytes::Bytes;
-use contextra_core::{
-    CollectionId, ContextraError, DocId, ResourceBudget, ResourceTracker, SnapshotRegistry,
-    StorageEngine, TenantId, TxId,
+use contextra_mvcc::snapshot::SnapshotRegistry;
+use contextra_ports::{StorageEngine, StorageStats};
+use contextra_types::{
+    CollectionId, ContextraError, DocId, ResourceBudget, ResourceTracker, TenantId, TxId,
 };
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_ports::SystemClock;
@@ -64,7 +65,7 @@ struct DummyAdaptivePlanner;
 impl AdaptiveCompactionPlanner for DummyAdaptivePlanner {
     fn plan_compaction(
         &self,
-        _stats: &contextra_core::StorageStats,
+        _stats: &StorageStats,
         _metrics: &WorkloadMetricsSnapshot,
         _sstables: &[Arc<contextra_store::sstable::SstableReader>],
         _min_active_seqno: u64,

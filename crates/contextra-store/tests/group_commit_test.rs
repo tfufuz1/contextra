@@ -2,7 +2,8 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
