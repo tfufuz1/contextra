@@ -4,7 +4,7 @@
 // INVARIANTEN: Strikte Mandanten-Isolation, fail-closed Mandanten-Auflösung, Pflicht-TenantId bei remove_doc_segments
 
 use std::sync::Arc;
-use contextra_core::{CollectionId, ContextraError, DocId, TenantId, TxId};
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope, PurgeOutput};
 use contextra_ports::{KvLifecycleHooks, StorageEngine};
 use contextra_store::lsm::LsmStorage;
