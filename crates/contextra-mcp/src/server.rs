@@ -7,11 +7,11 @@ use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::server_dispatch::cancellation::ConcurrencyGovernor;
 use crate::server_dispatch::forget_guard::ForgetGuard;
 use crate::server_dispatch::recall_truncator::RecallTruncator;
-use crate::validation::is_write_allowed_by_env;
+use crate::validation::{is_write_allowed_by_env, resolve_session_tenant_from_env};
 use contextra::Contextra;
 use contextra_ports::EmbeddingProvider;
 use contextra_ports::SystemClock;
-use contextra_types::ContextraError;
+use contextra_types::{ContextraError, TenantId};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -20,6 +20,7 @@ pub struct McpServer {
     pub db: Arc<Contextra>,
     pub embedder: Arc<dyn EmbeddingProvider>,
     pub sandbox: Arc<McpSandbox>,
+    pub tenant_id: TenantId,
     pub injection_guard: Arc<PromptInjectionGuard>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     pub forget_guard: Arc<ForgetGuard>,
@@ -32,7 +33,8 @@ impl McpServer {
         db: Arc<Contextra>,
         embedder: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, ContextraError> {
-        Self::with_write_permission(db, embedder, is_write_allowed_by_env())
+        let tenant = resolve_session_tenant_from_env()?;
+        Self::with_write_permission_and_tenant(db, embedder, is_write_allowed_by_env(), tenant)
     }
 
     /// Instantiates an `McpServer` fully configured from environment variables and default runtime components.
@@ -40,8 +42,9 @@ impl McpServer {
         db: Arc<Contextra>,
         embedder: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, ContextraError> {
+        let tenant = resolve_session_tenant_from_env()?;
         let allow_write = is_write_allowed_by_env();
-        let server = Self::with_write_permission(db, embedder, allow_write)?;
+        let server = Self::with_write_permission_and_tenant(db, embedder, allow_write, tenant)?;
 
         // Verify LLM generator build configuration from environment
         let _llm_generator = LlmConfig::from_env().build_generator()?;
@@ -64,6 +67,16 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         allow_db_writes: bool,
     ) -> Result<Self, ContextraError> {
+        let tenant = resolve_session_tenant_from_env()?;
+        Self::with_write_permission_and_tenant(db, embedder, allow_db_writes, tenant)
+    }
+
+    pub fn with_write_permission_and_tenant(
+        db: Arc<Contextra>,
+        embedder: Arc<dyn EmbeddingProvider>,
+        allow_db_writes: bool,
+        tenant_id: TenantId,
+    ) -> Result<Self, ContextraError> {
         let policy = SandboxPolicy {
             allow_db_reads: true,
             allow_db_writes,
@@ -74,7 +87,7 @@ impl McpServer {
         };
         let sandbox = McpSandbox::new(policy)
             .map_err(|e| ContextraError::Internal(format!("Sandbox init: {e}")))?;
-        Ok(Self::with_sandbox(db, embedder, Arc::new(sandbox)))
+        Self::with_sandbox_and_tenant(db, embedder, Arc::new(sandbox), tenant_id)
     }
 
     pub fn with_sandbox(
@@ -82,20 +95,39 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         sandbox: Arc<McpSandbox>,
     ) -> Self {
+        let tenant = resolve_session_tenant_from_env()
+            .unwrap_or_else(|_| TenantId::try_new(1).expect("tenant 1"));
+        Self::with_sandbox_and_tenant(db, embedder, sandbox, tenant).expect("valid tenant")
+    }
+
+    pub fn with_sandbox_and_tenant(
+        db: Arc<Contextra>,
+        embedder: Arc<dyn EmbeddingProvider>,
+        sandbox: Arc<McpSandbox>,
+        tenant_id: TenantId,
+    ) -> Result<Self, ContextraError> {
+        if tenant_id.inner() == 0 {
+            return Err(ContextraError::InvalidInput(
+                "TenantId 0 (SYSTEM) is prohibited for MCP server session (INV-TENANT-1)."
+                    .to_string(),
+            ));
+        }
+
         let clock = Arc::new(SystemClock::new());
         let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
             db.license_gate(),
         )));
-        Self {
+        Ok(Self {
             db,
             embedder,
             sandbox,
+            tenant_id,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
             plugin_registry,
             forget_guard: Arc::new(ForgetGuard::new(10, clock)),
             concurrency_governor: Arc::new(ConcurrencyGovernor::new(8)),
             recall_truncator: Arc::new(RecallTruncator::new(4000)),
-        }
+        })
     }
 
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {

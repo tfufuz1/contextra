@@ -345,7 +345,8 @@ async fn test_contextra_forget_options_forwarding_and_unsupported_capability() {
     assert_eq!(res_f["result"]["isError"], true);
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        text.contains("real_scan_erasure") || text.contains("Assurance levels above S0 require real storage scans"),
+        text.contains("real_scan_erasure")
+            || text.contains("Assurance levels above S0 require real storage scans"),
         "Expected CapabilityUnsupported error when assurance option S3 is passed, got: '{text}'"
     );
 }
@@ -611,4 +612,137 @@ async fn test_read_tools_always_allowed_regardless_of_flag() {
     let resp_rw = server_rw.handle(read_req).await;
     let res_rw = serde_json::to_value(&resp_rw).unwrap();
     assert_ne!(res_rw["result"]["isError"], true);
+}
+
+#[tokio::test]
+async fn test_server_start_without_tenant_fails() {
+    std::env::remove_var("CONTEXTRA_TENANT_ID");
+    let tmp = TempDir::new().expect("temp dir");
+    let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
+    let embedder: Arc<dyn contextra_ports::EmbeddingProvider> =
+        Arc::new(MockEmbedder { dimension: 768 });
+
+    let res = McpServer::from_env(db, embedder);
+    assert!(
+        res.is_err(),
+        "McpServer::from_env without CONTEXTRA_TENANT_ID must fail closed"
+    );
+}
+
+#[tokio::test]
+async fn test_server_start_with_tenant_zero_fails() {
+    std::env::set_var("CONTEXTRA_TENANT_ID", "0");
+    let tmp = TempDir::new().expect("temp dir");
+    let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
+    let embedder: Arc<dyn contextra_ports::EmbeddingProvider> =
+        Arc::new(MockEmbedder { dimension: 768 });
+
+    let res = McpServer::from_env(db, embedder);
+    std::env::remove_var("CONTEXTRA_TENANT_ID");
+
+    assert!(
+        res.is_err(),
+        "McpServer::from_env with TenantId 0 (SYSTEM) must fail closed"
+    );
+}
+
+#[tokio::test]
+async fn test_request_with_foreign_tenant_arg_rejected() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // Server is initialized with TenantId 1 (or 4). Pass tenant_id 999 in args.
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_insert",
+            "arguments": {
+                "id": "foreign_tenant_doc",
+                "text": "data",
+                "tenant_id": 999
+            }
+        }),
+    );
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or("");
+    assert!(
+        text.contains("Tenant ID mismatch") || text.contains("foreign") || text.contains("invalid"),
+        "Expected foreign tenant rejection error, got: '{text}'"
+    );
+}
+
+#[tokio::test]
+async fn test_two_tenant_data_isolation() {
+    use crate::sandbox::{McpSandbox, SandboxPolicy};
+    use contextra_types::TenantId;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
+
+    let policy = SandboxPolicy {
+        allow_db_reads: true,
+        allow_db_writes: true,
+        allow_code_execution: false,
+        allow_cloud_egress: false,
+        max_execution_ms: 5_000,
+        sidecar_limits: crate::sandbox::SidecarLimits::default(),
+    };
+    let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox"));
+
+    let t4 = TenantId::try_new(4).unwrap();
+    let t42 = TenantId::try_new(42).unwrap();
+
+    let embedder4: Arc<dyn contextra_ports::EmbeddingProvider> =
+        Arc::new(MockEmbedder { dimension: 768 });
+    let embedder42: Arc<dyn contextra_ports::EmbeddingProvider> =
+        Arc::new(MockEmbedder { dimension: 768 });
+
+    let server_a = Arc::new(
+        McpServer::with_sandbox_and_tenant(db.clone(), embedder4, sandbox.clone(), t4).unwrap(),
+    );
+
+    let server_b =
+        Arc::new(McpServer::with_sandbox_and_tenant(db.clone(), embedder42, sandbox, t42).unwrap());
+
+    // Insert doc in Server A (Tenant 4)
+    let insert_req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_insert",
+            "arguments": {
+                "id": "tenant_isolated_doc",
+                "text": "classified secret for tenant 4",
+                "collection": "default"
+            }
+        }),
+    );
+    let resp_a = server_a.handle(insert_req).await;
+    let res_a = serde_json::to_value(&resp_a).unwrap();
+    assert_ne!(res_a["result"]["isError"], true);
+
+    // Search doc in Server B (Tenant 42)
+    let search_req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_search",
+            "arguments": {
+                "query": "classified secret",
+                "collection": "default"
+            }
+        }),
+    );
+    let resp_b = server_b.handle(search_req).await;
+    let res_b = serde_json::to_value(&resp_b).unwrap();
+    let text_b = res_b["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or("[]");
+    let hits: Value = serde_json::from_str(text_b).unwrap_or(json!([]));
+    assert_eq!(
+        hits.as_array().map(|a| a.len()),
+        Some(0),
+        "Server B (Tenant 42) must not see Server A's (Tenant 4) data"
+    );
 }
