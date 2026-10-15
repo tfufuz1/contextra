@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use bytes::Bytes;
-use contextra_core::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
+use contextra_mvcc::snapshot::SnapshotRegistry;
+use contextra_types::{ResourceBudget, ResourceTracker, Result};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_store::wal::KeyManager;
