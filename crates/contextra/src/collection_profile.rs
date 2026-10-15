@@ -3,7 +3,7 @@
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-pub use contextra_core::types::domain::AutoExtractionMode;
+pub use contextra_types::types::domain::AutoExtractionMode;
 use contextra_ports::erasure::ErasureMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;

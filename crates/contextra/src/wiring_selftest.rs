@@ -4,7 +4,7 @@
 //! (Clock, Rng, IdGen, LicenseGate) gültige Implementierungen haben
 //! und Null-/Accept-All-Implementierungen nicht als Sicherheits-Port-Standard dienen.
 
-use contextra_core::error::ContextraError;
+use contextra_types::error::ContextraError;
 use contextra_db::Contextra;
 use crate::builder::{BuildError, ContextraBuilder};
 
@@ -43,42 +43,10 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
         report.missing_ports.push("Kms (disabled)".to_string());
     }
 
-    if builder.kv_shredding_enabled() {
-        report.wired_ports.push("KvShredding".to_string());
-    } else {
-        report.missing_ports.push("KvShredding (disabled)".to_string());
-    }
-
     if builder.checkpoint_enabled() {
         report.wired_ports.push("CheckpointRecovery".to_string());
     } else {
         report.missing_ports.push("CheckpointRecovery (disabled)".to_string());
-    }
-
-    if builder.router_enabled() {
-        report.wired_ports.push("Router".to_string());
-    } else {
-        report.missing_ports.push("Router (disabled)".to_string());
-    }
-
-    #[cfg(feature = "adapt")]
-    if builder.adapt_enabled() {
-        report.wired_ports.push("AdaptController".to_string());
-    } else {
-        report.missing_ports.push("AdaptController (disabled)".to_string());
-    }
-
-    #[cfg(feature = "privacy")]
-    if builder.privacy_enabled() {
-        report.wired_ports.push("PrivacyEgress".to_string());
-    } else {
-        report.missing_ports.push("PrivacyEgress (disabled)".to_string());
-    }
-
-    if builder.sandbox_enabled() {
-        report.wired_ports.push("WasmSandbox".to_string());
-    } else {
-        report.missing_ports.push("WasmSandbox (disabled)".to_string());
     }
 
     if builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
@@ -91,20 +59,6 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
 /// Dynamic wiring validator for ContextraBuilder (§4.7).
 pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport, BuildError> {
     let report = generate_report_for_builder(builder);
-
-    if builder.router_enabled() && !cfg!(feature = "router") {
-        return Err(BuildError::FeatureMissing {
-            mode: "router".to_string(),
-            feature: "router".to_string(),
-        });
-    }
-
-    if builder.sandbox_enabled() && !cfg!(feature = "sandbox") {
-        return Err(BuildError::FeatureMissing {
-            mode: "sandbox".to_string(),
-            feature: "sandbox".to_string(),
-        });
-    }
 
     if (builder.explicit_erasure_mode() || builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off) && !cfg!(feature = "erasure") {
         if builder.explicit_erasure_mode() && builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {

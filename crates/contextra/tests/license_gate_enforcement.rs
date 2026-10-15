@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::PerformanceProfile;
-use contextra_core::error::ContextraError;
+use contextra_types::error::ContextraError;
 use contextra_license::OpenFastGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 

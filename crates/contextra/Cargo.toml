@@ -10,12 +10,12 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 ring = "4"
 
 [dependencies]
-contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
 contextra-engine = { workspace = true }
+contextra-rank = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
@@ -39,21 +39,6 @@ erasure = ["contextra-store/erasure", "contextra-engine/erasure", "contextra-por
 
 # Format-Features
 docid-128 = ["contextra-types/docid-128"]
-
-# No-op Features für Workspace-Kompatibilität (aktivieren KEINE Parkplatz-Crates)
-router = []
-ollama = []
-candle = []
-onnx = []
-privacy = []
-sandbox = []
-adapt = []
-cognition = []
-agent = []
-graph = []
-kvcache = []
-license = []
-sovereign = []
 
 [lints]
 workspace = true
