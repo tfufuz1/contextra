@@ -378,16 +378,16 @@ fn classify_target_crate(symbol: &str, origin_crate: &str, _origin_module: &str,
     // - DocId, TxId, ContextraError -> contextra_types
     // - TxBuffer -> contextra_mvcc
     // - WireFormat -> contextra_wire
-    // - Budget types & Distance types -> contextra_ports / contextra_types
-    if origin_crate == "contextra_types" || types_symbols.contains_key(symbol) {
-        return ("contextra_types".to_string(), "KLAR".to_string());
+    // - Budget types & Distance types -> contextra_ports
+    if symbol == "ResourceBudget" || symbol == "ResourceTracker" || symbol == "TokenBudget" || symbol == "DistanceMetric" || symbol == "MAX_SEARCH_K" || symbol == "TOMBSTONE_BIT" {
+        return ("contextra_ports".to_string(), "KLAR".to_string());
     }
 
     if symbol == "DocId" || symbol == "TxId" || symbol == "ContextraError" || symbol == "ContextraErrorDto" || symbol == "SeqBitTombstone" {
         return ("contextra_types".to_string(), "KLAR".to_string());
     }
 
-    if symbol == "TxBuffer" || symbol == "IndexOp" || symbol == "SequenceLog" || symbol == "SnapshotRegistry" || symbol == "SnapshotGuard" || origin_crate == "contextra_mvcc" {
+    if symbol == "TxBuffer" || symbol == "IndexOp" || symbol == "SequenceLog" || symbol == "SnapshotRegistry" || symbol == "SnapshotGuard" || symbol == "SnapshotLease" || origin_crate == "contextra_mvcc" {
         return ("contextra_mvcc".to_string(), "KLAR".to_string());
     }
 
@@ -395,8 +395,8 @@ fn classify_target_crate(symbol: &str, origin_crate: &str, _origin_module: &str,
         return ("contextra_wire".to_string(), "KLAR".to_string());
     }
 
-    if symbol == "ResourceBudget" || symbol == "ResourceTracker" || symbol == "TokenBudget" || symbol == "DistanceMetric" || symbol == "MAX_SEARCH_K" || symbol == "TOMBSTONE_BIT" {
-        return ("contextra_ports".to_string(), "KLAR".to_string());
+    if origin_crate == "contextra_types" || types_symbols.contains_key(symbol) {
+        return ("contextra_types".to_string(), "KLAR".to_string());
     }
 
     if origin_crate == "contextra_ports" {
