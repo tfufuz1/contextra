@@ -501,7 +501,7 @@ Zusätzlich zu Teil F sind im Code mit ID referenziert (Fundstelle = erster Tref
 
 | ID | Aussage | Ort |
 |---|---|---|
-| INV-KV-DELETE-1 | KV-Löschbeweis nur für `CryptoShred`-Segmente | `contextra-store/src/kv/segment.rs` |
+| INV-KV-DELETE-1 | KV-Löschbeweis nur für `CryptoShred`-Segmente. Ohne Verschlüsselung ist kein KV-Löschbeweis möglich. | `contextra-store/src/kv/segment.rs` |
 | INV-TENANT, INV-TENANT-2, INV-TENANT-A | Mandanten-Isolation (Key-Isolation, KV-Segmente) | `contextra-crypto/src/kv_segment/store.rs`, `engine/tests` |
 | INV-DAG-DEPS | Lock-Reihenfolge `collections` → `kv_locks` → `embedder` | `contextra-engine/src/collection/crud/internal.rs` |
 | INV-HASHER-SEEDS | Hasher-Seeds nie randomisieren | `contextra-engine/src/collection/kv_lock.rs` |
@@ -4089,7 +4089,7 @@ Alle Abschnitte: Ablauf im Code gelesen am HEAD `b564e830` **[V]**, sofern nicht
 - `derive_subkey(master_key: &KeyManager, group_id: u64) -> Result<SubKey>`: HKDF-SHA256 (`Hkdf::from_prk` über die Master-Key-Bytes), `info = b"contextra-kv-shred-v1:" ‖ group_id.to_le_bytes()`, Ausgabe 32 Byte. <!-- crate-ref-ignore -->
 - `SubKey([u8;32])`: `ZeroizeOnDrop`; `Debug` gibt `***REDACTED***` aus; `Clone` kopiert die Bytes.
 - `KeyRegistry` (`RwLock<HashMap<u64, SubKey>>`, thread-sicher, nur im RAM): `get_or_derive(master, group_id)` liest unter Read-Lock, leitet bei Fehlen unter Write-Lock (Double-Check) ab und speichert. `revoke_subkey(group_id) -> bool` entfernt den Eintrag in **O(1)**; danach ist `is_key_active(group_id)` falsch. `encrypt_with_group` verschlüsselt mit dem Sub-Key der Gruppe (AES-256-GCM-SIV).
-- **Semantik der Löschung:** Nach `revoke_subkey` leitet ein erneutes `get_or_derive` aus dem Master-Key denselben Schlüssel wieder ab. Crypto-Shredding ist deshalb nur wirksam, wenn zusätzlich der Master-Key bzw. die Gruppenzuordnung vernichtet wird; die Registry allein ist kein unwiderruflicher Löschbeweis. **[V, Folgerung aus dem Code]** Anwender: `contextra-store/src/kv/segment.rs` (`revoke_subkey`), Layer `KvCacheSegments` im `DeletionProof` (B.6). INV-KV-DELETE-1 (G.3) gilt nur für `CryptoShred`-Segmente.
+- **Semantik der Löschung:** Nach `revoke_subkey` leitet ein erneutes `get_or_derive` aus dem Master-Key denselben Schlüssel wieder ab. Crypto-Shredding ist deshalb nur wirksam, wenn zusätzlich der Master-Key bzw. die Gruppenzuordnung vernichtet wird; die Registry allein ist kein unwiderruflicher Löschbeweis. **[V, Folgerung aus dem Code]** Anwender: `contextra-store/src/kv/segment.rs` (`revoke_subkey`), Layer `KvCacheSegments` im `DeletionProof` (B.6). INV-KV-DELETE-1 (G.3) gilt nur für `CryptoShred`-Segmente. Ohne Verschlüsselung ist kein KV-Löschbeweis möglich.
 
 ## L.2 Manifest und Schutz vor SSTable-Wiederauferstehung (`contextra-store/src/manifest/core.rs`, `contextra-store/src/lsm/recovery.rs`)
 

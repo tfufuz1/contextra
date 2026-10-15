@@ -19,6 +19,7 @@ use contextra_ports::id_gen::{IdGen, SystemIdGen};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_ports::rng::{Rng, SystemRng};
 use contextra_ports::wiring::PortsWiring;
+use contextra_store::kv::KvDeleteMode;
 use contextra_store::lsm::DurabilityMode;
 
 /// Error types emitted during contextra build/wiring verification (§4.7).
@@ -85,6 +86,7 @@ pub struct ContextraBuilder {
     sandbox_enabled: bool,
     kms_enabled: bool,
     kv_shredding_enabled: bool,
+    kv_delete_mode: KvDeleteMode,
     checkpoint_enabled: bool,
     erasure_mode: ErasureMode,
     explicit_erasure_mode: bool,
@@ -161,6 +163,7 @@ impl Clone for ContextraBuilder {
             sandbox_enabled: self.sandbox_enabled,
             kms_enabled: self.kms_enabled,
             kv_shredding_enabled: self.kv_shredding_enabled,
+            kv_delete_mode: self.kv_delete_mode,
             checkpoint_enabled: self.checkpoint_enabled,
             erasure_mode: self.erasure_mode,
             explicit_erasure_mode: self.explicit_erasure_mode,
@@ -201,6 +204,12 @@ impl ContextraBuilder {
         .map(|w| w.into_gate())
         .unwrap_or_else(|_| Arc::new(SignedLicenseGate::no_activation_with_clock(clock.clone())));
 
+        let kv_delete_mode = if cfg!(feature = "encryption-at-rest") {
+            KvDeleteMode::CryptoShred
+        } else {
+            KvDeleteMode::TombstoneOnly
+        };
+
         Self {
             storage_path,
             config: ContextraConfig {
@@ -224,6 +233,7 @@ impl ContextraBuilder {
             sandbox_enabled: cfg!(feature = "sandbox"),
             kms_enabled: true,
             kv_shredding_enabled: false,
+            kv_delete_mode,
             checkpoint_enabled: true,
             erasure_mode: ErasureMode::Off,
             explicit_erasure_mode: false,
@@ -298,6 +308,9 @@ impl ContextraBuilder {
     pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
         self.config.encryption_passphrase = Some(passphrase.into());
         self.kv_shredding_enabled = true;
+        if cfg!(feature = "encryption-at-rest") {
+            self.kv_delete_mode = KvDeleteMode::CryptoShred;
+        }
         self
     }
 
@@ -578,6 +591,10 @@ impl ContextraBuilder {
         self.kv_shredding_enabled
     }
 
+    pub fn kv_delete_mode(&self) -> KvDeleteMode {
+        self.kv_delete_mode
+    }
+
     pub fn checkpoint_enabled(&self) -> bool {
         self.checkpoint_enabled
     }
@@ -643,6 +660,15 @@ impl ContextraBuilder {
             .license_gate
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+
+        // Check KvDeleteMode feature requirement
+        if self.kv_delete_mode == KvDeleteMode::CryptoShred && !cfg!(feature = "encryption-at-rest") {
+            return Err(BuildError::FeatureMissing {
+                mode: "CryptoShred".to_string(),
+                feature: "encryption-at-rest".to_string(),
+            }
+            .into());
+        }
 
         // Honest verify_wiring check - result is NEVER discarded
         let report = crate::wiring_selftest::verify_builder_wiring(&self)?;
