@@ -8,7 +8,7 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
 use crate::restore_filter::CpyRestoreFilter;
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
@@ -152,6 +152,17 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     Ok(())
 }
 
+#[derive(Debug, Default)]
+struct DefaultCheckpointIdGenerator {
+    next: AtomicU64,
+}
+
+impl contextra_ports::IdGenerator for DefaultCheckpointIdGenerator {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
 /// Registry für gespeicherte Checkpoints mit Thread-sicherem Zustand.
 ///
 /// # Invarianten
@@ -279,7 +290,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
         let clock = orphan_registry.clock().clone();
         let id_generator: Arc<dyn contextra_ports::IdGenerator> =
-            Arc::new(contextra_ports::SystemIdGenerator::new());
+            Arc::new(DefaultCheckpointIdGenerator::default());
 
         Ok(Self {
             storage,

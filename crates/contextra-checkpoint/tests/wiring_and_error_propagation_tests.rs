@@ -4,7 +4,8 @@ use contextra_checkpoint::{
     wiring::{CheckpointWiring, CheckpointWiringDeps},
     CheckpointGuard, InstanceOrphanRegistry, PersistentCheckpointStore, PinGuard, StateCheckpoint,
 };
-use contextra_ports::{BoxFuture, Clock, ManualClock, StorageEngine, StorageStats};
+use contextra_ports::{BoxFuture, Clock, StorageEngine, StorageStats};
+use contextra_testkit::ManualClock;
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::sync::Arc;

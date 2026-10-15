@@ -3,8 +3,27 @@
 // ZWECK: Integrationstest für Checkpoint-Determinismus (Zweimal gleicher Seed -> bitgleicher Checkpoint).
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_ports::{ManualClock, SequentialIdGen, StorageEngine};
-use contextra_testkit::InMemoryStorageEngine;
+use contextra_ports::{IdGenerator, StorageEngine};
+use contextra_testkit::{InMemoryStorageEngine, ManualClock};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+struct SequentialIdGen {
+    next: AtomicU64,
+}
+
+impl SequentialIdGen {
+    fn new(start: u64) -> Self {
+        Self {
+            next: AtomicU64::new(start),
+        }
+    }
+}
+
+impl IdGenerator for SequentialIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, Ordering::SeqCst)
+    }
+}
 use contextra_types::TxId;
 use std::sync::Arc;
 
