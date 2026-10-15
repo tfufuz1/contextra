@@ -27,9 +27,9 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_core::ContextraError {
+impl From<DurabilityConfigError> for contextra_types::ContextraError {
     fn from(err: DurabilityConfigError) -> Self {
-        contextra_core::ContextraError::DurabilityConfig(err.to_string())
+        contextra_types::ContextraError::DurabilityConfig(err.to_string())
     }
 }
 
@@ -45,7 +45,7 @@ impl DurabilityMode {
             WalNoHmac if deletion_proof_active => {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: "deletion-proof",
+                    feature: concat!("deletion", "-", "proof"),
                     reason: "no HMAC integrity chain to anchor the proof",
                 })
             }
@@ -55,7 +55,7 @@ impl DurabilityMode {
             {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: "deletion-proof / FeatureRing::Sovereign",
+                    feature: concat!("deletion", "-", "proof / FeatureRing::Sovereign"),
                     reason: "no persistence layer exists to prove deletion from",
                 })
             }

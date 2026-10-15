@@ -8,7 +8,7 @@
 //! - I-3: Torn Writes am physischen Dateiende (pos >= file_size) werden abgeschnitten; Bitrot (pos < file_size) liefert WalCorruption.
 //! - I-6: Verzeichnis-Fsync (fsync_parent_dir) nach allen .bak Recovery-Verzeichnis-Mutationen.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;

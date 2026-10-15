@@ -8,7 +8,7 @@
 //! - segments_scanned == segments_total - segments_removed
 //! - frames_matching_scope == 0
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use contextra_ports::{Clock, SystemClock};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

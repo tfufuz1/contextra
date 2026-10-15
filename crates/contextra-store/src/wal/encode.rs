@@ -6,7 +6,7 @@
 //! INVARIANTEN:
 //! - I-4: Monotone Sequenznummern: seq_no == u64::MAX wird als Überlauf abgelehnt.
 
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::WalHmac;
 

@@ -15,7 +15,8 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_core::{CollectionId, ContextraError, DocId, StorageStats, TenantId, TxId};
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
+use contextra_ports::StorageStats;
 use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope};
 use contextra_ports::{BoxFuture, Result, StorageEngine};

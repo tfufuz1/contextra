@@ -26,7 +26,6 @@ erasure = ["wal-integrity"]
 encryption-at-rest = ["wal-integrity"]
 wal-integrity = []
 wal-v4-wip = []
-deletion-proof = ["wal-integrity"]
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
@@ -38,7 +37,6 @@ contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true, features = ["backend-impl"] }
 contextra-sys = { workspace = true }
-contextra-core = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
 arc-swap = "1.9.2"

@@ -1,4 +1,4 @@
-use contextra_core::{SnapshotRegistry, TxBuffer};
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_mvcc::snapshot::SnapshotFloor;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

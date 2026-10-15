@@ -8,7 +8,7 @@ use super::{
 };
 use crate::compaction::purge_filter::CompactionRecordFilter;
 use crate::wal::replay_filter::WalReplayFilter;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 

@@ -6,7 +6,7 @@
 //! - I-3 (Crash-Konsistenz): Nach fsync-Fehler verbleiben keine unbestätigten Bytes im Page-Cache.
 //! - I-5 (Poison-State Isolation): Nach I/O- oder fsync-Fehler bleibt das Handle poisoned bis zur expliziten Replay-Recovery.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use contextra_durable_fs::{FaultInjector, NoFault};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -858,7 +858,7 @@ impl Wal {
 mod flusher_injector_tests {
     use super::*;
     use crate::wal::{PreparedBatch, WalOp};
-    use contextra_core::TxId;
+    use contextra_types::TxId;
     use std::io::{Error, ErrorKind};
     use tempfile::tempdir;
 

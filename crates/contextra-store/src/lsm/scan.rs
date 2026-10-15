@@ -1,6 +1,6 @@
 use super::*;
 use crate::memtable::is_valid_range_bounds;
-use contextra_core::{Result, TOMBSTONE_BIT};
+use contextra_types::{Result, TOMBSTONE_BIT};
 
 pub(super) enum SstableScanMode<'a> {
     Prefix(&'a [u8]),
@@ -96,7 +96,7 @@ impl LsmStorage {
         let sstables = self.sstables.read().await;
 
         let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-        let max_accumulator_limit = contextra_core::MAX_SCAN_MERGE_ACCUMULATOR
+        let max_accumulator_limit = contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR
             .saturating_mul(self.config.max_internal_merge_factor);
 
         if let SstableScanMode::Range(s, e) = mode {

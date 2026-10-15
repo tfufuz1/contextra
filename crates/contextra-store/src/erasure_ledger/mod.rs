@@ -7,7 +7,7 @@ pub mod coverage;
 pub mod entry;
 pub mod replay_filter;
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 pub use coverage::{LedgerCoverage, LedgerGap};
 pub use replay_filter::{ErasureLedgerHandle, LedgerReplayFilter};
 use std::collections::HashSet;

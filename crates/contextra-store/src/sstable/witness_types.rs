@@ -21,7 +21,7 @@ impl WitnessEntry {
     /// Returns the raw sequence number with the tombstone bit masked out.
     #[inline]
     pub fn raw_seq(&self) -> u64 {
-        self.seq_no & !contextra_core::TOMBSTONE_BIT
+        self.seq_no & !contextra_types::TOMBSTONE_BIT
     }
 }
 

@@ -7,7 +7,7 @@ use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeReport,
 use crate::lsm::engine::LsmStorage;
 use crate::manifest::ManifestEntry;
 use crate::sstable::{SstableBuilder, SstableReader};
-use contextra_core::StorageEngine;
+use contextra_ports::StorageEngine;
 use std::sync::Arc;
 
 impl LsmStorage {
