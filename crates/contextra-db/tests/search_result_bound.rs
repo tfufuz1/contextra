@@ -1,5 +1,4 @@
 use contextra_db::{Collection, Language};
-use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::DistanceMetric;
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -29,13 +28,11 @@ async fn create_test_collection(
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).expect("hnsw index"));
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
-    let col = Collection::new(
+    let col = Collection::new_without_graph(
         name.to_string(),
         storage,
         index,
-        graph,
         next_tx,
         dimension,
         Language::English,
