@@ -126,14 +126,15 @@ pub fn select_purge_candidates(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use contextra_ports::ProbeError;
 
     struct MockSpaceProbe {
         free: Option<u64>,
     }
 
     impl FreeSpaceProbe for MockSpaceProbe {
-        fn free_space_bytes(&self) -> Option<u64> {
-            self.free
+        fn available_bytes(&self) -> std::result::Result<Option<u64>, ProbeError> {
+            Ok(self.free)
         }
     }
 

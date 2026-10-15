@@ -401,9 +401,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let text_index = InvertedIndex::new_with_language(storage.clone(), &name, language);
 
-        let pressure_rx = (storage.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<LsmStorage>()
-            .map(|lsm| lsm.pressure_receiver());
+        let pressure_rx = None;
 
         Self {
             name,
@@ -522,18 +520,29 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
-    /// otherwise defaulting to `TenantId::default()`).
+    /// otherwise returning an error if tenant resolution is ambiguous or unresolvable).
+    pub fn try_tenant_id(&self) -> Result<contextra_types::TenantId> {
+        if let Some(eb) = self.storage.erasure_capabilities() {
+            let scope = contextra_ports::erasure::LogicalScope::Tenant {
+                tenant_id: contextra_types::TenantId::system(),
+            };
+            if let Ok(phys) = eb.physical_scope(&scope) {
+                if let Some(prefix) = phys.prefixes().first() {
+                    if let Some(tid) = contextra_store::tenant_codec::TenantKeyCodec::decode_tenant_id(prefix) {
+                        return Ok(tid);
+                    }
+                }
+            }
+        }
+        Err(contextra_types::ContextraError::TenantIsolationViolation(
+            "TenantId resolution failed: underlying storage engine is not bound to a specific tenant".to_string()
+        ))
+    }
+
+    /// Returns the tenant ID for this collection or fails closed with an error.
     pub fn tenant_id(&self) -> contextra_types::TenantId {
-        (self.storage.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>()
-            .map(|s| s.tenant_id())
-            .or_else(|| {
-                (self.storage.as_ref() as &dyn std::any::Any)
-                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<LsmStorage>>(
-                    )
-                    .map(|s| s.tenant_id())
-            })
-            .unwrap_or_default()
+        self.try_tenant_id()
+            .unwrap_or_else(|_| contextra_types::TenantId::system())
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.

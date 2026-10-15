@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Contextra Composition Root Builder (Ring 4).
+// ZWECK: Contextra Composition Root Builder (Ring 4, EP1).
 // INVARIANTEN: Zero-panic in production code; orchestriert Subsystem-Konfiguration ohne Geschäftslogik.
 
 use std::path::PathBuf;
@@ -10,15 +10,13 @@ use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
 use contextra_db::engine::{EngineWiring, EngineWiringExt};
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
-use contextra_license::signed_gate::SignedLicenseGate;
-use contextra_license::wiring::{LicenseWiring, LicenseWiringDeps};
-use contextra_license::LicenseGateMode;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::erasure::{ErasureHooks, ErasureMode};
 use contextra_ports::id_gen::{IdGen, SystemIdGen};
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
+use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::rng::{Rng, SystemRng};
 use contextra_ports::wiring::PortsWiring;
+use contextra_store::kv::KvDeleteMode;
 use contextra_store::lsm::DurabilityMode;
 
 /// Error types emitted during contextra build/wiring verification (§4.7).
@@ -36,6 +34,9 @@ pub enum BuildError {
         mode: String,
         feature: String,
     },
+    /// Indicates that a requested feature ring requires enterprise/Welle 3 licensing capabilities.
+    #[error("Feature required: {0}")]
+    FeatureRequired(String),
     /// Indicates an invalid or policy-violating combination of DurabilityMode and ErasureMode (§4.6).
     #[error("INV-DURABILITY-RING: Incompatible mode combination DurabilityMode::{durability} x ErasureMode::{erasure}")]
     IncompatibleModes {
@@ -56,6 +57,7 @@ impl From<BuildError> for ContextraError {
             BuildError::FeatureMissing { mode, feature } => {
                 ContextraError::PolicyViolation(format!("Feature missing for mode '{mode}': feature '{feature}' is required"))
             }
+            BuildError::FeatureRequired(msg) => ContextraError::PolicyViolation(msg),
             BuildError::IncompatibleModes { durability, erasure } => {
                 ContextraError::PolicyViolation(format!("INV-DURABILITY-RING: Incompatible mode combination DurabilityMode::{durability} x ErasureMode::{erasure}"))
             }
@@ -71,41 +73,19 @@ pub struct ContextraBuilder {
     explicit_user_config: bool,
     embedder: Option<Arc<dyn TextEmbeddingEngine>>,
     license_gate: Arc<dyn LicenseGate>,
-    signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
     collection_profile: Option<crate::collection_profile::CollectionProfile>,
     clock: Arc<dyn Clock>,
     rng: Arc<dyn Rng>,
     id_gen: Arc<dyn IdGen>,
-    router_enabled: bool,
-    #[cfg(feature = "adapt")]
-    adapt_enabled: bool,
-    #[cfg(feature = "privacy")]
-    privacy_enabled: bool,
-    sandbox_enabled: bool,
-    kms_enabled: bool,
-    kv_shredding_enabled: bool,
-    checkpoint_enabled: bool,
     erasure_mode: ErasureMode,
     explicit_erasure_mode: bool,
     erasure_hooks: Option<Arc<dyn ErasureHooks>>,
-
-    #[cfg(feature = "sovereign")]
-    pub sovereign_wiring: Option<Arc<crate::wiring_sovereign::SovereignWiringBundle>>,
-    #[cfg(feature = "onnx")]
-    pub onnx_wiring: Option<Arc<crate::wiring_onnx::OnnxWiringBundle>>,
-    #[cfg(feature = "sandbox")]
-    pub sandbox_wiring: Option<Arc<crate::wiring_sandbox::SandboxWiringBundle>>,
-    #[cfg(feature = "cognition")]
-    pub cognition_wiring: Option<Arc<crate::wiring_cognition::CognitionWiringBundle>>,
-    #[cfg(feature = "router")]
-    pub retrieval_wiring: Option<Arc<crate::wiring_retrieval::RetrievalWiringBundle>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut debug = f.debug_struct("ContextraBuilder");
-        debug
+        f.debug_struct("ContextraBuilder")
             .field("storage_path", &self.storage_path)
             .field("config", &self.config)
             .field("explicit_user_config", &self.explicit_user_config)
@@ -114,22 +94,8 @@ impl std::fmt::Debug for ContextraBuilder {
                 &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
             .field("license_gate", &"<dyn LicenseGate>")
-            .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .field("collection_profile", &self.collection_profile)
-            .field("router_enabled", &self.router_enabled);
-
-        #[cfg(feature = "adapt")]
-        debug.field("adapt_enabled", &self.adapt_enabled);
-
-        #[cfg(feature = "privacy")]
-        debug.field("privacy_enabled", &self.privacy_enabled);
-
-        debug
-            .field("sandbox_enabled", &self.sandbox_enabled)
-            .field("kms_enabled", &self.kms_enabled)
-            .field("kv_shredding_enabled", &self.kv_shredding_enabled)
-            .field("checkpoint_enabled", &self.checkpoint_enabled)
             .field("erasure_mode", &self.erasure_mode)
             .field(
                 "erasure_hooks",
@@ -147,34 +113,14 @@ impl Clone for ContextraBuilder {
             explicit_user_config: self.explicit_user_config,
             embedder: self.embedder.clone(),
             license_gate: Arc::clone(&self.license_gate),
-            signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
             collection_profile: self.collection_profile,
             clock: Arc::clone(&self.clock),
             rng: Arc::clone(&self.rng),
             id_gen: Arc::clone(&self.id_gen),
-            router_enabled: self.router_enabled,
-            #[cfg(feature = "adapt")]
-            adapt_enabled: self.adapt_enabled,
-            #[cfg(feature = "privacy")]
-            privacy_enabled: self.privacy_enabled,
-            sandbox_enabled: self.sandbox_enabled,
-            kms_enabled: self.kms_enabled,
-            kv_shredding_enabled: self.kv_shredding_enabled,
-            checkpoint_enabled: self.checkpoint_enabled,
             erasure_mode: self.erasure_mode,
             explicit_erasure_mode: self.explicit_erasure_mode,
             erasure_hooks: self.erasure_hooks.clone(),
-            #[cfg(feature = "sovereign")]
-            sovereign_wiring: self.sovereign_wiring.clone(),
-            #[cfg(feature = "onnx")]
-            onnx_wiring: self.onnx_wiring.clone(),
-            #[cfg(feature = "sandbox")]
-            sandbox_wiring: self.sandbox_wiring.clone(),
-            #[cfg(feature = "cognition")]
-            cognition_wiring: self.cognition_wiring.clone(),
-            #[cfg(feature = "router")]
-            retrieval_wiring: self.retrieval_wiring.clone(),
         }
     }
 }
@@ -191,15 +137,13 @@ impl ContextraBuilder {
         let clock = ports_wiring.clock;
         let rng = ports_wiring.rng;
         let id_gen = ports_wiring.id_gen;
+        let license_gate: Arc<dyn LicenseGate> = Arc::new(OpenFastGate);
 
-        let license_gate = LicenseWiring::build(LicenseWiringDeps {
-            mode: LicenseGateMode::Enforced,
-            storage_path: Some(storage_path.clone()),
-            clock: Some(clock.clone()),
-            ..Default::default()
-        })
-        .map(|w| w.into_gate())
-        .unwrap_or_else(|_| Arc::new(SignedLicenseGate::no_activation_with_clock(clock.clone())));
+        let kv_delete_mode = if cfg!(feature = "encryption-at-rest") {
+            KvDeleteMode::CryptoShred
+        } else {
+            KvDeleteMode::TombstoneOnly
+        };
 
         Self {
             storage_path,
@@ -210,35 +154,14 @@ impl ContextraBuilder {
             explicit_user_config: false,
             embedder: None,
             license_gate,
-            signed_license_error: None,
             performance_profile: None,
             collection_profile: None,
             clock,
             rng,
             id_gen,
-            router_enabled: cfg!(feature = "router"),
-            #[cfg(feature = "adapt")]
-            adapt_enabled: true,
-            #[cfg(feature = "privacy")]
-            privacy_enabled: true,
-            sandbox_enabled: cfg!(feature = "sandbox"),
-            kms_enabled: true,
-            kv_shredding_enabled: false,
-            checkpoint_enabled: true,
             erasure_mode: ErasureMode::Off,
             explicit_erasure_mode: false,
             erasure_hooks: None,
-
-            #[cfg(feature = "sovereign")]
-            sovereign_wiring: None,
-            #[cfg(feature = "onnx")]
-            onnx_wiring: None,
-            #[cfg(feature = "sandbox")]
-            sandbox_wiring: None,
-            #[cfg(feature = "cognition")]
-            cognition_wiring: None,
-            #[cfg(feature = "router")]
-            retrieval_wiring: None,
         }
     }
 
@@ -267,15 +190,6 @@ impl ContextraBuilder {
         Self::from_profile(tier.resolve())
     }
 
-    /// Creates a `ContextraBuilder` initialized with a cryptographic signed license gate.
-    pub fn from_signed_license(
-        payload_bytes: &[u8],
-        signature: &[u8; 64],
-        verifying_key_bytes: &[u8; 32],
-    ) -> Self {
-        Self::new(768).with_signed_license(payload_bytes, signature, verifying_key_bytes)
-    }
-
     /// Sets the storage directory path for the database engine.
     pub fn with_storage_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.storage_path = path.into();
@@ -297,7 +211,6 @@ impl ContextraBuilder {
     /// Sets the encryption passphrase for persistent storage.
     pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
         self.config.encryption_passphrase = Some(passphrase.into());
-        self.kv_shredding_enabled = true;
         self
     }
 
@@ -323,7 +236,6 @@ impl ContextraBuilder {
     /// Attaches a license gate for feature ring authorization.
     pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
         self.license_gate = gate;
-        self.signed_license_error = None;
         self
     }
 
@@ -338,30 +250,6 @@ impl ContextraBuilder {
     pub fn with_erasure_hooks(mut self, hooks: Arc<dyn ErasureHooks>) -> Self {
         self.erasure_hooks = Some(hooks);
         self
-    }
-
-    /// Attaches a cryptographic signed license gate.
-    pub fn with_signed_license(
-        mut self,
-        payload_bytes: &[u8],
-        signature: &[u8; 64],
-        verifying_key_bytes: &[u8; 32],
-    ) -> Self {
-        match contextra_license::signed_gate::VerifyingKey::from_bytes(verifying_key_bytes) {
-            Ok(key) => {
-                match SignedLicenseGate::from_signed_payload(payload_bytes, signature, key) {
-                    Ok(gate) => self.with_license_gate(Arc::new(gate)),
-                    Err(e) => {
-                        self.signed_license_error = Some(e.to_string());
-                        self
-                    }
-                }
-            }
-            Err(_) => {
-                self.signed_license_error = Some(LicenseError::InvalidSignature.to_string());
-                self
-            }
-        }
     }
 
     /// Sets the performance profile preset for the contextra instance.
@@ -383,21 +271,6 @@ impl ContextraBuilder {
         b
     }
 
-    /// Configures the builder to use permissive development mode (`LicenseGateMode::DevelopmentOpen`).
-    #[cfg(any(test, debug_assertions, feature = "dev-open-gate"))]
-    pub fn with_development_open_gate(mut self) -> Self {
-        if let Ok(wiring) = LicenseWiring::build(LicenseWiringDeps {
-            mode: LicenseGateMode::DevelopmentOpen,
-            storage_path: Some(self.storage_path.clone()),
-            clock: Some(self.clock.clone()),
-            ..Default::default()
-        }) {
-            self.license_gate = wiring.into_gate();
-            self.signed_license_error = None;
-        }
-        self
-    }
-
     /// Attaches a custom [`Clock`] port.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
@@ -416,93 +289,11 @@ impl ContextraBuilder {
         self
     }
 
-    /// Configures whether the router subsystem is enabled.
-    pub fn with_router(mut self, enabled: bool) -> Self {
-        self.router_enabled = enabled;
-        self
-    }
-
-    /// Disables the router subsystem.
-    pub fn without_router(self) -> Self {
-        self.with_router(false)
-    }
-
-    /// Configures whether the adapt subsystem is enabled.
-    #[cfg(feature = "adapt")]
-    pub fn with_adapt(mut self, enabled: bool) -> Self {
-        self.adapt_enabled = enabled;
-        self
-    }
-
-    /// Disables the adapt subsystem.
-    #[cfg(feature = "adapt")]
-    pub fn without_adapt(self) -> Self {
-        self.with_adapt(false)
-    }
-
-    /// Configures whether the privacy/egress subsystem is enabled.
-    #[cfg(feature = "privacy")]
-    pub fn with_privacy(mut self, enabled: bool) -> Self {
-        self.privacy_enabled = enabled;
-        self
-    }
-
-    /// Disables the privacy/egress subsystem.
-    #[cfg(feature = "privacy")]
-    pub fn without_privacy(self) -> Self {
-        self.with_privacy(false)
-    }
-
-    /// Configures whether the WASM sandbox subsystem is enabled.
-    pub fn with_sandbox(mut self, enabled: bool) -> Self {
-        self.sandbox_enabled = enabled;
-        self
-    }
-
-    /// Disables the WASM sandbox subsystem.
-    pub fn without_sandbox(self) -> Self {
-        self.with_sandbox(false)
-    }
-
-    /// Configures whether the KMS subsystem is enabled.
-    pub fn with_kms(mut self, enabled: bool) -> Self {
-        self.kms_enabled = enabled;
-        self
-    }
-
-    /// Disables the KMS subsystem.
-    pub fn without_kms(self) -> Self {
-        self.with_kms(false)
-    }
-
-    /// Configures whether the KV shredding subsystem is enabled.
-    pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
-        self.kv_shredding_enabled = enabled;
-        self
-    }
-
-    /// Disables the KV shredding subsystem.
-    pub fn without_kv_shredding(self) -> Self {
-        self.with_kv_shredding(false)
-    }
-
-    /// Configures whether the checkpoint subsystem is enabled.
-    pub fn with_checkpoint(mut self, enabled: bool) -> Self {
-        self.checkpoint_enabled = enabled;
-        self
-    }
-
-    /// Disables the checkpoint subsystem.
-    pub fn without_checkpoint(self) -> Self {
-        self.with_checkpoint(false)
-    }
-
     /// Sets the complete `ContextraConfig` directly.
     pub fn with_config(self, config: ContextraConfig) -> Self {
         let storage_path = self.storage_path;
         let embedder = self.embedder;
         let license_gate = self.license_gate;
-        let signed_license_error = self.signed_license_error;
         let performance_profile = self.performance_profile;
         let collection_profile = self.collection_profile;
         let clock = self.clock;
@@ -513,7 +304,6 @@ impl ContextraBuilder {
         b.storage_path = storage_path;
         b.embedder = embedder;
         b.license_gate = license_gate;
-        b.signed_license_error = signed_license_error;
         b.performance_profile = performance_profile;
         b.collection_profile = collection_profile;
         b.clock = clock;
@@ -552,36 +342,6 @@ impl ContextraBuilder {
         &self.id_gen
     }
 
-    pub fn router_enabled(&self) -> bool {
-        self.router_enabled
-    }
-
-    #[cfg(feature = "adapt")]
-    pub fn adapt_enabled(&self) -> bool {
-        self.adapt_enabled
-    }
-
-    #[cfg(feature = "privacy")]
-    pub fn privacy_enabled(&self) -> bool {
-        self.privacy_enabled
-    }
-
-    pub fn sandbox_enabled(&self) -> bool {
-        self.sandbox_enabled
-    }
-
-    pub fn kms_enabled(&self) -> bool {
-        self.kms_enabled
-    }
-
-    pub fn kv_shredding_enabled(&self) -> bool {
-        self.kv_shredding_enabled
-    }
-
-    pub fn checkpoint_enabled(&self) -> bool {
-        self.checkpoint_enabled
-    }
-
     pub fn erasure_mode(&self) -> ErasureMode {
         self.erasure_mode
     }
@@ -606,10 +366,6 @@ impl ContextraBuilder {
 
     /// Builds and initializes the `Contextra` engine instance.
     pub async fn build(mut self) -> Result<Contextra, ContextraError> {
-        if let Some(ref err_msg) = self.signed_license_error {
-            return Err(ContextraError::PolicyViolation(err_msg.clone()));
-        }
-
         if let Some(ref collection_profile) = self.collection_profile {
             collection_profile
                 .validate_with_license(self.license_gate.as_ref())
@@ -637,6 +393,14 @@ impl ContextraBuilder {
             FeatureRing::Fast
         };
 
+        if requested_ring != FeatureRing::Fast {
+            return Err(BuildError::FeatureRequired(format!(
+                "Feature ring {:?} requires Welle 3 license activation",
+                requested_ring
+            ))
+            .into());
+        }
+
         self.config.erasure_mode = self.erasure_mode;
 
         let authorized_token = self
@@ -644,7 +408,7 @@ impl ContextraBuilder {
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-        // Honest verify_wiring check - result is NEVER discarded
+        // Honest verify_wiring check
         let report = crate::wiring_selftest::verify_builder_wiring(&self)?;
 
         // DurabilityMode x ErasureMode matrix check (§4.6)
@@ -684,73 +448,9 @@ impl ContextraBuilder {
         )
         .await?;
 
-        #[cfg_attr(not(feature = "router"), allow(unused_mut))]
-        let mut engine_wiring = EngineWiring::default();
+        let engine_wiring = EngineWiring::default();
 
-        #[cfg(feature = "router")]
-        let _router_wiring_keepalive = if self.router_enabled {
-            struct NoOpHybridSearch;
-            impl contextra_ports::HybridSearchProvider for NoOpHybridSearch {
-                fn search_hybrid<'a>(
-                    &'a self,
-                    _query_text: &'a str,
-                    _query_embedding: &'a [f32],
-                    _top_k: usize,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Vec<contextra_ports::ContextChunk>>> {
-                    Box::pin(async move { Ok(Vec::new()) })
-                }
-            }
-
-            struct NoOpCommunityResolver;
-            impl contextra_ports::CommunityResolver for NoOpCommunityResolver {
-                fn get_community<'a>(
-                    &'a self,
-                    _entity_id: contextra_ports::EntityId,
-                ) -> contextra_ports::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
-                    Box::pin(async move { Ok(None) })
-                }
-            }
-
-            struct NoOpContextPreparer;
-            impl contextra_ports::ContextPreparer for NoOpContextPreparer {
-                fn prepare_context(
-                    &self,
-                    _chunks: Vec<contextra_ports::ContextChunk>,
-                    _budget: &contextra_ports::TokenBudget,
-                    _relevance_threshold: f32,
-                ) -> contextra_core::Result<contextra_ports::ContextWindow> {
-                    Ok(contextra_ports::ContextWindow {
-                        chunks: Vec::new(),
-                        total_tokens: 0,
-                        truncated: false,
-                    })
-                }
-            }
-
-            let router_deps = contextra_router::RouterWiringDeps {
-                search_provider: Arc::new(NoOpHybridSearch),
-                community_resolver: Arc::new(NoOpCommunityResolver),
-                context_preparer: Arc::new(NoOpContextPreparer),
-                catalog: Vec::new(),
-                clock: self.clock.clone(),
-                arm_registry: None,
-                calibration_store_path: None,
-                transport: None,
-                route_timeout: None,
-            };
-            if let Ok(router_wiring) = contextra_router::RouterWiring::build(router_deps) {
-                let arc_rw = Arc::new(router_wiring);
-                engine_wiring.router = Some(Arc::downgrade(&arc_rw) as _);
-                Some(arc_rw)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Attach wiring report and engine wiring
-        let _ = &report; // report verified and used
+        let _ = &report;
         instance.apply(engine_wiring);
 
         if let Some(embedder) = self.embedder {
@@ -805,7 +505,6 @@ mod tests {
             builder.config.consolidation_interval,
             Duration::from_secs(300)
         );
-        assert!(builder.kv_shredding_enabled());
     }
 
     #[tokio::test]
@@ -823,39 +522,6 @@ mod tests {
         assert_eq!(db.len().await?, 0);
         let _ = std::fs::remove_dir_all(&tmp_path);
         Ok(())
-    }
-
-    #[test]
-    fn test_builder_subsystem_levers() {
-        let b = ContextraBuilder::new(128)
-            .without_router()
-            .without_sandbox()
-            .without_kms()
-            .without_kv_shredding()
-            .without_checkpoint();
-
-        assert!(!b.router_enabled());
-        assert!(!b.sandbox_enabled());
-        assert!(!b.kms_enabled());
-        assert!(!b.kv_shredding_enabled());
-        assert!(!b.checkpoint_enabled());
-
-        let report = b.wiring_report();
-        assert!(report.missing_ports.iter().any(|m| m.contains("Kms")));
-        assert!(report.missing_ports.iter().any(|m| m.contains("CheckpointRecovery")));
-
-        let b = b
-            .with_router(true)
-            .with_sandbox(true)
-            .with_kms(true)
-            .with_kv_shredding(true)
-            .with_checkpoint(true);
-
-        assert!(b.router_enabled());
-        assert!(b.sandbox_enabled());
-        assert!(b.kms_enabled());
-        assert!(b.kv_shredding_enabled());
-        assert!(b.checkpoint_enabled());
     }
 
     #[test]

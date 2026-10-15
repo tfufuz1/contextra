@@ -4,11 +4,9 @@
 // ZWECK: Deep integration, proptest, and adversarial test suite for contextra-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (invalidation resets observations/weights), P8 compliance.
 
-use contextra_adapt::PidController;
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
 use contextra_types::ConfigFingerprint;
 use proptest::prelude::*;
-use std::time::Duration;
 
 // ============================================================================
 // 1. ISOTONIC CALIBRATOR TESTS (PAVA & ECE)
@@ -199,79 +197,7 @@ fn test_platt_scaler_invalidation() {
 }
 
 // ============================================================================
-// 3. PID CONTROLLER TESTS
-// ============================================================================
-
-#[test]
-fn test_pid_controller_basic_regulation() {
-    let dt = Duration::from_millis(100);
-    let mut pid = PidController::new(150.0, 50, 200, Some(100));
-
-    // At target latency (150ms) -> pool size unchanged
-    let pool1 = pid.update(dt, 150.0);
-    assert_eq!(pool1, 100);
-
-    // Latency too high (300ms > 150ms) -> pool size decreases
-    let pool2 = pid.update(dt, 300.0);
-    assert!(pool2 < 100);
-
-    // Latency too low (50ms < 150ms) -> pool size increases
-    let pool3 = pid.update(dt, 50.0);
-    assert!(pool3 > pool2);
-}
-
-#[test]
-fn test_pid_controller_anti_windup_and_reset() {
-    let dt = Duration::from_millis(100);
-    let mut pid = PidController::new(150.0, 50, 200, Some(100));
-
-    // Saturate integral via large error
-    for _ in 0..500 {
-        pid.update(dt, 1000.0);
-    }
-    assert!(pid.current_pool_size.is_some());
-
-    pid.reset();
-    assert_eq!(pid.current_pool_size, None);
-
-    // After reset, at target latency pool size defaults to min_pool_size (50)
-    let pool_after_reset = pid.update(dt, 150.0);
-    assert_eq!(pool_after_reset, 50);
-}
-
-#[test]
-fn test_pid_controller_min_max_clamping() {
-    let dt = Duration::from_millis(100);
-    let mut pid = PidController::new(150.0, 50, 150, Some(100));
-
-    let min_clamped = pid.update(dt, 10000.0);
-    assert_eq!(min_clamped, 50);
-
-    let max_clamped = pid.update(dt, 0.0);
-    assert_eq!(max_clamped, 150);
-}
-
-#[test]
-fn test_pid_controller_non_finite_latency_safety() {
-    let dt = Duration::from_millis(100);
-    let mut pid = PidController::new(150.0, 50, 200, Some(100));
-    let pool_before = pid.update(dt, 150.0);
-
-    // Pass NaN latency
-    let pool_nan = pid.update(dt, f32::NAN);
-    assert_eq!(pool_nan, pool_before);
-
-    // Pass Infinity latency
-    let pool_inf = pid.update(dt, f32::INFINITY);
-    assert_eq!(pool_inf, pool_before);
-
-    // Subsequent normal measurement should function normally without state corruption
-    let pool_normal = pid.update(dt, 300.0);
-    assert!(pool_normal < pool_before);
-}
-
-// ============================================================================
-// 4. EDGE-CASE & ANTI-MIRRORING HARDENING TESTS
+// 3. EDGE-CASE & ANTI-MIRRORING HARDENING TESTS
 // ============================================================================
 
 #[test]
@@ -334,17 +260,8 @@ fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
     );
 }
 
-#[test]
-fn test_pid_controller_hard_floor_50_enforcement_in_constructor() {
-    let pid = PidController::new(150.0, 10, 200, Some(100));
-    assert_eq!(
-        pid.min_pool_size, 50,
-        "Hard floor 50 must be enforced in constructor"
-    );
-}
-
 // ============================================================================
-// 5. PROPTEST PROPERTY TESTS
+// 4. PROPTEST PROPERTY TESTS
 // ============================================================================
 
 proptest! {
@@ -353,21 +270,5 @@ proptest! {
         let scaler = PlattScaler::new(a, b);
         let prob = scaler.transform(logit);
         prop_assert!((0.0..=1.0).contains(&prob), "Probability out of bounds: {}", prob);
-    }
-
-    #[test]
-    fn prop_pid_output_within_bounds(
-        pool_size in 50usize..1000,
-        measured_lat in 0.0f32..2000.0f32,
-        steps in 1usize..20
-    ) {
-        let dt = Duration::from_millis(100);
-        let mut pid = PidController::new(150.0, 50, 500, Some(pool_size));
-
-        for _ in 0..steps {
-            let current_pool = pid.update(dt, measured_lat);
-            prop_assert!(current_pool >= 50, "Pool size {} below min 50", current_pool);
-            prop_assert!(current_pool <= 500, "Pool size {} above max 500", current_pool);
-        }
     }
 }

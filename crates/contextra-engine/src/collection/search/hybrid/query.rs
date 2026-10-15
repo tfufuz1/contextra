@@ -42,7 +42,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            let snapshot = contextra_ports::ReadSnapshot::new(seq);
+            let snapshot = contextra_ports::ReadSnapshot::from_seq(seq);
             self.hybrid_search_with_query_at(query, &snapshot).await
         })
         .await

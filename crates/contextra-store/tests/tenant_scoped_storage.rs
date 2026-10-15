@@ -78,6 +78,24 @@ async fn test_tenant_a_cannot_read_tenant_b() {
 }
 
 #[tokio::test]
+async fn test_tenant_matrix_runner_basic_isolation() {
+    use contextra_testkit::erasure_harness::TenantMatrixRunner;
+
+    TenantMatrixRunner::run_async(|ctx| {
+        let storage = ctx.storage;
+        async move {
+            let tx1 = TxId(10);
+            storage.put(tx1, b"key_m", b"val_m").await.unwrap();
+            storage.commit(tx1).await.unwrap();
+
+            let res = storage.get(b"key_m").await.unwrap();
+            assert_eq!(res.as_deref(), Some(&b"val_m"[..]));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn test_snapshot_reads() {
     let (_dir, lsm) = setup_test_lsm().await;
     let tenant1 = TenantId::try_new(201).unwrap();

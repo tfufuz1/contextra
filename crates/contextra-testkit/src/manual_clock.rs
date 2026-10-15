@@ -71,11 +71,9 @@ impl ManualClock {
 }
 
 impl Clock for ManualClock {
-    fn now(&self) -> DeterministicTimestamp {
-        let nanos = self.now_nanos();
-        let wall_ms = nanos / 1_000_000;
-        let mono_ctr = nanos;
-        DeterministicTimestamp::new(wall_ms, mono_ctr)
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        let wall_ms = self.now_nanos() / 1_000_000;
+        contextra_types::DeterministicTimestamp::new(wall_ms, self.now_nanos())
     }
 
     fn monotonic_ticks(&self) -> u64 {

@@ -30,14 +30,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         let storage_ref = self.collection.storage.as_ref();
-        let ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>> = (storage_ref
-            as &dyn std::any::Any)
-            .downcast_ref::<contextra_store::LsmStorage>()
-            .map(|lsm| lsm.ssi_validator.clone());
-
-        if let Some(validator) = ssi_validator {
-            validator.validate(self.tx_id, &read_set)
-        } else if storage_ref.supports_ssi_tracking() {
+        if storage_ref.supports_ssi_tracking() {
             Err(ContextraError::Conflict(format!(
                 "Serializable isolation validation failed for TxId({}): SSI validator unavailable (fail-closed)",
                 self.tx_id.inner()

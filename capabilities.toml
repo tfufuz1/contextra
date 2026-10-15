@@ -81,6 +81,18 @@ ci_class = 'pr'
 spec = ['2', '15']
 test = "cargo test -p contextra-avv-generator --locked"
 
+[crates.contextra-bench]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Contextra Reproducible Benchmark Harness for Retrieval Accuracy'
+capabilities = ['benchmark-harness']
+path = "benchmarks/contextra-bench"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
+test = "cargo check -p contextra-bench --locked"
+
 [crates.contextra-checkpoint]
 ring = 'Ring 1'
 maturity = 'stable'
@@ -134,6 +146,41 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '9', '13']
 test = "cargo test -p contextra-crypto --locked"
 
+[crates.contextra-crypto-core]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'KeyManager, KDF, AEAD, HMAC, SecureBuf (geplanter Split aus contextra-crypto)'
+capabilities = ['crypto-primitives']
+path = "crates/contextra-crypto-core"
+planned = true
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
+
+[crates.contextra-crypto-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-crypto'
+capabilities = ['fuzzing']
+path = "crates/contextra-crypto/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
+[crates.contextra-crypto-kv]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'KV-Segmentverschlüsselung, Revocation-Log (geplantes Crate)'
+capabilities = ['kv-encryption']
+path = "crates/contextra-crypto-kv"
+planned = true
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
+
 [crates.contextra-db]
 ring = 'Ring 3'
 maturity = 'stable'
@@ -145,6 +192,17 @@ may_depend_on = ['contextra-adapt', 'contextra-checkpoint', 'contextra-cognition
 ci_class = 'pr'
 spec = ['A2', 'A3', '0', '2', '3', '4', '13', '15', '20']
 test = "cargo test -p contextra-db --locked"
+
+[crates.contextra-db-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-db'
+capabilities = ['fuzzing']
+path = "crates/contextra-db/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
 
 [crates.contextra-durable-fs]
 ring = 'Ring 0'
@@ -169,6 +227,18 @@ may_depend_on = ['contextra-adapt', 'contextra-checkpoint', 'contextra-core', 'c
 ci_class = 'pr'
 spec = ['A2', 'A3', '0', '4', '20']
 test = "cargo test -p contextra-engine --locked"
+
+[crates.contextra-erasure-evidence]
+ring = 'Ring 3'
+maturity = 'experimental'
+description = 'Beweisausstellung, Policy, Zeugen (geplanter Split)'
+capabilities = ['erasure-evidence']
+path = "crates/contextra-erasure-evidence"
+planned = true
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
 
 [crates.contextra-graph]
 ring = 'Ring 0'
@@ -254,6 +324,17 @@ ci_class = 'pr'
 spec = ['A2', '0', '2', '4', '13']
 test = "cargo test -p contextra-mcp --locked"
 
+[crates.contextra-mcp-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-mcp'
+capabilities = ['fuzzing']
+path = "crates/contextra-mcp/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
 [crates.contextra-mvcc]
 ring = 'Ring 0'
 maturity = 'stable'
@@ -289,6 +370,18 @@ may_depend_on = ['contextra-core', 'contextra-ports']
 ci_class = 'pr'
 spec = ['A2', 'A3', '0', '4']
 test = "cargo test -p contextra-privacy --locked"
+
+[crates.contextra-proof-verify]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'Unabhängiger Deletion Proof Verifier (geplantes Crate)'
+capabilities = ['proof-verification']
+path = "crates/contextra-proof-verify"
+planned = true
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
 
 [crates.contextra-py]
 ring = 'Ring 4'
@@ -362,6 +455,17 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '5', '9', '13', '15', '20', 'B']
 test = "cargo test -p contextra-store --locked"
 
+[crates.contextra-store-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-store'
+capabilities = ['fuzzing']
+path = "crates/contextra-store/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
 [crates.contextra-sys]
 ring = 'Ring 0'
 maturity = 'stable'
@@ -398,6 +502,17 @@ ci_class = 'pr'
 spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '21', 'D']
 test = "cargo test -p contextra-text --locked"
 
+[crates.contextra-text-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-text'
+capabilities = ['fuzzing']
+path = "crates/contextra-text/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
 [crates.contextra-types]
 ring = 'Ring 0'
 maturity = 'stable'
@@ -423,6 +538,17 @@ ci_class = 'pr'
 spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '20', '21', 'D']
 test = "cargo test -p contextra-vector --locked"
 
+[crates.contextra-vector-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-vector'
+capabilities = ['fuzzing']
+path = "crates/contextra-vector/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
 [crates.contextra-wire]
 ring = 'Ring 0'
 maturity = 'stable'
@@ -435,6 +561,29 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-wire --locked"
 
+[crates.contextra-wire-fuzz]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Fuzzing targets for contextra-wire'
+capabilities = ['fuzzing']
+path = "crates/contextra-wire/fuzz"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr-check-only'
+spec = ['0']
+
+[crates.xtask]
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Contextra Build & Verification Harness'
+capabilities = ['harness', 'cli-gates']
+path = "xtask"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['0']
+test = "cargo test -p xtask --locked"
+
 [crates.xtask-heavy]
 ring = 'Tooling'
 maturity = 'experimental'
@@ -446,3 +595,18 @@ may_depend_on = ['contextra-router']
 ci_class = 'pr-check-only'
 spec = ['0']
 test = "cargo check -p xtask-heavy --locked"
+
+# Übergangsausnahmen zur Ringmatrix (Spezifikation §4.3a, E54, G-21)
+[[exceptions]]
+id = "E-1"
+from = "contextra-store"
+to = "contextra-core"
+expiry = "N3.1"
+reason = "Unvollständiger Crate-Split (§4.9). Abbau in M3.1."
+
+[[exceptions]]
+id = "E-2"
+from = "contextra-store"
+to = "contextra-crypto"
+expiry = "N5.2"
+reason = "Monolithisches contextra-crypto (§4.8). Abbau beim Crate-Split."

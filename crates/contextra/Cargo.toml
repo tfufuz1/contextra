@@ -13,27 +13,13 @@ ring = "4"
 contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-license = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
 contextra-engine = { workspace = true }
-contextra-crypto = { workspace = true, optional = true }
-contextra-privacy = { workspace = true, optional = true }
-contextra-cognition = { workspace = true, optional = true }
-contextra-sandbox = { workspace = true, optional = true }
-contextra-graph = { workspace = true, optional = true }
-contextra-text = { workspace = true, optional = true }
-contextra-adapt = { workspace = true, optional = true }
-contextra-agent = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 rand = "0.8"
-contextra-infer-candle = { workspace = true, optional = true }
-contextra-infer-ollama = { workspace = true, optional = true }
-contextra-infer-onnx = { workspace = true, optional = true }
-contextra-router = { workspace = true, optional = true }
-contextra-rank = { workspace = true, optional = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
@@ -45,35 +31,29 @@ tempfile = { workspace = true }
 default = ["fast"]
 fast = ["contextra-engine/fast"]
 
-# Erweiterungen (einzeln aktivierbar)
-graph = ["contextra-engine/graph", "dep:contextra-graph"]
-adapt = ["dep:contextra-adapt"]
-kvcache = ["contextra-engine/kvcache"]
-cognition = ["dep:contextra-cognition"]
-router = ["dep:contextra-router", "contextra-rank", "dep:contextra-graph", "dep:contextra-text", "dep:contextra-adapt"]
-agent = ["dep:contextra-agent"]
-
-# Inferenz (opt-in; candle ist NICHT mehr Default)
-candle = ["dep:contextra-infer-candle"]
-ollama = ["dep:contextra-infer-ollama"]
-onnx = ["dep:contextra-infer-onnx", "contextra-db/onnx"]
-kv-stage-b = ["candle", "contextra-infer-candle/kv-stage-b"]
-
 # Sicherheit
-privacy = ["dep:contextra-privacy"]
-sandbox = ["dep:contextra-sandbox"]
-license = []
-dev-open-gate = ["contextra-license/dev-open-gate"]
 encryption-at-rest = ["contextra-db/encryption-at-rest"]
 
 # Löschgarantie
-erasure = ["contextra-store/erasure", "contextra-engine/erasure"]
+erasure = ["contextra-store/erasure", "contextra-engine/erasure", "contextra-ports/backend-impl"]
 
 # Format-Features
 docid-128 = ["contextra-types/docid-128"]
 
-# Bündel
-sovereign = ["privacy", "encryption-at-rest"]
+# No-op Features für Workspace-Kompatibilität (aktivieren KEINE Parkplatz-Crates)
+router = []
+ollama = []
+candle = []
+onnx = []
+privacy = []
+sandbox = []
+adapt = []
+cognition = []
+agent = []
+graph = []
+kvcache = []
+license = []
+sovereign = []
 
 [lints]
 workspace = true
