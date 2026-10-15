@@ -23,7 +23,7 @@ pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
 pub use contextra_db::{
-    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
+    chunker, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
