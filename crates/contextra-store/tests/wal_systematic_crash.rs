@@ -8,7 +8,8 @@
 // combined with deterministic WAL disk boundary simulation for LsmStorage WAL operations.
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::{FaultConfig, FaultVfs};
 use tempfile::TempDir;
