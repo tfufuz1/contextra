@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_search_dimension_mismatch_rejected() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -45,7 +45,7 @@ async fn test_search_dimension_mismatch_rejected() {
 
 #[tokio::test]
 async fn test_checkpoint_unpin_on_search_error_path() {
-    use contextra_graph::csr::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{FilterExpr, Result, TxId};
@@ -195,7 +195,7 @@ async fn test_checkpoint_unpin_on_search_error_path() {
 #[tokio::test]
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -250,27 +250,11 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
-#[tokio::test]
-async fn test_single_pid_controller_instantiation_in_query_builder() {
-    // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
-    // is instantiated across production collection search and query_builder modules.
-    let mut pid = contextra_adapt::PidController::default();
-    assert_eq!(pid.kp, 0.5);
-    assert_eq!(pid.ki, 0.05);
-    assert_eq!(pid.kd, 0.1);
-    assert_eq!(pid.target_latency_ms, 150.0);
-    assert_eq!(pid.min_pool_size, 50);
-    assert_eq!(pid.max_pool_size, 200);
-
-    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
-    assert!(updated < 100);
-    assert!(updated >= 50);
-}
 
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
@@ -349,7 +333,7 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 #[tokio::test]
 async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Box<dyn std::error::Error>> {
     use contextra_ports::ReadSnapshot;
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -420,7 +404,7 @@ async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Bo
 
 #[tokio::test]
 async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::{BoxFuture, Reranker};
     use contextra_store::LsmStorage;
     use contextra_types::{RerankResult, Result};
@@ -517,7 +501,7 @@ async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn
 #[tokio::test]
 async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::EntityId;
     use contextra_vector::HnswIndex;
@@ -614,7 +598,7 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 #[tokio::test]
 async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;

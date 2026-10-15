@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -66,7 +66,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types
 
 #[tokio::test]
 async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -188,7 +188,7 @@ fn test_kv_locks_try_lock_blocking() {
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_collection_next_tx_sequence() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -232,7 +232,7 @@ async fn test_collection_next_tx_sequence() {
 
 #[tokio::test]
 async fn test_collection_allocate_tx_sequence() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -276,7 +276,7 @@ async fn test_collection_allocate_tx_sequence() {
 
 #[tokio::test]
 async fn test_concurrent_insert_and_write_ops_lock_safety() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -365,7 +365,7 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
 
 #[tokio::test]
 async fn test_concurrent_insert_many_collision_safety() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
@@ -482,7 +482,7 @@ async fn test_concurrent_insert_many_collision_safety() {
 #[tokio::test]
 async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -544,7 +544,7 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 
 #[tokio::test]
 async fn test_begin_transaction_returns_active_db_transaction() {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -583,7 +583,7 @@ async fn test_begin_transaction_returns_active_db_transaction() {
 
 #[tokio::test]
 async fn test_apm3_lock_contention_fallback() -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
+    use crate::no_graph_stubs::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
