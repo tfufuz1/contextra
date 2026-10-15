@@ -1,14 +1,18 @@
+id = "T-2026-0302"
+title = "Purge Correctness Differential Test"
 crate = "contextra-store"
 tier = 1
 risk = "crash"
-invariants = ["INV-ATOMIC-IDX-1", "INV-FSYNC-1", "INV-ENOSPC-1", "INV-FORMAT-1", "Zero-Panic"]
-scope = ["crates/contextra-store/src/wal/**", "crates/contextra-store/tests/wal_v4_*.rs"]
+goal = "Differential testing for LSM purge correctness comparing LsmStorage against reference model"
+non_goals = ["Modifications to contextra-store production code"]
+scope = [
+    "crates/contextra-store/tests/differential/**",
+    "crates/contextra-store/tests/differential_purge_correctness.rs",
+    "docs/analysis/**",
+    ".jules/tasks/T-2026-0302.toml"
+]
 forbidden = [
-    "crates/contextra-store/src/lsm/**",
-    "crates/contextra-store/src/manifest/**",
-    "crates/contextra-store/src/sstable/**",
-    "crates/contextra-store/src/lib.rs",
-    "crates/contextra-store/Cargo.toml",
+    "crates/contextra-store/src/**",
     ".github/**",
     "xtask/**",
     "justfile",
@@ -25,12 +29,16 @@ forbidden = [
     "WORKING_STATE.md",
     "docs/generated/**"
 ]
+invariants = ["I1", "I2", "I3", "I4", "I5", "Zero-Panic"]
 acceptance = [
-    "cargo test -p contextra-store wal",
-    "cargo xtask wal-replay-verify"
+    "cargo test -p contextra-store --test differential_purge_correctness --features fault-injection"
+]
+evidence_required = [
+    "Differential test suite for invariants I1 to I5",
+    "Befunde report in docs/analysis/purge_differential_befunde.md"
 ]
 
 [budget]
-files = 25
-lines = 3000
+files = 10
+lines = 800
 iterations = 12
