@@ -3,7 +3,8 @@
 //! Evaluates whether truncating a Delete entry from WAL tail causes record resurrection when Put exists in SSTable,
 //! and proves that ErasureLedger successfully prevents resurrection as a second line of defense.
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, TxId};
 use contextra_store::erasure_ledger::{
     compute_keyed_hash, ErasureLedger, LedgerEntry, LedgerEntryKind, LedgerKey,
 };
