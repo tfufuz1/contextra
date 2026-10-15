@@ -3,7 +3,7 @@
 // INVARIANTEN: Pure read path — haelt NIE den globalen write_mutex (INV-D9).
 // Keine Locks über .await. Lock-Reihenfolge einhalten.
 
-use contextra_core::{DocId, Result};
+use contextra_types::{DocId, Result};
 use std::collections::HashSet;
 
 use super::types::{HnswIndex, VectorData};

@@ -2,7 +2,7 @@
 // ZWECK: Unit-Tests für HNSW Persistenz-Schicht.
 
 use super::*;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 #[test]
 fn test_hnsw_header_roundtrip_and_errors() -> Result<()> {
@@ -50,9 +50,10 @@ fn test_node_record_roundtrip_and_errors() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_index_boundary_checks() -> contextra_core::Result<()> {
+async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+    use contextra_ports::VectorIndex;
+    use contextra_types::{DistanceMetric, DocId, TxId};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("bounds_test.hnsw");
@@ -86,9 +87,10 @@ async fn test_mmap_index_boundary_checks() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_open_async() -> contextra_core::Result<()> {
+async fn test_mmap_open_async() -> contextra_types::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+    use contextra_ports::VectorIndex;
+    use contextra_types::{DistanceMetric, DocId, TxId};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("test_async.hnsw");
@@ -342,7 +344,8 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
 #[tokio::test]
 async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_core::{DocId, TxId, VectorIndex};
+    use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("v2_roundtrip.hnsw");

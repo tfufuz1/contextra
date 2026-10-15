@@ -2,7 +2,7 @@
 // STAND: 2026-10-06
 // ZWECK: Durable Filesystem Operations (APM-1) für HNSW Index Persistence.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 
 /// Atomically replaces target file `dst` with temporary file `src` adhering to APM-1 durability rules:

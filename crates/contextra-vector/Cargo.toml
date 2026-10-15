@@ -16,7 +16,7 @@ ring = "0"
 contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-core = { workspace = true }
+contextra-mvcc = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
 contextra-sys = { workspace = true }
@@ -32,10 +32,6 @@ serde = { workspace = true, features = ["derive"] }
 [features]
 default = []
 docid-128 = ["contextra-types/docid-128"]
-experimental-diskann = []
-experimental-rabitq = []
-experimental-predicate-augmented-search = []
-graph = []
 # ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
 # dokumentiertes Architektur-Veto verstößt (siehe VETOES.md, falls vorhanden, sonst
 # docs/decisions/ nach "Nucleation" durchsuchen). Der aktuelle rebuild_region()
@@ -87,31 +83,3 @@ required-features = ["partial-index-rebuild"]
 name = "distance_nan_impact_bench"
 harness = false
 
-[[bench]]
-name = "filtered_search_selectivity_bench"
-harness = false
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "diskann_fault_injection_test"
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "diskann_corruption_fallback_test"
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "diskann_recall_test"
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "mmap_toctou_test"
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "quantize_persistence_audit"
-required-features = ["experimental-diskann"]
-
-[[test]]
-name = "recall_audit"
-required-features = ["experimental-diskann"]

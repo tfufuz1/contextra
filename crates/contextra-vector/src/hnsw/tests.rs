@@ -1,5 +1,6 @@
 use super::*;
-use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_ports::Rng;
 use parking_lot::Mutex;
 
