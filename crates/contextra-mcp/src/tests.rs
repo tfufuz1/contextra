@@ -291,6 +291,66 @@ async fn test_contextra_forget_single_doc() {
 }
 
 #[tokio::test]
+async fn test_contextra_forget_options_forwarding_and_unsupported_capability() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // Insert document
+    let insert_req = make_request(
+        "contextra_insert",
+        json!({
+            "id": "forget_doc_opts",
+            "text": "Data with options",
+            "collection": "default"
+        }),
+    );
+    let resp = server.handle(insert_req).await;
+    assert!(resp.error.is_none());
+
+    // 1. Passing an unsupported option key triggers CapabilityUnsupported
+    let forget_unsupported_opt = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "forget_doc_opts",
+                "confirm": true,
+                "options": {
+                    "unsupported_custom_flag": true
+                }
+            }
+        }),
+    );
+    let resp_unsup = server.handle(forget_unsupported_opt).await;
+    let res_unsup = serde_json::to_value(&resp_unsup).unwrap();
+    assert_eq!(res_unsup["result"]["isError"], true);
+
+    // 2. Forget single doc with options requiring assurance S3 (triggers CapabilityUnsupported in erase_document)
+    let forget_req_opts = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "forget_doc_opts",
+                "confirm": true,
+                "options": {
+                    "assurance": "S3"
+                }
+            }
+        }),
+    );
+    let resp_f = server.handle(forget_req_opts).await;
+    let res_f = serde_json::to_value(&resp_f).unwrap();
+    assert_eq!(res_f["result"]["isError"], true);
+    let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains("real_scan_erasure") || text.contains("Assurance levels above S0 require real storage scans"),
+        "Expected CapabilityUnsupported error when assurance option S3 is passed, got: '{text}'"
+    );
+}
+
+#[tokio::test]
 async fn test_malformed_json_returns_parse_error() {
     let parse_res = serde_json::from_str::<Value>("{ invalid }");
     assert!(parse_res.is_err());

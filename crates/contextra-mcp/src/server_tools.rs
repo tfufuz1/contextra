@@ -406,7 +406,93 @@ impl McpServer {
 
                 if let Some(id) = id_opt {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
-                    let opts = contextra::collection::crud::DocEraseOptions::default();
+                    let mut opts = contextra::collection::crud::DocEraseOptions {
+                        options: contextra::deletion::ForgetOptions {
+                            assurance: contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
+                            ..Default::default()
+                        },
+                    };
+
+                    let options_val = args.get("options").or_else(|| args.get("erase_options"));
+                    if let Some(v) = options_val {
+                        let obj = v.as_object().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'options' must be an object")
+                        })?;
+
+                        for (key, val) in obj {
+                            match key.as_str() {
+                                "assurance" => {
+                                    let s = val.as_str().ok_or_else(|| {
+                                        McpError::invalid_params("Invalid params: 'assurance' must be a string")
+                                    })?;
+                                    opts.options.assurance = match s {
+                                        "S0" | "s0" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
+                                        "S1" | "s1" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S1,
+                                        "S2" | "s2" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S2,
+                                        "S3" | "s3" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S3,
+                                        "S4" | "s4" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S4,
+                                        other => {
+                                            return Err(McpError::invalid_params(format!(
+                                                "Invalid assurance '{other}'. Valid options are: 'S0', 'S1', 'S2', 'S3', 'S4'"
+                                            )));
+                                        }
+                                    };
+                                }
+                                "purge" => {
+                                    let s = val.as_str().ok_or_else(|| {
+                                        McpError::invalid_params("Invalid params: 'purge' must be a string")
+                                    })?;
+                                    opts.options.purge = match s {
+                                        "None" | "none" => contextra::deletion::PurgeMode::None,
+                                        "Purge" | "purge" => contextra::deletion::PurgeMode::Purge,
+                                        "PurgeWithScrub" | "purge_with_scrub" => contextra::deletion::PurgeMode::PurgeWithScrub,
+                                        other => {
+                                            return Err(McpError::invalid_params(format!(
+                                                "Invalid purge '{other}'. Valid options are: 'None', 'Purge', 'PurgeWithScrub'"
+                                            )));
+                                        }
+                                    };
+                                }
+                                "verify_depth" => {
+                                    let s = val.as_str().ok_or_else(|| {
+                                        McpError::invalid_params("Invalid params: 'verify_depth' must be a string")
+                                    })?;
+                                    opts.options.verify_depth = match s {
+                                        "Footprint" | "footprint" => contextra::deletion::VerifyDepth::Footprint,
+                                        "FullSweep" | "full_sweep" => contextra::deletion::VerifyDepth::FullSweep,
+                                        other => {
+                                            return Err(McpError::invalid_params(format!(
+                                                "Invalid verify_depth '{other}'. Valid options are: 'Footprint', 'FullSweep'"
+                                            )));
+                                        }
+                                    };
+                                }
+                                "wait" => {
+                                    let s = val.as_str().ok_or_else(|| {
+                                        McpError::invalid_params("Invalid params: 'wait' must be a string")
+                                    })?;
+                                    opts.options.wait = match s {
+                                        "No" | "no" => contextra::deletion::Wait::No,
+                                        "Forever" | "forever" => contextra::deletion::Wait::Forever,
+                                        other => {
+                                            return Err(McpError::invalid_params(format!(
+                                                "Invalid wait '{other}'. Valid options are: 'No', 'Forever'"
+                                            )));
+                                        }
+                                    };
+                                }
+                                unhandled => {
+                                    return Err(McpError::from(
+                                        contextra_types::ContextraError::capability_unsupported(
+                                            unhandled,
+                                            format!("Option '{unhandled}' is not supported"),
+                                        ),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+
                     let erasure = col.erase_document(id, &opts).await.map_err(McpError::from)?;
 
                     Ok(json!({

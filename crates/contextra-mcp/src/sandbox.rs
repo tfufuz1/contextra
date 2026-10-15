@@ -97,7 +97,16 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
             "properties": {
                 "collection": { "type": "string" },
                 "id":         { "type": "string" },
-                "confirm":    { "type": "boolean" }
+                "confirm":    { "type": "boolean" },
+                "options":    {
+                    "type": "object",
+                    "properties": {
+                        "assurance":    { "type": "string", "enum": ["S0", "S1", "S2", "S3", "S4"] },
+                        "purge":        { "type": "string", "enum": ["None", "Purge", "PurgeWithScrub"] },
+                        "verify_depth": { "type": "string", "enum": ["Footprint", "FullSweep"] },
+                        "wait":         { "type": "string", "enum": ["No", "Forever"] }
+                    }
+                }
             },
             "required": ["collection", "confirm"]
         }),
