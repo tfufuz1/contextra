@@ -21,7 +21,7 @@
 // INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen, Registrierung vor Disk-Link.
 
 use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

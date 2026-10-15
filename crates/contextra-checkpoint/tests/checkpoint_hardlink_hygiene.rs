@@ -3,7 +3,7 @@
 // ZWECK: Tests für Hardlink-Cloner Hygiene — SSTable-Filterung (.sst vs .tmp), Target-Removal Fehler und Registration.
 
 use contextra_checkpoint::{CheckpointHardlinkCloner, CpyCopyRegistry, DefaultHardlinkCloner};
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::Result;

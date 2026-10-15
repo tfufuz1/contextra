@@ -7,7 +7,6 @@
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
-use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 use std::sync::atomic::Ordering;
@@ -845,17 +844,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // 3. Reset text index RAM state
         self.text_index.resident_index().clear();
 
-        // 4. Reset graph index RAM state
-        {
-            let mut g_write = self.graph_index.write_state.lock();
-            *g_write = contextra_graph::csr::GraphInner::new();
-            self.graph_index
-                .inner
-                .store(Arc::new(contextra_graph::csr::GraphInner::new()));
-            self.graph_index.cascade_queue.lock().clear();
-        }
-
-        // 5. Reset vector index RAM state
+        // 4. Reset vector index RAM state
         if let Ok(active_doc_ids) = self.index.all_doc_ids().await {
             for doc_id in active_doc_ids {
                 let _ = self.index.delete(tx, doc_id).await;
@@ -868,95 +857,3 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 }
 
-#[cfg(feature = "graph-connectivity-health")]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PercolationResult {
-    pub health: Option<f32>,
-    pub rebonding_triggered: bool,
-    pub new_edges_added: usize,
-}
-
-#[cfg(feature = "graph-connectivity-health")]
-impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Überprüft die Perkolations-Gesundheit des Wissensgraphen und löst bei Unterschreitung
-    /// des Schwellenwerts automatisch einen Re-Bonding-Pass aus.
-    #[tracing::instrument(level = "trace", skip(self, config))]
-    pub async fn run_percolation_check(
-        &self,
-        config: &contextra_graph::percolation::PercolationConfig,
-    ) -> Result<PercolationResult> {
-        let stats = self.graph_index.stats().await?;
-        let health = contextra_graph::percolation::compute_percolation_health(
-            stats.num_entities,
-            stats.num_edges,
-        );
-
-        let rebonding_triggered = if let Some(phi) = health {
-            contextra_graph::percolation::should_trigger_rebonding(phi, config)
-        } else {
-            false
-        };
-
-        let mut new_edges_added = 0;
-
-        if rebonding_triggered {
-            let user_prefix = self.namespaced_key(b"", 0);
-            let mut embeddings = std::collections::HashMap::new();
-            let mut id_map = std::collections::HashMap::new();
-            let mut cursor: Option<Vec<u8>> = None;
-            const BATCH_SIZE: usize = 1000;
-
-            loop {
-                let (batch, next_cursor) = self
-                    .storage
-                    .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
-                    .await?;
-
-                if batch.is_empty() {
-                    break;
-                }
-
-                for (_k, v) in batch {
-                    if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
-                        if let Ok(eid) = EntityId::from_key(&stored.id) {
-                            id_map.insert(eid, stored.id.clone());
-                            embeddings.insert(eid, stored.embedding);
-                        }
-                    }
-                }
-
-                if let Some(next) = next_cursor {
-                    cursor = Some(next);
-                    tokio::task::yield_now().await;
-                } else {
-                    break;
-                }
-            }
-
-            let candidate_pairs = contextra_graph::percolation::find_rebonding_candidates(
-                self.graph_index.as_ref(),
-                &embeddings,
-                config,
-            )
-            .await;
-
-            for (from_id, to_id, _sim) in candidate_pairs {
-                if let (Some(from_str), Some(to_str)) = (id_map.get(&from_id), id_map.get(&to_id)) {
-                    if self
-                        .relate_bidirectional(from_str, to_str, "rebonded")
-                        .await
-                        .is_ok()
-                    {
-                        new_edges_added += 2;
-                    }
-                }
-            }
-        }
-
-        Ok(PercolationResult {
-            health,
-            rebonding_triggered,
-            new_edges_added,
-        })
-    }
-}

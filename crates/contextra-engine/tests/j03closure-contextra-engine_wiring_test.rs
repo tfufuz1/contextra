@@ -8,7 +8,7 @@ use contextra_engine::kv_cache_integration::{
     start_kv_cache_eviction, AccessCounterAttentionExporter,
 };
 use contextra_engine::{Contextra, ContextraConfig};
-use contextra_kvcache::TenantIsolatedKvStore;
+
 use contextra_ports::{AttentionExporter, RequestId, TenantId};
 use contextra_types::DocId;
 use std::collections::BTreeSet;

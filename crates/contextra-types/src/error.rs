@@ -98,7 +98,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as `contextra-py` and `contextra-mcp`).
+/// (such as language bindings and client drivers).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.

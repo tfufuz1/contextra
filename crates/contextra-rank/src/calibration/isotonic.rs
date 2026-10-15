@@ -301,10 +301,19 @@ impl IsotonicCalibrator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use contextra_types::DeterministicTimestamp;
 
     struct FixedTestClock(u64);
 
     impl Clock for FixedTestClock {
+        fn now(&self) -> DeterministicTimestamp {
+            DeterministicTimestamp::new(self.0 / 1_000_000, 0)
+        }
+
+        fn monotonic_ticks(&self) -> u64 {
+            0
+        }
+
         fn now_unix_nanos(&self) -> u64 {
             self.0
         }

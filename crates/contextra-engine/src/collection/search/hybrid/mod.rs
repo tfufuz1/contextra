@@ -7,7 +7,7 @@ pub use query::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
-use contextra_ports::{GraphIndex, Reranker, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{Reranker, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, EntityId, Result, TxId};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
@@ -168,44 +168,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 None
             };
 
-            let graph_results = if let Some(anchors) = anchors_ref {
-                let tuples = match graph_strat {
-                    contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .multi_traverse_at(anchors, *max_hops, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                    contextra_types::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .personalized_page_rank_at(anchors, cfg, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                    contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .path_rag_at(anchors, *max_hops, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                };
-                let doc_tuples = tuples
-                    .into_iter()
-                    .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-                    .collect();
-                self.hydrate_from_tuples_at(doc_tuples, seq).await?
-            } else {
-                Vec::new()
-            };
+            let graph_results: Vec<crate::SearchResult> = Vec::new();
 
             if !text_results.is_empty() && graph_results.is_empty() && anchor_entities.is_none() {
                 tracing::warn!(

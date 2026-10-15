@@ -5,7 +5,7 @@
 
 use crate::orphan::InstanceOrphanRegistry;
 use crate::store::PersistentCheckpointStore;
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::Clock;
 use contextra_types::{Result, TxId};
 use std::path::Path;
