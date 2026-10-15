@@ -1,7 +1,8 @@
 #![cfg(feature = "fault-injection")]
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::wal::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 use contextra_store::{LsmConfig, LsmStorage};
 use std::sync::atomic::Ordering;
