@@ -7,7 +7,7 @@
 
 //! Contextra Index — HNSW vector index with SIMD distance computation.
 // INVARIANT: Vector Engine (Triebwerk — Layer 1).
-// IMPLEMENTS: VectorIndex Trait (contextra-core/traits.rs)
+// IMPLEMENTS: VectorIndex Trait (contextra-ports/src/vector_index.rs)
 // KERNKOMPONENTEN: HNSW (Graph-basierte ANN) + CSR Graph (Relationen) + SIMD-Distanz.
 // INVARIANTE: HNSW-Graphen liegen exklusiv im RAM. Disk-Storage erfolgt über contextra-store (via LsmStorage).
 
