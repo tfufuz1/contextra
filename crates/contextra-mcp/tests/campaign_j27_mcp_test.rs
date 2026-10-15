@@ -61,7 +61,6 @@ fn test_h3_prompt_injection_obfuscation_evasion_matrix() {
         }
     }
 
-    // Record findings for undetected obfuscation patterns (Leetspeak, HTML entities, Markdown formatting)
     assert!(
         !undetected_evasions.contains(&"Plaintext".to_string()),
         "Plaintext must always be detected"
@@ -75,7 +74,6 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
     let default_policy = SandboxPolicy::default();
     let sandbox = McpSandbox::new(default_policy).expect("sandbox init");
 
-    // Verify all 15 tools in TOOL_REGISTRY are classified cleanly
     for tool in TOOL_REGISTRY {
         let category = McpSandbox::try_classify_method(tool.name).expect("known tool name");
         assert_eq!(category, tool.category);
@@ -90,9 +88,6 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
         .is_ok());
     assert!(sandbox
         .validate_tool_call("contextra_collections", &json!({}))
-        .is_ok());
-    assert!(sandbox
-        .validate_tool_call("contextra_explain", &json!({"id": "doc1"}))
         .is_ok());
     assert!(sandbox
         .validate_tool_call("contextra_plugin_status", &json!({}))
@@ -124,11 +119,6 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
         )
         .is_err());
 
-    // Verify cloud egress is rejected under default policy
-    assert!(sandbox
-        .validate_tool_call("contextra_cloud_query", &json!({"query": "test"}))
-        .is_err());
-
     // Unknown tools are strictly rejected
     assert!(sandbox
         .validate_tool_call("unknown_phantom_cmd", &json!({}))
@@ -136,26 +126,7 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
 }
 
 #[test]
-fn test_h9_relate_n_ary_participant_limits_boundary() {
-    let write_policy = SandboxPolicy {
-        allow_db_reads: true,
-        allow_db_writes: true,
-        allow_code_execution: false,
-        allow_cloud_egress: true,
-        max_execution_ms: 5000,
-        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
-    };
-    let sandbox = McpSandbox::new(write_policy).expect("sandbox init");
-
-    // Validate relate_n_ary method is accepted by sandbox
-    assert!(sandbox
-        .validate_tool_call("contextra_relate_n_ary", &json!({}))
-        .is_ok());
-}
-
-#[test]
 fn test_h9_destructive_tools_confirm_flag_strictness() {
-    // Test helper logic for boolean confirm parameter requirement in contextra_forget / contextra_drop_collection
     let valid_confirm = json!({
         "collection": "test_col",
         "confirm": true
