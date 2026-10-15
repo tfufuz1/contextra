@@ -44,7 +44,6 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
     pub(super) staged_graph_entity_sequence: Mutex<Vec<StagedGraphEntityOp>>,
     pub(super) staged_graph_edge_sequence: Mutex<Vec<StagedGraphEdgeOp>>,
-    pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
     pub(super) committed: AtomicBool,
 }
 
@@ -73,7 +72,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             staged_graph_edge_deletes: Mutex::new(Vec::with_capacity(16)),
             staged_graph_entity_sequence: Mutex::new(Vec::with_capacity(16)),
             staged_graph_edge_sequence: Mutex::new(Vec::with_capacity(16)),
-            staged_hyperedges: Mutex::new(Vec::with_capacity(16)),
             committed: AtomicBool::new(false),
         }
     }
@@ -193,14 +191,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Err(p) => p.into_inner(),
         };
         seq.push(StagedGraphEdgeOp::Delete(from, to));
-    }
-
-    pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
-        let mut guard = match self.staged_hyperedges.lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
-        guard.push(hyperedge);
     }
 
     /// Attaches an explicit SSI validator implementation to this transaction.

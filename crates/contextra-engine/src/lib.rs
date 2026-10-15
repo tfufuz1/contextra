@@ -8,9 +8,6 @@
 pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
-use contextra_ports::license::LicenseGate;
-#[cfg(feature = "sandbox")]
-use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
@@ -30,14 +27,9 @@ pub mod background_workers;
 #[cfg(not(loom))]
 pub mod chunker;
 pub mod collection;
-#[cfg(not(loom))]
-pub mod decay_controller;
 pub mod deletion;
 #[cfg(not(loom))]
 pub mod export;
-#[cfg(feature = "entity-extraction")]
-#[cfg(not(loom))]
-pub mod extraction;
 #[cfg(not(loom))]
 pub mod filter;
 #[cfg(not(loom))]
@@ -45,27 +37,14 @@ pub mod fusion;
 #[cfg(not(loom))]
 pub mod import;
 #[cfg(not(loom))]
-pub mod kv_cache_integration;
-#[cfg(not(loom))]
 pub mod lifecycle;
 pub mod limits;
 pub mod metrics_names;
-pub mod no_graph_stubs;
 #[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(not(loom))]
-pub use kv_cache_integration::build_eviction_worker;
-
-#[cfg(feature = "sandbox")]
-pub mod merge_operator_adapter;
-#[cfg(feature = "sandbox")]
-pub use merge_operator_adapter::WasmMergeOperator;
-
-#[cfg(not(loom))]
-pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 pub use limits::EngineLimits;
 
 #[cfg(not(loom))]
@@ -86,22 +65,17 @@ pub use lifecycle::{EngineLifecycle, ErasureSupervisor};
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(not(loom))]
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationResult;
-#[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
-pub use collection::search::hybrid::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
+pub use collection::search::hybrid::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
+#[cfg(not(loom))]
+pub use collection::{Collection, CollectionConfig};
+pub use contextra_checkpoint;
+pub use contextra_text::Language;
 pub use deletion::{
     forget_document, reverse_sweep, DeletionWiring, DeletionWiringDeps, DpiDeletionRuntime,
     DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
     PurgeHandle, VerifyDepth, Wait,
 };
-#[cfg(not(loom))]
-pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
-pub use contextra_text::Language;
 #[cfg(not(loom))]
 #[allow(deprecated)]
 pub use filter::MetadataFilter;
@@ -189,7 +163,6 @@ pub enum EmbeddingBackend {
     },
     Candle {
         model_dir: std::path::PathBuf,
-        quantization: contextra_infer_candle::model_registry::CandleQuantization,
     },
     Ollama {
         endpoint: String,
@@ -205,7 +178,6 @@ impl std::str::FromStr for EmbeddingBackend {
         match s.to_ascii_lowercase().trim() {
             "candle" => Ok(Self::Candle {
                 model_dir: std::path::PathBuf::new(),
-                quantization: contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
             }),
             "onnx" => Ok(Self::Onnx {
                 model_name: "nomic-embed-text".to_string(),
@@ -388,7 +360,6 @@ pub struct Contextra {
     next_tx: Arc<AtomicU64>,
     dimension: usize,
     config: ContextraConfig,
-    license_gate: Arc<dyn LicenseGate>,
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
@@ -401,10 +372,6 @@ pub struct Contextra {
     calibrator: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
-    pid_controller: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
-    >,
-    kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
     kv_hooks: parking_lot::RwLock<Option<Arc<dyn contextra_ports::KvLifecycleHooks>>>,
 }
@@ -429,21 +396,6 @@ impl Contextra {
         &self.config
     }
 
-    /// Returns a reference to the attached [`LicenseGate`].
-    pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
-        Arc::clone(&self.license_gate)
-    }
-
-    /// Public observability API: exposes the active KV eviction worker's attention score source for external monitoring integrations. Intentionally has no internal caller.
-    pub fn kv_eviction_attention_source(
-        &self,
-    ) -> Option<Arc<dyn contextra_kvcache::AttentionScoreSource>> {
-        self.kv_eviction_worker
-            .read()
-            .as_ref()
-            .map(|w| w.attention_source())
-    }
-
     /// Sets or overrides the KV lifecycle hooks implementation on Contextra.
     pub fn set_kv_hooks(&self, hooks: Arc<dyn contextra_ports::KvLifecycleHooks>) {
         *self.kv_hooks.write() = Some(hooks);
@@ -452,87 +404,6 @@ impl Contextra {
     /// Returns a cloned reference to the active KV lifecycle hooks, if configured.
     pub fn kv_hooks(&self) -> Option<Arc<dyn contextra_ports::KvLifecycleHooks>> {
         self.kv_hooks.read().as_ref().map(Arc::clone)
-    }
-}
-
-#[cfg(feature = "sandbox")]
-pub trait SandboxBridge: Send + Sync {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>>;
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
-}
-
-#[cfg(feature = "sandbox")]
-impl SandboxBridge for Contextra {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
-        Box::pin(async move {
-            let f32_count = query.len() / 4;
-            let mut vector = Vec::with_capacity(f32_count);
-            for i in 0..f32_count {
-                let start = i * 4;
-                let bits = u32::from_le_bytes(
-                    query
-                        .get(start..start + 4)
-                        .ok_or_else(|| {
-                            contextra_types::ContextraError::Serialization("Query too short".into())
-                        })?
-                        .try_into()
-                        .map_err(|_| {
-                            contextra_types::ContextraError::Serialization("Invalid slice".into())
-                        })?,
-                );
-                vector.push(f32::from_bits(bits));
-            }
-
-            let results: Vec<SearchResult> = self.search(&vector, k).await?;
-            serde_json::to_vec(&results)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
-        })
-    }
-
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let val_json: Value = serde_json::from_slice(value)
-                .unwrap_or(serde_json::json!({ "raw_data": String::from_utf8_lossy(value) }));
-
-            self.insert(&id, &[], Some(val_json)).await
-        })
-    }
-
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let doc = self.get(&id).await?;
-            match doc {
-                Some(d) => Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                    contextra_types::ContextraError::Internal(e.to_string())
-                })?)),
-                None => Ok(None),
-            }
-        })
     }
 }
 

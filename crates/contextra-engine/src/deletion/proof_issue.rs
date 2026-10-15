@@ -53,9 +53,8 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
                     ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}"))
                 })?;
 
-            let raw_bytes = std::fs::read(&self.key_path).map_err(|e| {
-                ContextraError::Crypto(format!("Failed to read key file: {e}"))
-            })?;
+            let raw_bytes = std::fs::read(&self.key_path)
+                .map_err(|e| ContextraError::Crypto(format!("Failed to read key file: {e}")))?;
 
             if raw_bytes.len() != 32 {
                 return Err(ContextraError::Crypto(format!(
