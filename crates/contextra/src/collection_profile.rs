@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05)
+// ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, EP1)
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
@@ -47,14 +47,10 @@ pub enum CollectionProfileError {
 
 impl CollectionProfile {
     /// Validates the profile against system rules and invariants.
-    ///
-    /// Verifies that if KV-side deletion proof requirements are active in the performance profile,
-    /// the KV deletion mode is compatible (e.g. `CryptoShred`). Vector indexing operates independently
-    /// without vector-side deletion proof dependencies.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if (resolved.erasure_mode != ErasureMode::Off || self.performance == PerformanceProfile::Compliance)
+        if resolved.erasure_mode != ErasureMode::Off
             && self.kv_delete_mode == KvDeleteMode::TombstoneOnly
         {
             return Err(CollectionProfileError::KvDeleteMismatch);
@@ -86,7 +82,7 @@ impl DeploymentTier {
     pub fn resolve(self) -> CollectionProfile {
         match self {
             Self::EdgeMinimal => CollectionProfile {
-                performance: PerformanceProfile::BareMetal,
+                performance: PerformanceProfile::Balanced,
                 kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 8 << 20,
@@ -96,7 +92,7 @@ impl DeploymentTier {
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
-            Self::PowerUserLocal => CollectionProfile {
+            Self::PowerUserLocal | Self::EnterpriseShared | Self::EnterpriseRegulated => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
                 kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
@@ -105,29 +101,11 @@ impl DeploymentTier {
                     group_commit_window_micros: 2_000,
                     block_cache_shards: 8,
                 },
-                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
-            },
-            Self::EnterpriseShared => CollectionProfile {
-                performance: PerformanceProfile::Balanced,
-                kv_delete_mode: KvDeleteMode::CryptoShred,
-                lsm_tuning: LsmTuning {
-                    memtable_size_limit: 256 << 20,
-                    max_ram_mb: 4_096,
-                    group_commit_window_micros: 10_000,
-                    block_cache_shards: 32,
+                auto_extraction: if matches!(self, Self::EnterpriseRegulated) {
+                    ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT
+                } else {
+                    DEFAULT_AUTO_EXTRACTION_MODE
                 },
-                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
-            },
-            Self::EnterpriseRegulated => CollectionProfile {
-                performance: PerformanceProfile::Compliance,
-                kv_delete_mode: KvDeleteMode::CryptoShred,
-                lsm_tuning: LsmTuning {
-                    memtable_size_limit: 256 << 20,
-                    max_ram_mb: 4_096,
-                    group_commit_window_micros: 10_000,
-                    block_cache_shards: 32,
-                },
-                auto_extraction: ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
             },
         }
     }

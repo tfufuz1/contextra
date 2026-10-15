@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05)
-// INVARIANTEN: INV-PERF-PROFILE-1, INV-PERF-PROFILE-2
+// ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, EP1)
+// INVARIANTEN: PerformanceProfile::default() == PerformanceProfile::Balanced
 
 pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::erasure::ErasureMode;
@@ -10,14 +10,12 @@ use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PerformanceProfile {
-    Compliance,
     Balanced,
-    BareMetal,
 }
 
 impl Default for PerformanceProfile {
     fn default() -> Self {
-        Self::Compliance
+        Self::Balanced
     }
 }
 
@@ -42,20 +40,8 @@ pub enum PerformanceProfileError {
 impl PerformanceProfile {
     pub fn resolve(self) -> ResolvedProfileConfig {
         match self {
-            Self::Compliance => ResolvedProfileConfig {
-                durability_mode: DurabilityMode::Full,
-                vector_delete_mode: VectorDeleteMode::SynchronousRepair,
-                erasure_mode: ErasureMode::Assured,
-                feature_ring: FeatureRing::Sovereign,
-            },
             Self::Balanced => ResolvedProfileConfig {
                 durability_mode: DurabilityMode::WalNoHmac,
-                vector_delete_mode: VectorDeleteMode::BackgroundRepair,
-                erasure_mode: ErasureMode::Off,
-                feature_ring: FeatureRing::Fast,
-            },
-            Self::BareMetal => ResolvedProfileConfig {
-                durability_mode: DurabilityMode::MemoryOnly,
                 vector_delete_mode: VectorDeleteMode::BackgroundRepair,
                 erasure_mode: ErasureMode::Off,
                 feature_ring: FeatureRing::Fast,
@@ -85,5 +71,15 @@ impl ResolvedProfileConfig {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_performance_profile_default_is_balanced() {
+        assert_eq!(PerformanceProfile::default(), PerformanceProfile::Balanced);
     }
 }
