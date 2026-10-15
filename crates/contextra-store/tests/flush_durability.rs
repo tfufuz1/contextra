@@ -1,5 +1,4 @@
-use contextra_types::{Result, TxId};
-use contextra_ports::StorageEngine;
+use contextra_core::{Result, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 #[cfg(unix)]
 use std::fs::Permissions;

@@ -1,6 +1,6 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_types::TxId;
+use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalOp, FAIL_APPEND_AFTER_PARTIAL_BYTES, FAIL_APPEND_PARTIAL_ONCE};
 use tempfile::tempdir;
 

@@ -3,7 +3,7 @@
 //! Verifies that `WalReplayFilter` correctly filters WAL entries during replay,
 //! respects transaction ID thresholds, and accurately updates `WalReplayReport`.
 
-use contextra_types::{ContextraError, TxId};
+use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::{Wal, WalOp, WalReplayFilter};
 use tempfile::tempdir;
 

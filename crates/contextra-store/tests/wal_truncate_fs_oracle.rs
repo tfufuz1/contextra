@@ -7,7 +7,7 @@
 // 2. Nebenläufig (Append-Phase): Bei richtiger Lese-Reihenfolge (erst wal.size(), dann fs::metadata)
 //    gilt während Append: mem_size <= disk_size (weil fetch_add nach dem Schreiben erfolgt).
 
-use contextra_types::{Result, TxId};
+use contextra_core::{Result, TxId};
 use contextra_store::wal::{Wal, WalOp};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

@@ -3,8 +3,7 @@
 // ZWECK: Tests für Compaction-basierte Key-Bereinigung in LsmStorage::purge_keys.
 // INVARIANTEN: Canary key raw-scan verification, crash safety at 3 interruption points, zero-panic.
 
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;

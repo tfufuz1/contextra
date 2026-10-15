@@ -1,6 +1,6 @@
 //! Integration tests for issue_witnesses_v2 and store_probe (T-2026-9220).
 
-use contextra_types::TxId;
+use contextra_core::TxId;
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::DeletionLayer;
 use contextra_store::compaction::CompactionConfig;

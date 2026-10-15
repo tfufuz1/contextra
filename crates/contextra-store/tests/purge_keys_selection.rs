@@ -1,8 +1,7 @@
 mod purge_oracle_helper;
 
 use bytes::Bytes;
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -25,7 +24,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_keys_selection_put_l0() -> contextra_types::Result<()> {
+async fn test_purge_keys_selection_put_l0() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -59,7 +58,7 @@ async fn test_purge_keys_selection_put_l0() -> contextra_types::Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_prefix_isolation() -> contextra_types::Result<()> {
+async fn test_purge_keys_prefix_isolation() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -97,7 +96,7 @@ async fn test_purge_keys_prefix_isolation() -> contextra_types::Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<()> {
+async fn test_purge_keys_preserves_newer_versions() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -131,7 +130,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<(
 }
 
 #[tokio::test]
-async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra_types::Result<()> {
+async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -161,7 +160,7 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
 }
 
 #[tokio::test]
-async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_types::Result<()> {
+async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

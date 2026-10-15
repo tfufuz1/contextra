@@ -1,4 +1,4 @@
-use contextra_types::TxId;
+use contextra_core::TxId;
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_store::sstable::SstableBuilder;
 use contextra_store::wal::{WalEntry, WalOp, WAL_V3_HEADER};

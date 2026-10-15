@@ -5,8 +5,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::TempDir;

@@ -6,8 +6,7 @@
 //!
 //! Evaluates `PowerCutSimulation` defined in `rules/chaos_testing.md` and `TEST/MASTER_INTEGRATION_PLAN.md`.
 
-use contextra_types::ContextraError;
-use contextra_ports::StorageEngine;
+use contextra_core::{ContextraError, StorageEngine};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use rand::Rng;
 use std::collections::HashMap;

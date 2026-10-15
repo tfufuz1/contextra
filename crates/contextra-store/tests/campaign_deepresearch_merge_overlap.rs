@@ -1,8 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_types::Result;
-use contextra_ports::{ResourceBudget, ResourceTracker};
-use contextra_mvcc::SnapshotRegistry;
+use contextra_core::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use std::sync::Arc;

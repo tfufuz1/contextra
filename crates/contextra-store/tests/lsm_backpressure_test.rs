@@ -2,8 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::system_pressure::{PressureLevel, WAL_QUEUE_CRITICAL_THRESHOLD};
 use contextra_store::{LsmConfig, LsmStorage};
 use std::sync::Arc;

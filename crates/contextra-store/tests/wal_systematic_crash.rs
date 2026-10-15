@@ -8,8 +8,7 @@
 // combined with deterministic WAL disk boundary simulation for LsmStorage WAL operations.
 
 use bytes::Bytes;
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::{FaultConfig, FaultVfs};
 use tempfile::TempDir;
@@ -56,7 +55,7 @@ async fn systematic_crash_at_every_wal_io_point() {
             let commit_result = if res_put1.is_ok() && res_put2.is_ok() {
                 storage.commit(tx1).await
             } else {
-                Err(contextra_types::ContextraError::Storage(
+                Err(contextra_core::ContextraError::Storage(
                     "Simulated write error".into(),
                 ))
             };
@@ -65,7 +64,7 @@ async fn systematic_crash_at_every_wal_io_point() {
             let uncommitted_put_result = if commit_result.is_ok() {
                 storage.put(TxId::new(2), b"key3", b"val3").await
             } else {
-                Err(contextra_types::ContextraError::Storage(
+                Err(contextra_core::ContextraError::Storage(
                     "Skipped uncommitted put".into(),
                 ))
             };

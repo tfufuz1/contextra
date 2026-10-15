@@ -45,7 +45,7 @@ async fn test_matrix_line_5_older_value_in_ln_shadowed_by_tombstone_in_l0_contro
     let l0_path = dir.path().join("sst_l0.sst");
     let mut l0_builder = SstableBuilder::create(&l0_path).await.expect("l0 builder");
     l0_builder
-        .add(b"user_2002", b"", 20 | contextra_types::TOMBSTONE_BIT, 200)
+        .add(b"user_2002", b"", 20 | contextra_core::TOMBSTONE_BIT, 200)
         .await
         .expect("add tombstone");
     l0_builder.finish().await.expect("finish l0");
@@ -99,7 +99,7 @@ async fn test_matrix_line_6_only_tombstone() {
 
     let mut builder = SstableBuilder::create(&sst_path).await.expect("builder");
     builder
-        .add(b"user_3003", b"", 50 | contextra_types::TOMBSTONE_BIT, 500)
+        .add(b"user_3003", b"", 50 | contextra_core::TOMBSTONE_BIT, 500)
         .await
         .expect("add tombstone");
     builder.finish().await.expect("finish");

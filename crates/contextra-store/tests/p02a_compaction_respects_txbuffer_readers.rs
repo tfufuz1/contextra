@@ -3,9 +3,7 @@
 // ZWECK: Integrationstest für P02 F-01 CRITICAL — Compaction Engine respektiert MVCC TxBuffer Reader.
 // INVARIANTEN: Invariante I-2: Reader bei Seq N über TxBuffer schützt Put(50)+Tombstone(90) vor vorzeitiger Purging/GC.
 
-use contextra_types::{TOMBSTONE_BIT, TxId};
-use contextra_ports::ResourceTracker;
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_core::{ResourceTracker, SnapshotRegistry, TxBuffer, TxId, TOMBSTONE_BIT};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::lsm::GcFloor;
 use contextra_store::sstable::{create_block_cache_with_shards, SstableBuilder, SstableReader};
@@ -18,7 +16,7 @@ async fn test_compaction_respects_txbuffer_active_reader() {
     let dir_path = temp_dir.path();
 
     let block_cache = create_block_cache_with_shards(16, 4);
-    let budget = Arc::new(ResourceTracker::new(contextra_ports::ResourceBudget {
+    let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
         memory_limit: 128 * 1024 * 1024,
     }));
     let snapshot_registry = Arc::new(SnapshotRegistry::new());
@@ -122,7 +120,7 @@ async fn test_compaction_without_active_readers_purges_tombstone() {
     let dir_path = temp_dir.path();
 
     let block_cache = create_block_cache_with_shards(16, 4);
-    let budget = Arc::new(ResourceTracker::new(contextra_ports::ResourceBudget {
+    let budget = Arc::new(ResourceTracker::new(contextra_core::ResourceBudget {
         memory_limit: 128 * 1024 * 1024,
     }));
     let snapshot_registry = Arc::new(SnapshotRegistry::new());

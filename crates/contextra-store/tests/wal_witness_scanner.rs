@@ -3,7 +3,7 @@
 //! Tests injection lines 14 (sealed segment), 15 (marker behind logical EOF in cleartext),
 //! 16 (archived segment), and a clean control scan.
 
-use contextra_types::{ContextraError, TxId};
+use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::{scan_wal_directory, Wal, WalOp, WalScanInputs, WalScopeSpec};
 use std::time::Duration;
 use tempfile::tempdir;

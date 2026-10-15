@@ -6,8 +6,7 @@
 //! Verifies that `commit_mutex` serialization prevents race conditions between
 //! a failing transaction undergoing WAL HMAC rollback and a concurrent successful commit.
 
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::FAIL_APPEND_FOR_TX;
 use std::sync::atomic::Ordering;

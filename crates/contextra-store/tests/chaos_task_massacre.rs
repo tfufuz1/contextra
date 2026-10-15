@@ -2,8 +2,7 @@
 //! Chaos test verifying resilience against concurrent task aborts, no partial state corruption,
 //! and deterministic recovery after restart.
 
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use parking_lot::Mutex;
 use rand::seq::SliceRandom;

@@ -6,8 +6,7 @@
 //! Result: If the deleted record stays deleted (`get` returns `None`), G15 is refuted for the WAL path
 //! because SSTable tombstone takes precedence over missing WAL log entries.
 
-use contextra_types::{ContextraError, TxId};
-use contextra_ports::StorageEngine;
+use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::tempdir;
 

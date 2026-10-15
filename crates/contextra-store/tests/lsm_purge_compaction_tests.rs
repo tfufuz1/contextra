@@ -1,5 +1,4 @@
-use contextra_types::TxId;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -20,7 +19,7 @@ impl FreeSpaceProbe for TestFreeSpaceProbe {
 }
 
 #[tokio::test]
-async fn test_purge_keys_insufficient_disk_space() -> contextra_types::Result<()> {
+async fn test_purge_keys_insufficient_disk_space() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -46,7 +45,7 @@ async fn test_purge_keys_insufficient_disk_space() -> contextra_types::Result<()
 }
 
 #[tokio::test]
-async fn test_purge_keys_success() -> contextra_types::Result<()> {
+async fn test_purge_keys_success() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),

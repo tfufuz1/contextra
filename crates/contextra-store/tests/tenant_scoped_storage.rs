@@ -1,6 +1,6 @@
 //! Integration and isolation tests for `TenantScopedStorage`.
 
-use contextra_types::{TenantId, TxId};
+use contextra_core::{TenantId, TxId};
 use contextra_ports::StorageEngine;
 use contextra_store::{tenant_codec::TenantScopedStorage, LsmConfig, LsmStorage};
 use proptest::prelude::*;
