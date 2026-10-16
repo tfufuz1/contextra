@@ -290,7 +290,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 let plist = match loaded_list {
                     Some(l) => l,
                     None => {
-                        let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
+                        let raw_entries = storage.scan_prefix_at(&prefix, seq).await?;
                         let mut postings = Vec::with_capacity(raw_entries.len());
                         for (key, val_bytes) in raw_entries {
                             let suffix_bytes = &key[prefix.len()..];

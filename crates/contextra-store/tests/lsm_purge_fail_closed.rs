@@ -34,7 +34,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types::Result<()> {
+async fn test_purge_keys_successful_compaction() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -99,6 +99,8 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Re
     storage.put(TxId(1), b"target_key", b"target_value").await?;
     storage.commit(TxId(1)).await?;
     StorageEngine::flush(&storage).await?;
+
+    let _snapshot_guard = storage.snapshot_registry.acquire(|| 50);
 
     let sst_count_before = count_sst_files(dir.path());
     assert!(

@@ -37,21 +37,19 @@ pub struct DocErasure {
 }
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Complete document erasure from all key spaces, RAM indices, and witnesses (INV-D1/D2/D3).
+    /// Logical document erasure and tombstone committal for a single document (Guarantee Level C1: logical, single document only).
     ///
-    /// # Crash-Safety & Idempotency
-    /// Writes to the Erasure Ledger are idempotent; if a crash occurs after the ledger append
-    /// but before the tombstone commit, recovery WAL replay and compaction filters use the ledger entry
-    /// to safely filter out deleted key versions.
+    /// # Guarantee Level & Truth (Doc-Truth, S12)
+    /// Provides Level C1 logical deletion by committing tombstones for document keys and clearing associated RAM indices.
+    /// Physical purge, erasure ledger logging, and real storage witness scans are not performed at this stage.
     ///
     /// # Execution Order
-    /// (a) Lock document key and scope erasure fence;
-    /// (b) Compute ErasureFootprint;
-    /// (c) Validate assurance capabilities;
-    /// (d) Write and commit tombstones for all footprint keys in a single transaction;
-    /// (e) Clear RAM indices (HNSW, InvertedIndex, Graph/Relations, KV-Hooks);
-    /// (f) Return empty witnesses (no witness fabrication without real scan per REG-14);
-    /// (g) Verify scope write sequence for concurrent modification.
+    /// (a) Validate input document ID and erase options;
+    /// (b) Lock document key;
+    /// (c) Verify scope write sequence for concurrent modification before tombstone commit;
+    /// (d) Write and commit tombstones in a single transaction;
+    /// (e) Clear RAM indices (HNSW, InvertedIndex, KV-Hooks if configured);
+    /// (f) Return `DocErasure` result with empty witnesses (witnesses are issued only when real scans are active).
     pub async fn erase_document(&self, id: &str, opts: &DocEraseOptions) -> Result<DocErasure> {
         if id.is_empty() {
             return Err(ContextraError::InvalidInput(
@@ -85,20 +83,39 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // (a) Key lock
         let _key_guard = self.kv_locks.lock_for(id).await;
 
-        // Compute Footprint first to get exact keys/prefixes
-        let footprint = self.erasure_footprint(doc_id).await?;
+        let is_off_mode = opts.options.assurance == contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
+            && opts.options.purge == crate::deletion::forget_options::PurgeMode::None;
 
         let maybe_backend = self.storage.erasure_backend();
 
-        if maybe_backend.is_none()
-            && (opts.options.assurance != contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
-                || opts.options.purge != crate::deletion::forget_options::PurgeMode::None)
-        {
+        if maybe_backend.is_none() && !is_off_mode {
             return Err(EraseError::NotAvailable.into());
         }
 
-        let scope_write_seq_before = if let Some(backend) = maybe_backend {
-            backend.snapshot_write_seq(&footprint.keys.prefixes)
+        let user_key = self.namespaced_key(id.as_bytes(), 0);
+        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+
+        let (footprint_hash, scope_hash, prefixes, explicit_keys, observed_empty, scope_prefixes_ref) = if is_off_mode {
+            // Mode Off: Direct deletion without footprint computation / storage scan / heap allocations.
+            let explicit = vec![user_key.clone(), doc_key.clone()];
+            let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(&explicit);
+            let prefixes = Vec::<Vec<u8>>::new();
+            ([0u8; 32], scope_hash, prefixes, explicit, false, Vec::<Vec<u8>>::new())
+        } else {
+            let footprint = self.erasure_footprint(doc_id).await?;
+            let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(&footprint.keys.explicit);
+            (
+                footprint.hash,
+                scope_hash,
+                footprint.keys.prefixes.clone(),
+                footprint.keys.explicit,
+                footprint.observed_empty,
+                footprint.keys.prefixes,
+            )
+        };
+
+        let scope_write_seq_before = if let Some(backend) = maybe_backend.as_ref() {
+            backend.snapshot_write_seq(&scope_prefixes_ref)
         } else {
             0
         };
@@ -107,15 +124,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let db_tx = self.begin_transaction()?;
         let erased_at_tx = db_tx.tx_id;
 
-        // Compute Scope Hash
-        let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(
-            &footprint.keys.explicit,
-        );
+        // Check concurrent modification before commit
+        if let Some(backend) = maybe_backend.as_ref() {
+            let scope_write_seq_check = backend.snapshot_write_seq(&scope_prefixes_ref);
+            if scope_write_seq_before != scope_write_seq_check {
+                return Err(ContextraError::Conflict(
+                    "ConcurrentModification detected before tombstone commit".to_string(),
+                ));
+            }
+        }
 
-        // (d) Tombstones for ALL Footprint Keys in single transaction
-        let user_key = self.namespaced_key(id.as_bytes(), 0);
-        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-
+        // (d) Tombstones for explicit keys in single transaction
         let old_user_val = self
             .storage
             .get_at_seq_tracked(erased_at_tx, &user_key, erased_at_tx.inner())
@@ -132,8 +151,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Err(_) => {}
         }
 
-        // Tombstone explicit footprint keys
-        for key in &footprint.keys.explicit {
+        // Direct storage.delete calls
+        for key in &explicit_keys {
             self.storage.delete(erased_at_tx, key).await?;
         }
 
@@ -141,8 +160,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         db_tx.commit().await?;
 
-        // (e) RAM index cleanup
-        self.index.delete(erased_at_tx, doc_id).await?;
+        // After commit succeeds, post-commit operations must not fail the deletion call.
+        if let Err(e) = self.index.delete(erased_at_tx, doc_id).await {
+            tracing::error!("Post-commit vector index delete failed for doc {}: {:?}", id, e);
+        }
 
         self.check_and_trigger_community_detection(1);
         if let Some(kv_hooks) = self.kv_hooks() {
@@ -153,32 +174,21 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // (f) No witness fabrication without real scan (REG-14, Hotfix F-01)
         let witnesses = Vec::new();
 
-        // (g) Scope Write Seq verification
-        let final_scope_write_seq = if let Some(backend) = maybe_backend {
-            let scope_write_seq_after = backend
-                .snapshot_write_seq(&footprint.keys.prefixes);
-            if scope_write_seq_before != scope_write_seq_after {
-                tracing::warn!(
-                    "Concurrent modification detected during erase_document (write_seq changed from {} to {}). Deletion committed at tx {}.",
-                    scope_write_seq_before,
-                    scope_write_seq_after,
-                    erased_at_tx.inner()
-                );
-            }
-            scope_write_seq_after
+        let final_scope_write_seq = if let Some(backend) = maybe_backend.as_ref() {
+            backend.snapshot_write_seq(&scope_prefixes_ref)
         } else {
             scope_write_seq_before
         };
 
         Ok(DocErasure {
-            footprint_hash: footprint.hash,
+            footprint_hash,
             scope_hash,
             as_of_tx: erased_at_tx,
             scope_write_seq: final_scope_write_seq,
             witnesses,
-            observed_empty: footprint.observed_empty,
-            prefixes: footprint.keys.prefixes,
-            keys: footprint.keys.explicit,
+            observed_empty,
+            prefixes,
+            keys: explicit_keys,
         })
     }
 

@@ -28,6 +28,14 @@ fn test_manifest_entry_roundtrip() {
             max_version: 4,
             migrated_from: 3,
         },
+        ManifestEntry::ErasureWatermarkRecord { mode: 1 },
+        ManifestEntry::LedgerHeadRecord {
+            seq: 100,
+            mac: [0xAAu8; 32],
+        },
+        ManifestEntry::BackendIdRecord {
+            backend_id: 0x1234_5678_9ABC_DEF0,
+        },
     ];
 
     for entry in entries {
@@ -104,10 +112,10 @@ async fn test_manifest_truncated_tail_recovery() {
     let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
     assert_eq!(
         loaded.len(),
-        1,
-        "Truncated tail entry should be safely ignored"
+        2,
+        "Truncated tail entry should leave preceding entries intact (including auto-appended BackendIdRecord)"
     );
-    assert_eq!(loaded[0], entry1);
+    assert_eq!(loaded[1], entry1);
 }
 
 #[tokio::test]
@@ -152,11 +160,11 @@ async fn test_manifest_replace_tail_truncation_discards_incomplete_replace() {
         .expect("load manifest with truncated replace entry");
     assert_eq!(
         loaded.len(),
-        2,
-        "Incomplete Replace tail entry must be discarded"
+        3,
+        "Incomplete Replace tail entry must be discarded (including auto-appended BackendIdRecord)"
     );
-    assert_eq!(loaded[0], add1);
-    assert_eq!(loaded[1], add2);
+    assert_eq!(loaded[1], add1);
+    assert_eq!(loaded[2], add2);
 
     let valid = Manifest::reconstruct_valid_sstables(&loaded);
     assert_eq!(
@@ -331,9 +339,9 @@ async fn test_manifest_rollover_crash_injection_preserves_old_manifest() {
     let loaded = Manifest::load(&manifest_path)
         .await
         .expect("load manifest during crash recovery");
-    assert_eq!(loaded.len(), 2);
-    assert_eq!(loaded[0], entry1);
-    assert_eq!(loaded[1], entry2);
+    assert_eq!(loaded.len(), 3); // BackendIdRecord + entry1 + entry2
+    assert_eq!(loaded[1], entry1);
+    assert_eq!(loaded[2], entry2);
 
     // Verify startup recovery removes leftover MANIFEST.new.* file
     let config = LsmConfig {
@@ -411,8 +419,8 @@ async fn test_manifest_explicit_rollover() {
     manifest.rollover(&live).await.expect("explicit rollover");
 
     let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
-    assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded[0], entry1);
+    assert_eq!(loaded.len(), 2); // BackendIdRecord + entry1
+    assert_eq!(loaded[1], entry1);
 }
 
 #[test]

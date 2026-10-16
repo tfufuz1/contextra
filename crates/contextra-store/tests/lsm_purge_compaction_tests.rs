@@ -28,6 +28,10 @@ async fn test_purge_keys_insufficient_disk_space() -> contextra_types::Result<()
     };
     let storage = LsmStorage::open(config).await?;
 
+    storage.put(TxId(1), b"key1", b"val1").await?;
+    storage.commit(TxId(1)).await?;
+    StorageEngine::flush(&storage).await?;
+
     let probe = TestFreeSpaceProbe {
         free_bytes: Some(0),
     };

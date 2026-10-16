@@ -1,4 +1,4 @@
-use contextra_ports::{DeleteOutcome, PurgeState, TxId, PurgeId};
+use contextra_ports::{DeleteOutcome, PendingReason, PurgeId, PurgeState, PurgeStatus, TxId};
 
 #[test]
 fn test_purge_state_u8_encoding_golden() {
@@ -20,6 +20,56 @@ fn test_purge_state_u8_encoding_golden() {
 }
 
 #[test]
+fn test_purge_status_mapping_golden() {
+    assert_eq!(PurgeStatus::from_state(PurgeState::Begun), None);
+
+    assert_eq!(
+        PurgeStatus::from_state(PurgeState::LedgerAppended),
+        Some(PurgeStatus::Pending {
+            reason: PendingReason::KeyWaitPeriod,
+            since_ms: 0,
+            retry_at_ms: 0
+        })
+    );
+    assert_eq!(
+        PurgeStatus::from_state(PurgeState::Tombstoned),
+        Some(PurgeStatus::Pending {
+            reason: PendingReason::KeyWaitPeriod,
+            since_ms: 0,
+            retry_at_ms: 0
+        })
+    );
+    assert_eq!(
+        PurgeStatus::from_state(PurgeState::PurgePending),
+        Some(PurgeStatus::Pending {
+            reason: PendingReason::KeyWaitPeriod,
+            since_ms: 0,
+            retry_at_ms: 0
+        })
+    );
+
+    assert_eq!(
+        PurgeStatus::from_state(PurgeState::Purging),
+        Some(PurgeStatus::InProgress {
+            sstables_done: 0,
+            sstables_total: 0
+        })
+    );
+
+    assert_eq!(PurgeStatus::from_state(PurgeState::Purged), Some(PurgeStatus::Purged));
+    assert_eq!(PurgeStatus::from_state(PurgeState::KeyQuarantined), Some(PurgeStatus::Purged));
+
+    assert_eq!(PurgeStatus::from_state(PurgeState::Completed), Some(PurgeStatus::Completed));
+
+    assert_eq!(
+        PurgeStatus::from_state(PurgeState::Attested),
+        Some(PurgeStatus::Attested {
+            proof_ref: String::new()
+        })
+    );
+}
+
+#[test]
 fn test_delete_outcome_variants() {
     let tx = TxId::try_new(42).unwrap();
     let purge_id = PurgeId::new([1u8; 16]);
@@ -37,5 +87,13 @@ fn test_delete_outcome_variants() {
             assert_eq!(pid, purge_id);
         }
         _ => panic!("Expected Assured variant"),
+    }
+
+    let attested = DeleteOutcome::Attested {
+        proof_ref: "proof_123".to_string(),
+    };
+    match attested {
+        DeleteOutcome::Attested { proof_ref } => assert_eq!(proof_ref, "proof_123"),
+        _ => panic!("Expected Attested variant"),
     }
 }

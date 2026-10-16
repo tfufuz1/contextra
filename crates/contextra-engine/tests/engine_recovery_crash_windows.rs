@@ -6,10 +6,9 @@
 
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-use contextra_engine::no_graph_stubs::CsrGraph;
-use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, StorageStats, VectorIndex};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -202,14 +201,12 @@ async fn create_faulty_collection() -> (
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = Collection::new(
+    let col = Collection::new_without_graph(
         "default".to_string(),
         storage.clone(),
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -247,11 +244,11 @@ async fn test_crash_after_text_staging_before_intent_write() -> Result<()> {
     Ok(())
 }
 
-/// (b) Crash nach Graph-Staging, vor Storage-Commit:
-/// Simuliert einen Crash, nachdem Graph/Text/Vector-Staging und Phase (a) Intent-Write stattfand,
+/// (b) Crash nach Text/Vector-Staging, vor Storage-Commit:
+/// Simuliert einen Crash, nachdem Text/Vector-Staging und Phase (a) Intent-Write stattfand,
 /// aber vor dem Storage-Commit (Phase c).
 #[tokio::test]
-async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
+async fn test_crash_after_staging_before_storage_commit() -> Result<()> {
     let (col, storage) = create_faulty_collection().await;
 
     // Manually write a Pending intent for doc_id 202
@@ -261,23 +258,19 @@ async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
     let intent = CommitIntent::Pending {
         doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
-        has_graph: true,
+        has_graph: false,
         stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
     storage.put(intent_tx, &intent_key, &intent_bytes).await?;
     storage.commit(intent_tx).await?;
 
-    // Stage/insert into vector, text, and graph indices to simulate Phase (b) having run
+    // Stage/insert into vector index to simulate Phase (b) having run
     let stage_tx = col.allocate_tx()?;
     col.vector_index()
         .insert(stage_tx, doc_id, &[1.0, 0.0, 0.0, 0.0])
         .await?;
     col.vector_index().commit(stage_tx).await?;
-
-    let e1 = Entity::new(EntityId::from_key("202")?, "Node202", "Doc");
-    col.graph_index().add_entity(stage_tx, e1).await?;
-    col.graph_index().commit(stage_tx).await?;
 
     // Storage commit NEVER happened for doc_id 202!
     // Now run repair() to recover from this crash window
@@ -294,15 +287,6 @@ async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
     assert!(
         text_hits.is_empty(),
         "Text query for doc_id 202 must be empty after crash before storage commit"
-    );
-
-    let neighbors = col
-        .graph_index()
-        .neighbors(EntityId::from_key("202")?)
-        .await?;
-    assert!(
-        neighbors.is_empty(),
-        "Graph index entry for entity must be compensated"
     );
 
     // Intent key must be cleaned up from storage
@@ -370,7 +354,7 @@ async fn test_storage_commit_success_committed_marker_failure_recovery() -> Resu
 }
 
 /// (d) Storage-Commit nicht erfolgt + Pending-Intent:
-/// Recovery entfernt Index-Einträge ohne Storage-Datensatz (Vektor, Text, Graph) und bereinigt den Intent.
+/// Recovery entfernt Index-Einträge ohne Storage-Datensatz (Vektor, Text) und bereinigt den Intent.
 #[tokio::test]
 async fn test_pending_intent_without_storage_commit_cleans_indices() -> Result<()> {
     let (col, storage) = create_faulty_collection().await;
@@ -381,23 +365,19 @@ async fn test_pending_intent_without_storage_commit_cleans_indices() -> Result<(
     let intent = CommitIntent::Pending {
         doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
-        has_graph: true,
+        has_graph: false,
         stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
     storage.put(intent_tx, &intent_key, &intent_bytes).await?;
     storage.commit(intent_tx).await?;
 
-    // Put entries in vector, graph indices
+    // Put entries in vector index
     let idx_tx = col.allocate_tx()?;
     col.vector_index()
         .insert(idx_tx, doc_id, &[0.0, 1.0, 0.0, 0.0])
         .await?;
     col.vector_index().commit(idx_tx).await?;
-
-    let e = Entity::new(EntityId::from_key("404")?, "Node404", "Doc");
-    col.graph_index().add_entity(idx_tx, e).await?;
-    col.graph_index().commit(idx_tx).await?;
 
     // Verify storage has NO record for doc_id 404
     let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);

@@ -102,6 +102,11 @@ impl ErasureLedgerHandle {
     pub fn records(&self) -> Vec<CTRALRecord> {
         self.ledger.read().records().to_vec()
     }
+
+    /// Returns the head sequence and MAC of the ledger.
+    pub fn read_head_info(&self) -> (u64, [u8; 32]) {
+        self.ledger.read().read_head_info()
+    }
 }
 
 /// Filter implementing both [`WalReplayFilter`] and [`CompactionRecordFilter`] via [`ErasureLedgerHandle`].

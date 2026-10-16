@@ -8,7 +8,6 @@
 
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::fence::InflightGuard;
 use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
     WalQueueGuard,
@@ -354,7 +353,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let _intent_guard = IntentLockGuard(storage, tx_id);
 
     // LOCK ORDER 1: commit_mutex
-    let commit_lock = storage.commit_mutex.lock().await;
+    let commit_lock = storage.erasure_fence.commit_mutex.lock().await;
+    let _engine_commit_lock = storage.commit_mutex.lock().await;
 
     // 1. ReadSet VOR drain_kv
     let read_set = storage.tx_buffer.get_read_set(tx_id);
@@ -420,8 +420,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 )));
             }
         }
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence.gate);
-
         let (wal_ops, mem_updates, first_seq) = prepare_tx_ops(storage, tx_id, &ops)?;
         let (wal_entries, _prev_hmac) = wal.prepare_batch(wal_ops).await?;
         let entries_for_observer = if storage.has_observers() {
@@ -493,7 +491,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let state = storage.state.read().await;
         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
         storage.advance_visibility(tx_id);
-        drop(_inflight_guard);
 
         let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);
@@ -694,7 +691,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         // Re-acquire commit_mutex after collection window.
         // Leader holds commit_mutex continuously from queue_guard.take() / prepare_batch through apply_mem_updates, advance_visibility, and follower notification.
-        let commit_lock = storage.commit_mutex.lock().await;
+        let commit_lock = storage.erasure_fence.commit_mutex.lock().await;
+        let _engine_commit_lock = storage.commit_mutex.lock().await;
 
         let mut queue_guard = storage.pending_commit_queue.lock().await;
         let pending_queue = match queue_guard.take() {
@@ -732,6 +730,9 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 _ => continue,
             };
             if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
+                if leader_first_seq > 0 {
+                    storage.ssi_validator.forget_from(leader_first_seq);
+                }
                 let mut batch_txs = vec![leader_tx_id];
                 batch_txs.extend(requests.iter().map(|r| r.tx_id));
                 storage.cleanup_intent_locks_for_txs(&batch_txs);
@@ -756,6 +757,9 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     _ => continue,
                 };
                 if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
+                    if leader_first_seq > 0 {
+                        storage.ssi_validator.forget_from(leader_first_seq);
+                    }
                     let mut batch_txs = vec![leader_tx_id];
                     batch_txs.extend(requests.iter().map(|r| r.tx_id));
                     storage.cleanup_intent_locks_for_txs(&batch_txs);
@@ -767,8 +771,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 }
             }
         }
-
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence.gate);
 
         let mut follower_prep = Vec::with_capacity(requests.len());
         for r in &requests {
@@ -906,7 +908,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
             storage.advance_visibility(req_tx_id);
         }
-        drop(_inflight_guard);
 
         let needs_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);

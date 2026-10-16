@@ -108,6 +108,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<(
 
     storage.put(TxId(10), b"key1", b"old_val").await?;
     storage.commit(TxId(10)).await?;
+    let s1 = storage.last_applied_seq();
     StorageEngine::flush(&storage).await?;
 
     storage.put(TxId(100), b"key1", b"new_val").await?;
@@ -119,7 +120,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<(
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let report = storage.purge_keys(scope, 50, Some(&probe)).await.unwrap();
+    let report = storage.purge_keys(scope, s1, Some(&probe)).await.unwrap();
 
     for file in &report.obsolete_files {
         let _ = contextra_durable_fs::durable_remove(file);

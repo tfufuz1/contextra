@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11 (T-2026-9103)
+// STAND: 2026-10-16
 // ZWECK: Fail-Closed Opening Matrix-Tests für ErasureLedger (T10 Rollback-Erkennung).
 
 use contextra_store::erasure_ledger::*;
@@ -23,7 +23,7 @@ async fn test_missing_ledger_with_existing_db_returns_rollback_suspected() {
     let dir = tempdir().unwrap();
     let key = LedgerKey::new([2u8; 32]);
 
-    // db_has_data = true, but directory has no erasure.ledger file
+    // db_has_data = true, but directory has no erasure ledger file/segment
     let (ledger, status) = ErasureLedger::open_or_fail_closed(dir.path(), key, true, None)
         .await
         .unwrap();
@@ -95,9 +95,8 @@ async fn test_replaced_older_ledger_fails_closed() {
     };
     ledger.append(&[e1]).await.unwrap();
 
-    // Save copy of erasure.ledger after entry 1
-    let ledger_path = dir.path().join("erasure.ledger");
-    let older_ledger_bytes = tokio::fs::read(&ledger_path).await.unwrap();
+    let seg_path = dir.path().join("segment_0000000000000000.ctraledg");
+    let older_seg_bytes = tokio::fs::read(&seg_path).await.unwrap();
 
     let e2 = LedgerEntry {
         ledger_seq: 2,
@@ -110,8 +109,8 @@ async fn test_replaced_older_ledger_fails_closed() {
 
     let head_after_e2 = ledger.last_chain_mac().clone();
 
-    // Revert erasure.ledger to older_ledger_bytes (simulating rollback of ledger file)
-    tokio::fs::write(&ledger_path, &older_ledger_bytes)
+    // Revert segment to older_seg_bytes
+    tokio::fs::write(&seg_path, &older_seg_bytes)
         .await
         .unwrap();
 
