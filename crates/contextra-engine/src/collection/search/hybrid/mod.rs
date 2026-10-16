@@ -110,11 +110,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            let _unused_anchor = anchor_entities;
+            let _unused_strategy = strategy;
+            let _unused_community = same_community_as;
+
             let is_vector_zero = vector.iter().all(|&v| v == 0.0);
             let is_text_empty = text.trim().is_empty();
-
-            let default_strategy = contextra_types::GraphTraversalStrategy::default();
-            let graph_strat = strategy.unwrap_or(&default_strategy);
 
             // 1. Vector Signal (Candidate overfetching for RRF fusion)
             let vector_results = if is_vector_zero {
@@ -147,47 +148,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .await?
             };
 
-            // 3. Graph Signal
-            // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
-            let implicit_anchors: Vec<contextra_types::EntityId>;
-            let anchors_ref: Option<&[contextra_types::EntityId]> = if let Some(anchors) = anchor_entities
-            {
-                if anchors.is_empty() {
-                    None
-                } else {
-                    Some(anchors)
-                }
-            } else if !text_results.is_empty() {
-                // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
-                implicit_anchors = text_results
-                    .iter()
-                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
-                    .collect();
-                Some(&implicit_anchors)
-            } else {
-                None
-            };
-
-            let graph_results: Vec<crate::SearchResult> = Vec::new();
-
-            if !text_results.is_empty() && graph_results.is_empty() && anchor_entities.is_none() {
-                tracing::warn!(
-                    text_count = text_results.len(),
-                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
-                );
-            }
-
-            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
+            if vector_results.is_empty() && text_results.is_empty() {
                 return Ok(Vec::new());
             }
 
-            let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(weights);
-
-            let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as {
-                self.get_community(same_comm_entity).await?
-            } else {
-                None
-            };
+            let (vw, tw, _gw) = crate::fusion::weights_to_signal_factors(weights);
 
             let mut signal_sets = Vec::new();
             if !vector_results.is_empty() {
@@ -195,9 +160,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
             if !text_results.is_empty() {
                 signal_sets.push(("text".to_string(), text_results, tw));
-            }
-            if !graph_results.is_empty() {
-                signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
             let selected_fusion_strategy = fusion_strategy.unwrap_or_default();
@@ -212,14 +174,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             );
             fused.truncate(k);
 
-            let boosted = self
-                .apply_community_boost_post_fusion(
-                    fused,
-                    target_community_id,
-                    Self::DEFAULT_COMMUNITY_BOOST,
-                )
-                .await?;
-            Ok(boosted)
+            Ok(fused)
         })
         .await
     }
