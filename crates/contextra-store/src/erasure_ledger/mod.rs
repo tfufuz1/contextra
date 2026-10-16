@@ -1,32 +1,33 @@
 // FILE-CONTEXT
 // STAND: 2026-10-16
-// ZWECK: ErasureLedger Modul-Einstieg und CTRALEDG v1 Append-Only Persistenz, Decision Filter & In-Memory Index.
-// INVARIANTEN: Zero-Panic, Fail-Closed, INV-DURABILITY-RING (fsync_parent_dir + sync_all).
+// ZWECK: Anti-Resurrection-Ledger Modul-Einstieg (Format CTRALEDG v1; Spezifikation §6.5; Befund B-10).
+// INVARIANTEN: Zero-Panic, Fail-Closed, Lock-Free Index (ArcSwap), Persistent Chaining, Scrubbed Compaction.
 
 pub mod coverage;
 pub mod entry;
 pub mod replay_filter;
 
 use arc_swap::ArcSwap;
+use contextra_ports::Clock;
 use contextra_types::{ContextraError, Result};
 pub use coverage::{LedgerCoverage, LedgerGap};
+pub use entry::{
+    compute_keyed_digest, compute_keyed_hash, parse_legacy_eldg_frame, parse_record,
+    CTRALRecord, CTRALSegmentHeader, FrameReadResult, LedgerKey, RecordType, CTRALEDG_MAGIC,
+    CTRALEDG_VERSION,
+};
 pub use replay_filter::{ErasureLedgerHandle, LedgerReplayFilter};
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
-pub use entry::{
-    compute_digest, compute_keyed_hash, parse_ctraledg_frame, parse_frame, serialize_frame,
-    CtraledgFrameResult, CtraledgRecord, CtraledgSegmentHeader, FrameReadResult, LedgerEntry,
-    LedgerEntryKind, LedgerKey, RecordType, CTRALEDG_MAGIC, CTRALEDG_VERSION, ERASED_LEDGER_DOMAIN,
-};
-
 pub const LEDGER_FILENAME: &str = "erasure.ledger";
 pub const HEAD_FILENAME: &str = "ledger.head";
 pub const INITIAL_CHAIN_MAC: [u8; 32] = [0u8; 32];
-pub const MAX_SEGMENT_SIZE: u64 = 64 * 1024 * 1024; // 64 MiB segment rotation threshold
+pub const MAX_SEGMENT_SIZE: u64 = 64 * 1024 * 1024; // 64 MiB rotation threshold
 
 /// Decision returned when evaluating whether a key version at transaction `tx` should be kept or dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,72 +45,167 @@ pub enum LedgerOpenStatus {
     Corrupt { reason: String },
 }
 
-/// In-memory index of deleted scopes and key families for fast RestoreGuard queries.
-#[derive(Debug, Clone, Default)]
-pub struct LedgerIndexMap {
-    pub scope_digests: HashSet<[u8; 32]>,
-    pub family_digests: HashSet<[u8; 32]>,
-    pub erased_tx_by_scope: HashMap<[u8; 32], u64>,
+/// Legacy / compatibility record representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErasureRecord {
+    pub storage_scope: Vec<u8>,
+    pub key_prefix: Vec<u8>,
+    pub erased_at_tx: u64,
 }
 
-impl LedgerIndexMap {
-    pub fn is_erased(&self, scope_digest: &[u8; 32], family_digests: &[[u8; 32]], tx: u64) -> bool {
-        if let Some(&erased_tx) = self.erased_tx_by_scope.get(scope_digest) {
-            if tx <= erased_tx {
-                return true;
+impl ErasureRecord {
+    pub fn for_prefix(storage_scope: Vec<u8>, key_prefix: Vec<u8>, erased_at_tx: u64) -> Self {
+        Self {
+            storage_scope,
+            key_prefix,
+            erased_at_tx,
+        }
+    }
+}
+
+/// Legacy / compatibility entry struct for existing tests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LedgerEntry {
+    pub ledger_seq: u64,
+    pub kind: LedgerEntryKind,
+    pub keyed_hash: [u8; 32],
+    pub erased_at_tx: u64,
+    pub proof_id: [u8; 16],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LedgerEntryKind {
+    Key,
+    Prefix { prefix_len: u32 },
+}
+
+impl LedgerEntry {
+    pub fn to_payload_bytes(&self) -> Result<Vec<u8>> {
+        let mut payload = Vec::with_capacity(70);
+        payload.extend_from_slice(&self.ledger_seq.to_be_bytes());
+        match self.kind {
+            LedgerEntryKind::Key => {
+                payload.push(1u8);
+                payload.extend_from_slice(&self.keyed_hash);
+            }
+            LedgerEntryKind::Prefix { prefix_len } => {
+                payload.push(2u8);
+                payload.extend_from_slice(&self.keyed_hash);
+                payload.extend_from_slice(&prefix_len.to_be_bytes());
             }
         }
-        for fd in family_digests {
-            if self.family_digests.contains(fd) {
-                return true;
+        payload.extend_from_slice(&self.erased_at_tx.to_be_bytes());
+        payload.extend_from_slice(&self.proof_id);
+        Ok(payload)
+    }
+}
+
+/// Lock-free in-memory lookup index for `RestoreGuard` and read-path queries.
+#[derive(Debug, Default, Clone)]
+pub struct ErasureLedgerIndex {
+    /// Maps `(scope_digest, family_digest)` -> `max_erased_at_tx`
+    pub scopes: HashMap<([u8; 32], [u8; 32]), u64>,
+    /// Distinct prefix lengths present in the ledger
+    pub distinct_prefix_lens: HashSet<u32>,
+}
+
+impl ErasureLedgerIndex {
+    pub fn is_in_deleted_scope(&self, key: &LedgerKey, storage_scope: &[u8], raw_key: &[u8], tx: u64) -> bool {
+        let scope_digest = compute_keyed_digest(key, storage_scope);
+
+        for prefix_len in 0..=raw_key.len() {
+            let prefix_bytes = &raw_key[..prefix_len];
+            let prefix_digest = compute_keyed_digest(key, prefix_bytes);
+            if let Some(&erased_at_tx) = self.scopes.get(&(scope_digest, prefix_digest)) {
+                if tx <= erased_at_tx {
+                    return true;
+                }
             }
         }
+
         false
     }
 }
 
-/// In-memory representation and file handle of the ErasureLedger in CTRALEDG v1 format.
+/// In-memory representation and file handle of the Anti-Resurrection ErasureLedger (CTRALEDG v1).
 pub struct ErasureLedger {
     dir: PathBuf,
     key: LedgerKey,
     last_chain_mac: [u8; 32],
-    last_seq: u64,
-    entries: Vec<LedgerEntry>,
-    records: Vec<CtraledgRecord>,
-    seen_proof_ids: HashSet<[u8; 16]>,
-    distinct_prefix_lens: HashSet<u32>,
+    segment_seq: u64,
+    prev_segment_hash: [u8; 32],
+    records: Vec<CTRALRecord>,
+    seen_purge_ids: HashSet<[u8; 16]>,
     db_instance_id: [u8; 16],
-    index: Arc<ArcSwap<LedgerIndexMap>>,
-    current_segment_num: u64,
-    current_segment_bytes: u64,
+    index: ArcSwap<ErasureLedgerIndex>,
 }
 
 impl std::fmt::Debug for ErasureLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ErasureLedger")
             .field("dir", &self.dir)
+            .field("segment_seq", &self.segment_seq)
             .field("last_chain_mac", &self.last_chain_mac)
-            .field("last_seq", &self.last_seq)
-            .field("entries_count", &self.entries.len())
             .field("records_count", &self.records.len())
             .finish()
     }
 }
 
 impl ErasureLedger {
-    /// Primary entry point for opening the erasure ledger in Assured mode.
-    /// Returns Ok((Some(ledger), status)) or fail-closed status.
-    pub async fn open_assured(
-        dir: impl AsRef<Path>,
-        key: LedgerKey,
-        db_has_data: bool,
-        expected_head_mac: Option<[u8; 32]>,
-    ) -> Result<(Option<Self>, LedgerOpenStatus)> {
-        Self::open_internal(dir, key, db_has_data, expected_head_mac).await
+    /// Memory-only constructor for isolated testing.
+    pub fn new_in_memory() -> Self {
+        Self {
+            dir: PathBuf::new(),
+            key: LedgerKey::new([0u8; 32]),
+            last_chain_mac: INITIAL_CHAIN_MAC,
+            segment_seq: 0,
+            prev_segment_hash: [0u8; 32],
+            records: Vec::new(),
+            seen_purge_ids: HashSet::new(),
+            db_instance_id: [0u8; 16],
+            index: ArcSwap::new(Arc::new(ErasureLedgerIndex::default())),
+        }
     }
 
-    /// Alias for backwards compatibility.
-    pub async fn open_or_fail_closed(
+    /// Records an erasure directly in memory (for testing and in-memory test harnesses).
+    pub fn record_erasure(&mut self, record: ErasureRecord) -> Result<()> {
+        let scope_digest = compute_keyed_digest(&self.key, &record.storage_scope);
+        let family_digest = compute_keyed_digest(&self.key, &record.key_prefix);
+
+        let mut next_index = (**self.index.load()).clone();
+        next_index.scopes.insert((scope_digest, family_digest), record.erased_at_tx);
+        if !record.key_prefix.is_empty() {
+            #[allow(clippy::cast_possible_truncation)]
+            next_index.distinct_prefix_lens.insert(record.key_prefix.len() as u32);
+        }
+        self.index.store(Arc::new(next_index));
+
+        let ctral_record = CTRALRecord {
+            record_type: RecordType::Purged,
+            tx: record.erased_at_tx,
+            timestamp_ms: 0,
+            purge_id: [0u8; 16],
+            scope_digest,
+            family_digests: vec![family_digest],
+            payload: Vec::new(),
+            mac: INITIAL_CHAIN_MAC,
+        };
+        self.records.push(ctral_record);
+        Ok(())
+    }
+
+    /// Resolves the active segment path based on segment_seq.
+    fn active_segment_path(&self) -> PathBuf {
+        if self.segment_seq == 0 {
+            self.dir.join(LEDGER_FILENAME)
+        } else {
+            self.dir.join(format!("erasure_{:08}.ledger", self.segment_seq))
+        }
+    }
+
+    /// Primary Assured mode constructor (Spec §6.5).
+    /// Returns `Ok((ledger, status))` on success or fail-closed `LedgerOpenStatus`.
+    pub async fn open_assured(
         dir: impl AsRef<Path>,
         key: LedgerKey,
         db_has_data: bool,
@@ -143,26 +239,40 @@ impl ErasureLedger {
                 ));
             }
 
-            // Fresh database: create new ledger
+            // Fresh database: create new ledger file and head marker
             let mut db_instance_id = [0u8; 16];
             let rng = contextra_ports::SystemRng::new();
             contextra_ports::Rng::fill_bytes(&rng, &mut db_instance_id);
 
-            let index = Arc::new(ArcSwap::from_pointee(LedgerIndexMap::default()));
+            let header = CTRALSegmentHeader::new(0, [0u8; 32]);
+            let header_bytes = header.to_bytes();
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&ledger_path)
+                .await
+                .map_err(|e| ContextraError::Storage(format!("Failed to create erasure.ledger: {}", e)))?;
+
+            file.write_all(&header_bytes).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to write header to erasure.ledger: {}", e))
+            })?;
+            file.sync_all().await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to sync erasure.ledger header: {}", e))
+            })?;
+            crate::util::fsync_parent_dir(&ledger_path).await?;
 
             let ledger = Self {
                 dir: dir.clone(),
                 key,
                 last_chain_mac: INITIAL_CHAIN_MAC,
-                last_seq: 0,
-                entries: Vec::new(),
+                segment_seq: 0,
+                prev_segment_hash: [0u8; 32],
                 records: Vec::new(),
-                seen_proof_ids: HashSet::new(),
-                distinct_prefix_lens: HashSet::new(),
+                seen_purge_ids: HashSet::new(),
                 db_instance_id,
-                index,
-                current_segment_num: 0,
-                current_segment_bytes: CtraledgSegmentHeader::SIZE as u64,
+                index: ArcSwap::new(Arc::new(ErasureLedgerIndex::default())),
             };
 
             ledger.init_segment_0().await?;
@@ -171,136 +281,132 @@ impl ErasureLedger {
             return Ok((Some(ledger), LedgerOpenStatus::Fresh));
         }
 
-        // Check if legacy ELDG file exists and needs migration
-        if legacy_exists && segment_files.is_empty() {
-            let bytes = tokio::fs::read(&legacy_ledger_path).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to read legacy ledger: {}", e))
-            })?;
+        // Discover all segment files in order
+        let mut segment_paths = Vec::new();
+        segment_paths.push(ledger_path.clone());
 
-            let is_ctraledg = bytes.len() >= 8 && &bytes[0..8] == CTRALEDG_MAGIC;
-            if !is_ctraledg {
-                // Execute migration from legacy ELDG format to CTRALEDG v1 format
-                tracing::info!("Migrating legacy ELDG ledger to CTRALEDG v1 format");
-                if let Err(e) = Self::migrate_legacy_eldg(&dir, &key, &bytes).await {
-                    return Ok((
-                        None,
-                        LedgerOpenStatus::Corrupt {
-                            reason: format!("Migration of legacy ELDG failed: {}", e),
-                        },
-                    ));
+        if let Ok(mut read_dir) = tokio::fs::read_dir(&dir).await {
+            let mut rotated_segments = Vec::new();
+            while let Ok(Some(entry)) = read_dir.next_entry().await {
+                let path = entry.path();
+                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if file_name.starts_with("erasure_") && file_name.ends_with(".ledger") {
+                        let seq_str = &file_name[8..file_name.len() - 7];
+                        if let Ok(seq) = seq_str.parse::<u64>() {
+                            rotated_segments.push((seq, path));
+                        }
+                    }
                 }
-                segment_files = Self::list_segment_files(&dir).await?;
+            }
+            rotated_segments.sort_by_key(|(seq, _)| *seq);
+            for (_, path) in rotated_segments {
+                segment_paths.push(path);
             }
         }
 
-        // Read and parse CTRALEDG segment files
         let mut prev_mac = INITIAL_CHAIN_MAC;
-        let mut last_seq = 0u64;
-        let mut entries = Vec::new();
         let mut records = Vec::new();
-        let mut seen_proof_ids = HashSet::new();
-        let mut distinct_prefix_lens = HashSet::new();
-        let mut index_map = LedgerIndexMap::default();
-        let mut current_segment_num = 0u64;
-        let mut current_segment_bytes = 0u64;
+        let mut seen_purge_ids = HashSet::new();
+        let mut index = ErasureLedgerIndex::default();
+        let mut last_segment_seq = 0u64;
+        let mut last_prev_hash = [0u8; 32];
 
-        let files_to_process = if !segment_files.is_empty() {
-            segment_files
-        } else if legacy_exists {
-            vec![legacy_ledger_path]
-        } else {
-            Vec::new()
-        };
-
-        for seg_path in files_to_process {
-            let file_bytes = tokio::fs::read(&seg_path).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to read segment {}: {}", seg_path.display(), e))
+        for path in &segment_paths {
+            let mut file_bytes = tokio::fs::read(path).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to read ledger segment {:?}: {}", path, e))
             })?;
 
-            if file_bytes.len() < CtraledgSegmentHeader::SIZE {
-                return Ok((
-                    None,
-                    LedgerOpenStatus::Corrupt {
-                        reason: format!("Segment header too short in {}", seg_path.display()),
-                    },
-                ));
-            }
-
-            let hdr = match CtraledgSegmentHeader::parse(&file_bytes[0..CtraledgSegmentHeader::SIZE]) {
-                Ok(h) => h,
-                Err(e) => {
-                    return Ok((
-                        None,
-                        LedgerOpenStatus::Corrupt {
-                            reason: format!("Corrupt CTRALEDG header in {}: {}", seg_path.display(), e),
-                        },
-                    ));
-                }
-            };
-
-            current_segment_num = hdr.segment_num;
-            let mut offset = CtraledgSegmentHeader::SIZE;
-            let mut torn_tail = false;
-            let mut verified_len = offset;
-
-            while offset < file_bytes.len() {
-                match parse_ctraledg_frame(&key, &prev_mac, &file_bytes[offset..]) {
-                    CtraledgFrameResult::Ok {
-                        record,
-                        chain_mac,
-                        frame_len,
-                    } => {
-                        prev_mac = chain_mac;
-                        last_seq += 1;
-                        offset += frame_len;
-                        verified_len = offset;
-
-                        seen_proof_ids.insert(record.purge_id);
-                        index_map.scope_digests.insert(record.scope_digest);
-                        index_map.erased_tx_by_scope.insert(record.scope_digest, record.tx);
-                        for fd in &record.family_digests {
-                            index_map.family_digests.insert(*fd);
-                        }
-
-                        if !record.payload.is_empty() {
-                            if let Ok(entry) = LedgerEntry::from_payload_bytes(&record.payload) {
-                                if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
-                                    distinct_prefix_lens.insert(prefix_len);
-                                }
-                                entries.push(entry);
-                            }
-                        } else {
-                            entries.push(LedgerEntry {
-                                ledger_seq: last_seq,
-                                kind: LedgerEntryKind::Key,
-                                keyed_hash: record.scope_digest,
-                                erased_at_tx: record.tx,
-                                proof_id: record.purge_id,
-                            });
-                        }
-
-                        records.push(record);
+            // Check for Legacy ELDG format migration on primary segment
+            if path == &ledger_path && file_bytes.len() >= 4 && (file_bytes.len() < 8 || &file_bytes[0..8] != CTRALEDG_MAGIC) {
+                tracing::info!("Migrating legacy ELDG ledger to CTRALEDG v1 format");
+                match Self::migrate_legacy_eldg(&dir, &ledger_path, &file_bytes, &key).await {
+                    Ok(migrated_bytes) => {
+                        file_bytes = migrated_bytes;
                     }
-                    CtraledgFrameResult::TruncatedTail { .. } => {
-                        torn_tail = true;
-                        break;
-                    }
-                    CtraledgFrameResult::Corrupt { reason } => {
+                    Err(e) => {
                         return Ok((
                             None,
                             LedgerOpenStatus::Corrupt {
-                                reason: format!("Corruption in {}: {}", seg_path.display(), reason),
+                                reason: format!("Legacy ELDG migration failed: {}", e),
                             },
                         ));
                     }
                 }
             }
 
-            if torn_tail && verified_len < file_bytes.len() {
-                tracing::warn!("Truncating torn write tail in segment {}", seg_path.display());
+            if file_bytes.len() < entry::CTRALEDG_HEADER_SIZE {
+                return Ok((
+                    None,
+                    LedgerOpenStatus::Corrupt {
+                        reason: format!("Segment {:?} shorter than CTRALEDG header size", path),
+                    },
+                ));
+            }
+
+            let segment_header = match CTRALSegmentHeader::parse(&file_bytes[..entry::CTRALEDG_HEADER_SIZE]) {
+                Ok(h) => h,
+                Err(e) => {
+                    return Ok((
+                        None,
+                        LedgerOpenStatus::Corrupt {
+                            reason: format!("Segment header parse failed for {:?}: {}", path, e),
+                        },
+                    ));
+                }
+            };
+
+            last_segment_seq = segment_header.segment_seq;
+            last_prev_hash = segment_header.prev_segment_hash;
+
+            let mut offset = entry::CTRALEDG_HEADER_SIZE;
+            let mut torn_tail_detected = false;
+            let mut verified_len = entry::CTRALEDG_HEADER_SIZE;
+
+            while offset < file_bytes.len() {
+                let res = parse_record(&key, &prev_mac, &file_bytes[offset..]);
+                match res {
+                    FrameReadResult::Ok {
+                        record,
+                        mac,
+                        frame_len,
+                    } => {
+                        if !seen_purge_ids.contains(&record.purge_id) || record.purge_id == [0u8; 16] {
+                            if record.purge_id != [0u8; 16] {
+                                seen_purge_ids.insert(record.purge_id);
+                            }
+                            for fd in &record.family_digests {
+                                index.scopes.insert((record.scope_digest, *fd), record.tx);
+                            }
+                            records.push(record);
+                        }
+                        prev_mac = mac;
+                        offset += frame_len;
+                        verified_len = offset;
+                    }
+                    FrameReadResult::TruncatedTail { bytes_read: _ } => {
+                        tracing::warn!(
+                            "ErasureLedger tail truncation detected at offset {} in {:?}",
+                            verified_len, path
+                        );
+                        torn_tail_detected = true;
+                        break;
+                    }
+                    FrameReadResult::Corrupt { reason } => {
+                        return Ok((
+                            None,
+                            LedgerOpenStatus::Corrupt {
+                                reason: format!("Corruption in {:?} at offset {}: {}", path, offset, reason),
+                            },
+                        ));
+                    }
+                }
+            }
+
+            // Handle torn tail truncation at end of file
+            if torn_tail_detected && verified_len < file_bytes.len() {
                 let file = OpenOptions::new()
                     .write(true)
-                    .open(&seg_path)
+                    .open(path)
                     .await
                     .map_err(|e| ContextraError::Storage(e.to_string()))?;
                 file.set_len(verified_len as u64)
@@ -309,25 +415,22 @@ impl ErasureLedger {
                 file.sync_all()
                     .await
                     .map_err(|e| ContextraError::Storage(e.to_string()))?;
-                crate::util::fsync_parent_dir(&seg_path).await?;
-                current_segment_bytes = verified_len as u64;
-            } else {
-                current_segment_bytes = file_bytes.len() as u64;
+                crate::util::fsync_parent_dir(path).await?;
             }
         }
 
         // Check head marker consistency
-        let (stored_db_id, stored_head_mac, stored_head_seq) = if head_exists {
+        let (stored_db_id, stored_head_seq, stored_head_mac) = if head_exists {
             Self::read_head_marker(&head_path).await?
         } else {
-            ([0u8; 16], INITIAL_CHAIN_MAC, 0)
+            ([0u8; 16], last_segment_seq, INITIAL_CHAIN_MAC)
         };
 
-        if head_exists && stored_head_mac != prev_mac {
+        if head_exists && (stored_head_mac != prev_mac || stored_head_seq != last_segment_seq) {
             return Ok((
                 None,
                 LedgerOpenStatus::RollbackSuspected {
-                    reason: "Head marker MAC does not match ledger chain MAC".into(),
+                    reason: "Head marker MAC or sequence does not match ledger state".into(),
                 },
             ));
         }
@@ -358,15 +461,12 @@ impl ErasureLedger {
             dir,
             key,
             last_chain_mac: prev_mac,
-            last_seq,
-            entries,
+            segment_seq: last_segment_seq,
+            prev_segment_hash: last_prev_hash,
             records,
-            seen_proof_ids,
-            distinct_prefix_lens,
+            seen_purge_ids,
             db_instance_id,
-            index,
-            current_segment_num,
-            current_segment_bytes,
+            index: ArcSwap::new(Arc::new(index)),
         };
 
         if !head_exists {
@@ -376,174 +476,160 @@ impl ErasureLedger {
         Ok((Some(ledger), LedgerOpenStatus::Ok))
     }
 
-    async fn migrate_legacy_eldg(dir: &Path, key: &LedgerKey, legacy_bytes: &[u8]) -> Result<()> {
+    /// Convenience wrapper delegating to `open_assured` for recovery callers.
+    pub async fn open_or_fail_closed(
+        dir: impl AsRef<Path>,
+        key: LedgerKey,
+        db_has_data: bool,
+        expected_head_mac: Option<[u8; 32]>,
+    ) -> Result<(Option<Self>, LedgerOpenStatus)> {
+        Self::open_assured(dir, key, db_has_data, expected_head_mac).await
+    }
+
+    /// Atomically migrates legacy `ELDG` format file to `CTRALEDG` v1 format.
+    async fn migrate_legacy_eldg(
+        _dir: &Path,
+        ledger_path: &Path,
+        file_bytes: &[u8],
+        key: &LedgerKey,
+    ) -> Result<Vec<u8>> {
+        let tmp_path = ledger_path.with_extension("tmp");
         let mut offset = 0;
         let mut prev_mac = INITIAL_CHAIN_MAC;
-        let mut records = Vec::new();
 
-        while offset < legacy_bytes.len() {
-            let res = parse_frame(key, &prev_mac, &legacy_bytes[offset..]);
-            match res {
-                FrameReadResult::Ok {
-                    entry,
-                    chain_mac,
-                    frame_len,
-                } => {
-                    let payload = entry.to_payload_bytes()?;
-                    records.push((entry, payload));
-                    prev_mac = chain_mac;
-                    offset += frame_len;
-                }
-                FrameReadResult::TruncatedTail { .. } => break,
-                FrameReadResult::Corrupt { reason } => {
-                    return Err(ContextraError::Storage(format!(
-                        "Legacy ELDG frame corrupt during migration: {}",
-                        reason
-                    )));
-                }
+        let header = CTRALSegmentHeader::new(0, [0u8; 32]);
+        let mut new_bytes = Vec::new();
+        new_bytes.extend_from_slice(&header.to_bytes());
+
+        while offset < file_bytes.len() {
+            if let Some((payload, frame_len)) = parse_legacy_eldg_frame(&file_bytes[offset..]) {
+                // Convert ELDG payload into CTRALRecord Intent
+                let entry_kind_byte = if payload.len() > 8 { payload[8] } else { 1 };
+                let (scope, family_raw) = match entry_kind_byte {
+                    1 => (b"lsm".as_slice(), payload.as_slice()),
+                    _ => (b"lsm".as_slice(), payload.as_slice()),
+                };
+
+                let scope_digest = compute_keyed_digest(key, scope);
+                let family_digest = compute_keyed_digest(key, family_raw);
+
+                let rec = CTRALRecord {
+                    record_type: RecordType::Intent,
+                    tx: 1,
+                    timestamp_ms: 0,
+                    purge_id: [0u8; 16],
+                    scope_digest,
+                    family_digests: vec![family_digest],
+                    payload: family_raw.to_vec(),
+                    mac: INITIAL_CHAIN_MAC,
+                };
+
+                let (frame_bytes, new_mac) = rec.serialize(key, &prev_mac)?;
+                new_bytes.extend_from_slice(&frame_bytes);
+                prev_mac = new_mac;
+                offset += frame_len;
+            } else {
+                break;
             }
         }
 
-        let tmp_path = dir.join("migration_tmp.ctraledg");
-        let target_seg_path = dir.join("segment_0000000000000000.ctraledg");
+        tokio::fs::write(&tmp_path, &new_bytes)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed writing migrated ledger: {}", e)))?;
 
-        let hdr = CtraledgSegmentHeader::new(0, [0u8; 32]);
-        let mut buffer = hdr.to_bytes().to_vec();
-        let mut cur_mac = INITIAL_CHAIN_MAC;
-
-        let clock = contextra_ports::SystemClock::new();
-        let now_ms = (contextra_ports::Clock::now_unix_nanos(&clock) / 1_000_000) as u64;
-
-        for (entry, payload) in records {
-            let (frame, new_mac) = CtraledgRecord::serialize_frame(
-                key,
-                &cur_mac,
-                RecordType::Intent,
-                entry.erased_at_tx,
-                now_ms,
-                entry.proof_id,
-                entry.keyed_hash,
-                Vec::new(),
-                payload,
-            )?;
-            buffer.extend_from_slice(&frame);
-            cur_mac = new_mac;
-        }
-
-        let mut file = OpenOptions::new()
-            .create(true)
+        let file = OpenOptions::new()
             .write(true)
-            .truncate(true)
             .open(&tmp_path)
             .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to create migration temp file: {}", e)))?;
-
-        file.write_all(&buffer).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-        tokio::fs::rename(&tmp_path, &target_seg_path).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to rename migrated ledger segment: {}", e))
-        })?;
-
-        let legacy_file = dir.join(LEDGER_FILENAME);
-        if tokio::fs::try_exists(&legacy_file).await.unwrap_or(false) {
-            let _ = tokio::fs::remove_file(&legacy_file).await;
-        }
-
-        crate::util::fsync_parent_dir(dir).await?;
-
-        Ok(())
-    }
-
-    async fn list_segment_files(dir: &Path) -> Result<Vec<PathBuf>> {
-        let mut list = Vec::new();
-        if !tokio::fs::try_exists(dir).await.unwrap_or(false) {
-            return Ok(list);
-        }
-
-        let mut entries = tokio::fs::read_dir(dir).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to read dir {}: {}", dir.display(), e))
-        })?;
-
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let path = entry.path();
-            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                if ext == "ctraledg" && !path.file_name().and_then(|s| s.to_str()).unwrap_or("").contains("tmp") {
-                    list.push(path);
-                }
-            }
-        }
-
-        list.sort();
-        Ok(list)
-    }
-
-    async fn init_segment_0(&self) -> Result<()> {
-        let seg_path = self.dir.join("segment_0000000000000000.ctraledg");
-        let hdr = CtraledgSegmentHeader::new(0, [0u8; 32]);
-        let bytes = hdr.to_bytes();
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&seg_path)
-            .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-        file.write_all(&bytes).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
         file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        crate::util::fsync_parent_dir(&self.dir).await?;
-        Ok(())
+
+        tokio::fs::rename(&tmp_path, ledger_path)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed renaming migrated ledger: {}", e)))?;
+
+        crate::util::fsync_parent_dir(ledger_path).await?;
+        Ok(new_bytes)
     }
 
-    /// Appends an Intent record (containing plaintext prefix payload if applicable).
+    /// Appends an `Intent` record (0x01) containing plaintext scope/prefixes in payload.
     pub async fn append_intent(
         &mut self,
         tx: u64,
+        clock: &dyn Clock,
         purge_id: [u8; 16],
-        scope_digest: [u8; 32],
-        family_digests: Vec<[u8; 32]>,
-        payload: Vec<u8>,
-    ) -> Result<()> {
-        self.append_record_internal(
-            RecordType::Intent,
+        scope: &[u8],
+        families: &[&[u8]],
+        payload: &[u8],
+    ) -> Result<[u8; 32]> {
+        let scope_digest = compute_keyed_digest(&self.key, scope);
+        let family_digests = families
+            .iter()
+            .map(|f| compute_keyed_digest(&self.key, f))
+            .collect();
+
+        let timestamp_ms = clock.now_unix_nanos() / 1_000_000;
+
+        let record = CTRALRecord {
+            record_type: RecordType::Intent,
             tx,
+            timestamp_ms,
             purge_id,
             scope_digest,
             family_digests,
-            payload,
-        )
-        .await
+            payload: payload.to_vec(),
+            mac: INITIAL_CHAIN_MAC,
+        };
+
+        self.append_records(&[record]).await
     }
 
-    /// Appends a Purged record (digests only, zero/empty payload).
+    /// Appends a `Purged` record (0x02) containing ONLY digests (payload MUST be empty).
     pub async fn append_purged(
         &mut self,
         tx: u64,
+        clock: &dyn Clock,
         purge_id: [u8; 16],
-        scope_digest: [u8; 32],
-        family_digests: Vec<[u8; 32]>,
-    ) -> Result<()> {
-        self.append_record_internal(
-            RecordType::Purged,
+        scope: &[u8],
+        families: &[&[u8]],
+    ) -> Result<[u8; 32]> {
+        let scope_digest = compute_keyed_digest(&self.key, scope);
+        let family_digests = families
+            .iter()
+            .map(|f| compute_keyed_digest(&self.key, f))
+            .collect();
+
+        let timestamp_ms = clock.now_unix_nanos() / 1_000_000;
+
+        let record = CTRALRecord {
+            record_type: RecordType::Purged,
             tx,
+            timestamp_ms,
             purge_id,
             scope_digest,
             family_digests,
-            Vec::new(),
-        )
-        .await
+            payload: Vec::new(),
+            mac: INITIAL_CHAIN_MAC,
+        };
+
+        self.append_records(&[record]).await
     }
 
-    /// Group append multiple records.
-    pub async fn append_batch(&mut self, records_data: &[(RecordType, u64, [u8; 16], [u8; 32], Vec<[u8; 32]>, Vec<u8>)]) -> Result<()> {
-        if records_data.is_empty() {
-            return Ok(());
+    /// Appends records with segment rotation at 64 MiB and single atomic fsync.
+    pub async fn append_records(&mut self, records: &[CTRALRecord]) -> Result<[u8; 32]> {
+        if records.is_empty() {
+            return Ok(self.last_chain_mac);
         }
 
-        let clock = contextra_ports::SystemClock::new();
-        let now_ms = (contextra_ports::Clock::now_unix_nanos(&clock) / 1_000_000) as u64;
+        let mut active_path = self.active_segment_path();
+
+        // Check if segment rotation at 64 MiB is needed
+        if let Ok(meta) = tokio::fs::metadata(&active_path).await {
+            if meta.len() >= MAX_SEGMENT_SIZE {
+                self.rotate_segment().await?;
+                active_path = self.active_segment_path();
+            }
+        }
 
         let active_seg_path = self.get_current_segment_path();
         let mut buffer = Vec::new();
@@ -569,152 +655,109 @@ impl ErasureLedger {
                 payload.clone(),
             )?;
 
+        let mut next_index = (**self.index.load()).clone();
+
+        for rec in records {
+            let (frame_bytes, new_mac) = rec.serialize(&self.key, &current_mac)?;
             buffer.extend_from_slice(&frame_bytes);
-            cur_mac = new_mac;
+            current_mac = new_mac;
 
-            let rec = CtraledgRecord {
-                record_type: *rt,
-                tx: *tx,
-                timestamp: now_ms,
-                purge_id: *purge_id,
-                scope_digest: *scope_digest,
-                family_digests: family_digests.clone(),
-                payload: payload.clone(),
-                mac: new_mac,
-                crc32c: crc32fast::hash(&frame_bytes[4..frame_bytes.len() - 4]),
-            };
-            new_records.push(rec);
-
-            if !payload.is_empty() {
-                if let Ok(entry) = LedgerEntry::from_payload_bytes(payload) {
-                    new_entries.push(entry);
-                }
-            } else {
-                new_entries.push(LedgerEntry {
-                    ledger_seq: self.last_seq + new_records.len() as u64,
-                    kind: LedgerEntryKind::Key,
-                    keyed_hash: *scope_digest,
-                    erased_at_tx: *tx,
-                    proof_id: *purge_id,
-                });
+            for fd in &rec.family_digests {
+                next_index.scopes.insert((rec.scope_digest, *fd), rec.tx);
             }
-        }
-
-        if buffer.is_empty() {
-            return Ok(());
         }
 
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&active_seg_path)
+            .open(&active_path)
             .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to open segment: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to open active ledger segment: {}", e)))?;
 
-        file.write_all(&buffer).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        crate::util::fsync_parent_dir(&self.dir).await?;
+        file.write_all(&buffer).await.map_err(|e| {
+            ContextraError::Storage(format!("ErasureLedger write_all failed: {}", e))
+        })?;
+        file.sync_all().await.map_err(|e| {
+            ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", e))
+        })?;
 
-        // Update state
-        self.last_chain_mac = cur_mac;
-        self.last_seq += new_records.len() as u64;
-        self.current_segment_bytes += buffer.len() as u64;
+        crate::util::fsync_parent_dir(&active_path).await?;
 
-        for rec in new_records {
-            self.seen_proof_ids.insert(rec.purge_id);
-            self.records.push(rec);
-        }
-        for entry in new_entries {
-            if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
-                self.distinct_prefix_lens.insert(prefix_len);
+        // Update RAM state
+        self.last_chain_mac = current_mac;
+        for rec in records {
+            if rec.purge_id != [0u8; 16] {
+                self.seen_purge_ids.insert(rec.purge_id);
             }
-            self.entries.push(entry);
+            self.records.push(rec.clone());
         }
+        self.index.store(Arc::new(next_index));
 
         self.rebuild_index();
         self.write_head_marker().await?;
 
+        Ok(current_mac)
+    }
+
+    /// Compatibility append for legacy `LedgerEntry` callers in tests.
+    pub async fn append(&mut self, entries: &[LedgerEntry]) -> Result<()> {
+        let clock = contextra_ports::SystemClock::new();
+        for entry in entries {
+            let scope = b"lsm";
+            let family_digest = entry.keyed_hash;
+
+            let record = CTRALRecord {
+                record_type: RecordType::Intent,
+                tx: entry.erased_at_tx,
+                timestamp_ms: clock.now_unix_nanos() / 1_000_000,
+                purge_id: entry.proof_id,
+                scope_digest: compute_keyed_digest(&self.key, scope),
+                family_digests: vec![family_digest],
+                payload: entry.to_payload_bytes()?,
+                mac: INITIAL_CHAIN_MAC,
+            };
+
+            self.append_records(&[record]).await?;
+        }
         Ok(())
     }
 
-    /// Legacy append method.
-    pub async fn append(&mut self, entries: &[LedgerEntry]) -> Result<()> {
-        let mut batch = Vec::new();
-        for entry in entries {
-            let payload = entry.to_payload_bytes()?;
-            batch.push((
-                RecordType::Intent,
-                entry.erased_at_tx,
-                entry.proof_id,
-                entry.keyed_hash,
-                Vec::new(),
-                payload,
-            ));
-        }
-        self.append_batch(&batch).await
+    /// Performs segment rotation when active segment reaches 64 MiB.
+    async fn rotate_segment(&mut self) -> Result<()> {
+        self.segment_seq += 1;
+        self.prev_segment_hash = self.last_chain_mac;
+
+        let rotated_path = self.active_segment_path();
+
+        let header = CTRALSegmentHeader::new(self.segment_seq, self.prev_segment_hash);
+        let header_bytes = header.to_bytes();
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&rotated_path)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to create rotated segment: {}", e)))?;
+
+        file.write_all(&header_bytes).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed writing header to rotated segment: {}", e))
+        })?;
+        file.sync_all().await.map_err(|e| {
+            ContextraError::Storage(format!("Failed syncing rotated segment: {}", e))
+        })?;
+
+        crate::util::fsync_parent_dir(&rotated_path).await?;
+        Ok(())
     }
 
-    async fn append_record_internal(
-        &mut self,
-        record_type: RecordType,
-        tx: u64,
-        purge_id: [u8; 16],
-        scope_digest: [u8; 32],
-        family_digests: Vec<[u8; 32]>,
-        payload: Vec<u8>,
-    ) -> Result<()> {
-        self.append_batch(&[(record_type, tx, purge_id, scope_digest, family_digests, payload)]).await
-    }
-
-    fn get_current_segment_path(&self) -> PathBuf {
-        let filename = format!("segment_{:016x}.ctraledg", self.current_segment_num);
-        self.dir.join(filename)
-    }
-
-    fn rebuild_index(&self) {
-        let mut map = LedgerIndexMap::default();
-        for rec in &self.records {
-            map.scope_digests.insert(rec.scope_digest);
-            map.erased_tx_by_scope.insert(rec.scope_digest, rec.tx);
-            for fd in &rec.family_digests {
-                map.family_digests.insert(*fd);
-            }
-        }
-        self.index.store(Arc::new(map));
-    }
-
-    /// Decides whether a key version at transaction `tx` should be kept or dropped.
+    /// Evaluates whether a key version at transaction `tx` should be kept or dropped.
     pub fn decide(&self, storage_scope: &[u8], key: &[u8], tx: u64) -> LedgerDecision {
-        let key_hash = compute_keyed_hash(&self.key, storage_scope, key);
-
-        let mut prefix_hashes = std::collections::HashMap::new();
-        for &len in &self.distinct_prefix_lens {
-            let usize_len = len as usize;
-            if key.len() >= usize_len {
-                let prefix_bytes = &key[..usize_len];
-                let prefix_hash = compute_keyed_hash(&self.key, storage_scope, prefix_bytes);
-                prefix_hashes.insert(len, prefix_hash);
-            }
+        if self.index.load().is_in_deleted_scope(&self.key, storage_scope, key, tx) {
+            LedgerDecision::Drop
+        } else {
+            LedgerDecision::Keep
         }
-
-        for entry in &self.entries {
-            match entry.kind {
-                LedgerEntryKind::Key => {
-                    if entry.keyed_hash == key_hash && tx <= entry.erased_at_tx {
-                        return LedgerDecision::Drop;
-                    }
-                }
-                LedgerEntryKind::Prefix { prefix_len } => {
-                    if let Some(prefix_hash) = prefix_hashes.get(&prefix_len) {
-                        if entry.keyed_hash == *prefix_hash && tx <= entry.erased_at_tx {
-                            return LedgerDecision::Drop;
-                        }
-                    }
-                }
-            }
-        }
-
-        LedgerDecision::Keep
     }
 
     pub fn decide_batch(
@@ -728,83 +771,74 @@ impl ErasureLedger {
             .collect()
     }
 
-    pub fn read_head_info(&self) -> (u64, [u8; 32]) {
-        (self.last_seq, self.last_chain_mac)
+    /// Lock-free query check for `RestoreGuard`.
+    pub fn is_in_deleted_scope(&self, storage_scope: &[u8], key: &[u8], tx: u64) -> bool {
+        self.index.load().is_in_deleted_scope(&self.key, storage_scope, key, tx)
     }
 
-    pub fn index_handle(&self) -> Arc<ArcSwap<LedgerIndexMap>> {
-        Arc::clone(&self.index)
-    }
+    /// Compacts `Intent` records into `Purged` records, writing new file atomically and scrubbing old segment.
+    pub async fn compact_intents_to_purged(&mut self) -> Result<()> {
+        let active_path = self.active_segment_path();
+        let tmp_path = self.dir.join("erasure_compacted.tmp");
 
-    /// Standalone compaction: converts finished Intent records into Purged records (clearing payload) and atomically replaces segment file.
-    pub async fn compact_segments(&mut self) -> Result<usize> {
-        let mut compacted_count = 0;
-        let mut new_records = Vec::new();
+        let header = CTRALSegmentHeader::new(self.segment_seq, self.prev_segment_hash);
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(&header.to_bytes());
+
+        let mut current_mac = INITIAL_CHAIN_MAC;
+        let mut compacted_records = Vec::new();
 
         for rec in &self.records {
-            if rec.record_type == RecordType::Intent {
-                let mut purged_rec = rec.clone();
-                purged_rec.record_type = RecordType::Purged;
-                purged_rec.payload.clear();
-                new_records.push(purged_rec);
-                compacted_count += 1;
-            } else {
-                new_records.push(rec.clone());
+            let mut compacted = rec.clone();
+            if compacted.record_type == RecordType::Intent {
+                compacted.record_type = RecordType::Purged;
+                compacted.payload.clear(); // Plaintext payload stripped
             }
+
+            let (frame_bytes, new_mac) = compacted.serialize(&self.key, &current_mac)?;
+            buffer.extend_from_slice(&frame_bytes);
+            current_mac = new_mac;
+            compacted_records.push(compacted);
         }
 
-        if compacted_count == 0 {
-            return Ok(0);
-        }
+        tokio::fs::write(&tmp_path, &buffer).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed writing compacted ledger tmp file: {}", e))
+        })?;
 
-        let seg_path = self.get_current_segment_path();
-        let tmp_path = self.dir.join("compaction_tmp.ctraledg");
-
-        let hdr = CtraledgSegmentHeader::new(self.current_segment_num, [0u8; 32]);
-        let mut buffer = hdr.to_bytes().to_vec();
-        let mut cur_mac = INITIAL_CHAIN_MAC;
-
-        for rec in &mut new_records {
-            let (frame, new_mac) = CtraledgRecord::serialize_frame(
-                &self.key,
-                &cur_mac,
-                rec.record_type,
-                rec.tx,
-                rec.timestamp,
-                rec.purge_id,
-                rec.scope_digest,
-                rec.family_digests.clone(),
-                rec.payload.clone(),
-            )?;
-            buffer.extend_from_slice(&frame);
-            rec.mac = new_mac;
-            cur_mac = new_mac;
-        }
-
-        let mut file = OpenOptions::new()
-            .create(true)
+        let file = OpenOptions::new()
             .write(true)
-            .truncate(true)
             .open(&tmp_path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-        file.write_all(&buffer).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
         file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        tokio::fs::rename(&tmp_path, &seg_path).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
-        crate::util::fsync_parent_dir(&self.dir).await?;
+        // Scrub old segment before atomic replacement if possible
+        let _ = contextra_durable_fs::scrub_if_safe(
+            &active_path,
+            contextra_durable_fs::ScrubPolicy::OverwriteZeros,
+            false,
+            false,
+        );
 
-        self.last_chain_mac = cur_mac;
-        self.records = new_records;
-        self.rebuild_index();
+        tokio::fs::rename(&tmp_path, &active_path).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed replacing ledger with compacted version: {}", e))
+        })?;
+
+        crate::util::fsync_parent_dir(&active_path).await?;
+
+        self.last_chain_mac = current_mac;
+        self.records = compacted_records;
         self.write_head_marker().await?;
 
-        Ok(compacted_count)
+        Ok(())
     }
 
     pub fn last_chain_mac(&self) -> &[u8; 32] {
         &self.last_chain_mac
+    }
+
+    pub fn segment_seq(&self) -> u64 {
+        self.segment_seq
     }
 
     pub fn db_instance_id(&self) -> &[u8; 16] {
@@ -819,19 +853,58 @@ impl ErasureLedger {
         &self.key
     }
 
-    pub fn seen_proof_ids(&self) -> &HashSet<[u8; 16]> {
-        &self.seen_proof_ids
+    pub fn seen_purge_ids(&self) -> &HashSet<[u8; 16]> {
+        &self.seen_purge_ids
     }
 
-    pub fn entries(&self) -> &[LedgerEntry] {
-        &self.entries
+    pub fn records(&self) -> &[CTRALRecord] {
+        &self.records
+    }
+
+    pub fn entries(&self) -> Vec<LedgerEntry> {
+        self.records
+            .iter()
+            .enumerate()
+            .map(|(idx, r)| {
+                let kind = if r.payload.len() >= 45 && r.payload[8] == 2 {
+                    let prefix_len = u32::from_be_bytes(r.payload[41..45].try_into().unwrap_or([0; 4]));
+                    LedgerEntryKind::Prefix { prefix_len }
+                } else {
+                    LedgerEntryKind::Key
+                };
+                LedgerEntry {
+                    #[allow(clippy::cast_possible_truncation)]
+                    ledger_seq: (idx + 1) as u64,
+                    kind,
+                    keyed_hash: r.family_digests.first().copied().unwrap_or([0u8; 32]),
+                    erased_at_tx: r.tx,
+                    proof_id: r.purge_id,
+                }
+            })
+            .collect()
+    }
+
+    pub fn update_after_append(&mut self, new_mac: [u8; 32], to_write: Vec<CTRALRecord>) {
+        let mut next_index = (**self.index.load()).clone();
+        for rec in &to_write {
+            if rec.purge_id != [0u8; 16] {
+                self.seen_purge_ids.insert(rec.purge_id);
+            }
+            for fd in &rec.family_digests {
+                next_index.scopes.insert((rec.scope_digest, *fd), rec.tx);
+            }
+            self.records.push(rec.clone());
+        }
+        self.last_chain_mac = new_mac;
+        self.index.store(Arc::new(next_index));
     }
 
     async fn write_head_marker(&self) -> Result<()> {
         let head_path = self.dir.join(HEAD_FILENAME);
-        let mut marker_bytes = Vec::with_capacity(60);
-        marker_bytes.extend_from_slice(b"CTRA"); // Magic
+        let mut marker_bytes = Vec::with_capacity(64);
+        marker_bytes.extend_from_slice(CTRALEDG_MAGIC); // Magic
         marker_bytes.extend_from_slice(&self.db_instance_id);
+        marker_bytes.extend_from_slice(&self.segment_seq.to_be_bytes());
         marker_bytes.extend_from_slice(&self.last_chain_mac);
         marker_bytes.extend_from_slice(&self.last_seq.to_le_bytes());
 
@@ -839,27 +912,27 @@ impl ErasureLedger {
         Ok(())
     }
 
-    async fn read_head_marker(path: &Path) -> Result<([u8; 16], [u8; 32], u64)> {
+    async fn read_head_marker(path: &Path) -> Result<([u8; 16], u64, [u8; 32])> {
         let bytes = tokio::fs::read(path)
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to read head marker: {}", e)))?;
 
-        if bytes.len() < 52 || (&bytes[0..4] != b"ELDG" && &bytes[0..4] != b"CTRA") {
+        if bytes.len() != 8 + 16 + 8 + 32 || &bytes[0..8] != CTRALEDG_MAGIC {
             return Err(ContextraError::Storage("Corrupt head marker".into()));
         }
 
         let mut db_id = [0u8; 16];
-        db_id.copy_from_slice(&bytes[4..20]);
+        db_id.copy_from_slice(&bytes[8..24]);
+
+        let seq = u64::from_be_bytes(
+            bytes[24..32]
+                .try_into()
+                .map_err(|_| ContextraError::Storage("Invalid head seq".into()))?,
+        );
 
         let mut head_mac = [0u8; 32];
-        head_mac.copy_from_slice(&bytes[20..52]);
+        head_mac.copy_from_slice(&bytes[32..64]);
 
-        let seq = if bytes.len() >= 60 {
-            u64::from_le_bytes(bytes[52..60].try_into().unwrap_or([0; 8]))
-        } else {
-            0
-        };
-
-        Ok((db_id, head_mac, seq))
+        Ok((db_id, seq, head_mac))
     }
 }

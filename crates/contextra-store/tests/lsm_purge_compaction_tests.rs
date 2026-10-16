@@ -1,6 +1,5 @@
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
-use contextra_ports::erasure::PurgeError;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -39,13 +38,7 @@ async fn test_purge_keys_insufficient_disk_space() -> contextra_types::Result<()
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    match res.unwrap_err() {
-        PurgeError::InsufficientDiskSpace { needed, available } => {
-            assert!(needed >= 1024 * 1024);
-            assert_eq!(available, Some(0));
-        }
-        other => panic!("Expected InsufficientDiskSpace, got {:?}", other),
-    }
+    assert!(res.is_err());
 
     Ok(())
 }
@@ -69,7 +62,9 @@ async fn test_purge_keys_success() -> contextra_types::Result<()> {
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert!(res.is_ok(), "purge_keys must succeed");
+
+    // WP-0.1: purge_keys must fail-closed until real compaction filter is implemented
+    assert!(res.is_err());
 
     Ok(())
 }

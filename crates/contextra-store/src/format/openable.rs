@@ -21,13 +21,6 @@ impl FileKind {
         }
     }
 
-    pub fn expected_magic_8(&self) -> Option<[u8; 8]> {
-        match self {
-            FileKind::Ledger => Some(*b"CTRALEDG"),
-            _ => None,
-        }
-    }
-
     pub fn name(&self) -> &'static str {
         match self {
             FileKind::Sstable => "SSTable",

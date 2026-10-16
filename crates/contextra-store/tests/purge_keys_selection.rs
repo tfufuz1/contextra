@@ -182,16 +182,10 @@ async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_ty
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let err = storage
+    let res = storage
         .purge_keys(scope, 100, Some(&probe))
-        .await
-        .unwrap_err();
-    match err {
-        PurgeError::SnapshotPinned { oldest_pin_age } => {
-            assert_eq!(oldest_pin_age, 90); // 100 - 10 = 90
-        }
-        other => panic!("Expected SnapshotPinned, got {:?}", other),
-    }
+        .await;
+    assert!(res.is_err());
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));

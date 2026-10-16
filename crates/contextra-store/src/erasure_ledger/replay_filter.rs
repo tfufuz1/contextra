@@ -1,13 +1,12 @@
 //! FILE-CONTEXT
 //! STAND: 2026-10-16
-//! ZWECK: Thread-sicherer Handle für ErasureLedger und Implementierung von WalReplayFilter und CompactionRecordFilter.
-//! INVARIANTEN: Zero-Panic, Fail-Closed, non-blocking sync decision evaluate für Hotpath/Replay.
+//! ZWECK: Thread-sicherer Handle für Anti-Resurrection ErasureLedger (CTRALEDG v1).
+//! INVARIANTEN: Zero-Panic, Fail-Closed, lock-free decision query für Hotpath/Replay.
 
-use super::{
-    ErasureLedger, LedgerDecision, LedgerEntry, RecordType,
-};
+use super::{CTRALRecord, ErasureLedger, LedgerDecision, LedgerEntry};
 use crate::compaction::purge_filter::CompactionRecordFilter;
 use crate::wal::replay_filter::WalReplayFilter;
+use contextra_ports::Clock;
 use contextra_types::Result;
 use std::sync::Arc;
 
@@ -27,57 +26,61 @@ impl ErasureLedgerHandle {
         }
     }
 
-    /// Appends entries to the erasure ledger with atomic fsync durability.
+    /// Appends legacy entries to the erasure ledger.
     pub async fn append(&self, entries: &[LedgerEntry]) -> Result<()> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-
         let _guard = self.append_mutex.lock().await;
         let mut guard = self.ledger.write();
         guard.append(entries).await
     }
 
-    /// Appends Intent record (with plaintext prefixes for resume).
+    /// Appends an `Intent` record (0x01).
     pub async fn append_intent(
         &self,
         tx: u64,
+        clock: &dyn Clock,
         purge_id: [u8; 16],
-        scope_digest: [u8; 32],
-        family_digests: Vec<[u8; 32]>,
-        payload: Vec<u8>,
-    ) -> Result<()> {
+        scope: &[u8],
+        families: &[&[u8]],
+        payload: &[u8],
+    ) -> Result<[u8; 32]> {
         let _guard = self.append_mutex.lock().await;
         let mut guard = self.ledger.write();
-        guard.append_intent(tx, purge_id, scope_digest, family_digests, payload).await
+        guard
+            .append_intent(tx, clock, purge_id, scope, families, payload)
+            .await
     }
 
-    /// Appends Purged record (only digests, no plaintext payload).
+    /// Appends a `Purged` record (0x02).
     pub async fn append_purged(
         &self,
         tx: u64,
+        clock: &dyn Clock,
         purge_id: [u8; 16],
-        scope_digest: [u8; 32],
-        family_digests: Vec<[u8; 32]>,
-    ) -> Result<()> {
+        scope: &[u8],
+        families: &[&[u8]],
+    ) -> Result<[u8; 32]> {
         let _guard = self.append_mutex.lock().await;
         let mut guard = self.ledger.write();
-        guard.append_purged(tx, purge_id, scope_digest, family_digests).await
+        guard
+            .append_purged(tx, clock, purge_id, scope, families)
+            .await
     }
 
-    /// Group append multiple records sharing a single fsync.
-    pub async fn append_batch(
-        &self,
-        records_data: &[(RecordType, u64, [u8; 16], [u8; 32], Vec<[u8; 32]>, Vec<u8>)],
-    ) -> Result<()> {
+    /// Appends CTRALRecords in batch.
+    pub async fn append_records(&self, records: &[CTRALRecord]) -> Result<[u8; 32]> {
         let _guard = self.append_mutex.lock().await;
         let mut guard = self.ledger.write();
-        guard.append_batch(records_data).await
+        guard.append_records(records).await
     }
 
     /// Decides whether a key version at transaction `tx` should be kept or dropped.
     pub fn decide(&self, storage_scope: &[u8], key: &[u8], tx: u64) -> LedgerDecision {
         self.ledger.read().decide(storage_scope, key, tx)
+    }
+
+    /// Checks if key is in deleted scope for `RestoreGuard`.
+    pub fn is_in_deleted_scope(&self, storage_scope: &[u8], key: &[u8], tx: u64) -> bool {
+        self.ledger.read().is_in_deleted_scope(storage_scope, key, tx)
     }
 
     /// Returns the database instance ID associated with this ledger.
@@ -90,9 +93,14 @@ impl ErasureLedgerHandle {
         *self.ledger.read().last_chain_mac()
     }
 
-    /// Returns a copy of all current ledger entries.
+    /// Returns all current ledger entries.
     pub fn entries(&self) -> Vec<LedgerEntry> {
-        self.ledger.read().entries().to_vec()
+        self.ledger.read().entries()
+    }
+
+    /// Returns raw CTRALRecords.
+    pub fn records(&self) -> Vec<CTRALRecord> {
+        self.ledger.read().records().to_vec()
     }
 
     /// Returns the head sequence and MAC of the ledger.

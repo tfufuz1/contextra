@@ -5,7 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_ports::StorageEngine;
-use contextra_types::types::domain::ids::TxId;
+use contextra_types::TxId;
 use contextra_types::ContextraError;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::Arc;
