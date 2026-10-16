@@ -1,0 +1,20 @@
+id = "T-2026-A006"
+title = "[Entfernung EP5] contextra-cognition Dateibaum"
+crate = "contextra-cognition"
+tier = 1
+risk = "none"
+goal = "Entfernung des veralteten EP5 Crate-Dateibaums contextra-cognition"
+non_goals = ["Keine Änderungen an Dateien außerhalb von BESITZ", "Kein Refactoring"]
+scope = ["crates/contextra-cognition/**", ".jules/tasks/A-06.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**", "governance/**"]
+invariants = ["Zero-Panic"]
+acceptance = [
+  "cargo metadata --no-deps --offline",
+  "cargo check --workspace --all-targets"
+]
+evidence_required = ["Löschung von crates/contextra-cognition", "Grüne Metadata und Check ohne neue Fehler"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 5
