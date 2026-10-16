@@ -24,7 +24,11 @@ impl Contextra {
         mut config: ContextraConfig,
         wiring: EngineWiring,
     ) -> Result<Self> {
-        config.erasure_mode = contextra_ports::erasure::ErasureMode::Off;
+        if config.erasure_mode != contextra_ports::erasure::ErasureMode::Off
+            && !cfg!(feature = "erasure")
+        {
+            return Err(contextra_ports::erasure::ErasureError::NotConfigured.into());
+        }
 
         if config.dimension == 0 {
             return Err(contextra_types::ContextraError::invalid_input(
@@ -556,5 +560,28 @@ mod consolidation_launcher_tests {
         db.close().await?;
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_assured_erasure_mode_without_feature_fails_named() {
+        let dir = tempdir().unwrap();
+        let config = ContextraConfig {
+            erasure_mode: contextra_ports::erasure::ErasureMode::Assured,
+            consolidation_enabled: false,
+            ..Default::default()
+        };
+
+        let res = Contextra::open_with_config(dir.path(), config).await;
+        assert!(res.is_err(), "Opening in Assured mode without erasure feature must fail");
+        let err = res.err().unwrap();
+        match err {
+            contextra_types::ContextraError::InvalidInput(msg) => {
+                assert!(
+                    msg.contains("Erasure backend not configured"),
+                    "Expected 'Erasure backend not configured', got: {msg}"
+                );
+            }
+            other => panic!("Expected InvalidInput error, got: {:?}", other),
+        }
     }
 }
