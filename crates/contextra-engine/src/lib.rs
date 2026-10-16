@@ -187,8 +187,49 @@ mod no_crypto_stubs {
             }
         }
 
-        pub fn verify(&self, _key: &[u8]) -> contextra_types::Result<bool> {
-            Ok(true)
+        /// Verifiziert die HMAC-SHA256-Signatur des Löschbelegs in konstanter Zeit.
+        ///
+        /// # Kryptografische Garantie
+        /// Geprüft wird ausschließlich die mathematische Gültigkeit der HMAC-Signatur über den
+        /// Beleg-Payload (Scope, Keys-Hash, TxId, covered_layers, excluded_scopes und optionales WAL-Receipt).
+        ///
+        /// # Nicht-Garantie
+        /// Diese Methode führt KEINE Prüfung des tatsächlichen physischen Storage-Zustands durch.
+        /// Sie stellt nicht sicher, dass Daten in den zugrundeliegenden Layern bereits gelöscht sind.
+        pub fn verify(&self, key: &[u8]) -> contextra_types::Result<bool> {
+            if self.signature_version != 2 {
+                return Ok(false);
+            }
+
+            let scope_bytes = bincode::serialize(&self.scope)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+            let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+            let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+            let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+            let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+            let receipt_part = if self.wal_chain_receipt.is_some() {
+                receipt_bytes.as_slice()
+            } else {
+                &[]
+            };
+
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            let mut mac = Hmac::<Sha256>::new_from_slice(key).map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("HMAC key error: {e}"))
+            })?;
+
+            mac.update(&scope_bytes);
+            mac.update(&self.deleted_keys_hash);
+            mac.update(&tx_bytes);
+            mac.update(&covered_layers_bytes);
+            mac.update(&excluded_scopes_bytes);
+            mac.update(receipt_part);
+
+            Ok(mac.verify_slice(&self.signature).is_ok())
         }
 
         pub fn export_for_audit(&self) -> contextra_types::Result<String> {
