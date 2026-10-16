@@ -6,6 +6,7 @@
 pub mod failpoints;
 pub mod raw_sweep;
 pub mod reference_store;
+#[cfg(not(loom))]
 pub mod tenant_matrix;
 
 #[cfg(feature = "fault-injection")]
@@ -13,4 +14,5 @@ pub use failpoints::FailpointHelper;
 
 pub use raw_sweep::{raw_sweep, SweepHit, SweepReport};
 pub use reference_store::{KeyState, ReferenceStore};
+#[cfg(not(loom))]
 pub use tenant_matrix::{TenantMatrixContext, TenantMatrixMode, TenantMatrixRunner};

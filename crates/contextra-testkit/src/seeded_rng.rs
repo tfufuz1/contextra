@@ -62,6 +62,9 @@ mod tests {
         let seq1: Vec<u64> = (0..10).map(|_| rng1.next_u64()).collect();
         let seq2: Vec<u64> = (0..10).map(|_| rng2.next_u64()).collect();
 
-        assert_eq!(seq1, seq2, "SeededRng with same seed produced different streams");
+        assert_eq!(
+            seq1, seq2,
+            "SeededRng with same seed produced different streams"
+        );
     }
 }

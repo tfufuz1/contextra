@@ -334,4 +334,31 @@ mod tests {
         vfs.reset_counters();
         assert!(vfs.read_file(path).is_err());
     }
+
+    #[test]
+    fn test_fault_vfs_concurrent_operations_integrity() {
+        let vfs = Arc::new(FaultVfs::new());
+        vfs.set_config(FaultConfig {
+            fail_writes_after: Some(50),
+            ..Default::default()
+        });
+
+        let mut handles = Vec::new();
+        for i in 0..10 {
+            let vfs_clone = vfs.clone();
+            handles.push(std::thread::spawn(move || {
+                for j in 0..10 {
+                    let filename = format!("file_{}_{}.txt", i, j);
+                    let _ = vfs_clone.write_file(Path::new(&filename), b"data");
+                }
+            }));
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        // Exactly 100 write operations attempted
+        assert_eq!(vfs.write_count(), 100);
+    }
 }

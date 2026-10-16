@@ -18,12 +18,11 @@ pub mod wiring;
 
 pub use deletion_oracle::{raw_sweep, OrcFieldMarker, OrcHit, OrcMarkerSet, OrcSweepReport};
 pub use dst::{EntropyRng, SeededRng};
-pub use erasure_harness::{
-    KeyState, ReferenceStore, SweepHit, SweepReport, TenantMatrixContext, TenantMatrixMode,
-    TenantMatrixRunner,
-};
 #[cfg(feature = "fault-injection")]
 pub use erasure_harness::FailpointHelper;
+pub use erasure_harness::{KeyState, ReferenceStore, SweepHit, SweepReport};
+#[cfg(not(loom))]
+pub use erasure_harness::{TenantMatrixContext, TenantMatrixMode, TenantMatrixRunner};
 #[cfg(feature = "fault-injection")]
 pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_store::InMemoryStorageEngine;
