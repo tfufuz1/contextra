@@ -402,7 +402,7 @@ impl ErasureFence {
     }
 
     /// Helper to release a registered prefix fence by ID and prefixes under commit_mutex lock.
-    fn release_prefix_fence(&self, id: u64, prefixes: &[Vec<u8>]) {
+    pub(crate) fn release_prefix_fence(&self, id: u64, prefixes: &[Vec<u8>]) {
         #[cfg(not(loom))]
         let _commit_guard = if tokio::runtime::Handle::try_current().is_ok() {
             self.commit_mutex.try_lock().ok()

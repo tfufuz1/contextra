@@ -61,6 +61,7 @@ impl ErasureBackend for LsmStorage {
         } else {
             return Err(ErasureError::MalformedScope);
         };
+        let fence_prefixes = prefixes.clone();
         let fen_guard = self
             .erasure_fence
             .acquire_scope_fence_for(prefixes)
@@ -71,7 +72,7 @@ impl ErasureBackend for LsmStorage {
 
         let fence_arc = Arc::clone(&self.erasure_fence);
         let release = Box::new(move || {
-            fence_arc.release_prefix_fence(fence_id);
+            fence_arc.release_prefix_fence(fence_id, &fence_prefixes);
         });
 
         Ok(FenceGuard::new(id, release))

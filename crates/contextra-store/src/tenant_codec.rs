@@ -1011,10 +1011,8 @@ mod tests {
         };
         let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
         match err {
-            ContextraError::InvalidInput(msg) => {
-                assert!(msg.contains("TenantId mismatch"));
-            }
-            _ => panic!("Expected InvalidInput error, got {:?}", err),
+            contextra_ports::erasure::ErasureError::ForeignScope => {}
+            _ => panic!("Expected ForeignScope error, got {:?}", err),
         }
 
         // 4. Collection scope with matching TenantId
