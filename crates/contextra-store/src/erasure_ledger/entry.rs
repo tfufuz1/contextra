@@ -222,7 +222,7 @@ pub enum FrameReadResult {
 /// Parses a CTRALEDG record frame from `bytes` starting at offset 0.
 pub fn parse_record(key: &LedgerKey, prev_mac: &[u8; 32], bytes: &[u8]) -> FrameReadResult {
     if bytes.len() < 4 {
-        return CtraledgFrameResult::TruncatedTail {
+        return FrameReadResult::TruncatedTail {
             bytes_read: bytes.len(),
         };
     }
@@ -236,7 +236,7 @@ pub fn parse_record(key: &LedgerKey, prev_mac: &[u8; 32], bytes: &[u8]) -> Frame
 
     let total_frame_len = 4 + record_len;
     if bytes.len() < total_frame_len {
-        return CtraledgFrameResult::TruncatedTail {
+        return FrameReadResult::TruncatedTail {
             bytes_read: bytes.len(),
         };
     }

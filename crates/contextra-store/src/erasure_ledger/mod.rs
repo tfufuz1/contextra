@@ -211,30 +211,19 @@ impl ErasureLedger {
         db_has_data: bool,
         expected_head_mac: Option<[u8; 32]>,
     ) -> Result<(Option<Self>, LedgerOpenStatus)> {
-        Self::open_assured(dir, key, db_has_data, expected_head_mac).await
-    }
-
-    async fn open_internal(
-        dir: impl AsRef<Path>,
-        key: LedgerKey,
-        db_has_data: bool,
-        expected_head_mac: Option<[u8; 32]>,
-    ) -> Result<(Option<Self>, LedgerOpenStatus)> {
         let dir = dir.as_ref().to_path_buf();
-        let legacy_ledger_path = dir.join(LEDGER_FILENAME);
+        let ledger_path = dir.join(LEDGER_FILENAME);
         let head_path = dir.join(HEAD_FILENAME);
 
-        let legacy_exists = tokio::fs::try_exists(&legacy_ledger_path).await.unwrap_or(false);
+        let ledger_exists = tokio::fs::try_exists(&ledger_path).await.unwrap_or(false);
         let head_exists = tokio::fs::try_exists(&head_path).await.unwrap_or(false);
 
-        let mut segment_files = Self::list_segment_files(&dir).await?;
-
-        if !legacy_exists && segment_files.is_empty() {
+        if !ledger_exists {
             if db_has_data {
                 return Ok((
                     None,
                     LedgerOpenStatus::RollbackSuspected {
-                        reason: "Database contains data but erasure ledger is missing".into(),
+                        reason: "Database contains data but erasure.ledger is missing".into(),
                     },
                 ));
             }
@@ -275,7 +264,6 @@ impl ErasureLedger {
                 index: ArcSwap::new(Arc::new(ErasureLedgerIndex::default())),
             };
 
-            ledger.init_segment_0().await?;
             ledger.write_head_marker().await?;
 
             return Ok((Some(ledger), LedgerOpenStatus::Fresh));
@@ -455,8 +443,6 @@ impl ErasureLedger {
             id
         };
 
-        let index = Arc::new(ArcSwap::from_pointee(index_map));
-
         let ledger = Self {
             dir,
             key,
@@ -631,29 +617,8 @@ impl ErasureLedger {
             }
         }
 
-        let active_seg_path = self.get_current_segment_path();
         let mut buffer = Vec::new();
-        let mut cur_mac = self.last_chain_mac;
-
-        let mut new_records = Vec::new();
-        let mut new_entries = Vec::new();
-
-        for (rt, tx, purge_id, scope_digest, family_digests, payload) in records_data {
-            if self.seen_proof_ids.contains(purge_id) {
-                continue;
-            }
-
-            let (frame_bytes, new_mac) = CtraledgRecord::serialize_frame(
-                &self.key,
-                &cur_mac,
-                *rt,
-                *tx,
-                now_ms,
-                *purge_id,
-                *scope_digest,
-                family_digests.clone(),
-                payload.clone(),
-            )?;
+        let mut current_mac = self.last_chain_mac;
 
         let mut next_index = (**self.index.load()).clone();
 
@@ -693,7 +658,6 @@ impl ErasureLedger {
         }
         self.index.store(Arc::new(next_index));
 
-        self.rebuild_index();
         self.write_head_marker().await?;
 
         Ok(current_mac)
@@ -760,6 +724,7 @@ impl ErasureLedger {
         }
     }
 
+    /// Bulk decide for multiple keys.
     pub fn decide_batch(
         &self,
         storage_scope: &[u8],
@@ -841,6 +806,10 @@ impl ErasureLedger {
         self.segment_seq
     }
 
+    pub fn read_head_info(&self) -> (u64, [u8; 32]) {
+        (self.segment_seq, self.last_chain_mac)
+    }
+
     pub fn db_instance_id(&self) -> &[u8; 16] {
         &self.db_instance_id
     }
@@ -906,7 +875,6 @@ impl ErasureLedger {
         marker_bytes.extend_from_slice(&self.db_instance_id);
         marker_bytes.extend_from_slice(&self.segment_seq.to_be_bytes());
         marker_bytes.extend_from_slice(&self.last_chain_mac);
-        marker_bytes.extend_from_slice(&self.last_seq.to_le_bytes());
 
         contextra_durable_fs::atomic_replace(&head_path, &marker_bytes)?;
         Ok(())

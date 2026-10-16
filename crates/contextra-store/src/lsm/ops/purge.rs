@@ -35,7 +35,7 @@ impl LsmStorage {
         // 2. Active Memtable Flush to SSTable first
         StorageEngine::flush(self)
             .await
-            .map_err(|e| PurgeError::FlushFailed(e.to_string()))?;
+            .map_err(|e| PurgeError::ProbeFailed(format!("Flush failed: {e}")))?;
 
         // Snapshot existing sstables list under read lock
         let snapshot_sstables = {
