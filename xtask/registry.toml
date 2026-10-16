@@ -330,6 +330,13 @@ blocking = false
 phase = "Phase 2"
 
 [[commands]]
+name = "check-no-stubs"
+owner_tier = "ci-gate"
+summary = "Spürt Stub-/Platzhalter-Implementierungen auf."
+blocking = false
+phase = "Phase 0"
+
+[[commands]]
 name = "check-mutation-score-gate"
 owner_tier = "ci-gate"
 summary = "Prüft Einhaltung des Mutations-Test-Score-Schwellenwerts."
@@ -363,6 +370,13 @@ owner_tier = "ci-gate"
 summary = "Prüft Port-Features (backend-impl nur in store, test-utils nur in dev-dependencies)"
 blocking = false
 phase = "Phase 1"
+
+[[commands]]
+name = "check-port-names"
+owner_tier = "ci-gate"
+summary = "Verifiziert Port-Trait-Namen gegen Spezifikation §7.4."
+blocking = false
+phase = "Phase 0"
 
 [[commands]]
 name = "check-placeholder-refs"
