@@ -5,6 +5,7 @@
 //! - [`ErasureBackend`]: Storage-level physical scope derivation and purge execution.
 //! - [`ErasureHooks`]: Lifecycle callbacks during coordinator execution.
 //! - [`LayerScan`]: Verification scan contracts for storage/index layers.
+//! - [`LayerEraser`]: Storage layer physical data removal contracts.
 //! - [`RestoreGuard`]: Anti-resurrection guard for checkpoint restoration.
 //! - [`PhysicalScope`]: Opaque tenant-encoded physical keys and prefixes.
 
@@ -53,6 +54,160 @@ impl PurgeId {
     }
 }
 
+/// Scope provenance and origin metadata (§4.3, DE-03).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct ScopeOrigin {
+    /// Random process/instance-stable storage backend identifier.
+    pub backend_id: u64,
+    /// Tenant BLAKE3 digest.
+    pub tenant_digest: [u8; 32],
+}
+
+impl ScopeOrigin {
+    /// Creates a new `ScopeOrigin`.
+    pub fn new(backend_id: u64, tenant_digest: [u8; 32]) -> Self {
+        Self {
+            backend_id,
+            tenant_digest,
+        }
+    }
+}
+
+/// Error returned by erasure backend operations (§4.3).
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ErasureError {
+    /// Erasure backend not available.
+    #[error("Erasure backend not available")]
+    NotAvailable,
+    /// Policy violation.
+    #[error("Policy violation: current {current}, requested {requested}")]
+    PolicyViolation {
+        /// Currently active policy.
+        current: String,
+        /// Requested policy.
+        requested: String,
+    },
+    /// Erasure backend not configured.
+    #[error("Erasure backend not configured")]
+    NotConfigured,
+    /// Scope belongs to a foreign tenant or mismatched backend origin.
+    #[error("Foreign scope or backend origin mismatch")]
+    ForeignScope,
+    /// Scope key or prefix violates tenant encoding invariants.
+    #[error("Malformed physical scope")]
+    MalformedScope,
+    /// Erasure ledger state is corrupt.
+    #[error("Erasure ledger corrupt")]
+    LedgerCorrupt,
+    /// Internal failure in erasure subsystem.
+    #[error("Internal erasure error: {0}")]
+    Internal(String),
+}
+
+impl From<ErasureError> for ContextraError {
+    fn from(err: ErasureError) -> Self {
+        match err {
+            ErasureError::NotAvailable => ContextraError::capability_unsupported(
+                "erasure_backend",
+                "Erasure backend not available on this storage engine",
+            ),
+            ErasureError::PolicyViolation { current, requested } => ContextraError::PolicyViolation(
+                format!("Erasure policy violation: current={}, requested={}", current, requested),
+            ),
+            ErasureError::NotConfigured => ContextraError::InvalidInput(
+                "Erasure backend not configured".to_string(),
+            ),
+            ErasureError::ForeignScope => ContextraError::InvalidInput(
+                "Foreign physical scope or backend origin mismatch".to_string(),
+            ),
+            ErasureError::MalformedScope => ContextraError::InvalidInput(
+                "Malformed physical scope: key/prefix does not match tenant prefix or format rules".to_string(),
+            ),
+            ErasureError::LedgerCorrupt => ContextraError::Storage(
+                "Erasure ledger corrupt".to_string(),
+            ),
+            ErasureError::Internal(msg) => ContextraError::Storage(msg),
+        }
+    }
+}
+
+/// Obsolete file record identified for disposal (§4.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObsoleteFile {
+    /// File path.
+    pub path: PathBuf,
+    /// Byte length of file.
+    pub byte_len: u64,
+}
+
+/// Report returned by [`ErasureBackend::dispose`] (§4.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DisposeReport {
+    /// Number of files removed.
+    pub files_removed: usize,
+    /// Total disk space freed in bytes.
+    pub bytes_freed: u64,
+}
+
+/// Error returned by [`ErasureBackend::dispose`] (§4.3).
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DisposeError {
+    /// File scrub was refused by storage or policy.
+    #[error("Scrub refused for file {file}: {reason}")]
+    ScrubRefused {
+        /// Target file path.
+        file: String,
+        /// Refusal reason.
+        reason: String,
+    },
+    /// File removal failed.
+    #[error("Failed to remove file: {file}")]
+    RemoveFailed {
+        /// Target file path.
+        file: String,
+    },
+    /// Filesystem sync failed after disposal.
+    #[error("Sync failed during file disposal")]
+    SyncFailed,
+}
+
+/// Error returned by purge resume operation (§4.3).
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResumeError {
+    /// Target purge ID was not recorded in ledger.
+    #[error("Scope not in ledger for purge_id: {purge_id:?}")]
+    ScopeNotInLedger {
+        /// Purge operation handle.
+        purge_id: PurgeId,
+    },
+    /// Purge intent file or record is corrupt.
+    #[error("Purge intent corrupt")]
+    IntentCorrupt,
+    /// Erasure ledger state is corrupt.
+    #[error("Erasure ledger corrupt")]
+    LedgerCorrupt,
+    /// Storage engine not ready for resume.
+    #[error("Store not ready")]
+    StoreNotReady,
+}
+
+/// Error returned by checkpoint restore verification (§4.3).
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RestoreError {
+    /// Anti-resurrection restore guard is required for active erasure mode.
+    #[error("Restore guard required for mode: {mode}")]
+    GuardRequired {
+        /// Active erasure mode.
+        mode: String,
+    },
+    /// Erasure ledger state is corrupt.
+    #[error("Erasure ledger corrupt")]
+    LedgerCorrupt,
+    /// I/O error during restore operation.
+    #[error("I/O error during restore: {0}")]
+    Io(String),
+}
+
 /// Logical scope of a deletion request specified by the caller (§5.4).
 ///
 /// Every variant carries the owning [`TenantId`].
@@ -98,6 +253,7 @@ impl LogicalScope {
 /// Fields are strictly private. The constructor is gated behind feature `backend-impl`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PhysicalScope {
+    origin: ScopeOrigin,
     keys: Vec<Vec<u8>>,
     prefixes: Vec<Vec<u8>>,
 }
@@ -107,37 +263,31 @@ impl PhysicalScope {
     ///
     /// # Invariants
     /// 1. Must not be empty (at least one key or prefix required).
-    /// 2. Every key and prefix MUST start with `t:<tenant_id>:`. Empty prefix is rejected.
-    /// 3. Canonical: sorted, deduplicated, and subsumed keys/prefixes removed.
+    /// 2. Every key and prefix MUST start with `t:<tenant_id>:`.
+    /// 3. Every prefix MUST end with `:`.
+    /// 4. Canonical: sorted, deduplicated, and subsumed keys/prefixes removed.
     #[cfg(feature = "backend-impl")]
     pub fn try_new(
         tenant_id: TenantId,
+        origin: ScopeOrigin,
         keys: Vec<Vec<u8>>,
         prefixes: Vec<Vec<u8>>,
-    ) -> std::result::Result<Self, ContextraError> {
+    ) -> std::result::Result<Self, ErasureError> {
         if keys.is_empty() && prefixes.is_empty() {
-            return Err(ContextraError::InvalidInput(
-                "PhysicalScope cannot be empty".to_string(),
-            ));
+            return Err(ErasureError::MalformedScope);
         }
 
         let tenant_prefix_bytes = format!("t:{}:", tenant_id.0).into_bytes();
 
         for k in &keys {
             if !k.starts_with(&tenant_prefix_bytes) {
-                return Err(ContextraError::InvalidInput(format!(
-                    "Key {:?} does not start with expected tenant prefix 't:{}:'",
-                    k, tenant_id.0
-                )));
+                return Err(ErasureError::MalformedScope);
             }
         }
 
         for p in &prefixes {
-            if p.is_empty() || !p.starts_with(&tenant_prefix_bytes) {
-                return Err(ContextraError::InvalidInput(format!(
-                    "Prefix {:?} does not start with expected tenant prefix 't:{}:'",
-                    p, tenant_id.0
-                )));
+            if p.is_empty() || !p.starts_with(&tenant_prefix_bytes) || !p.ends_with(b":") {
+                return Err(ErasureError::MalformedScope);
             }
         }
 
@@ -169,9 +319,16 @@ impl PhysicalScope {
             .collect();
 
         Ok(Self {
+            origin,
             keys: canonical_keys,
             prefixes: canonical_prefixes,
         })
+    }
+
+    /// Returns the provenance origin of this physical scope.
+    #[must_use]
+    pub fn origin(&self) -> &ScopeOrigin {
+        &self.origin
     }
 
     /// Returns the explicit physical keys in this scope.
@@ -271,10 +428,41 @@ pub struct EraseCtx<'a> {
 }
 
 /// Active write fence guard held during purge execution.
-#[derive(Debug)]
 pub struct FenceGuard {
-    /// Identifier of purge holding the fence.
-    pub purge_id: PurgeId,
+    purge_id: PurgeId,
+    release: Option<Box<dyn FnOnce() + Send + Sync>>,
+}
+
+impl std::fmt::Debug for FenceGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FenceGuard")
+            .field("purge_id", &self.purge_id)
+            .finish()
+    }
+}
+
+impl FenceGuard {
+    /// Creates a new `FenceGuard` with a purge ID and a drop release hook.
+    pub fn new(purge_id: PurgeId, release: Box<dyn FnOnce() + Send + Sync>) -> Self {
+        Self {
+            purge_id,
+            release: Some(release),
+        }
+    }
+
+    /// Returns the identifier of the purge operation holding the fence.
+    #[must_use]
+    pub fn purge_id(&self) -> PurgeId {
+        self.purge_id
+    }
+}
+
+impl Drop for FenceGuard {
+    fn drop(&mut self) {
+        if let Some(release) = self.release.take() {
+            release();
+        }
+    }
 }
 
 /// Output report produced by an [`ErasureBackend::purge_physical`] operation (§5.5).
@@ -324,6 +512,12 @@ pub enum PurgeError {
         /// Error detail string.
         source_details: String,
     },
+    /// Flush failed during purge execution.
+    #[error("Flush failed: {details}")]
+    FlushFailed {
+        /// Detail text describing flush error.
+        details: String,
+    },
     /// Background compaction lease is currently busy.
     #[error("Compaction busy")]
     CompactionBusy,
@@ -347,13 +541,13 @@ pub enum PurgeError {
     },
 }
 
-/// Storage backend contract for erasure operations (§5.5).
+/// Storage backend contract for erasure operations (§4.3, §5.5).
 pub trait ErasureBackend: Send + Sync {
     /// Translates a logical scope into a tenant-encoded physical scope.
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError>;
+    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ErasureError>;
 
     /// Acquires write drain fence for `scope`.
-    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError>;
+    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ErasureError>;
 
     /// Executes physical purge compaction for `scope` as of `as_of`.
     fn purge_physical(
@@ -361,7 +555,16 @@ pub trait ErasureBackend: Send + Sync {
         scope: &PhysicalScope,
         as_of: TxId,
         probe: &dyn FreeSpaceProbe,
+        fence: &FenceGuard,
     ) -> std::result::Result<PurgeOutput, PurgeError>;
+
+    /// Disposes obsolete files (§4.3).
+    fn dispose(&self, _files: &[ObsoleteFile]) -> std::result::Result<DisposeReport, DisposeError> {
+        Err(DisposeError::ScrubRefused {
+            file: String::new(),
+            reason: "Dispose operation not available".to_string(),
+        })
+    }
 
     /// Returns the erasure fence snapshot write sequence number for the specified prefixes.
     fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {
@@ -473,6 +676,24 @@ pub trait LayerScan: Send + Sync {
     fn scan(&self, scope: &PhysicalScope) -> std::result::Result<LayerObservation, ScanError>;
 }
 
+/// Report returned by layer erasure execution (§4.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct EraseReport {
+    /// Number of items erased in layer.
+    pub items_erased: u64,
+    /// Bytes reclaimed in layer.
+    pub bytes_reclaimed: u64,
+}
+
+/// Layer eraser contract implemented by layer owners (idempotent, §4.3).
+pub trait LayerEraser: Send + Sync {
+    /// Layer identifier.
+    fn layer(&self) -> u16;
+
+    /// Erases scoped data from layer up to `as_of` transaction (idempotent).
+    fn erase(&self, scope: &PhysicalScope, as_of: TxId) -> std::result::Result<EraseReport, ErasureError>;
+}
+
 /// Outcome of a deletion request (§5.3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeleteOutcome {
@@ -488,6 +709,11 @@ pub enum DeleteOutcome {
         /// Purge operation handle.
         purge_id: PurgeId,
     },
+    /// Mode Attested: Logical and assured processing complete, attestation proof reference issued (DE-21).
+    Attested {
+        /// Proof reference identifier.
+        proof_ref: String,
+    },
 }
 
 /// Error returned by erasure operations (§5.3).
@@ -500,16 +726,6 @@ pub enum EraseError {
     /// Failed before commit point (retry is safe).
     #[error("Deletion failed before commit point: {0}")]
     NotStarted(#[source] ContextraError),
-
-    /// State indeterminate after commit point (deletion will roll forward).
-    #[error("Deletion state indeterminate after commit point (purge_id: {purge_id:?}): {cause}")]
-    Indeterminate {
-        /// Identifier of purge operation.
-        purge_id: PurgeId,
-        /// Cause of failure after commit point.
-        #[source]
-        cause: ContextraError,
-    },
 }
 
 impl From<EraseError> for ContextraError {
@@ -520,7 +736,6 @@ impl From<EraseError> for ContextraError {
                 "Erasure backend not available on this storage engine",
             ),
             EraseError::NotStarted(cause) => cause,
-            EraseError::Indeterminate { cause, .. } => cause,
         }
     }
 }
@@ -570,6 +785,91 @@ impl PurgeState {
             7 => Some(Self::Completed),
             8 => Some(Self::Attested),
             _ => None,
+        }
+    }
+}
+
+/// Reasons why purge execution is currently pending (§4.3, §5.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum PendingReason {
+    /// Active open read snapshot pins purge horizon.
+    OpenSnapshot,
+    /// Disk space is low or free space probe failed.
+    DiskSpaceUnknownOrLow,
+    /// File scrub operation was refused.
+    ScrubRefused,
+    /// Background compaction lease is busy.
+    CompactionLease,
+    /// Write fence active on requested key scope.
+    Fenced,
+    /// Read error encountered during execution.
+    ReadError,
+    /// Write error encountered during execution.
+    WriteError,
+    /// Manifest error encountered during execution.
+    ManifestError,
+    /// Key retention wait period active.
+    KeyWaitPeriod,
+}
+
+/// Public purge status derived from internal `PurgeState` state machine (§4.3, §5.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PurgeStatus {
+    /// Purge execution pending.
+    Pending {
+        /// Reason for pending status.
+        reason: PendingReason,
+        /// Timestamp in milliseconds when purge entered pending state.
+        since_ms: u64,
+        /// Next retry timestamp in milliseconds.
+        retry_at_ms: u64,
+    },
+    /// Purge rewrite in progress.
+    InProgress {
+        /// Number of SSTables processed.
+        sstables_done: usize,
+        /// Total number of SSTables to process.
+        sstables_total: usize,
+    },
+    /// Physically purged.
+    Purged,
+    /// Assured phase completed.
+    Completed,
+    /// Witness scan failed for layer.
+    ScanFailed {
+        /// Numeric layer identifier.
+        layer: u16,
+    },
+    /// Attestation proof available.
+    Attested {
+        /// Proof reference identifier.
+        proof_ref: String,
+    },
+}
+
+impl PurgeStatus {
+    /// Derives public [`PurgeStatus`] from internal [`PurgeState`] (§5.2).
+    /// Returns `None` if internal state is `Begun` (invisible state).
+    #[must_use]
+    pub fn from_state(state: PurgeState) -> Option<Self> {
+        match state {
+            PurgeState::Begun => None,
+            PurgeState::LedgerAppended | PurgeState::Tombstoned | PurgeState::PurgePending => {
+                Some(Self::Pending {
+                    reason: PendingReason::KeyWaitPeriod,
+                    since_ms: 0,
+                    retry_at_ms: 0,
+                })
+            }
+            PurgeState::Purging => Some(Self::InProgress {
+                sstables_done: 0,
+                sstables_total: 0,
+            }),
+            PurgeState::Purged | PurgeState::KeyQuarantined => Some(Self::Purged),
+            PurgeState::Completed => Some(Self::Completed),
+            PurgeState::Attested => Some(Self::Attested {
+                proof_ref: String::new(),
+            }),
         }
     }
 }
