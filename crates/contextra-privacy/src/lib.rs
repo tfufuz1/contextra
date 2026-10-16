@@ -39,5 +39,5 @@ pub use error::EgressError;
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
-    ProcessorRole, TenantId,
+    ProcessorRole, TenantLabel,
 };
