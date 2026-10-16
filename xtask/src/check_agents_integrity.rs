@@ -9,7 +9,13 @@ pub fn run_check_agents_integrity() -> bool {
     let mut success = true;
 
     // 1. Check that every workspace crate has a local AGENTS.md
-    let crates = get_workspace_crates();
+    let crates = match get_workspace_crates() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("❌ [AGENTS-INTEGRITY]: Failed to load workspace crates: {}", e);
+            return false;
+        }
+    };
     for c in &crates {
         let crate_agents_path = root.join(&c.path).join("AGENTS.md");
         if !crate_agents_path.exists() {
@@ -97,8 +103,10 @@ fn is_type_or_crate_implemented(item: &str, root: &Path) -> bool {
         if root.join("crates").join(item).exists() {
             return true;
         }
-        if get_workspace_crates().iter().any(|c| c.name == item) {
-            return true;
+        if let Ok(crates) = get_workspace_crates() {
+            if crates.iter().any(|c| c.name == item) {
+                return true;
+            }
         }
     }
 

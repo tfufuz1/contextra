@@ -146,6 +146,21 @@ pub fn find_root_dir() -> PathBuf {
 }
 
 fn find_root_dir_uncached(current_dir: &Path) -> PathBuf {
+    let mut dir = current_dir.to_path_buf();
+    loop {
+        let cargo_path = dir.join("Cargo.toml");
+        if cargo_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cargo_path) {
+                if content.contains("[workspace]") && content.contains("members") {
+                    return dir;
+                }
+            }
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut dir = PathBuf::from(manifest_dir);
         loop {
@@ -160,21 +175,6 @@ fn find_root_dir_uncached(current_dir: &Path) -> PathBuf {
             if !dir.pop() {
                 break;
             }
-        }
-    }
-
-    let mut dir = current_dir.to_path_buf();
-    loop {
-        let cargo_path = dir.join("Cargo.toml");
-        if cargo_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cargo_path) {
-                if content.contains("[workspace]") && content.contains("members") {
-                    return dir;
-                }
-            }
-        }
-        if !dir.pop() {
-            break;
         }
     }
 
@@ -585,28 +585,28 @@ pub fn compute_crate_layers(crates: &mut [CrateInfo]) -> Result<(), String> {
     Ok(())
 }
 
-pub fn get_workspace_crates() -> Vec<CrateInfo> {
+pub fn get_workspace_crates() -> Result<Vec<CrateInfo>, String> {
     let root_dir = find_root_dir();
     if let Ok(guard) = WORKSPACE_CRATES_CACHE.lock() {
         if let Some(ref cache) = *guard {
             if let Some(cached) = cache.get(&root_dir) {
-                return cached.clone();
+                return Ok(cached.clone());
             }
         }
     }
     let capabilities = load_capabilities_manifest(&root_dir);
-    let crates = get_workspace_crates_from_root(&root_dir, &capabilities);
+    let crates = get_workspace_crates_from_root(&root_dir, &capabilities)?;
     if let Ok(mut guard) = WORKSPACE_CRATES_CACHE.lock() {
         let cache = guard.get_or_insert_with(HashMap::new);
         cache.insert(root_dir, crates.clone());
     }
-    crates
+    Ok(crates)
 }
 
 pub fn get_workspace_crates_from_root(
     root_dir: &Path,
     capabilities: &CapabilitiesManifest,
-) -> Vec<CrateInfo> {
+) -> Result<Vec<CrateInfo>, String> {
     let cargo_path = root_dir.join("Cargo.toml");
     let root_cargo = fs::read_to_string(&cargo_path).unwrap_or_default();
     let toml_val: toml::Value =
@@ -618,7 +618,7 @@ pub fn get_workspace_crates_from_root(
         .and_then(|m| m.as_array())
     {
         Some(m) => m,
-        None => return Vec::new(),
+        None => return Ok(Vec::new()),
     };
 
     let mut crates = Vec::new();
@@ -729,8 +729,8 @@ pub fn get_workspace_crates_from_root(
         });
     }
 
-    let _ = compute_crate_layers(&mut crates);
-    crates
+    compute_crate_layers(&mut crates)?;
+    Ok(crates)
 }
 
 pub fn render_updated_markdown(
@@ -1092,7 +1092,13 @@ pub fn run_sync_docs(check_only: bool) -> bool {
     println!("✅ capabilities.toml is fully aligned with Spec §4.1 (G-04).");
 
     let tags = scan_tags(&root);
-    let crates = get_workspace_crates();
+    let crates = match get_workspace_crates() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("❌ Fehler beim Laden der Workspace-Crates: {}", e);
+            return false;
+        }
+    };
 
     let new_ws = generate_full_working_state(&tags, &crates);
     let ws_path = root.join("WORKING_STATE.md");
@@ -1457,7 +1463,13 @@ pub fn check_dag_layer_violations(crates: &[CrateInfo]) -> Vec<DagViolation> {
 
 pub fn run_check_dag() -> bool {
     println!("=== xtask check-dag ===");
-    let crates = get_workspace_crates();
+    let crates = match get_workspace_crates() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("❌ DAG-Fehler beim Laden der Workspace-Crates: {}", e);
+            return false;
+        }
+    };
     let violations = check_dag_layer_violations(&crates);
 
     let known_exceptions: &[(&str, &str)] = &[];

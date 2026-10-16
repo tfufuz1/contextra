@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
-use crate::{compute_crate_layers, find_root_dir, get_workspace_crates};
+use crate::{find_root_dir, get_workspace_crates};
 
 /// Ein Treffer im Code oder in der TYPE_REGISTRY.md.
 #[derive(Debug, Serialize)]
@@ -96,8 +96,13 @@ pub fn check_type_registry(root: &Path, type_name: &str) -> TypeCheckResult {
     let code_re = Regex::new(&pattern).unwrap();
 
     // Layer-Map aufbauen
-    let mut crates = get_workspace_crates();
-    let _ = compute_crate_layers(&mut crates);
+    let crates = match get_workspace_crates() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("⚠️ Fehler beim Berechnen der Crate-Layer: {}", e);
+            Vec::new()
+        }
+    };
     let layer_map: std::collections::HashMap<String, u8> =
         crates.iter().map(|c| (c.name.clone(), c.layer)).collect();
 
