@@ -54,7 +54,12 @@ impl PurgeId {
     }
 }
 
+/// Numeric storage or index layer identifier (§5.5).
+pub type LayerId = u16;
+
 /// Scope provenance and origin metadata (§4.3, DE-03).
+///
+/// Verdrahtung: J-20
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct ScopeOrigin {
     /// Random process/instance-stable storage backend identifier.
@@ -141,6 +146,8 @@ pub struct ObsoleteFile {
 }
 
 /// Report returned by [`ErasureBackend::dispose`] (§4.3).
+///
+/// Verdrahtung: J-20
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DisposeReport {
     /// Number of files removed.
@@ -150,6 +157,8 @@ pub struct DisposeReport {
 }
 
 /// Error returned by [`ErasureBackend::dispose`] (§4.3).
+///
+/// Verdrahtung: J-20
 #[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DisposeError {
     /// File scrub was refused by storage or policy.
@@ -512,12 +521,6 @@ pub enum PurgeError {
         /// Error detail string.
         source_details: String,
     },
-    /// Flush failed during purge execution.
-    #[error("Flush failed: {details}")]
-    FlushFailed {
-        /// Detail text describing flush error.
-        details: String,
-    },
     /// Background compaction lease is currently busy.
     #[error("Compaction busy")]
     CompactionBusy,
@@ -677,18 +680,25 @@ pub trait LayerScan: Send + Sync {
 }
 
 /// Report returned by layer erasure execution (§4.3).
+///
+/// Verdrahtung: J-20
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct EraseReport {
+    /// Numeric layer identifier.
+    pub layer: LayerId,
     /// Number of items erased in layer.
     pub items_erased: u64,
-    /// Bytes reclaimed in layer.
-    pub bytes_reclaimed: u64,
+    /// Bytes scrubbed/reclaimed in layer.
+    pub bytes_scrubbed: u64,
 }
 
 /// Layer eraser contract implemented by layer owners (idempotent, §4.3).
+///
+/// Implementations MUST be idempotent.
+/// Verdrahtung: J-20
 pub trait LayerEraser: Send + Sync {
     /// Layer identifier.
-    fn layer(&self) -> u16;
+    fn layer(&self) -> LayerId;
 
     /// Erases scoped data from layer up to `as_of` transaction (idempotent).
     fn erase(&self, scope: &PhysicalScope, as_of: TxId) -> std::result::Result<EraseReport, ErasureError>;
