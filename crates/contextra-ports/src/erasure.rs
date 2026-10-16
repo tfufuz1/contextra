@@ -305,9 +305,6 @@ pub enum PurgeError {
         /// Available disk space in bytes (None = probe unknown).
         available: Option<u64>,
     },
-    /// Active memtable flush failed prior to purge.
-    #[error("Flush failed: {0}")]
-    FlushFailed(String),
     /// Write fence conflict detected during purge execution.
     #[error("Fence conflict")]
     FenceConflict,
@@ -338,6 +335,9 @@ pub enum PurgeError {
     /// Manifest log processing error.
     #[error("Manifest error: {0}")]
     Manifest(String),
+    /// Flush operation failed prior to purge execution.
+    #[error("Flush failed: {0}")]
+    FlushFailed(String),
     /// Free space probe failed.
     #[error("Probe failed: {0}")]
     ProbeFailed(String),

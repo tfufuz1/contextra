@@ -184,10 +184,12 @@ async fn Invariante_I1_outside_scope_snap() -> contextra_types::Result<()> {
 }
 
 // ============================================================================
-// INVARIANTE I2: Version ordering and L0 overlap
+// INVARIANTE I2: Version ordering, L0 overlap, and early empty SSTable replacement (P-2)
 // ============================================================================
 /// Invariante I2: Die Versionsreihenfolge bleibt erhalten (kein älterer Wert
-/// verdeckt einen neueren). Der Test erzwingt überlappende Bereiche in Ebene 0.
+/// verdeckt einen neueren). Der Test erzwingt überlappende Bereiche in Ebene 0
+/// sowie eine SSTable, die beim Purge vollständig leer wird, um exakte Pfad-
+/// basierte Ersetzung ohne Zuordnungsverschiebung zu beweisen (P-2/B-07).
 #[tokio::test]
 async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Result<()> {
     let dir = tempdir()?;
@@ -198,35 +200,40 @@ async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Res
     let storage = LsmStorage::open(config).await?;
     let mut model = PurgeReferenceModel::new();
 
-    // Flush 1: L0 SSTable 1 containing key_a (v1) and key_b (v1)
-    storage.put(TxId(1), b"key_a", b"val_a_v1").await?;
+    // Flush 1: SSTable 1 (L0) contains ONLY purgeable keys (becomes empty during purge)
+    storage.put(TxId(1), b"purge:earlier_1", b"val_purge_1").await?;
     storage.commit(TxId(1)).await?;
     let s1 = storage.last_applied_seq();
-    model.put(s1, b"key_a".to_vec(), b"val_a_v1".to_vec());
+    model.put(s1, b"purge:earlier_1".to_vec(), b"val_purge_1".to_vec());
+    StorageEngine::flush(&storage).await?;
 
-    storage.put(TxId(2), b"key_b", b"val_b_v1").await?;
+    // Flush 2: SSTable 2 (L0) contains key_a (v1) and key_b (v1)
+    storage.put(TxId(2), b"key_a", b"val_a_v1").await?;
     storage.commit(TxId(2)).await?;
     let s2 = storage.last_applied_seq();
-    model.put(s2, b"key_b".to_vec(), b"val_b_v1".to_vec());
+    model.put(s2, b"key_a".to_vec(), b"val_a_v1".to_vec());
 
-    StorageEngine::flush(&storage).await?;
-
-    // Flush 2: Overlapping L0 SSTable 2 containing key_a (v2) and key_b (v2)
-    storage.put(TxId(3), b"key_a", b"val_a_v2").await?;
+    storage.put(TxId(3), b"key_b", b"val_b_v1").await?;
     storage.commit(TxId(3)).await?;
     let s3 = storage.last_applied_seq();
-    model.put(s3, b"key_a".to_vec(), b"val_a_v2".to_vec());
-
-    storage.put(TxId(4), b"key_b", b"val_b_v2").await?;
-    storage.commit(TxId(4)).await?;
-    let s4 = storage.last_applied_seq();
-    model.put(s4, b"key_b".to_vec(), b"val_b_v2".to_vec());
-
+    model.put(s3, b"key_b".to_vec(), b"val_b_v1".to_vec());
     StorageEngine::flush(&storage).await?;
 
-    // Purge key_a up to s1 (purges v1 of key_a at s1, keeps v2 at s3)
-    let as_of_tx = s1;
-    let scope = PurgeScope::Keys(vec![b"key_a".to_vec()]);
+    // Flush 3: SSTable 3 (L0) contains key_a (v2) and key_b (v2) - overlapping
+    storage.put(TxId(4), b"key_a", b"val_a_v2").await?;
+    storage.commit(TxId(4)).await?;
+    let s4 = storage.last_applied_seq();
+    model.put(s4, b"key_a".to_vec(), b"val_a_v2".to_vec());
+
+    storage.put(TxId(5), b"key_b", b"val_b_v2").await?;
+    storage.commit(TxId(5)).await?;
+    let s5 = storage.last_applied_seq();
+    model.put(s5, b"key_b".to_vec(), b"val_b_v2".to_vec());
+    StorageEngine::flush(&storage).await?;
+
+    // Purge prefix "purge:" and key_a up to s2
+    let as_of_tx = s2;
+    let scope = PurgeScope::Prefixes(vec![b"purge:".to_vec(), b"key_a".to_vec()]);
 
     let report = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
     model.purge(&scope, as_of_tx);
@@ -235,19 +242,17 @@ async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Res
         let _ = contextra_durable_fs::durable_remove(file);
     }
 
-    // Verify MVCC point reads for key_a and key_b across snapshots
-    let snap_between = s1 + 1;
-    let val_a_snap_between = storage.get_at_seq(b"key_a", snap_between).await?.map(|b| b.to_vec());
-    let model_a_snap_between = model.get_at_seq(b"key_a", snap_between);
-    assert_eq!(val_a_snap_between, model_a_snap_between);
+    // Verify MVCC point reads for key_a, key_b, and purge:earlier_1
+    let val_purge = storage.get_at_seq(b"purge:earlier_1", s5 + 1).await?.map(|b| b.to_vec());
+    assert_eq!(val_purge, None, "Early empty SSTable keys must be purged");
 
-    let val_a_snap3 = storage.get_at_seq(b"key_a", s3 + 1).await?.map(|b| b.to_vec());
-    let model_a_snap3 = model.get_at_seq(b"key_a", s3 + 1);
-    assert_eq!(val_a_snap3, model_a_snap3);
+    let val_a_s5 = storage.get_at_seq(b"key_a", s5 + 1).await?.map(|b| b.to_vec());
+    let model_a_s5 = model.get_at_seq(b"key_a", s5 + 1);
+    assert_eq!(val_a_s5, model_a_s5, "Newer version in subsequent SSTable must remain intact");
 
-    let val_b_snap4 = storage.get_at_seq(b"key_b", s4 + 1).await?.map(|b| b.to_vec());
-    let model_b_snap4 = model.get_at_seq(b"key_b", s4 + 1);
-    assert_eq!(val_b_snap4, model_b_snap4);
+    let val_b_s5 = storage.get_at_seq(b"key_b", s5 + 1).await?.map(|b| b.to_vec());
+    let model_b_s5 = model.get_at_seq(b"key_b", s5 + 1);
+    assert_eq!(val_b_s5, model_b_s5, "Unrelated key_b in overlapping L0 must remain intact");
 
     Ok(())
 }

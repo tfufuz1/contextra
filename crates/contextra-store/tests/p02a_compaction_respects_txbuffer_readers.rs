@@ -6,8 +6,8 @@
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_types::types::budget::ResourceTracker;
-use contextra_types::TxId;
-use contextra_types::TOMBSTONE_BIT;
+use contextra_types::types::domain::ids::TxId;
+use contextra_types::types::domain::misc::TOMBSTONE_BIT;
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::lsm::GcFloor;
 use contextra_store::sstable::{create_block_cache_with_shards, SstableBuilder, SstableReader};

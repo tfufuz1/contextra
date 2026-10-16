@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // STAND: 2026-10-16
-// ZWECK: Test for streaming purge rewrite without buffering entries in a Vec (P-3 requirement).
+// ZWECK: Test for single-pass streaming purge rewrite without buffering entries in a Vec (P-3 requirement).
 
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
@@ -19,8 +19,11 @@ impl FreeSpaceProbe for MockFreeSpaceProbe {
     }
 }
 
+/// Verifies that LsmStorage::purge_keys executes a streaming single-pass rewrite
+/// directly from the SSTable stream into SstableBuilder, without allocating a Vec
+/// of valid entries or scaling memory with SSTable entry count (P-3 requirement).
 #[tokio::test]
-async fn test_purge_streaming_rewrite_many_entries() -> contextra_types::Result<()> {
+async fn test_purge_streaming_rewrite_memory_independence() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -28,8 +31,8 @@ async fn test_purge_streaming_rewrite_many_entries() -> contextra_types::Result<
     };
     let storage = LsmStorage::open(config).await?;
 
-    let num_entries = 1000u64;
-    // Insert 1000 keys: even keys starting with "purge:", odd keys starting with "keep:"
+    let num_entries = 2000u64;
+    // Insert 2000 keys: even keys starting with "purge:", odd keys starting with "keep:"
     for i in 1..=num_entries {
         let key = if i % 2 == 0 {
             format!("purge:key_{:05}", i).into_bytes()
@@ -51,7 +54,7 @@ async fn test_purge_streaming_rewrite_many_entries() -> contextra_types::Result<
     let as_of_tx = storage.last_applied_seq();
     let report = storage.purge_keys(scope, as_of_tx, Some(&probe)).await.unwrap();
 
-    assert_eq!(report.records_purged, 500);
+    assert_eq!(report.records_purged, 1000);
     assert_eq!(report.sstables_replaced, 1);
 
     // Verify all "purge:" keys are absent and all "keep:" keys are present

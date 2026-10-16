@@ -7,8 +7,7 @@
 // 3. Gelöschte Schlüssel kehren nicht zurück (Anti-Resurrection).
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
-use contextra_ports::{Rng, StorageEngine};
-use contextra_testkit::TestkitSeededRng;
+use contextra_ports::{Rng, SeededRng, StorageEngine};
 use contextra_testkit::ManualClock;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
@@ -52,7 +51,7 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
 
     for i in 0..seed_count {
         let seed = base_seed + (i as u64);
-        let rng = TestkitSeededRng::new(seed);
+        let rng = SeededRng::new(seed);
         let clock = Arc::new(ManualClock::new(1_700_000_000_000_000_000));
 
         // Advance deterministic clock using seeded pseudo-random steps
