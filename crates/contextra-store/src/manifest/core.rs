@@ -5,8 +5,11 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
+use contextra_ports::erasure::ErasureMode;
+use contextra_ports::rng::EntropyRng;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use super::entry::ManifestEntry;
@@ -16,7 +19,7 @@ use crate::format::{check_openable, FileKind, FormatError, FormatHeader};
 use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
-pub const CURRENT_MANIFEST_VERSION: u8 = 1;
+pub const CURRENT_MANIFEST_VERSION: u8 = 2;
 
 /// Tracks highest recorded format versions per file kind from manifest entries.
 #[derive(Debug, Clone, Default)]
@@ -134,6 +137,9 @@ impl ManifestFormatTracker {
 pub struct Manifest {
     pub(super) path: PathBuf,
     pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
+    pub(super) erasure_high_water_mark: AtomicU8,
+    pub(super) ledger_head: tokio::sync::RwLock<(u64, [u8; 32])>,
+    pub(super) backend_id: AtomicU64,
     pub(super) _dir_lock: Option<DirLock>,
 }
 
@@ -202,11 +208,58 @@ impl Manifest {
             crate::util::fsync_parent_dir(&path).await?;
         }
 
-        Ok(Self {
+        // Load existing entries or parse populated state
+        let entries = Self::load(&path).await?;
+
+        let mut max_watermark = 0u8; // ErasureMode::Off
+        let mut last_ledger_seq = 0u64;
+        let mut last_ledger_mac = [0u8; 32];
+        let mut found_backend_id = None;
+
+        for entry in &entries {
+            match entry {
+                ManifestEntry::ErasureWatermarkRecord { mode } => {
+                    max_watermark = max_watermark.max(*mode);
+                }
+                ManifestEntry::LedgerHeadRecord { seq, mac } => {
+                    last_ledger_seq = *seq;
+                    last_ledger_mac = *mac;
+                }
+                ManifestEntry::BackendIdRecord { backend_id } => {
+                    found_backend_id = Some(*backend_id);
+                }
+                _ => {}
+            }
+        }
+
+        let backend_id = match found_backend_id {
+            Some(id) => id,
+            None => {
+                let rng = contextra_ports::SystemRng::new();
+                let mut gen_id = rng.next_u64();
+                while gen_id == 0 {
+                    gen_id = rng.next_u64();
+                }
+                gen_id
+            }
+        };
+
+        let manifest = Self {
             path,
             file: tokio::sync::Mutex::new(file),
+            erasure_high_water_mark: AtomicU8::new(max_watermark),
+            ledger_head: tokio::sync::RwLock::new((last_ledger_seq, last_ledger_mac)),
+            backend_id: AtomicU64::new(backend_id),
             _dir_lock: dir_lock,
-        })
+        };
+
+        if found_backend_id.is_none() {
+            manifest
+                .append(&ManifestEntry::BackendIdRecord { backend_id })
+                .await?;
+        }
+
+        Ok(manifest)
     }
 
     /// Appends a new entry to the manifest and performs flush + fsync.
@@ -416,7 +469,10 @@ impl Manifest {
                 }
                 ManifestEntry::RollbackComplete { .. }
                 | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. } => {}
+                | ManifestEntry::FormatVersionRecord { .. }
+                | ManifestEntry::ErasureWatermarkRecord { .. }
+                | ManifestEntry::LedgerHeadRecord { .. }
+                | ManifestEntry::BackendIdRecord { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -475,7 +531,10 @@ impl Manifest {
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
                 | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. } => {}
+                | ManifestEntry::FormatVersionRecord { .. }
+                | ManifestEntry::ErasureWatermarkRecord { .. }
+                | ManifestEntry::LedgerHeadRecord { .. }
+                | ManifestEntry::BackendIdRecord { .. } => {}
             }
         }
 
@@ -494,5 +553,62 @@ impl Manifest {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Reads the current highest ErasureMode watermark recorded in the manifest.
+    pub fn erasure_high_water_mark(&self) -> ErasureMode {
+        match self.erasure_high_water_mark.load(Ordering::SeqCst) {
+            1 => ErasureMode::Assured,
+            2 => ErasureMode::Attested,
+            _ => ErasureMode::Off,
+        }
+    }
+
+    /// Monotonically raises the erasure high water mark in the manifest.
+    ///
+    /// If `mode` is less than or equal to the currently stored watermark, this call is a no-op and returns `Ok(())`.
+    /// The mark is strictly non-decreasing and cannot be lowered.
+    pub async fn set_erasure_high_water_mark(&self, mode: ErasureMode) -> Result<()> {
+        let mode_u8 = mode as u8;
+        let mut current = self.erasure_high_water_mark.load(Ordering::SeqCst);
+
+        while mode_u8 > current {
+            match self.erasure_high_water_mark.compare_exchange_weak(
+                current,
+                mode_u8,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    self.append(&ManifestEntry::ErasureWatermarkRecord { mode: mode_u8 })
+                        .await?;
+                    break;
+                }
+                Err(actual) => {
+                    current = actual;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Reads the current ledger head state `(ledger_head_seq, ledger_head_mac)`.
+    pub async fn ledger_head(&self) -> (u64, [u8; 32]) {
+        *self.ledger_head.read().await
+    }
+
+    /// Updates and persists the ledger head state.
+    pub async fn set_ledger_head(&self, seq: u64, mac: [u8; 32]) -> Result<()> {
+        let mut guard = self.ledger_head.write().await;
+        self.append(&ManifestEntry::LedgerHeadRecord { seq, mac })
+            .await?;
+        *guard = (seq, mac);
+        Ok(())
+    }
+
+    /// Reads the persistent non-zero backend identifier.
+    pub fn backend_id(&self) -> u64 {
+        self.backend_id.load(Ordering::SeqCst)
     }
 }

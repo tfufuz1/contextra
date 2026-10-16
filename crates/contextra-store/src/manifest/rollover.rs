@@ -109,7 +109,51 @@ impl Manifest {
                 ))
             })?;
 
+            // Write backend_id record first
+            let backend_id = self.backend_id();
+            let backend_entry = ManifestEntry::BackendIdRecord { backend_id };
+            new_file.write_all(&backend_entry.to_bytes()?).await.map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to write backend_id record to temporary MANIFEST {:?}: {e}",
+                    tmp_path
+                ))
+            })?;
+
+            // Write erasure_high_water_mark record if non-zero
+            let mark = self.erasure_high_water_mark() as u8;
+            if mark > 0 {
+                let watermark_entry = ManifestEntry::ErasureWatermarkRecord { mode: mark };
+                new_file.write_all(&watermark_entry.to_bytes()?).await.map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Failed to write erasure watermark record to temporary MANIFEST {:?}: {e}",
+                        tmp_path
+                    ))
+                })?;
+            }
+
+            // Write ledger_head record if non-zero
+            let (ledger_seq, ledger_mac) = self.ledger_head().await;
+            if ledger_seq > 0 || ledger_mac != [0u8; 32] {
+                let ledger_entry = ManifestEntry::LedgerHeadRecord {
+                    seq: ledger_seq,
+                    mac: ledger_mac,
+                };
+                new_file.write_all(&ledger_entry.to_bytes()?).await.map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Failed to write ledger head record to temporary MANIFEST {:?}: {e}",
+                        tmp_path
+                    ))
+                })?;
+            }
+
             for entry in live_entries {
+                // Avoid writing duplicate backend_id, watermark, or ledger_head records if present in live_entries
+                match entry {
+                    ManifestEntry::BackendIdRecord { .. }
+                    | ManifestEntry::ErasureWatermarkRecord { .. }
+                    | ManifestEntry::LedgerHeadRecord { .. } => continue,
+                    _ => {}
+                }
                 let bytes = entry.to_bytes()?;
                 new_file.write_all(&bytes).await.map_err(|e| {
                     ContextraError::Storage(format!(
