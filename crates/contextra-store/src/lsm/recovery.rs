@@ -701,8 +701,6 @@ impl LsmStorage {
             Arc::clone(&last_applied_seq),
         ));
 
-        let compaction_lease_lock = Arc::new(tokio::sync::Mutex::new(()));
-
         let mut compaction_engine_builder = CompactionEngine::new(
             config.compaction.clone(),
             Arc::clone(&gc_floor),
@@ -711,8 +709,7 @@ impl LsmStorage {
             Arc::clone(&resource_tracker),
             Some(Arc::clone(&manifest)),
         )
-        .with_pressure_rx(pressure_rx.clone())
-        .with_compaction_lease_lock(Arc::clone(&compaction_lease_lock));
+        .with_pressure_rx(pressure_rx.clone());
 
         if config.compaction.enable_adaptive_compaction {
             let planner = Arc::new(crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
@@ -749,7 +746,6 @@ impl LsmStorage {
             snapshot_registry,
             floor: gc_floor,
             compaction_engine,
-            compaction_lease_lock,
             manifest,
             next_seq_no: AtomicU64::new(max_seq.saturating_add(1)),
             last_committed_tx: AtomicU64::new(max_tx),

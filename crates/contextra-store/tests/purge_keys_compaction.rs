@@ -145,14 +145,12 @@ async fn test_purge_keys_crash_safety_3_interruption_points() {
             .join("sst-purge-00000000000000000001-000001.sst.tmp");
         std::fs::write(&orphan_tmp, b"partial sstable contents").unwrap();
 
-        storage.close().await.unwrap();
         drop(storage);
 
         // Reopen and verify DB state remains consistent and unaffected by orphan .tmp file
         let recovered = LsmStorage::open(config.clone()).await.unwrap();
         assert!(recovered.get(b"key-purge-1").await.unwrap().is_some());
         assert!(recovered.get(b"key-keep-1").await.unwrap().is_some());
-        recovered.close().await.unwrap();
         drop(recovered);
     }
 
@@ -168,14 +166,12 @@ async fn test_purge_keys_crash_safety_3_interruption_points() {
 
         let _report = storage.purge_keys(scope, 0, Some(&probe)).await.unwrap();
 
-        storage.close().await.unwrap();
         drop(storage);
 
         // Reopen: manifest reconstructs valid active sstables without orphan files
         let recovered = LsmStorage::open(config.clone()).await.unwrap();
         assert!(recovered.get(b"key-purge-1").await.unwrap().is_none());
         assert!(recovered.get(b"key-keep-1").await.unwrap().is_some());
-        recovered.close().await.unwrap();
         drop(recovered);
     }
 
@@ -189,7 +185,6 @@ async fn test_purge_keys_crash_safety_3_interruption_points() {
         let entries = Manifest::load(&manifest_path).await.unwrap();
         let valid = Manifest::reconstruct_valid_sstables(&entries);
         assert!(!valid.is_empty());
-        recovered.close().await.unwrap();
         drop(recovered);
     }
 }

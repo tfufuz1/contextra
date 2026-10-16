@@ -42,9 +42,11 @@ async fn test_record_phase_failpoint_returns_failed_and_preserves_intent() -> st
         other => panic!("Expected PurgeOutcome::Failed, got {:?}", other),
     }
 
-    let intents = OrxPurgeIntent::read_all_intents(dir.path())?;
-    assert_eq!(intents.len(), 1, "Intent file must remain intact on disk after record_phase error");
-    let intent_path = PurgeOrchestrator::intent_path_for_id(dir.path(), &intents[0].purge_id);
+    let intent_path = dir.path().join("purge.intent");
+    assert!(
+        intent_path.exists(),
+        "Intent file must remain intact on disk after record_phase error"
+    );
 
     let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent on disk");
     assert_eq!(intent.phase, PurgePhase::P1Intent);
@@ -107,9 +109,11 @@ async fn test_wal_callback_error_returns_failed_and_releases_fence() -> std::io:
         "Fence must be released upon failure"
     );
 
-    let intents = OrxPurgeIntent::read_all_intents(dir.path())?;
-    assert_eq!(intents.len(), 1, "Intent file must exist on disk after WAL callback error");
-    let intent_path = PurgeOrchestrator::intent_path_for_id(dir.path(), &intents[0].purge_id);
+    let intent_path = dir.path().join("purge.intent");
+    assert!(
+        intent_path.exists(),
+        "Intent file must exist on disk after WAL callback error"
+    );
 
     let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
     assert_eq!(intent.phase, PurgePhase::P6WalCallback);
@@ -160,9 +164,9 @@ async fn test_repetition_after_wal_error_completes_purge() -> std::io::Result<()
         "WAL callback must have been executed during resumption"
     );
 
-    let intents_after = OrxPurgeIntent::read_all_intents(dir.path())?;
+    let intent_path = dir.path().join("purge.intent");
     assert!(
-        intents_after.is_empty(),
+        !intent_path.exists(),
         "Intent file must be removed after successful completion"
     );
 

@@ -81,7 +81,7 @@ pub enum PurgeBlocked {
 }
 
 /// Report summarizing results of a successful purge compaction.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PurgeReport {
     /// Number of records/versions dropped.
     pub records_purged: u64,

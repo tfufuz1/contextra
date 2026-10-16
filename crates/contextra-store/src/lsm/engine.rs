@@ -46,7 +46,6 @@ pub struct LsmStorage {
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
-    pub(super) compaction_lease_lock: Arc<tokio::sync::Mutex<()>>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
@@ -331,10 +330,6 @@ impl LsmStorage {
     #[doc(hidden)]
     pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
         Arc::clone(&self.compaction_engine)
-    }
-
-    pub fn compaction_lease_lock_for_test(&self) -> Arc<tokio::sync::Mutex<()>> {
-        Arc::clone(&self.compaction_lease_lock)
     }
 
     #[doc(hidden)]

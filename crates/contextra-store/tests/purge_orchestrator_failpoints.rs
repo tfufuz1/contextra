@@ -39,17 +39,16 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
             fp_name
         );
 
-        let intents = OrxPurgeIntent::read_all_intents(dir.path())?;
+        let intent_path = dir.path().join("purge.intent");
 
         // Depending on failpoint location, intent file must exist or be cleaned up
         if *fp_name != "after_intent_cleanup" && *fp_name != "p0_init" {
-            assert_eq!(
-                intents.len(),
-                1,
+            assert!(
+                intent_path.exists(),
                 "Intent file must remain intact at failpoint {}",
                 fp_name
             );
-            let intent = &intents[0];
+            let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
             assert!(
                 intent.phase <= PurgePhase::Release,
                 "Phase at failpoint {} must be recorded",
@@ -66,9 +65,8 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
                 "Resumption after failpoint {} should complete",
                 fp_name
             );
-            let intents_after = OrxPurgeIntent::read_all_intents(dir.path())?;
             assert!(
-                intents_after.is_empty(),
+                !intent_path.exists(),
                 "Intent file must be removed after successful resumption for {}",
                 fp_name
             );
