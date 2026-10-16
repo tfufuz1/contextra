@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 //! Integration test verifying that dropping a collection completely clears/resets
-//! HNSW vector index, BM25 text index, CSR graph index, and storage RAM state (WP-L3.1 & C5.2).
+//! HNSW vector index, BM25 text index, and storage RAM state (WP-L3.1 & C5.2).
 
 use contextra_engine::Contextra;
 use contextra_ports::VectorIndex;
@@ -18,7 +18,7 @@ async fn test_drop_collection_resets_ram_state_completely() {
     let mut embedding = vec![0.0f32; col.dimension()];
     embedding[0] = 1.0;
 
-    // Insert document with text and entity into graph
+    // Insert document with text
     let db_tx = col.begin_transaction().unwrap();
     col.insert_op(
         &db_tx,
@@ -48,13 +48,6 @@ async fn test_drop_collection_resets_ram_state_completely() {
         "Text index RAM should have 1 hit before drop"
     );
 
-    let eid = contextra_types::EntityId::from_key(doc_id).unwrap();
-    let g_entity_before = col.graph_index().entity_exists(eid);
-    assert!(
-        g_entity_before,
-        "Graph index RAM should have entity before drop"
-    );
-
     // Execute drop_collection
     col.drop_collection().await.unwrap();
 
@@ -73,12 +66,6 @@ async fn test_drop_collection_resets_ram_state_completely() {
     assert!(
         text_hits_after.is_empty(),
         "BM25 text index RAM postings must be empty after drop_collection"
-    );
-
-    let g_entity_after = col.graph_index().entity_exists(eid);
-    assert!(
-        !g_entity_after,
-        "Graph index RAM state must be cleared after drop_collection"
     );
 
     db.close().await.unwrap();

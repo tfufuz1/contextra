@@ -1,7 +1,6 @@
 use contextra_db::wiring::{MultiStepWiring, MultiStepWiringDeps, PipelineStage};
 use contextra_db::{Collection, MultiStepConfig};
 use contextra_engine::Language;
-use contextra_ports::graph_index::GraphIndexPlaceholder;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
 use std::sync::atomic::AtomicU64;
@@ -26,14 +25,12 @@ async fn test_multistep_wiring_build_and_execute_cascade() {
         })
         .expect("hnsw index"),
     );
-    let graph = Arc::new(GraphIndexPlaceholder);
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = Arc::new(Collection::new(
+    let col = Arc::new(Collection::new_without_graph(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         Language::English,
