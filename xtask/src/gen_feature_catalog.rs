@@ -9,7 +9,7 @@ pub fn run_gen_feature_catalog() -> Result<(), String> {
     println!("=== Running xtask gen-feature-catalog ===");
 
     let root = crate::find_root_dir();
-    let workspace_crates = crate::get_workspace_crates();
+    let workspace_crates = crate::get_workspace_crates()?;
 
     let mut catalog: BTreeMap<String, BTreeMap<String, Vec<String>>> = BTreeMap::new();
 
