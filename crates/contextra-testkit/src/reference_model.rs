@@ -239,4 +239,51 @@ mod tests {
         let p_seq2 = model.scan_prefix_at(b"k", seq2);
         assert_eq!(p_seq2, vec![(b"k1".to_vec(), b"v1_seq2".to_vec())]);
     }
+
+    #[test]
+    fn test_reference_model_rollback_clears_pending_writes() {
+        let mut model = ReferenceModel::new();
+        model.put(b"committed_k", b"v1");
+        let seq1 = model.commit();
+
+        model.put(b"pending_k", b"uncommitted_v");
+        model.delete(b"committed_k");
+        model.rollback(); // Clear pending buffer without commit
+
+        // Sequence number remains at 1
+        assert_eq!(model.snapshot_seq(), seq1);
+        // Committed key retains value; pending key is not present
+        assert_eq!(model.get_latest(b"committed_k"), Some(b"v1".to_vec()));
+        assert_eq!(model.get_latest(b"pending_k"), None);
+    }
+
+    #[test]
+    fn test_reference_model_scan_range_bounds() {
+        let mut model = ReferenceModel::new();
+        model.put(b"a", b"v_a");
+        model.put(b"b", b"v_b");
+        model.put(b"c", b"v_c");
+        model.put(b"d", b"v_d");
+        let seq = model.commit();
+
+        // Inclusive range [b, c]
+        let res_inc = model.scan_range_at(Bound::Included(b"b"), Bound::Included(b"c"), seq);
+        assert_eq!(
+            res_inc,
+            vec![
+                (b"b".to_vec(), b"v_b".to_vec()),
+                (b"c".to_vec(), b"v_c".to_vec())
+            ]
+        );
+
+        // Exclusive range (a, d)
+        let res_exc = model.scan_range_at(Bound::Excluded(b"a"), Bound::Excluded(b"d"), seq);
+        assert_eq!(
+            res_exc,
+            vec![
+                (b"b".to_vec(), b"v_b".to_vec()),
+                (b"c".to_vec(), b"v_c".to_vec())
+            ]
+        );
+    }
 }
