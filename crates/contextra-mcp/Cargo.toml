@@ -11,6 +11,7 @@ ring = "4"
 
 [features]
 default = []
+mock-providers = []
 agent-workflows = ["contextra-agent"]
 onnx = ["contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 candle = ["dep:contextra-infer-candle"]
@@ -49,4 +50,5 @@ tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = "0.3"
 
 [dev-dependencies]
+contextra-mcp = { path = ".", features = ["mock-providers"] }
 tempfile = "3"
