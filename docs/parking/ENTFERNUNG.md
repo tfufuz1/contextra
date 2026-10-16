@@ -1,8 +1,20 @@
 ## 3. Regelwerk
 
-Dieser Abschnitt ist der Inhalt von `docs/parking/ENTFERNUNG.md`. Maintainer committet ihn in M0. Jede Karte beginnt mit: „Lies docs/parking/ENTFERNUNG.md und befolge es.“
+Dieser Abschnitt ist der Inhalt von `docs/parking/ENTFERNUNG.md`. Maintainer committet ihn in M0. Jede Karte beginnt mit: „Lies docs/parking/ENTFERNUNG.md und befolge it.“
 
-### 3.1 Regeln
+### 3.1 Status & Protokoll der Entfernungen (Stand: Karte D1, 16. Oktober 2026)
+
+Auf dem Hauptzweig (`main`) wurden alle EP2 bis EP6 Expansion-Packs sowie Nicht-Kern-Crates vollständig entfernt und entkoppelt:
+- **EP1-Nicht-Kern / FFI:** `crates/contextra-core` und `crates/contextra-py` entfernt (Tag `park/EP1/v1`).
+- **EP2 (Compliance & Proofs):** `crates/contextra-license`, `crates/contextra-audit-export`, `crates/contextra-avv-generator` entfernt (Tag `park/EP2/v1`).
+- **EP3 (Graph & Retrieval Plus):** `crates/contextra-graph` entfernt (Tag `park/EP3/v1`).
+- **EP4 (Inference & KV-Cache):** `crates/contextra-infer-candle`, `crates/contextra-infer-ollama`, `crates/contextra-infer-onnx`, `crates/contextra-kvcache` entfernt (Tag `park/EP4/v1`).
+- **EP5 (Cognition & Router):** `crates/contextra-cognition`, `crates/contextra-adapt`, `crates/contextra-router`, `crates/contextra-agent` entfernt (Tag `park/EP5/v1`).
+- **EP6 (Guard & Sandbox):** `crates/contextra-privacy`, `crates/contextra-sandbox` entfernt (Tag `park/EP6/v1`).
+
+Alle verbleibenden 21 Workspace-Crates repräsentieren ausschließlich den EP1-Kern sowie verbleibende LAB-Tooling/Bench-Crates (`contextra-testkit`, `contextra-bench`, `xtask`, `xtask-heavy`).
+
+### 3.2 Regeln
 
 - **R1 Besitz.** Geändert werden nur Pfade unter „Besitz“ der Karte. Lesen ist überall erlaubt.
 - **R2 Parkplatz.** Code aus Parkplatz-Tags (`park/<ID>/v1`) wird nicht gelesen. Ausnahme: Prüfung einer Wiederherstellung nach PR4. Kein Import aus Parkplatz-Crates.
@@ -11,11 +23,11 @@ Dieser Abschnitt ist der Inhalt von `docs/parking/ENTFERNUNG.md`. Maintainer com
 - **R5 Zero-Panic.** Keine neuen `unwrap`, `expect`, `panic!`, roher Indexzugriff.
 - **R6 Lockfile.** `Cargo.lock` wird nicht committet. Ausnahme: W3-01.
 - **R7 Stopp.** Stoß auf eine Entscheidung, die weder im Regelwerk noch in der Karte steht, oder findest du einen Verweis auf Parkplatz-Symbole in einer Datei außerhalb des Besitzes: Stopp. Im PR notieren: Datei, Zeile, Symbol. Kein Workaround.
-- **R8 Mechanik.** Umbenennung nach Mapping 3.2, ohne Logikänderung. Danach `cargo check`.
+- **R8 Mechanik.** Umbenennung nach Mapping 3.3, ohne Logikänderung. Danach `cargo check`.
 - **R9 Feature-Schalter.** Nur Einträge mit Aktion E entfernen. B bleibt. M wird nicht angefasst.
 - **R10 PR.** Titel `[Entkopplung <crate>] <kurz>` in Welle 1, `[Entfernung EP<n>] <kurz>` in Welle 2. Label `scope:decouple` bzw. `scope:core-cut`. Vor dem PR: `git diff --name-only origin/main...HEAD` liegt vollständig im Besitz.
 
-### 3.2 Mapping `contextra_core` (Quelle: `crates/contextra-core/src/lib.rs`)
+### 3.3 Mapping `contextra_core` (Quelle: `crates/contextra-core/src/lib.rs`)
 
 | Alt | Neu |
 | --- | --- |
@@ -28,7 +40,7 @@ Dieser Abschnitt ist der Inhalt von `docs/parking/ENTFERNUNG.md`. Maintainer com
 
 Schichtregel: `contextra-simd` (L0) darf nur `contextra-types` nutzen, nicht `contextra-ports`. Alle anderen Kern-Crates nutzen den Definitionsort.
 
-### 3.3 Suchmuster
+### 3.4 Suchmuster
 
 - **S1 Parkplatz und core:**
   `contextra[_-](graph|adapt|kvcache|infer[_-](candle|onnx|ollama)|sandbox|license|cognition|router|agent|privacy|audit[_-]export|avv[_-]generator|py|core)\b`
@@ -37,7 +49,7 @@ Schichtregel: `contextra-simd` (L0) darf nur `contextra-types` nutzen, nicht `co
 
 Abnahme gilt für S1 und S2 mit Kommentaren eingeschlossen.
 
-### 3.4 Feature-Entscheidungen
+### 3.5 Feature-Entscheidungen
 
 Legende: **E** entfernen (inkl. cfg-Blöcke und abhängiger Code). **B** behalten. **M** Maintainer entscheidet, Karte fasst nicht an.
 
