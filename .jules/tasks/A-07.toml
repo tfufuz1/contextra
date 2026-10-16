@@ -1,0 +1,19 @@
+id        = "T-2026-0007"
+title     = "[Entfernung EP5] contextra-router Dateibaum"
+crate     = "contextra-router"
+tier      = 1
+risk      = "none"
+goal      = "Löschen des Verzeichnisses crates/contextra-router"
+non_goals = ["Änderung an Root Cargo.toml", "Änderungen in xtask-heavy"]
+scope     = ["crates/contextra-router/**", ".jules/tasks/A-07.toml"]
+forbidden = [".github/**", "xtask/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic"]
+acceptance = [
+  "cargo metadata --no-deps --offline"
+]
+evidence_required = ["Entfernung von crates/contextra-router Verzeichnis"]
+
+[budget]
+files = 25
+lines = 1000
+iterations = 5
