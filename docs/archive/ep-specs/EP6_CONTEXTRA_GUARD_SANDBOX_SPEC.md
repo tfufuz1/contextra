@@ -1,3 +1,5 @@
+ARCHIV: Feature nicht im Hauptzweig. Wiederherstellung nur über Tag park/EPn/v1 und die Regeln PR1 bis PR5 der Gesamtspezifikation v4.2 §4.5.
+
 # Contextra — Mikrofeingranulare Implementierungsspezifikation EP6: Contextra Guard & Sandbox
 
 **Dokumenten-ID:** `DOC-SPEC-EP6-GUARD-2026-10-14`  
