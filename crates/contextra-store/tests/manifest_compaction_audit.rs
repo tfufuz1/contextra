@@ -2,7 +2,7 @@
 
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_types::types::budget::{ResourceBudget, ResourceTracker};
-use contextra_types::types::domain::misc::TOMBSTONE_BIT;
+use contextra_types::TOMBSTONE_BIT;
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::manifest::ManifestEntry;
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};

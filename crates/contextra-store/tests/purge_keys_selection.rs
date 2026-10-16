@@ -3,7 +3,8 @@ mod purge_oracle_helper;
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
+use contextra_ports::erasure::PurgeError;
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use contextra_store::sstable::witness_types::SstScopeSpec;
@@ -107,6 +108,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<(
 
     storage.put(TxId(10), b"key1", b"old_val").await?;
     storage.commit(TxId(10)).await?;
+    let s1 = storage.last_applied_seq();
     StorageEngine::flush(&storage).await?;
 
     storage.put(TxId(100), b"key1", b"new_val").await?;
@@ -118,7 +120,7 @@ async fn test_purge_keys_preserves_newer_versions() -> contextra_types::Result<(
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let report = storage.purge_keys(scope, 50, Some(&probe)).await.unwrap();
+    let report = storage.purge_keys(scope, s1, Some(&probe)).await.unwrap();
 
     for file in &report.obsolete_files {
         let _ = contextra_durable_fs::durable_remove(file);
@@ -152,7 +154,7 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
         .purge_keys(scope, 100, Some(&probe))
         .await
         .unwrap_err();
-    assert!(matches!(err, PurgeBlocked::InsufficientDiskSpace { .. }));
+    assert!(matches!(err, PurgeError::InsufficientDiskSpace { .. }));
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));
@@ -184,7 +186,12 @@ async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_ty
         .purge_keys(scope, 100, Some(&probe))
         .await
         .unwrap_err();
-    assert_eq!(err, PurgeBlocked::ActiveSnapshot { min_seq: 10 });
+    match err {
+        PurgeError::SnapshotPinned { oldest_pin_age } => {
+            assert_eq!(oldest_pin_age, 90); // 100 - 10 = 90
+        }
+        other => panic!("Expected SnapshotPinned, got {:?}", other),
+    }
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));

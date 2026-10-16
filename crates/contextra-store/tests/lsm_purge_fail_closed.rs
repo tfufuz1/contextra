@@ -1,6 +1,7 @@
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
+use contextra_ports::erasure::PurgeError;
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use std::fs;
@@ -34,7 +35,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types::Result<()> {
+async fn test_purge_keys_successful_compaction() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -57,7 +58,7 @@ async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types:
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    assert!(res.is_ok(), "purge_keys must succeed");
 
     Ok(())
 }
@@ -81,10 +82,12 @@ async fn test_purge_keys_active_snapshot_precedence() -> contextra_types::Result
 
     // Call purge_keys as_of_tx = 100 (min_active_seq 50 <= as_of_tx 100)
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(
-        res.unwrap_err(),
-        PurgeBlocked::ActiveSnapshot { min_seq: 50 }
-    );
+    match res {
+        Err(PurgeError::SnapshotPinned { oldest_pin_age }) => {
+            assert_eq!(oldest_pin_age, 50);
+        }
+        other => panic!("Expected SnapshotPinned, got {:?}", other),
+    }
 
     Ok(())
 }
@@ -103,6 +106,8 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Re
     storage.commit(TxId(1)).await?;
     StorageEngine::flush(&storage).await?;
 
+    let _snapshot_guard = storage.snapshot_registry.acquire(|| 50);
+
     let sst_count_before = count_sst_files(dir.path());
     assert!(
         sst_count_before >= 1,
@@ -115,7 +120,7 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Re
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    assert!(matches!(res.unwrap_err(), PurgeError::SnapshotPinned { .. }));
 
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(
