@@ -1,3 +1,5 @@
+ARCHIV: Feature nicht im Hauptzweig. Wiederherstellung nur über Tag park/EPn/v1 und die Regeln PR1 bis PR5 der Gesamtspezifikation v4.2 §4.5.
+
 # Contextra — Mikrofeingranulare Implementierungsspezifikation EP2: Contextra Proof
 
 **Dokumenten-ID:** `DOC-SPEC-EP2-PROOF-2026-10-14`  

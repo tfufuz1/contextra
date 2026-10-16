@@ -1,3 +1,5 @@
+ARCHIV: Feature nicht im Hauptzweig. Wiederherstellung nur über Tag park/EPn/v1 und die Regeln PR1 bis PR5 der Gesamtspezifikation v4.2 §4.5.
+
 # Contextra — Mikrofeingranulare Implementierungsspezifikation EP3: Contextra Retrieval+
 
 **Dokumenten-ID:** `DOC-SPEC-EP3-RETRIEVAL-2026-10-14`  
