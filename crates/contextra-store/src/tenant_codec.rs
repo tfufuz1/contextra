@@ -15,7 +15,7 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use contextra_ports::StorageStats;
 use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope};
@@ -904,46 +904,14 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
 }
 
 impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
-    fn physical_scope(&self, scope: &LogicalScope) -> Result<PhysicalScope> {
-        match scope {
-            LogicalScope::Document {
-                doc_id,
-                collection_id,
-                tenant_id,
-            } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let prefix = self.codec.collection_prefix(collection_id);
-                let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
-                PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![prefix])
-            }
-            LogicalScope::Collection {
-                collection_id,
-                tenant_id,
-            } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let col_prefix = self.codec.collection_prefix(collection_id);
-                PhysicalScope::try_new(*tenant_id, vec![], vec![col_prefix])
-            }
-            LogicalScope::Tenant { tenant_id } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let tenant_prefix = self.codec.scan_prefix().to_vec();
-                PhysicalScope::try_new(*tenant_id, vec![], vec![tenant_prefix])
-            }
+    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, contextra_ports::erasure::ErasureError> {
+        if scope.tenant_id() != self.codec.tenant_id {
+            return Err(contextra_ports::erasure::ErasureError::ForeignScope);
+        }
+        if let Some(backend) = self.inner.erasure_backend_handle() {
+            backend.physical_scope(scope)
+        } else {
+            Err(contextra_ports::erasure::ErasureError::NotAvailable)
         }
     }
 
@@ -951,14 +919,11 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
         &self,
         scope: &PhysicalScope,
         id: contextra_ports::erasure::PurgeId,
-    ) -> std::result::Result<contextra_ports::erasure::FenceGuard, ContextraError> {
-        if let Some(backend) = self.inner.erasure_capabilities_handle() {
+    ) -> std::result::Result<contextra_ports::erasure::FenceGuard, contextra_ports::erasure::ErasureError> {
+        if let Some(backend) = self.inner.erasure_backend_handle() {
             backend.acquire_fence(scope, id)
         } else {
-            Err(ContextraError::capability_unsupported(
-                "acquire_fence",
-                "Underlying storage engine does not support ErasureBackend",
-            ))
+            Err(contextra_ports::erasure::ErasureError::NotAvailable)
         }
     }
 
@@ -967,14 +932,29 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
         scope: &PhysicalScope,
         as_of: TxId,
         probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
+        fence: &contextra_ports::erasure::FenceGuard,
     ) -> std::result::Result<contextra_ports::erasure::PurgeOutput, contextra_ports::erasure::PurgeError> {
         if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.purge_physical(scope, as_of, probe)
+            backend.purge_physical(scope, as_of, probe, fence)
         } else {
             Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Underlying storage engine does not support ErasureBackend",
             )))
+        }
+    }
+
+    fn dispose(
+        &self,
+        files: &[contextra_ports::erasure::ObsoleteFile],
+    ) -> std::result::Result<contextra_ports::erasure::DisposeReport, contextra_ports::erasure::DisposeError> {
+        if let Some(backend) = self.inner.erasure_backend_handle() {
+            backend.dispose(files)
+        } else {
+            Err(contextra_ports::erasure::DisposeError::ScrubRefused {
+                file: String::new(),
+                reason: "Underlying storage engine does not support ErasureBackend".to_string(),
+            })
         }
     }
 
