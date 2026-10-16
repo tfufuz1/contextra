@@ -1,4 +1,4 @@
-use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse, McpError};
+use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse};
 use crate::server::McpServer;
 use serde_json::{json, Value};
 
@@ -10,9 +10,10 @@ impl McpServer {
         if let Some(arr) = val.as_array() {
             if arr.is_empty() {
                 return Some(
-                    serde_json::to_value(response_from_error(
+                    serde_json::to_value(JsonRpcResponse::err(
                         None,
-                        McpError::invalid_request("Invalid Request: empty batch array"),
+                        -32600,
+                        "Invalid Request: empty batch array",
                     ))
                     .unwrap_or_default(),
                 );
@@ -42,10 +43,8 @@ impl McpServer {
                         }
                     }
                     Err(e) => {
-                        let resp = response_from_error(
-                            req_id,
-                            McpError::invalid_request(format!("Invalid Request: {e}")),
-                        );
+                        let resp =
+                            JsonRpcResponse::err(req_id, -32600, format!("Invalid Request: {e}"));
                         if let Ok(v) = serde_json::to_value(resp) {
                             responses.push(v);
                         }
@@ -80,15 +79,13 @@ impl McpServer {
                     }
                 }
                 Err(e) => {
-                    let resp = response_from_error(
-                        req_id,
-                        McpError::invalid_request(format!("Invalid Request: {e}")),
-                    );
+                    let resp =
+                        JsonRpcResponse::err(req_id, -32600, format!("Invalid Request: {e}"));
                     serde_json::to_value(resp).ok()
                 }
             }
         } else {
-            let resp = response_from_error(None, McpError::invalid_request("Invalid Request"));
+            let resp = JsonRpcResponse::err(None, -32600, "Invalid Request");
             serde_json::to_value(resp).ok()
         }
     }
@@ -102,12 +99,13 @@ impl McpServer {
     pub async fn handle(&self, req: JsonRpcRequest) -> JsonRpcResponse {
         let id = req.id.clone();
         if req.jsonrpc != "2.0" {
-            return response_from_error(
+            return JsonRpcResponse::err(
                 id,
-                McpError::invalid_request(format!(
+                -32600,
+                format!(
                     "Invalid Request: jsonrpc version must be '2.0', got '{}'",
                     req.jsonrpc
-                )),
+                ),
             );
         }
         match req.method.as_str() {
@@ -334,9 +332,10 @@ impl McpServer {
                 let tool_name = match req.params.get("name").and_then(|v| v.as_str()) {
                     Some(name) if !name.is_empty() => name,
                     _ => {
-                        return response_from_error(
+                        return JsonRpcResponse::err(
                             id,
-                            McpError::invalid_params("Invalid params: missing or empty tool 'name'"),
+                            -32602,
+                            "Invalid params: missing or empty tool 'name'",
                         );
                     }
                 };
@@ -409,10 +408,7 @@ impl McpServer {
             "ping" => JsonRpcResponse::ok(id, json!({})),
 
             // ── Unbekannte Methode ──────────────────────────────────────────────
-            other => response_from_error(
-                id,
-                McpError::method_not_found(format!("Method not found: {other}")),
-            ),
+            other => JsonRpcResponse::err(id, -32601, format!("Method not found: {other}")),
         }
     }
 }

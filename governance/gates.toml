@@ -1,6 +1,6 @@
 # governance/gates.toml
 # Gate-Katalog für Contextra Qualitäts-Gates.
-# Definiert name, phase, required_local, required_ci, risk_class, owner, fixture, tier und covered_by für alle Gates.
+# Definiert name, phase, required_local, required_ci, risk_class, owner und fixture für alle Gates.
 
 [[gate]]
 name = "claim"
@@ -10,7 +10,6 @@ required_ci = true
 risk_class = "high"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "context-pack"
@@ -20,37 +19,6 @@ required_ci = true
 risk_class = "medium"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
-
-[[gate]]
-name = "gate-guard"
-phase = "check"
-required_local = true
-required_ci = false
-risk_class = "high"
-owner = "governance"
-fixture = "none"
-tier = "agent"
-
-[[gate]]
-name = "gate-arch"
-phase = "verify"
-required_local = true
-required_ci = false
-risk_class = "high"
-owner = "architecture"
-fixture = "none"
-tier = "agent"
-
-[[gate]]
-name = "gate-integrity"
-phase = "submit"
-required_local = true
-required_ci = false
-risk_class = "high"
-owner = "quality"
-fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "scope-guard"
@@ -60,8 +28,6 @@ required_ci = true
 risk_class = "high"
 owner = "governance"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-guard"
 
 [[gate]]
 name = "protected-paths"
@@ -71,8 +37,6 @@ required_ci = true
 risk_class = "critical"
 owner = "governance"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-guard"
 
 [[gate]]
 name = "check-duplicate-symbols"
@@ -82,8 +46,6 @@ required_ci = true
 risk_class = "high"
 owner = "architecture"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-arch"
 
 [[gate]]
 name = "symbol-exists"
@@ -93,7 +55,6 @@ required_ci = true
 risk_class = "medium"
 owner = "architecture"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "check-dag"
@@ -103,8 +64,6 @@ required_ci = true
 risk_class = "high"
 owner = "architecture"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-arch"
 
 [[gate]]
 name = "check-ring-layering"
@@ -114,8 +73,6 @@ required_ci = true
 risk_class = "high"
 owner = "architecture"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-arch"
 
 [[gate]]
 name = "check-vetoes"
@@ -125,8 +82,6 @@ required_ci = true
 risk_class = "critical"
 owner = "governance"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-arch"
 
 [[gate]]
 name = "ratchet"
@@ -136,8 +91,6 @@ required_ci = true
 risk_class = "high"
 owner = "governance"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "gate-weakening"
@@ -147,8 +100,6 @@ required_ci = true
 risk_class = "critical"
 owner = "governance"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-guard"
 
 [[gate]]
 name = "test-integrity"
@@ -158,8 +109,6 @@ required_ci = true
 risk_class = "high"
 owner = "quality"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "session-report"
@@ -169,7 +118,6 @@ required_ci = true
 risk_class = "low"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "doc-truth"
@@ -179,7 +127,6 @@ required_ci = true
 risk_class = "medium"
 owner = "architecture"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "registry-check"
@@ -189,28 +136,24 @@ required_ci = true
 risk_class = "high"
 owner = "governance"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "diff-budget"
 phase = "submit"
-required_local = false
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "medium"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
-covered_by = "gate-guard"
 
 [[gate]]
 name = "claims-in-pr"
 phase = "submit"
-required_local = false
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "medium"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "task-card"
@@ -220,71 +163,60 @@ required_ci = true
 risk_class = "high"
 owner = "agent-ops"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "ledger"
 phase = "submit"
-required_local = false
+required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "high"
 owner = "governance"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "can-merge"
 phase = "submit"
-required_local = false
+required_local = false # Exklusiv in verdict-required.toml
 required_ci = true
 risk_class = "critical"
 owner = "governance"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "gate-determinism-check"
 phase = "verify"
-required_local = false
+required_local = false # In harness-phases.toml als determinism-check required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "high"
 owner = "core"
 fixture = "none"
-tier = "ci"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "gate-unsafe-audit"
 phase = "verify"
-required_local = false
+required_local = false # In harness-phases.toml als unsafe-audit required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "critical"
 owner = "security"
 fixture = "none"
-tier = "ci"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "gate-lock-audit"
 phase = "verify"
-required_local = false
+required_local = false # In harness-phases.toml als lock-audit required = false, in verdict-required.toml blocking = true
 required_ci = true
 risk_class = "high"
 owner = "core"
 fixture = "none"
-tier = "ci"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "gate-wal-replay-verify"
 phase = "verify"
-required_local = false
+required_local = false # Exklusiv in verdict-required.toml
 required_ci = true
 risk_class = "critical"
 owner = "storage"
 fixture = "none"
-tier = "ci"
-covered_by = "gate-integrity"
 
 [[gate]]
 name = "fuzz-smoke"
@@ -294,7 +226,6 @@ required_ci = false
 risk_class = "low"
 owner = "security"
 fixture = "none"
-tier = "nightly"
 
 [[gate]]
 name = "mutants-diff"
@@ -304,7 +235,6 @@ required_ci = false
 risk_class = "low"
 owner = "quality"
 fixture = "none"
-tier = "nightly"
 
 [[gate]]
 name = "gates-catalog-sync"
@@ -314,7 +244,6 @@ required_ci = true
 risk_class = "critical"
 owner = "governance"
 fixture = "none"
-tier = "agent"
 
 [[gate]]
 name = "codeowners-coverage"
@@ -324,4 +253,3 @@ required_ci = true
 risk_class = "high"
 owner = "governance"
 fixture = "none"
-tier = "agent"

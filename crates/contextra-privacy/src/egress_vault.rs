@@ -12,122 +12,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zeroize::{Zeroize, Zeroizing};
 
-/// Common prefix for session-bound surrogate tokens.
-pub const SURROGATE_PREFIX: &str = "[USER_ENTITY_";
-
-/// Validates a credit card number candidate using the Luhn algorithm (ISO/IEC 7812-1 MOD 10).
-pub fn is_luhn_valid(number_str: &str) -> bool {
-    let digits: Vec<u32> = number_str.chars().filter_map(|c| c.to_digit(10)).collect();
-    if digits.len() < 13 || digits.len() > 19 {
-        return false;
-    }
-
-    let mut sum = 0;
-    let mut double = false;
-
-    for &digit in digits.iter().rev() {
-        if double {
-            let mut val = digit * 2;
-            if val > 9 {
-                val -= 9;
-            }
-            sum += val;
-        } else {
-            sum += digit;
-        }
-        double = !double;
-    }
-
-    sum % 10 == 0
-}
-
-/// Validates an IBAN candidate using the ISO 7064 MOD 97-10 algorithm.
-pub fn is_iban_valid(iban_str: &str) -> bool {
-    let cleaned: String = iban_str
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .map(|c| c.to_ascii_uppercase())
-        .collect();
-
-    if cleaned.len() < 15 || cleaned.len() > 34 {
-        return false;
-    }
-
-    let country = &cleaned[..2];
-    if !country.chars().all(|c| c.is_ascii_alphabetic()) {
-        return false;
-    }
-
-    let check_digits = &cleaned[2..4];
-    if !check_digits.chars().all(|c| c.is_ascii_digit()) {
-        return false;
-    }
-
-    let rearranged = format!("{}{}", &cleaned[4..], &cleaned[..4]);
-
-    let mut remainder = 0u64;
-    for ch in rearranged.chars() {
-        if ch.is_ascii_digit() {
-            let val = (ch as u8 - b'0') as u64;
-            remainder = (remainder * 10 + val) % 97;
-        } else if ch.is_ascii_uppercase() {
-            let val = (ch as u8 - b'A' + 10) as u64;
-            remainder = (remainder * 10 + (val / 10)) % 97;
-            remainder = (remainder * 10 + (val % 10)) % 97;
-        } else {
-            return false;
-        }
-    }
-
-    remainder == 1
-}
-
-/// Normalizes a payload string prior to Layer-1 classification by stripping whitespace
-/// and hyphen delimiters bridging alphanumeric characters (e.g., in credit cards or IBANs).
-///
-/// Returns a new string for evaluation without mutating the original text.
-pub fn normalize_payload(text: &str) -> String {
-    if !text.contains(' ') && !text.contains('-') {
-        return text.to_string();
-    }
-
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    let mut result = String::with_capacity(len);
-    let mut i = 0;
-
-    while i < len {
-        let ch = chars[i];
-        if (ch == ' ' || ch == '-') && i > 0 {
-            let prev = chars[i - 1];
-            if prev.is_ascii_alphanumeric() {
-                let mut j = i;
-                while j < len && (chars[j] == ' ' || chars[j] == '-') {
-                    j += 1;
-                }
-                if j < len && chars[j].is_ascii_alphanumeric() {
-                    i = j;
-                    continue;
-                }
-            }
-        }
-        result.push(ch);
-        i += 1;
-    }
-
-    result
-}
-
-fn is_credit_card_pattern(regex: &regex::Regex) -> bool {
-    let s = regex.as_str();
-    s.contains(r"\d{13,19}") || s.contains(r"\d{16}")
-}
-
-fn is_iban_pattern(regex: &regex::Regex) -> bool {
-    let s = regex.as_str();
-    s.contains(r"[A-Z]{2}\d{2}") || s.contains(r"[a-zA-Z]{2}\d{2}")
-}
-
 /// Trait for recognizing entities (NER) in text without creating a direct dependency
 /// on heavy embedding or ML crates (DAG-neutral interface).
 pub trait EntityRecognizer: Send + Sync {
@@ -295,93 +179,6 @@ pub enum EgressClassification {
     Block(BlockReason),
 }
 
-/// Validates a credit card candidate number using the Luhn checksum algorithm (Modulus 10).
-pub fn validate_luhn(number: &str) -> bool {
-    let digits: Vec<u32> = number.chars().filter_map(|c| c.to_digit(10)).collect();
-    if digits.len() < 13 || digits.len() > 19 {
-        return false;
-    }
-    let mut sum = 0;
-    let mut alternate = false;
-    for &digit in digits.iter().rev() {
-        let mut d = digit;
-        if alternate {
-            d *= 2;
-            if d > 9 {
-                d -= 9;
-            }
-        }
-        sum += d;
-        alternate = !alternate;
-    }
-    sum % 10 == 0
-}
-
-/// Validates an IBAN candidate string using ISO 7064 MOD 97-10 checksum algorithm.
-pub fn validate_iban_mod97(iban: &str) -> bool {
-    let clean: String = iban.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-    if clean.len() < 15 || clean.len() > 34 {
-        return false;
-    }
-    let (head, tail) = clean.split_at(4);
-    let rearranged = format!("{}{}", tail, head);
-
-    let mut remainder: u32 = 0;
-    for ch in rearranged.chars() {
-        if ch.is_ascii_digit() {
-            let val = ch.to_digit(10).unwrap_or(0);
-            remainder = (remainder * 10 + val) % 97;
-        } else if ch.is_ascii_alphabetic() {
-            let val = ch.to_ascii_uppercase() as u32 - 'A' as u32 + 10;
-            remainder = (remainder * 10 + val / 10) % 97;
-            remainder = (remainder * 10 + val % 10) % 97;
-        } else {
-            return false;
-        }
-    }
-    remainder == 1
-}
-
-/// Normalizes a payload for DLP pattern matching by removing common delimiters (spaces, hyphens)
-/// occurring between digits or alphanumeric characters, without mutating the original text for redaction.
-pub fn normalize_payload_for_dlp(payload: &str) -> String {
-    let mut normalized = String::with_capacity(payload.len());
-    let chars: Vec<char> = payload.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-    while i < len {
-        let ch = chars[i];
-        if (ch == ' ' || ch == '-') && i > 0 && i + 1 < len {
-            let prev = chars[i - 1];
-            let mut j = i;
-            while j < len && (chars[j] == ' ' || chars[j] == '-') {
-                j += 1;
-            }
-            if j < len {
-                let next = chars[j];
-                if (prev.is_ascii_digit() && next.is_ascii_digit())
-                    || (prev.is_ascii_alphanumeric() && next.is_ascii_alphanumeric())
-                {
-                    i = j;
-                    continue;
-                }
-            }
-        }
-        normalized.push(ch);
-        i += 1;
-    }
-    normalized
-}
-
-/// Optional validator applied post-regex match to confirm checksum-backed patterns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PatternValidator {
-    /// Luhn checksum validation (credit card numbers).
-    Luhn,
-    /// ISO 7064 MOD 97-10 checksum validation (IBAN).
-    IbanMod97,
-}
-
 /// Ein vorkompiliertes Regex-Muster für die Egress-Klassifikation.
 #[derive(Debug, Clone)]
 pub struct CompiledPattern {
@@ -389,8 +186,6 @@ pub struct CompiledPattern {
     pub name: String,
     /// Kompiliertes Regex-Objekt.
     pub regex: regex::Regex,
-    /// Optionale Nachprüfung (z. B. Prüfsumme) nach Regex-Treffer.
-    pub validator: Option<PatternValidator>,
 }
 
 impl CompiledPattern {
@@ -401,38 +196,10 @@ impl CompiledPattern {
             pattern: name_str.clone(),
             reason: e.to_string(),
         })?;
-        let validator = if pattern.contains("[A-Za-z]{2}") && pattern.contains("11,30")
-            || name_str.to_lowercase().contains("iban")
-        {
-            Some(PatternValidator::IbanMod97)
-        } else if pattern.contains("{13,19}")
-            || name_str.to_lowercase().contains("card")
-            || name_str.to_lowercase().contains("credit")
-        {
-            Some(PatternValidator::Luhn)
-        } else {
-            None
-        };
         Ok(Self {
             name: name_str,
             regex,
-            validator,
         })
-    }
-
-    /// Setzt ein spezifisches `PatternValidator`-Prüfverfahren.
-    pub fn with_validator(mut self, validator: PatternValidator) -> Self {
-        self.validator = Some(validator);
-        self
-    }
-
-    /// Prüft, ob ein übereinstimmender Substring das verknüpfte Prüfsummenverfahren erfüllt.
-    pub fn is_valid_match(&self, matched_text: &str) -> bool {
-        match self.validator {
-            Some(PatternValidator::Luhn) => validate_luhn(matched_text),
-            Some(PatternValidator::IbanMod97) => validate_iban_mod97(matched_text),
-            None => true,
-        }
     }
 }
 
@@ -482,7 +249,7 @@ pub async fn classify_layer1(
 pub async fn classify_layer1_arc(
     payload: &str,
     patterns: Arc<Vec<CompiledPattern>>,
-    _regex_set: Arc<regex::RegexSet>,
+    regex_set: Arc<regex::RegexSet>,
     timeout: Duration,
 ) -> EgressClassification {
     if payload.len() > MAX_CLASSIFY_PAYLOAD_BYTES {
@@ -495,6 +262,7 @@ pub async fn classify_layer1_arc(
 
     let sensitive_payload = Zeroizing::new(payload.as_bytes().to_vec());
     let patterns_cloned = patterns.clone();
+    let set_cloned = regex_set.clone();
 
     let eval_task = tokio::task::spawn_blocking(move || {
         let text = match std::str::from_utf8(&sensitive_payload) {
@@ -505,11 +273,10 @@ pub async fn classify_layer1_arc(
                 ));
             }
         };
-        let normalized = normalize_payload_for_dlp(text);
-
-        for cp in patterns_cloned.iter() {
-            let mut raw_matches = cp.regex.find_iter(text);
-            if raw_matches.any(|m| cp.is_valid_match(m.as_str())) {
+        let matches = set_cloned.matches(text);
+        if matches.matched_any() {
+            if let Some(first_idx) = matches.iter().next() {
+                let cp = &patterns_cloned[first_idx];
                 tracing::warn!(
                     rule_id = %cp.name,
                     pattern = %cp.regex.as_str(),
@@ -517,27 +284,7 @@ pub async fn classify_layer1_arc(
                 );
                 return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
             }
-
-            if normalized != text {
-                let mut norm_matches = cp.regex.find_iter(&normalized);
-                if norm_matches.any(|m| cp.is_valid_match(m.as_str())) {
-                    tracing::warn!(
-                        rule_id = %cp.name,
-                        pattern = %cp.regex.as_str(),
-                        "Egress DLP sensitive pattern match detected via normalized payload"
-                    );
-                    return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
-                }
-            }
         }
-
-        let normalized = normalize_payload(text);
-        if normalized != text {
-            if let Some(classification) = eval_text(&normalized) {
-                return classification;
-            }
-        }
-
         EgressClassification::Allow
     });
 
@@ -563,7 +310,7 @@ impl EgressVault {
     /// Standard-Timeout für Klassifikationsprüfungen (100 ms).
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_millis(100);
 
-    /// Standard-DLP-Muster für Egress-Klassifikationen (Secrets, API-Keys, PII, E-Mail, IBAN, JWT, PEM, Credit Card, Phone, IPv4).
+    /// Standard-DLP-Muster für Egress-Klassifikationen (Secrets, API-Keys, PII, E-Mail).
     pub fn default_patterns() -> Vec<String> {
         vec![
             r"sk-".to_string(),
@@ -571,12 +318,6 @@ impl EgressVault {
             r"api_key".to_string(),
             r"password".to_string(),
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b".to_string(),
-            r"\b[A-Za-z]{2}\d{2}(?:[ \t-]*[A-Za-z0-9]){11,30}\b".to_string(), // IBAN (with ISO 7064 MOD 97-10 check)
-            r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b".to_string(), // JWT Token
-            r"-----BEGIN [A-Z0-9 -]+-----".to_string(), // PEM Block
-            r"\b(?:\d[ -]*?){13,19}\b".to_string(), // Credit Card (with Luhn check)
-            r"\b(?:\+\d{1,3}[- .]?)?\(?\d{2,5}\)?[- .]?\d{3,4}[- .]?\d{3,5}\b".to_string(), // Phone Number
-            r"\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b".to_string(), // IPv4 Address
         ]
     }
 
@@ -588,11 +329,11 @@ impl EgressVault {
     /// Erstellt eine neue `EgressVault`-Instanz aus einer Liste von Regex-Patterns.
     /// Jedem Pattern wird eine opake Regel-ID ("R-001", "R-002", ...) zugewiesen.
     pub fn new(patterns: Vec<String>) -> Result<Self, EgressVaultError> {
-        let mut compiled = Vec::with_capacity(patterns.len());
-        for (idx, pat) in patterns.into_iter().enumerate() {
-            let cp = CompiledPattern::new(format!("R-{:03}", idx + 1), &pat)?;
-            compiled.push(cp);
-        }
+        let compiled = patterns
+            .into_iter()
+            .enumerate()
+            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx + 1), &pat))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let set_patterns: Vec<&str> = compiled.iter().map(|p| p.regex.as_str()).collect();
         let regex_set =
@@ -694,11 +435,8 @@ impl EgressVault {
             let mut new_text = Zeroizing::new(String::with_capacity(current_text.len()));
             let mut last_end = 0;
             for m in cp.regex.find_iter(&current_text) {
-                let entity_text = m.as_str();
-                if !cp.is_valid_match(entity_text) {
-                    continue;
-                }
                 new_text.push_str(&current_text[last_end..m.start()]);
+                let entity_text = m.as_str();
                 let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                 new_text.push_str(&surrogate);
                 last_end = m.end();
@@ -930,40 +668,13 @@ mod tests {
     #[tokio::test]
     async fn test_egress_vault_default_implementation() {
         let vault = EgressVault::default();
-        assert_eq!(vault.patterns().len(), 11);
+        assert_eq!(vault.patterns().len(), 5);
         assert_eq!(vault.timeout(), EgressVault::DEFAULT_TIMEOUT);
 
         let res = vault.classify("hello user alice@example.com").await;
         assert_eq!(
             res,
             EgressClassification::Block(BlockReason::SensitivePattern("R-005".to_string()))
-        );
-    }
-
-    #[test]
-    fn test_luhn_and_iban_validation_functions() {
-        assert!(is_luhn_valid("4532015112830366"));
-        assert!(!is_luhn_valid("1111111111111111"));
-        assert!(!is_luhn_valid("1234"));
-
-        assert!(is_iban_valid("DE89370400440532013000"));
-        assert!(!is_iban_valid("DE00370400440532013000"));
-        assert!(!is_iban_valid("INVALID_IBAN"));
-    }
-
-    #[test]
-    fn test_normalize_payload_delimiters() {
-        assert_eq!(
-            normalize_payload("4532-0151-1283-0366"),
-            "4532015112830366"
-        );
-        assert_eq!(
-            normalize_payload("DE89 3704 0044 0532 0130 00"),
-            "DE89370400440532013000"
-        );
-        assert_eq!(
-            normalize_payload("plain text without delimiters"),
-            "plain text without delimiters"
         );
     }
 

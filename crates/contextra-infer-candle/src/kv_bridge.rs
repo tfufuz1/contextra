@@ -14,8 +14,7 @@ use contextra_crypto::EncryptedKvLayer;
 #[cfg(test)]
 use contextra_crypto::KvSegment;
 use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
-pub use contextra_ports::ContextSegment;
-use contextra_ports::KvBridgeStorage;
+use contextra_ports::{ContextSegment, KvBridgeStorage};
 use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

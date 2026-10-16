@@ -54,11 +54,6 @@ pub trait CandleModelInner: Send {
         Ok(text)
     }
 
-    /// Returns the last computed layer/head attention scores for the request if supported by the model implementation.
-    fn last_attention_scores(&self) -> Option<Vec<Vec<f32>>> {
-        None
-    }
-
     /// Returns the KV layout and RoPE configuration of the underlying model, if supported.
     #[cfg(feature = "kv-stage-b")]
     fn kv_layout(
@@ -125,10 +120,6 @@ pub struct CandleLlmClient {
     /// Telemetry counter tracking prefill skipped token count.
     #[cfg(feature = "kv-stage-b")]
     pub prefill_skipped_tokens: Arc<std::sync::atomic::AtomicU64>,
-    /// Optional Attention Exporter for recording attention weights during inference.
-    pub attention_exporter: Option<Arc<crate::attention_exporter::CandleAttentionExporter>>,
-    /// ID generator port for allocating unique inference request identifiers.
-    pub id_gen: Arc<dyn contextra_ports::IdGen>,
 }
 
 impl CandleLlmClient {
@@ -155,8 +146,6 @@ impl CandleLlmClient {
             prefix_store: None,
             #[cfg(feature = "kv-stage-b")]
             prefill_skipped_tokens: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            attention_exporter: None,
-            id_gen: Arc::new(contextra_ports::SequentialIdGen::new(1)),
         }
     }
 
@@ -185,26 +174,6 @@ impl CandleLlmClient {
         self
     }
 
-    /// Configures optional `CandleAttentionExporter` for exporting attention weights during inference.
-    ///
-    /// Note: Accepts `Arc<CandleAttentionExporter>` directly because `contextra_ports::AttentionExporter`
-    /// only exposes `export_attention_weights` for consumers, while producer recording methods
-    /// (`record_attention_weights`, `record_layer_head_scores`) are defined on `CandleAttentionExporter`.
-    /// Exporter state memory is strictly bounded by [`MAX_TRACKED_REQUESTS`] (256) ring-buffer FIFO eviction.
-    pub fn with_attention_exporter(
-        mut self,
-        exporter: Arc<crate::attention_exporter::CandleAttentionExporter>,
-    ) -> Self {
-        self.attention_exporter = Some(exporter);
-        self
-    }
-
-    /// Configures custom `IdGen` port for request ID allocation.
-    pub fn with_id_gen(mut self, id_gen: Arc<dyn contextra_ports::IdGen>) -> Self {
-        self.id_gen = id_gen;
-        self
-    }
-
     /// Generates completion with stage B KV prefix reuse and tenant isolation.
     #[cfg(feature = "kv-stage-b")]
     pub fn generate_with_prefix_store<'a>(
@@ -226,8 +195,6 @@ impl CandleLlmClient {
         let prefill_count = Arc::clone(&self.prefill_count);
         let prefill_skip_count = Arc::clone(&self.prefill_skip_count);
         let prefill_skipped_tokens = Arc::clone(&self.prefill_skipped_tokens);
-        let attention_exporter = self.attention_exporter.clone();
-        let request_id = contextra_ports::RequestId(self.id_gen.next_id());
 
         let concatenated = segments
             .iter()
@@ -290,12 +257,6 @@ impl CandleLlmClient {
                     seed,
                     &mut |_| true,
                 )?;
-
-                if let Some(exporter) = attention_exporter {
-                    if let Some(scores) = guard.last_attention_scores() {
-                        exporter.record_layer_head_scores(request_id, &scores);
-                    }
-                }
 
                 prefill_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if run.reused_tokens > 0 {
@@ -869,8 +830,6 @@ impl LlmTextGenerator for CandleLlmClient {
         let device = self.device.clone();
         let semaphore = Arc::clone(&self.semaphore);
         let prompt_owned = prompt.to_string();
-        let attention_exporter = self.attention_exporter.clone();
-        let request_id = contextra_ports::RequestId(self.id_gen.next_id());
 
         Box::pin(async move {
             let _permit = semaphore.acquire().await.map_err(|_| {
@@ -879,15 +838,7 @@ impl LlmTextGenerator for CandleLlmClient {
 
             tokio::task::spawn_blocking(move || {
                 let mut guard = model.blocking_lock();
-                let res = guard.generate(&prompt_owned, &tokenizer, &device);
-                if res.is_ok() {
-                    if let Some(exporter) = attention_exporter {
-                        if let Some(scores) = guard.last_attention_scores() {
-                            exporter.record_layer_head_scores(request_id, &scores);
-                        }
-                    }
-                }
-                res
+                guard.generate(&prompt_owned, &tokenizer, &device)
             })
             .await
             .map_err(|e| {
@@ -988,8 +939,6 @@ impl LlmTextGeneratorStreaming for CandleLlmClient {
         let prompt_owned = prompt.to_string();
 
         let (tx, rx) = tokio::sync::mpsc::channel::<Result<String>>(32);
-        let attention_exporter = self.attention_exporter.clone();
-        let request_id = contextra_ports::RequestId(self.id_gen.next_id());
 
         tokio::spawn(async move {
             let permit = match semaphore.acquire_owned().await {
@@ -1011,13 +960,7 @@ impl LlmTextGeneratorStreaming for CandleLlmClient {
                     tx.blocking_send(Ok(chunk)).is_ok()
                 });
 
-                if res.is_ok() {
-                    if let Some(exporter) = attention_exporter {
-                        if let Some(scores) = guard.last_attention_scores() {
-                            exporter.record_layer_head_scores(request_id, &scores);
-                        }
-                    }
-                } else if let Err(err) = res {
+                if let Err(err) = res {
                     let _ = tx.blocking_send(Err(err));
                 }
             })

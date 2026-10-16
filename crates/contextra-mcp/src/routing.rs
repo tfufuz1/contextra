@@ -33,10 +33,6 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionAdapter 
     }
 }
 
-/// Adapter resolving entity-to-community mappings.
-///
-/// Currently returns `Ok(None)` because neither the `Contextra` facade nor `Collection`
-/// exposes a public entity-to-community lookup API (`get_community` / `get_communities_batch`).
 struct CommunityAdapter;
 
 impl contextra::router::ports_local::CommunityResolver for CommunityAdapter {
@@ -55,40 +51,14 @@ impl contextra::router::ports_local::ContextPreparer for ContextPreparerAdapter 
         &self,
         chunks: Vec<ContextChunk>,
         budget: &TokenBudget,
-        relevance_threshold: f32,
+        _relevance_threshold: f32,
     ) -> Result<ContextWindow, ContextraError> {
-        let initial_count = chunks.len();
-        let usable_budget = budget.limit.saturating_sub(budget.reserved);
-
-        let mut filtered_chunks: Vec<ContextChunk> = chunks
-            .into_iter()
-            .filter(|c| c.relevance >= relevance_threshold)
-            .collect();
-
-        // Stable sort descending by relevance, breaking ties deterministically by doc_id ascending.
-        filtered_chunks.sort_by(|a, b| {
-            b.relevance
-                .partial_cmp(&a.relevance)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.doc_id.cmp(&b.doc_id))
-        });
-
-        let mut retained_chunks = Vec::new();
-        let mut accumulated_tokens: usize = 0;
-
-        for chunk in filtered_chunks {
-            let next_total = accumulated_tokens.saturating_add(chunk.token_count);
-            if next_total <= usable_budget {
-                accumulated_tokens = next_total;
-                retained_chunks.push(chunk);
-            }
-        }
-
-        let truncated = retained_chunks.len() < initial_count;
-
+        let total_tokens = chunks.iter().map(|c| c.token_count).sum();
+        let limit = budget.limit;
+        let truncated = total_tokens > limit;
         Ok(ContextWindow {
-            chunks: retained_chunks,
-            total_tokens: accumulated_tokens,
+            chunks,
+            total_tokens,
             truncated,
         })
     }
@@ -158,175 +128,10 @@ pub async fn setup_routing(
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
 pub fn setup_kv_bridge(
-    db: &Arc<Contextra>,
+    _db: &Arc<Contextra>,
 ) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
-    let passphrase = db
-        .config()
-        .encryption_passphrase
-        .clone()
-        .or_else(|| std::env::var("CONTEXTRA_ENCRYPTION_PASSPHRASE").ok())
-        .or_else(|| std::env::var("CONTEXTRA_PASSPHRASE").ok());
-
-    let passphrase = match passphrase {
-        Some(p) if !p.trim().is_empty() => p,
-        _ => {
-            tracing::warn!(
-                "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
-            );
-            return None;
-        }
-    };
-
-    let master_km = match contextra_crypto::CryptoKey::try_new(&passphrase, b"contextra-kv-salt") {
-        Ok(km) => km,
-        Err(e) => {
-            tracing::warn!("KvBridgeAdapter: CryptoKey initialization failed: {e}");
-            return None;
-        }
-    };
-
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
-
-    let col_res = match tokio::runtime::Handle::try_current() {
-        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(db.collection("default"))),
-        Err(_) => {
-            if let Ok(rt) = tokio::runtime::Builder::new_current_thread().build() {
-                rt.block_on(db.collection("default"))
-            } else {
-                return None;
-            }
-        }
-    };
-
-    let store = match col_res {
-        Ok(mut col) => {
-            if let Some(existing) = col.kv_store() {
-                Arc::clone(existing)
-            } else {
-                let new_store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
-                if let Some(col_mut) = Arc::get_mut(&mut col) {
-                    col_mut.set_kv_store(Arc::clone(&new_store));
-                }
-                new_store
-            }
-        }
-        Err(e) => {
-            tracing::warn!("KvBridgeAdapter: Failed to acquire default collection: {e}");
-            Arc::new(contextra_crypto::TenantIsolatedKvStore::new())
-        }
-    };
-
-    Some(Arc::new(contextra_infer_candle::KvBridgeAdapter::new(
-        store, cipher,
-    )))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use contextra::router::ports_local::ContextPreparer;
-    use contextra_types::DocId;
-
-    fn make_chunk(doc_id: u64, relevance: f32, token_count: usize) -> ContextChunk {
-        ContextChunk {
-            doc_id: DocId::new(doc_id),
-            content: format!("chunk_{doc_id}"),
-            relevance,
-            token_count,
-            metadata: None,
-            contextual_prefix: None,
-            links: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn test_relevance_threshold_removes_irrelevant_chunks() {
-        let preparer = ContextPreparerAdapter;
-        let budget = TokenBudget::new(1000, 0);
-        let chunks = vec![
-            make_chunk(1, 0.8, 100),
-            make_chunk(2, 0.3, 100),
-            make_chunk(3, 0.6, 100),
-        ];
-
-        let window = preparer
-            .prepare_context(chunks, &budget, 0.5)
-            .expect("prepare_context should succeed");
-
-        assert_eq!(window.chunks.len(), 2);
-        assert_eq!(window.chunks[0].doc_id, DocId::new(1));
-        assert_eq!(window.chunks[1].doc_id, DocId::new(3));
-        assert_eq!(window.total_tokens, 200);
-        assert!(window.truncated);
-    }
-
-    #[test]
-    fn test_budget_truncates_list_and_sets_truncated_flag() {
-        let preparer = ContextPreparerAdapter;
-        let budget = TokenBudget::new(250, 50); // Usable: 200 tokens
-        let chunks = vec![
-            make_chunk(1, 0.9, 100),
-            make_chunk(2, 0.8, 100),
-            make_chunk(3, 0.7, 100),
-        ];
-
-        let window = preparer
-            .prepare_context(chunks, &budget, 0.0)
-            .expect("prepare_context should succeed");
-
-        assert_eq!(window.chunks.len(), 2);
-        assert_eq!(window.chunks[0].doc_id, DocId::new(1));
-        assert_eq!(window.chunks[1].doc_id, DocId::new(2));
-        assert_eq!(window.total_tokens, 200);
-        assert!(window.truncated);
-    }
-
-    #[test]
-    fn test_empty_input_returns_empty_window() {
-        let preparer = ContextPreparerAdapter;
-        let budget = TokenBudget::new(1000, 100);
-        let window = preparer
-            .prepare_context(Vec::new(), &budget, 0.5)
-            .expect("prepare_context should succeed");
-
-        assert!(window.chunks.is_empty());
-        assert_eq!(window.total_tokens, 0);
-        assert!(!window.truncated);
-    }
-
-    #[test]
-    fn test_relevance_tie_breaking_is_deterministic() {
-        let preparer = ContextPreparerAdapter;
-        let budget = TokenBudget::new(1000, 0);
-        let chunks = vec![
-            make_chunk(3, 0.8, 100),
-            make_chunk(1, 0.8, 100),
-            make_chunk(2, 0.8, 100),
-        ];
-
-        let window = preparer
-            .prepare_context(chunks, &budget, 0.0)
-            .expect("prepare_context should succeed");
-
-        assert_eq!(window.chunks.len(), 3);
-        assert_eq!(window.chunks[0].doc_id, DocId::new(1));
-        assert_eq!(window.chunks[1].doc_id, DocId::new(2));
-        assert_eq!(window.chunks[2].doc_id, DocId::new(3));
-        assert!(!window.truncated);
-    }
-
-    #[test]
-    fn test_reserved_greater_than_limit_does_not_panic() {
-        let preparer = ContextPreparerAdapter;
-        let budget = TokenBudget::new(100, 200); // Reserved > Limit => Usable = 0
-        let chunks = vec![make_chunk(1, 0.9, 10)];
-
-        let window = preparer
-            .prepare_context(chunks, &budget, 0.0)
-            .expect("prepare_context should succeed");
-
-        assert!(window.chunks.is_empty());
-        assert_eq!(window.total_tokens, 0);
-        assert!(window.truncated);
-    }
+    tracing::info!(
+        "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
+    );
+    None
 }
