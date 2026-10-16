@@ -351,7 +351,7 @@ pub fn run_ratchet(args: &[String]) -> i32 {
         let unwrap_baseline_path = Path::new(&root).join(".github/unwrap_baseline.txt");
         let _ = fs::write(
             unwrap_baseline_path,
-            format!("{}\n", measured.unwrap_legacy_grep),
+            format!("{}\n", measured.unwrap_exact),
         );
 
         if json {
@@ -433,6 +433,7 @@ pub fn run_ratchet(args: &[String]) -> i32 {
     if command == "update" {
         // Check if baseline increases occur
         let mut has_increases = false;
+        let mut adr_valid = false;
         let mut increase_details = Vec::new();
 
         if measured.unwrap_legacy_grep > baseline.unwrap_legacy_grep {
@@ -486,7 +487,6 @@ pub fn run_ratchet(args: &[String]) -> i32 {
         }
 
         if has_increases {
-            let mut adr_valid = false;
             if let Some(adr_id) = &adr {
                 let adr_path = Path::new(&root)
                     .join("docs/decisions")
@@ -534,23 +534,27 @@ pub fn run_ratchet(args: &[String]) -> i32 {
         }
 
         // Apply auto-tightening / updates
-        let new_config = RatchetConfig {
-            unwrap_legacy_grep: measured.unwrap_legacy_grep.min(baseline.unwrap_legacy_grep),
-            unwrap_exact: measured.unwrap_exact.min(baseline.unwrap_exact),
-            expect_exact: measured.expect_exact.min(baseline.expect_exact),
-            allow_attrs: measured.allow_attrs.min(baseline.allow_attrs),
-            ignore_attrs: measured.ignore_attrs.min(baseline.ignore_attrs),
-            forbid_unsafe_crates: measured
-                .forbid_unsafe_crates
-                .max(baseline.forbid_unsafe_crates),
-            unsafe_blocks: measured
-                .unsafe_blocks
-                .iter()
-                .map(|(k, v)| {
-                    let base_v = baseline.unsafe_blocks.get(k).copied().unwrap_or(0);
-                    (k.clone(), (*v).min(base_v))
-                })
-                .collect(),
+        let new_config = if adr_valid {
+            measured.clone()
+        } else {
+            RatchetConfig {
+                unwrap_legacy_grep: measured.unwrap_legacy_grep.min(baseline.unwrap_legacy_grep),
+                unwrap_exact: measured.unwrap_exact.min(baseline.unwrap_exact),
+                expect_exact: measured.expect_exact.min(baseline.expect_exact),
+                allow_attrs: measured.allow_attrs.min(baseline.allow_attrs),
+                ignore_attrs: measured.ignore_attrs.min(baseline.ignore_attrs),
+                forbid_unsafe_crates: measured
+                    .forbid_unsafe_crates
+                    .max(baseline.forbid_unsafe_crates),
+                unsafe_blocks: measured
+                    .unsafe_blocks
+                    .iter()
+                    .map(|(k, v)| {
+                        let base_v = baseline.unsafe_blocks.get(k).copied().unwrap_or(0);
+                        (k.clone(), (*v).min(base_v))
+                    })
+                    .collect(),
+            }
         };
 
         let toml_str = match toml::to_string_pretty(&new_config) {
@@ -596,7 +600,7 @@ pub fn run_ratchet(args: &[String]) -> i32 {
         let unwrap_baseline_path = Path::new(&root).join(".github/unwrap_baseline.txt");
         let _ = fs::write(
             unwrap_baseline_path,
-            format!("{}\n", new_config.unwrap_legacy_grep),
+            format!("{}\n", new_config.unwrap_exact),
         );
 
         if json {
