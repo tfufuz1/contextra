@@ -74,6 +74,7 @@ pub struct LsmStorage {
     pub erasure_ledger_handle: Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>>,
     pub(super) read_only: bool,
     pub(super) ledger_status: crate::erasure_ledger::LedgerOpenStatus,
+    pub backend_id: u64,
 }
 
 impl Drop for LsmStorage {

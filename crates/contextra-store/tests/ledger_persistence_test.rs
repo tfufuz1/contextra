@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11 (T-2026-9103)
-// ZWECK: Tests für Etappe 1 & 3: Erasure-Ledger Formate, Framing, Chain-MACs, Append, Torn Writes, Manipulation & Fail-Closed Opening.
+// STAND: 2026-10-16
+// ZWECK: Tests für Etappe 1 & 3: CTRALEDG v1 Erasure-Ledger Formate, Framing, Chain-MACs, Append, Torn Writes, Manipulation & Fail-Closed Opening.
 
 use contextra_store::erasure_ledger::*;
 use tempfile::tempdir;
@@ -75,11 +75,11 @@ async fn test_torn_write_tail_truncation() {
     };
     ledger.append(&[entry.clone()]).await.unwrap();
 
-    // Append partial garbage to simulate torn write at the tail
-    let ledger_path = dir.path().join("erasure.ledger");
-    let mut file_bytes = tokio::fs::read(&ledger_path).await.unwrap();
+    // Append partial garbage to simulate torn write at the tail of CTRALEDG segment
+    let seg_path = dir.path().join("segment_0000000000000000.ctraledg");
+    let mut file_bytes = tokio::fs::read(&seg_path).await.unwrap();
     file_bytes.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]); // Incomplete frame length
-    tokio::fs::write(&ledger_path, &file_bytes).await.unwrap();
+    tokio::fs::write(&seg_path, &file_bytes).await.unwrap();
 
     // Reopen - should heal tail truncation gracefully
     let (healed_opt, status) =
@@ -119,11 +119,11 @@ async fn test_tampered_middle_frame_fails_closed() {
     };
     ledger.append(&[e1, e2]).await.unwrap();
 
-    // Tamper with bytes in the middle of the ledger file
-    let ledger_path = dir.path().join("erasure.ledger");
-    let mut file_bytes = tokio::fs::read(&ledger_path).await.unwrap();
-    file_bytes[15] ^= 0xFF; // Mutate byte in the middle of frame 1 payload
-    tokio::fs::write(&ledger_path, &file_bytes).await.unwrap();
+    // Tamper with bytes in the middle of CTRALEDG segment file
+    let seg_path = dir.path().join("segment_0000000000000000.ctraledg");
+    let mut file_bytes = tokio::fs::read(&seg_path).await.unwrap();
+    file_bytes[60] ^= 0xFF; // Mutate byte in the middle of frame 1 payload
+    tokio::fs::write(&seg_path, &file_bytes).await.unwrap();
 
     // Reopen - should fail closed with Corrupt
     let (corrupt_opt, status) =
@@ -134,7 +134,7 @@ async fn test_tampered_middle_frame_fails_closed() {
     assert!(corrupt_opt.is_none());
     match status {
         LedgerOpenStatus::Corrupt { reason } => {
-            assert!(reason.contains("Corruption") || reason.contains("CRC mismatch"));
+            assert!(reason.contains("Corruption") || reason.contains("CRC32 mismatch") || reason.contains("MAC mismatch"));
         }
         _ => panic!("Expected Corrupt status, got {:?}", status),
     }

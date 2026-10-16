@@ -57,7 +57,19 @@ async fn test_upgrade_on_open_all_fixtures() {
     // 4. Manifest Fixture Upgrade Open
     let manifest_path = base.join("manifest_v1.manifest");
     assert!(manifest_path.exists());
-    let entries = Manifest::load(&manifest_path).await.expect("load manifest");
+    let test_manifest_dir = tmp_dir.path().join("manifest");
+    std::fs::create_dir_all(&test_manifest_dir).expect("create manifest dir");
+    let test_manifest_path = test_manifest_dir.join("MANIFEST");
+    std::fs::copy(&manifest_path, &test_manifest_path).expect("copy manifest v1");
+
+    let manifest = Manifest::open(&test_manifest_path).await.expect("open upgraded manifest v1");
+    assert_eq!(manifest.erasure_high_water_mark(), contextra_ports::erasure::ErasureMode::Off);
+    let (seq, mac) = manifest.ledger_head().await;
+    assert_eq!(seq, 0);
+    assert_eq!(mac, [0u8; 32]);
+    assert_ne!(manifest.backend_id(), 0);
+
+    let entries = Manifest::load(&test_manifest_path).await.expect("load manifest");
     assert!(!entries.is_empty());
     let tracker = ManifestFormatTracker::from_entries(&entries);
     assert_eq!(tracker.max_sstable_version, 4);

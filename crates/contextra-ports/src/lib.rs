@@ -39,12 +39,6 @@ pub mod embedding;
 pub mod embedding_sanity;
 /// Erasure and deletion guarantee port traits (§5.3, §5.4, §5.5, §8.3, §8.4).
 pub mod erasure;
-/// Graph mutation and CSR traversal port traits.
-pub mod graph;
-/// Graph index traits and CSR statistics.
-pub mod graph_index;
-/// Graph persistence port traits (§4.3).
-pub mod graph_persistence;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
 /// Unique ID generator port traits (§7.4).
@@ -89,9 +83,6 @@ pub use checkpoint::*;
 pub use clock::*;
 pub use embedding::*;
 pub use erasure::*;
-pub use graph::*;
-pub use graph_index::*;
-pub use graph_persistence::*;
 pub use id_gen::*;
 pub use kv::*;
 pub use kv_bridge_port::*;
@@ -119,9 +110,6 @@ mod dyn_safety {
     fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
     fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
     fn _assert_dyn_kv_lifecycle_hooks(_: Option<&dyn KvLifecycleHooks>) {}
-    fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
-    fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
-    fn _assert_dyn_graph_persistence(_: Option<&dyn GraphPersistence>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
@@ -151,9 +139,6 @@ mod dyn_safety {
         _assert_dyn_kv_bridge_storage(None);
         _assert_dyn_kv_prefix_store(None);
         _assert_dyn_kv_lifecycle_hooks(None);
-        _assert_dyn_graph_mutation(None);
-        _assert_dyn_graph(None);
-        _assert_dyn_graph_persistence(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
         _assert_dyn_entropy_rng(None);

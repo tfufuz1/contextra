@@ -232,6 +232,11 @@ impl<'a> FenFenceGuard<'a> {
     pub fn prefixes(&self) -> &[Vec<u8>] {
         &self.prefixes
     }
+
+    /// Returns unique fence identifier.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
 }
 
 impl<'a> Drop for FenFenceGuard<'a> {
