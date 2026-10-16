@@ -655,48 +655,72 @@ impl ErasureLedger {
                 payload.clone(),
             )?;
 
-        let mut next_index = (**self.index.load()).clone();
-
-        for rec in records {
-            let (frame_bytes, new_mac) = rec.serialize(&self.key, &current_mac)?;
             buffer.extend_from_slice(&frame_bytes);
-            current_mac = new_mac;
+            cur_mac = new_mac;
 
-            for fd in &rec.family_digests {
-                next_index.scopes.insert((rec.scope_digest, *fd), rec.tx);
+            let rec = CtraledgRecord {
+                record_type: *rt,
+                tx: *tx,
+                timestamp: now_ms,
+                purge_id: *purge_id,
+                scope_digest: *scope_digest,
+                family_digests: family_digests.clone(),
+                payload: payload.clone(),
+                mac: new_mac,
+                crc32c: crc32fast::hash(&frame_bytes[4..frame_bytes.len() - 4]),
+            };
+            new_records.push(rec);
+
+            if !payload.is_empty() {
+                if let Ok(entry) = LedgerEntry::from_payload_bytes(payload) {
+                    new_entries.push(entry);
+                }
+            } else {
+                new_entries.push(LedgerEntry {
+                    ledger_seq: self.last_seq + new_records.len() as u64,
+                    kind: LedgerEntryKind::Key,
+                    keyed_hash: *scope_digest,
+                    erased_at_tx: *tx,
+                    proof_id: *purge_id,
+                });
             }
+        }
+
+        if buffer.is_empty() {
+            return Ok(());
         }
 
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&active_path)
+            .open(&active_seg_path)
             .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to open active ledger segment: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to open segment: {}", e)))?;
 
-        file.write_all(&buffer).await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger write_all failed: {}", e))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", e))
-        })?;
+        file.write_all(&buffer).await.map_err(|e| ContextraError::Storage(e.to_string()))?;
+        file.sync_all().await.map_err(|e| ContextraError::Storage(e.to_string()))?;
+        crate::util::fsync_parent_dir(&self.dir).await?;
 
-        crate::util::fsync_parent_dir(&active_path).await?;
+        // Update state
+        self.last_chain_mac = cur_mac;
+        self.last_seq += new_records.len() as u64;
+        self.current_segment_bytes += buffer.len() as u64;
 
-        // Update RAM state
-        self.last_chain_mac = current_mac;
-        for rec in records {
-            if rec.purge_id != [0u8; 16] {
-                self.seen_purge_ids.insert(rec.purge_id);
-            }
-            self.records.push(rec.clone());
+        for rec in new_records {
+            self.seen_proof_ids.insert(rec.purge_id);
+            self.records.push(rec);
         }
-        self.index.store(Arc::new(next_index));
+        for entry in new_entries {
+            if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
+                self.distinct_prefix_lens.insert(prefix_len);
+            }
+            self.entries.push(entry);
+        }
 
         self.rebuild_index();
         self.write_head_marker().await?;
 
-        Ok(current_mac)
+        Ok(())
     }
 
     /// Compatibility append for legacy `LedgerEntry` callers in tests.

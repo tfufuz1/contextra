@@ -29,6 +29,9 @@ ignore = [
     "RUSTSEC-2026-0096", # wasmtime
     "RUSTSEC-2026-0222", # wasmtime
     "RUSTSEC-2026-0269", # wasmtime
+    "RUSTSEC-2025-0057", # fxhash
+    "RUSTSEC-2026-0253", # lru
+    "RUSTSEC-2025-0141", # bincode
 ]
 
 [licenses]
@@ -62,18 +65,26 @@ deny = [
         "contextra",
         "contextra-agent",
         "contextra-bench",
+        "contextra-checkpoint",
         "contextra-cognition",
+        "contextra-crypto",
         "contextra-db",
         "contextra-engine",
         "contextra-infer-candle",
         "contextra-infer-ollama",
         "contextra-infer-onnx",
         "contextra-mcp",
+        "contextra-mvcc",
+        "contextra-ports",
         "contextra-privacy",
         "contextra-py",
+        "contextra-rank",
         "contextra-router",
         "contextra-sandbox",
+        "contextra-store",
         "contextra-testkit",
+        "contextra-text",
+        "contextra-vector",
         "reqwest",
         "tokio-rustls",
         "tokio-util",
