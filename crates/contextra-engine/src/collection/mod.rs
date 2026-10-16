@@ -498,7 +498,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
     /// otherwise returning an error if tenant resolution is ambiguous or unresolvable).
     pub fn try_tenant_id(&self) -> Result<contextra_types::TenantId> {
-        if let Some(eb) = self.storage.erasure_capabilities() {
+        if let Some(eb) = self.storage.erasure_backend() {
             let scope = contextra_ports::erasure::LogicalScope::Tenant {
                 tenant_id: contextra_types::TenantId::system(),
             };
@@ -510,7 +510,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 }
             }
         }
-        Err(contextra_types::ContextraError::TenantIsolationViolation(
+        Err(contextra_types::ContextraError::InvalidInput(
             "TenantId resolution failed: underlying storage engine is not bound to a specific tenant".to_string()
         ))
     }

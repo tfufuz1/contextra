@@ -774,6 +774,12 @@ impl LsmStorage {
             erasure_ledger_handle,
             read_only,
             ledger_status,
+            backend_id: {
+                use contextra_ports::{EntropyRng, SystemRng};
+                let mut bytes = [0u8; 8];
+                SystemRng::new().fill_bytes(&mut bytes);
+                u64::from_le_bytes(bytes)
+            },
         };
 
         let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);

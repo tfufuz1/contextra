@@ -313,6 +313,11 @@ impl<'a> FenFenceGuard<'a> {
     pub fn prefixes(&self) -> &[Vec<u8>] {
         &self.prefixes
     }
+
+    /// Returns unique fence identifier.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
 }
 
 impl<'a> Drop for FenFenceGuard<'a> {
@@ -428,7 +433,7 @@ impl ErasureFence {
     }
 
     /// Helper to release a registered prefix fence by ID.
-    fn release_prefix_fence(&self, id: u64) {
+    pub(crate) fn release_prefix_fence(&self, id: u64) {
         self.gate.release_fence(id);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
