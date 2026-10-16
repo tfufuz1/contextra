@@ -114,25 +114,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )
         };
 
-        let scope_write_seq_before = if let Some(backend) = maybe_backend.as_ref() {
-            backend.snapshot_write_seq(&scope_prefixes_ref)
-        } else {
-            0
-        };
-
         // Allocate TxId for Ledger and Tombstones
         let db_tx = self.begin_transaction()?;
         let erased_at_tx = db_tx.tx_id;
-
-        // Check concurrent modification before commit
-        if let Some(backend) = maybe_backend.as_ref() {
-            let scope_write_seq_check = backend.snapshot_write_seq(&scope_prefixes_ref);
-            if scope_write_seq_before != scope_write_seq_check {
-                return Err(ContextraError::Conflict(
-                    "ConcurrentModification detected before tombstone commit".to_string(),
-                ));
-            }
-        }
 
         // (d) Tombstones for explicit keys in single transaction
         let old_user_val = self
@@ -174,17 +158,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // (f) No witness fabrication without real scan (REG-14, Hotfix F-01)
         let witnesses = Vec::new();
 
-        let final_scope_write_seq = if let Some(backend) = maybe_backend.as_ref() {
-            backend.snapshot_write_seq(&scope_prefixes_ref)
-        } else {
-            scope_write_seq_before
-        };
-
         Ok(DocErasure {
             footprint_hash,
             scope_hash,
             as_of_tx: erased_at_tx,
-            scope_write_seq: final_scope_write_seq,
+            scope_write_seq: 0,
             witnesses,
             observed_empty,
             prefixes,

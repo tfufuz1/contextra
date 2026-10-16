@@ -372,11 +372,6 @@ impl ErasureFence {
         &self,
         prefixes: Vec<Vec<u8>>,
     ) -> Result<FenFenceGuard<'_>, FenceError> {
-        let state = *self.scope_state.read();
-        if state == FenceScopeState::CollectionDropping {
-            return Err(FenceError::CollectionDropping);
-        }
-
         #[cfg(not(loom))]
         if tokio::runtime::Handle::try_current().is_ok() {
             return Err(FenceError::AsyncRuntimeBlockingAttempt);
@@ -386,6 +381,11 @@ impl ErasureFence {
         let _commit_guard = self.commit_mutex.blocking_lock();
         #[cfg(loom)]
         let _commit_guard = self.commit_mutex.lock().unwrap();
+
+        let state = *self.scope_state.read();
+        if state == FenceScopeState::CollectionDropping {
+            return Err(FenceError::CollectionDropping);
+        }
 
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
