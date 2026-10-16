@@ -26,7 +26,9 @@ impl StatvfsSpaceProbe {
 
 impl FreeSpaceProbe for StatvfsSpaceProbe {
     fn available_bytes(&self) -> std::result::Result<Option<u64>, ProbeError> {
-        Ok(contextra_sys::statvfs_available_bytes(&self.path).ok())
+        contextra_sys::statvfs_available_bytes(&self.path)
+            .map(Some)
+            .map_err(|e| ProbeError(e.to_string()))
     }
 }
 
@@ -74,6 +76,8 @@ pub enum PurgeBlocked {
     ScanTimeout,
     /// Unknown free space.
     UnknownFreeSpace,
+    /// Free space probe failed.
+    ProbeFailed(String),
 }
 
 /// Report summarizing results of a successful purge compaction.

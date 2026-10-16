@@ -37,7 +37,9 @@ pub fn ranges_overlap(f1: &[u8], l1: &[u8], f2: &[u8], l2: &[u8]) -> bool {
 /// (b) Transitive completion (Abschlussbildung): as long as an unselected file intersects
 ///     the bounding range of selected files, include it to form a contiguous level window.
 /// (c) Disk space check: sum of candidate file sizes <= free space. If probe is missing or
-///     returns None, returns `PurgeBlocked::UnknownFreeSpace`.
+///     returns None (unknown space), candidates are processed strictly sequentially (one SSTable
+///     candidate at a time). Probe failure yields `PurgeBlocked::ProbeFailed`. Some(0) yields
+///     `PurgeBlocked::InsufficientDiskSpace`.
 pub fn select_purge_candidates(
     sstables: &[Arc<SstableReader>],
     scope: &PurgeScope,
@@ -97,26 +99,45 @@ pub fn select_purge_candidates(
 
     selected_indices.sort_unstable();
 
-    let candidates: Vec<Arc<SstableReader>> = selected_indices
+    let mut candidates: Vec<Arc<SstableReader>> = selected_indices
         .into_iter()
         .map(|idx| Arc::clone(&sstables[idx]))
         .collect();
 
     // (c) Disk space pre-flight check (L8 fix)
-    // None probe means "unknown", not "0 bytes free". Purge is permitted to start.
-    let needed_bytes: u64 = candidates.iter().map(|s| s.metadata().file_size).sum();
-
-    let free_space_opt = match space_probe {
-        Some(probe) => probe.free_space_bytes(),
+    // Probe failure yields ProbeFailed.
+    // Some(0) yields InsufficientDiskSpace.
+    // None probe or Ok(None) means "unknown free space": purge processes candidates sequentially (one SSTable at a time).
+    let probe_res = match space_probe {
+        Some(probe) => match probe.available_bytes() {
+            Ok(res) => res,
+            Err(e) => return Err(PurgeBlocked::ProbeFailed(e.0)),
+        },
         None => None,
     };
 
-    if let Some(free_space) = free_space_opt {
-        if free_space < needed_bytes || free_space == 0 {
+    match probe_res {
+        Some(0) => {
+            let needed_bytes: u64 = candidates.iter().map(|s| s.metadata().file_size).sum();
             return Err(PurgeBlocked::InsufficientDiskSpace {
-                needed: needed_bytes,
-                free: free_space,
+                needed: needed_bytes.max(1024 * 1024),
+                free: 0,
             });
+        }
+        Some(free_space) => {
+            let needed_bytes: u64 = candidates.iter().map(|s| s.metadata().file_size).sum();
+            if free_space < needed_bytes {
+                return Err(PurgeBlocked::InsufficientDiskSpace {
+                    needed: needed_bytes,
+                    free: free_space,
+                });
+            }
+        }
+        None => {
+            // Unknown free space: conservatively limit to 1 SSTable candidate at a time
+            if candidates.len() > 1 {
+                candidates.truncate(1);
+            }
         }
     }
 
