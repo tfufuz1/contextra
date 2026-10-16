@@ -657,10 +657,7 @@ mod tests {
         let doc1 = DocId::from(large_id1);
         let doc2 = DocId::from(large_id2);
 
-        let vectors = vec![
-            vec![1.0, 0.0, 0.0, 0.0],
-            vec![2.0, 0.0, 0.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![2.0, 0.0, 0.0, 0.0]];
         let ids = vec![doc1, doc2];
 
         index.build(&vectors, &ids).await?;

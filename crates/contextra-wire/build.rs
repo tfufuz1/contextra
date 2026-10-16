@@ -114,7 +114,9 @@ fn post_process_generated_code(output_file: &Path) {
         if content.ends_with('\n') {
             new_content.push('\n');
         }
-        let _ = std::fs::write(output_file, new_content);
+        if std::fs::write(output_file, new_content).is_err() {
+            eprintln!("Failed to write post-processed code to {}", output_file.display());
+        }
     }
 }
 
@@ -128,7 +130,8 @@ mod tests {
         let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input1), expected1);
 
-        let input2 = "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
+        let input2 =
+            "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
         let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input2), expected2);
 

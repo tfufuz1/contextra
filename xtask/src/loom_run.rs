@@ -72,7 +72,8 @@ pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult,
         // Skip tests that cannot run under `RUSTFLAGS="--cfg loom"`:
         // - `loom_relate_n_ary`: contextra-db depends on contextra-engine which gates Collection with #[cfg(not(loom))]
         // - `loom_quantizer_race_test`: tokio runtime builder enable_all() panics under Loom mock runtime
-        if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test") {
+        if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test")
+        {
             continue;
         }
 
@@ -120,7 +121,9 @@ pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult,
         report_content.push_str("| Crate | File | Status |\n");
         report_content.push_str("|---|---|---|\n");
         for file in &discovered {
-            let status_str = if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test") {
+            let status_str = if file.path.contains("loom_relate_n_ary")
+                || file.path.contains("loom_quantizer_race_test")
+            {
                 "SKIPPED_NOT_LOOM"
             } else if passed {
                 "PASSED"

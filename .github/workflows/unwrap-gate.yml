@@ -16,13 +16,18 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - uses: dtolnay/rust-toolchain@1.89.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
       - name: Count Production Unwraps
         run: |
-          COUNT=$(grep -r '\.unwrap()\|\.expect(' crates/ --include="*.rs" \
-            | grep -v '/tests' | grep -v '/test' | grep -v '/bench' \
-            | grep -v '#\[cfg(test)\]' | wc -l)
+          OUTPUT=$(cargo run -p xtask -- panic-inventory --exclude-tests)
+          echo "$OUTPUT"
+          COUNT=$(echo "$OUTPUT" | grep -oP '\d+(?= panic entries found)')
           echo "Production unwrap/expect count: $COUNT"
           BASELINE=$(cat .github/unwrap_baseline.txt 2>/dev/null || echo 99999)
+          echo "Current baseline: $BASELINE"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Production unwrap count increased from $BASELINE to $COUNT"
             exit 1
