@@ -70,12 +70,7 @@ impl FailpointHelper {
             }
             if self
                 .fail_count
-                .compare_exchange_weak(
-                    current,
-                    current - 1,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
+                .compare_exchange_weak(current, current - 1, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok()
             {
                 return false;
@@ -101,7 +96,7 @@ mod tests {
 
         helper.set_fail_after_count(2);
         assert!(!helper.check_and_decrement()); // count -> 1
-        assert!(helper.check_and_decrement());  // count -> 0, triggered
+        assert!(helper.check_and_decrement()); // count -> 0, triggered
         assert!(!helper.check_and_decrement()); // remaining 0
     }
 }
