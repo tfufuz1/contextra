@@ -5,11 +5,12 @@
 
 use contextra_types::{ContextraError, TxId};
 use contextra_ports::erasure::{
-    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, PurgeOutput,
+    DisposeError, ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, PurgeOutput,
 };
 
 use crate::compaction::purge_filter::PurgeScope;
 use crate::lsm::engine::LsmStorage;
+use crate::lsm::purge::dispose::dispose_obsolete_files;
 use crate::tenant_codec::TenantKeyCodec;
 
 impl ErasureBackend for LsmStorage {
@@ -71,6 +72,28 @@ impl ErasureBackend for LsmStorage {
             obsolete_files: report.obsolete_files,
             duration_ticks: 0,
         })
+    }
+
+    fn dispose(&self, files: &[std::path::PathBuf], secure_delete: bool) -> std::result::Result<(), DisposeError> {
+        let storage_dir = &self.config.path;
+        let obsolete_files = files.to_vec();
+
+        let handle = tokio::runtime::Handle::try_current()
+            .map_err(|e| DisposeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+
+        let report = handle
+            .block_on(async { dispose_obsolete_files(storage_dir, obsolete_files, secure_delete).await })
+            .map_err(DisposeError::Io)?;
+
+        if secure_delete && !report.refusals.is_empty() {
+            let (path, refusal) = &report.refusals[0];
+            return Err(DisposeError::ScrubRefused {
+                path: path.to_string_lossy().to_string(),
+                reason: format!("{:?}", refusal),
+            });
+        }
+
+        Ok(())
     }
 
     fn snapshot_write_seq(&self, prefixes: &[Vec<u8>]) -> u64 {

@@ -31,10 +31,19 @@ impl LsmStorage {
             });
         }
 
+        // Acquire CompactionGate lease: Purge and background compaction are mutually exclusive.
+        let _lease_guard = self
+            .compaction_lease_lock
+            .try_lock()
+            .map_err(|_| PurgeError::CompactionBusy)?;
+
         // 2. Active Memtable Flush to SSTable first
         StorageEngine::flush(self)
             .await
-            .map_err(|_| PurgeError::CompactionBusy)?;
+            .map_err(|e| PurgeError::WriteError {
+                file: "<flush>".to_string(),
+                source_details: format!("Flush failed during purge: {e}"),
+            })?;
 
         // Snapshot existing sstables list under read lock
         let snapshot_sstables = {
@@ -92,8 +101,8 @@ impl LsmStorage {
             let mut matches = false;
             loop {
                 match stream.next_entry().await {
-                    Ok(Some((key, _val, _seq, _tx))) => {
-                        if scope.matches_key(&key) {
+                    Ok(Some((key, _val, _seq, tx))) => {
+                        if scope.matches_key(&key) && (as_of_tx == 0 || tx <= as_of_tx) {
                             matches = true;
                             break;
                         }
@@ -147,7 +156,7 @@ impl LsmStorage {
             loop {
                 match stream.next_entry().await {
                     Ok(Some((key, val, seq, tx))) => {
-                        if scope.matches_key(&key) {
+                        if scope.matches_key(&key) && (as_of_tx == 0 || tx <= as_of_tx) {
                             records_purged += 1;
                             bytes_reclaimed += (key.len() + val.len()) as u64;
                         } else {

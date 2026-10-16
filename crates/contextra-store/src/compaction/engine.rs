@@ -33,6 +33,7 @@ pub struct CompactionEngine {
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
+    compaction_lease_lock: Option<Arc<tokio::sync::Mutex<()>>>,
     purge_scope: parking_lot::RwLock<
         Option<(
             super::purge_filter::PurgeScope,
@@ -75,8 +76,15 @@ impl CompactionEngine {
             adaptive_planner,
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
+            compaction_lease_lock: None,
             purge_scope: parking_lot::RwLock::new(None),
         }
+    }
+
+    /// Attaches the compaction lease lock shared with LsmStorage.
+    pub fn with_compaction_lease_lock(mut self, lock: Arc<tokio::sync::Mutex<()>>) -> Self {
+        self.compaction_lease_lock = Some(lock);
+        self
     }
 
     /// Sets an active purge scope and optional space probe to prioritize purge candidate SSTables.
@@ -159,6 +167,11 @@ impl CompactionEngine {
         data_path: &std::path::Path,
         cancel_token: Option<&tokio_util::sync::CancellationToken>,
     ) -> Result<bool> {
+        let _lease_guard = match &self.compaction_lease_lock {
+            Some(lock) => Some(lock.lock().await),
+            None => None,
+        };
+
         // 1. Select candidates under a single read-lock window.
         // Both candidate decision, Arc cloning, and full-compaction determination
         // happen atomically under one lock acquisition to prevent TOCTOU race conditions.

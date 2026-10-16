@@ -346,6 +346,22 @@ pub enum PurgeError {
     },
 }
 
+/// Error during file disposal (§6.7).
+#[derive(Debug, Error)]
+pub enum DisposeError {
+    /// Scrubbing was refused or failed (e.g. hardlink count > 1, CoW filesystem, immutable flag).
+    #[error("Scrub refused for path {path}: {reason}")]
+    ScrubRefused {
+        /// File path where scrubbing was refused.
+        path: String,
+        /// Reason description.
+        reason: String,
+    },
+    /// I/O error during file disposal.
+    #[error("I/O error during disposal: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 /// Storage backend contract for erasure operations (§5.5).
 pub trait ErasureBackend: Send + Sync {
     /// Translates a logical scope into a tenant-encoded physical scope.
@@ -361,6 +377,14 @@ pub trait ErasureBackend: Send + Sync {
         as_of: TxId,
         probe: &dyn FreeSpaceProbe,
     ) -> std::result::Result<PurgeOutput, PurgeError>;
+
+    /// Disposes obsolete files durably (§6.7).
+    fn dispose(&self, _files: &[std::path::PathBuf], _secure_delete: bool) -> std::result::Result<(), DisposeError> {
+        Err(DisposeError::ScrubRefused {
+            path: "<default>".to_string(),
+            reason: "ErasureBackend::dispose not supported by default implementation".to_string(),
+        })
+    }
 
     /// Returns the erasure fence snapshot write sequence number for the specified prefixes.
     fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {

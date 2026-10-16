@@ -206,7 +206,12 @@ impl OrxPurgeIntent {
     }
 
     /// Persists this intent to `path` via `atomic_replace` with CRC32C frame.
+    /// Ensures parent directory exists and is synced after replace.
     pub fn write_to_file(&self, path: &Path) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
         let payload = self.to_bytes();
         let checksum = crc32fast::hash(&payload);
 
@@ -217,7 +222,14 @@ impl OrxPurgeIntent {
         buffer.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         buffer.extend_from_slice(&payload);
 
-        atomic_replace(path, &buffer)
+        atomic_replace(path, &buffer)?;
+
+        if let Some(parent) = path.parent() {
+            if let Ok(dir_file) = fs::File::open(parent) {
+                let _ = dir_file.sync_all();
+            }
+        }
+        Ok(())
     }
 
     /// Reads an intent from `path`.
@@ -282,5 +294,32 @@ impl OrxPurgeIntent {
 
         let intent = Self::from_bytes(payload)?;
         Ok(Some(intent))
+    }
+
+    /// Reads all intent files located in `storage_dir/purge/` or fallback `storage_dir/purge.intent`.
+    pub fn read_all_intents(storage_dir: &Path) -> Result<Vec<Self>> {
+        let mut intents = Vec::new();
+
+        // 1. Check legacy single intent file at `storage_dir/purge.intent`
+        let legacy_file = storage_dir.join("purge.intent");
+        if let Some(intent) = Self::read_from_file(&legacy_file)? {
+            intents.push(intent);
+        }
+
+        // 2. Scan `storage_dir/purge/` directory for `<purge_id>.intent` files
+        let purge_dir = storage_dir.join("purge");
+        if purge_dir.is_dir() {
+            for entry in fs::read_dir(&purge_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("intent") {
+                    if let Some(intent) = Self::read_from_file(&path)? {
+                        intents.push(intent);
+                    }
+                }
+            }
+        }
+
+        Ok(intents)
     }
 }

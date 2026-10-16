@@ -27,29 +27,31 @@ pub async fn resume_pending_with_policy(
     failpoints: Option<&OrxFailpointSet>,
     dispose_policy: DisposePolicy,
 ) -> Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
-    let intent_file = storage_dir.join("purge.intent");
     let journal_file = storage_dir.join("pending_delete.journal");
 
-    let intent_opt = OrxPurgeIntent::read_from_file(&intent_file)?;
+    let intents = OrxPurgeIntent::read_all_intents(storage_dir)?;
 
-    if let Some(intent) = intent_opt {
-        let scope = if let Some(ref recon_fn) = hooks.reconstruct_scope {
-            recon_fn(intent.ledger_seq, intent.proof_id)?
-        } else {
-            PurgeScope::Keys(Vec::new())
-        };
+    if !intents.is_empty() {
+        let mut last_report = PurgeReport::default();
+        for intent in intents {
+            let scope = if let Some(ref recon_fn) = hooks.reconstruct_scope {
+                recon_fn(intent.ledger_seq, intent.proof_id)?
+            } else {
+                PurgeScope::Keys(Vec::new())
+            };
 
-        let mut orchestrator = PurgeOrchestrator::new_standalone(storage_dir);
-        if let Some(fp) = failpoints {
-            orchestrator = orchestrator.with_failpoints(fp.clone());
+            let mut orchestrator = PurgeOrchestrator::new_standalone(storage_dir);
+            if let Some(fp) = failpoints {
+                orchestrator = orchestrator.with_failpoints(fp.clone());
+            }
+
+            let secure_delete = dispose_policy != DisposePolicy::Disabled;
+            last_report = orchestrator
+                .execute_from_intent(intent, scope, hooks, secure_delete, None)
+                .await?;
         }
 
-        let secure_delete = dispose_policy != DisposePolicy::Disabled;
-        let report = orchestrator
-            .execute_from_intent(intent, scope, hooks, secure_delete, None)
-            .await?;
-
-        return Ok(Some((report, OrxDisposeReport::default())));
+        return Ok(Some((last_report, OrxDisposeReport::default())));
     }
 
     // If no intent remains but pending_delete.journal is present, clean up orphaned files

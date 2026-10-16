@@ -108,7 +108,6 @@ impl std::fmt::Debug for OrxHooks {
 pub struct PurgeOrchestrator<'a> {
     storage: Option<&'a LsmStorage>,
     storage_dir: PathBuf,
-    intent_file: PathBuf,
     failpoints: Option<OrxFailpointSet>,
 }
 
@@ -116,11 +115,9 @@ impl<'a> PurgeOrchestrator<'a> {
     /// Creates a new `PurgeOrchestrator` instance for `storage`.
     pub fn new(storage: &'a LsmStorage) -> Self {
         let storage_dir = storage.config.path.clone();
-        let intent_file = storage_dir.join("purge.intent");
         Self {
             storage: Some(storage),
             storage_dir,
-            intent_file,
             failpoints: None,
         }
     }
@@ -128,13 +125,20 @@ impl<'a> PurgeOrchestrator<'a> {
     /// Creates a standalone `PurgeOrchestrator` without active storage.
     pub fn new_standalone(storage_dir: &Path) -> Self {
         let storage_dir = storage_dir.to_path_buf();
-        let intent_file = storage_dir.join("purge.intent");
         Self {
             storage: None,
             storage_dir,
-            intent_file,
             failpoints: None,
         }
+    }
+
+    /// Returns the path to the intent file for a given `purge_id` (`storage_dir/purge/<hex(purge_id)>.intent`).
+    pub fn intent_path_for_id(storage_dir: &Path, purge_id: &[u8; 16]) -> PathBuf {
+        let hex_id = purge_id
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>();
+        storage_dir.join("purge").join(format!("{}.intent", hex_id))
     }
 
     /// Configures active failpoints for testing.
@@ -150,8 +154,9 @@ impl<'a> PurgeOrchestrator<'a> {
         phase: PurgePhase,
     ) -> Result<(), OrxPurgeError> {
         intent.phase = phase;
+        let intent_path = Self::intent_path_for_id(&self.storage_dir, &intent.purge_id);
         intent
-            .write_to_file(&self.intent_file)
+            .write_to_file(&intent_path)
             .map_err(OrxPurgeError::Io)
     }
 
@@ -351,8 +356,13 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::Release)?;
                 self.check_failpoint("after_release")?;
 
-                if self.intent_file.exists() {
-                    durable_remove(&self.intent_file).map_err(OrxPurgeError::Io)?;
+                let active_intent_path = Self::intent_path_for_id(&self.storage_dir, &intent.purge_id);
+                if active_intent_path.exists() {
+                    durable_remove(&active_intent_path).map_err(OrxPurgeError::Io)?;
+                }
+                let legacy_intent_file = self.storage_dir.join("purge.intent");
+                if legacy_intent_file.exists() {
+                    durable_remove(&legacy_intent_file).map_err(OrxPurgeError::Io)?;
                 }
                 self.check_failpoint("after_intent_cleanup")?;
             }
@@ -411,8 +421,10 @@ impl<'a> PurgeOrchestrator<'a> {
             }
         }
         #[cfg(feature = "fault-injection")]
-        if std::env::var(format!("PURGE_FAILPOINT_{}", name)).is_ok() {
-            return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
+        {
+            if std::env::var(format!("PURGE_FAILPOINT_{}", name)).is_ok() {
+                return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
+            }
         }
         Ok(())
     }
