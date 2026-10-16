@@ -2,10 +2,9 @@
 //!
 //! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten gemäß Art. 30 Abs. 1 DSGVO.
 //!
-//! ### Hinweis zur Abhängigkeit `TenantId`:
-//! `contextra-privacy` verwendet in diesem Modul den lokalen Typ-Alias `pub type TenantId = String;` anstelle
-//! einer Abhängigkeit zu `contextra-types`, um den Abhängigkeitsbaum schlank zu halten und den Scope
-//! der Crate-Konfiguration zu wahren.
+//! ### Hinweis zum Typ `TenantLabel`:
+//! `TenantLabel` ist ein freies String-Label für den menschenlesbaren Export (z. B. Mandantenname
+//! oder Organisations-Bezeichnung) und bewusst nicht `contextra_types::TenantId` (Newtype `u64`).
 
 use serde::{Deserialize, Serialize};
 
@@ -29,8 +28,8 @@ impl ProcessorRole {
     }
 }
 
-/// Identifikator eines Mandanten im System.
-pub type TenantId = String;
+/// Menschlesbares Label eines Mandanten im Export.
+pub type TenantLabel = String;
 
 /// Ein Datensatz einer Verarbeitungstätigkeit gemäß Art. 30 Abs. 1 DSGVO.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,8 +52,8 @@ pub struct ProcessingActivityRecord {
     pub retention_period: String,
     /// Allgemeine Beschreibung der technischen und organisatorischen Maßnahmen (TOMs).
     pub technical_and_organizational_measures: Vec<String>,
-    /// Mandanten-Identifikator.
-    pub tenant_id: TenantId,
+    /// Mandanten-Identifikator (menschenlesbares Label).
+    pub tenant_id: TenantLabel,
 }
 
 /// Strukturierte Export-Repräsentation des Verzeichnisses von Verarbeitungstätigkeiten.
@@ -204,5 +203,16 @@ mod tests {
         let lines: Vec<&str> = md.trim().lines().collect();
         // 4 header setup lines + 2 data rows = 6 lines total
         assert_eq!(lines.len(), 6);
+    }
+
+    #[test]
+    fn test_serialization_tenant_id_is_string() -> Result<(), serde_json::Error> {
+        let rec = create_sample_record();
+        let json = serde_json::to_value(&rec)?;
+        assert_eq!(
+            json["tenant_id"],
+            serde_json::Value::String("tenant-123".to_string())
+        );
+        Ok(())
     }
 }
