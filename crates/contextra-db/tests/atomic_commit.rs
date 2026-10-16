@@ -43,8 +43,7 @@ async fn test_collection_atomic_rollback_on_error() {
 }
 
 #[tokio::test]
-async fn test_4_index_atomic_rollback_on_vector_failure() {
-    use contextra_types::EntityId;
+async fn test_3_index_atomic_rollback_on_vector_failure() {
     use serde_json::json;
 
     let tmp = TempDir::new().unwrap();
@@ -55,9 +54,9 @@ async fn test_4_index_atomic_rollback_on_vector_failure() {
     let db = Contextra::open_with_config(tmp.path(), config)
         .await
         .unwrap();
-    let col = db.collection("four_index_col").await.unwrap();
+    let col = db.collection("three_index_col").await.unwrap();
 
-    // 1. Valid insertion with text and graph
+    // 1. Valid insertion with text
     col.insert(
         "doc_valid",
         &[0.1, 0.2, 0.3, 0.4],
@@ -96,13 +95,5 @@ async fn test_4_index_atomic_rollback_on_vector_failure() {
     assert!(
         hybrid_res.iter().all(|r| r.id != "doc_failed"),
         "doc_failed text must not be present in text index"
-    );
-
-    // 5. Verify Graph Index isolation
-    let eid_failed = EntityId::from_key("doc_failed").unwrap();
-    let neighbors = col.graph_index().neighbors(eid_failed).await.unwrap();
-    assert!(
-        neighbors.is_empty(),
-        "doc_failed entity must not be present in graph index"
     );
 }

@@ -1,6 +1,6 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -192,9 +192,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
         }
 
-        if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
-            tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
-        }
         if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Text index rollback failed: {}", e);
         }
@@ -206,7 +203,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    /// Rolls back any uncommitted changes applied to all 4 sub-systems in reverse commit order.
+    /// Rolls back any uncommitted changes applied to sub-systems in reverse commit order.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
         let doc_ids = {
@@ -221,14 +218,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             tracing::error!("[INV-DB-3] KV store rollback failed: {}", e);
         }
 
-        let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
         let index_res = self.collection.index.rollback(self.tx_id).await;
         let storage_res = self.collection.storage.rollback(self.tx_id).await;
 
-        if let Err(ref e) = graph_res {
-            tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
-        }
         if let Err(ref e) = text_res {
             tracing::error!("[INV-DB-3] Text index rollback failed: {}", e);
         }
@@ -242,9 +235,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let mut errors = Vec::new();
         if let Err(e) = kv_res {
             errors.push(format!("KV Store: {}", e));
-        }
-        if let Err(e) = graph_res {
-            errors.push(format!("Graph: {}", e));
         }
         if let Err(e) = text_res {
             errors.push(format!("Text: {}", e));

@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 //! Integration test verifying WP-L3.1 transaction semantics:
-//! (a) insert(A); delete(A) in a single transaction leaves zero remnants in LSM, HNSW, BM25, or Graph indices.
+//! (a) insert(A); delete(A) in a single transaction leaves zero remnants in LSM, HNSW, or BM25 indices.
 //! (b) delete(A); insert(A) in a single transaction leaves A with NEW content and zero old remnants.
 //! (c) rollback after insert(A); delete(A) leaves state unchanged.
 
@@ -62,14 +62,6 @@ async fn test_insert_and_delete_same_tx_leaves_no_remnants() {
     assert!(
         text_hits.is_empty(),
         "BM25 text index still returned hits for doc_id '{doc_id}' after insert; delete in same tx: {text_hits:?}"
-    );
-
-    // 4. Graph index check: Entity for doc_id must not exist
-    let eid = contextra_types::EntityId::from_key(doc_id).unwrap();
-    let exists = col.graph_index().entity_exists(eid);
-    assert!(
-        !exists,
-        "Graph index still contains entity for doc_id '{doc_id}' after insert; delete in same tx"
     );
 
     db.close().await.unwrap();
