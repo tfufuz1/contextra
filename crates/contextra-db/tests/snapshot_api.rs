@@ -99,15 +99,6 @@ async fn test_search_isolation_concurrent_writes() {
     .await
     .expect("ins");
 
-    // 2. We don't have an explicit 'SnapshotGuard' in the DB API yet,
-    // but the search methods internally capture the current seq_no.
-    // To test this effectively, we rely on the fact that `search` and `hybrid_search`
-    // will now use `last_seq_no()` at their start.
-
-    // 3. Insert Doc 2 AFTER we (conceptually) would have started a search.
-    // Since we cannot perfectly time it without a real guard, we verify that
-    // search_with_filter at a manual snapshot works.
-
     col.insert("doc-2", &[0.5, 0.5, 0.0, 0.0], Some(json!({"val": "new"})))
         .await
         .expect("ins");
@@ -121,21 +112,12 @@ async fn test_search_isolation_concurrent_writes() {
     .await
     .expect("ins");
 
-    // Search at seq_after_2 should find doc-1 and doc-2, but NOT doc-3
-    // We'll use hybrid search which uses text index + storage hydration
     let results = col
         .hybrid_search("initial new latest", &[1.0, 0.0, 0.0, 0.0], 10, None)
         .await
         .expect("search");
 
-    // doc-3 was added AFTER doc-2. If isolation works, doc-3 should be visible
-    // because hybrid_search captures the LATEST seq.
     assert!(results.iter().any(|r| r.id == "doc-3"));
-
-    // Now, if we were to have an API for historical search (not public yet),
-    // we would check it. But the internal fix ensures that if a search takes
-    // some time to hydrate from storage (LSM), it won't see keys that were
-    // added AFTER the search started.
 }
 
 /// `create_snapshot()` is consistent with `last_committed_seq()`.
@@ -146,9 +128,6 @@ async fn test_create_snapshot_equals_last_committed_seq() {
     let snap = db.create_snapshot().await.expect("snapshot");
     let seq = db.last_committed_seq().await.expect("seq");
 
-    // Both read the same underlying value (both are last_seq_no())
-    // They may differ by at most the seq advancement from the second call —
-    // in practice they should be equal or snap <= seq.
     assert!(
         snap <= seq,
         "create_snapshot() ({}) must be <= last_committed_seq() ({})",
@@ -157,14 +136,11 @@ async fn test_create_snapshot_equals_last_committed_seq() {
     );
 }
 
-/// Verifies that calling `VectorIndex::search_at` and `GraphIndex::traverse_at`
+/// Verifies that calling `VectorIndex::search_at`
 /// executes snapshot-isolated queries without returning `CapabilityUnsupported`.
 #[tokio::test]
-async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported() {
-    use contextra_ports::{GraphIndex, VectorIndex};
-
-    let (db, _tmp) = test_db(4).await;
-    let col = db.collection("isolation_policy").await.expect("col");
+async fn test_vector_search_at_returns_adr024_capability_unsupported() {
+    use contextra_ports::VectorIndex;
 
     let mock_vec_index = contextra_vector::HnswIndex::try_new(contextra_vector::HnswConfig {
         dimension: 4,
@@ -179,18 +155,5 @@ async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported()
         ),
         "VectorIndex::search_at should be supported, got: {:?}",
         res_vec
-    );
-
-    let graph_idx = col.graph_index();
-    let res_graph = graph_idx
-        .traverse_at(contextra_types::EntityId::new(1), 2, 1)
-        .await;
-    assert!(
-        !matches!(
-            res_graph,
-            Err(contextra_types::ContextraError::CapabilityUnsupported { .. })
-        ),
-        "GraphIndex::traverse_at should be supported, got: {:?}",
-        res_graph
     );
 }

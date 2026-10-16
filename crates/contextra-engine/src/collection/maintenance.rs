@@ -7,8 +7,8 @@
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, DocId, Result, TxId, EXPIRY_METADATA_KEY};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -179,12 +179,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let recovery_tx = self.allocate_tx()?;
         let mut recovered_any = false;
         let mut recovered_text = false;
-        let mut recovered_graph = false;
 
         for (intent_key, intent_val) in intents {
             use crate::transaction::CommitIntent;
             if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
-                let (doc_ids, has_text, has_graph) = match intent_variant {
+                let (doc_ids, has_text, _has_graph) = match intent_variant {
                     CommitIntent::Pending {
                         doc_ids,
                         has_text,
@@ -215,10 +214,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 };
 
                 tracing::info!(
-                    "Found pending transaction intent, recovering {} documents (has_text={}, has_graph={})",
+                    "Found pending transaction intent, recovering {} documents (has_text={})",
                     doc_ids.len(),
-                    has_text,
-                    has_graph
+                    has_text
                 );
 
                 let mut any_doc_in_storage = false;
@@ -285,25 +283,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                         }
                                     }
                                 }
-
-                                if has_graph {
-                                    if let Ok(eid) = EntityId::from_key(&stored.id) {
-                                        let entity = contextra_types::Entity::new(
-                                            eid, &stored.id, "Document",
-                                        );
-                                        if let Err(e) =
-                                            self.graph_index.add_entity(recovery_tx, entity).await
-                                        {
-                                            tracing::warn!(
-                                                doc_id = %stored.id,
-                                                error = %e,
-                                                "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
-                                            );
-                                        } else {
-                                            recovered_graph = true;
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -325,15 +304,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 recovered_text = true;
                             }
                         }
-
-                        if has_graph {
-                            let eid = EntityId::from_doc_id(doc_id);
-                            if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {
-                                tracing::warn!(?eid, error = %e, "Konnte verwaisten Graph-Index-Eintrag bei Recovery nicht löschen");
-                            } else {
-                                recovered_graph = true;
-                            }
-                        }
                     }
                 }
 
@@ -349,10 +319,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if recovered_text {
             self.text_index.commit(recovery_tx).await?;
         }
-        if recovered_graph {
-            self.graph_index.commit(recovery_tx).await?;
-        }
-        if recovered_any || recovered_text || recovered_graph {
+        if recovered_any || recovered_text {
             self.storage.commit(recovery_tx).await?;
         }
 
@@ -763,4 +730,3 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 }
-

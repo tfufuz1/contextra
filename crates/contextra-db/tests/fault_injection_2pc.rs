@@ -1,12 +1,11 @@
 // FILE-CONTEXT: 2PC Fault-Injection Test Suite & Multi-Engine Rollback Verification
-// ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines.
+// ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über Sub-Engines.
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::graph_index::GraphIndexPlaceholder;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, DocId, EntityId, Result, ScoredDocument, TxId};
+use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::collections::HashMap;
@@ -25,7 +24,6 @@ pub struct FaultyStorage {
     pub commit_count: Arc<parking_lot::Mutex<HashMap<TxId, usize>>>,
     pub fail_on_commit_index: Arc<parking_lot::Mutex<Option<usize>>>,
     pub fail_put_text: AtomicBool,
-    pub fail_put_graph: AtomicBool,
     pub fail_all_commits: AtomicBool,
 }
 
@@ -36,7 +34,6 @@ impl FaultyStorage {
             commit_count: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             fail_on_commit_index: Arc::new(parking_lot::Mutex::new(None)),
             fail_put_text: AtomicBool::new(false),
-            fail_put_graph: AtomicBool::new(false),
             fail_all_commits: AtomicBool::new(false),
         }
     }
@@ -62,11 +59,6 @@ impl StorageEngine for FaultyStorage {
                     "INJECTED FAULT: BM25/Text staging storage put failure".into(),
                 ));
             }
-            if self.fail_put_graph.load(Ordering::SeqCst) && key.starts_with(b"__graph:") {
-                return Err(ContextraError::Transaction(
-                    "INJECTED FAULT: CSR-Graph staging storage put failure".into(),
-                ));
-            }
             self.inner.put(tx_id, key, value).await
         })
     }
@@ -81,11 +73,6 @@ impl StorageEngine for FaultyStorage {
             if self.fail_put_text.load(Ordering::SeqCst) && key.starts_with(b"__txt:") {
                 return Err(ContextraError::Transaction(
                     "INJECTED FAULT: BM25/Text staging storage put failure".into(),
-                ));
-            }
-            if self.fail_put_graph.load(Ordering::SeqCst) && key.starts_with(b"__graph:") {
-                return Err(ContextraError::Transaction(
-                    "INJECTED FAULT: CSR-Graph staging storage put failure".into(),
                 ));
             }
             self.inner.put_if_absent(tx_id, key, value).await
@@ -309,14 +296,12 @@ async fn create_faulty_collection(
     let real_hnsw = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());
     let faulty_hnsw = Arc::new(FaultyVectorIndex::new(real_hnsw));
 
-    let graph = GraphIndexPlaceholder;
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = contextra_db::Collection::new(
+    let col = contextra_db::Collection::new_without_graph(
         "fault_test_col".to_string(),
         faulty_storage.clone(),
         faulty_hnsw.clone(),
-        Arc::new(graph),
         next_tx,
         dim,
         contextra_text::Language::English,
@@ -325,9 +310,9 @@ async fn create_faulty_collection(
     (col, faulty_storage, faulty_hnsw, real_storage)
 }
 
-/// Verification helper: checks whether a document is visible across all 4 search/storage signals.
+/// Verification helper: checks whether a document is visible across search/storage signals.
 #[allow(deprecated)]
-async fn assert_4_signal_consistency(
+async fn assert_signal_consistency(
     col: &contextra_db::Collection<FaultyStorage, FaultyVectorIndex>,
     id: &str,
     expected_visible: bool,
@@ -343,11 +328,6 @@ async fn assert_4_signal_consistency(
     // 3. BM25 Text Index Check (via hybrid_search_with_weights using text signal without requiring embedder)
     let text_res = col.hybrid_search("test", &[], 10, None).await.unwrap();
     let text_visible = text_res.iter().any(|r| r.id == id);
-
-    // 4. CSR Graph Index Check
-    let eid = EntityId::from_key(id).unwrap();
-    let neighbors = col.graph_index().neighbors(eid).await.unwrap();
-    let graph_visible = !neighbors.is_empty() || col.graph_index().entity_exists(eid);
 
     if expected_visible {
         assert!(
@@ -365,11 +345,6 @@ async fn assert_4_signal_consistency(
             "Document '{}' expected in BM25, but was missing",
             id
         );
-        assert!(
-            graph_visible,
-            "Document '{}' expected in CSR Graph, but was missing",
-            id
-        );
     } else {
         assert!(
             !lsm_visible,
@@ -384,11 +359,6 @@ async fn assert_4_signal_consistency(
         assert!(
             !text_visible,
             "CRITICAL: Phantom document '{}' found in BM25 Text Index after failure",
-            id
-        );
-        assert!(
-            !graph_visible,
-            "CRITICAL: Phantom document '{}' found in CSR Graph Index after failure",
             id
         );
     }
@@ -417,8 +387,8 @@ async fn test_2a_hnsw_staging_failure() {
 
     assert!(res.is_err(), "Insert must fail when HNSW staging fails");
 
-    // Verify 0 phantom hits across all 4 signals
-    assert_4_signal_consistency(&col, "doc_2a", false).await;
+    // Verify 0 phantom hits across signals
+    assert_signal_consistency(&col, "doc_2a", false).await;
 }
 
 /// Case 2b: BM25/Text Staging Fails AFTER HNSW Staging Succeeded
@@ -443,34 +413,8 @@ async fn test_2b_text_staging_failure_after_hnsw_success() {
         "Insert must fail when BM25 text staging fails"
     );
 
-    // Verify 0 phantom hits across all 4 signals (HNSW staged vector was rolled back)
-    assert_4_signal_consistency(&col, "doc_2b", false).await;
-}
-
-/// Case 2c: CSR-Graph Staging / Persistence Fails AFTER HNSW & Text Staging Succeeded
-#[tokio::test]
-async fn test_2c_graph_staging_failure_after_hnsw_and_text_success() {
-    let tmp = tempdir().unwrap();
-    let (col, faulty_storage, _, _) = create_faulty_collection(tmp.path().to_path_buf(), 4).await;
-
-    // Inject failure during CSR-Graph storage put
-    faulty_storage.fail_put_graph.store(true, Ordering::SeqCst);
-
-    let res = col
-        .insert(
-            "doc_2c",
-            &[0.1, 0.2, 0.3, 0.4],
-            Some(json!({ "text": "test content doc_2c" })),
-        )
-        .await;
-
-    assert!(
-        res.is_err(),
-        "Insert must fail when CSR graph persistence fails"
-    );
-
-    // Verify 0 phantom hits across all 4 signals
-    assert_4_signal_consistency(&col, "doc_2c", false).await;
+    // Verify 0 phantom hits across signals (HNSW staged vector was rolled back)
+    assert_signal_consistency(&col, "doc_2b", false).await;
 }
 
 /// Case 2d1: LSM Commit Fails during Phase 2 Commit
@@ -494,8 +438,8 @@ async fn test_2d1_lsm_commit_failure() {
 
     assert!(res.is_err(), "Insert must fail when LSM commit fails");
 
-    // Verify 0 phantom hits across all 4 signals
-    assert_4_signal_consistency(&col, "doc_2d1", false).await;
+    // Verify 0 phantom hits across signals
+    assert_signal_consistency(&col, "doc_2d1", false).await;
 }
 
 /// Case 2d2: HNSW Commit Fails AFTER LSM Commit Succeeded (Compensating LSM Tx)
@@ -520,8 +464,8 @@ async fn test_2d2_hnsw_commit_failure_post_lsm_commit() {
         "Insert must fail when HNSW commit fails post LSM commit"
     );
 
-    // Verify 0 phantom hits across all 4 signals (compensating LSM tx removed committed LSM keys)
-    assert_4_signal_consistency(&col, "doc_2d2", false).await;
+    // Verify 0 phantom hits across signals (compensating LSM tx removed committed LSM keys)
+    assert_signal_consistency(&col, "doc_2d2", false).await;
 }
 
 /// Case 2d3: BM25/Text Commit Fails AFTER LSM & HNSW Commits Succeeded (Compensating HNSW & LSM Txs)
@@ -549,39 +493,8 @@ async fn test_2d3_text_commit_failure_post_lsm_and_hnsw_commit() {
         "Insert must fail when text commit fails post HNSW commit"
     );
 
-    // Verify 0 phantom hits across all 4 signals
-    assert_4_signal_consistency(&col, "doc_2d3", false).await;
-}
-
-/// Case 2d4: CSR-Graph Commit Fails AFTER LSM, HNSW & BM25 Commits ALL Succeeded (3-Engine Compensating Rollback!)
-#[tokio::test]
-async fn test_2d4_graph_commit_failure_post_all_three_commits() {
-    let tmp = tempdir().unwrap();
-    let (col, faulty_storage, _, _) = create_faulty_collection(tmp.path().to_path_buf(), 4).await;
-
-    // Enable graph storage put failure.
-    // Graph entities are staged in memory during insert_op/commit_graph_staged,
-    // so storage put is only called when graph_index.commit() runs (Phase 2 Step 4),
-    // AFTER LSM, HNSW, and BM25 have all physically committed!
-    faulty_storage.fail_put_graph.store(true, Ordering::SeqCst);
-
-    let res = col
-        .insert(
-            "doc_2d4",
-            &[0.1, 0.2, 0.3, 0.4],
-            Some(json!({ "text": "test content doc_2d4" })),
-        )
-        .await;
-
-    assert!(
-        res.is_err(),
-        "Insert must fail when graph index commit fails post-all-three-commits"
-    );
-
-    // Verify 0 phantom hits across all 4 signals!
-    // This proves that compensating transactions (compensate_text, compensate_hnsw, compensate_lsm)
-    // cleanly reverted all 3 previously committed sub-engines!
-    assert_4_signal_consistency(&col, "doc_2d4", false).await;
+    // Verify 0 phantom hits across signals
+    assert_signal_consistency(&col, "doc_2d3", false).await;
 }
 
 /// Case 2e: Simulated Process Crash across Crash Points & Verification via repair_on_open()
@@ -630,7 +543,7 @@ async fn test_2e_crash_points_and_repair_on_open() {
         let intent = contextra_db::transaction::CommitIntent::Pending {
             doc_ids: Arc::new(vec![doc_id]),
             has_text: true,
-            has_graph: true,
+            has_graph: false,
             stages_completed: 0,
         };
         let intent_bytes = serde_json::to_vec(&intent).unwrap();
@@ -642,16 +555,16 @@ async fn test_2e_crash_points_and_repair_on_open() {
         // Commit LSM storage (simulating crash right after LSM commit)
         col.storage().commit(tx).await.unwrap();
 
-        // Close DB without committing HNSW, BM25, or Graph in memory (simulating process crash)
+        // Close DB without committing HNSW or BM25 in memory (simulating process crash)
         db.close().await.unwrap();
     }
 
-    // Re-open database: repair_on_open must execute, resolve pending intent, re-sync all 4 signals
+    // Re-open database: repair_on_open must execute, resolve pending intent, re-sync signals
     {
         let db = Contextra::open_with_config(&path, config).await.unwrap();
         let col = db.collection("crash_col").await.unwrap();
 
-        // Verify document is 100% visible across ALL 4 signals after repair_on_open
+        // Verify document is 100% visible across signals after repair_on_open
         let lsm_doc = col.get("crash_doc_1").await.unwrap();
         assert!(
             lsm_doc.is_some(),
@@ -674,12 +587,6 @@ async fn test_2e_crash_points_and_repair_on_open() {
             text_res.len(),
             1,
             "Document must be repaired and visible in BM25 text index"
-        );
-
-        let eid = EntityId::from_key("crash_doc_1").unwrap();
-        assert!(
-            col.graph_index().entity_exists(eid),
-            "Entity must be repaired and visible in CSR graph index"
         );
     }
 }
