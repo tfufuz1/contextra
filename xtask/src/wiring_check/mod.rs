@@ -485,8 +485,10 @@ pub fn get_workspace_package_names(root: &Path) -> HashSet<String> {
 
     if names.is_empty() {
         // Fallback: parse workspace crates via xtask helper
-        for c in crate::get_workspace_crates() {
-            names.insert(c.name);
+        if let Ok(crates) = crate::get_workspace_crates() {
+            for c in crates {
+                names.insert(c.name);
+            }
         }
         names.insert("xtask".to_string());
         names.insert("xtask-heavy".to_string());

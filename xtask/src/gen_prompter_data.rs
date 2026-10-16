@@ -286,7 +286,13 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
     };
 
     // 2. Get workspace crates (excluding xtask and xtask-heavy)
-    let all_workspace_crates = get_workspace_crates();
+    let all_workspace_crates = match get_workspace_crates() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("⚠️ Failed to load workspace crates for prompter data: {}", e);
+            Vec::new()
+        }
+    };
     let mut workspace_crates: Vec<_> = all_workspace_crates
         .into_iter()
         .filter(|c| c.path.starts_with("crates/") || c.path.starts_with("benchmarks/"))
@@ -604,7 +610,7 @@ mod tests {
         );
 
         // Golden-Test: Alle Workspace Crates/Packages unter crates/ & benchmarks/ müssen enthalten sein
-        let all_crates = get_workspace_crates();
+        let all_crates = get_workspace_crates().expect("get_workspace_crates failed");
         let expected_packages: Vec<String> = all_crates
             .into_iter()
             .filter(|c| c.path.starts_with("crates/") || c.path.starts_with("benchmarks/"))
