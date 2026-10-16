@@ -198,10 +198,8 @@ impl PhysicalScope {
             Err(insertion_point) => insertion_point,
         };
 
-        if idx > 0 {
-            if key.starts_with(self.prefixes[idx - 1].as_slice()) {
-                return true;
-            }
+        if idx > 0 && key.starts_with(self.prefixes[idx - 1].as_slice()) {
+            return true;
         }
 
         false

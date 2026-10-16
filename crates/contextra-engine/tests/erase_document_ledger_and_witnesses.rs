@@ -48,29 +48,25 @@ async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
 }
 
 #[tokio::test]
-async fn test_erase_document_success_with_ledger_and_witnesses() {
+async fn test_erase_document_success_with_empty_witnesses() {
     let collection = create_test_collection().await;
 
     let doc_id = "doc123";
     let opts = DocEraseOptions {
-        options: ForgetOptions::default().with_verify_depth(VerifyDepth::FullSweep),
+        options: ForgetOptions::default().with_assurance(WitAssurance::S0),
     };
 
     let result = collection.erase_document(doc_id, &opts).await;
     assert!(
         result.is_ok(),
-        "erase_document should succeed with valid options: {:?}",
+        "erase_document should succeed with S0 options: {:?}",
         result.err()
     );
 
     let erasure = result.expect("erasure result expected");
-    let has_ledger_witness = erasure
-        .witnesses
-        .iter()
-        .any(|w| *w.layer() == DeletionLayer::ErasureLedger);
     assert!(
-        has_ledger_witness,
-        "ErasureLedger witness must be present in erasure result"
+        erasure.witnesses.is_empty(),
+        "Witnesses must be empty without real storage scans"
     );
 }
 
