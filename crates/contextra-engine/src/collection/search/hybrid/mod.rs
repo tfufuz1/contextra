@@ -110,11 +110,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            let _unused_anchor = anchor_entities;
+            let _unused_strategy = strategy;
+
             let is_vector_zero = vector.iter().all(|&v| v == 0.0);
             let is_text_empty = text.trim().is_empty();
-
-            let default_strategy = contextra_types::GraphTraversalStrategy::default();
-            let graph_strat = strategy.unwrap_or(&default_strategy);
 
             // 1. Vector Signal (Candidate overfetching for RRF fusion)
             let vector_results = if is_vector_zero {
@@ -147,37 +147,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .await?
             };
 
-            // 3. Graph Signal
-            // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
-            let implicit_anchors: Vec<contextra_types::EntityId>;
-            let anchors_ref: Option<&[contextra_types::EntityId]> = if let Some(anchors) = anchor_entities
-            {
-                if anchors.is_empty() {
-                    None
-                } else {
-                    Some(anchors)
-                }
-            } else if !text_results.is_empty() {
-                // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
-                implicit_anchors = text_results
-                    .iter()
-                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
-                    .collect();
-                Some(&implicit_anchors)
-            } else {
-                None
-            };
-
-            let graph_results: Vec<crate::SearchResult> = Vec::new();
-
-            if !text_results.is_empty() && graph_results.is_empty() && anchor_entities.is_none() {
-                tracing::warn!(
-                    text_count = text_results.len(),
-                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
-                );
-            }
-
-            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
+            if vector_results.is_empty() && text_results.is_empty() {
                 return Ok(Vec::new());
             }
 

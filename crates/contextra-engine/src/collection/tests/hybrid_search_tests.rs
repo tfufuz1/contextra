@@ -885,86 +885,67 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
 }
 
 #[tokio::test]
-async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types::Result<()> {
+async fn test_hybrid_search_tie_breaker_doc_id_ascending() -> contextra_types::Result<()> {
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
-    let lsm_config = LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    };
-    let storage = Arc::new(LsmStorage::new(lsm_config).await?);
-    let hnsw_config = HnswConfig {
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(HnswConfig {
         dimension: 4,
         ..Default::default()
-    };
-    let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
-    let next_tx = Arc::new(AtomicU64::new(1));
+    })?);
     let col = Collection::new(
-        "test_snapshot_unsupported".to_string(),
+        "tie_breaker_test".to_string(),
         storage,
         index,
-        next_tx,
+        Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
     );
 
+    // Insert 3 documents with identical vector and text content
     col.insert(
-        "doc_1",
+        "doc_charlie",
         &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "graph node 1"})),
+        Some(serde_json::json!({"text": "identical tie breaker text"})),
     )
     .await?;
 
-    let ppr_strat = contextra_types::GraphTraversalStrategy::PersonalizedPageRank(
-        contextra_types::PprConfig::default(),
-    );
-    let ppr_res = col
-        .hybrid_search_with_strategy(
-            "graph",
-            &[1.0, 0.0, 0.0, 0.0],
-            5,
-            None,
-            None,
-            Some(&ppr_strat),
-            None,
-            None,
-        )
-        .await;
+    col.insert(
+        "doc_alpha",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "identical tie breaker text"})),
+    )
+    .await?;
 
-    assert!(
-        ppr_res.is_ok(),
-        "PPR under snapshot isolation must succeed, got {:?}",
-        ppr_res
-    );
+    col.insert(
+        "doc_bravo",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "identical tie breaker text"})),
+    )
+    .await?;
 
-    let eid_1 = contextra_types::EntityId::from_key("doc_1")?;
-    let anchors = vec![eid_1];
-    let path_rag_strat = contextra_types::GraphTraversalStrategy::PathRag {
-        max_hops: 2,
-        sufficiency_threshold: 0.5,
-    };
-    let path_res = col
-        .hybrid_search_with_strategy(
-            "graph",
-            &[1.0, 0.0, 0.0, 0.0],
-            5,
-            Some(&anchors),
-            None,
-            Some(&path_rag_strat),
-            None,
-            None,
-        )
-        .await;
+    let res = col
+        .hybrid_search("identical", &[1.0, 0.0, 0.0, 0.0], 3, None)
+        .await?;
 
-    assert!(
-        path_res.is_ok(),
-        "PathRag under snapshot isolation is supported via path_rag_at, got {:?}",
-        path_res
-    );
+    assert_eq!(res.len(), 3);
+    assert_eq!(res[0].score, res[1].score);
+    assert_eq!(res[1].score, res[2].score);
+
+    // Equal score must result in ascending document ID ordering: doc_alpha, doc_bravo, doc_charlie
+    assert_eq!(res[0].id, "doc_alpha");
+    assert_eq!(res[1].id, "doc_bravo");
+    assert_eq!(res[2].id, "doc_charlie");
 
     Ok(())
 }
