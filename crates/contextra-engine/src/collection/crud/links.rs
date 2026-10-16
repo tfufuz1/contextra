@@ -182,7 +182,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    /// Retrieves all links for a given document at a specific snapshot point.
+    /// Retrieves all links for a given document at a specific snapshot point (K1.13).
     pub async fn get_links_at_snapshot(
         &self,
         doc_id: DocId,
