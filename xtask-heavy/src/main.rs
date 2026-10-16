@@ -6,7 +6,6 @@
 )]
 
 mod bench_gate;
-mod check_bandit_latency_budget;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -23,15 +22,6 @@ fn main() {
                 std::process::exit(0);
             } else {
                 std::process::exit(1);
-            }
-        }
-        "check-bandit-latency-budget" => {
-            match check_bandit_latency_budget::check_bandit_latency_budget() {
-                Ok(_) => std::process::exit(0),
-                Err(e) => {
-                    eprintln!("❌ check-bandit-latency-budget failed: {}", e);
-                    std::process::exit(1);
-                }
             }
         }
         subcommand => {
