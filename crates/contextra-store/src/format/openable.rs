@@ -17,7 +17,14 @@ impl FileKind {
             FileKind::Blob => *b"MFBL",
             FileKind::Manifest => *b"MFMN",
             FileKind::Wal => *b"MFW3",
-            FileKind::Ledger => *b"ELDG",
+            FileKind::Ledger => *b"CTRA",
+        }
+    }
+
+    pub fn expected_magic_8(&self) -> Option<[u8; 8]> {
+        match self {
+            FileKind::Ledger => Some(*b"CTRALEDG"),
+            _ => None,
         }
     }
 
