@@ -3,25 +3,18 @@
 // INVARIANTEN: Zero-Panic doctrine in non-test code, fail-closed revocation checks, length-prefixed deletion proof hashes, and Blake3 audit chain integrity.
 
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    deprecated
-)]
 
 use contextra_crypto::{
     anti_tamper::VolatileEncryptionKey,
     audit_chain::{compute_record_commitment, AuditChain, DataClass, EncryptedCommitmentSalt},
-    crypto::KeyManager,
     deletion_proof::{
         compute_wal_delete_receipt, hash_deleted_keys_length_prefixed, verify_wal_delete_receipt,
-        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
-        ExcludedScope, GraphRepairAttestation, LayerCleanupProof,
+        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+        GraphRepairAttestation, LayerCleanupProof,
     },
     ed25519_proof::SignatureVersion,
     error::CryptoError,
+    crypto::KeyManager,
     kv_shredding::KeyRegistry,
     revocation_log::{RevocationLog, RevocationTarget},
 };
@@ -60,9 +53,7 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     let group_id = 999;
 
     // Derive KEK
-    let _subkey = registry
-        .get_or_derive(&km, group_id)
-        .expect("derive subkey");
+    let _subkey = registry.get_or_derive(&km, group_id).expect("derive subkey");
     assert!(registry.is_group_active(group_id));
 
     // Revoke group in registry
@@ -496,11 +487,7 @@ fn test_h5_record_commitment_binding_hiding_and_encrypted_salt() {
     let secret_salt = b"super-secret-256-bit-random-salt!";
     let target_commitment = compute_record_commitment(secret_salt, target_attr);
 
-    let candidates = [
-        b"Alice".as_slice(),
-        b"Bob".as_slice(),
-        b"Charlie".as_slice(),
-    ];
+    let candidates = [b"Alice".as_slice(), b"Bob".as_slice(), b"Charlie".as_slice()];
     let dictionary_salt_guesses = [b"guess_salt_1".as_slice(), b"guess_salt_2".as_slice()];
 
     for cand in candidates {
@@ -518,8 +505,8 @@ fn test_h5_record_commitment_binding_hiding_and_encrypted_salt() {
     let registry = KeyRegistry::new();
     let group_id = 555;
 
-    let enc_salt = EncryptedCommitmentSalt::encrypt(&registry, &km, group_id, secret_salt)
-        .expect("encrypt salt");
+    let enc_salt =
+        EncryptedCommitmentSalt::encrypt(&registry, &km, group_id, secret_salt).expect("encrypt salt");
     let dec_salt = enc_salt.decrypt(&registry).expect("decrypt salt");
     assert_eq!(dec_salt, secret_salt);
 
@@ -565,10 +552,7 @@ fn test_h6_deletion_proof_v3_validation_suite() {
             1 => assert_eq!(typed, Ok(SignatureVersion::V1)),
             2 => assert_eq!(typed, Ok(SignatureVersion::V2)),
             3 => assert_eq!(typed, Ok(SignatureVersion::V3)),
-            v => assert_eq!(
-                typed,
-                Err(contextra_crypto::ed25519_proof::DeletionProofError::UnsupportedVersion(v))
-            ),
+            v => assert_eq!(typed, Err(contextra_crypto::ed25519_proof::DeletionProofError::UnsupportedVersion(v))),
         }
     }
 
@@ -587,7 +571,6 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
     ];
 
-    let durability = DurabilityProof::new(50);
     let proof_x = DeletionProof::create_v3(
         scope_x.clone(),
         keys_1.clone(),
@@ -596,7 +579,6 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &graph_attest,
-        Some(&durability),
         keypair.signing_key(),
     )
     .expect("create_v3");
@@ -640,9 +622,7 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         doc_id: doc_y,
         tenant_id: tenant_b,
     };
-    assert!(replayed_proof
-        .verify_external(&keypair.verifying_key)
-        .is_err());
+    assert!(replayed_proof.verify_external(&keypair.verifying_key).is_err());
 
     // (e) LayerCleanupProof non-empty rejection
     assert!(
@@ -655,18 +635,11 @@ fn test_h6_deletion_proof_v3_validation_suite() {
     let prev_hmac = [0x77u8; 32];
     let delete_payload = b"wal_delete_event_payload";
 
-    let receipt =
-        compute_wal_delete_receipt(&prev_hmac, delete_payload, integrity_key).expect("receipt");
-    assert!(
-        verify_wal_delete_receipt(&receipt, &prev_hmac, delete_payload, integrity_key)
-            .expect("verify receipt")
-    );
+    let receipt = compute_wal_delete_receipt(&prev_hmac, delete_payload, integrity_key).expect("receipt");
+    assert!(verify_wal_delete_receipt(&receipt, &prev_hmac, delete_payload, integrity_key).expect("verify receipt"));
 
     let tampered_payload = b"wal_delete_event_tampered";
-    assert!(
-        !verify_wal_delete_receipt(&receipt, &prev_hmac, tampered_payload, integrity_key)
-            .expect("verify receipt")
-    );
+    assert!(!verify_wal_delete_receipt(&receipt, &prev_hmac, tampered_payload, integrity_key).expect("verify receipt"));
 
     // (g) export_for_audit secrecy: JSON contains no key or cleartext payload
     let json_export = proof_x.export_for_audit().expect("export");

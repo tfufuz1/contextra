@@ -2,7 +2,7 @@ use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
+use contextra_core::{ContextraError, Result, TOMBSTONE_BIT};
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -13,9 +13,6 @@ use std::sync::Arc;
 /// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
 /// concurrent sequence allocation races during rotation.
 pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
-    if storage.is_read_only() {
-        return Err(ContextraError::Storage("Store is in read-only mode".into()));
-    }
     let _flush_lock = storage.flush_mutex.lock().await;
 
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
@@ -94,7 +91,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     // ── Phase 3: Expensive I/O & Atomic Transition ──────────────────────────
     let phase3_res: Result<()> = async {
-        let floor_seq = storage.floor.floor();
+        let floor_seq = storage.snapshot_registry.min_active_seqno();
 
         let mut key_map: BTreeMap<Bytes, Vec<(Bytes, u64, u64)>> = BTreeMap::new();
 
@@ -160,7 +157,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
         let sst_max_tx = reader.metadata().max_tx_id;
-        storage.advance_visibility(contextra_types::TxId::new(sst_max_tx));
+        storage.advance_visibility(contextra_core::TxId::new(sst_max_tx));
 
         sstables.push(Arc::new(reader));
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -193,41 +190,25 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         }
                     }
 
-                    let p = wal_path.clone();
-                    let remove_res = tokio::task::spawn_blocking(move || {
-                        contextra_durable_fs::durable_remove(&p)
-                    })
-                    .await;
-                    match remove_res {
-                        Ok(Err(e)) if e.kind() != std::io::ErrorKind::NotFound => {
-                            tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
-                        }
-                        Ok(Ok(())) => {
-                            let uuid_sidecar =
-                                std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
-                            let sidecar = uuid_sidecar.clone();
-                            let sidecar_res = tokio::task::spawn_blocking(move || {
-                                contextra_durable_fs::durable_remove(&sidecar)
-                            })
-                            .await;
-                            if let Ok(Err(e)) = sidecar_res {
-                                if e.kind() != std::io::ErrorKind::NotFound {
-                                    tracing::debug!(
-                                        "Could not delete sidecar {:?}: {}",
-                                        uuid_sidecar,
-                                        e
-                                    );
-                                }
+                    if let Err(e) = tokio::fs::remove_file(&wal_path).await {
+                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
+                    } else {
+                        let uuid_sidecar =
+                            std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
+                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+                            if e.kind() != std::io::ErrorKind::NotFound {
+                                tracing::debug!(
+                                    "Could not delete sidecar {:?}: {}",
+                                    uuid_sidecar,
+                                    e
+                                );
                             }
                         }
-                        _ => {}
                     }
                     drop(trunc_guard_opt);
                 }
             }
-            if let Err(e) = crate::util::fsync_parent_dir(&storage.config.path).await {
-                tracing::debug!("Parent directory fsync after WAL cleanup failed: {e}");
-            }
+            let _ = crate::util::fsync_parent_dir(&storage.config.path).await;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
@@ -242,7 +223,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .budget_tracking_drift_bytes
             .store(0, std::sync::atomic::Ordering::Relaxed);
 
-        let prune_bound = storage.floor.floor();
+        let prune_bound = storage
+            .tx_buffer
+            .min_read_snapshot()
+            .unwrap_or(u64::MAX)
+            .min(storage.snapshot_registry.min_active_seqno());
         storage.ssi_validator.prune_through(prune_bound);
 
         tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
@@ -252,16 +237,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     if let Err(ref e) = phase3_res {
         if sst_path.exists() {
-            let p = sst_path.clone();
-            let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p)).await;
-            if let Ok(Err(rm_err)) = res {
-                if rm_err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
-                        path = ?sst_path,
-                        "Failed to remove partial SSTable after flush failure: {rm_err}"
-                    );
-                }
+            if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
+                tracing::warn!(
+                    path = ?sst_path,
+                    "Failed to remove partial SSTable after flush failure: {rm_err}"
+                );
             }
         }
 

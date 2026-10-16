@@ -1,6 +1,6 @@
 use super::reader::SstableReader;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::sync::Arc;
 
 pub struct SstableStream {

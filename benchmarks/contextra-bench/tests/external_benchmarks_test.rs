@@ -7,8 +7,9 @@ use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, LongMemEvalQuestionType,
     RegressionReport, RegressionSuite, ScoredChunk,
 };
+use contextra_bench::path_rag_sweep::{run_pathrag_sweep_locomo, run_pathrag_sweep_long_mem_eval};
+use contextra_core::Result;
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_types::Result;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -40,7 +41,7 @@ async fn test_long_mem_eval_fixture_parsing_and_eval() {
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_types::Result<Vec<ScoredChunk>>,
+                contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
 
@@ -90,7 +91,7 @@ async fn test_locomo_fixture_parsing_and_eval() {
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_types::Result<Vec<ScoredChunk>>,
+                contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
 
@@ -155,6 +156,49 @@ async fn test_regression_suite_baseline_count_and_execution() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_pathrag_sweep_long_mem_eval_execution() -> Result<()> {
+    // Standard execution with 2 thresholds
+    let thresholds = vec![0.1, 0.5];
+    let sweep_results = run_pathrag_sweep_long_mem_eval(&thresholds).await?;
+
+    assert_eq!(sweep_results.len(), 2);
+    assert_eq!(sweep_results[0].threshold, 0.1);
+    assert_eq!(sweep_results[1].threshold, 0.5);
+    assert!(sweep_results[0].total_queries >= 30);
+
+    // Empty thresholds
+    let empty_sweep = run_pathrag_sweep_long_mem_eval(&[]).await?;
+    assert!(empty_sweep.is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_pathrag_sweep_locomo_execution() -> Result<()> {
+    let fixture_path = Path::new("tests/fixtures/locomo_fixture.json");
+    let thresholds = vec![0.1, 0.5];
+
+    let sweep_results = run_pathrag_sweep_locomo(fixture_path, &thresholds).await?;
+    assert_eq!(sweep_results.len(), 2);
+    assert_eq!(sweep_results[0].threshold, 0.1);
+    assert_eq!(sweep_results[1].threshold, 0.5);
+    // Fixture has 3 total cases, 1 adversarial excluded -> 2 eval cases
+    assert_eq!(sweep_results[0].total_queries, 2);
+
+    // Empty thresholds
+    let empty_sweep = run_pathrag_sweep_locomo(fixture_path, &[]).await?;
+    assert!(empty_sweep.is_empty());
+
+    // Non-existent dataset file error propagation
+    let missing_path = Path::new("non_existent_dataset_dir/locomo.json");
+    let err_res = run_pathrag_sweep_locomo(missing_path, &thresholds).await;
+    assert!(err_res.is_err());
+    let err_msg = err_res.unwrap_err().to_string();
+    assert!(err_msg.contains("LoCoMo dataset file not found"));
+
+    Ok(())
+}
 
 #[test]
 fn test_locomo_category_enum_conversions() {
@@ -235,7 +279,7 @@ async fn test_empty_and_erroring_eval_runs() {
         Box::pin(async { Ok(vec![]) })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_types::Result<Vec<ScoredChunk>>,
+                contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
     let locomo_report = run_locomo_eval(
@@ -258,13 +302,13 @@ async fn test_empty_and_erroring_eval_runs() {
     // Erroring search closure
     let mock_search_err = |_q: &str| {
         Box::pin(async {
-            Err(contextra_types::ContextraError::InvalidInput(
+            Err(contextra_core::ContextraError::InvalidInput(
                 "Search failed".into(),
             ))
         })
             as contextra_bench::long_mem_eval::BoxFuture<
                 'static,
-                contextra_types::Result<Vec<ScoredChunk>>,
+                contextra_core::Result<Vec<ScoredChunk>>,
             >
     };
     let dummy_case = contextra_bench::long_mem_eval::LongMemEvalCase {

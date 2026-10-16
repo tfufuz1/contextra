@@ -1,35 +1,31 @@
 {
-  "generated_at": "2026-10-12T21:41:54Z",
-  "head": "12be9b8d",
-  "context_preamble": "Pflicht-Schritt 1 (vor jeder Aufgabe): Starte die Sitzung und passe den Arbeitsstand an mit:\ncargo xtask jules start --card <CARD_PATH>\n",
+  "generated_at": "2026-09-24T17:14:50Z",
+  "head": "f3fb3c1",
+  "context_preamble": "Pflicht-Schritt 1 (vor jeder Aufgabe): Lies `.jules/JULES_CONTEXT.md`, dann `AGENTS.md`, dann `crates/{crate}/AGENTS.md`, dann `WORKING_STATE.md`. Fasse in 2 Sätzen zusammen, was du gelesen hast, bevor du mit der Aufgabe beginnst.\n",
   "target_architecture": {
     "contextra": "contextra-facade",
     "contextra-adapt": "contextra-inference",
     "contextra-agent": "contextra-agentic",
-    "contextra-audit-export": "contextra-foundation",
-    "contextra-avv-generator": "contextra-foundation",
     "contextra-bench": "contextra-benchmarks",
     "contextra-checkpoint": "contextra-persistence",
     "contextra-cognition": "contextra-orchestrator",
     "contextra-core": "contextra-foundation",
-    "contextra-crypto": "contextra-foundation",
     "contextra-db": "contextra-orchestrator",
-    "contextra-durable-fs": "contextra-foundation",
     "contextra-engine": "contextra-orchestrator",
     "contextra-graph": "contextra-retrieval",
     "contextra-infer-candle": "contextra-inference",
     "contextra-infer-ollama": "contextra-inference",
     "contextra-infer-onnx": "contextra-inference",
     "contextra-kvcache": "contextra-persistence",
-    "contextra-license": "contextra-facade",
     "contextra-mcp": "contextra-mcp",
     "contextra-mvcc": "contextra-foundation",
     "contextra-ports": "contextra-foundation",
-    "contextra-privacy": "contextra-privacy",
+    "contextra-privacy": "contextra-security",
     "contextra-py": "contextra-bindings",
     "contextra-rank": "contextra-retrieval",
     "contextra-router": "contextra-inference",
     "contextra-sandbox": "contextra-agentic",
+    "contextra-security": "contextra-security",
     "contextra-simd": "contextra-foundation",
     "contextra-store": "contextra-persistence",
     "contextra-sys": "contextra-foundation",
@@ -39,670 +35,347 @@
     "contextra-vector": "contextra-retrieval",
     "contextra-wire": "contextra-foundation"
   },
-  "rules_files": [
-    "async-io.md",
-    "dependencies.md",
-    "simd_safety.md",
-    "test_quality.md",
-    "testing.md",
-    "wal_crypto.md"
-  ],
   "crates": [
     {
-      "id": "contextra",
-      "package_name": "contextra",
-      "layer": 9,
-      "order": 1,
-      "loc": 1153,
-      "tests": "71+",
-      "desc": "Haupt-Library Facade für Endanwender",
-      "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
       "id": "contextra-adapt",
-      "package_name": "contextra-adapt",
-      "layer": 2,
-      "order": 2,
-      "loc": 4339,
-      "tests": "126+",
+      "layer": 0,
+      "order": 1,
+      "loc": 3975,
+      "tests": "77+",
       "desc": "Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)",
       "status": "❓",
       "risk": "calib",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
-      "id": "contextra-agent",
-      "package_name": "contextra-agent",
-      "layer": 9,
+      "id": "contextra-privacy",
+      "layer": 0,
+      "order": 2,
+      "loc": 1865,
+      "tests": "37+",
+      "desc": "Egress Filtering, Anonymisierung und Privacy Compliance Rules",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-sandbox",
+      "layer": 0,
       "order": 3,
-      "loc": 4504,
-      "tests": "112+",
-      "desc": "Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline",
+      "loc": 1918,
+      "tests": "25+",
+      "desc": "WASM Execution Boundary und Isolations-Sandbox",
       "status": "❓",
-      "risk": "budget",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "risk": "sec",
+      "tier": "2"
     },
     {
-      "id": "contextra-audit-export",
-      "package_name": "contextra-audit-export",
-      "layer": 3,
+      "id": "contextra-sys",
+      "layer": 0,
       "order": 4,
-      "loc": 495,
-      "tests": "12+",
-      "desc": "Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export",
+      "loc": 526,
+      "tests": "2+",
+      "desc": "Systemnahe Bindings, Low-Level I/O und Memory-Mapping",
       "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "risk": "ffi",
+      "tier": "2"
     },
     {
-      "id": "contextra-avv-generator",
-      "package_name": "contextra-avv-generator",
-      "layer": 1,
+      "id": "contextra-types",
+      "layer": 0,
       "order": 5,
-      "loc": 315,
-      "tests": "9+",
-      "desc": "AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO",
+      "loc": 6065,
+      "tests": "115+",
+      "desc": "Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)",
       "status": "❓",
       "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
-      "id": "contextra-bench",
-      "package_name": "contextra-bench",
-      "layer": 9,
+      "id": "contextra-wire",
+      "layer": 0,
       "order": 6,
-      "loc": 6442,
-      "tests": "42+",
-      "desc": "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy",
+      "loc": 1751,
+      "tests": "11+",
+      "desc": "FlatBuffers Wire-Protokolle und Serialisierungs-Formate",
+      "status": "❓",
+      "risk": "gen",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-crypto",
+      "layer": 1,
+      "order": 7,
+      "loc": 6964,
+      "tests": "167+",
+      "desc": "Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-mvcc",
+      "layer": 1,
+      "order": 8,
+      "loc": 1955,
+      "tests": "38+",
+      "desc": "Multi-Version Concurrency Control und Isolation-Mechanismen",
+      "status": "❓",
+      "risk": "concurrency",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-ports",
+      "layer": 1,
+      "order": 9,
+      "loc": 2963,
+      "tests": "33+",
+      "desc": "Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung",
       "status": "❓",
       "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "competitive_kv",
-        "kv_cache_effect",
-        "locomo",
-        "long_mem_eval"
-      ],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-checkpoint",
-      "package_name": "contextra-checkpoint",
-      "layer": 4,
-      "order": 7,
-      "loc": 3989,
-      "tests": "130+",
+      "layer": 2,
+      "order": 10,
+      "loc": 6165,
+      "tests": "90+",
       "desc": "Persistent Checkpoint Engine und Blake3 Manifest-Verifikation",
       "status": "❓",
       "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "checkpoint_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-cognition",
-      "package_name": "contextra-cognition",
-      "layer": 7,
-      "order": 8,
-      "loc": 5630,
-      "tests": "101+",
-      "desc": "Konsolidierungs- und Background Sleep Passes",
-      "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-core",
-      "package_name": "contextra-core",
-      "layer": 3,
-      "order": 9,
-      "loc": 123,
+      "layer": 2,
+      "order": 11,
+      "loc": 368,
       "tests": "7+",
       "desc": "Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer",
       "status": "❓",
       "risk": "none",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-crypto",
-      "package_name": "contextra-crypto",
-      "layer": 2,
-      "order": 10,
-      "loc": 11367,
-      "tests": "422+",
-      "desc": "Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC",
-      "status": "❓",
-      "risk": "sec",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "audit_chain_decode_fuzz",
-        "deletion_proof_tamper",
-        "deletion_proof_verify_external_fuzz",
-        "revocation_log_decode_fuzz",
-        "wal_hmac_chain_verify_fuzz"
-      ],
-      "bench_targets": [
-        "crypto_benchmarks",
-        "deletion_proof_latency_bench"
-      ],
-      "required_gates": [
-        "fuzz-smoke",
-        "mutants-diff"
-      ]
-    },
-    {
-      "id": "contextra-db",
-      "package_name": "contextra-db",
-      "layer": 8,
-      "order": 11,
-      "loc": 2378,
-      "tests": "190+",
-      "desc": "Contextra Main Database Abstraction, Hybrid Search & Collections",
-      "status": "❓",
-      "risk": "fusion",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "rrf_fusion"
-      ],
-      "bench_targets": [
-        "competitive_bench",
-        "migration_benchmarks",
-        "relate_bench",
-        "rrf_scale_bench",
-        "scale_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-durable-fs",
-      "package_name": "contextra-durable-fs",
-      "layer": 1,
-      "order": 12,
-      "loc": 669,
-      "tests": "21+",
-      "desc": "Durable Filesystem Operations und synchrone Disk-Flushes",
-      "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-engine",
-      "package_name": "contextra-engine",
-      "layer": 6,
-      "order": 13,
-      "loc": 14862,
-      "tests": "271+",
-      "desc": "Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)",
-      "status": "❓",
-      "risk": "concurrency",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "1"
     },
     {
       "id": "contextra-graph",
-      "package_name": "contextra-graph",
-      "layer": 3,
-      "order": 14,
-      "loc": 14288,
-      "tests": "382+",
+      "layer": 2,
+      "order": 12,
+      "loc": 21599,
+      "tests": "285+",
       "desc": "CSR Graph-Engine, Path Graphing und GraphRAG Community Detection",
       "status": "❓",
       "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "binary_edge_regression",
-        "csr_traversal_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-infer-candle",
-      "package_name": "contextra-infer-candle",
-      "layer": 3,
-      "order": 15,
-      "loc": 4862,
-      "tests": "115+",
-      "desc": "Candle LLM Inference Client und KV-Bridge Adapter",
-      "status": "❓",
-      "risk": "candle",
-      "tier": "3",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "kv_bridge_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-infer-ollama",
-      "package_name": "contextra-infer-ollama",
-      "layer": 3,
-      "order": 16,
-      "loc": 4479,
-      "tests": "112+",
-      "desc": "Ollama External Provider Client und Embeddings Integration",
-      "status": "❓",
-      "risk": "inj",
-      "tier": "3",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-infer-onnx",
-      "package_name": "contextra-infer-onnx",
-      "layer": 4,
-      "order": 17,
-      "loc": 1807,
-      "tests": "38+",
-      "desc": "ONNX Embeddings und Cross-Encoder Reranking Execution Provider",
-      "status": "❓",
-      "risk": "gate",
-      "tier": "3",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "embed_bench"
-      ],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-kvcache",
-      "package_name": "contextra-kvcache",
-      "layer": 3,
-      "order": 18,
-      "loc": 4081,
-      "tests": "103+",
+      "layer": 2,
+      "order": 13,
+      "loc": 3160,
+      "tests": "50+",
       "desc": "Stufenmodell KV-Cache Storage & Offloading",
       "status": "❓",
       "risk": "sec",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": [
-        "fuzz-smoke",
-        "mutants-diff"
-      ]
-    },
-    {
-      "id": "contextra-license",
-      "package_name": "contextra-license",
-      "layer": 2,
-      "order": 19,
-      "loc": 406,
-      "tests": "40+",
-      "desc": "Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe",
-      "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-mcp",
-      "package_name": "contextra-mcp",
-      "layer": 10,
-      "order": 20,
-      "loc": 8598,
-      "tests": "206+",
-      "desc": "Model Context Protocol Server & Cloud Egress Gateway",
-      "status": "❓",
-      "risk": "proto",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "fuzz_jsonrpc_parsing",
-        "fuzz_prompt_injection_guard"
-      ],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-mvcc",
-      "package_name": "contextra-mvcc",
-      "layer": 2,
-      "order": 21,
-      "loc": 3489,
-      "tests": "94+",
-      "desc": "Multi-Version Concurrency Control und Isolation-Mechanismen",
-      "status": "❓",
-      "risk": "concurrency",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "mvcc_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-ports",
-      "package_name": "contextra-ports",
-      "layer": 1,
-      "order": 22,
-      "loc": 3711,
-      "tests": "55+",
-      "desc": "Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung",
-      "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-privacy",
-      "package_name": "contextra-privacy",
-      "layer": 2,
-      "order": 23,
-      "loc": 3262,
-      "tests": "91+",
-      "desc": "Egress Filtering, Anonymisierung und Privacy Compliance Rules",
-      "status": "❓",
-      "risk": "sec",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": [
-        "fuzz-smoke",
-        "mutants-diff"
-      ]
-    },
-    {
-      "id": "contextra-py",
-      "package_name": "contextra-py",
-      "layer": 9,
-      "order": 24,
-      "loc": 2197,
-      "tests": "32+",
-      "desc": "PyO3 Python Bindings",
-      "status": "❓",
-      "risk": "ffi",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-rank",
-      "package_name": "contextra-rank",
       "layer": 2,
-      "order": 25,
-      "loc": 3757,
-      "tests": "86+",
+      "order": 14,
+      "loc": 3753,
+      "tests": "44+",
       "desc": "Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)",
       "status": "❓",
       "risk": "fusion",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-router",
-      "package_name": "contextra-router",
-      "layer": 3,
-      "order": 26,
-      "loc": 3211,
-      "tests": "141+",
+      "layer": 2,
+      "order": 15,
+      "loc": 7149,
+      "tests": "113+",
       "desc": "Lyapunov Drift Control und Multi-Candidate Search Routing Engine",
       "status": "❓",
       "risk": "nan",
-      "tier": "3",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "bandit_latency_gate",
-        "cost_routing_savings_bench",
-        "router_bench"
-      ],
-      "required_gates": []
-    },
-    {
-      "id": "contextra-sandbox",
-      "package_name": "contextra-sandbox",
-      "layer": 0,
-      "order": 27,
-      "loc": 2122,
-      "tests": "55+",
-      "desc": "WASM Execution Boundary und Isolations-Sandbox",
-      "status": "❓",
-      "risk": "sec",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": [
-        "fuzz-smoke",
-        "mutants-diff"
-      ]
-    },
-    {
-      "id": "contextra-simd",
-      "package_name": "contextra-simd",
-      "layer": 4,
-      "order": 28,
-      "loc": 2527,
-      "tests": "30+",
-      "desc": "SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen",
-      "status": "❓",
-      "risk": "simd",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [
-        "simd_bench"
-      ],
-      "required_gates": [
-        "simd-safety"
-      ]
-    },
-    {
-      "id": "contextra-store",
-      "package_name": "contextra-store",
-      "layer": 4,
-      "order": 29,
-      "loc": 23522,
-      "tests": "717+",
-      "desc": "LSM-Tree Storage Engine, WAL Durability und Compaction Engine",
-      "status": "❓",
-      "risk": "crash",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "fuzz_compaction_interleave",
-        "fuzz_manifest_load",
-        "fuzz_memtable_concurrent",
-        "fuzz_recovery_arbitrary_state",
-        "fuzz_sstable_binary_search",
-        "fuzz_wal_replay",
-        "wal_mutation_chaos",
-        "wal_roundtrip",
-        "witness_reader_sstable"
-      ],
-      "bench_targets": [
-        "block_cache_bench",
-        "lsm_concurrency_bench",
-        "memtable_bench",
-        "redb_comparative_bench",
-        "sstable_bench",
-        "wal_bench"
-      ],
-      "required_gates": [
-        "wal-replay-verify"
-      ]
-    },
-    {
-      "id": "contextra-sys",
-      "package_name": "contextra-sys",
-      "layer": 0,
-      "order": 30,
-      "loc": 1110,
-      "tests": "11+",
-      "desc": "Systemnahe Bindings, Low-Level I/O und Memory-Mapping",
-      "status": "❓",
-      "risk": "ffi",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "3"
     },
     {
       "id": "contextra-testkit",
-      "package_name": "contextra-testkit",
       "layer": 2,
-      "order": 31,
-      "loc": 1402,
-      "tests": "23+",
+      "order": 16,
+      "loc": 562,
+      "tests": "7+",
       "desc": "Test Fixtures, Mock Engines und Chaos Matrix Harness",
       "status": "❓",
       "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
       "id": "contextra-text",
-      "package_name": "contextra-text",
       "layer": 2,
-      "order": 32,
-      "loc": 4525,
-      "tests": "182+",
+      "order": 17,
+      "loc": 9381,
+      "tests": "135+",
       "desc": "Volltextsuche und Inverted-Index (BM25 Engine)",
       "status": "❓",
       "risk": "utf8",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "fuzz_bm25_tokenize"
-      ],
-      "bench_targets": [],
-      "required_gates": []
+      "tier": "2"
     },
     {
-      "id": "contextra-types",
-      "package_name": "contextra-types",
-      "layer": 0,
-      "order": 33,
-      "loc": 5456,
-      "tests": "148+",
-      "desc": "Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)",
+      "id": "contextra-infer-ollama",
+      "layer": 3,
+      "order": 18,
+      "loc": 4604,
+      "tests": "92+",
+      "desc": "Ollama External Provider Client und Embeddings Integration",
       "status": "❓",
-      "risk": "none",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [],
-      "bench_targets": [],
-      "required_gates": []
+      "risk": "inj",
+      "tier": "3"
+    },
+    {
+      "id": "contextra-infer-onnx",
+      "layer": 3,
+      "order": 19,
+      "loc": 2264,
+      "tests": "37+",
+      "desc": "ONNX Embeddings und Cross-Encoder Reranking Execution Provider",
+      "status": "❓",
+      "risk": "gate",
+      "tier": "3"
+    },
+    {
+      "id": "contextra-simd",
+      "layer": 3,
+      "order": 20,
+      "loc": 1388,
+      "tests": "0+",
+      "desc": "SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen",
+      "status": "❓",
+      "risk": "simd",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-store",
+      "layer": 3,
+      "order": 21,
+      "loc": 28098,
+      "tests": "307+",
+      "desc": "LSM-Tree Storage Engine, WAL Durability und Compaction Engine",
+      "status": "❓",
+      "risk": "crash",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-infer-candle",
+      "layer": 4,
+      "order": 22,
+      "loc": 6664,
+      "tests": "89+",
+      "desc": "Candle LLM Inference Client und KV-Bridge Adapter",
+      "status": "❓",
+      "risk": "candle",
+      "tier": "3"
     },
     {
       "id": "contextra-vector",
-      "package_name": "contextra-vector",
-      "layer": 5,
-      "order": 34,
-      "loc": 14708,
-      "tests": "298+",
+      "layer": 4,
+      "order": 23,
+      "loc": 17021,
+      "tests": "173+",
       "desc": "Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)",
       "status": "❓",
       "risk": "simd",
-      "tier": "1",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "fuzz_hnsw_persistence",
-        "hnsw_insert_search"
-      ],
-      "bench_targets": [
-        "acorn_vs_post_filter",
-        "audit_benchmarks",
-        "distance_bench",
-        "distance_nan_impact_bench",
-        "filtered_search_selectivity_bench",
-        "flush_threshold_amplification",
-        "hnsw_bench",
-        "hnsw_delete_search_bench",
-        "overfetch_selectivity",
-        "partial_rebuild_recall_bench",
-        "sq8_bench"
-      ],
-      "required_gates": [
-        "simd-safety"
-      ]
+      "tier": "1"
     },
     {
-      "id": "contextra-wire",
-      "package_name": "contextra-wire",
-      "layer": 0,
-      "order": 35,
-      "loc": 1455,
-      "tests": "14+",
-      "desc": "FlatBuffers Wire-Protokolle und Serialisierungs-Formate",
+      "id": "contextra-engine",
+      "layer": 5,
+      "order": 24,
+      "loc": 15899,
+      "tests": "137+",
+      "desc": "Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)",
       "status": "❓",
-      "risk": "gen",
-      "tier": "2",
-      "has_agents_md": true,
-      "fuzz_targets": [
-        "fuzz_flatbuffers_ipc"
-      ],
-      "bench_targets": [],
-      "required_gates": []
+      "risk": "concurrency",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-cognition",
+      "layer": 6,
+      "order": 25,
+      "loc": 6578,
+      "tests": "71+",
+      "desc": "Konsolidierungs- und Background Sleep Passes",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-db",
+      "layer": 7,
+      "order": 26,
+      "loc": 12516,
+      "tests": "176+",
+      "desc": "Contextra Main Database Abstraction, Hybrid Search & Collections",
+      "status": "❓",
+      "risk": "fusion",
+      "tier": "1"
+    },
+    {
+      "id": "contextra",
+      "layer": 8,
+      "order": 27,
+      "loc": 721,
+      "tests": "10+",
+      "desc": "Haupt-Library Facade für Endanwender",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-agent",
+      "layer": 8,
+      "order": 28,
+      "loc": 6976,
+      "tests": "78+",
+      "desc": "Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline",
+      "status": "❓",
+      "risk": "budget",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-bench",
+      "layer": 8,
+      "order": 29,
+      "loc": 5751,
+      "tests": "39+",
+      "desc": "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-py",
+      "layer": 8,
+      "order": 30,
+      "loc": 2249,
+      "tests": "24+",
+      "desc": "PyO3 Python Bindings",
+      "status": "❓",
+      "risk": "ffi",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-mcp",
+      "layer": 9,
+      "order": 31,
+      "loc": 7073,
+      "tests": "112+",
+      "desc": "Model Context Protocol Server & Cloud Egress Gateway",
+      "status": "❓",
+      "risk": "proto",
+      "tier": "1"
     }
   ],
   "components": {
@@ -710,23 +383,15 @@
       {
         "file": "agent_memory.rs",
         "size": "M",
-        "loc": 335,
+        "loc": 213,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "builder.rs",
-        "size": "M",
-        "loc": 363,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection_profile.rs",
         "size": "S",
-        "loc": 131,
+        "loc": 177,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -734,31 +399,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 91,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "performance_profile.rs",
-        "size": "S",
-        "loc": 88,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "query_rewriter.rs",
-        "size": "M",
-        "loc": 223,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wiring_selftest.rs",
-        "size": "S",
-        "loc": 78,
+        "loc": 84,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -768,7 +409,7 @@
       {
         "file": "bandit.rs",
         "size": "L",
-        "loc": 1210,
+        "loc": 780,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -783,16 +424,16 @@
       },
       {
         "file": "drift.rs",
-        "size": "M",
-        "loc": 332,
+        "size": "S",
+        "loc": 124,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "flow_thompson.rs",
-        "size": "L",
-        "loc": 921,
+        "size": "M",
+        "loc": 592,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -800,7 +441,7 @@
       {
         "file": "homeostat.rs",
         "size": "M",
-        "loc": 234,
+        "loc": 230,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -808,7 +449,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 35,
+        "loc": 32,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -816,7 +457,7 @@
       {
         "file": "lyapunov.rs",
         "size": "M",
-        "loc": 561,
+        "loc": 552,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -832,7 +473,7 @@
       {
         "file": "offpolicy.rs",
         "size": "M",
-        "loc": 304,
+        "loc": 302,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -840,7 +481,7 @@
       {
         "file": "pid.rs",
         "size": "M",
-        "loc": 465,
+        "loc": 394,
         "risk": "calib",
         "desc": "Adaptive PID Pool Sizing & LinUCB Contextual Bandit",
         "focus": "Rerank PID Controller hält Recall Floor k_min >= 50 ein."
@@ -848,23 +489,7 @@
       {
         "file": "pid_latency_controller.rs",
         "size": "M",
-        "loc": 303,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "rie_greedy.rs",
-        "size": "M",
-        "loc": 258,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "shadow_mode.rs",
-        "size": "S",
-        "loc": 117,
+        "loc": 278,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -874,7 +499,7 @@
       {
         "file": "audit.rs",
         "size": "L",
-        "loc": 734,
+        "loc": 735,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -888,17 +513,9 @@
         "focus": ""
       },
       {
-        "file": "clm_scratchpad.rs",
-        "size": "L",
-        "loc": 716,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "context.rs",
         "size": "M",
-        "loc": 532,
+        "loc": 408,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -906,7 +523,7 @@
       {
         "file": "dlq.rs",
         "size": "M",
-        "loc": 402,
+        "loc": 262,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -914,7 +531,7 @@
       {
         "file": "engine.rs",
         "size": "L",
-        "loc": 858,
+        "loc": 830,
         "risk": "APM-4",
         "desc": "State Machine & TokenBudget RAII Reservation",
         "focus": "Budget-Check vor Tool-Execution. Reservation guarantees atomic refunds on Drop unless settled."
@@ -929,8 +546,8 @@
       },
       {
         "file": "engine/tests.rs",
-        "size": "M",
-        "loc": 274,
+        "size": "S",
+        "loc": 190,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -938,15 +555,7 @@
       {
         "file": "event_source.rs",
         "size": "M",
-        "loc": 298,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "goal_condition.rs",
-        "size": "M",
-        "loc": 496,
+        "loc": 289,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -954,7 +563,7 @@
       {
         "file": "graph.rs",
         "size": "M",
-        "loc": 309,
+        "loc": 233,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -962,7 +571,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 98,
+        "loc": 90,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -971,74 +580,6 @@
         "file": "step.rs",
         "size": "S",
         "loc": 94,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-audit-export": [
-      {
-        "file": "bsi_mapping.rs",
-        "size": "S",
-        "loc": 143,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "error.rs",
-        "size": "S",
-        "loc": 19,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 186,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "markdown_template.rs",
-        "size": "S",
-        "loc": 130,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "testkit.rs",
-        "size": "S",
-        "loc": 82,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-avv-generator": [
-      {
-        "file": "error.rs",
-        "size": "S",
-        "loc": 15,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 176,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "template.rs",
-        "size": "S",
-        "loc": 165,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1070,14 +611,6 @@
         "focus": ""
       },
       {
-        "file": "bin/scale_100k.rs",
-        "size": "M",
-        "loc": 297,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "compare.rs",
         "size": "M",
         "loc": 437,
@@ -1088,7 +621,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 16,
+        "loc": 14,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1096,7 +629,7 @@
       {
         "file": "locomo.rs",
         "size": "M",
-        "loc": 541,
+        "loc": 385,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1111,8 +644,8 @@
       },
       {
         "file": "main.rs",
-        "size": "XL",
-        "loc": 1608,
+        "size": "L",
+        "loc": 1441,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1137,24 +670,8 @@
     "contextra-checkpoint": [
       {
         "file": "guard.rs",
-        "size": "L",
-        "loc": 753,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "guard/tests.rs",
         "size": "M",
-        "loc": 289,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hardlink_cloner.rs",
-        "size": "M",
-        "loc": 205,
+        "loc": 557,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1162,7 +679,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 52,
+        "loc": 49,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1184,25 +701,9 @@
         "focus": ""
       },
       {
-        "file": "meta/tests.rs",
-        "size": "S",
-        "loc": 83,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "orphan.rs",
-        "size": "L",
-        "loc": 639,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "orphan/tests.rs",
-        "size": "S",
-        "loc": 119,
+        "size": "M",
+        "loc": 578,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1210,7 +711,7 @@
       {
         "file": "store.rs",
         "size": "L",
-        "loc": 916,
+        "loc": 808,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1218,7 +719,7 @@
       {
         "file": "store/tests.rs",
         "size": "L",
-        "loc": 856,
+        "loc": 857,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1228,7 +729,7 @@
       {
         "file": "aggregation_phase.rs",
         "size": "L",
-        "loc": 690,
+        "loc": 694,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1236,7 +737,7 @@
       {
         "file": "consolidation_executor.rs",
         "size": "L",
-        "loc": 1149,
+        "loc": 983,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1252,7 +753,7 @@
       {
         "file": "context.rs",
         "size": "M",
-        "loc": 566,
+        "loc": 553,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1268,7 +769,7 @@
       {
         "file": "context_compaction/compactor.rs",
         "size": "M",
-        "loc": 304,
+        "loc": 256,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1284,7 +785,7 @@
       {
         "file": "context_compaction/session.rs",
         "size": "M",
-        "loc": 305,
+        "loc": 306,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1292,7 +793,7 @@
       {
         "file": "context_compaction/tests.rs",
         "size": "M",
-        "loc": 595,
+        "loc": 565,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1308,7 +809,7 @@
       {
         "file": "graph_sink.rs",
         "size": "S",
-        "loc": 90,
+        "loc": 85,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1316,7 +817,7 @@
       {
         "file": "leanrag_input.rs",
         "size": "S",
-        "loc": 112,
+        "loc": 116,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1324,7 +825,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 56,
+        "loc": 68,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1340,7 +841,7 @@
       {
         "file": "maintenance_scheduler.rs",
         "size": "M",
-        "loc": 561,
+        "loc": 460,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1348,41 +849,25 @@
       {
         "file": "memory_consolidation.rs",
         "size": "L",
-        "loc": 1126,
+        "loc": 972,
         "risk": "P1-Pass-Separation",
         "desc": "Structural Consolidation Pass (run_structural_synthesis_pass) — LLM-frei",
         "focus": "Pass Separation Invariant (P1): Strikt ZERO dependencies on memfuse-graph/contextra-graph und ZERO LLM API calls."
       },
       {
-        "file": "semantic_aggregation_facade.rs",
-        "size": "S",
-        "loc": 108,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "synthesis_phase.rs",
         "size": "M",
-        "loc": 207,
+        "loc": 206,
         "risk": "LLM-Synthesis",
         "desc": "Generative Synthesis Pass (run_synthesis_pass) — LLM-basiert",
         "focus": "Generativer Pass zur Erzeugung synthetischer Chunks mit Provenance-Kennzeichnung."
-      },
-      {
-        "file": "transitivity_veto.rs",
-        "size": "S",
-        "loc": 139,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
       }
     ],
     "contextra-core": [
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 137,
+        "loc": 136,
         "risk": "—",
         "desc": "Modulstruktur, pub-Exports, Re-Exports der Kern-Traits",
         "focus": "Prüfe bei jeder Änderung, ob neue pub-Exports das DAG-Prinzip verletzen (contextra-core darf keine contextra-*-Abhängigkeit referenzieren)."
@@ -1392,15 +877,7 @@
       {
         "file": "anti_tamper.rs",
         "size": "S",
-        "loc": 134,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "audit_chain.rs",
-        "size": "M",
-        "loc": 398,
+        "loc": 145,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1408,167 +885,23 @@
       {
         "file": "crypto.rs",
         "size": "L",
-        "loc": 1076,
-        "risk": "RFC 8452/5869/4231",
-        "desc": "KeyManager — AES-256-GCM-SIV encrypt/decrypt + Nonce-Konstruktion, HKDF Key Derivation, HMAC-SHA256",
-        "focus": "Nonce = 4B Instanz-Präfix + 8B per-Call OsRng-Suffix. Constant-Time comparisons via subtle::ConstantTimeEq erzwungen."
+        "loc": 816,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "deletion_proof.rs",
         "size": "L",
-        "loc": 1347,
-        "risk": "sec",
-        "desc": "DSGVO Art. 17 DeletionProof & LayerCleanupProof",
-        "focus": "INV-DELETION-1: LayerCleanupProof::new_after_verified_empty fordert physical remaining_live_entries == 0."
+        "loc": 906,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "deletion_proof/audit_export.rs",
+        "file": "egress_vault.rs",
         "size": "S",
-        "loc": 29,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/builder.rs",
-        "size": "M",
-        "loc": 204,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/canon.rs",
-        "size": "S",
-        "loc": 185,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/keys.rs",
-        "size": "S",
-        "loc": 112,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/layer_ids.rs",
-        "size": "S",
-        "loc": 54,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/layer_proof.rs",
-        "size": "S",
-        "loc": 75,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/policy.rs",
-        "size": "M",
-        "loc": 415,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/proof.rs",
-        "size": "S",
-        "loc": 117,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/proof_store.rs",
-        "size": "M",
-        "loc": 270,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/proof_v2.rs",
-        "size": "S",
-        "loc": 165,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/proof_v3.rs",
-        "size": "M",
-        "loc": 474,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/proof_v4.rs",
-        "size": "M",
-        "loc": 348,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/signer.rs",
-        "size": "M",
-        "loc": 246,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/types.rs",
-        "size": "S",
-        "loc": 103,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/verify.rs",
-        "size": "M",
-        "loc": 208,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof/wal_receipt.rs",
-        "size": "S",
-        "loc": 39,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_proof_typestate.rs",
-        "size": "M",
-        "loc": 463,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion_witness.rs",
-        "size": "S",
-        "loc": 197,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ed25519_proof.rs",
-        "size": "S",
-        "loc": 177,
+        "loc": 4,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1576,7 +909,7 @@
       {
         "file": "error.rs",
         "size": "S",
-        "loc": 133,
+        "loc": 118,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1584,23 +917,7 @@
       {
         "file": "kdf.rs",
         "size": "M",
-        "loc": 328,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "keystore.rs",
-        "size": "S",
-        "loc": 184,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kms.rs",
-        "size": "S",
-        "loc": 161,
+        "loc": 278,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1608,7 +925,7 @@
       {
         "file": "kv_cipher.rs",
         "size": "M",
-        "loc": 463,
+        "loc": 343,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1616,7 +933,7 @@
       {
         "file": "kv_segment/eviction_worker.rs",
         "size": "M",
-        "loc": 211,
+        "loc": 210,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1632,7 +949,7 @@
       {
         "file": "kv_segment/segment.rs",
         "size": "M",
-        "loc": 353,
+        "loc": 351,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1640,15 +957,7 @@
       {
         "file": "kv_segment/store.rs",
         "size": "L",
-        "loc": 853,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv_shredding.rs",
-        "size": "L",
-        "loc": 818,
+        "loc": 845,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1656,23 +965,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 62,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "revocation_log.rs",
-        "size": "L",
-        "loc": 843,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wal_completeness.rs",
-        "size": "S",
-        "loc": 66,
+        "loc": 47,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1680,33 +973,25 @@
       {
         "file": "wal_crypto.rs",
         "size": "L",
-        "loc": 897,
-        "risk": "HMAC-Chain",
-        "desc": "WAL-HMAC-Chaining v3 — kryptographische Integritätskette über das gesamte WAL",
-        "focus": "Byte-Reihenfolge ist bindend: domain-separator → prev_hmac → seq_no → tx_id → op_type+kv."
+        "loc": 732,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       }
     ],
     "contextra-db": [
       {
-        "file": "homeostat.rs",
-        "size": "S",
-        "loc": 12,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "lib.rs",
         "size": "L",
-        "loc": 878,
+        "loc": 885,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "multistep.rs",
-        "size": "L",
-        "loc": 704,
+        "size": "M",
+        "loc": 575,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1714,41 +999,7 @@
       {
         "file": "volatile_vault.rs",
         "size": "M",
-        "loc": 497,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-durable-fs": [
-      {
-        "file": "fault_injector.rs",
-        "size": "S",
-        "loc": 82,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "journal.rs",
-        "size": "S",
-        "loc": 97,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "M",
-        "loc": 407,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "scrub.rs",
-        "size": "M",
-        "loc": 204,
+        "loc": 392,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1782,7 +1033,7 @@
       {
         "file": "background_workers/mod.rs",
         "size": "S",
-        "loc": 29,
+        "loc": 31,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1798,7 +1049,7 @@
       {
         "file": "background_workers/tests.rs",
         "size": "L",
-        "loc": 759,
+        "loc": 763,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1806,15 +1057,7 @@
       {
         "file": "chunker.rs",
         "size": "L",
-        "loc": 1092,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/crud/auto_extraction.rs",
-        "size": "M",
-        "loc": 312,
+        "loc": 681,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1822,7 +1065,7 @@
       {
         "file": "collection/crud/delete.rs",
         "size": "S",
-        "loc": 70,
+        "loc": 57,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1830,7 +1073,7 @@
       {
         "file": "collection/crud/insert.rs",
         "size": "M",
-        "loc": 548,
+        "loc": 441,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1838,7 +1081,7 @@
       {
         "file": "collection/crud/internal.rs",
         "size": "S",
-        "loc": 72,
+        "loc": 80,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1846,7 +1089,7 @@
       {
         "file": "collection/crud/kv.rs",
         "size": "S",
-        "loc": 62,
+        "loc": 59,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1854,7 +1097,7 @@
       {
         "file": "collection/crud/links.rs",
         "size": "M",
-        "loc": 222,
+        "loc": 211,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1862,7 +1105,7 @@
       {
         "file": "collection/crud/mod.rs",
         "size": "S",
-        "loc": 24,
+        "loc": 19,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1870,7 +1113,7 @@
       {
         "file": "collection/crud/read.rs",
         "size": "M",
-        "loc": 296,
+        "loc": 269,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1878,7 +1121,7 @@
       {
         "file": "collection/crud/tests.rs",
         "size": "M",
-        "loc": 368,
+        "loc": 370,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1886,15 +1129,15 @@
       {
         "file": "collection/crud/update.rs",
         "size": "S",
-        "loc": 120,
+        "loc": 113,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "collection/kv_lock.rs",
-        "size": "M",
-        "loc": 234,
+        "size": "S",
+        "loc": 49,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1902,7 +1145,7 @@
       {
         "file": "collection/maintenance.rs",
         "size": "L",
-        "loc": 928,
+        "loc": 870,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1910,7 +1153,7 @@
       {
         "file": "collection/mod.rs",
         "size": "L",
-        "loc": 872,
+        "loc": 657,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1918,15 +1161,15 @@
       {
         "file": "collection/query_builder/builder.rs",
         "size": "M",
-        "loc": 305,
+        "loc": 285,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "collection/query_builder/builder_exec.rs",
-        "size": "M",
-        "loc": 463,
+        "size": "S",
+        "loc": 181,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1934,15 +1177,7 @@
       {
         "file": "collection/query_builder/mod.rs",
         "size": "S",
-        "loc": 30,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/query_builder/scope.rs",
-        "size": "S",
-        "loc": 60,
+        "loc": 19,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1950,15 +1185,15 @@
       {
         "file": "collection/query_builder/strategy.rs",
         "size": "S",
-        "loc": 80,
+        "loc": 75,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "collection/query_builder/tests.rs",
-        "size": "L",
-        "loc": 704,
+        "size": "M",
+        "loc": 549,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1974,7 +1209,7 @@
       {
         "file": "collection/relate.rs",
         "size": "M",
-        "loc": 282,
+        "loc": 259,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1990,7 +1225,7 @@
       {
         "file": "collection/search/checkpoint.rs",
         "size": "S",
-        "loc": 99,
+        "loc": 131,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1998,7 +1233,7 @@
       {
         "file": "collection/search/filtered.rs",
         "size": "M",
-        "loc": 251,
+        "loc": 245,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2006,7 +1241,7 @@
       {
         "file": "collection/search/hybrid/mod.rs",
         "size": "M",
-        "loc": 377,
+        "loc": 359,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2014,7 +1249,7 @@
       {
         "file": "collection/search/hybrid/query.rs",
         "size": "M",
-        "loc": 492,
+        "loc": 409,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2022,7 +1257,7 @@
       {
         "file": "collection/search/hydrate.rs",
         "size": "S",
-        "loc": 105,
+        "loc": 103,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2030,15 +1265,15 @@
       {
         "file": "collection/search/mod.rs",
         "size": "S",
-        "loc": 25,
+        "loc": 26,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "collection/tests/concurrency_tests.rs",
-        "size": "L",
-        "loc": 635,
+        "size": "M",
+        "loc": 581,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2053,8 +1288,8 @@
       },
       {
         "file": "collection/tests/hybrid_search_tests.rs",
-        "size": "L",
-        "loc": 1280,
+        "size": "M",
+        "loc": 555,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2062,7 +1297,7 @@
       {
         "file": "collection/tests/insert_tests.rs",
         "size": "M",
-        "loc": 359,
+        "loc": 363,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2070,15 +1305,15 @@
       {
         "file": "collection/tests/link_tests.rs",
         "size": "M",
-        "loc": 423,
+        "loc": 427,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "collection/tests/misc_tests.rs",
-        "size": "M",
-        "loc": 599,
+        "size": "L",
+        "loc": 601,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2094,7 +1329,7 @@
       {
         "file": "collection/tests/read_tests.rs",
         "size": "M",
-        "loc": 354,
+        "loc": 356,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2102,7 +1337,7 @@
       {
         "file": "collection/tests/search_tests.rs",
         "size": "M",
-        "loc": 547,
+        "loc": 552,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2110,7 +1345,7 @@
       {
         "file": "collection/tests/update_delete_tests.rs",
         "size": "M",
-        "loc": 336,
+        "loc": 341,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2126,7 +1361,7 @@
       {
         "file": "contextra_impl/collections.rs",
         "size": "M",
-        "loc": 510,
+        "loc": 229,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2134,7 +1369,7 @@
       {
         "file": "contextra_impl/crud.rs",
         "size": "M",
-        "loc": 334,
+        "loc": 336,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2149,8 +1384,8 @@
       },
       {
         "file": "contextra_impl/lifecycle.rs",
-        "size": "L",
-        "loc": 608,
+        "size": "M",
+        "loc": 480,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2166,39 +1401,15 @@
       {
         "file": "contextra_impl/wiring.rs",
         "size": "S",
-        "loc": 32,
+        "loc": 23,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "decay_controller.rs",
-        "size": "S",
-        "loc": 8,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion/footprint.rs",
-        "size": "S",
-        "loc": 77,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion/mod.rs",
-        "size": "S",
-        "loc": 12,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "deletion/registry.rs",
         "size": "M",
-        "loc": 452,
+        "loc": 204,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2212,49 +1423,9 @@
         "focus": ""
       },
       {
-        "file": "extraction/mod.rs",
-        "size": "S",
-        "loc": 93,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "extraction/open_ie.rs",
-        "size": "S",
-        "loc": 122,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "extraction/rule_based.rs",
-        "size": "M",
-        "loc": 233,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "extraction/tests.rs",
-        "size": "S",
-        "loc": 105,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "extraction/types.rs",
-        "size": "S",
-        "loc": 44,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "filter.rs",
         "size": "M",
-        "loc": 322,
+        "loc": 320,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2262,7 +1433,7 @@
       {
         "file": "fusion.rs",
         "size": "S",
-        "loc": 59,
+        "loc": 40,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2270,15 +1441,7 @@
       {
         "file": "import.rs",
         "size": "S",
-        "loc": 126,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv_cache_integration/mod.rs",
-        "size": "S",
-        "loc": 82,
+        "loc": 124,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2286,39 +1449,7 @@
       {
         "file": "lib.rs",
         "size": "M",
-        "loc": 557,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "limits.rs",
-        "size": "S",
-        "loc": 184,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "merge_operator_adapter.rs",
-        "size": "S",
-        "loc": 194,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "metrics_names.rs",
-        "size": "S",
-        "loc": 60,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "no_graph_stubs.rs",
-        "size": "M",
-        "loc": 221,
+        "loc": 300,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2342,7 +1473,7 @@
       {
         "file": "transaction/compensating_actions.rs",
         "size": "M",
-        "loc": 373,
+        "loc": 303,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2358,7 +1489,7 @@
       {
         "file": "transaction/db_transaction_commit.rs",
         "size": "M",
-        "loc": 384,
+        "loc": 290,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2366,7 +1497,7 @@
       {
         "file": "transaction/db_transaction_rollback.rs",
         "size": "M",
-        "loc": 291,
+        "loc": 254,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2374,7 +1505,7 @@
       {
         "file": "transaction/intent.rs",
         "size": "S",
-        "loc": 38,
+        "loc": 34,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2390,69 +1521,13 @@
       {
         "file": "transaction/tests.rs",
         "size": "S",
-        "loc": 159,
+        "loc": 154,
         "risk": "—",
         "desc": "",
         "focus": ""
       }
     ],
     "contextra-graph": [
-      {
-        "file": "apprh/diffusion.rs",
-        "size": "S",
-        "loc": 175,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/error.rs",
-        "size": "S",
-        "loc": 25,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/gate_monitor.rs",
-        "size": "M",
-        "loc": 259,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/mod.rs",
-        "size": "S",
-        "loc": 117,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/params.rs",
-        "size": "S",
-        "loc": 112,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/selector.rs",
-        "size": "M",
-        "loc": 205,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "apprh/shadow.rs",
-        "size": "S",
-        "loc": 137,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
       {
         "file": "arc_slice.rs",
         "size": "S",
@@ -2464,7 +1539,7 @@
       {
         "file": "cascade.rs",
         "size": "L",
-        "loc": 1096,
+        "loc": 856,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2480,7 +1555,7 @@
       {
         "file": "community/tests.rs",
         "size": "L",
-        "loc": 810,
+        "loc": 812,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2504,7 +1579,7 @@
       {
         "file": "csr/graph_index.rs",
         "size": "L",
-        "loc": 872,
+        "loc": 859,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2512,7 +1587,7 @@
       {
         "file": "csr/graph_persist.rs",
         "size": "M",
-        "loc": 268,
+        "loc": 271,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2520,7 +1595,7 @@
       {
         "file": "csr/graph_read.rs",
         "size": "M",
-        "loc": 418,
+        "loc": 351,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2528,7 +1603,7 @@
       {
         "file": "csr/graph_write.rs",
         "size": "L",
-        "loc": 1232,
+        "loc": 915,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2536,7 +1611,7 @@
       {
         "file": "csr/inner.rs",
         "size": "L",
-        "loc": 814,
+        "loc": 811,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2560,7 +1635,7 @@
       {
         "file": "csr/tests/basic_tests.rs",
         "size": "L",
-        "loc": 756,
+        "loc": 759,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2568,7 +1643,7 @@
       {
         "file": "csr/tests/bitemporal_tests.rs",
         "size": "M",
-        "loc": 553,
+        "loc": 554,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2576,7 +1651,7 @@
       {
         "file": "csr/tests/graph_index_tests.rs",
         "size": "L",
-        "loc": 699,
+        "loc": 700,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2584,7 +1659,7 @@
       {
         "file": "csr/tests/persistence_tests.rs",
         "size": "L",
-        "loc": 756,
+        "loc": 757,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2616,15 +1691,7 @@
       {
         "file": "edge_reinforcement_buffer.rs",
         "size": "M",
-        "loc": 211,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "entity_extraction.rs",
-        "size": "M",
-        "loc": 303,
+        "loc": 201,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2640,15 +1707,7 @@
       {
         "file": "hyperedge.rs",
         "size": "L",
-        "loc": 834,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hyperedge_suggest.rs",
-        "size": "S",
-        "loc": 179,
+        "loc": 819,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2656,39 +1715,15 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 128,
+        "loc": 106,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "path_rag/k_path.rs",
-        "size": "M",
-        "loc": 321,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "path_rag/mod.rs",
-        "size": "M",
-        "loc": 464,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "path_rag/snapshot.rs",
-        "size": "M",
-        "loc": 221,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "path_rag/tests.rs",
-        "size": "M",
-        "loc": 549,
+        "file": "path_rag.rs",
+        "size": "L",
+        "loc": 1002,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2704,23 +1739,7 @@
       {
         "file": "ppr.rs",
         "size": "L",
-        "loc": 1077,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ppr/cost.rs",
-        "size": "M",
-        "loc": 251,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ppr/shadow_hook.rs",
-        "size": "S",
-        "loc": 103,
+        "loc": 998,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2744,7 +1763,7 @@
       {
         "file": "ppr/tests/algo_tests.rs",
         "size": "L",
-        "loc": 1168,
+        "loc": 928,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2752,7 +1771,7 @@
       {
         "file": "ppr/tests/context_tests.rs",
         "size": "L",
-        "loc": 846,
+        "loc": 819,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2767,8 +1786,8 @@
       },
       {
         "file": "provenance.rs",
-        "size": "M",
-        "loc": 272,
+        "size": "S",
+        "loc": 175,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2776,7 +1795,7 @@
       {
         "file": "session_dag.rs",
         "size": "L",
-        "loc": 979,
+        "loc": 978,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2784,7 +1803,7 @@
       {
         "file": "tl_hfd/diffusion.rs",
         "size": "M",
-        "loc": 244,
+        "loc": 252,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2808,7 +1827,7 @@
       {
         "file": "tl_hfd/mod.rs",
         "size": "S",
-        "loc": 62,
+        "loc": 50,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2824,7 +1843,7 @@
       {
         "file": "tl_hfd/shadow.rs",
         "size": "S",
-        "loc": 152,
+        "loc": 114,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2832,17 +1851,9 @@
     ],
     "contextra-infer-candle": [
       {
-        "file": "attention_exporter.rs",
-        "size": "S",
-        "loc": 110,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "embedding.rs",
-        "size": "L",
-        "loc": 715,
+        "size": "M",
+        "loc": 451,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2858,7 +1869,7 @@
       {
         "file": "gasp.rs",
         "size": "L",
-        "loc": 668,
+        "loc": 661,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2866,7 +1877,7 @@
       {
         "file": "gguf_loader.rs",
         "size": "S",
-        "loc": 95,
+        "loc": 93,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2874,7 +1885,7 @@
       {
         "file": "inference.rs",
         "size": "S",
-        "loc": 26,
+        "loc": 24,
         "risk": "candle",
         "desc": "Candle ML Inferenz Backend & KvBridgeAdapter",
         "focus": "#![forbid(unsafe_code)] at crate root. Native Candle GGUF ML inference backend."
@@ -2882,7 +1893,7 @@
       {
         "file": "inference/core.rs",
         "size": "L",
-        "loc": 1084,
+        "loc": 934,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2906,7 +1917,7 @@
       {
         "file": "kv_bridge.rs",
         "size": "L",
-        "loc": 695,
+        "loc": 709,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2914,7 +1925,7 @@
       {
         "file": "kv_state.rs",
         "size": "M",
-        "loc": 322,
+        "loc": 319,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2922,7 +1933,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 61,
+        "loc": 51,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2937,8 +1948,8 @@
       },
       {
         "file": "model/quantized_llama.rs",
-        "size": "M",
-        "loc": 559,
+        "size": "L",
+        "loc": 642,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2946,7 +1957,7 @@
       {
         "file": "model_registry.rs",
         "size": "S",
-        "loc": 143,
+        "loc": 141,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2956,7 +1967,7 @@
       {
         "file": "client.rs",
         "size": "S",
-        "loc": 25,
+        "loc": 24,
         "risk": "inj",
         "desc": "Ollama Client & XML Special Character Escaping",
         "focus": "build_rag_prompt escapes XML special characters (<, >, &, \", '). Static regex helpers use OnceLock."
@@ -2972,7 +1983,7 @@
       {
         "file": "client/core.rs",
         "size": "L",
-        "loc": 1013,
+        "loc": 981,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -2988,7 +1999,7 @@
       {
         "file": "client/tests.rs",
         "size": "XL",
-        "loc": 1656,
+        "loc": 1591,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3036,7 +2047,7 @@
       {
         "file": "importance.rs",
         "size": "L",
-        "loc": 630,
+        "loc": 626,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3056,21 +2067,13 @@
         "risk": "—",
         "desc": "",
         "focus": ""
-      },
-      {
-        "file": "query_rewriter.rs",
-        "size": "M",
-        "loc": 331,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
       }
     ],
     "contextra-infer-onnx": [
       {
         "file": "lib.rs",
         "size": "L",
-        "loc": 847,
+        "loc": 852,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3078,15 +2081,15 @@
       {
         "file": "reranker/config.rs",
         "size": "S",
-        "loc": 58,
+        "loc": 64,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "reranker/cross_encoder.rs",
-        "size": "M",
-        "loc": 209,
+        "size": "S",
+        "loc": 186,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3102,7 +2105,7 @@
       {
         "file": "reranker/onnx.rs",
         "size": "M",
-        "loc": 347,
+        "loc": 342,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3110,7 +2113,7 @@
       {
         "file": "reranker/tests.rs",
         "size": "M",
-        "loc": 535,
+        "loc": 525,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3118,17 +2121,9 @@
     ],
     "contextra-kvcache": [
       {
-        "file": "attention_score.rs",
-        "size": "M",
-        "loc": 275,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "eviction_worker.rs",
         "size": "M",
-        "loc": 307,
+        "loc": 212,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3136,7 +2131,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 40,
+        "loc": 20,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3144,31 +2139,15 @@
       {
         "file": "prefix_store.rs",
         "size": "M",
-        "loc": 409,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "quantize_kivi.rs",
-        "size": "L",
-        "loc": 788,
+        "loc": 275,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "radix.rs",
-        "size": "L",
-        "loc": 848,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "scratchpad_invalidation.rs",
         "size": "M",
-        "loc": 221,
+        "loc": 461,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3176,7 +2155,7 @@
       {
         "file": "segment.rs",
         "size": "M",
-        "loc": 586,
+        "loc": 473,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3184,39 +2163,13 @@
       {
         "file": "store.rs",
         "size": "L",
-        "loc": 1231,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-license": [
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 12,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "signed_gate.rs",
-        "size": "M",
-        "loc": 444,
+        "loc": 976,
         "risk": "—",
         "desc": "",
         "focus": ""
       }
     ],
     "contextra-mcp": [
-      {
-        "file": "bin/contextra-mcp-cli.rs",
-        "size": "S",
-        "loc": 109,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
       {
         "file": "bin/contextra-mcp-server.rs",
         "size": "S",
@@ -3234,49 +2187,9 @@
         "focus": ""
       },
       {
-        "file": "cli/confirm.rs",
-        "size": "S",
-        "loc": 96,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "cli/doctor.rs",
-        "size": "S",
-        "loc": 131,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "cli/init.rs",
-        "size": "S",
-        "loc": 46,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "cli/mod.rs",
-        "size": "S",
-        "loc": 11,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "cli/verify_proof.rs",
-        "size": "S",
-        "loc": 68,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "config.rs",
-        "size": "L",
-        "loc": 733,
+        "size": "M",
+        "loc": 501,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3284,7 +2197,7 @@
       {
         "file": "egress_gateway.rs",
         "size": "S",
-        "loc": 28,
+        "loc": 25,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3292,15 +2205,7 @@
       {
         "file": "egress_guard.rs",
         "size": "S",
-        "loc": 4,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "explain.rs",
-        "size": "M",
-        "loc": 268,
+        "loc": 154,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3314,68 +2219,12 @@
         "focus": ""
       },
       {
-        "file": "ipc/channel.rs",
-        "size": "S",
-        "loc": 24,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/mod.rs",
-        "size": "S",
-        "loc": 9,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/peer_cred.rs",
-        "size": "S",
-        "loc": 53,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/primary.rs",
-        "size": "S",
-        "loc": 177,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/proxy.rs",
-        "size": "S",
-        "loc": 163,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/server.rs",
-        "size": "S",
-        "loc": 199,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "lib.rs",
         "size": "S",
-        "loc": 84,
+        "loc": 50,
         "risk": "proto",
         "desc": "stdio JSON-RPC 2.0 Server & McpSandbox",
         "focus": "ADR-010 stdio transport only. read_line_bounded enforced by MAX_RPC_BYTES = 16MB. SLM dispatch directly executes binary without shell."
-      },
-      {
-        "file": "plugin_status.rs",
-        "size": "S",
-        "loc": 43,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
       },
       {
         "file": "prompt_injection.rs",
@@ -3396,7 +2245,7 @@
       {
         "file": "prompt_injection/guard.rs",
         "size": "L",
-        "loc": 769,
+        "loc": 611,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3412,23 +2261,7 @@
       {
         "file": "prompt_injection/tests.rs",
         "size": "M",
-        "loc": 398,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "proof_key.rs",
-        "size": "S",
-        "loc": 166,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "proof_key_env.rs",
-        "size": "S",
-        "loc": 187,
+        "loc": 305,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3443,24 +2276,24 @@
       },
       {
         "file": "routing.rs",
-        "size": "M",
-        "loc": 571,
+        "size": "S",
+        "loc": 165,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "sandbox.rs",
-        "size": "L",
-        "loc": 886,
+        "size": "M",
+        "loc": 499,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "server.rs",
-        "size": "M",
-        "loc": 231,
+        "size": "S",
+        "loc": 168,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3468,71 +2301,7 @@
       {
         "file": "server_dispatch.rs",
         "size": "M",
-        "loc": 544,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/cancellation.rs",
-        "size": "S",
-        "loc": 94,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/channel_kind.rs",
-        "size": "S",
-        "loc": 6,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/confirm_handler.rs",
-        "size": "S",
-        "loc": 31,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/error_codes.rs",
-        "size": "S",
-        "loc": 64,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/forget_guard.rs",
-        "size": "S",
-        "loc": 162,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/recall_truncator.rs",
-        "size": "S",
-        "loc": 50,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/tool_hints.rs",
-        "size": "S",
-        "loc": 16,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "server_dispatch/trust_frame.rs",
-        "size": "S",
-        "loc": 58,
+        "loc": 320,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3540,7 +2309,7 @@
       {
         "file": "server_tools.rs",
         "size": "L",
-        "loc": 949,
+        "loc": 926,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3548,15 +2317,7 @@
       {
         "file": "tests.rs",
         "size": "L",
-        "loc": 1379,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "tools_crud.rs",
-        "size": "S",
-        "loc": 195,
+        "loc": 1150,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3572,33 +2333,17 @@
     ],
     "contextra-mvcc": [
       {
-        "file": "floor.rs",
-        "size": "S",
-        "loc": 55,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lease.rs",
-        "size": "S",
-        "loc": 40,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "lib.rs",
         "size": "S",
-        "loc": 32,
+        "loc": 21,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "seq_log.rs",
-        "size": "L",
-        "loc": 629,
+        "size": "M",
+        "loc": 556,
         "risk": "MVCC",
         "desc": "24-Byte Sequential Versioned Log (DocId + insert_seq + delete_seq)",
         "focus": "Sichtbarkeitsinvariante (insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)) muss lückenlos gelten."
@@ -3606,23 +2351,7 @@
       {
         "file": "snapshot.rs",
         "size": "M",
-        "loc": 536,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ssi.rs",
-        "size": "L",
-        "loc": 1142,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "sync.rs",
-        "size": "S",
-        "loc": 7,
+        "loc": 390,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3630,7 +2359,7 @@
       {
         "file": "tx_buffer.rs",
         "size": "L",
-        "loc": 1450,
+        "loc": 988,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3638,17 +2367,9 @@
     ],
     "contextra-ports": [
       {
-        "file": "attention.rs",
-        "size": "S",
-        "loc": 16,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "checkpoint.rs",
         "size": "S",
-        "loc": 51,
+        "loc": 57,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3656,7 +2377,7 @@
       {
         "file": "clock.rs",
         "size": "S",
-        "loc": 163,
+        "loc": 92,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3664,15 +2385,7 @@
       {
         "file": "embedding.rs",
         "size": "M",
-        "loc": 328,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "embedding_sanity.rs",
-        "size": "M",
-        "loc": 372,
+        "loc": 303,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3688,7 +2401,7 @@
       {
         "file": "graph_index.rs",
         "size": "M",
-        "loc": 520,
+        "loc": 484,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3696,7 +2409,7 @@
       {
         "file": "id_gen.rs",
         "size": "S",
-        "loc": 152,
+        "loc": 96,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3704,15 +2417,7 @@
       {
         "file": "kv.rs",
         "size": "M",
-        "loc": 265,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv_bridge_port.rs",
-        "size": "S",
-        "loc": 24,
+        "loc": 250,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3720,31 +2425,23 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 145,
+        "loc": 107,
         "risk": "Ports",
         "desc": "Dyn-kompatible Non-Determinismus-Ports (Clock, Rng, IdGen)",
         "focus": "Clock, Rng und IdGen sind synchron und Dyn-kompatibel. ManualClock in contextra-testkit zur deterministischen Zeitsteuerung nutzen."
       },
       {
-        "file": "license.rs",
-        "size": "S",
-        "loc": 111,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "lifecycle.rs",
         "size": "S",
-        "loc": 55,
+        "loc": 124,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "metrics.rs",
-        "size": "M",
-        "loc": 223,
+        "size": "S",
+        "loc": 69,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3752,39 +2449,15 @@
       {
         "file": "observability.rs",
         "size": "S",
-        "loc": 14,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "plugin.rs",
-        "size": "M",
-        "loc": 439,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "query_rewriter.rs",
-        "size": "S",
-        "loc": 46,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "reranker.rs",
-        "size": "S",
-        "loc": 22,
+        "loc": 17,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "rng.rs",
-        "size": "M",
-        "loc": 235,
+        "size": "S",
+        "loc": 142,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3792,7 +2465,7 @@
       {
         "file": "storage.rs",
         "size": "M",
-        "loc": 277,
+        "loc": 471,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3800,7 +2473,7 @@
       {
         "file": "text_index.rs",
         "size": "M",
-        "loc": 214,
+        "loc": 227,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3808,7 +2481,7 @@
       {
         "file": "vector_index.rs",
         "size": "M",
-        "loc": 313,
+        "loc": 310,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3816,41 +2489,17 @@
     ],
     "contextra-privacy": [
       {
-        "file": "audit_trace.rs",
-        "size": "S",
-        "loc": 75,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "avv_generator.rs",
-        "size": "S",
-        "loc": 195,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "bulk_exfiltration_detector.rs",
         "size": "M",
-        "loc": 300,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "context_edit_audit.rs",
-        "size": "M",
-        "loc": 313,
+        "loc": 299,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "egress_gateway.rs",
-        "size": "L",
-        "loc": 664,
+        "size": "M",
+        "loc": 441,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3858,7 +2507,7 @@
       {
         "file": "egress_guard.rs",
         "size": "M",
-        "loc": 527,
+        "loc": 258,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3866,15 +2515,15 @@
       {
         "file": "egress_vault.rs",
         "size": "L",
-        "loc": 1290,
-        "risk": "sec",
-        "desc": "EgressVault — Surrogate-Vaulting & Rule-based PII redaction",
-        "focus": "P28 Cloud Egress Guard - alle unautorisierten PII-Tokens müssen vor Cloud-Egress maskiert werden."
+        "loc": 739,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "error.rs",
         "size": "S",
-        "loc": 56,
+        "loc": 25,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3890,15 +2539,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 43,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "processing_registry.rs",
-        "size": "M",
-        "loc": 208,
+        "loc": 28,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3916,7 +2557,7 @@
       {
         "file": "bindings/common.rs",
         "size": "M",
-        "loc": 372,
+        "loc": 368,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3931,8 +2572,8 @@
       },
       {
         "file": "bindings/db.rs",
-        "size": "M",
-        "loc": 318,
+        "size": "S",
+        "loc": 188,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -3956,7 +2597,7 @@
       {
         "file": "bindings/functions.rs",
         "size": "S",
-        "loc": 117,
+        "loc": 91,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4004,7 +2645,7 @@
       {
         "file": "bindings/tests.rs",
         "size": "M",
-        "loc": 410,
+        "loc": 389,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4028,7 +2669,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 84,
+        "loc": 81,
         "risk": "ffi",
         "desc": "PyO3 Standalone Workspace Bindings",
         "focus": "ADR-064 workspace isolation. Standalone [workspace] in crates/contextra-py/Cargo.toml."
@@ -4036,17 +2677,9 @@
     ],
     "contextra-rank": [
       {
-        "file": "calibration/conformal.rs",
-        "size": "M",
-        "loc": 228,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "calibration/isotonic.rs",
         "size": "M",
-        "loc": 336,
+        "loc": 252,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4054,7 +2687,7 @@
       {
         "file": "calibration/mod.rs",
         "size": "S",
-        "loc": 9,
+        "loc": 7,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4062,7 +2695,7 @@
       {
         "file": "calibration/platt.rs",
         "size": "S",
-        "loc": 164,
+        "loc": 151,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4086,7 +2719,7 @@
       {
         "file": "dibud/state.rs",
         "size": "M",
-        "loc": 310,
+        "loc": 286,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4094,31 +2727,15 @@
       {
         "file": "dibud/types.rs",
         "size": "S",
-        "loc": 129,
+        "loc": 118,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "drift.rs",
-        "size": "M",
-        "loc": 241,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "explain.rs",
-        "size": "M",
-        "loc": 420,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "fusion/global.rs",
-        "size": "M",
-        "loc": 211,
+        "size": "S",
+        "loc": 122,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4126,7 +2743,7 @@
       {
         "file": "fusion/mod.rs",
         "size": "S",
-        "loc": 28,
+        "loc": 22,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4142,7 +2759,7 @@
       {
         "file": "fusion/provenance.rs",
         "size": "M",
-        "loc": 295,
+        "loc": 226,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4157,8 +2774,8 @@
       },
       {
         "file": "fusion/rrf.rs",
-        "size": "L",
-        "loc": 977,
+        "size": "M",
+        "loc": 412,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4166,7 +2783,7 @@
       {
         "file": "fusion/signal.rs",
         "size": "S",
-        "loc": 169,
+        "loc": 135,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4182,7 +2799,7 @@
       {
         "file": "fusion/types.rs",
         "size": "S",
-        "loc": 166,
+        "loc": 131,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4190,21 +2807,13 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 35,
+        "loc": 26,
         "risk": "—",
         "desc": "",
         "focus": ""
       }
     ],
     "contextra-router": [
-      {
-        "file": "arm_registry.rs",
-        "size": "S",
-        "loc": 176,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
       {
         "file": "bandit_regret_tests.rs",
         "size": "M",
@@ -4216,7 +2825,7 @@
       {
         "file": "dispatch.rs",
         "size": "M",
-        "loc": 266,
+        "loc": 254,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4232,7 +2841,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 70,
+        "loc": 67,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4240,7 +2849,7 @@
       {
         "file": "outcome.rs",
         "size": "S",
-        "loc": 141,
+        "loc": 135,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4256,50 +2865,18 @@
       {
         "file": "profile.rs",
         "size": "M",
-        "loc": 527,
+        "loc": 489,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "router/dispatch_core.rs",
+        "file": "router.rs",
         "size": "L",
-        "loc": 639,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "router/lifecycle.rs",
-        "size": "S",
-        "loc": 167,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "router/mod.rs",
-        "size": "M",
-        "loc": 326,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "router/outcomes.rs",
-        "size": "M",
-        "loc": 214,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "router/tests.rs",
-        "size": "S",
-        "loc": 180,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
+        "loc": 1353,
+        "risk": "nan",
+        "desc": "SLM Router Engine & recalibrate_conformal",
+        "focus": "Rejects non-finite query embeddings (!v.is_finite()). Recalibrate_conformal requires window_total >= 30."
       },
       {
         "file": "routing_strategy.rs",
@@ -4327,16 +2904,8 @@
       },
       {
         "file": "tests/fixtures.rs",
-        "size": "S",
-        "loc": 187,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "tests/id_gen_determinism_test.rs",
-        "size": "S",
-        "loc": 17,
+        "size": "M",
+        "loc": 225,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4360,7 +2929,7 @@
       {
         "file": "tests/misc_tests/part1.rs",
         "size": "L",
-        "loc": 958,
+        "loc": 949,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4368,7 +2937,7 @@
       {
         "file": "tests/misc_tests/part2.rs",
         "size": "L",
-        "loc": 760,
+        "loc": 756,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4376,7 +2945,7 @@
       {
         "file": "tests/mod.rs",
         "size": "S",
-        "loc": 21,
+        "loc": 20,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4392,7 +2961,7 @@
       {
         "file": "tests/routing_tests/dispatch.rs",
         "size": "M",
-        "loc": 288,
+        "loc": 292,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4400,7 +2969,7 @@
       {
         "file": "tests/routing_tests/engine_part1.rs",
         "size": "L",
-        "loc": 635,
+        "loc": 619,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4408,7 +2977,7 @@
       {
         "file": "tests/routing_tests/engine_part2.rs",
         "size": "L",
-        "loc": 735,
+        "loc": 727,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4416,7 +2985,7 @@
       {
         "file": "transport.rs",
         "size": "S",
-        "loc": 55,
+        "loc": 44,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4424,25 +2993,9 @@
     ],
     "contextra-sandbox": [
       {
-        "file": "admission.rs",
-        "size": "S",
-        "loc": 53,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "approval.rs",
-        "size": "M",
-        "loc": 504,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "capabilities.rs",
-        "size": "M",
-        "loc": 332,
+        "size": "S",
+        "loc": 83,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4450,7 +3003,7 @@
       {
         "file": "error.rs",
         "size": "S",
-        "loc": 59,
+        "loc": 37,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4458,7 +3011,7 @@
       {
         "file": "executor.rs",
         "size": "L",
-        "loc": 663,
+        "loc": 630,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4466,15 +3019,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 30,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "merge.rs",
-        "size": "S",
-        "loc": 142,
+        "loc": 22,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4490,7 +3035,7 @@
       {
         "file": "wasi.rs",
         "size": "M",
-        "loc": 592,
+        "loc": 577,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4500,23 +3045,23 @@
       {
         "file": "dispatch.rs",
         "size": "M",
-        "loc": 445,
+        "loc": 234,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "kernels/avx2.rs",
-        "size": "L",
-        "loc": 850,
+        "size": "M",
+        "loc": 383,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "kernels/avx512.rs",
-        "size": "L",
-        "loc": 866,
+        "size": "M",
+        "loc": 367,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4524,15 +3069,15 @@
       {
         "file": "kernels/mod.rs",
         "size": "S",
-        "loc": 14,
+        "loc": 9,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "kernels/neon.rs",
-        "size": "M",
-        "loc": 338,
+        "size": "S",
+        "loc": 108,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4548,7 +3093,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 73,
+        "loc": 75,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4556,41 +3101,9 @@
     ],
     "contextra-store": [
       {
-        "file": "blob/mod.rs",
+        "file": "checkpoint.rs",
         "size": "S",
-        "loc": 90,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "blob/orphan.rs",
-        "size": "S",
-        "loc": 37,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "blob/pointer.rs",
-        "size": "S",
-        "loc": 10,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "blob/reader.rs",
-        "size": "S",
-        "loc": 135,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "blob/writer.rs",
-        "size": "S",
-        "loc": 117,
+        "loc": 126,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4598,15 +3111,7 @@
       {
         "file": "compaction.rs",
         "size": "S",
-        "loc": 21,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "compaction/adaptive.rs",
-        "size": "M",
-        "loc": 356,
+        "loc": 10,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4614,7 +3119,7 @@
       {
         "file": "compaction/config.rs",
         "size": "S",
-        "loc": 91,
+        "loc": 70,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4622,31 +3127,7 @@
       {
         "file": "compaction/engine.rs",
         "size": "L",
-        "loc": 988,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "compaction/merge_operator.rs",
-        "size": "S",
-        "loc": 16,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "compaction/purge_filter.rs",
-        "size": "S",
-        "loc": 70,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "compaction/retention.rs",
-        "size": "S",
-        "loc": 81,
+        "loc": 683,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4662,7 +3143,7 @@
       {
         "file": "compaction/tests/advanced.rs",
         "size": "L",
-        "loc": 1042,
+        "loc": 1024,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4670,119 +3151,15 @@
       {
         "file": "compaction/tests/basic.rs",
         "size": "L",
-        "loc": 1104,
+        "loc": 933,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "copy_registry/mod.rs",
-        "size": "M",
-        "loc": 252,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "engine/memory_only.rs",
-        "size": "M",
-        "loc": 366,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "engine/mod.rs",
+        "file": "kv_locks.rs",
         "size": "S",
-        "loc": 4,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "erasure_ledger/coverage.rs",
-        "size": "S",
-        "loc": 41,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "erasure_ledger/entry.rs",
-        "size": "M",
-        "loc": 273,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "erasure_ledger/mod.rs",
-        "size": "M",
-        "loc": 379,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "format/error.rs",
-        "size": "S",
-        "loc": 28,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "format/header.rs",
-        "size": "S",
-        "loc": 96,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "format/migration.rs",
-        "size": "M",
-        "loc": 253,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "format/mod.rs",
-        "size": "S",
-        "loc": 12,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "format/openable.rs",
-        "size": "S",
-        "loc": 84,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv/delete_mode.rs",
-        "size": "S",
-        "loc": 46,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv/mod.rs",
-        "size": "S",
-        "loc": 10,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "kv/segment.rs",
-        "size": "S",
-        "loc": 177,
+        "loc": 171,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4790,7 +3167,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 76,
+        "loc": 57,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4798,7 +3175,7 @@
       {
         "file": "lsm/commit.rs",
         "size": "S",
-        "loc": 152,
+        "loc": 97,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4806,23 +3183,15 @@
       {
         "file": "lsm/config.rs",
         "size": "S",
-        "loc": 114,
+        "loc": 44,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "lsm/engine.rs",
-        "size": "M",
-        "loc": 465,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/fence.rs",
         "size": "S",
-        "loc": 92,
+        "loc": 103,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4830,15 +3199,7 @@
       {
         "file": "lsm/flush.rs",
         "size": "S",
-        "loc": 19,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/gc_floor.rs",
-        "size": "S",
-        "loc": 39,
+        "loc": 18,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4846,7 +3207,7 @@
       {
         "file": "lsm/group_commit.rs",
         "size": "S",
-        "loc": 87,
+        "loc": 31,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4862,95 +3223,15 @@
       {
         "file": "lsm/mod.rs",
         "size": "S",
-        "loc": 125,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/observer.rs",
-        "size": "M",
-        "loc": 571,
+        "loc": 115,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "lsm/ops.rs",
-        "size": "S",
-        "loc": 154,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/ops/compaction.rs",
-        "size": "M",
-        "loc": 271,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/ops/maintenance.rs",
-        "size": "S",
-        "loc": 52,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/ops/purge.rs",
-        "size": "S",
-        "loc": 45,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/ops/read.rs",
-        "size": "M",
-        "loc": 358,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/ops/write.rs",
         "size": "L",
-        "loc": 807,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/purge/failpoint.rs",
-        "size": "S",
-        "loc": 21,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/purge/mod.rs",
-        "size": "S",
-        "loc": 10,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/purge/orchestrator.rs",
-        "size": "S",
-        "loc": 89,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lsm/purge/plan.rs",
-        "size": "S",
-        "loc": 15,
+        "loc": 1083,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4958,7 +3239,7 @@
       {
         "file": "lsm/recovery.rs",
         "size": "L",
-        "loc": 1068,
+        "loc": 729,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4966,7 +3247,7 @@
       {
         "file": "lsm/scan.rs",
         "size": "M",
-        "loc": 221,
+        "loc": 203,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4974,7 +3255,7 @@
       {
         "file": "lsm/tests.rs",
         "size": "S",
-        "loc": 32,
+        "loc": 29,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4982,7 +3263,7 @@
       {
         "file": "lsm/tests/commit_tests.rs",
         "size": "M",
-        "loc": 470,
+        "loc": 410,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -4990,7 +3271,7 @@
       {
         "file": "lsm/tests/flush_tests.rs",
         "size": "M",
-        "loc": 253,
+        "loc": 252,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5006,7 +3287,7 @@
       {
         "file": "lsm/tests/recovery_tests.rs",
         "size": "L",
-        "loc": 1025,
+        "loc": 1005,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5014,7 +3295,7 @@
       {
         "file": "lsm/tests/scan_tests.rs",
         "size": "M",
-        "loc": 538,
+        "loc": 523,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5028,17 +3309,9 @@
         "focus": ""
       },
       {
-        "file": "lsm/witness.rs",
-        "size": "M",
-        "loc": 220,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "manifest/core.rs",
         "size": "M",
-        "loc": 467,
+        "loc": 320,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5046,7 +3319,7 @@
       {
         "file": "manifest/entry.rs",
         "size": "M",
-        "loc": 419,
+        "loc": 310,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5062,7 +3335,7 @@
       {
         "file": "manifest/recovery.rs",
         "size": "S",
-        "loc": 126,
+        "loc": 104,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5070,7 +3343,7 @@
       {
         "file": "manifest/rollover.rs",
         "size": "S",
-        "loc": 193,
+        "loc": 164,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5078,7 +3351,7 @@
       {
         "file": "manifest/tests.rs",
         "size": "M",
-        "loc": 453,
+        "loc": 405,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5086,7 +3359,7 @@
       {
         "file": "memtable.rs",
         "size": "L",
-        "loc": 1145,
+        "loc": 915,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5094,7 +3367,7 @@
       {
         "file": "sstable.rs",
         "size": "S",
-        "loc": 31,
+        "loc": 20,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5102,15 +3375,15 @@
       {
         "file": "sstable/block_cache.rs",
         "size": "M",
-        "loc": 361,
+        "loc": 397,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "sstable/block_search.rs",
-        "size": "M",
-        "loc": 206,
+        "size": "S",
+        "loc": 161,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5118,7 +3391,7 @@
       {
         "file": "sstable/bloom.rs",
         "size": "S",
-        "loc": 162,
+        "loc": 139,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5126,7 +3399,7 @@
       {
         "file": "sstable/builder.rs",
         "size": "M",
-        "loc": 522,
+        "loc": 350,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5140,17 +3413,9 @@
         "focus": ""
       },
       {
-        "file": "sstable/orphan_gc.rs",
-        "size": "S",
-        "loc": 84,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "sstable/reader.rs",
         "size": "L",
-        "loc": 1088,
+        "loc": 830,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5158,7 +3423,7 @@
       {
         "file": "sstable/reader_ext.rs",
         "size": "M",
-        "loc": 339,
+        "loc": 290,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5166,7 +3431,7 @@
       {
         "file": "sstable/stream.rs",
         "size": "S",
-        "loc": 133,
+        "loc": 130,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5174,39 +3439,7 @@
       {
         "file": "sstable/tests.rs",
         "size": "L",
-        "loc": 914,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "sstable/witness_inventory.rs",
-        "size": "S",
-        "loc": 112,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "sstable/witness_reader.rs",
-        "size": "L",
-        "loc": 687,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "sstable/witness_scan.rs",
-        "size": "S",
-        "loc": 192,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "sstable/witness_types.rs",
-        "size": "S",
-        "loc": 188,
+        "loc": 871,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5214,15 +3447,15 @@
       {
         "file": "system_pressure.rs",
         "size": "M",
-        "loc": 367,
+        "loc": 223,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "tenant_codec.rs",
-        "size": "L",
-        "loc": 921,
+        "size": "S",
+        "loc": 123,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5230,7 +3463,7 @@
       {
         "file": "util.rs",
         "size": "S",
-        "loc": 129,
+        "loc": 37,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5238,23 +3471,23 @@
       {
         "file": "wal/encode.rs",
         "size": "M",
-        "loc": 466,
+        "loc": 421,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "wal/flusher.rs",
-        "size": "L",
-        "loc": 925,
+        "size": "M",
+        "loc": 490,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "wal/hmac.rs",
-        "size": "L",
-        "loc": 641,
+        "size": "M",
+        "loc": 277,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5262,23 +3495,15 @@
       {
         "file": "wal/io.rs",
         "size": "L",
-        "loc": 1120,
+        "loc": 900,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "wal/mod.rs",
-        "size": "L",
-        "loc": 1042,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wal/open_heal_tests.rs",
         "size": "M",
-        "loc": 387,
+        "loc": 494,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5286,23 +3511,7 @@
       {
         "file": "wal/replay.rs",
         "size": "L",
-        "loc": 838,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wal/replay_filter.rs",
-        "size": "S",
-        "loc": 22,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wal/retire.rs",
-        "size": "S",
-        "loc": 147,
+        "loc": 666,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5310,7 +3519,7 @@
       {
         "file": "wal/tests.rs",
         "size": "S",
-        "loc": 19,
+        "loc": 14,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5318,7 +3527,7 @@
       {
         "file": "wal/tests/encode_tests.rs",
         "size": "M",
-        "loc": 260,
+        "loc": 218,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5326,7 +3535,7 @@
       {
         "file": "wal/tests/flusher_tests.rs",
         "size": "M",
-        "loc": 402,
+        "loc": 252,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5334,7 +3543,7 @@
       {
         "file": "wal/tests/hmac_tests.rs",
         "size": "M",
-        "loc": 414,
+        "loc": 417,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5342,7 +3551,7 @@
       {
         "file": "wal/tests/io_tests.rs",
         "size": "M",
-        "loc": 575,
+        "loc": 570,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5350,15 +3559,7 @@
       {
         "file": "wal/tests/replay_tests.rs",
         "size": "XL",
-        "loc": 1598,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "wal/witness_scan.rs",
-        "size": "M",
-        "loc": 276,
+        "loc": 1627,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5368,15 +3569,7 @@
       {
         "file": "acl_win32.rs",
         "size": "M",
-        "loc": 328,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "durability.rs",
-        "size": "M",
-        "loc": 495,
+        "loc": 317,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5384,7 +3577,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 20,
+        "loc": 15,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5392,7 +3585,7 @@
       {
         "file": "mlock.rs",
         "size": "S",
-        "loc": 128,
+        "loc": 49,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5400,7 +3593,7 @@
       {
         "file": "mmap.rs",
         "size": "S",
-        "loc": 87,
+        "loc": 15,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5408,7 +3601,7 @@
       {
         "file": "posix.rs",
         "size": "S",
-        "loc": 92,
+        "loc": 43,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5416,7 +3609,7 @@
       {
         "file": "vault.rs",
         "size": "S",
-        "loc": 111,
+        "loc": 87,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5424,65 +3617,9 @@
     ],
     "contextra-testkit": [
       {
-        "file": "dst/engine.rs",
-        "size": "M",
-        "loc": 333,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/invariants.rs",
-        "size": "S",
-        "loc": 122,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/mod.rs",
-        "size": "S",
-        "loc": 18,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/op.rs",
-        "size": "S",
-        "loc": 21,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/rng.rs",
-        "size": "S",
-        "loc": 68,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/runner.rs",
-        "size": "M",
-        "loc": 215,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "dst/scenario.rs",
-        "size": "S",
-        "loc": 47,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "fault_vfs.rs",
         "size": "S",
-        "loc": 191,
+        "loc": 189,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5498,7 +3635,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 17,
+        "loc": 14,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5506,15 +3643,7 @@
       {
         "file": "manual_clock.rs",
         "size": "S",
-        "loc": 113,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "reference_model.rs",
-        "size": "M",
-        "loc": 212,
+        "loc": 109,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5524,31 +3653,7 @@
       {
         "file": "bm25.rs",
         "size": "L",
-        "loc": 662,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "domain/legal_de.rs",
-        "size": "S",
-        "loc": 48,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "domain/medical_de.rs",
-        "size": "S",
-        "loc": 48,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "domain/mod.rs",
-        "size": "S",
-        "loc": 131,
+        "loc": 655,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5572,7 +3677,7 @@
       {
         "file": "inverted/morph_index.rs",
         "size": "S",
-        "loc": 81,
+        "loc": 77,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5596,7 +3701,7 @@
       {
         "file": "inverted/tests/search_tests.rs",
         "size": "L",
-        "loc": 790,
+        "loc": 718,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5620,7 +3725,7 @@
       {
         "file": "lib.rs",
         "size": "M",
-        "loc": 271,
+        "loc": 263,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5636,7 +3741,7 @@
       {
         "file": "morphology/compound_splitter.rs",
         "size": "M",
-        "loc": 284,
+        "loc": 265,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5684,7 +3789,7 @@
       {
         "file": "posting_list.rs",
         "size": "M",
-        "loc": 525,
+        "loc": 498,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5700,7 +3805,7 @@
       {
         "file": "tokenizer.rs",
         "size": "M",
-        "loc": 435,
+        "loc": 428,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5708,7 +3813,7 @@
       {
         "file": "wand.rs",
         "size": "L",
-        "loc": 828,
+        "loc": 811,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5718,7 +3823,7 @@
       {
         "file": "error.rs",
         "size": "L",
-        "loc": 1157,
+        "loc": 905,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5726,7 +3831,7 @@
       {
         "file": "error_dto.rs",
         "size": "M",
-        "loc": 579,
+        "loc": 489,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5734,7 +3839,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 32,
+        "loc": 24,
         "risk": "TxId",
         "desc": "Kanonische Domain-Typen (DocId, TxId, TenantId, EntityId, Embedding, FilterExpr, TokenBudget)",
         "focus": "Niemals SystemTime für TxId verwenden. Ring 0 Synchronisationspurity wahren."
@@ -5748,25 +3853,9 @@
         "focus": ""
       },
       {
-        "file": "retrieval_strategy.rs",
-        "size": "S",
-        "loc": 86,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "schema.rs",
         "size": "S",
-        "loc": 139,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "tenant_scope.rs",
-        "size": "S",
-        "loc": 63,
+        "loc": 102,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5782,7 +3871,7 @@
       {
         "file": "types.rs",
         "size": "S",
-        "loc": 27,
+        "loc": 18,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5790,7 +3879,7 @@
       {
         "file": "types/budget.rs",
         "size": "L",
-        "loc": 664,
+        "loc": 691,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5798,7 +3887,7 @@
       {
         "file": "types/domain/document.rs",
         "size": "M",
-        "loc": 225,
+        "loc": 206,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5806,7 +3895,7 @@
       {
         "file": "types/domain/ids.rs",
         "size": "M",
-        "loc": 471,
+        "loc": 464,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5814,7 +3903,7 @@
       {
         "file": "types/domain/misc.rs",
         "size": "M",
-        "loc": 560,
+        "loc": 528,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5822,7 +3911,7 @@
       {
         "file": "types/domain/mod.rs",
         "size": "S",
-        "loc": 30,
+        "loc": 27,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5830,7 +3919,7 @@
       {
         "file": "types/domain/tests/doc_tests.rs",
         "size": "M",
-        "loc": 276,
+        "loc": 280,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5838,7 +3927,7 @@
       {
         "file": "types/domain/tests/ids_tests.rs",
         "size": "M",
-        "loc": 448,
+        "loc": 453,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5846,7 +3935,7 @@
       {
         "file": "types/domain/tests/misc_tests.rs",
         "size": "M",
-        "loc": 248,
+        "loc": 252,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5876,25 +3965,9 @@
         "focus": ""
       },
       {
-        "file": "types/math.rs",
-        "size": "S",
-        "loc": 86,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "types/saos.rs",
         "size": "L",
-        "loc": 990,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "types/saturating.rs",
-        "size": "S",
-        "loc": 47,
+        "loc": 712,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5902,41 +3975,17 @@
     ],
     "contextra-vector": [
       {
-        "file": "acorn/gamma_augmentation.rs",
-        "size": "S",
-        "loc": 53,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "acorn/mod.rs",
-        "size": "S",
-        "loc": 71,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "acorn/naive_reference.rs",
-        "size": "S",
-        "loc": 92,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "candidate_stream.rs",
         "size": "S",
-        "loc": 169,
+        "loc": 173,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "compute_pool.rs",
-        "size": "M",
-        "loc": 207,
+        "size": "S",
+        "loc": 165,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5944,7 +3993,7 @@
       {
         "file": "diskann/build.rs",
         "size": "L",
-        "loc": 767,
+        "loc": 712,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5952,15 +4001,7 @@
       {
         "file": "diskann/config.rs",
         "size": "S",
-        "loc": 82,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "diskann/durable_fs.rs",
-        "size": "S",
-        "loc": 33,
+        "loc": 78,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5976,7 +4017,7 @@
       {
         "file": "diskann/format.rs",
         "size": "S",
-        "loc": 194,
+        "loc": 198,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5984,7 +4025,7 @@
       {
         "file": "diskann/mod.rs",
         "size": "S",
-        "loc": 23,
+        "loc": 20,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -5992,15 +4033,7 @@
       {
         "file": "diskann/persistence.rs",
         "size": "L",
-        "loc": 671,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "diskann/predicate_augmented.rs",
-        "size": "M",
-        "loc": 273,
+        "loc": 613,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6016,15 +4049,15 @@
       {
         "file": "diskann/tests.rs",
         "size": "L",
-        "loc": 1238,
+        "loc": 1087,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "diskann/types.rs",
-        "size": "M",
-        "loc": 300,
+        "size": "S",
+        "loc": 146,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6046,25 +4079,9 @@
         "focus": "JEDER unsafe-Block muss von is_x86_feature_detected!(\"avx2\") umschlossen sein."
       },
       {
-        "file": "hnsw/acorn_filtered.rs",
-        "size": "M",
-        "loc": 297,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hnsw/adaptive_ef.rs",
-        "size": "M",
-        "loc": 229,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
         "file": "hnsw/arena.rs",
         "size": "M",
-        "loc": 502,
+        "loc": 369,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6072,23 +4089,15 @@
       {
         "file": "hnsw/batch.rs",
         "size": "S",
-        "loc": 91,
+        "loc": 99,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "hnsw/config.rs",
-        "size": "M",
-        "loc": 210,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hnsw/connections.rs",
         "size": "S",
-        "loc": 93,
+        "loc": 183,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6096,7 +4105,7 @@
       {
         "file": "hnsw/core_insert.rs",
         "size": "M",
-        "loc": 465,
+        "loc": 443,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6104,31 +4113,15 @@
       {
         "file": "hnsw/core_rebuild.rs",
         "size": "L",
-        "loc": 991,
+        "loc": 814,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "hnsw/core_search.rs",
-        "size": "L",
-        "loc": 738,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hnsw/deletion.rs",
-        "size": "L",
-        "loc": 720,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hnsw/durable_fs.rs",
-        "size": "S",
-        "loc": 52,
+        "size": "M",
+        "loc": 428,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6136,7 +4129,7 @@
       {
         "file": "hnsw/mod.rs",
         "size": "S",
-        "loc": 43,
+        "loc": 31,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6151,8 +4144,8 @@
       },
       {
         "file": "hnsw/tests.rs",
-        "size": "M",
-        "loc": 371,
+        "size": "S",
+        "loc": 158,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6160,23 +4153,15 @@
       {
         "file": "hnsw/types.rs",
         "size": "L",
-        "loc": 832,
+        "loc": 732,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "hnsw/vector_index_impl.rs",
-        "size": "L",
-        "loc": 689,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "hnsw/verify.rs",
-        "size": "S",
-        "loc": 31,
+        "size": "M",
+        "loc": 557,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6184,7 +4169,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 44,
+        "loc": 43,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6200,7 +4185,7 @@
       {
         "file": "persistence/header.rs",
         "size": "M",
-        "loc": 437,
+        "loc": 435,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6208,7 +4193,7 @@
       {
         "file": "persistence/mmap.rs",
         "size": "M",
-        "loc": 298,
+        "loc": 216,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6232,23 +4217,15 @@
       {
         "file": "persistence/tests.rs",
         "size": "M",
-        "loc": 555,
+        "loc": 475,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "quantize/mod.rs",
+        "file": "quantize.rs",
         "size": "L",
-        "loc": 624,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "quantize/tests.rs",
-        "size": "M",
-        "loc": 551,
+        "loc": 1013,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6256,7 +4233,7 @@
       {
         "file": "quantize_rabitq.rs",
         "size": "M",
-        "loc": 506,
+        "loc": 438,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6266,7 +4243,7 @@
       {
         "file": "adapter.rs",
         "size": "S",
-        "loc": 42,
+        "loc": 36,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6274,7 +4251,7 @@
       {
         "file": "contextra_generated.rs",
         "size": "L",
-        "loc": 1230,
+        "loc": 1200,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6282,7 +4259,7 @@
       {
         "file": "jsonrpc.rs",
         "size": "S",
-        "loc": 152,
+        "loc": 144,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6290,7 +4267,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 59,
+        "loc": 22,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -6298,146 +4275,9 @@
     ]
   },
   "working_state_snapshot": {
-    "generated_at": "2026-10-12T21:41:54Z",
-    "crate_count": 34,
-    "crates": [
-      {
-        "name": "contextra-adapt",
-        "status": "4.3k"
-      },
-      {
-        "name": "contextra-agent",
-        "status": "4.5k"
-      },
-      {
-        "name": "contextra-audit-export",
-        "status": "473"
-      },
-      {
-        "name": "contextra-avv-generator",
-        "status": "315"
-      },
-      {
-        "name": "contextra-bench",
-        "status": "6.4k"
-      },
-      {
-        "name": "contextra-checkpoint",
-        "status": "4.0k"
-      },
-      {
-        "name": "contextra-cognition",
-        "status": "5.6k"
-      },
-      {
-        "name": "contextra-core",
-        "status": "123"
-      },
-      {
-        "name": "contextra-crypto",
-        "status": "9.3k"
-      },
-      {
-        "name": "contextra-db",
-        "status": "2.4k"
-      },
-      {
-        "name": "contextra-durable-fs",
-        "status": "179"
-      },
-      {
-        "name": "contextra-engine",
-        "status": "14.3k"
-      },
-      {
-        "name": "contextra-graph",
-        "status": "14.3k"
-      },
-      {
-        "name": "contextra-infer-candle",
-        "status": "4.9k"
-      },
-      {
-        "name": "contextra-infer-ollama",
-        "status": "4.5k"
-      },
-      {
-        "name": "contextra-infer-onnx",
-        "status": "1.8k"
-      },
-      {
-        "name": "contextra-kvcache",
-        "status": "4.1k"
-      },
-      {
-        "name": "contextra-license",
-        "status": "406"
-      },
-      {
-        "name": "contextra-mcp",
-        "status": "7.0k"
-      },
-      {
-        "name": "contextra-mvcc",
-        "status": "3.4k"
-      },
-      {
-        "name": "contextra-ports",
-        "status": "3.6k"
-      },
-      {
-        "name": "contextra-privacy",
-        "status": "3.3k"
-      },
-      {
-        "name": "contextra-py",
-        "status": "2.2k"
-      },
-      {
-        "name": "contextra-rank",
-        "status": "3.7k"
-      },
-      {
-        "name": "contextra-router",
-        "status": "3.2k"
-      },
-      {
-        "name": "contextra-sandbox",
-        "status": "2.1k"
-      },
-      {
-        "name": "contextra-simd",
-        "status": "2.5k"
-      },
-      {
-        "name": "contextra-store",
-        "status": "19.4k"
-      },
-      {
-        "name": "contextra-sys",
-        "status": "668"
-      },
-      {
-        "name": "contextra-testkit",
-        "status": "675"
-      },
-      {
-        "name": "contextra-text",
-        "status": "4.5k"
-      },
-      {
-        "name": "contextra-types",
-        "status": "5.5k"
-      },
-      {
-        "name": "contextra-vector",
-        "status": "14.7k"
-      },
-      {
-        "name": "contextra-wire",
-        "status": "1.5k"
-      }
-    ],
-    "last_merge": "12be9b8d Merge pull request #4624 from tfufuz1/jules-9421657548916380622-ccd0afc3"
+    "generated_at": "2026-09-24T17:14:50Z",
+    "crate_count": 0,
+    "crates": [],
+    "last_merge": "unbekannt"
   }
 }

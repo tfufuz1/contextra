@@ -9,20 +9,33 @@ pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
-pub mod wiring_selftest;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
-pub use builder::{BuildError, ContextraBuilder};
+pub use builder::ContextraBuilder;
+pub use contextra_core::error::ContextraError;
+pub use contextra_core::types::domain::{DocId, ScoredDocument};
+pub use contextra_core::DistanceMetric;
 pub use contextra_db::{
-    chunker, Collection, CollectionConfig,
+    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
-pub use contextra_rank as rank;
-pub use contextra_types::error::ContextraError;
-pub use contextra_types::types::domain::{DistanceMetric, DocId, ScoredDocument};
 pub use query_rewriter::LlmQueryRewriter;
-pub use wiring_selftest::{ContextraWiringReportExt, WiringReport};
+
+#[cfg(feature = "router")]
+pub use contextra_router as router;
+
+#[cfg(feature = "router")]
+pub use contextra_rank as rank;
+
+#[cfg(feature = "ollama")]
+pub use contextra_infer_ollama as ollama;
+
+#[cfg(feature = "candle")]
+pub use contextra_infer_candle as candle;
+
+#[cfg(feature = "onnx")]
+pub use contextra_infer_onnx as onnx;
 
 /// Creates a new `ContextraBuilder` for configuring and instantiating `Contextra`.
 pub fn builder(dimension: usize) -> ContextraBuilder {

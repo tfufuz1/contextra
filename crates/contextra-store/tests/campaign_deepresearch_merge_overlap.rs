@@ -1,8 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_mvcc::snapshot::SnapshotRegistry;
-use contextra_types::error::Result;
-use contextra_types::types::budget::{ResourceBudget, ResourceTracker};
+use contextra_core::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use std::sync::Arc;
@@ -103,7 +101,12 @@ async fn test_campaign_deepresearch_three_way_merge_full_consumption() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2, reader3], &out_path, min_seq, true)
+        .merge_sstables(
+            &[reader1, reader2, reader3],
+            &out_path,
+            min_seq,
+            true,
+        )
         .await
         .unwrap();
 

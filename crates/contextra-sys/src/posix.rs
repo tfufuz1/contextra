@@ -42,38 +42,6 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
     ))
 }
 
-/// Queries available bytes on the filesystem containing `path` using `statvfs`.
-#[cfg(unix)]
-pub fn statvfs_available_bytes(path: &Path) -> std::io::Result<u64> {
-    use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
-
-    let path_c = CString::new(path.as_os_str().as_bytes())
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
-
-    // SAFETY:
-    // 1. `path_c` is a valid NUL-terminated C string.
-    // 2. `statvfs` writes into the zeroed struct buffer.
-    unsafe {
-        let mut stat: libc::statvfs = std::mem::zeroed();
-        let res = libc::statvfs(path_c.as_ptr(), &mut stat);
-        if res < 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        let bavail = stat.f_bavail as u64;
-        let frsize = stat.f_frsize as u64;
-        Ok(bavail.saturating_mul(frsize))
-    }
-}
-
-#[cfg(not(unix))]
-pub fn statvfs_available_bytes(_path: &Path) -> std::io::Result<u64> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "statvfs is only supported on Unix targets",
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

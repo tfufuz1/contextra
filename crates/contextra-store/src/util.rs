@@ -1,7 +1,7 @@
 // FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::Path;
 
 #[cfg(not(loom))]

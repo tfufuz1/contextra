@@ -12,10 +12,6 @@ description = "Canonical dyn-compatible port traits for Contextra subsystems"
 [package.metadata.contextra]
 ring = "0"
 
-[features]
-backend-impl = []
-test-utils = []
-
 [dependencies]
 contextra-types = { workspace = true }
 futures-util = "0.3"
@@ -24,10 +20,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 ahash = { workspace = true }
 thiserror = { workspace = true }
-blake3 = { workspace = true }
 
 [dev-dependencies]
-contextra-ports = { path = ".", features = ["test-utils", "backend-impl"] }
 proptest = "1.4"
 tokio = { workspace = true, features = ["rt", "macros"] }
-trybuild = "1.0"

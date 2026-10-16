@@ -5,141 +5,22 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
-use contextra_ports::erasure::ErasureMode;
-use contextra_ports::rng::EntropyRng;
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
 use super::MAX_MANIFEST_ENTRY_SIZE;
-use crate::format::{check_openable, FileKind, FormatError, FormatHeader};
 use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
-pub const CURRENT_MANIFEST_VERSION: u8 = 2;
-
-/// Tracks highest recorded format versions per file kind from manifest entries.
-#[derive(Debug, Clone, Default)]
-pub struct ManifestFormatTracker {
-    pub max_sstable_version: u16,
-    pub max_blob_version: u16,
-    pub max_manifest_version: u16,
-    pub max_wal_version: u16,
-    pub max_ledger_version: u16,
-    pub id_width: Option<u8>,
-    pub allowed_sstable_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_blob_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_manifest_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_wal_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_ledger_migrated_from: std::collections::HashSet<u16>,
-}
-
-impl ManifestFormatTracker {
-    pub fn from_entries(entries: &[ManifestEntry]) -> Self {
-        let mut tracker = Self::default();
-        for entry in entries {
-            if let ManifestEntry::FormatVersionRecord {
-                file_kind,
-                max_version,
-                migrated_from,
-            } = entry
-            {
-                match file_kind {
-                    0 => {
-                        tracker.max_sstable_version = tracker.max_sstable_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_sstable_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    1 => {
-                        tracker.max_blob_version = tracker.max_blob_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_blob_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    2 => {
-                        tracker.max_manifest_version =
-                            tracker.max_manifest_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker
-                                .allowed_manifest_migrated_from
-                                .insert(*migrated_from);
-                        }
-                    }
-                    3 => {
-                        tracker.max_wal_version = tracker.max_wal_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_wal_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    4 => {
-                        tracker.max_ledger_version = tracker.max_ledger_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_ledger_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        tracker
-    }
-
-    pub fn verify_file_version(
-        &self,
-        kind: FileKind,
-        file_version: u16,
-    ) -> std::result::Result<(), FormatError> {
-        let (recorded_max, allowed_migrated) = match kind {
-            FileKind::Sstable => (
-                self.max_sstable_version,
-                &self.allowed_sstable_migrated_from,
-            ),
-            FileKind::Blob => (self.max_blob_version, &self.allowed_blob_migrated_from),
-            FileKind::Manifest => (
-                self.max_manifest_version,
-                &self.allowed_manifest_migrated_from,
-            ),
-            FileKind::Wal => (self.max_wal_version, &self.allowed_wal_migrated_from),
-            FileKind::Ledger => (self.max_ledger_version, &self.allowed_ledger_migrated_from),
-        };
-
-        if recorded_max > 0
-            && file_version < recorded_max
-            && !allowed_migrated.contains(&file_version)
-        {
-            return Err(FormatError::DowngradeAttempt {
-                kind,
-                file_version,
-                recorded_version: recorded_max,
-            });
-        }
-        Ok(())
-    }
-
-    pub fn verify_id_width(&self, expected_width: u8) -> std::result::Result<(), FormatError> {
-        if let Some(recorded_width) = self.id_width {
-            if recorded_width != expected_width {
-                return Err(FormatError::IdWidthMismatch {
-                    expected: expected_width,
-                    found: recorded_width,
-                });
-            }
-        }
-        Ok(())
-    }
-}
+pub const CURRENT_MANIFEST_VERSION: u8 = 1;
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
 pub struct Manifest {
     pub(super) path: PathBuf,
     pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
-    pub(super) erasure_high_water_mark: AtomicU8,
-    pub(super) ledger_head: tokio::sync::RwLock<(u64, [u8; 32])>,
-    pub(super) backend_id: AtomicU64,
     pub(super) _dir_lock: Option<DirLock>,
 }
 
@@ -208,58 +89,11 @@ impl Manifest {
             crate::util::fsync_parent_dir(&path).await?;
         }
 
-        // Load existing entries or parse populated state
-        let entries = Self::load(&path).await?;
-
-        let mut max_watermark = 0u8; // ErasureMode::Off
-        let mut last_ledger_seq = 0u64;
-        let mut last_ledger_mac = [0u8; 32];
-        let mut found_backend_id = None;
-
-        for entry in &entries {
-            match entry {
-                ManifestEntry::ErasureWatermarkRecord { mode } => {
-                    max_watermark = max_watermark.max(*mode);
-                }
-                ManifestEntry::LedgerHeadRecord { seq, mac } => {
-                    last_ledger_seq = *seq;
-                    last_ledger_mac = *mac;
-                }
-                ManifestEntry::BackendIdRecord { backend_id } => {
-                    found_backend_id = Some(*backend_id);
-                }
-                _ => {}
-            }
-        }
-
-        let backend_id = match found_backend_id {
-            Some(id) => id,
-            None => {
-                let rng = contextra_ports::SystemRng::new();
-                let mut gen_id = rng.next_u64();
-                while gen_id == 0 {
-                    gen_id = rng.next_u64();
-                }
-                gen_id
-            }
-        };
-
-        let manifest = Self {
+        Ok(Self {
             path,
             file: tokio::sync::Mutex::new(file),
-            erasure_high_water_mark: AtomicU8::new(max_watermark),
-            ledger_head: tokio::sync::RwLock::new((last_ledger_seq, last_ledger_mac)),
-            backend_id: AtomicU64::new(backend_id),
             _dir_lock: dir_lock,
-        };
-
-        if found_backend_id.is_none() {
-            manifest
-                .append(&ManifestEntry::BackendIdRecord { backend_id })
-                .await?;
-        }
-
-        Ok(manifest)
+        })
     }
 
     /// Appends a new entry to the manifest and performs flush + fsync.
@@ -338,13 +172,13 @@ impl Manifest {
             let mut header = [0u8; 5];
             if reader.read_exact(&mut header).await.is_ok() {
                 if &header[0..4] == MANIFEST_HEADER_MAGIC {
-                    let version = header[4] as u16;
-                    let format_header = FormatHeader::new(*MANIFEST_HEADER_MAGIC, version);
-                    check_openable(
-                        FileKind::Manifest,
-                        &format_header,
-                        CURRENT_MANIFEST_VERSION as u16,
-                    )?;
+                    let version = header[4];
+                    if version > CURRENT_MANIFEST_VERSION {
+                        return Err(ContextraError::Storage(format!(
+                            "Unsupported MANIFEST format version: {}",
+                            version
+                        )));
+                    }
                     pos = 5;
                 } else {
                     // Legacy version 0 manifest without header magic
@@ -467,12 +301,7 @@ impl Manifest {
                         .unwrap_or_else(|| path.clone());
                     valid_map.remove(&key);
                 }
-                ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. }
-                | ManifestEntry::ErasureWatermarkRecord { .. }
-                | ManifestEntry::LedgerHeadRecord { .. }
-                | ManifestEntry::BackendIdRecord { .. } => {}
+                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -530,11 +359,7 @@ impl Manifest {
                 }
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. }
-                | ManifestEntry::ErasureWatermarkRecord { .. }
-                | ManifestEntry::LedgerHeadRecord { .. }
-                | ManifestEntry::BackendIdRecord { .. } => {}
+                | ManifestEntry::WalCheckpoint { .. } => {}
             }
         }
 
@@ -553,62 +378,5 @@ impl Manifest {
 
     pub fn path(&self) -> &Path {
         &self.path
-    }
-
-    /// Reads the current highest ErasureMode watermark recorded in the manifest.
-    pub fn erasure_high_water_mark(&self) -> ErasureMode {
-        match self.erasure_high_water_mark.load(Ordering::SeqCst) {
-            1 => ErasureMode::Assured,
-            2 => ErasureMode::Attested,
-            _ => ErasureMode::Off,
-        }
-    }
-
-    /// Monotonically raises the erasure high water mark in the manifest.
-    ///
-    /// If `mode` is less than or equal to the currently stored watermark, this call is a no-op and returns `Ok(())`.
-    /// The mark is strictly non-decreasing and cannot be lowered.
-    pub async fn set_erasure_high_water_mark(&self, mode: ErasureMode) -> Result<()> {
-        let mode_u8 = mode as u8;
-        let mut current = self.erasure_high_water_mark.load(Ordering::SeqCst);
-
-        while mode_u8 > current {
-            match self.erasure_high_water_mark.compare_exchange_weak(
-                current,
-                mode_u8,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    self.append(&ManifestEntry::ErasureWatermarkRecord { mode: mode_u8 })
-                        .await?;
-                    break;
-                }
-                Err(actual) => {
-                    current = actual;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Reads the current ledger head state `(ledger_head_seq, ledger_head_mac)`.
-    pub async fn ledger_head(&self) -> (u64, [u8; 32]) {
-        *self.ledger_head.read().await
-    }
-
-    /// Updates and persists the ledger head state.
-    pub async fn set_ledger_head(&self, seq: u64, mac: [u8; 32]) -> Result<()> {
-        let mut guard = self.ledger_head.write().await;
-        self.append(&ManifestEntry::LedgerHeadRecord { seq, mac })
-            .await?;
-        *guard = (seq, mac);
-        Ok(())
-    }
-
-    /// Reads the persistent non-zero backend identifier.
-    pub fn backend_id(&self) -> u64 {
-        self.backend_id.load(Ordering::SeqCst)
     }
 }

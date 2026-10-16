@@ -3,7 +3,6 @@
 // INVARIANTEN: Multi-tenant cryptographic isolation. Rejects cross-tenant scope mismatches fail-closed.
 
 #![forbid(unsafe_code)]
-#![allow(deprecated)]
 
 use contextra_crypto::{CryptoError, KeyManager};
 use contextra_types::{TenantId, TenantScoped};

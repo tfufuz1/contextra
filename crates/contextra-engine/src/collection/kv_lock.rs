@@ -189,17 +189,6 @@ mod loom_tests {
     }
 }
 
-#[cfg(test)]
-mod type_fixation_tests {
-    use super::*;
-
-    #[test]
-    fn test_kv_key_locks_shard_type_is_mutex() {
-        let kv = KvKeyLocks::new();
-        let _m: &tokio::sync::Mutex<()> = &kv.shards[0];
-    }
-}
-
 #[cfg(not(loom))]
 #[cfg(test)]
 mod non_loom_tests {

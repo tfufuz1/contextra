@@ -1,6 +1,5 @@
 # Contextra — Häufige LLM-Fehler & Korrekturen
 > Destilliert aus Session-Audits. Bei Unsicherheit: diese Datei zuerst prüfen.
-> Für das vollständige Verzeichnis aller 42 Anti-Pattern-Matrix (APM) Regeln und crate-spezifischen Pflicht-APMs siehe [ANTI_PATTERNS.md](ANTI_PATTERNS.md).
 
 ## FEHLER-KLASSE 1: API-Halluzination
 
@@ -55,7 +54,7 @@ grep -rn "struct <TYPNAME>\|enum <TYPNAME>\|type <TYPNAME>" crates/ --include="*
 grep "<TYPNAME>" docs/TYPE_REGISTRY.md
 ```
 
-## FEHLER-KLASSE 3: Stille Fehler (Silent Failures) — siehe auch APM-1 & APM-3
+## FEHLER-KLASSE 3: Stille Fehler (Silent Failures)
 
 **Symptom**: Agent schreibt Code der Fehler verschluckt.
 
@@ -92,7 +91,7 @@ contextra-vector = { path = "../contextra-vector" }  # LAYER-PEER-BRUCH!
 
 **Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
 ```bash
-cargo run -p xtask -- dependency-graph-audit
+just dag-check
 ```
 
 ## FEHLER-KLASSE 5: TxId-Missbrauch
@@ -148,7 +147,7 @@ assert!((result - 1.41421356_f32).abs() < 1e-4);
 // AI-TAG[SMELL][CRITICAL] Problem in dieser Funktion (ID: AGT-STORE-001)
 
 // ✅ KORREKT — vollständige Pflichtfelder:
-// AI-TAG[SMELL][CRITICAL] Problem in meier Funktion (ID: AGT-STORE-a3f29c1d) (TS: 2026-08-29T10:00:00Z) (SESSION: a3f29c1d)
+// AI-TAG[SMELL][CRITICAL] Problem in dieser Funktion (ID: AGT-STORE-a3f29c1d) (TS: 2026-08-29T10:00:00Z) (SESSION: a3f29c1d)
 // BEFUND: <Detaillierte Analyse>
 // RISIKO: <Was passiert bei Ausfall>
 // EMPFEHLUNG: <Konkrete Handlung>

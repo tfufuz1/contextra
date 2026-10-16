@@ -143,7 +143,11 @@ fn test_differential_rrf_correctness_scenarios() {
     ];
 
     let cal_ctxs = vec![
-        SignalCalibrationContext::new("vector", true, DriftStatus::Stable { mean_shift: 0.01 }),
+        SignalCalibrationContext::new(
+            "vector",
+            true,
+            DriftStatus::Stable { mean_shift: 0.01 },
+        ),
         SignalCalibrationContext::new("text", true, DriftStatus::Stable { mean_shift: 0.02 }),
     ];
 

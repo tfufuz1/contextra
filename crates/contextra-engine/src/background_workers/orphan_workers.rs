@@ -16,11 +16,9 @@ pub const MAX_ORPHANS_PER_TICK: usize = 100;
 pub fn start_orphan_cleanup_worker_with_config<
     T: Clone + Send + Sync + 'static,
     I: OrphanCleanupIndex + 'static,
-    S: contextra_ports::StorageEngine + 'static,
 >(
     buffer: Arc<TxBuffer<T>>,
     hnsw_index: Arc<I>,
-    orphan_registry: Option<(Arc<contextra_checkpoint::InstanceOrphanRegistry>, Arc<S>)>,
     interval: Duration,
     backoff_config: OrphanCleanupBackoffConfig,
     cancel_token: tokio_util::sync::CancellationToken,
@@ -33,12 +31,6 @@ pub fn start_orphan_cleanup_worker_with_config<
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         let mut last_rebuild_attempt: Option<std::time::Instant> = None;
-
-        if let Some((ref reg, ref storage)) = orphan_registry {
-            if let Err(err) = reg.recover_and_clean(storage.as_ref()).await {
-                tracing::warn!(error = %err, "Initial orphan pin recovery failed");
-            }
-        }
 
         tracing::info!(
             "Orphan cleanup worker started (timeout: {:?}, interval: {:?}, base_backoff: {:?})",
@@ -61,12 +53,6 @@ pub fn start_orphan_cleanup_worker_with_config<
                             "Orphan cleanup worker cleaned up {} expired transactions",
                             expired.len()
                         );
-                    }
-
-                    if let Some((ref reg, ref storage)) = orphan_registry {
-                        if let Err(err) = reg.recover_and_clean(storage.as_ref()).await {
-                            tracing::warn!(error = %err, "Periodic orphan pin recovery failed");
-                        }
                     }
 
                     if let Err(err) = hnsw_index.check_connectivity() {
@@ -168,33 +154,9 @@ pub fn start_orphan_cleanup_worker<T: Clone + Send + Sync + 'static>(
     interval: Duration,
     cancel_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
-    let (handle, _) = start_orphan_cleanup_worker_with_config::<_, _, contextra_store::LsmStorage>(
-        buffer,
-        hnsw_index,
-        None,
-        interval,
-        OrphanCleanupBackoffConfig::default(),
-        cancel_token,
-    );
-    handle
-}
-
-/// Starts an orphan cleanup worker with an attached [`InstanceOrphanRegistry`] for MVCC snapshot pin recovery.
-pub fn start_orphan_cleanup_worker_with_registry<
-    T: Clone + Send + Sync + 'static,
-    S: contextra_ports::StorageEngine + 'static,
->(
-    buffer: Arc<TxBuffer<T>>,
-    hnsw_index: Arc<contextra_vector::hnsw::HnswIndex>,
-    orphan_registry: Arc<contextra_checkpoint::InstanceOrphanRegistry>,
-    storage: Arc<S>,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
     let (handle, _) = start_orphan_cleanup_worker_with_config(
         buffer,
         hnsw_index,
-        Some((orphan_registry, storage)),
         interval,
         OrphanCleanupBackoffConfig::default(),
         cancel_token,

@@ -1,7 +1,7 @@
 use super::intent::{CommitIntent, StagedKeyOp};
 use crate::Collection;
-use contextra_ports::{BoxFuture, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
+use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TenantId, TxId};
 use std::sync::Arc;
 
 /// Trait representing an undo operation to be executed during transaction rollback/compensation.
@@ -26,23 +26,11 @@ impl CommitLedger {
         self.actions.push(Box::new(action));
     }
 
-    pub async fn execute_rollback(&mut self) -> Result<()> {
-        let mut first_error = None;
+    pub async fn execute_rollback(&mut self) {
         while let Some(action) = self.actions.pop() {
             if let Err(e) = action.execute().await {
                 tracing::error!("[INV-DB-3] CompensatingAction execution failed: {}", e);
-                if first_error.is_none() {
-                    first_error = Some(e);
-                }
             }
-        }
-        if let Some(e) = first_error {
-            Err(ContextraError::Transaction(format!(
-                "Compensating action execution failed: {}",
-                e
-            )))
-        } else {
-            Ok(())
         }
     }
 }
@@ -76,14 +64,6 @@ impl<S: StorageEngine, V: VectorIndex> CompensateLsmAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            // Idempotency check: if intent is already Aborted, compensation has completed.
-            if let Ok(Some(existing_bytes)) = self.collection.storage.get(&self.intent_key).await {
-                if let Ok(CommitIntent::Aborted) = serde_json::from_slice(&existing_bytes) {
-                    tracing::info!("[INV-DB-3] Transaction already marked Aborted; skipping redundant compensation");
-                    return Ok(());
-                }
-            }
-
             let mut success = false;
             let mut attempts = 0;
             let max_attempts = 3;
@@ -202,10 +182,56 @@ mod tests {
     #[test]
     fn test_docid_u64_overflow_handling() {
         let max_u64_doc = DocId::new(u64::MAX as _);
-        assert_eq!(max_u64_doc.inner(), u64::MAX);
+        assert_eq!(u64::try_from(max_u64_doc.inner()), Ok(u64::MAX));
 
         let overflow_raw: u128 = (u64::MAX as u128) + 1;
         assert!(u64::try_from(overflow_raw).is_err());
+    }
+}
+
+pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
+    pub(super) collection: Collection<S, V>,
+    pub(super) doc_ids: Arc<Vec<DocId>>,
+}
+
+impl<S: StorageEngine, V: VectorIndex> CompensateGraphAction<S, V> {
+    #[allow(dead_code)]
+    pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
+        Self {
+            collection,
+            doc_ids,
+        }
+    }
+}
+
+impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAction<S, V> {
+    fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            for &doc_id in self.doc_ids.iter() {
+                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
+                    ContextraError::InvalidInput(format!(
+                        "DocId {} exceeds u64::MAX for EntityId conversion",
+                        doc_id.inner()
+                    ))
+                })?;
+                let eid = EntityId::new(eid_val);
+                let _ = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await;
+            }
+            if let Err(e) = self.collection.graph_index.commit(comp_tx).await {
+                tracing::error!("[INV-DB-3] Compensating graph commit failed: {}", e);
+                return Err(e);
+            }
+            Ok(())
+        })
     }
 }
 
@@ -236,7 +262,14 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()
-                    .map(|d| Ok(d.inner()))
+                    .map(|d| {
+                        u64::try_from(d.inner()).map_err(|_| {
+                            ContextraError::InvalidInput(format!(
+                                "DocId {} exceeds u64::MAX for chunk_id conversion",
+                                d.inner()
+                            ))
+                        })
+                    })
                     .collect::<Result<Vec<u64>>>()?;
                 kv_hooks.on_rollback(self.tenant_id, &chunk_ids);
             }
@@ -322,6 +355,9 @@ impl<S: StorageEngine, V: VectorIndex> RollbackStagedAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for RollbackStagedAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
+            if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
+                tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
+            }
             if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {
                 tracing::error!("[INV-DB-3] Text index rollback failed: {}", e);
             }

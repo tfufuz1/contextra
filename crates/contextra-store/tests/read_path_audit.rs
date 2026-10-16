@@ -1,6 +1,5 @@
 use bytes::Bytes;
-use contextra_ports::StorageEngine;
-use contextra_types::{TxId, TOMBSTONE_BIT};
+use contextra_core::{StorageEngine, TxId, TOMBSTONE_BIT};
 use contextra_store::memtable::MemTable;
 use contextra_store::{LsmConfig, LsmStorage};
 use std::collections::BTreeMap;
@@ -99,7 +98,7 @@ async fn test_model_btreemap_reference_comparison() {
     let (storage, _tmp) = test_storage().await;
 
     // Pin snapshot at seq 0 so flush retains historical MVCC versions
-    let _snap_guard = storage.snapshot_registry.acquire(|| 0);
+    let _snap_guard = storage.snapshot_registry.register(0);
 
     // Reference model for snapshot sequence numbers
     let mut ref_model: BTreeMap<u64, BTreeMap<Vec<u8>, Vec<u8>>> = BTreeMap::new();

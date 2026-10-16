@@ -1,0 +1,8 @@
+title = "Unsafe-Inseln Prüfer"
+what = "Unsafe-Code in einer Datei außerhalb der genehmigten Liste von Unsafe-Inseln."
+why = "Hält den Unsafe-Sicherheitsradius unter kontrollierbarer Überwachung."
+fix = "Verschiebe den Unsafe-Code in eine zugelassene Insel oder fordere ein ADR an."
+anti_fix = "Füge die Datei nicht eigenmächtig zur Ausnahmeliste hinzu."
+adr = ["ADR-017", "ADR-N03"]
+related = ["unsafe-audit", "check-ring-layering"]
+sources = ["docs/decisions/ADR-N03-drei-unsafe-inseln.md"]

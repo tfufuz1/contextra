@@ -7,7 +7,7 @@
 
 //! Contextra Index — HNSW vector index with SIMD distance computation.
 // INVARIANT: Vector Engine (Triebwerk — Layer 1).
-// IMPLEMENTS: VectorIndex Trait (contextra-ports/src/vector_index.rs)
+// IMPLEMENTS: VectorIndex Trait (contextra-core/traits.rs)
 // KERNKOMPONENTEN: HNSW (Graph-basierte ANN) + CSR Graph (Relationen) + SIMD-Distanz.
 // INVARIANTE: HNSW-Graphen liegen exklusiv im RAM. Disk-Storage erfolgt über contextra-store (via LsmStorage).
 
@@ -18,6 +18,8 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::too_many_arguments)]
 
+#[cfg(feature = "experimental-diskann")]
+pub mod diskann;
 pub mod distance;
 pub mod hnsw;
 pub mod persistence;
@@ -28,8 +30,15 @@ pub mod candidate_stream;
 pub mod compute_pool;
 pub mod partial_rebuild;
 
+#[cfg(feature = "experimental-rabitq")]
+pub mod quantize_rabitq;
+
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
+#[cfg(feature = "experimental-diskann")]
+pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
+#[cfg(feature = "experimental-rabitq")]
+pub use quantize_rabitq::RaBitQQuantizer;

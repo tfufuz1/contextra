@@ -2,6 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types::Result<()> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -24,6 +25,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types
         "parallel_locks".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -64,6 +66,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types
 
 #[tokio::test]
 async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_types::Result<()> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -86,6 +89,7 @@ async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_t
         "batch_order_no_deadlock".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -184,6 +188,7 @@ fn test_kv_locks_try_lock_blocking() {
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_collection_next_tx_sequence() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -203,12 +208,14 @@ async fn test_collection_next_tx_sequence() {
         })
         .unwrap(), // unwrap
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -225,6 +232,7 @@ async fn test_collection_next_tx_sequence() {
 
 #[tokio::test]
 async fn test_collection_allocate_tx_sequence() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -244,12 +252,14 @@ async fn test_collection_allocate_tx_sequence() {
         })
         .unwrap(), // unwrap
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(100));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -266,6 +276,7 @@ async fn test_collection_allocate_tx_sequence() {
 
 #[tokio::test]
 async fn test_concurrent_insert_and_write_ops_lock_safety() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -285,12 +296,14 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
         })
         .unwrap(), // unwrap
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Arc::new(Collection::new(
         "default".to_string(),
         storage,
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -352,6 +365,7 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
 
 #[tokio::test]
 async fn test_concurrent_insert_many_collision_safety() {
+    use contextra_graph::CsrGraph;
     use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
@@ -371,12 +385,14 @@ async fn test_concurrent_insert_many_collision_safety() {
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Arc::new(Collection::new(
         "default".to_string(),
         storage.clone(),
         index,
+        graph,
         next_tx.clone(),
         4,
         contextra_text::Language::English,
@@ -466,6 +482,7 @@ async fn test_concurrent_insert_many_collision_safety() {
 #[tokio::test]
 async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -488,6 +505,7 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -526,6 +544,7 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 
 #[tokio::test]
 async fn test_begin_transaction_returns_active_db_transaction() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -545,12 +564,14 @@ async fn test_begin_transaction_returns_active_db_transaction() {
         })
         .unwrap(), // unwrap
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -562,6 +583,7 @@ async fn test_begin_transaction_returns_active_db_transaction() {
 
 #[tokio::test]
 async fn test_apm3_lock_contention_fallback() -> contextra_types::Result<()> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -584,6 +606,7 @@ async fn test_apm3_lock_contention_fallback() -> contextra_types::Result<()> {
         "apm3_lock".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,

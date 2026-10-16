@@ -2,8 +2,7 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use ahash::AHashMap;
-use contextra_mvcc::TxBuffer;
-use contextra_types::{ContextraError, DocId, Result};
+use contextra_core::{ContextraError, DocId, Result, TxBuffer};
 use parking_lot::{Mutex, RwLock};
 
 use super::arena::HnswArena;
@@ -32,7 +31,7 @@ pub enum VectorData {
 pub struct HnswNode {
     pub(super) doc_id: DocId,
     pub(super) vector: VectorData,
-    pub max_layer: usize,
+    pub(super) max_layer: usize,
     pub(super) committed_tx: u64,
 }
 
@@ -86,7 +85,6 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
 }
 
 /// The HNSW (Hierarchical Navigable Small World) vector index.
-#[derive(Clone)]
 pub struct HnswIndex {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
 }
@@ -106,7 +104,6 @@ pub struct HnswHotCore {
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
-    pub index_epoch: AtomicU64,
     pub rebuilding: AtomicBool,
     pub arena: HnswArena,
 }
@@ -179,8 +176,7 @@ pub struct HnswColdCore {
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
-    pub mmap_backlink_overlay: super::connections::MmapBacklinkOverlay,
-    pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
+    pub seq_log: RwLock<contextra_core::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
@@ -238,7 +234,6 @@ impl HnswIndex {
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
-                    index_epoch: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
                     arena: HnswArena::new(),
                 },
@@ -249,8 +244,7 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+                    seq_log: RwLock::new(contextra_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -278,7 +272,7 @@ impl HnswIndex {
     ///
     /// Uses an internal, non-cryptographic, reproducible default RNG seeded with [`DEFAULT_LAYER_SEED`].
     pub fn try_new(config: HnswConfig) -> Result<Self> {
-        let rng = std::sync::Arc::new(contextra_ports::SystemRng::new());
+        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
     }
 
@@ -291,7 +285,7 @@ impl HnswIndex {
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
         let rng: std::sync::Arc<dyn contextra_ports::Rng> =
-            std::sync::Arc::new(contextra_ports::SystemRng::new());
+            std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
@@ -308,7 +302,6 @@ impl HnswIndex {
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
-                    index_epoch: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
                     arena: HnswArena::new(),
                 },
@@ -319,8 +312,7 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    mmap_backlink_overlay: super::connections::MmapBacklinkOverlay::new(),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+                    seq_log: RwLock::new(contextra_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -383,16 +375,6 @@ impl HnswIndex {
         self
     }
 
-    /// Returns the current index epoch (monotonically increasing on insert/delete/rebuild).
-    pub fn index_epoch(&self) -> u64 {
-        self.inner.hot.index_epoch.load(Ordering::Acquire)
-    }
-
-    /// Increments the index epoch counter.
-    pub fn bump_index_epoch(&self) -> u64 {
-        self.inner.hot.index_epoch.fetch_add(1, Ordering::SeqCst) + 1
-    }
-
     /// Sets the random seed used for HNSW layer selection during insertions.
     pub fn set_layer_seed(&self, seed: u64) {
         self.inner.set_layer_seed(seed);
@@ -414,20 +396,8 @@ impl HnswIndex {
         self.inner.connectivity_score()
     }
 
-    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    pub fn check_connectivity(&self) -> contextra_core::Result<()> {
         self.inner.check_connectivity()
-    }
-
-    /// Returns the number of active backlink overrides in the in-memory mmap overlay.
-    ///
-    /// # Important
-    /// Overrides stored in the mmap backlink overlay are **in-memory only** and are lost
-    /// whenever the index is reloaded via `load_mmap` / `load_mmap_from_instance` or upon restart.
-    /// After a restart without a full index rebuild, deleted node backlinks return from the read-only
-    /// mmap file into the active search graph. Therefore, a cryptographic or permanent deletion proof
-    /// for the HNSW layer cannot be derived from in-memory graph repair overrides alone.
-    pub fn mmap_overlay_len(&self) -> usize {
-        self.inner.cold.mmap_backlink_overlay.len()
     }
 
     pub fn is_rebuild_required(&self) -> bool {
@@ -544,7 +514,6 @@ impl HnswIndex {
         &self,
         mmap_index: crate::persistence::MmapIndex,
     ) -> Result<()> {
-        self.inner.cold.mmap_backlink_overlay.clear();
         let ep = if mmap_index.header.entry_point() >= 0 {
             Some(mmap_index.header.entry_point() as usize)
         } else {
@@ -628,17 +597,6 @@ impl HnswIndex {
             });
         }
 
-        let node_count = mmap_index.header.node_count() as usize;
-        {
-            let mut doc_map = self.inner.hot.doc_to_node.write();
-            doc_map.clear();
-            for i in 0..node_count {
-                if let Ok(record) = mmap_index.get_node_record(i) {
-                    doc_map.insert(record.doc_id, i);
-                }
-            }
-        }
-
         let mut guard = self.inner.cold.mmap_index.write();
         self.inner
             .hot
@@ -660,7 +618,6 @@ impl HnswIndex {
         let q_guard = inner.cold.quantizer.read();
 
         let temp_path = path_buf.with_extension("hnsw.tmp");
-        let _ = super::durable_fs::durable_remove(&temp_path);
         let file = std::fs::File::create(&temp_path).map_err(|e| {
             ContextraError::Storage(format!("Failed to create temporary HNSW file: {}", e))
         })?;
@@ -834,11 +791,20 @@ impl HnswIndex {
         }
         file.sync_all()
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        drop(file);
 
-        if let Err(err) = super::durable_fs::atomic_replace(&temp_path, &path_buf) {
-            let _ = super::durable_fs::durable_remove(&temp_path);
-            return Err(err);
+        std::fs::rename(&temp_path, &path_buf).map_err(|e| {
+            ContextraError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
+        })?;
+
+        if let Some(parent) = path_buf.parent() {
+            if let Ok(parent_dir) = std::fs::File::open(parent) {
+                parent_dir.sync_all().map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Failed to fsync parent directory after rename: {}",
+                        e
+                    ))
+                })?;
+            }
         }
 
         Ok(())

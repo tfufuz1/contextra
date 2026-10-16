@@ -1,6 +1,7 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
+use contextra_graph::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_types::DocId;
 use contextra_vector::HnswIndex;
@@ -22,12 +23,14 @@ async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
         })
         .unwrap(),
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     Collection::new(
         "tx_test".to_string(),
         storage,
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -153,97 +156,4 @@ fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
         }
         _ => panic!("Unexpected CommitIntent variant"),
     }
-}
-
-#[tokio::test]
-async fn test_ssi_write_skew_two_transactions_second_fails() {
-    use contextra_mvcc::SequenceLogSsiValidator;
-    use contextra_types::ContextraError;
-
-    let col = create_test_collection().await;
-    let ssi_val = Arc::new(SequenceLogSsiValidator::new());
-
-    let tx_id1 = col.allocate_tx().unwrap();
-    let tx_id2 = col.allocate_tx().unwrap();
-
-    let tx1 = DbTransaction::new(col.clone(), tx_id1).with_ssi_validator(ssi_val.clone());
-    let tx2 = DbTransaction::new(col.clone(), tx_id2).with_ssi_validator(ssi_val.clone());
-
-    // tx1 reads key_k at snapshot sequence 10
-    tx1.record_read(b"key_k".to_vec(), 10);
-
-    // Concurrent transaction tx2 writes key_k and commits at sequence 12
-    tx2.stage_text_insert(DocId::new(99), "concurrent write".to_string());
-    let res2 = tx2.commit().await;
-    assert!(res2.is_ok());
-    ssi_val.record_commit_key(b"key_k", 12);
-
-    // tx1 now attempts to commit; must fail with ContextraError::Conflict due to write skew
-    let res1 = tx1.commit().await;
-    assert!(
-        matches!(res1, Err(ContextraError::Conflict(_))),
-        "tx1 must be rejected with ContextraError::Conflict due to write skew on key_k"
-    );
-}
-
-#[tokio::test]
-async fn test_two_tenant_commit_isolation() {
-    use contextra_types::TenantId;
-
-    let col = create_test_collection().await;
-
-    let tenant_a = TenantId::try_new(2).unwrap();
-    let tenant_b = TenantId::try_new(3).unwrap();
-
-    let tx_id_a = col.allocate_tx().unwrap();
-    let tx_id_b = col.allocate_tx().unwrap();
-
-    let tx_a = DbTransaction::new_for_tenant(col.clone(), tx_id_a, tenant_a);
-    let tx_b = DbTransaction::new_for_tenant(col.clone(), tx_id_b, tenant_b);
-
-    assert_eq!(tx_a.tenant_id, tenant_a);
-    assert_eq!(tx_b.tenant_id, tenant_b);
-
-    let doc_id_a = DocId::new(701);
-    let doc_id_b = DocId::new(702);
-
-    tx_a.record_keys(vec![10, 1], vec![1, 10], doc_id_a);
-    tx_b.record_keys(vec![20, 2], vec![2, 20], doc_id_b);
-
-    let res_a = tx_a.commit().await;
-    let res_b = tx_b.commit().await;
-
-    assert!(res_a.is_ok());
-    assert!(res_b.is_ok());
-}
-
-#[tokio::test]
-async fn test_rollback_completeness_and_compensation_idempotency() {
-    use super::compensating_actions::{CompensateHnswAction, CompensatingAction};
-    use contextra_types::TenantId;
-
-    let col = create_test_collection().await;
-    let tenant = TenantId::try_new(4).unwrap();
-    let tx_id = col.allocate_tx().unwrap();
-
-    let tx = DbTransaction::new_for_tenant(col.clone(), tx_id, tenant);
-    let doc_id = DocId::new(801);
-
-    tx.stage_text_insert(doc_id, "idempotency test text".to_string());
-    tx.record_keys(vec![30, 3], vec![3, 30], doc_id);
-
-    // First rollback
-    let rollback_res1 = tx.rollback().await;
-    assert!(rollback_res1.is_ok());
-
-    // Executing compensating action repeatedly must be idempotent and succeed
-    let comp_action = CompensateHnswAction::new(col.clone(), tenant, Arc::new(vec![doc_id]));
-    let comp_res1 = comp_action.execute().await;
-    assert!(comp_res1.is_ok());
-
-    let comp_res2 = comp_action.execute().await;
-    assert!(
-        comp_res2.is_ok(),
-        "Second compensating execution must be idempotent"
-    );
 }

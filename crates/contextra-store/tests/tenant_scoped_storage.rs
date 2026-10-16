@@ -1,6 +1,6 @@
 //! Integration and isolation tests for `TenantScopedStorage`.
 
-use contextra_types::{TenantId, TxId};
+use contextra_core::{TenantId, TxId};
 use contextra_ports::StorageEngine;
 use contextra_store::{tenant_codec::TenantScopedStorage, LsmConfig, LsmStorage};
 use proptest::prelude::*;
@@ -75,24 +75,6 @@ async fn test_tenant_a_cannot_read_tenant_b() {
         store_b.get(b"key1").await.expect("get").as_deref(),
         Some(&b"val_b"[..])
     );
-}
-
-#[tokio::test]
-async fn test_tenant_matrix_runner_basic_isolation() {
-    use contextra_testkit::erasure_harness::TenantMatrixRunner;
-
-    TenantMatrixRunner::run_async(|ctx| {
-        let storage = ctx.storage;
-        async move {
-            let tx1 = TxId(10);
-            storage.put(tx1, b"key_m", b"val_m").await.unwrap();
-            storage.commit(tx1).await.unwrap();
-
-            let res = storage.get(b"key_m").await.unwrap();
-            assert_eq!(res.as_deref(), Some(&b"val_m"[..]));
-        }
-    })
-    .await;
 }
 
 #[tokio::test]

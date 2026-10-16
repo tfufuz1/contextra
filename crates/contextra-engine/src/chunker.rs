@@ -45,9 +45,9 @@
 //! ## 4. Beziehung zur ContextPrefixEngine (Teil 6.13)
 //! - **Ablaufreihenfolge in der Pipeline**:
 //!   1. **MarkdownChunker**: Das Dokument wird in saubere Markdown-Chunks zerlegt.
-//!   2. **ContextPrefixEngine**: Für jeden fertigen Chunk kann über ein kleines
+//!   2. **ContextPrefixEngine** (`contextra-infer-ollama`): Für jeden fertigen Chunk wird über ein kleines
 //!      LLM-Modell (z. B. `llama3.2:3b`, `max_document_chars` Default 8000, `max_prefix_tokens` Default 80)
-//!      ein 1–2-Satz-Kontextpräfix generiert werden (unter XML-Escaping zur Prompt-Injection-Isolation).
+//!      ein 1–2-Satz-Kontextpräfix generiert (unter XML-Escaping zur Prompt-Injection-Isolation).
 //!   3. Das generierte Präfix wird im Feld [`ContextChunk::contextual_prefix`] gespeichert bzw. vor BM25/Embedding
 //!      dem Chunk-Text vorangestellt.
 //! - **Garantie**: Chunking erfolgt **strikt vor** der Präfix-Generierung. Der Chunker operiert ausschließlich

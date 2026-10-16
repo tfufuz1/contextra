@@ -1,10 +1,9 @@
 // FILE-CONTEXT
-// ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, EP1)
+// ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05)
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-pub use contextra_types::types::domain::AutoExtractionMode;
-use contextra_ports::erasure::ErasureMode;
+pub use contextra_core::types::domain::AutoExtractionMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
@@ -33,26 +32,19 @@ pub struct CollectionProfile {
     pub auto_extraction: AutoExtractionMode,
 }
 
-/// Errors arising during validation of a [`CollectionProfile`].
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
     Performance(#[from] PerformanceProfileError),
-    /// Indicates that a KV-side cryptographic deletion proof is requested by the performance profile,
-    /// but the KV deletion mode is configured as TombstoneOnly instead of CryptoShred.
-    /// Note: Vector index maintenance (HNSW) is decoupled from cryptographic deletion proofs.
     #[error("deletion-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side DeletionProof")]
     KvDeleteMismatch,
 }
 
 impl CollectionProfile {
-    /// Validates the profile against system rules and invariants.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if resolved.erasure_mode != ErasureMode::Off
-            && self.kv_delete_mode == KvDeleteMode::TombstoneOnly
-        {
+        if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
             return Err(CollectionProfileError::KvDeleteMismatch);
         }
         Ok(())
@@ -82,7 +74,7 @@ impl DeploymentTier {
     pub fn resolve(self) -> CollectionProfile {
         match self {
             Self::EdgeMinimal => CollectionProfile {
-                performance: PerformanceProfile::Balanced,
+                performance: PerformanceProfile::BareMetal,
                 kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 8 << 20,
@@ -92,7 +84,7 @@ impl DeploymentTier {
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
-            Self::PowerUserLocal | Self::EnterpriseShared | Self::EnterpriseRegulated => CollectionProfile {
+            Self::PowerUserLocal => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
                 kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
@@ -101,11 +93,29 @@ impl DeploymentTier {
                     group_commit_window_micros: 2_000,
                     block_cache_shards: 8,
                 },
-                auto_extraction: if matches!(self, Self::EnterpriseRegulated) {
-                    ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT
-                } else {
-                    DEFAULT_AUTO_EXTRACTION_MODE
+                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
+            },
+            Self::EnterpriseShared => CollectionProfile {
+                performance: PerformanceProfile::Balanced,
+                kv_delete_mode: KvDeleteMode::CryptoShred,
+                lsm_tuning: LsmTuning {
+                    memtable_size_limit: 256 << 20,
+                    max_ram_mb: 4_096,
+                    group_commit_window_micros: 10_000,
+                    block_cache_shards: 32,
                 },
+                auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
+            },
+            Self::EnterpriseRegulated => CollectionProfile {
+                performance: PerformanceProfile::Compliance,
+                kv_delete_mode: KvDeleteMode::CryptoShred,
+                lsm_tuning: LsmTuning {
+                    memtable_size_limit: 256 << 20,
+                    max_ram_mb: 4_096,
+                    group_commit_window_micros: 10_000,
+                    block_cache_shards: 32,
+                },
+                auto_extraction: ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
             },
         }
     }

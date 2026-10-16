@@ -172,44 +172,20 @@ pub fn apply_temporal_validity_filter(
 
 /// Applies historical "as-of" bi-temporal validity filtering to candidates post-RRF fusion.
 ///
-/// Evaluates candidate validity given an explicit transaction ID `as_of_tx` and business time `as_of_business`.
+/// Evaluates candidate validity at historical point-in-time `as_of_timestamp` (analogous to Graphitis Episode-Pinning).
+/// A candidate is retained ONLY IF `as_of_timestamp` lies within `[valid_from, valid_until)` AND
+/// transaction validity (`tx_valid_to`, ADR-033) is active at that historical timestamp.
 /// Candidates without validity window metadata (legacy data) are retained (Fail-Open for backward compatibility).
-pub fn apply_temporal_validity_filter_at_bitemporal(
-    results: Vec<crate::SearchResult>,
-    as_of_tx: TxId,
-    as_of_business: Option<u64>,
-) -> Vec<crate::SearchResult> {
-    results
-        .into_iter()
-        .filter(|res| {
-            let window = extract_validity_window(res.metadata.as_ref());
-            window.is_valid_bitemporal(as_of_tx, as_of_business)
-        })
-        .collect()
-}
-
-/// Applies historical "as-of" validity filtering using business time timestamp.
-///
-/// Evaluates `as_of_timestamp` purely as business time (`as_of_business`), avoiding
-/// misinterpreting business timestamps as system transaction IDs (`TxId`).
-///
-/// # Deprecated
-/// Use [`apply_temporal_validity_filter_at_bitemporal`] with explicit system `TxId` and business time instead.
-#[deprecated(
-    since = "0.1.0",
-    note = "Use apply_temporal_validity_filter_at_bitemporal with explicit TxId and business time instead"
-)]
 pub fn apply_temporal_validity_filter_at(
     results: Vec<crate::SearchResult>,
     as_of_timestamp: u64,
 ) -> Vec<crate::SearchResult> {
+    let as_of_tx = TxId::new(as_of_timestamp);
     results
         .into_iter()
         .filter(|res| {
-            let mut window = extract_validity_window(res.metadata.as_ref());
-            window.tx_valid_from = None;
-            window.tx_valid_to = None;
-            window.is_valid_bitemporal(TxId::new(0), Some(as_of_timestamp))
+            let window = extract_validity_window(res.metadata.as_ref());
+            window.is_valid_bitemporal(as_of_tx, Some(as_of_timestamp))
         })
         .collect()
 }
@@ -300,8 +276,7 @@ mod tests {
         let results = vec![old_chunk, new_chunk];
 
         // Query historical point in time at t = 30 (when old chunk was active, before supersedes at t=50)
-        let historical_results =
-            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let historical_results = apply_temporal_validity_filter_at(results, 30);
         assert_eq!(
             historical_results.len(),
             1,
@@ -332,8 +307,7 @@ mod tests {
         // Business check: 10 <= 30 < 100 -> PASS.
         // Transaction check: 30 < tx_valid_from (50) -> FAIL.
         // Bi-temporal AND logic must filter out this candidate!
-        let filtered =
-            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let filtered = apply_temporal_validity_filter_at(results, 30);
         assert!(
             filtered.is_empty(),
             "Candidate with valid business window but invalid transaction window at query time must be filtered out"
@@ -352,87 +326,27 @@ mod tests {
         );
 
         // Before start (< 10) -> Invalid
-        let res_before = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(9),
-        );
+        let res_before = apply_temporal_validity_filter_at(vec![candidate.clone()], 9);
         assert!(res_before.is_empty());
 
         // Exact start (10) -> Valid (inclusive lower bound)
-        let res_start = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(10),
-        );
+        let res_start = apply_temporal_validity_filter_at(vec![candidate.clone()], 10);
         assert_eq!(res_start.len(), 1);
 
         // Inside window (50) -> Valid
-        let res_mid = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(50),
-        );
+        let res_mid = apply_temporal_validity_filter_at(vec![candidate.clone()], 50);
         assert_eq!(res_mid.len(), 1);
 
         // One step before end (99) -> Valid
-        let res_before_end = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(99),
-        );
+        let res_before_end = apply_temporal_validity_filter_at(vec![candidate.clone()], 99);
         assert_eq!(res_before_end.len(), 1);
 
         // Exact end (100) -> Invalid (exclusive upper bound)
-        let res_end = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(100),
-        );
+        let res_end = apply_temporal_validity_filter_at(vec![candidate.clone()], 100);
         assert!(res_end.is_empty());
 
         // After end (> 100) -> Invalid
-        let res_after = apply_temporal_validity_filter_at_bitemporal(
-            vec![candidate.clone()],
-            TxId::new(1),
-            Some(101),
-        );
+        let res_after = apply_temporal_validity_filter_at(vec![candidate.clone()], 101);
         assert!(res_after.is_empty());
-    }
-
-    #[test]
-    fn test_eng_filter_001_business_timestamp_not_treated_as_tx_id() {
-        // Red-Test from report:
-        // tx_valid_from: 5, valid_from: 1700000000, query with as_of_timestamp = 1700000000.
-        let candidate = make_candidate(
-            "doc-bitemporal",
-            Some(json!({
-                "tx_valid_from": 5,
-                "tx_valid_to": 1000,
-                "valid_from": 1700000000,
-            })),
-        );
-
-        let results = vec![candidate];
-        // Querying with as_of_tx = TxId::new(5) and as_of_business = Some(1700000000)
-        let filtered = apply_temporal_validity_filter_at_bitemporal(
-            results.clone(),
-            TxId::new(5),
-            Some(1700000000),
-        );
-        assert_eq!(
-            filtered.len(),
-            1,
-            "Candidate must be valid when queried with correct TxId and business timestamp"
-        );
-
-        // Querying via deprecated business time helper (as_of_timestamp = 1700000000)
-        #[allow(deprecated)]
-        let filtered_legacy = apply_temporal_validity_filter_at(results, 1700000000);
-        assert_eq!(
-            filtered_legacy.len(),
-            1,
-            "Legacy helper must treat as_of_timestamp as business time, not TxId"
-        );
     }
 }

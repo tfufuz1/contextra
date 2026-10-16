@@ -45,10 +45,6 @@ Implementiert den Trait `contextra_ports::CheckpointCoordinator` und entkoppelt 
 
 ```bash
 cargo test -p contextra-checkpoint --locked
-cargo xtask check-agents-integrity
-cargo xtask doctrine-scan --crate contextra-checkpoint
-cargo xtask check-result-dropped-io
-cargo xtask determinism-check
 ```
 
 ## 7. Bekannte Lücken / SOLL

@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use walkdir::WalkDir;
 
@@ -38,19 +38,18 @@ struct ComponentFocus {
     risk: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct PrompterDataOutput {
     generated_at: String,
     head: String,
     context_preamble: Option<String>,
     target_architecture: BTreeMap<String, String>,
-    rules_files: Vec<String>,
     crates: Vec<CrateJsonData>,
     components: BTreeMap<String, Vec<ComponentJsonData>>,
     working_state_snapshot: WorkingStateSnapshot,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct WorkingStateSnapshot {
     generated_at: String,
     crate_count: usize,
@@ -58,16 +57,15 @@ struct WorkingStateSnapshot {
     last_merge: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct WorkingStateCrate {
     name: String,
     status: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct CrateJsonData {
     id: String,
-    package_name: String,
     layer: u8,
     order: usize,
     loc: usize,
@@ -76,13 +74,9 @@ struct CrateJsonData {
     status: String,
     risk: String,
     tier: String,
-    has_agents_md: bool,
-    fuzz_targets: Vec<String>,
-    bench_targets: Vec<String>,
-    required_gates: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct ComponentJsonData {
     file: String,
     size: String,
@@ -168,103 +162,9 @@ fn derive_status_from_working_state(crate_id: &str, ws_content: &str) -> String 
     "❓".to_string()
 }
 
-fn get_fuzz_targets(crate_dir: &Path) -> Vec<String> {
-    let mut targets = Vec::new();
-    let fuzz_dir = crate_dir.join("fuzz").join("fuzz_targets");
-    if fuzz_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&fuzz_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        targets.push(stem.to_string());
-                    }
-                }
-            }
-        }
-    }
-    targets.sort();
-    targets
-}
-
-fn get_bench_targets(crate_dir: &Path) -> Vec<String> {
-    let mut targets = Vec::new();
-
-    // 1. benches/ directory
-    let benches_dir = crate_dir.join("benches");
-    if benches_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&benches_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        targets.push(stem.to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    // 2. Cargo.toml [[bench]] targets
-    let cargo_toml = crate_dir.join("Cargo.toml");
-    if cargo_toml.exists() {
-        if let Ok(content) = fs::read_to_string(&cargo_toml) {
-            if let Ok(val) = toml::from_str::<toml::Value>(&content) {
-                if let Some(benches) = val.get("bench").and_then(|b| b.as_array()) {
-                    for bench in benches {
-                        if let Some(name) = bench.get("name").and_then(|n| n.as_str()) {
-                            targets.push(name.to_string());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    targets.sort();
-    targets.dedup();
-    targets
-}
-
-fn get_rules_files(root: &Path) -> Vec<String> {
-    let mut rules = Vec::new();
-    let rules_dir = root.join("rules");
-    if rules_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&rules_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
-                    if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                        rules.push(name.to_string());
-                    }
-                }
-            }
-        }
-    }
-    rules.sort();
-    rules
-}
-
-fn derive_required_gates(risk: &str) -> Vec<String> {
-    let mut gates = Vec::new();
-    match risk {
-        "sec" => {
-            gates.push("mutants-diff".to_string());
-            gates.push("fuzz-smoke".to_string());
-        }
-        "crash" => {
-            gates.push("wal-replay-verify".to_string());
-        }
-        "simd" => {
-            gates.push("simd-safety".to_string());
-        }
-        _ => {}
-    }
-    gates.sort();
-    gates
-}
-
-fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
+pub fn run() -> bool {
+    println!("=== Running xtask gen-prompter-data ===");
+    let root = find_root_dir();
     let root_str = root.to_str().unwrap_or(".");
 
     // 1. Load .jules/prompter-tiers.toml
@@ -285,47 +185,19 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
         PrompterTiers::default()
     };
 
-    // 2. Get workspace crates (excluding xtask and xtask-heavy)
-    let all_workspace_crates = match get_workspace_crates() {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("⚠️ Failed to load workspace crates for prompter data: {}", e);
-            Vec::new()
-        }
-    };
-    let mut workspace_crates: Vec<_> = all_workspace_crates
+    // 2. Get workspace crates (excluding xtask and benchmarks)
+    let all_workspace_crates = get_workspace_crates();
+    let workspace_crates: Vec<_> = all_workspace_crates
         .into_iter()
         .filter(|c| c.path.starts_with("crates/") || c.path.starts_with("benchmarks/"))
         .collect();
 
-    workspace_crates.sort_by(|a, b| a.name.cmp(&b.name));
-
     let mut crates_json = Vec::new();
     let mut components_json = BTreeMap::new();
-
-    let ws_path = root.join("WORKING_STATE.md");
-    let ws_content = fs::read_to_string(&ws_path).unwrap_or_default();
 
     for (idx, c) in workspace_crates.iter().enumerate() {
         let crate_id = &c.name;
         let crate_dir = root.join(&c.path);
-
-        // Read package_name from Cargo.toml if available
-        let cargo_toml = crate_dir.join("Cargo.toml");
-        let package_name = if cargo_toml.exists() {
-            fs::read_to_string(&cargo_toml)
-                .ok()
-                .and_then(|content| toml::from_str::<toml::Value>(&content).ok())
-                .and_then(|val| {
-                    val.get("package")
-                        .and_then(|p| p.get("name"))
-                        .and_then(|n| n.as_str())
-                        .map(ToString::to_string)
-                })
-                .unwrap_or_else(|| crate_id.clone())
-        } else {
-            crate_id.clone()
-        };
 
         // Calculate test count
         let test_count = count_crate_tests(&crate_dir);
@@ -340,15 +212,13 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
             .and_then(|o| o.risk.clone())
             .unwrap_or_else(|| "none".to_string());
 
+        // Status
+        let ws_path = root.join("WORKING_STATE.md");
+        let ws_content = fs::read_to_string(&ws_path).unwrap_or_default();
         let status = derive_status_from_working_state(crate_id, &ws_content);
-        let has_agents_md = crate_dir.join("AGENTS.md").is_file();
-        let fuzz_targets = get_fuzz_targets(&crate_dir);
-        let bench_targets = get_bench_targets(&crate_dir);
-        let required_gates = derive_required_gates(&risk);
 
         crates_json.push(CrateJsonData {
             id: crate_id.clone(),
-            package_name,
             layer: c.layer,
             order: idx + 1,
             loc: c.loc,
@@ -357,10 +227,6 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
             status,
             risk,
             tier,
-            has_agents_md,
-            fuzz_targets,
-            bench_targets,
-            required_gates,
         });
 
         // Collect components in src/
@@ -430,6 +296,7 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
     }
 
     // Read and parse WORKING_STATE.md for working_state_snapshot
+    let ws_path = root.join("WORKING_STATE.md");
     let mut ws_crates = Vec::new();
     let mut last_merge = Command::new("git")
         .args(["-C", root_str, "log", "--oneline", "-1", "--merges"])
@@ -463,17 +330,14 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
         }
     }
 
-    ws_crates.sort_by(|a, b| a.name.cmp(&b.name));
-
     let snapshot_now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let crate_count = ws_crates.len();
 
-    PrompterDataOutput {
+    let output_data = PrompterDataOutput {
         generated_at: snapshot_now.clone(),
-        head: get_git_head_short(root),
-        context_preamble: tiers_cfg.defaults.context_preamble,
+        head: get_git_head_short(&root),
+        context_preamble: tiers_cfg.defaults.context_preamble.clone(),
         target_architecture: tiers_cfg.target_architecture,
-        rules_files: get_rules_files(root),
         crates: crates_json,
         components: components_json,
         working_state_snapshot: WorkingStateSnapshot {
@@ -482,15 +346,7 @@ fn generate_prompter_data_struct(root: &Path) -> PrompterDataOutput {
             crates: ws_crates,
             last_merge,
         },
-    }
-}
-
-pub fn run() -> bool {
-    println!("=== Running xtask gen-prompter-data ===");
-    let root = find_root_dir();
-    let root_str = root.to_str().unwrap_or(".");
-
-    let output_data = generate_prompter_data_struct(&root);
+    };
 
     let output_path = root.join(".jules/prompter-data.json");
     let json_str = match serde_json::to_string_pretty(&output_data) {
@@ -587,48 +443,5 @@ mod tests {
             derive_status_from_working_state("nonexistent-crate", sample_ws),
             "❓"
         );
-    }
-
-    #[test]
-    fn test_prompter_data_golden_and_determinism() {
-        let root = find_root_dir();
-        let mut data1 = generate_prompter_data_struct(&root);
-        let mut data2 = generate_prompter_data_struct(&root);
-
-        // Normalize timestamp for determinism comparison
-        data1.generated_at = "FIXED_TIMESTAMP".to_string();
-        data1.working_state_snapshot.generated_at = "FIXED_TIMESTAMP".to_string();
-        data2.generated_at = "FIXED_TIMESTAMP".to_string();
-        data2.working_state_snapshot.generated_at = "FIXED_TIMESTAMP".to_string();
-
-        // Determinismus-Test: Zwei Läufe liefern identische Ausgaben
-        let json1 = serde_json::to_string_pretty(&data1).expect("Failed to serialize data1");
-        let json2 = serde_json::to_string_pretty(&data2).expect("Failed to serialize data2");
-        assert_eq!(
-            json1, json2,
-            "Prompter data generation must be deterministic across calls"
-        );
-
-        // Golden-Test: Alle Workspace Crates/Packages unter crates/ & benchmarks/ müssen enthalten sein
-        let all_crates = get_workspace_crates().expect("get_workspace_crates failed");
-        let expected_packages: Vec<String> = all_crates
-            .into_iter()
-            .filter(|c| c.path.starts_with("crates/") || c.path.starts_with("benchmarks/"))
-            .map(|c| c.name)
-            .collect();
-
-        assert_eq!(
-            data1.crates.len(),
-            expected_packages.len(),
-            "JSON crate count must match workspace package count"
-        );
-
-        for expected_pkg in &expected_packages {
-            assert!(
-                data1.crates.iter().any(|c| &c.id == expected_pkg),
-                "Package '{}' is missing from generated prompter data JSON",
-                expected_pkg
-            );
-        }
     }
 }

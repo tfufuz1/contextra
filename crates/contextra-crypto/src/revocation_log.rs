@@ -1,9 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: Persistierter, Ed25519-signierter, manipulationssicherer Append-Only Widerrufslog (v17 Teil 16.1).
-// INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag. Atomare Initialisierungs- & Truncation-Prüfung via Marker-Datei (<path>.initialized).
+// INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag.
 // ABGRENZUNG PROMPT 10: Prompt 10 definiert KEK/DEK Envelope-Datenstrukturen; revocation_log stellt die persistierte Widerrufs-Engine bereit.
 // ABGRENZUNG PROMPT 12: Prompt 12 betrifft die Audit-Hash-Kette, die diesen Revocation-Log als Eingabequelle referenzieren kann, aber ein eigenständiges, separates System-Artefakt ist.
-// HOTSPOTS: [RevocationLog::open_or_create, RevocationLog::open_existing, RevocationLog::create_new, RevocationLog::append, RevocationLog::verify_chain]
+// HOTSPOTS: [RevocationLog::open_or_create, RevocationLog::append, RevocationLog::verify_chain]
 
 #![forbid(unsafe_code)]
 
@@ -20,12 +20,6 @@
 //! # Abgrenzung zu Prompt 12 (Audit-Hash-Kette)
 //! Prompt 12 regelt die globale Audit-Hash-Kette von Contextra. Der Widerrufslog dient der
 //! Audit-Kette als optionale Eingabequelle, bleibt aber als eigenständiges, isoliertes Artefakt bestehen.
-//!
-//! # Rollback-Schutz & Monotonie-Generationen
-//! Jede Schreiboperation erhöht eine Monoton-Generation. Über `export_head()` wird der externe Anker
-//! `(generation, head_hash)` bereitgestellt. Eine vergleichende Prüfung über `verify_against_anchor()`
-//! erkennt ein Zurückrollen auf ältere Stände und versetzt den Log in einen fail-closed Zustand, in dem
-//! alle Abfragen nach Widerrufen `true` zurückliefern.
 
 use crate::error::{CryptoError, Result};
 use contextra_ports::Clock;
@@ -34,173 +28,13 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-const MARKER_MAGIC: &[u8; 4] = b"RVMK";
-const MARKER_VERSION_1: u8 = 1;
-const MARKER_VERSION_2: u8 = 2;
-
-/// Marker structure stored in `<log-path>.initialized` for atomic deletion & truncation protection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RevocationMarker {
-    /// Minimum expected entry count in the log.
-    pub count: u64,
-    /// Head hash of the latest log entry (`[0u8; 32]` if count == 0).
-    pub head_hash: [u8; 32],
-    /// Monotonically increasing generation counter.
-    #[serde(default)]
-    pub generation: u64,
-}
-
-/// Helper to serialize a signed marker file.
-fn serialize_signed_marker(
-    count: u64,
-    head_hash: [u8; 32],
-    generation: u64,
-    signing_key: Option<&SigningKey>,
-) -> Vec<u8> {
-    if let Some(sk) = signing_key {
-        let mut msg = Vec::with_capacity(48);
-        msg.extend_from_slice(&count.to_le_bytes());
-        msg.extend_from_slice(&head_hash);
-        msg.extend_from_slice(&generation.to_le_bytes());
-        let sig = sk.sign(&msg);
-
-        let mut buf = Vec::with_capacity(4 + 1 + 8 + 32 + 8 + 64);
-        buf.extend_from_slice(MARKER_MAGIC);
-        buf.push(MARKER_VERSION_2);
-        buf.extend_from_slice(&count.to_le_bytes());
-        buf.extend_from_slice(&head_hash);
-        buf.extend_from_slice(&generation.to_le_bytes());
-        buf.extend_from_slice(&sig.to_bytes());
-        buf
-    } else {
-        let marker = RevocationMarker {
-            count,
-            head_hash,
-            generation,
-        };
-        bincode::serialize(&marker).unwrap_or_default()
-    }
-}
-
-/// Helper to deserialize and verify a marker file.
-fn parse_and_verify_marker(
-    marker_bytes: &[u8],
-    verifying_key: &VerifyingKey,
-) -> Result<RevocationMarker> {
-    if marker_bytes.starts_with(MARKER_MAGIC) {
-        if marker_bytes.len() < 5 {
-            return Err(CryptoError::IntegrityViolation);
-        }
-        let version = marker_bytes[4];
-        if version == MARKER_VERSION_1 {
-            if marker_bytes.len() < 4 + 1 + 8 + 32 + 64 {
-                return Err(CryptoError::IntegrityViolation);
-            }
-            let mut count_bytes = [0u8; 8];
-            count_bytes.copy_from_slice(&marker_bytes[5..13]);
-            let count = u64::from_le_bytes(count_bytes);
-
-            let mut head_hash = [0u8; 32];
-            head_hash.copy_from_slice(&marker_bytes[13..45]);
-
-            let mut sig_bytes = [0u8; 64];
-            sig_bytes.copy_from_slice(&marker_bytes[45..109]);
-
-            let mut msg = Vec::with_capacity(40);
-            msg.extend_from_slice(&count_bytes);
-            msg.extend_from_slice(&head_hash);
-
-            let sig = Signature::from_bytes(&sig_bytes);
-            verifying_key
-                .verify(&msg, &sig)
-                .map_err(|_| CryptoError::IntegrityViolation)?;
-
-            Ok(RevocationMarker {
-                count,
-                head_hash,
-                generation: count,
-            })
-        } else if version == MARKER_VERSION_2 {
-            if marker_bytes.len() < 4 + 1 + 8 + 32 + 8 + 64 {
-                return Err(CryptoError::IntegrityViolation);
-            }
-            let mut count_bytes = [0u8; 8];
-            count_bytes.copy_from_slice(&marker_bytes[5..13]);
-            let count = u64::from_le_bytes(count_bytes);
-
-            let mut head_hash = [0u8; 32];
-            head_hash.copy_from_slice(&marker_bytes[13..45]);
-
-            let mut gen_bytes = [0u8; 8];
-            gen_bytes.copy_from_slice(&marker_bytes[45..53]);
-            let generation = u64::from_le_bytes(gen_bytes);
-
-            let mut sig_bytes = [0u8; 64];
-            sig_bytes.copy_from_slice(&marker_bytes[53..117]);
-
-            let mut msg = Vec::with_capacity(48);
-            msg.extend_from_slice(&count_bytes);
-            msg.extend_from_slice(&head_hash);
-            msg.extend_from_slice(&gen_bytes);
-
-            let sig = Signature::from_bytes(&sig_bytes);
-            verifying_key
-                .verify(&msg, &sig)
-                .map_err(|_| CryptoError::IntegrityViolation)?;
-
-            Ok(RevocationMarker {
-                count,
-                head_hash,
-                generation,
-            })
-        } else {
-            Err(CryptoError::IntegrityViolation)
-        }
-    } else {
-        let marker: RevocationMarker =
-            bincode::deserialize(marker_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
-        tracing::warn!("Loaded legacy unsigned revocation marker; will upgrade on next write");
-        Ok(marker)
-    }
-}
-
-/// Cursor for amortized incremental verification of log entries.
-#[derive(Debug, Clone, Copy)]
-struct VerifiedCursor {
-    verified_len: usize,
-    last_verified_hash: [u8; 32],
-}
-
-/// Mode for initializing or opening a `RevocationLog`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InitMode {
-    /// Explicit fresh creation. Fails if log or marker file already exists with contents.
-    CreateNew,
-    /// Explicit reopen of existing log. Fails with `IntegrityViolation` if log or marker file is missing or truncated.
-    OpenExisting,
-    /// Auto-detect: Fresh creation if no marker and empty/missing log; otherwise open existing.
-    /// Fails closed if marker exists without log, log exists without marker, or if `has_existing_keys` is true when log and marker are missing.
-    OpenOrCreateIfFresh {
-        /// Whether existing wrapped key traces or registry entries are present.
-        has_existing_keys: bool,
-    },
-}
-
-/// Computes the path of the `.initialized` marker file corresponding to a given log file path.
-pub fn marker_path_for(log_path: &Path) -> PathBuf {
-    let mut os_str = log_path.as_os_str().to_os_string();
-    os_str.push(".initialized");
-    PathBuf::from(os_str)
-}
-
-fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
-    contextra_durable_fs::atomic_replace(path, content)
-        .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))
-}
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -289,9 +123,6 @@ pub struct RevocationLog {
     clock: Arc<dyn Clock>,
     entries: RwLock<Vec<RevocationEntry>>,
     revoked_targets: RwLock<HashSet<RevocationTarget>>,
-    verified_cursor: RwLock<VerifiedCursor>,
-    generation: RwLock<u64>,
-    rollback_detected: AtomicBool,
 }
 
 impl RevocationLog {
@@ -308,380 +139,71 @@ impl RevocationLog {
             clock,
             entries: RwLock::new(Vec::new()),
             revoked_targets: RwLock::new(HashSet::new()),
-            verified_cursor: RwLock::new(VerifiedCursor {
-                verified_len: 0,
-                last_verified_hash: [0u8; 32],
-            }),
-            generation: RwLock::new(0),
-            rollback_detected: AtomicBool::new(false),
         }
     }
 
-    /// Erzeugt einen neuen Widerrufslog unter `path` (Erstinitialisierung).
-    /// Fails mit `CryptoError::IntegrityViolation`, falls die Datei oder die Marker-Datei bereits existiert.
-    pub fn create_new(
-        path: impl AsRef<Path>,
-        clock: Arc<dyn Clock>,
-        signing_key: Option<SigningKey>,
-        verifying_key: VerifyingKey,
-    ) -> Result<Self> {
-        Self::open_or_create_with_mode(path, clock, signing_key, verifying_key, InitMode::CreateNew)
-    }
-
-    /// Öffnet einen bestehenden Widerrufslog unter `path`.
-    /// Fails mit `CryptoError::IntegrityViolation`, falls die Log-Datei oder die Marker-Datei fehlt oder gekürzt ist.
-    pub fn open_existing(
-        path: impl AsRef<Path>,
-        clock: Arc<dyn Clock>,
-        signing_key: Option<SigningKey>,
-        verifying_key: VerifyingKey,
-    ) -> Result<Self> {
-        Self::open_or_create_with_mode(
-            path,
-            clock,
-            signing_key,
-            verifying_key,
-            InitMode::OpenExisting,
-        )
-    }
-
-    /// Abwärtskompatibles Öffnen oder Erzeugen unter `path` (nutzt `InitMode::OpenOrCreateIfFresh`).
+    /// Öffnet einen bestehenden Widerrufslog oder erzeugt einen neuen unter `path`.
     ///
-    /// # Warnung / Security Note
-    /// Diese Methode setzt fest `has_existing_keys: false` ein, was den Rollback-Schutz
-    /// bei Neu-Initialisierung über einem gelöschten Log abschwächt.
-    /// Produktionscode MUSS `open_or_create_if_fresh` mit korrekter Flag-Übergabe nutzen!
-    /// Only available in tests/test-utils to enforce proper production initialization.
-    #[cfg(any(test, feature = "test-utils"))]
+    /// Beim Öffnen einer bestehenden Datei wird die komplette Hash-Kette sowie jede
+    /// Ed25519-Signatur anhand von `verifying_key` verifiziert.
+    /// Bei Integritätsverletzungen bricht das Öffnen mit `CryptoError::IntegrityViolation` ab.
     pub fn open_or_create(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
         signing_key: Option<SigningKey>,
         verifying_key: VerifyingKey,
     ) -> Result<Self> {
-        Self::open_or_create_with_mode(
-            path,
-            clock,
-            signing_key,
-            verifying_key,
-            InitMode::OpenOrCreateIfFresh {
-                has_existing_keys: false,
-            },
-        )
-    }
-
-    /// Öffnet oder erzeugt einen Widerrufslog mit Schutz vor Stale/Missing Log wenn Schlüsselspuren existieren.
-    pub fn open_or_create_if_fresh(
-        path: impl AsRef<Path>,
-        clock: Arc<dyn Clock>,
-        signing_key: Option<SigningKey>,
-        verifying_key: VerifyingKey,
-        has_existing_keys: bool,
-    ) -> Result<Self> {
-        Self::open_or_create_with_mode(
-            path,
-            clock,
-            signing_key,
-            verifying_key,
-            InitMode::OpenOrCreateIfFresh { has_existing_keys },
-        )
-    }
-
-    /// Öffnet oder erzeugt einen Widerrufslog mit explizitem `InitMode`.
-    pub fn open_or_create_with_mode(
-        path: impl AsRef<Path>,
-        clock: Arc<dyn Clock>,
-        signing_key: Option<SigningKey>,
-        verifying_key: VerifyingKey,
-        mode: InitMode,
-    ) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
-        let m_path = marker_path_for(&path_buf);
-
-        let log_exists = path_buf.exists();
-        let log_has_content = log_exists
-            && std::fs::metadata(&path_buf)
-                .map(|m| m.len() > 0)
-                .unwrap_or(false);
-        let marker_exists = m_path.exists();
-
-        let effective_mode = match mode {
-            InitMode::CreateNew => {
-                if log_has_content || marker_exists {
-                    return Err(CryptoError::IntegrityViolation);
-                }
-                InitMode::CreateNew
-            }
-            InitMode::OpenExisting => {
-                if !log_exists || !marker_exists {
-                    return Err(CryptoError::IntegrityViolation);
-                }
-                InitMode::OpenExisting
-            }
-            InitMode::OpenOrCreateIfFresh { has_existing_keys } => {
-                if !log_has_content && !marker_exists {
-                    if has_existing_keys {
-                        return Err(CryptoError::IntegrityViolation);
-                    }
-                    InitMode::CreateNew
-                } else if log_exists && marker_exists {
-                    InitMode::OpenExisting
-                } else {
-                    // One exists but the other does not -> Fail Closed!
-                    return Err(CryptoError::IntegrityViolation);
-                }
-            }
-        };
-
-        if effective_mode == InitMode::CreateNew {
-            // Write initial empty log and marker
-            let empty_entries: Vec<RevocationEntry> = Vec::new();
-            let serialized_empty = bincode::serialize(&empty_entries).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to serialize empty revocation log: {e}"))
-            })?;
-            write_atomic_file(&path_buf, &serialized_empty)?;
-
-            let serialized_marker = serialize_signed_marker(0, [0u8; 32], 0, signing_key.as_ref());
-            write_atomic_file(&m_path, &serialized_marker)?;
-
-            return Ok(Self {
-                file_path: Some(path_buf),
-                signing_key,
-                verifying_key,
-                clock,
-                entries: RwLock::new(Vec::new()),
-                revoked_targets: RwLock::new(HashSet::new()),
-                verified_cursor: RwLock::new(VerifiedCursor {
-                    verified_len: 0,
-                    last_verified_hash: [0u8; 32],
-                }),
-                generation: RwLock::new(0),
-                rollback_detected: AtomicBool::new(false),
-            });
-        }
-
-        // Open existing path
-        let marker_bytes = std::fs::read(&m_path).map_err(|_| CryptoError::IntegrityViolation)?;
-        let marker = parse_and_verify_marker(&marker_bytes, &verifying_key)?;
-
-        let log_bytes = std::fs::read(&path_buf).map_err(|_| CryptoError::IntegrityViolation)?;
-        let parsed_entries: Vec<RevocationEntry> =
-            bincode::deserialize(&log_bytes).map_err(|_| CryptoError::IntegrityViolation)?;
-
-        Self::verify_chain_entries(&parsed_entries, &verifying_key)?;
-
-        // Truncation check: Log count cannot be smaller than marker count
-        let log_count = parsed_entries.len() as u64;
-        if log_count < marker.count {
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        if marker.count == 0 {
-            if marker.head_hash != [0u8; 32] {
-                return Err(CryptoError::IntegrityViolation);
-            }
-        } else {
-            let target_idx =
-                usize::try_from(marker.count - 1).map_err(|_| CryptoError::IntegrityViolation)?;
-            if parsed_entries[target_idx].entry_hash != marker.head_hash {
-                return Err(CryptoError::IntegrityViolation);
-            }
-        }
-
+        let mut entries = Vec::new();
         let mut revoked_targets = HashSet::new();
-        for entry in &parsed_entries {
-            revoked_targets.insert(entry.target.clone());
+
+        if path_buf.exists() {
+            let mut file = File::open(&path_buf).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to open revocation log file: {e}"))
+            })?;
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).map_err(|e| {
+                CryptoError::Crypto(format!("Failed to read revocation log file: {e}"))
+            })?;
+
+            if !contents.is_empty() {
+                let parsed_entries: Vec<RevocationEntry> =
+                    bincode::deserialize(&contents).map_err(|_| CryptoError::IntegrityViolation)?;
+
+                Self::verify_chain_entries(&parsed_entries, &verifying_key)?;
+
+                for entry in &parsed_entries {
+                    revoked_targets.insert(entry.target.clone());
+                }
+                entries = parsed_entries;
+            }
         }
-
-        let last_verified_hash = parsed_entries
-            .last()
-            .map(|e| e.entry_hash)
-            .unwrap_or([0u8; 32]);
-
-        let loaded_gen = marker.generation;
 
         Ok(Self {
             file_path: Some(path_buf),
             signing_key,
             verifying_key,
             clock,
-            entries: RwLock::new(parsed_entries.clone()),
+            entries: RwLock::new(entries),
             revoked_targets: RwLock::new(revoked_targets),
-            verified_cursor: RwLock::new(VerifiedCursor {
-                verified_len: parsed_entries.len(),
-                last_verified_hash,
-            }),
-            generation: RwLock::new(loaded_gen),
-            rollback_detected: AtomicBool::new(false),
         })
     }
 
-    /// Gibt `true` zurück, wenn dieser Log datei-persistiert ist (`file_path` gesetzt ist).
-    pub fn is_durable(&self) -> bool {
-        self.file_path.is_some()
-    }
-
-    /// Gibt die aktuelle Generation des Log-Zustands zurück.
-    pub fn generation(&self) -> u64 {
-        *self.generation.read()
-    }
-
-    /// Exports current head state `(generation, head_hash)` for external anchor tracking.
-    pub fn export_head(&self) -> (u64, [u8; 32]) {
-        let gen = *self.generation.read();
-        let cursor = self.verified_cursor.read();
-        (gen, cursor.last_verified_hash)
-    }
-
-    /// Verifies current log state against external anchor `min_generation` and optional `expected_head_hash`.
-    /// On rollback or head mismatch, triggers fail-closed state (`rollback_detected = true`) and returns `CryptoError::IntegrityViolation`.
-    pub fn verify_against_anchor(
-        &self,
-        min_generation: u64,
-        expected_head_hash: Option<[u8; 32]>,
-    ) -> Result<()> {
-        if self.rollback_detected.load(Ordering::SeqCst) {
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        let current_gen = *self.generation.read();
-        if current_gen < min_generation {
-            self.rollback_detected.store(true, Ordering::SeqCst);
-            tracing::error!(
-                current_gen,
-                min_generation,
-                "Rollback detected: RevocationLog generation is older than external anchor"
-            );
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        if let Some(expected_hash) = expected_head_hash {
-            let cursor = self.verified_cursor.read();
-            if cursor.last_verified_hash != expected_hash {
-                self.rollback_detected.store(true, Ordering::SeqCst);
-                tracing::error!("Rollback detected: head hash mismatch against external anchor");
-                return Err(CryptoError::IntegrityViolation);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Verifiziert inkrementell die Integrität unverifizierter neuer Einträge im Log.
+    /// Verifiziert die Integrität der gesamten Logeinträge-Kette (Sequenz, Hashes, Ed25519-Signaturen).
     pub fn verify_integrity(&self) -> Result<()> {
-        if self.rollback_detected.load(Ordering::SeqCst) {
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        if let Some(ref path) = self.file_path {
-            if !path.exists() || !marker_path_for(path).exists() {
-                self.rollback_detected.store(true, Ordering::SeqCst);
-                return Err(CryptoError::IntegrityViolation);
-            }
-        }
-
-        let entries_guard = self.entries.read();
-        let cursor = *self.verified_cursor.read();
-
-        let total_len = entries_guard.len();
-        if cursor.verified_len > total_len {
-            self.rollback_detected.store(true, Ordering::SeqCst);
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        if cursor.verified_len == total_len {
-            if total_len == 0 {
-                return Ok(());
-            }
-            if entries_guard[total_len - 1].entry_hash != cursor.last_verified_hash {
-                self.rollback_detected.store(true, Ordering::SeqCst);
-                return Err(CryptoError::IntegrityViolation);
-            }
-            return Ok(());
-        }
-
-        let unverified_slice = &entries_guard[cursor.verified_len..total_len];
-        let initial_prev_hash = if cursor.verified_len == 0 {
-            [0u8; 32]
-        } else {
-            if entries_guard[cursor.verified_len - 1].entry_hash != cursor.last_verified_hash {
-                self.rollback_detected.store(true, Ordering::SeqCst);
-                return Err(CryptoError::IntegrityViolation);
-            }
-            cursor.last_verified_hash
-        };
-
-        if let Err(e) = Self::verify_chain_slice(
-            unverified_slice,
-            cursor.verified_len as u64,
-            initial_prev_hash,
-            &self.verifying_key,
-        ) {
-            self.rollback_detected.store(true, Ordering::SeqCst);
-            return Err(e);
-        }
-
-        let new_last_hash = unverified_slice
-            .last()
-            .map(|e| e.entry_hash)
-            .unwrap_or(initial_prev_hash);
-
-        drop(entries_guard);
-
-        let mut cursor_guard = self.verified_cursor.write();
-        if total_len > cursor_guard.verified_len {
-            cursor_guard.verified_len = total_len;
-            cursor_guard.last_verified_hash = new_last_hash;
-        }
-
-        Ok(())
+        let guard = self.entries.read();
+        Self::verify_chain_entries(&guard, &self.verifying_key)
     }
 
-    /// Verifiziert bedingungslos die gesamte Eintrags-Kette neu von Index 0 an.
-    pub fn verify_integrity_full(&self) -> Result<()> {
-        if self.rollback_detected.load(Ordering::SeqCst) {
-            return Err(CryptoError::IntegrityViolation);
-        }
-
-        let entries_guard = self.entries.read();
-        if let Err(e) = Self::verify_chain_entries(&entries_guard, &self.verifying_key) {
-            self.rollback_detected.store(true, Ordering::SeqCst);
-            return Err(e);
-        }
-
-        let total_len = entries_guard.len();
-        let last_hash = entries_guard
-            .last()
-            .map(|e| e.entry_hash)
-            .unwrap_or([0u8; 32]);
-
-        drop(entries_guard);
-
-        let mut cursor_guard = self.verified_cursor.write();
-        cursor_guard.verified_len = total_len;
-        cursor_guard.last_verified_hash = last_hash;
-
-        Ok(())
-    }
-
-    /// Hilfsfunktion zur Verifikation einer Liste von Eintrags-Ketten ab Index 0.
+    /// Hilfsfunktion zur Verifikation einer Liste von Eintrags-Ketten.
     fn verify_chain_entries(
         entries: &[RevocationEntry],
         verifying_key: &VerifyingKey,
     ) -> Result<()> {
-        Self::verify_chain_slice(entries, 0, [0u8; 32], verifying_key)
-    }
+        let mut expected_prev_hash = [0u8; 32];
 
-    /// Hilfsfunktion zur Verifikation eines Slice von Eintrags-Ketten ab `start_seq`.
-    fn verify_chain_slice(
-        slice: &[RevocationEntry],
-        start_seq: u64,
-        mut expected_prev_hash: [u8; 32],
-        verifying_key: &VerifyingKey,
-    ) -> Result<()> {
-        for (offset, entry) in slice.iter().enumerate() {
-            let expected_seq = start_seq + offset as u64;
-            if entry.sequence_number != expected_seq {
+        for (idx, entry) in entries.iter().enumerate() {
+            if entry.sequence_number != idx as u64 {
                 return Err(CryptoError::IntegrityViolation);
             }
 
@@ -713,22 +235,18 @@ impl RevocationLog {
 
     /// Fügt einen neuen Widerrufs-Eintrag für `target` an den Log an.
     ///
-    /// PERSIST-BEFORE-MUTATE: Serialisiert und schreibt die neue Logdatei und den signierten Marker
-    /// vor der Mutation des RAM-Zustands (`entries`, `revoked_targets`). Bei Fehler bleibt der
-    /// RAM-Zustand exakt unberührt.
+    /// Nutzt den injizierten Clock-Port zur Generierung des Zeitstempels und den Signierschlüssel
+    /// zur Erstellung der Ed25519-Signatur. Persistiert die aktualisierte Kette sofort auf Disk.
     pub fn append(&self, target: RevocationTarget) -> Result<RevocationEntry> {
-        if self.rollback_detected.load(Ordering::SeqCst) {
-            return Err(CryptoError::IntegrityViolation);
-        }
-
         let signing_key = self.signing_key.as_ref().ok_or_else(|| {
             CryptoError::Crypto("Signing key not configured for RevocationLog append".to_string())
         })?;
 
-        let mut entries_write_guard = self.entries.write();
+        let mut entries_guard = self.entries.write();
+        let mut revoked_guard = self.revoked_targets.write();
 
-        let sequence_number = entries_write_guard.len() as u64;
-        let prev_hash = entries_write_guard
+        let sequence_number = entries_guard.len() as u64;
+        let prev_hash = entries_guard
             .last()
             .map(|e| e.entry_hash)
             .unwrap_or([0u8; 32]);
@@ -746,63 +264,65 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        let mut candidate_entries = entries_write_guard.clone();
-        candidate_entries.push(new_entry.clone());
-
-        let current_gen = *self.generation.read();
-        let new_gen = current_gen + 1;
+        entries_guard.push(new_entry.clone());
+        revoked_guard.insert(target);
 
         if let Some(ref path) = self.file_path {
-            let serialized_log = bincode::serialize(&candidate_entries).map_err(|e| {
+            let serialized = bincode::serialize(&*entries_guard).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            write_atomic_file(path, &serialized_log)?;
+            let parent = path.parent().unwrap_or_else(|| Path::new("."));
+            let file_name = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("revocation.log");
+            let count = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let tmp_path = parent.join(format!("{}.tmp-{}-{}", file_name, std::process::id(), count));
 
-            let m_path = marker_path_for(path);
-            let serialized_marker = serialize_signed_marker(
-                candidate_entries.len() as u64,
-                new_entry.entry_hash,
-                new_gen,
-                Some(signing_key),
-            );
+            let write_tmp = || -> Result<()> {
+                let mut tmp_file = OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&tmp_path)
+                    .map_err(|e| {
+                        CryptoError::Crypto(format!("Failed to create temp revocation log file: {e}"))
+                    })?;
 
-            write_atomic_file(&m_path, &serialized_marker)?;
+                tmp_file.write_all(&serialized).map_err(|e| {
+                    CryptoError::Crypto(format!("Failed to write temp revocation log file: {e}"))
+                })?;
+
+                tmp_file.sync_all().map_err(|e| {
+                    CryptoError::Crypto(format!("Failed to sync temp revocation log file: {e}"))
+                })?;
+
+                Ok(())
+            };
+
+            if let Err(err) = write_tmp() {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(err);
+            }
+
+            if let Err(e) = std::fs::rename(&tmp_path, path) {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(CryptoError::Crypto(format!(
+                    "Failed to rename temp revocation log file: {e}"
+                )));
+            }
+
+            // Optional parent directory sync on supporting POSIX platforms to persist directory entry modification
+            if let Ok(dir_file) = File::open(parent) {
+                let _ = dir_file.sync_all();
+            }
         }
-
-        let mut revoked_write_guard = self.revoked_targets.write();
-
-        entries_write_guard.push(new_entry.clone());
-        revoked_write_guard.insert(target);
-
-        let mut cursor_guard = self.verified_cursor.write();
-        cursor_guard.verified_len = entries_write_guard.len();
-        cursor_guard.last_verified_hash = new_entry.entry_hash;
-
-        *self.generation.write() = new_gen;
-
-        drop(entries_write_guard);
-        drop(revoked_write_guard);
 
         Ok(new_entry)
     }
 
     /// Prüft, ob ein gegebenes Target (KEK, DEK, Group oder Record) widerrufen wurde.
-    /// Falls ein Rollback oder Integritätsfehler erkannt wurde, wird UNBEDINGT `true` für JEDES Target zurückgegeben (fail-closed).
     pub fn is_revoked(&self, target: &RevocationTarget) -> bool {
-        if self.rollback_detected.load(Ordering::SeqCst) {
-            return true;
-        }
-        if let Some(ref path) = self.file_path {
-            if !path.exists() || !marker_path_for(path).exists() {
-                self.rollback_detected.store(true, Ordering::SeqCst);
-                return true;
-            }
-        }
-        if self.verify_integrity().is_err() {
-            self.rollback_detected.store(true, Ordering::SeqCst);
-            return true;
-        }
         let guard = self.revoked_targets.read();
         guard.contains(target)
     }
@@ -824,18 +344,11 @@ impl std::fmt::Debug for RevocationLog {
             .field("file_path", &self.file_path)
             .field("verifying_key", &self.verifying_key)
             .field("entries_count", &self.entries.read().len())
-            .field("is_durable", &self.is_durable())
-            .field("generation", &*self.generation.read())
-            .field(
-                "rollback_detected",
-                &self.rollback_detected.load(Ordering::SeqCst),
-            )
             .finish()
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
     use crate::crypto::KeyManager;
@@ -871,14 +384,7 @@ mod tests {
         assert!(!log.is_revoked(&RevocationTarget::Dek("dek-999".into())));
 
         assert_eq!(log.len(), 2);
-        assert_eq!(log.generation(), 2);
-
-        let (gen, head) = log.export_head();
-        assert_eq!(gen, 2);
-        assert_ne!(head, [0u8; 32]);
-
         assert!(log.verify_integrity().is_ok());
-        assert!(log.verify_integrity_full().is_ok());
         Ok(())
     }
 
@@ -897,48 +403,15 @@ mod tests {
             log1.append(kek_target.clone())?;
             log1.append(group_target.clone())?;
             assert_eq!(log1.len(), 2);
-            assert_eq!(log1.generation(), 2);
             // Drop log1 simulating process shutdown
         }
 
         // Simulate process restart by reopening log file
         let log2 = RevocationLog::open_or_create(&log_path, clock, None, vk)?;
         assert_eq!(log2.len(), 2);
-        assert_eq!(log2.generation(), 2);
         assert!(log2.is_revoked(&kek_target));
         assert!(log2.is_revoked(&group_target));
         assert!(log2.verify_integrity().is_ok());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_rollback_detection_fail_closed() -> Result<()> {
-        let tmp_file = NamedTempFile::new().map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let log_path = tmp_file.path().to_path_buf();
-        let (sk, vk) = test_keypair();
-        let clock = Arc::new(SystemClock::new());
-
-        let log = RevocationLog::open_or_create(&log_path, clock, Some(sk), vk)?;
-        log.append(RevocationTarget::Group(1))?;
-        assert_eq!(log.generation(), 1);
-
-        let (gen, head) = log.export_head();
-        assert_eq!(gen, 1);
-
-        // Verify against matching anchor passes
-        assert!(log.verify_against_anchor(1, Some(head)).is_ok());
-
-        // Verify against higher generation anchor fails and triggers rollback state
-        assert!(log.verify_against_anchor(5, None).is_err());
-
-        // Subsequent queries MUST return true for ALL targets (fail-closed)
-        assert!(log.is_revoked(&RevocationTarget::Group(1)));
-        assert!(
-            log.is_revoked(&RevocationTarget::Group(999)),
-            "Unrevoked target MUST return true when rollback is detected"
-        );
-        assert!(log.append(RevocationTarget::Group(2)).is_err());
 
         Ok(())
     }
@@ -972,42 +445,6 @@ mod tests {
         // Proof (c): decrypt_with_group fails with dedicated CryptoError::KeyRevoked
         let res_dec = registry.decrypt_with_group(group_id, &ct, &nonce);
         assert!(matches!(res_dec, Err(CryptoError::KeyRevoked(_))));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_append_write_failure_preserves_ram_state() -> Result<()> {
-        let (sk, vk) = test_keypair();
-        let clock = Arc::new(SystemClock::new());
-        let invalid_path = PathBuf::from("/nonexistent_dir_for_test_12345/revocation.log");
-        let log = RevocationLog {
-            file_path: Some(invalid_path),
-            signing_key: Some(sk),
-            verifying_key: vk,
-            clock,
-            entries: RwLock::new(Vec::new()),
-            revoked_targets: RwLock::new(HashSet::new()),
-            verified_cursor: RwLock::new(VerifiedCursor {
-                verified_len: 0,
-                last_verified_hash: [0u8; 32],
-            }),
-            generation: RwLock::new(0),
-            rollback_detected: AtomicBool::new(false),
-        };
-
-        let target = RevocationTarget::Group(99);
-        let res = log.append(target.clone());
-        assert!(res.is_err(), "append MUST fail when disk write fails");
-        assert_eq!(
-            log.len(),
-            0,
-            "RAM entries count MUST remain 0 on write failure"
-        );
-        assert!(
-            !log.is_revoked(&target),
-            "Target MUST NOT be marked revoked in RAM on write failure"
-        );
 
         Ok(())
     }

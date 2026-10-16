@@ -1,12 +1,7 @@
-// FILE-CONTEXT
-// STAND: 2026-10-06
-// ZWECK: HNSW-Knoten-Einfügepfad (`compute_insert`, `apply_insert`) mit atomarem Speicherreseriverungsschutz.
-// INVARIANTEN: Zero-Panic Guarantee (I-8), Kantensymmetrie (I-3), Atomares Einfügen bei Allokationsfehlern.
-
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_types::{ContextraError, DocId, Result};
+use contextra_core::{ContextraError, DocId, Result};
 
 use super::batch::{
     get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext,
@@ -34,9 +29,10 @@ impl HnswIndexCore {
             }
         }
 
-        if ctx.mmap.is_some() {
+        if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
-                return Ok(Cow::Owned(self.get_node_connections(idx, layer)?));
+                let record = mmap.get_node_record(idx)?;
+                return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
             }
             let ram_idx = idx - ctx.mmap_node_count;
             if let Some(bmap) = ctx.backlink_map {
@@ -246,7 +242,7 @@ impl HnswIndexCore {
             ep = neighbors.iter().map(|c| c.index).collect();
         }
 
-        let base_batch_idx = mmap_node_count + nodes_read.len();
+        let base_batch_idx = mmap_node_count + ram_nodes_count;
         let mut neighbor_backlinks = Vec::new();
 
         for layer in (0..=new_layer.min(current_max_layer)).rev() {
@@ -266,7 +262,7 @@ impl HnswIndexCore {
                     &nodes_read,
                     prior_prepared,
                     batch_ctx,
-                )?;
+                );
 
                 let mut conn_indices = existing_conns;
                 if !conn_indices.contains(&(new_idx as u32)) {
@@ -367,22 +363,7 @@ impl HnswIndexCore {
         })
     }
 
-    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) -> Result<()> {
-        let m = self.cold.config.m;
-        let mmap_count = self
-            .cold
-            .mmap_index
-            .read()
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-
-        // Perform node allocation first to ensure atomicity before any state modification.
-        let ram_idx =
-            self.hot
-                .arena
-                .allocate_node(prepared.new_layer, m, &prepared.final_connections)?;
-
+    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
         let node = HnswNode {
             doc_id: prepared.doc_id,
             vector: prepared.vector_data,
@@ -390,29 +371,29 @@ impl HnswIndexCore {
             committed_tx: tx_id,
         };
 
+        let m = self.cold.config.m;
+        self.hot
+            .arena
+            .allocate_node(prepared.new_layer, m, &prepared.final_connections)
+            .ok();
+
         for backlink in prepared.neighbor_backlinks {
-            self.hot.arena.update_backlink(
-                backlink.neighbor_ram_idx,
-                backlink.layer,
-                m,
-                &backlink.updated_connections,
-            )?;
+            self.hot
+                .arena
+                .update_backlink(
+                    backlink.neighbor_ram_idx,
+                    backlink.layer,
+                    m,
+                    &backlink.updated_connections,
+                )
+                .ok();
         }
 
-        let mut nodes = self.hot.nodes.write();
-        let global_idx = mmap_count + ram_idx;
-        if ram_idx < nodes.len() {
-            nodes[ram_idx] = node;
-            if self.cold.deleted_nodes.write().remove(global_idx as u64) {
-                self.hot.deleted_count.fetch_sub(1, Ordering::SeqCst);
-            }
-        } else {
-            nodes.push(node);
-        }
+        self.hot.nodes.write().push(node);
         self.hot
             .doc_to_node
             .write()
-            .insert(prepared.doc_id.inner(), global_idx);
+            .insert(prepared.doc_id.inner(), prepared.new_idx);
 
         let current_ep = self.hot.get_entry_point();
         if prepared.should_update_entry_point || current_ep.is_none() {
@@ -428,13 +409,11 @@ impl HnswIndexCore {
         if prepared.should_update_ram_entry_point || self.hot.get_ram_entry_point().is_none() {
             self.hot.set_ram_entry_point(Some(prepared.new_idx));
         }
-
-        Ok(())
     }
 
     pub(super) fn do_insert(&self, id: DocId, vector: &[f32], tx_id: u64) -> Result<()> {
         let prepared = self.compute_insert(id, vector)?;
-        self.apply_insert(prepared, tx_id)?;
+        self.apply_insert(prepared, tx_id);
         Ok(())
     }
 
@@ -454,11 +433,11 @@ impl HnswIndexCore {
         (1.0 - deleted as f64 / total as f64).max(0.0)
     }
 
-    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    pub fn check_connectivity(&self) -> contextra_core::Result<()> {
         let score = self.connectivity_score();
         if score < self.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            return Err(contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio });
+            return Err(contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio });
         }
         Ok(())
     }

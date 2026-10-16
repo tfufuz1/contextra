@@ -39,7 +39,10 @@ impl ScopeConstraint {
 impl Default for ScopeConstraint {
     /// Default `ScopeConstraint` uses empty document set and default `gamma = 2` (Spec §8.5 example "γ=2").
     fn default() -> Self {
-        Self::from_allowed_ids(BTreeSet::new())
+        Self {
+            allowed_doc_ids: BTreeSet::new(),
+            gamma: 2,
+        }
     }
 }
 
@@ -51,10 +54,5 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     pub fn scope(mut self, constraint: ScopeConstraint) -> Self {
         self.hard_scope = Some(constraint);
         self
-    }
-
-    /// Convenience builder method setting a hard boundary scope from allowed document IDs.
-    pub fn scope_ids(self, allowed_doc_ids: BTreeSet<DocId>) -> Self {
-        self.scope(ScopeConstraint::from_allowed_ids(allowed_doc_ids))
     }
 }

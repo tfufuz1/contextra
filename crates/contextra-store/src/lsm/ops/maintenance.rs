@@ -1,7 +1,5 @@
 use super::super::engine::LsmStorage;
-use contextra_types::ContextraError;
-use contextra_types::{Result, TxId};
-use contextra_ports::StorageStats;
+use contextra_core::{Result, StorageStats, TxId};
 use std::sync::atomic::Ordering;
 
 pub(super) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
@@ -11,9 +9,6 @@ pub(super) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 }
 
 pub(super) async fn rollback_to_tx(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
-    if storage.is_read_only() {
-        return Err(ContextraError::Storage("Store is in read-only mode".into()));
-    }
     LsmStorage::rollback_to_tx(storage, tx_id).await
 }
 

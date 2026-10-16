@@ -13,7 +13,6 @@ description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
 ring = "0"
 
 [dependencies]
-contextra-durable-fs = { path = "../contextra-durable-fs" }
 thiserror = { workspace = true }
 sha2 = "0.10"
 hmac = "0.12"
@@ -39,6 +38,7 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 [features]
 test-utils = []
 kv-encryption = []
+cloud-egress-guard = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
@@ -47,7 +47,6 @@ tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
 criterion = { workspace = true }
 loom = "0.7"
-trybuild = "1.0"
 
 [[bench]]
 name = "crypto_benchmarks"

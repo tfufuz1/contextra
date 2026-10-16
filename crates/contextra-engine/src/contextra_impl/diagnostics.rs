@@ -29,7 +29,13 @@ impl Contextra {
             })
             .unwrap_or((None, None));
 
-        let pid_pool_size = None;
+        let pid_pool_size = self
+            .pid_controller
+            .read()
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .map(|p| p.lock().current_pool_size())
+            .unwrap_or(None);
 
         Ok(ContextraStats {
             drift_status,

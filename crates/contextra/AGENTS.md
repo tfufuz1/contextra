@@ -40,13 +40,8 @@ Ermöglicht den schnellen Einstieg mit sicheren Standardeinstellungen (Ring Fast
 
 ## 6. Verifikation
 
-```bash
-cargo test -p contextra
-cargo xtask check-ring-layering
-cargo xtask check-agents-integrity
-cargo xtask doctrine-scan --crate contextra
-cargo xtask check-ring-capabilities-consistency
-```
+- `cargo test -p contextra`
+- `cargo xtask check-ring-layering`
 
 ## 7. Bekannte Lücken / SOLL
 

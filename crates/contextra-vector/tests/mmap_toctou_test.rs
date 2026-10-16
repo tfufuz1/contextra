@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Empirische TOCTOU-Testreihen für Mmap Truncation & Unlink/Deletion Szenarien in HNSW.
+// ZWECK: Empirische TOCTOU-Testreihen für Mmap Truncation & Unlink/Deletion Szenarien in DiskANN & HNSW.
 // INVARIANTEN: Nutzt Subprozess-Isolierung (`std::process::Command`) zur sicheren Erfassung von SIGBUS (Signal 7 / Exit-Code 135).
 // STAND: TS:2026-08-30T22:30:00Z (SESSION: 37b1d991)
 
@@ -82,12 +82,15 @@ fn child_truncation_runner() {
         .unwrap();
 
     rt.block_on(async {
-        use contextra_ports::VectorIndex;
-        use contextra_types::{DistanceMetric, DocId, TxId};
+        use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+        #[cfg(feature = "experimental-diskann")]
+        use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
         use contextra_vector::hnsw::{HnswConfig, HnswIndex};
         use contextra_vector::persistence::MmapIndex;
 
         let temp_dir = tempfile::tempdir().unwrap();
+        #[cfg(feature = "experimental-diskann")]
+        let diskann_path = temp_dir.path().join("diskann_trunc.idx");
         let hnsw_path = temp_dir.path().join("hnsw_trunc.hnsw");
 
         let dim = 128;
@@ -95,7 +98,25 @@ fn child_truncation_runner() {
         let vectors: Vec<Vec<f32>> = (0..n).map(|i| vec![i as f32; dim]).collect();
         let ids: Vec<DocId> = (0..n).map(|i| DocId::from(i as u64)).collect();
 
-        // Build HNSW
+        // 1. Build DiskANN
+        #[cfg(feature = "experimental-diskann")]
+        let diskann = {
+            let config = DiskAnnConfig {
+                index_path: diskann_path.clone(),
+                dimension: dim,
+                max_degree: 32,
+                beam_width: 16,
+                sector_size: 4096,
+                distance_metric: DistanceMetric::Euclidean,
+                quantize: false,
+                ..Default::default()
+            };
+            let diskann = DiskAnnIndex::try_new(config).unwrap();
+            diskann.build(&vectors, &ids).await.unwrap();
+            diskann
+        };
+
+        // 2. Build HNSW
         let hnsw_config = HnswConfig {
             dimension: dim,
             m: 16,
@@ -116,10 +137,20 @@ fn child_truncation_runner() {
 
         let mmap_index = MmapIndex::open(&hnsw_path).unwrap();
 
-        println!("Active mmap handles opened for HNSW.");
+        println!("Active mmap handles opened for DiskANN & HNSW.");
 
-        // Truncate file in-place
-        println!("Truncating HNSW file to 10 bytes in-place...");
+        // 3. Truncate files in-place
+        println!("Truncating DiskANN and HNSW files to 10 bytes in-place...");
+        #[cfg(feature = "experimental-diskann")]
+        {
+            let f1 = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&diskann_path)
+                .unwrap();
+            f1.set_len(10).unwrap();
+            drop(f1);
+        }
+
         let f2 = std::fs::OpenOptions::new()
             .write(true)
             .open(&hnsw_path)
@@ -128,8 +159,15 @@ fn child_truncation_runner() {
         drop(f2);
 
         println!("Files truncated! Attempting queries against mmap regions...");
-        // Access mmap memory post-truncation -> Trigger SIGBUS
+        // 4. Access mmap memory post-truncation -> Trigger SIGBUS
         let query = vec![500.0f32; dim];
+
+        #[cfg(feature = "experimental-diskann")]
+        {
+            // Accessing DiskANN or HNSW mmap memory
+            println!("Executing DiskANN search_internal...");
+            let _ = diskann.search(&query, 10).await;
+        }
 
         println!("Executing HNSW search...");
         let _ = hnsw_mmap.search(&query, 10).await;
@@ -150,17 +188,37 @@ fn child_deletion_runner() {
         .unwrap();
 
     rt.block_on(async {
-        use contextra_ports::VectorIndex;
-        use contextra_types::{DistanceMetric, DocId, TxId};
+        use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+        #[cfg(feature = "experimental-diskann")]
+        use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
         use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 
         let temp_dir = tempfile::tempdir().unwrap();
+        #[cfg(feature = "experimental-diskann")]
+        let diskann_path = temp_dir.path().join("diskann_del.idx");
         let hnsw_path = temp_dir.path().join("hnsw_del.hnsw");
 
         let dim = 128;
         let n = 100;
         let vectors: Vec<Vec<f32>> = (0..n).map(|i| vec![i as f32; dim]).collect();
         let ids: Vec<DocId> = (0..n).map(|i| DocId::from(i as u64)).collect();
+
+        #[cfg(feature = "experimental-diskann")]
+        let diskann = {
+            let config = DiskAnnConfig {
+                index_path: diskann_path.clone(),
+                dimension: dim,
+                max_degree: 16,
+                beam_width: 8,
+                sector_size: 4096,
+                distance_metric: DistanceMetric::Euclidean,
+                quantize: false,
+                ..Default::default()
+            };
+            let diskann = DiskAnnIndex::try_new(config).unwrap();
+            diskann.build(&vectors, &ids).await.unwrap();
+            diskann
+        };
 
         let hnsw_config = HnswConfig {
             dimension: dim,
@@ -181,12 +239,23 @@ fn child_deletion_runner() {
         hnsw_mmap.load_mmap(&hnsw_path).await.unwrap();
 
         println!("Deleting index files from filesystem...");
+        #[cfg(feature = "experimental-diskann")]
+        {
+            std::fs::remove_file(&diskann_path).unwrap();
+            assert!(!diskann_path.exists());
+        }
         std::fs::remove_file(&hnsw_path).unwrap();
         assert!(!hnsw_path.exists());
         println!("Files unlinked successfully.");
 
         println!("Querying mmap'd indexes post-deletion...");
         let query = vec![50.0f32; dim];
+
+        #[cfg(feature = "experimental-diskann")]
+        {
+            let res_diskann = diskann.search(&query, 5).await.unwrap();
+            assert_eq!(res_diskann.len(), 5);
+        }
 
         let res_hnsw = hnsw_mmap.search(&query, 5).await.unwrap();
         assert_eq!(res_hnsw.len(), 5);

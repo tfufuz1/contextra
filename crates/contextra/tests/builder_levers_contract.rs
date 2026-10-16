@@ -8,8 +8,8 @@ use std::time::Duration;
 use contextra::performance_profile::PerformanceProfile;
 use contextra::query_rewriter::LlmQueryRewriter;
 use contextra::ContextraBuilder;
-use contextra_types::error::ContextraError;
-use contextra_types::types::domain::DistanceMetric;
+use contextra_core::error::ContextraError;
+use contextra_core::DistanceMetric;
 use contextra_db::{ContextraConfig, EmbeddingBackend};
 use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
@@ -19,7 +19,7 @@ impl LlmTextGenerator for DummyLlmGenerator {
     fn generate<'a>(
         &'a self,
         _prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_types::error::Result<String>> {
+    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
         Box::pin(async { Ok("subquery 1\nsubquery 2".to_string()) })
     }
 }
@@ -175,14 +175,33 @@ fn test_rewriter_max_snippet_chars_lever() {
 #[tokio::test]
 async fn test_performance_profile_deletion_proof_conflict_returns_error() {
     let config = ContextraConfig {
-        durability_mode: contextra_store::lsm::DurabilityMode::MemoryOnly,
+        deletion_proof_active: true,
         ..Default::default()
     };
 
-    // Compliance profile expects DurabilityMode::Full, conflicting with explicit MemoryOnly
+    // BareMetal profile has deletion_proof_active = false
+    let res = ContextraBuilder::new(128)
+        .with_config(config.clone())
+        .with_performance_profile(PerformanceProfile::BareMetal)
+        .build()
+        .await;
+
+    if let Err(ContextraError::PolicyViolation(msg)) = res {
+        assert!(
+            msg.contains("Explicit ContextraConfig conflicts with PerformanceProfile settings"),
+            "Unexpected error message: {msg}"
+        );
+    } else {
+        assert!(
+            matches!(res, Err(ContextraError::PolicyViolation(_))),
+            "Expected PolicyViolation error"
+        );
+    }
+
+    // Balanced profile also has deletion_proof_active = false
     let res = ContextraBuilder::new(128)
         .with_config(config)
-        .with_performance_profile(PerformanceProfile::Compliance)
+        .with_performance_profile(PerformanceProfile::Balanced)
         .build()
         .await;
 

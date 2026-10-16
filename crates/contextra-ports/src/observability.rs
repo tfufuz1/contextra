@@ -8,10 +8,6 @@
 pub use super::lifecycle::{GroundingAssessment, GroundingValidator, ResponseGroundingValidator};
 
 /// Trait for querying Lyapunov drift status from an attached router engine without creating a cyclic dependency (ADR-080).
-///
-/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
-/// |---|---|---|---|
-/// | `DriftStatusProvider` | `EnsembleDriftWatcher` (externer Adapt-Watcher) / `RouterDriftAdapter` (`contextra-ports`) | router | Aktiver Port im Router-Subsystem |
 pub trait DriftStatusProvider: Send + Sync {
     /// Returns the overall drift status string ("stabil", "warnung", "kritisch", or "unbekannt").
     fn overall_drift_status(&self) -> String;

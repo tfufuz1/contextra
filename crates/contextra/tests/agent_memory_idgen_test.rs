@@ -1,6 +1,5 @@
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
-use contextra_ports::BoxFuture;
-use contextra_types::error::Result;
+use contextra_core::{BoxFuture, Result};
 use contextra_ports::SequentialIdGen;
 use std::sync::Arc;
 

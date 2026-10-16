@@ -74,8 +74,7 @@ path = "crates/contextra-core"
     fs::write(p.join("governance/ratchet.toml"), ratchet_content)
         .expect("failed to write ratchet.toml");
 
-    fs::write(p.join(".github/unwrap_baseline.txt"), "0\n")
-        .expect("failed to write unwrap baseline");
+    fs::write(p.join(".github/unwrap_baseline.txt"), "0\n").expect("failed to write unwrap baseline");
 
     fs::write(
         p.join("crates/contextra-core/src/lib.rs"),

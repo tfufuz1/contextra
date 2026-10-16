@@ -1,0 +1,8 @@
+title = "Lock-Ordnungs- & Async-Lock-Audit"
+what = "Mögliches Deadlock-Risiko durch Lock über `.await` oder Verletzung der Lock-Hierarchie."
+why = "Locks über `.await`-Punkte verursachen Deadlocks und blockieren Async-Executor-Threads."
+fix = "Halte Locks nur in synchronen Blöcken und nie über `.await`-Aufrufe hinweg."
+anti_fix = "Vermeide nicht die Ursache durch künstliche Mutex-Timeout-Schleifen."
+adr = ["ADR-101"]
+related = ["unsafe-audit", "check-ring-layering"]
+sources = ["docs/decisions/ADR-101-lock-ordnung-commit-flush.md"]

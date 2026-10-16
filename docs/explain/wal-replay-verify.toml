@@ -1,0 +1,8 @@
+title = "WAL-Replay-Integritätsprüfung"
+what = "Fehler bei der Wiederherstellung oder Validierung des Write-Ahead-Logs."
+why = "Das WAL ist die primäre Wahrheitsquelle für die Datenpersistenz bei Systemabstürzen."
+fix = "Stelle sicher, dass WAL-Einträge korrekt abgedichtet und CRC/HMAC-Prüfsummen valide sind."
+anti_fix = "Bypass die HMAC-Validation im Replay-Pfad keinesfalls."
+adr = ["ADR-029", "ADR-N06"]
+related = ["determinism-check", "check-vetoes"]
+sources = ["docs/decisions/ADR-029-wal-v3-format-tx-id-hmac.md"]

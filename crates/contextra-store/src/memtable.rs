@@ -32,7 +32,7 @@
 //! - **INVARIANT 4**: rollback(tx_id) removes ALL entries from that transaction atomically.
 
 use bytes::Bytes;
-use contextra_types::{TOMBSTONE_BIT, TxId};
+use contextra_core::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -223,27 +223,16 @@ impl MemTable {
         let mut entries = self.shards[shard_idx].entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
-        let raw_seq = seq_no & !TOMBSTONE_BIT;
-        // FIX(2026-10-07): Fast-path push for in-order sequence numbers; binary search insert for out-of-order sequence numbers to maintain sorted order for get_at_seq.
-        if versions.last().map_or(true, |(last_seq, _, _)| {
-            (last_seq & !TOMBSTONE_BIT) <= raw_seq
-        }) {
-            versions.push((seq_no, value, tx_id));
-        } else {
-            let insert_idx = match versions
-                .binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT)
-            {
-                Ok(idx) => {
-                    let mut pos = idx + 1;
-                    while pos < versions.len() && (versions[pos].0 & !TOMBSTONE_BIT) == raw_seq {
-                        pos += 1;
-                    }
-                    pos
-                }
-                Err(idx) => idx,
-            };
-            versions.insert(insert_idx, (seq_no, value, tx_id));
+        #[cfg(debug_assertions)]
+        if let Some((last_seq, _, _)) = versions.last() {
+            let raw_seq = seq_no & !TOMBSTONE_BIT;
+            let last_raw_seq = last_seq & !TOMBSTONE_BIT;
+            debug_assert!(
+                raw_seq >= last_raw_seq,
+                "Sequence numbers for a key in memtable must be monotonically non-decreasing: raw_seq {raw_seq} < last_raw_seq {last_raw_seq}"
+            );
         }
+        versions.push((seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)
         self.size.fetch_add(additional_size, Ordering::Relaxed);
@@ -343,7 +332,7 @@ impl MemTable {
         let entries = self.shards[shard_idx].entries.read();
         let versions = entries.get(key)?;
 
-        use contextra_types::{TOMBSTONE_BIT, TxId};
+        use contextra_core::{TxId, TOMBSTONE_BIT};
 
         let target_raw_seq = seq_no & !TOMBSTONE_BIT;
 
@@ -398,7 +387,7 @@ impl MemTable {
     /// atomic snapshot, but this method is only called on the flush guard
     /// path which is a rare, single-threaded check.
     pub fn is_empty(&self) -> bool {
-        self.shard_entry_counts().iter().all(|&c| c == 0)
+        self.shards.iter().all(|s| s.entries.read().is_empty())
     }
 
     /// Iterates over all entries (all versions) in sorted key order.
@@ -577,88 +566,6 @@ impl MemTable {
         results
     }
 
-    /// Counts ALL versions (put/merge/tombstone) with `seq <= as_of_tx` for a specific key.
-    pub fn count_all_versions_key(&self, key: &[u8], as_of_tx: u64) -> (usize, usize) {
-        let shard_idx = Self::shard_for(key);
-        let entries = self.shards[shard_idx].entries.read();
-        if let Some(versions) = entries.get(key) {
-            let mut total = 0;
-            let mut tombstones = 0;
-            for (seq, _, tx) in versions {
-                if *tx <= as_of_tx || *tx >= TxId::INTERNAL_BASE {
-                    total += 1;
-                    if is_tombstone(*seq) {
-                        tombstones += 1;
-                    }
-                }
-            }
-            (total, tombstones)
-        } else {
-            (0, 0)
-        }
-    }
-
-    /// Counts ALL versions (put/merge/tombstone) with `seq <= as_of_tx` for keys starting with `prefix`.
-    pub fn count_all_versions_prefix(&self, prefix: &[u8], as_of_tx: u64) -> (usize, usize) {
-        let shard_range = Self::shard_range_for_prefix(prefix);
-        let mut total = 0;
-        let mut tombstones = 0;
-        for shard_idx in shard_range {
-            let entries = self.shards[shard_idx].entries.read();
-            for (k, versions) in
-                entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
-            {
-                if !k.starts_with(prefix) {
-                    break;
-                }
-                for (seq, _, tx) in versions {
-                    if *tx <= as_of_tx || *tx >= TxId::INTERNAL_BASE {
-                        total += 1;
-                        if is_tombstone(*seq) {
-                            tombstones += 1;
-                        }
-                    }
-                }
-            }
-        }
-        (total, tombstones)
-    }
-
-    /// Counts non-tombstone versions for a specific exact key across all shards.
-    pub fn count_non_tombstone_key(&self, key: &[u8]) -> usize {
-        let shard_idx = Self::shard_for(key);
-        let entries = self.shards[shard_idx].entries.read();
-        if let Some(versions) = entries.get(key) {
-            versions
-                .iter()
-                .filter(|(seq, _, _)| !is_tombstone(*seq))
-                .count()
-        } else {
-            0
-        }
-    }
-
-    /// Counts non-tombstone versions for any key starting with `prefix` across target shards.
-    pub fn count_non_tombstone_prefix(&self, prefix: &[u8]) -> usize {
-        let shard_range = Self::shard_range_for_prefix(prefix);
-        let mut count = 0;
-        for shard_idx in shard_range {
-            let entries = self.shards[shard_idx].entries.read();
-            for (k, versions) in
-                entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
-            {
-                if !k.starts_with(prefix) {
-                    break;
-                }
-                count += versions
-                    .iter()
-                    .filter(|(seq, _, _)| !is_tombstone(*seq))
-                    .count();
-            }
-        }
-        count
-    }
-
     /// Returns entry count for each shard (used for testing shard distribution).
     #[doc(hidden)]
     pub fn shard_entry_counts(&self) -> [usize; SHARD_COUNT] {
@@ -744,7 +651,7 @@ mod tests {
 
     #[test]
     fn test_mvcc_tombstone_binary_search() {
-        use contextra_types::TOMBSTONE_BIT;
+        use contextra_core::TOMBSTONE_BIT;
         let mt = MemTable::new();
         let key = Bytes::from("key1");
 
@@ -1112,31 +1019,5 @@ mod tests {
 
         writer_handle.join().expect("writer finished"); // #[cfg(test)]
         scanner_handle.join().expect("scanner finished"); // #[cfg(test)]
-    }
-
-    #[test]
-    fn test_out_of_order_seq_no_binary_search_sorted() {
-        let mt = MemTable::new();
-        let key = Bytes::from("ooo_key");
-
-        // Insert seq 100 first, then seq 10 out of order
-        mt.put(key.clone(), Bytes::from("val_100"), 100, 10);
-        mt.put(key.clone(), Bytes::from("val_10"), 10, 1);
-
-        // get_at_seq at 15 should return val_10
-        let (val, seq, tx) = mt
-            .get_at_seq(&key, 15, u64::MAX)
-            .expect("should find val_10");
-        assert_eq!(val.as_ref(), b"val_10");
-        assert_eq!(seq, 10);
-        assert_eq!(tx, 1);
-
-        // get_at_seq at 120 should return val_100
-        let (val, seq, tx) = mt
-            .get_at_seq(&key, 120, u64::MAX)
-            .expect("should find val_100");
-        assert_eq!(val.as_ref(), b"val_100");
-        assert_eq!(seq, 100);
-        assert_eq!(tx, 10);
     }
 }

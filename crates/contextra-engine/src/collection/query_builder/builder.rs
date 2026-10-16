@@ -41,6 +41,8 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
     pub(super) on_signal_failure: SignalFailurePolicy,
+    #[cfg(feature = "adaptive-candidate-pool-sizing")]
+    pub(super) pid_controller: Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>,
     pub(super) seq: Option<u64>,
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
@@ -71,6 +73,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
             on_signal_failure: SignalFailurePolicy::Fail,
+            #[cfg(feature = "adaptive-candidate-pool-sizing")]
+            pid_controller: None,
             seq: None,
             as_of_timestamp: None,
             query_timestamp: None,
@@ -212,6 +216,16 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Default: 200 (`DEFAULT_RERANK_POOL_MAX`), capping pre-retrieval pool size for large `k`.
     pub fn rerank_pool_max(mut self, max: usize) -> Self {
         self.rerank_pool_max = Some(max);
+        self
+    }
+
+    /// Sets optional PID controller for adaptive reranking candidate pool sizing.
+    #[cfg(feature = "adaptive-candidate-pool-sizing")]
+    pub fn pid_controller(
+        mut self,
+        pid: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
+    ) -> Self {
+        self.pid_controller = Some(pid);
         self
     }
 

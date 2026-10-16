@@ -4,7 +4,8 @@
 // NICHT-OFFENSICHTLICH: check_doc_id_collision wird via atomic put_if_absent und Key-granulares Locking ausgeführt.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
-pub mod delete;
+mod auto_extraction;
+mod delete;
 mod insert;
 mod internal;
 mod kv;
@@ -15,6 +16,6 @@ mod update;
 #[cfg(test)]
 mod tests;
 
-pub use delete::{DocEraseOptions, DocErasure};
+pub use auto_extraction::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
 pub(super) use internal::validate_doc_id;
 pub use read::{DEFAULT_SCAN_LIMIT, HARD_SCAN_CEILING, MAX_SCAN_RESULTS};

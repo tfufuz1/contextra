@@ -3,8 +3,7 @@
 // INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, max_depth = MAX_SEARCH_K.
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_ports::VectorIndex;
-use contextra_types::{DocId, Result, ScoredDocument, MAX_SEARCH_K};
+use contextra_core::{DocId, Result, ScoredDocument, VectorIndex, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for vector candidate retrieval.

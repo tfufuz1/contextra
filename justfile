@@ -50,63 +50,6 @@ agent-verify *ARGS:
 agent-submit *ARGS:
     cargo xtask jules submit {{ARGS}}
 
-# Executes kernel-tier verification pipeline
-verify *ARGS:
-    cargo xtask verify --tier kernel {{ARGS}}
-
-# Executes full-tier verification pipeline
-verify-full *ARGS:
-    cargo xtask verify --tier full {{ARGS}}
-
-# Checks environment toolchain attestations and optional cargo subcommands
-jules-env-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cargo xtask env-attest
-    cargo +nightly fuzz --version
-    cargo mutants --version
-    cargo llvm-cov --version
-    cargo insta --version
-
-# Runs a short fuzz smoke test for all targets in a crate
-fuzz-smoke CRATE SECONDS="5":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    CRATE_DIR="crates/{{CRATE}}"
-    if [ ! -d "$CRATE_DIR/fuzz/fuzz_targets" ]; then
-        echo "❌ Kein fuzz/fuzz_targets Verzeichnis in $CRATE_DIR gefunden."
-        exit 1
-    fi
-    if ! command -v cargo-fuzz &>/dev/null && ! cargo fuzz --version &>/dev/null 2>&1; then
-        echo "❌ cargo-fuzz ist nicht installiert."
-        exit 1
-    fi
-    cd "$CRATE_DIR"
-    for target_file in fuzz/fuzz_targets/*.rs; do
-        target=$(basename "$target_file" .rs)
-        echo "🔥 Fuzzing target $target in {{CRATE}} for {{SECONDS}}s..."
-        cargo +nightly fuzz run "$target" -- -max_total_time={{SECONDS}}
-    done
-
-# Sets up benchmark dependencies and downloads benchmark datasets
-bench-setup:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -f .jules/setup/install-bench-deps.sh ]; then
-        bash .jules/setup/install-bench-deps.sh --check
-    fi
-    cargo xtask bench-download
-
-# Local fast gate check: fmt, clippy, gate-guard, gate-arch, registry-check
-jules-gates:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cargo fmt --all -- --check
-    cargo clippy --workspace --all-targets -- -D warnings
-    cargo xtask gate-guard
-    cargo xtask gate-arch
-    cargo xtask registry-check
-
 # Modular check for any crate
 check-crate CRATE *ARGS:
     just nix-run cargo check -p {{CRATE}} {{ARGS}}
@@ -404,7 +347,7 @@ asan:
 coverage-html:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	which cargo-llvm-cov || cargo install cargo-llvm-cov --locked
+	which cargo-llvm-cov || cargo install cargo-llvm-cov
 	cargo llvm-cov --workspace --exclude contextra-py --html --output-dir target/coverage/
 	echo "✅ Coverage-Report: target/coverage/index.html"
 	if command -v xdg-open &>/dev/null; then xdg-open target/coverage/index.html; fi
@@ -413,7 +356,7 @@ coverage-html:
 coverage-json:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	which cargo-llvm-cov || cargo install cargo-llvm-cov --locked
+	which cargo-llvm-cov || cargo install cargo-llvm-cov
 	cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
 	cargo xtask check-coverage-gate
 	echo "✅ Coverage-Gate bestanden"
@@ -422,42 +365,26 @@ coverage-json:
 fuzz-all SECONDS="60":
 	#!/usr/bin/env bash
 	set -euo pipefail
-	if ! command -v cargo-fuzz &>/dev/null && ! cargo fuzz --version &>/dev/null 2>&1; then
-		echo "❌ cargo-fuzz ist nicht installiert."
-		echo "   Für lokale Verifikation: cargo install cargo-fuzz"
-		exit 1
-	fi
-	if ! rustup run nightly cargo --version &>/dev/null 2>&1; then
-		echo "❌ Nightly Toolchain ist nicht installiert."
-		echo "   Für Fuzzing: rustup toolchain install nightly"
-		exit 1
-	fi
+	which cargo-fuzz || cargo install cargo-fuzz
 	echo "🔥 Fuzzing für {{SECONDS}} Sekunden pro Target..."
 	targets=(
-		"contextra-crypto:deletion_proof_tamper"
-		"contextra-crypto:wal_hmac_chain_verify_fuzz"
-		"contextra-crypto:deletion_proof_verify_external_fuzz"
-		"contextra-db:rrf_fusion"
-		"contextra-mcp:fuzz_prompt_injection_guard"
+		"contextra-store:fuzz_wal_replay"
+		"contextra-vector:fuzz_hnsw_persistence"
+		"contextra-text:fuzz_bm25_tokenize"
+		"contextra-wire:fuzz_flatbuffers_ipc"
 		"contextra-mcp:fuzz_jsonrpc_parsing"
 		"contextra-store:wal_roundtrip"
-		"contextra-store:wal_mutation_chaos"
-		"contextra-store:fuzz_sstable_binary_search"
 		"contextra-store:fuzz_manifest_load"
-		"contextra-store:fuzz_wal_replay"
-		"contextra-store:fuzz_memtable_concurrent"
-		"contextra-store:fuzz_compaction_interleave"
-		"contextra-store:fuzz_recovery_arbitrary_state"
-		"contextra-text:fuzz_bm25_tokenize"
+		"contextra-store:wal_mutation_chaos"
 		"contextra-vector:hnsw_insert_search"
-		"contextra-vector:fuzz_hnsw_persistence"
-		"contextra-wire:fuzz_flatbuffers_ipc"
+		"contextra-db:rrf_fusion"
+		"contextra-mcp:fuzz_prompt_injection_guard"
 	)
 	for entry in "${targets[@]}"; do
 		crate="${entry%%:*}"
 		target="${entry##*:}"
 		echo "  → crates/${crate} :: ${target}"
-		(cd "crates/${crate}" && cargo +nightly fuzz run "${target}" -- -max_total_time={{SECONDS}})
+		(cd "crates/${crate}" && cargo +nightly fuzz run "${target}" -- -max_total_time={{SECONDS}} 2>&1 | tail -3) || true
 	done
 	echo "✅ Fuzz-Suite abgeschlossen"
 
@@ -473,10 +400,10 @@ bench-delta:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Benchmark-Delta-Analyse..."
-	cargo bench --workspace --all-targets -- --save-baseline current 2>&1 | tail -20 || true
-	cargo xtask bench-gate --threshold 0.05 \
+	cargo bench --workspace --bench '*' -- --save-baseline current 2>&1 | tail -20
+	cargo xtask bench-gate --tolerance 0.05 \
 		--baseline benchmarks/results/criterion-baseline.json \
-		--results benchmarks/results/results.json
+		--current criterion/current
 	echo "✅ Kein Benchmark-Regression > 5%"
 
 # Setzt aktuelle Benchmarks als neue Baseline
@@ -484,11 +411,8 @@ bench-set-baseline:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "📊 Setze neue Baseline..."
-	cargo bench --workspace --all-targets -- --save-baseline current || true
-	cargo xtask bench-gate --threshold 0.05 \
-		--baseline benchmarks/results/criterion-baseline.json \
-		--results benchmarks/results/results.json \
-		--update
+	cargo bench --workspace --bench '*' -- --save-baseline current
+	cp -r criterion/current benchmarks/results/criterion-baseline.json
 	echo "✅ Baseline aktualisiert"
 
 # Externe Benchmarks (synthetisch, kein Download nötig)

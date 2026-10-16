@@ -2,6 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_update_document_importance_persists_model_id_provenance() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -28,6 +29,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -54,6 +56,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_deletes_decayed_working_memory() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
@@ -83,6 +86,7 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         next_tx.clone(),
         4,
         contextra_text::Language::English,
@@ -122,6 +126,7 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
@@ -151,6 +156,7 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         next_tx.clone(),
         4,
         contextra_text::Language::English,
@@ -187,6 +193,7 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
 
 #[tokio::test]
 async fn test_ttl_missing_created_at_does_not_expire() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -214,6 +221,7 @@ async fn test_ttl_missing_created_at_does_not_expire() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -233,6 +241,7 @@ async fn test_ttl_missing_created_at_does_not_expire() {
 
 #[tokio::test]
 async fn test_ttl_zero_does_not_expire() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -260,6 +269,7 @@ async fn test_ttl_zero_does_not_expire() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -279,6 +289,7 @@ async fn test_ttl_zero_does_not_expire() {
 
 #[tokio::test]
 async fn test_ttl_overflow_does_not_expire() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -306,6 +317,7 @@ async fn test_ttl_overflow_does_not_expire() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,

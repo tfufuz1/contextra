@@ -1,29 +1,11 @@
 //! Low-level memory locking abstraction for Unix/Windows target architectures.
 
-/// Detailed status outcome for memory locking operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MemLockStatus {
-    /// Memory region was successfully locked into RAM.
-    Locked,
-    /// Memory region could not be locked into RAM, with optional OS errno or OS error code.
-    NotLocked {
-        /// The raw OS error code (e.g. `errno` on Unix or `GetLastError` on Windows) if available.
-        errno: Option<i32>,
-    },
-}
-
-impl MemLockStatus {
-    /// Returns `true` if memory was successfully locked.
-    pub fn is_locked(&self) -> bool {
-        matches!(self, MemLockStatus::Locked)
-    }
-}
-
-/// Locks a memory region in RAM to prevent swapping (best-effort) and returns explicit status.
+/// Locks a memory region in RAM to prevent swapping (best-effort).
+/// Returns `true` if locking succeeded, or `false` with a logged warning if it failed.
 #[cfg(unix)]
-pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
+pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
     if len == 0 || ptr.is_null() {
-        return MemLockStatus::Locked;
+        return true;
     }
     // SAFETY:
     // 1. `ptr` is guaranteed non-null and points to a valid allocated memory region of length `len`.
@@ -38,18 +20,10 @@ pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
             len,
             err
         );
-        MemLockStatus::NotLocked {
-            errno: err.raw_os_error(),
-        }
+        false
     } else {
-        MemLockStatus::Locked
+        true
     }
-}
-
-/// Locks a memory region in RAM to prevent swapping (best-effort).
-/// Returns `true` if locking succeeded, or `false` with a logged warning if it failed.
-pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
-    mem_lock_explicit(ptr, len).is_locked()
 }
 
 /// Unlocks a previously locked memory region.
@@ -66,11 +40,12 @@ pub fn mem_unlock(addr: usize, len: usize) {
     }
 }
 
-/// Locks a memory region in RAM on Windows to prevent swapping (best-effort) and returns explicit status.
+/// Locks a memory region in RAM on Windows to prevent swapping (best-effort).
+/// Returns `true` if locking succeeded, or `false` with a logged warning if it failed.
 #[cfg(windows)]
-pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
+pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
     if len == 0 || ptr.is_null() {
-        return MemLockStatus::Locked;
+        return true;
     }
     // SAFETY:
     // 1. `ptr` is guaranteed non-null and points to a valid allocated memory region of length `len`.
@@ -87,11 +62,9 @@ pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
             len,
             err
         );
-        MemLockStatus::NotLocked {
-            errno: err.raw_os_error(),
-        }
+        false
     } else {
-        MemLockStatus::Locked
+        true
     }
 }
 
@@ -110,11 +83,11 @@ pub fn mem_unlock(addr: usize, len: usize) {
 }
 
 /// Fallback implementation for non-Unix/non-Windows platforms.
-/// Returns `NotLocked { errno: None }` when `len > 0` and `ptr` is non-null to truthfully indicate memory locking is unavailable.
+/// Returns `false` when `len > 0` and `ptr` is non-null to truthfully indicate memory locking is unavailable.
 #[cfg(not(any(unix, windows)))]
-pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
+pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
     if len == 0 || ptr.is_null() {
-        return MemLockStatus::Locked;
+        return true;
     }
     tracing::warn!(
         "Memory locking is not supported on this target architecture for region at {:p} (len={}). \
@@ -122,65 +95,12 @@ pub fn mem_lock_explicit(ptr: *const u8, len: usize) -> MemLockStatus {
         ptr,
         len
     );
-    MemLockStatus::NotLocked { errno: None }
+    false
 }
 
 /// Fallback no-op memory unlock for unsupported platforms.
 #[cfg(not(any(unix, windows)))]
 pub fn mem_unlock(_addr: usize, _len: usize) {}
-
-/// Applies `MADV_DONTDUMP` to exclude the memory region from core dumps on Linux targets.
-/// Returns `true` if advice succeeded or slice is empty/null, `false` otherwise.
-///
-/// # Security Limitations
-/// `MADV_DONTDUMP` only excludes memory from core dumps (`gcore`, panics).
-/// It does **NOT** protect memory against swapping, `fork()` child processes, `ptrace` inspection,
-/// or direct reading via `/proc/<pid>/mem`.
-#[cfg(target_os = "linux")]
-pub fn apply_dontdump(ptr: *const u8, len: usize) -> bool {
-    if len == 0 || ptr.is_null() {
-        return true;
-    }
-    let page_size = 4096;
-    let addr = ptr as usize;
-    let page_mask = page_size - 1;
-    let aligned_addr = addr & !page_mask;
-    let offset = addr & page_mask;
-    let aligned_len = (len + offset + page_mask) & !page_mask;
-
-    // SAFETY:
-    // 1. `ptr` is non-null and points to a valid allocated memory region of length `len`.
-    // 2. `aligned_addr` and `aligned_len` enclose `[ptr, ptr + len)` on page boundaries.
-    // 3. `libc::madvise` with `MADV_DONTDUMP` instructs Linux kernel to exclude memory pages from core dumps.
-    let ret = unsafe {
-        libc::madvise(
-            aligned_addr as *mut libc::c_void,
-            aligned_len,
-            libc::MADV_DONTDUMP,
-        )
-    };
-    if ret != 0 {
-        let err = std::io::Error::last_os_error();
-        tracing::warn!(
-            "madvise(MADV_DONTDUMP) failed for region at {:p} (len={}): {}",
-            ptr,
-            len,
-            err
-        );
-        false
-    } else {
-        true
-    }
-}
-
-/// Fallback implementation of `apply_dontdump` for non-Linux target platforms.
-#[cfg(not(target_os = "linux"))]
-pub fn apply_dontdump(ptr: *const u8, len: usize) -> bool {
-    if len == 0 || ptr.is_null() {
-        return true;
-    }
-    false
-}
 
 #[cfg(test)]
 mod tests {
@@ -188,10 +108,6 @@ mod tests {
 
     #[test]
     fn test_mem_lock_null_or_zero_len() {
-        assert_eq!(
-            mem_lock_explicit(std::ptr::null(), 0),
-            MemLockStatus::Locked
-        );
         assert!(mem_lock(std::ptr::null(), 0));
         mem_unlock(0, 0);
     }
@@ -202,14 +118,11 @@ mod tests {
         let ptr = buf.as_ptr();
         let len = buf.len();
 
-        let status = mem_lock_explicit(ptr, len);
-        if status.is_locked() {
+        let ok = mem_lock(ptr, len);
+        // Note: mlock/VirtualLock might succeed or fail depending on process memory limits.
+        // What matters is that it does not panic and returns a boolean.
+        if ok {
             mem_unlock(ptr as usize, len);
         }
-    }
-
-    #[test]
-    fn test_apply_dontdump_null_or_zero_len() {
-        assert!(apply_dontdump(std::ptr::null(), 0));
     }
 }

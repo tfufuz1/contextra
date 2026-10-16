@@ -66,42 +66,61 @@ pub struct GermanCompoundSplitter {
 }
 
 impl GermanCompoundSplitter {
-    /// Creates a new German compound splitter loaded with the embedded German vocabulary and all domain vocabularies (Legal & Medical).
+    /// Creates a new German compound splitter loaded with the embedded German vocabulary.
     pub fn new() -> Self {
-        Self::new_with_all_domains()
+        Self::with_min_length(3)
     }
 
     /// Creates a splitter with custom minimum component length and default embedded vocabulary.
     pub fn with_min_length(min_len: usize) -> Self {
-        let mut splitter = Self {
+        let mut trie = Trie::new();
+        for line in DEFAULT_GERMAN_WORDS.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let norm = normalize_umlauts(trimmed);
+            if norm.len() >= 2 {
+                trie.insert(&norm);
+            }
+        }
+        Self {
             min_component_len: min_len,
-            trie: Trie::new(),
-        };
-        splitter.extend_vocabulary(
-            DEFAULT_GERMAN_WORDS
-                .lines()
-                .map(|line| line.trim())
-                .filter(|trimmed| !trimmed.is_empty() && !trimmed.starts_with('#')),
-        );
-        splitter
+            trie,
+        }
     }
 
     /// Creates a splitter with custom minimum component length and custom dictionary set.
     pub fn with_dictionary(min_len: usize, custom_words: HashSet<String>) -> Self {
-        let mut splitter = Self {
+        let mut trie = Trie::new();
+        for word in custom_words {
+            let norm = normalize_umlauts(&word);
+            if norm.len() >= 2 {
+                trie.insert(&norm);
+            }
+        }
+        Self {
             min_component_len: min_len,
-            trie: Trie::new(),
-        };
-        splitter.extend_vocabulary(custom_words);
-        splitter
+            trie,
+        }
     }
 
     /// Creates a splitter with the default vocabulary plus compound stems and protected terms from specific domain packages.
     pub fn with_domains(min_len: usize, domains: &[&dyn DomainVocabulary]) -> Self {
         let mut splitter = Self::with_min_length(min_len);
         for domain in domains {
-            splitter.extend_vocabulary(domain.compound_stems());
-            splitter.extend_vocabulary(domain.protected_terms());
+            for stem in domain.compound_stems() {
+                let norm = normalize_umlauts(stem);
+                if norm.len() >= 2 {
+                    splitter.trie.insert(&norm);
+                }
+            }
+            for term in domain.protected_terms() {
+                let norm = normalize_umlauts(term);
+                if norm.len() >= 2 {
+                    splitter.trie.insert(&norm);
+                }
+            }
         }
         splitter
     }
@@ -166,7 +185,7 @@ impl GermanCompoundSplitter {
 
 impl Default for GermanCompoundSplitter {
     fn default() -> Self {
-        Self::new_with_all_domains()
+        Self::new()
     }
 }
 
@@ -179,10 +198,12 @@ struct PathNode {
 
 impl MorphologicalTokenizer for GermanCompoundSplitter {
     fn decompose<'a>(&self, token: &'a str) -> Vec<&'a str> {
-        // Safe input validation: non-lowercased inputs safely return un-decomposed token without panicking.
-        if token.chars().any(|c| c.is_uppercase()) {
-            return vec![token];
-        }
+        debug_assert!(
+            token.chars().all(|c| !c.is_uppercase()),
+            "GermanCompoundSplitter::decompose received non-lowercase input: {:?}. \
+             Call normalize_umlauts() before decompose().",
+            token
+        );
 
         // Guard against oversized single tokens (e.g., > 128 bytes) to avoid O(n^2) DP overhead
         if token.len() <= self.min_component_len || token.len() > 128 {
@@ -230,13 +251,10 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                         min_segment_len: new_min_len,
                     };
 
-                    let is_full_token = j == n;
                     let update = match &dp[j] {
                         None => true,
                         Some(existing) => {
-                            if is_full_token && existing.segment_count == 1 && candidate.segment_count >= 2 {
-                                true
-                            } else if candidate.segment_count < existing.segment_count {
+                            if candidate.segment_count < existing.segment_count {
                                 true
                             } else if candidate.segment_count == existing.segment_count {
                                 candidate.min_segment_len > existing.min_segment_len

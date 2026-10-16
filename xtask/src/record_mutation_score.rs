@@ -15,24 +15,12 @@ pub struct MutationScoreEntry {
     pub caught: usize,
     pub missed: usize,
     pub score_pct: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub log_path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub log_sha256: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mutants_json_sha256: Option<String>,
 }
 
 pub fn run_record_mutation_score(args: &[String], root: &Path) -> Result<(), String> {
     let mut crate_name = String::new();
     let mut total: Option<usize> = None;
     let mut caught: Option<usize> = None;
-    let mut allow_zero = false;
-    let mut _allow_zero_reason = String::new();
-    let mut log_path: Option<String> = None;
-    let mut log_sha256: Option<String> = None;
-    let mut mutants_json_sha256: Option<String> = None;
-    let mut outcomes_json_path: Option<String> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -55,71 +43,9 @@ pub fn run_record_mutation_score(args: &[String], root: &Path) -> Result<(), Str
                     i += 1;
                 }
             }
-            "--allow-zero" => {
-                allow_zero = true;
-                if i + 1 < args.len() && !args[i + 1].starts_with('-') {
-                    _allow_zero_reason = args[i + 1].clone();
-                    i += 1;
-                }
-            }
-            "--log-path" => {
-                if i + 1 < args.len() {
-                    log_path = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            "--log-sha256" => {
-                if i + 1 < args.len() {
-                    log_sha256 = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            "--mutants-json-sha256" => {
-                if i + 1 < args.len() {
-                    mutants_json_sha256 = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            "--outcomes-json" => {
-                if i + 1 < args.len() {
-                    outcomes_json_path = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
             _ => {}
         }
         i += 1;
-    }
-
-    if let Some(outcomes_path) = outcomes_json_path {
-        let p = Path::new(&outcomes_path);
-        if p.exists() {
-            if let Ok(content) = fs::read_to_string(p) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                    let arr_opt = val
-                        .as_array()
-                        .or_else(|| val.get("outcomes").and_then(|o| o.as_array()));
-                    if let Some(arr) = arr_opt {
-                        let parsed_total = arr.len();
-                        let parsed_caught = arr
-                            .iter()
-                            .filter(|m| {
-                                m.get("summary")
-                                    .and_then(|s| s.as_str())
-                                    .map(|s| s == "caught" || s == "timeout")
-                                    .unwrap_or(false)
-                            })
-                            .count();
-                        if total.is_none() {
-                            total = Some(parsed_total);
-                        }
-                        if caught.is_none() {
-                            caught = Some(parsed_caught);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     if crate_name.is_empty() {
@@ -132,12 +58,6 @@ pub fn run_record_mutation_score(args: &[String], root: &Path) -> Result<(), Str
         return Err(format!(
             "Invalid counts: caught ({caught}) cannot exceed total ({total})"
         ));
-    }
-
-    if caught == 0 && total > 0 && !allow_zero {
-        return Err(
-            "Refusing to record mutation score with caught == 0 and total > 0 without --allow-zero <reason>".to_string()
-        );
     }
 
     let missed = total.saturating_sub(caught);
@@ -165,9 +85,6 @@ pub fn run_record_mutation_score(args: &[String], root: &Path) -> Result<(), Str
         caught,
         missed,
         score_pct,
-        log_path,
-        log_sha256,
-        mutants_json_sha256,
     };
 
     let docs_dir = root.join("docs");

@@ -4,10 +4,6 @@ use super::BoxFuture;
 use contextra_types::{RerankResult, Result};
 
 /// Trait for post-retrieval cross-encoder reranking models.
-///
-/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
-/// |---|---|---|---|
-/// | `Reranker` | `CrossEncoderReranker` (externer Re-Ranker-Adapter) | `contextra-db` / `contextra::builder` | Aktiver Port für Re-Ranking nach der Retrieval-Phase |
 pub trait Reranker: Send + Sync {
     /// Reranks candidates for a given query text.
     fn rerank<'a>(

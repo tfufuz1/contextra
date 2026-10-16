@@ -1,0 +1,8 @@
+title = "Prüfung von Behauptungen im PR"
+what = "Behauptungen in der PR-Beschreibung stimmen nicht mit dem tatsächlichen Diff überein."
+why = "PR-Behauptungen müssen belegbar und wahr sein; Halluzinationen verfälschen Audit-Trails."
+fix = "Korrigiere den PR-Text so, dass er exakt den vorgenommenen Änderungen entspricht."
+anti_fix = "Füge keine fiktiven Testergebnisse oder ungeprüfte Behauptungen ein."
+adr = ["ADR-035"]
+related = ["check-commit-diff-integrity", "task-card"]
+sources = ["docs/gates/phantom-commit-gate.md", "CONSTITUTION.md"]

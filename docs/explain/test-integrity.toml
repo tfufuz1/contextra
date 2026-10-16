@@ -1,0 +1,8 @@
+title = "Integrität der Testsuite"
+what = "Tests wurden gelöscht, deaktiviert (`#[ignore]`) oder in ihrer Assertions-Schärfe geschwächt."
+why = "Das Entfernen oder Abschwächen von Tests erzeugt blinde Flecken in der Qualitätssicherung."
+fix = "Stelle den Originaltest wieder her und behebe die Ursache im Produktionscode."
+anti_fix = "Setze keine `#[ignore]` Attribute auf fehlschlagende Tests."
+adr = ["ADR-035"]
+related = ["gate-weakening", "check-mutation-score-gate"]
+sources = ["CONSTITUTION.md"]

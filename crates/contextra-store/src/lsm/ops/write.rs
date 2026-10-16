@@ -1,23 +1,12 @@
-// FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Implementiert Schreib- und Commit-Operationen (put, put_if_absent, delete, commit) für LsmStorage.
-// INVARIANTEN:
-// - Sperrenhierarchie: commit_mutex -> pending_commit_queue -> truncate_lock -> state.
-// - LeaderCancelGuard benachrichtigt bei Cancellation unaufgefordert und synchron alle Follower mit Storage-Error.
-// - committed_flag ist per PendingCommitQueue-Instanz isoliert und schützt vor fremden Batch-Statusabfragen.
-
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
 use super::super::group_commit::{
-    execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
-    WalQueueGuard,
+    execute_group_commit_append, GroupCommitRequest, PendingCommitQueue, WalQueueGuard,
 };
 use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT, TxId};
-use contextra_ports::StorageEngine;
-use contextra_mvcc::IndexOp;
+use contextra_core::{ContextraError, IndexOp, Result, StorageEngine, TxId, TOMBSTONE_BIT};
 use contextra_mvcc::SsiValidator;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -26,10 +15,6 @@ use std::time::Duration;
 pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {
     validate_key(key)?;
     validate_value(value)?;
-    storage
-        .erasure_fence
-        .check_write_allowed_scope(key)
-        .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -84,10 +69,6 @@ pub(super) async fn put_if_absent(
 ) -> Result<bool> {
     validate_key(key)?;
     validate_value(value)?;
-    storage
-        .erasure_fence
-        .check_write_allowed_scope(key)
-        .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -149,10 +130,6 @@ pub(super) async fn put_if_absent(
 
 pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
     validate_key(key)?;
-    storage
-        .erasure_fence
-        .check_write_allowed_scope(key)
-        .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -185,12 +162,6 @@ pub(super) async fn delete_many(
     }
     for key in &keys {
         validate_key(key)?;
-        storage
-            .erasure_fence
-            .check_write_allowed_scope(key)
-            .map_err(|e| {
-                ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
-            })?;
     }
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
@@ -219,13 +190,6 @@ pub(super) async fn delete_many(
 }
 
 pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
-    validate_key(prefix)?;
-    storage
-        .erasure_fence
-        .check_write_allowed_scope(prefix)
-        .map_err(|e| {
-            ContextraError::Storage(format!("Delete prefix rejected by erasure fence: {e}"))
-        })?;
     let matching_keys: Vec<Vec<u8>> = storage
         .scan_prefix(prefix)
         .await?
@@ -233,72 +197,6 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
         .map(|(key, _)| key)
         .collect();
     storage.delete_many(tx_id, matching_keys).await
-}
-
-fn prepare_tx_ops(
-    storage: &LsmStorage,
-    tx_id: TxId,
-    ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
-) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
-    let mut wal_ops = Vec::with_capacity(ops.len() + 1);
-    let mut mem_updates = Vec::with_capacity(ops.len());
-
-    for op in ops {
-        let seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
-        match op {
-            IndexOp::Insert { doc_id: _, data } => {
-                let (key, value) = data;
-                wal_ops.push((
-                    WalOp::Put {
-                        tx_id,
-                        key: key.clone(),
-                        value: value.clone(),
-                    },
-                    seq_no,
-                ));
-                mem_updates.push((key.clone(), value.clone(), seq_no));
-            }
-            IndexOp::Delete { doc_id: _, data } => {
-                if let Some((key, _)) = data {
-                    wal_ops.push((
-                        WalOp::Delete {
-                            tx_id,
-                            key: key.clone(),
-                        },
-                        seq_no,
-                    ));
-                    mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
-                }
-            }
-            _ => {
-                return Err(ContextraError::InvalidInput(
-                    "Unsupported operation type staged in LSM commit".to_string(),
-                ));
-            }
-        }
-    }
-
-    // FIX B1: Allocate a separate, distinct monotonic sequence number for TxEnd to enforce entry.seq_no > last_seq in IntegrityVerifier.
-    let tx_end_seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
-    wal_ops.push((
-        WalOp::TxEnd {
-            tx_id,
-            committed: true,
-        },
-        tx_end_seq_no,
-    ));
-
-    for (key, _, seq_no) in &mem_updates {
-        let raw_seq = seq_no & !TOMBSTONE_BIT;
-        storage.ssi_validator.record_commit_key(key, raw_seq);
-    }
-
-    let first_seq = mem_updates
-        .first()
-        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-        .unwrap_or(0);
-
-    Ok((wal_ops, mem_updates, first_seq))
 }
 
 /// Commits staged transaction operations to disk and memory.
@@ -353,8 +251,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let _intent_guard = IntentLockGuard(storage, tx_id);
 
     // LOCK ORDER 1: commit_mutex
-    let commit_lock = storage.erasure_fence.commit_mutex.lock().await;
-    let _engine_commit_lock = storage.commit_mutex.lock().await;
+    let commit_lock = storage.commit_mutex.lock().await;
 
     // 1. ReadSet VOR drain_kv
     let read_set = storage.tx_buffer.get_read_set(tx_id);
@@ -364,27 +261,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     if ops.is_empty() {
         storage.cleanup_intent_locks_for_tx(tx_id);
         return Ok(());
-    }
-
-    // Check erasure fence permissions for all staged operations prior to commit
-    for op in &ops {
-        let key = match op {
-            IndexOp::Insert { data, .. } => &data.0[..],
-            IndexOp::Delete { data, .. } => {
-                if let Some((k, _)) = data {
-                    &k[..]
-                } else {
-                    continue;
-                }
-            }
-            _ => continue,
-        };
-        if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-            storage.cleanup_intent_locks_for_tx(tx_id);
-            return Err(ContextraError::Storage(format!(
-                "Commit rejected by erasure fence: {e}"
-            )));
-        }
     }
 
     // 3. SSI ReadSet Validierung unter commit_mutex
@@ -397,30 +273,69 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
     }
 
+    let mut wal_ops = Vec::with_capacity(ops.len() + 1);
+    let mut mem_updates = Vec::with_capacity(ops.len());
+
+    for op in &ops {
+        let seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
+        match op {
+            IndexOp::Insert { doc_id: _, data } => {
+                let (key, value) = data;
+                wal_ops.push((
+                    WalOp::Put {
+                        tx_id,
+                        key: key.clone(),
+                        value: value.clone(),
+                    },
+                    seq_no,
+                ));
+                mem_updates.push((key.clone(), value.clone(), seq_no));
+            }
+            IndexOp::Delete { doc_id: _, data } => {
+                if let Some((key, _)) = data {
+                    wal_ops.push((
+                        WalOp::Delete {
+                            tx_id,
+                            key: key.clone(),
+                        },
+                        seq_no,
+                    ));
+                    mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
+                }
+            }
+            _ => {
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(ContextraError::InvalidInput(
+                    "Unsupported operation type staged in LSM commit".to_string(),
+                ));
+            }
+        }
+    }
+
+    // FIX B1: Allocate a separate, distinct monotonic sequence number for TxEnd to enforce entry.seq_no > last_seq in IntegrityVerifier.
+    let tx_end_seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
+    wal_ops.push((
+        WalOp::TxEnd {
+            tx_id,
+            committed: true,
+        },
+        tx_end_seq_no,
+    ));
+
+    for (key, _, seq_no) in &mem_updates {
+        let raw_seq = seq_no & !TOMBSTONE_BIT;
+        storage.ssi_validator.record_commit_key(key, raw_seq);
+    }
+
+    let first_seq = mem_updates
+        .first()
+        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+        .unwrap_or(0);
+
     let wal = storage.wal.read().await.clone();
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
-        for op in &ops {
-            let key = match op {
-                IndexOp::Insert { data, .. } => &data.0[..],
-                IndexOp::Delete { data, .. } => {
-                    if let Some((k, _)) = data {
-                        &k[..]
-                    } else {
-                        continue;
-                    }
-                }
-                _ => continue,
-            };
-            if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(ContextraError::Storage(format!(
-                    "Commit rejected by erasure fence: {e}"
-                )));
-            }
-        }
-        let (wal_ops, mem_updates, first_seq) = prepare_tx_ops(storage, tx_id, &ops)?;
         let (wal_entries, _prev_hmac) = wal.prepare_batch(wal_ops).await?;
         let entries_for_observer = if storage.has_observers() {
             wal_entries.entries().to_vec()
@@ -485,7 +400,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        )?;
+        );
 
         // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
         let state = storage.state.read().await;
@@ -506,45 +421,24 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     // LOCK ORDER 2: pending_commit_queue
     let mut queue_guard = storage.pending_commit_queue.lock().await;
 
-    if let Some(ref queue) = *queue_guard {
+    if let Some(ref mut queue) = *queue_guard {
         // --- FOLLOWER PATH ---
         let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
         let (tx, mut rx) = tokio::sync::oneshot::channel();
         let committed_flag = Arc::clone(&queue.committed_flag);
-        let shared = Arc::clone(&queue.shared);
         let req = GroupCommitRequest {
             tx_id,
-            ops,
+            wal_ops,
+            mem_updates,
             sender: tx,
         };
-
-        let (_is_full, notify_full) = {
-            let mut shared_guard = shared.lock().unwrap_or_else(|e| e.into_inner());
-            if shared_guard.cancelled {
-                drop(shared_guard);
-                if queue_guard
-                    .as_ref()
-                    .is_some_and(|q| Arc::ptr_eq(&q.shared, &shared))
-                {
-                    *queue_guard = None;
-                }
-                drop(queue_guard);
-                drop(commit_lock);
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(ContextraError::Storage(
-                    "Leader cancelled group commit".into(),
-                ));
-            }
-            shared_guard.requests.push(req);
-            let is_full = shared_guard.requests.len() >= MAX_GROUP_COMMIT_BATCH_SIZE;
-            let notify = if is_full {
-                Some(queue.notify_full.clone())
-            } else {
-                None
-            };
-            (is_full, notify)
+        queue.requests.push(req);
+        let is_full = queue.requests.len() >= MAX_GROUP_COMMIT_BATCH_SIZE;
+        let notify_full = if is_full {
+            Some(queue.notify_full.clone())
+        } else {
+            None
         };
-
         drop(queue_guard);
         drop(commit_lock);
 
@@ -558,34 +452,30 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 if committed_flag.load(Ordering::Acquire) {
                     Ok(())
                 } else {
+                    if first_seq > 0 {
+                        storage.ssi_validator.forget_from(first_seq);
+                    }
                     storage.cleanup_intent_locks_for_tx(tx_id);
                     Err(ContextraError::Storage(
-                        "Leader cancelled group commit".into(),
+                        "Commit failed at WAL append after leader cancellation".into(),
                     ))
                 }
             }
             Err(_) => {
                 let mut queue_guard = storage.pending_commit_queue.lock().await;
-                let still_in_queue = if let Some(ref q) = *queue_guard {
-                    if Arc::ptr_eq(&q.shared, &shared) {
-                        let shared_guard = q.shared.lock().unwrap_or_else(|e| e.into_inner());
-                        shared_guard.requests.iter().any(|r| r.tx_id == tx_id)
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
+                let queue_active = queue_guard.is_some();
+                let taken_by_leader = queue_guard
+                    .as_ref()
+                    .is_some_and(|q| !q.requests.iter().any(|r| r.tx_id == tx_id));
 
-                if still_in_queue {
+                if queue_active && !taken_by_leader {
                     if let Some(ref mut queue) = *queue_guard {
-                        if Arc::ptr_eq(&queue.shared, &shared) {
-                            let mut shared_guard =
-                                queue.shared.lock().unwrap_or_else(|e| e.into_inner());
-                            shared_guard.requests.retain(|r| r.tx_id != tx_id);
-                        }
+                        queue.requests.retain(|r| r.tx_id != tx_id);
                     }
                     drop(queue_guard);
+                    if first_seq > 0 {
+                        storage.ssi_validator.forget_from(first_seq);
+                    }
                     storage.cleanup_intent_locks_for_tx(tx_id);
                     Err(ContextraError::CommitTimeout {
                         tx_id: tx_id.inner(),
@@ -599,9 +489,12 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                             if committed_flag.load(Ordering::Acquire) {
                                 Ok(())
                             } else {
+                                if first_seq > 0 {
+                                    storage.ssi_validator.forget_from(first_seq);
+                                }
                                 storage.cleanup_intent_locks_for_tx(tx_id);
                                 Err(ContextraError::Storage(
-                                    "Leader cancelled group commit".into(),
+                                    "Commit failed at WAL append after leader cancellation".into(),
                                 ))
                             }
                         }
@@ -614,16 +507,13 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     } else {
         // --- LEADER PATH ---
         let leader_tx_id = tx_id;
-        let leader_ops = ops;
+        let leader_wal_ops = wal_ops;
+        let leader_mem_updates = mem_updates;
 
         let notify_full = Arc::new(tokio::sync::Notify::new());
         let committed_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let shared = Arc::new(std::sync::Mutex::new(GroupCommitSharedState {
-            requests: Vec::new(),
-            cancelled: false,
-        }));
         *queue_guard = Some(PendingCommitQueue {
-            shared: shared.clone(),
+            requests: Vec::new(),
             notify_full: notify_full.clone(),
             committed_flag: committed_flag.clone(),
         });
@@ -633,23 +523,29 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             storage: &'a LsmStorage,
             leader_tx_id: TxId,
             leader_first_seq: u64,
-            shared: Arc<std::sync::Mutex<GroupCommitSharedState>>,
             active: bool,
         }
 
         impl<'a> Drop for LeaderCancelGuard<'a> {
             fn drop(&mut self) {
                 if self.active {
-                    let requests = {
-                        let mut shared = self.shared.lock().unwrap_or_else(|e| e.into_inner());
-                        shared.cancelled = true;
-                        std::mem::take(&mut shared.requests)
-                    };
-                    for r in requests {
-                        self.storage.cleanup_intent_locks_for_tx(r.tx_id);
-                        let _ = r.sender.send(Err(ContextraError::Storage(
-                            "Leader cancelled group commit".into(),
-                        )));
+                    if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
+                        if let Some(pending_queue) = queue_guard.take() {
+                            for r in pending_queue.requests {
+                                let r_first_seq = r
+                                    .mem_updates
+                                    .first()
+                                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+                                    .unwrap_or(0);
+                                if r_first_seq > 0 {
+                                    self.storage.ssi_validator.forget_from(r_first_seq);
+                                }
+                                self.storage.cleanup_intent_locks_for_tx(r.tx_id);
+                                let _ = r.sender.send(Err(ContextraError::Storage(
+                                    "Leader cancelled group commit".into(),
+                                )));
+                            }
+                        }
                     }
                     if self.leader_first_seq > 0 {
                         self.storage
@@ -657,27 +553,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                             .forget_from(self.leader_first_seq);
                     }
                     self.storage.cleanup_intent_locks_for_tx(self.leader_tx_id);
-
-                    if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
-                        if let Some(ref q) = *queue_guard {
-                            if Arc::ptr_eq(&q.shared, &self.shared) {
-                                *queue_guard = None;
-                            }
-                        }
-                    }
                 }
             }
         }
 
-        // Leader's sequence numbers are assigned here so leader_first_seq is captured for LeaderCancelGuard
-        let (leader_wal_ops, leader_mem_updates, leader_first_seq) =
-            prepare_tx_ops(storage, leader_tx_id, &leader_ops)?;
-
         let mut leader_guard = LeaderCancelGuard {
             storage,
             leader_tx_id,
-            leader_first_seq,
-            shared: shared.clone(),
+            leader_first_seq: first_seq,
             active: true,
         };
 
@@ -691,8 +574,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         // Re-acquire commit_mutex after collection window.
         // Leader holds commit_mutex continuously from queue_guard.take() / prepare_batch through apply_mem_updates, advance_visibility, and follower notification.
-        let commit_lock = storage.erasure_fence.commit_mutex.lock().await;
-        let _engine_commit_lock = storage.commit_mutex.lock().await;
+        let commit_lock = storage.commit_mutex.lock().await;
 
         let mut queue_guard = storage.pending_commit_queue.lock().await;
         let pending_queue = match queue_guard.take() {
@@ -708,98 +590,33 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         leader_guard.active = false;
 
-        let requests = {
-            let mut shared_guard = pending_queue
-                .shared
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            std::mem::take(&mut shared_guard.requests)
-        };
-
-        // Window 1: Fence Check for Leader + Followers under commit_mutex
-        for op in &leader_ops {
-            let key = match op {
-                IndexOp::Insert { data, .. } => &data.0[..],
-                IndexOp::Delete { data, .. } => {
-                    if let Some((k, _)) = data {
-                        &k[..]
-                    } else {
-                        continue;
-                    }
-                }
-                _ => continue,
-            };
-            if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-                if leader_first_seq > 0 {
-                    storage.ssi_validator.forget_from(leader_first_seq);
-                }
-                let mut batch_txs = vec![leader_tx_id];
-                batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                storage.cleanup_intent_locks_for_txs(&batch_txs);
-                let err_msg = format!("Commit rejected by erasure fence: {e}");
-                for r in requests {
-                    let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                }
-                return Err(ContextraError::Storage(err_msg));
-            }
-        }
-        for r in &requests {
-            for op in &r.ops {
-                let key = match op {
-                    IndexOp::Insert { data, .. } => &data.0[..],
-                    IndexOp::Delete { data, .. } => {
-                        if let Some((k, _)) = data {
-                            &k[..]
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => continue,
-                };
-                if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-                    if leader_first_seq > 0 {
-                        storage.ssi_validator.forget_from(leader_first_seq);
-                    }
-                    let mut batch_txs = vec![leader_tx_id];
-                    batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                    storage.cleanup_intent_locks_for_txs(&batch_txs);
-                    let err_msg = format!("Commit rejected by erasure fence: {e}");
-                    for req in requests {
-                        let _ = req.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                    }
-                    return Err(ContextraError::Storage(err_msg));
-                }
-            }
-        }
-
-        let mut follower_prep = Vec::with_capacity(requests.len());
-        for r in &requests {
-            let prep = prepare_tx_ops(storage, r.tx_id, &r.ops)?;
-            follower_prep.push(prep);
-        }
-
         let mut all_wal_ops = leader_wal_ops;
-        for (f_wal_ops, _, _) in &follower_prep {
-            all_wal_ops.extend(f_wal_ops.clone());
+        for r in pending_queue.requests.iter() {
+            all_wal_ops.extend(r.wal_ops.clone());
         }
 
         let (all_wal_entries, _prev_hmac) = match wal.prepare_batch(all_wal_ops).await {
             Ok(res) => res,
             Err(e) => {
-                if leader_first_seq > 0 {
-                    storage.ssi_validator.forget_from(leader_first_seq);
+                if first_seq > 0 {
+                    storage.ssi_validator.forget_from(first_seq);
                 }
-                for (_, _, f_first_seq) in &follower_prep {
-                    if *f_first_seq > 0 {
-                        storage.ssi_validator.forget_from(*f_first_seq);
+                for r in &pending_queue.requests {
+                    let r_first_seq = r
+                        .mem_updates
+                        .first()
+                        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+                        .unwrap_or(0);
+                    if r_first_seq > 0 {
+                        storage.ssi_validator.forget_from(r_first_seq);
                     }
                 }
                 let mut batch_txs = vec![leader_tx_id];
-                batch_txs.extend(requests.iter().map(|r| r.tx_id));
+                batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
                 storage.cleanup_intent_locks_for_txs(&batch_txs);
 
                 let err_msg = format!("Group commit batch preparation failed: {e}");
-                for r in requests {
+                for r in pending_queue.requests {
                     let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
                 }
                 return Err(e);
@@ -841,22 +658,27 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         };
 
         if let Err(e) = append_res {
-            if leader_first_seq > 0 {
-                storage.ssi_validator.forget_from(leader_first_seq);
+            if first_seq > 0 {
+                storage.ssi_validator.forget_from(first_seq);
             }
-            for (_, _, f_first_seq) in &follower_prep {
-                if *f_first_seq > 0 {
-                    storage.ssi_validator.forget_from(*f_first_seq);
+            for r in &pending_queue.requests {
+                let r_first_seq = r
+                    .mem_updates
+                    .first()
+                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+                    .unwrap_or(0);
+                if r_first_seq > 0 {
+                    storage.ssi_validator.forget_from(r_first_seq);
                 }
             }
 
             let err_msg = format!("Commit failed (at WAL append), WAL anchor rollback executed: WAL append failed: {e}");
 
             let mut batch_txs = vec![leader_tx_id];
-            batch_txs.extend(requests.iter().map(|r| r.tx_id));
+            batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
             storage.cleanup_intent_locks_for_txs(&batch_txs);
 
-            for r in requests {
+            for r in pending_queue.requests {
                 if r.sender
                     .send(Err(ContextraError::Storage(err_msg.clone())))
                     .is_err()
@@ -873,12 +695,11 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             leader_tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        )?;
+        );
 
         let mut current_idx = leader_entries_count;
-        for (i, r) in requests.iter().enumerate() {
-            let follower_mem_updates = &follower_prep[i].1;
-            let follower_entries_count = follower_mem_updates.len() + 1;
+        for r in &pending_queue.requests {
+            let follower_entries_count = r.mem_updates.len() + 1;
             if storage.has_observers() {
                 if let Some(entries) = all_wal_entries
                     .entries()
@@ -889,17 +710,18 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                         r.tx_id,
                         WriteOrigin::UserWrite,
                         is_durable,
-                    )?;
+                    );
                 }
             }
             current_idx += follower_entries_count;
         }
 
         type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);
-        let mut all_updates: Vec<MemUpdateBatch> = Vec::with_capacity(1 + requests.len());
+        let mut all_updates: Vec<MemUpdateBatch> =
+            Vec::with_capacity(1 + pending_queue.requests.len());
         all_updates.push((leader_tx_id, &leader_mem_updates));
-        for (i, r) in requests.iter().enumerate() {
-            all_updates.push((r.tx_id, &follower_prep[i].1));
+        for r in &pending_queue.requests {
+            all_updates.push((r.tx_id, &r.mem_updates));
         }
 
         // LOCK ORDER 4: state (read guard: symmetrical with single-commit, MemTable uses internal RwLock)
@@ -916,10 +738,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
 
         let mut batch_txs = vec![leader_tx_id];
-        batch_txs.extend(requests.iter().map(|r| r.tx_id));
+        batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
         storage.cleanup_intent_locks_for_txs(&batch_txs);
 
-        for r in requests {
+        for r in pending_queue.requests {
             if r.sender.send(Ok(())).is_err() {
                 tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver before group commit notification");
             }

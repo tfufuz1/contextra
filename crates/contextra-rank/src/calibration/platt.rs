@@ -45,15 +45,6 @@ impl PlattScaler {
         !self.is_identity()
     }
 
-    /// Constructs a `SignalCalibrationContext` for this scaler.
-    pub fn calibration_context(
-        &self,
-        signal_name: impl Into<String>,
-        drift_status: crate::drift::DriftStatus,
-    ) -> crate::fusion::SignalCalibrationContext {
-        crate::fusion::SignalCalibrationContext::new(signal_name, self.is_fitted(), drift_status)
-    }
-
     /// Returns current parameters `(a, b)`.
     pub fn params(&self) -> (f32, f32) {
         (self.a, self.b)
@@ -73,10 +64,6 @@ impl PlattScaler {
     pub fn transform(&self, logit: f32) -> f32 {
         if logit.is_nan() {
             return 0.5;
-        }
-        if !self.is_fitted() {
-            let z = logit;
-            return 1.0 / (1.0 + (-z).exp());
         }
         let z = self.a * logit + self.b;
         1.0 / (1.0 + (-z).exp())

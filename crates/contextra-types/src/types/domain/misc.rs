@@ -40,23 +40,6 @@ mod hex {
     }
 }
 
-/// A deterministic timestamp containing wall-clock time in milliseconds since Unix epoch
-/// and a monotonic counter value for ordering and duration measurements.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct DeterministicTimestamp {
-    /// Wall-clock time in milliseconds since the Unix epoch.
-    pub wall_ms: u64,
-    /// Monotonic counter value for ordering within the same millisecond or tick sequence.
-    pub mono_ctr: u64,
-}
-
-impl DeterministicTimestamp {
-    /// Creates a new [`DeterministicTimestamp`].
-    pub const fn new(wall_ms: u64, mono_ctr: u64) -> Self {
-        Self { wall_ms, mono_ctr }
-    }
-}
-
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowState {
@@ -80,7 +63,8 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to HNSW and BM25 sub-searches. All upstream layers MUST reference this constant — never duplicate the literal `1000`.
+/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
+/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
@@ -236,7 +220,17 @@ impl Edge {
                 "Edge weight must be finite and non-negative".to_string(),
             ));
         }
-        Ok(Self::new(from, to, label_str).with_weight(weight))
+        Ok(Self {
+            from,
+            to,
+            label: label_str.into(),
+            weight,
+            tx_valid_from: None,
+            tx_valid_to: None,
+            business_valid_from: None,
+            business_valid_to: None,
+            source_doc_id: None,
+        })
     }
 
     /// Sets a custom weight on the edge.
@@ -246,8 +240,10 @@ impl Edge {
     }
 
     /// Sets transaction validity window (system time / MVCC) on the edge.
-    pub fn with_tx_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.with_validity(from, to)
+    pub fn with_tx_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.tx_valid_from = from;
+        self.tx_valid_to = to;
+        self
     }
 
     /// Sets business validity window (business time in Unix ms) on the edge.
@@ -258,10 +254,8 @@ impl Edge {
     }
 
     /// Sets transaction validity window on the edge (alias for `with_tx_validity` for backward compatibility).
-    pub fn with_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.tx_valid_from = from;
-        self.tx_valid_to = to;
-        self
+    pub fn with_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.with_tx_validity(from, to)
     }
 }
 
@@ -332,11 +326,6 @@ impl MemoryType {
         }
     }
 
-    /// Returns the canonical metadata key string.
-    pub fn as_str(&self) -> &'static str {
-        self.as_metadata_key()
-    }
-
     /// Gibt den kanonischen Metadaten-Key zurück (für JSON-Serialisierung).
     pub fn as_metadata_key(&self) -> &'static str {
         match self {
@@ -348,17 +337,11 @@ impl MemoryType {
     }
 }
 
-impl std::fmt::Display for MemoryType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_metadata_key())
-    }
-}
-
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
 /// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to isolate domain configuration.
-/// Graph algorithms map this configuration to internal diffusion parameters.
+/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
+/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
@@ -564,6 +547,13 @@ impl AutoExtractionMode {
 
 impl Default for AutoExtractionMode {
     fn default() -> Self {
-        Self::Enabled
+        #[cfg(not(feature = "auto-extraction-opt-out"))]
+        {
+            Self::Enabled
+        }
+        #[cfg(feature = "auto-extraction-opt-out")]
+        {
+            Self::Disabled
+        }
     }
 }

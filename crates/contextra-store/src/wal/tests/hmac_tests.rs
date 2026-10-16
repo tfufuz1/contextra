@@ -1,7 +1,7 @@
 use super::*;
 use crate::wal::KeyManager;
 use crate::wal::Wal;
-use contextra_types::TxId;
+use contextra_core::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::WalHmac;
 #[cfg(feature = "encryption-at-rest")]

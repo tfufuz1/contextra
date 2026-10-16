@@ -1,0 +1,8 @@
+title = "Dokumentations-Wahrhaftigkeit"
+what = "Widerspruch zwischen Code, Capability-Manifest oder Architektur-Dokumenten entdeckt."
+why = "Falsche oder veraltete Dokumentation führt zu fehlerhaften Annahmen bei Entwicklern und KI-Agenten."
+fix = "Führe `cargo xtask sync-docs` aus und aktualisiere die betroffenen Dokumentationsdateien."
+anti_fix = "Passe nicht den Prüfcode an, um Veraltungen zu ignorieren."
+adr = ["ADR-N08"]
+related = ["sync-docs", "registry-check"]
+sources = ["capabilities.toml", "AGENTS.md"]

@@ -1,14 +1,6 @@
-// FILE-CONTEXT
-// STAND: 2026-10-06
-// ZWECK: Enthält Datenstrukturen und Hilfsfunktionen für die Group-Commit-Batching-Koordination im LSM-Tree.
-// INVARIANTEN:
-// - GroupCommitSharedState ermöglicht unter std::sync::Mutex unbedingte und nicht-blockierende Follower-Benachrichtigungen bei Leader-Abbruch.
-// - committed_flag ist strikt an die jeweilige Batch-Generation gebunden.
-
 use crate::lsm::config::DurabilityMode;
-use crate::wal::{PreparedBatch, Wal};
-use contextra_types::{Result, TxId};
-use contextra_mvcc::IndexOp;
+use crate::wal::{PreparedBatch, Wal, WalOp};
+use contextra_core::{Result, TxId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -57,7 +49,8 @@ pub(super) async fn execute_group_commit_append(
 
 pub(super) struct GroupCommitRequest {
     pub(super) tx_id: TxId,
-    pub(super) ops: Vec<IndexOp<(Vec<u8>, Vec<u8>)>>,
+    pub(super) wal_ops: Vec<(WalOp, u64)>,
+    pub(super) mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     pub(super) sender: tokio::sync::oneshot::Sender<Result<()>>,
 }
 
@@ -76,13 +69,8 @@ impl Drop for WalQueueGuard {
     }
 }
 
-pub(super) struct GroupCommitSharedState {
-    pub(super) requests: Vec<GroupCommitRequest>,
-    pub(super) cancelled: bool,
-}
-
 pub(super) struct PendingCommitQueue {
-    pub(super) shared: Arc<std::sync::Mutex<GroupCommitSharedState>>,
+    pub(super) requests: Vec<GroupCommitRequest>,
     pub(super) notify_full: Arc<tokio::sync::Notify>,
     pub(super) committed_flag: Arc<AtomicBool>,
 }

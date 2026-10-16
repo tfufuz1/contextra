@@ -55,9 +55,8 @@ async fn create_mock_server() -> (Arc<McpServer>, TempDir) {
         allow_db_reads: true,
         allow_db_writes: true,
         allow_code_execution: false,
-        allow_cloud_egress: false,
+        allow_cloud_egress: true,
         max_execution_ms: 5_000,
-        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
     let server = Arc::new(McpServer::with_sandbox(Arc::new(db), embedder, sandbox));
@@ -128,17 +127,27 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
         );
     }
 
+    // 2. Erwartete Kategorien festschreiben
+    // Rationale for contextra_consolidate:
+    // contextra_consolidate triggert synchrone/asynchrone Memory Consolidation Passes (Tombstone-Erstellung,
+    // Synthese-Chunks, Graph-Anpassungen im Disk-/Speicher-State).
+    // Aufgrund dieser realen Schreib- und Mutationswirkung ist contextra_consolidate als DatabaseWrite klassifiziert.
     let expected_categories: HashMap<&'static str, ToolCategory> = HashMap::from([
         ("contextra_search", ToolCategory::DatabaseRead),
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_collections", ToolCategory::DatabaseRead),
         ("contextra_plugin_status", ToolCategory::DatabaseRead),
+        ("contextra_explain", ToolCategory::DatabaseRead),
         ("contextra_insert", ToolCategory::DatabaseWrite),
         ("contextra_upsert", ToolCategory::DatabaseWrite),
         ("contextra_delete", ToolCategory::DatabaseWrite),
         ("contextra_forget", ToolCategory::DatabaseWrite),
+        ("contextra_relate", ToolCategory::DatabaseWrite),
+        ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
         ("contextra_drop_collection", ToolCategory::DatabaseWrite),
+        ("contextra_consolidate", ToolCategory::DatabaseWrite),
+        ("contextra_cloud_query", ToolCategory::CloudEgress),
     ]);
 
     assert_eq!(
@@ -155,6 +164,7 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
             .get(name)
             .unwrap_or_else(|| panic!("Unmapped tool in test: {name}"));
 
+        // (2.1) Classification via try_classify_method matches expected category
         let actual_cat = McpSandbox::try_classify_method(name)
             .unwrap_or_else(|_| panic!("Tool '{name}' failed try_classify_method"));
 
@@ -164,12 +174,14 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
             expected_cat, actual_cat
         );
 
+        // (2.2) Tool definition category in TOOL_REGISTRY matches expected category
         assert_eq!(
             &tool.category, expected_cat,
             "TOOL_REGISTRY category for '{name}' mismatch: expected {:?}, got {:?}",
             expected_cat, tool.category
         );
 
+        // (3) Keines der gelisteten Werkzeuge ergibt CodeExecution
         assert_ne!(
             actual_cat,
             ToolCategory::CodeExecution,

@@ -27,9 +27,9 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_types::ContextraError {
+impl From<DurabilityConfigError> for contextra_core::ContextraError {
     fn from(err: DurabilityConfigError) -> Self {
-        contextra_types::ContextraError::DurabilityConfig(err.to_string())
+        contextra_core::ContextraError::DurabilityConfig(err.to_string())
     }
 }
 
@@ -45,7 +45,7 @@ impl DurabilityMode {
             WalNoHmac if deletion_proof_active => {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: concat!("deletion", "-", "proof"),
+                    feature: "deletion-proof",
                     reason: "no HMAC integrity chain to anchor the proof",
                 })
             }
@@ -55,7 +55,7 @@ impl DurabilityMode {
             {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: concat!("deletion", "-", "proof / FeatureRing::Sovereign"),
+                    feature: "deletion-proof / FeatureRing::Sovereign",
                     reason: "no persistence layer exists to prove deletion from",
                 })
             }
@@ -94,12 +94,6 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
-    /// Threshold in bytes to determine whether a payload should be stored as a blob.
-    /// Default is `crate::blob::DEFAULT_BLOB_THRESHOLD` (65,536 bytes).
-    pub blob_bytes_threshold: u64,
-    /// Maximum factor for internal merge set size relative to limit in bounded scans.
-    /// Default is `crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR` (8).
-    pub max_internal_merge_factor: usize,
 }
 
 impl Default for LsmConfig {
@@ -115,8 +109,6 @@ impl Default for LsmConfig {
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
-            blob_bytes_threshold: crate::blob::DEFAULT_BLOB_THRESHOLD,
-            max_internal_merge_factor: crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR,
         }
     }
 }

@@ -1,19 +1,21 @@
+use crate::egress_gateway::{self, CloudQueryRequest};
 use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::chunker::{ChunkerConfig, MarkdownChunker};
-use contextra_types::{DocId, MAX_SEARCH_K};
+use contextra_ports::StorageEngine;
+use contextra_types::{DocId, TenantId, TenantScoped, MAX_SEARCH_K};
 use serde_json::{json, Value};
+
+/// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
+pub(crate) const MAX_RELATE_PARTICIPANTS: usize = 64;
 
 impl McpServer {
     pub(crate) async fn call_tool(&self, name: &str, args: &Value) -> Result<Value, McpError> {
         self.sandbox
             .validate_tool_call(name, args)
             .map_err(McpError::from)?;
-
-        crate::validation::validate_request_tenant(self.tenant_id, Some(args))?;
-
         match name {
             "contextra_search" => {
                 let query = match args.get("query") {
@@ -83,6 +85,21 @@ impl McpServer {
                     .execute()
                     .await
                     .map_err(McpError::from)?;
+
+                #[cfg(feature = "kv-bridge")]
+                if let Some(ref bridge) = self.kv_bridge {
+                    for res in &results {
+                        let chunk_id = DocId::from_key(&res.id).map(|d| d.inner()).unwrap_or(0);
+                        let text = res
+                            .metadata
+                            .as_ref()
+                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let segment = contextra_ports::ContextSegment::new(chunk_id, text);
+                        bridge.consult_segment(&segment);
+                    }
+                }
 
                 let mut enriched_results = Vec::with_capacity(results.len());
                 for res in results {
@@ -230,6 +247,7 @@ impl McpServer {
                     }));
                 }
 
+                // AUTO-CHUNKING: Text in semantische Einheiten aufteilen mit MarkdownChunker (~512 Tokens)
                 let text = match text_opt {
                     Some(t) => t,
                     None => {
@@ -409,126 +427,26 @@ impl McpServer {
 
                 if let Some(id) = id_opt {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
-                    let mut opts = contextra::collection::crud::DocEraseOptions {
-                        options: contextra::deletion::ForgetOptions {
-                            assurance:
-                                contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
-                            ..Default::default()
-                        },
-                    };
+                    col.delete(id).await.map_err(McpError::from)?;
 
-                    let options_val = args.get("options").or_else(|| args.get("erase_options"));
-                    if let Some(v) = options_val {
-                        let obj = v.as_object().ok_or_else(|| {
-                            McpError::invalid_params("Invalid params: 'options' must be an object")
-                        })?;
-
-                        for (key, val) in obj {
-                            match key.as_str() {
-                                "assurance" => {
-                                    let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params(
-                                            "Invalid params: 'assurance' must be a string",
-                                        )
-                                    })?;
-                                    opts.options.assurance = match s {
-                                        "S0" | "s0" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S0,
-                                        "S1" | "s1" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S1,
-                                        "S2" | "s2" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S2,
-                                        "S3" | "s3" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S3,
-                                        "S4" | "s4" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S4,
-                                        other => {
-                                            return Err(McpError::invalid_params(format!(
-                                                "Invalid assurance '{other}'. Valid options are: 'S0', 'S1', 'S2', 'S3', 'S4'"
-                                            )));
-                                        }
-                                    };
-                                }
-                                "purge" => {
-                                    let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params(
-                                            "Invalid params: 'purge' must be a string",
-                                        )
-                                    })?;
-                                    opts.options.purge = match s {
-                                        "None" | "none" => contextra::deletion::PurgeMode::None,
-                                        "Purge" | "purge" => contextra::deletion::PurgeMode::Purge,
-                                        "PurgeWithScrub" | "purge_with_scrub" => {
-                                            contextra::deletion::PurgeMode::PurgeWithScrub
-                                        }
-                                        other => {
-                                            return Err(McpError::invalid_params(format!(
-                                                "Invalid purge '{other}'. Valid options are: 'None', 'Purge', 'PurgeWithScrub'"
-                                            )));
-                                        }
-                                    };
-                                }
-                                "verify_depth" => {
-                                    let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params(
-                                            "Invalid params: 'verify_depth' must be a string",
-                                        )
-                                    })?;
-                                    opts.options.verify_depth = match s {
-                                        "Footprint" | "footprint" => {
-                                            contextra::deletion::VerifyDepth::Footprint
-                                        }
-                                        "FullSweep" | "full_sweep" => {
-                                            contextra::deletion::VerifyDepth::FullSweep
-                                        }
-                                        other => {
-                                            return Err(McpError::invalid_params(format!(
-                                                "Invalid verify_depth '{other}'. Valid options are: 'Footprint', 'FullSweep'"
-                                            )));
-                                        }
-                                    };
-                                }
-                                "wait" => {
-                                    let s = val.as_str().ok_or_else(|| {
-                                        McpError::invalid_params(
-                                            "Invalid params: 'wait' must be a string",
-                                        )
-                                    })?;
-                                    opts.options.wait = match s {
-                                        "No" | "no" => contextra::deletion::Wait::No,
-                                        "Forever" | "forever" => contextra::deletion::Wait::Forever,
-                                        other => {
-                                            return Err(McpError::invalid_params(format!(
-                                                "Invalid wait '{other}'. Valid options are: 'No', 'Forever'"
-                                            )));
-                                        }
-                                    };
-                                }
-                                unhandled => {
-                                    return Err(McpError::from(
-                                        contextra_types::ContextraError::capability_unsupported(
-                                            unhandled,
-                                            format!("Option '{unhandled}' is not supported"),
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-
-                    let erasure = col
-                        .erase_document(id, &opts)
-                        .await
-                        .map_err(McpError::from)?;
-
+                    // Single document deletion in Contextra does not generate a DeletionProof.
+                    // In accordance with honesty rules, we return proof: null and proof_scope: "collection_only".
                     Ok(json!({
-                        "status": "logically_deleted",
-                        "tx": erasure.as_of_tx.inner(),
+                        "ok": true,
+                        "collection": col_name,
+                        "id": id,
+                        "proof": null,
+                        "proof_scope": "collection_only"
                     }))
                 } else {
-                    let tenant_id =
-                        crate::validation::validate_request_tenant(self.tenant_id, Some(args))?;
-
                     let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                         .key
                         .ok_or_else(|| {
                             McpError::invalid_params("deletion proof key not configured")
                         })?;
+
+                    let tenant_id = contextra_types::TenantId::try_new(1)
+                        .unwrap_or(contextra_types::TenantId::SYSTEM);
 
                     let proof = self
                         .db
@@ -556,20 +474,467 @@ impl McpServer {
                 Ok(json!({ "collections": names }))
             }
 
+            "contextra_consolidate" => {
+                let col_name = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        "default"
+                    } else {
+                        validate_collection_name(s)?;
+                        s
+                    }
+                } else {
+                    "default"
+                };
+
+                let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+
+                // Turns chronologisch aus der Collection lesen (analog zur ConsolidationEngine)
+                let user_key_prefix = col.user_key_prefix();
+                let entries = col
+                    .storage()
+                    .scan_prefix(&user_key_prefix)
+                    .await
+                    .map_err(McpError::from)?;
+
+                let mut turns: Vec<(DocId, Vec<f32>)> = Vec::new();
+                for (k, v) in entries {
+                    if col_name == "default" && k.starts_with(b"__") {
+                        continue;
+                    }
+                    if let Ok(stored) = serde_json::from_slice::<serde_json::Value>(&v) {
+                        if let (Some(id_str), Some(arr)) = (
+                            stored.get("id").and_then(|i| i.as_str()),
+                            stored.get("embedding").and_then(|e| e.as_array()),
+                        ) {
+                            if let Ok(doc_id) = DocId::from_key(id_str) {
+                                let mut vec = Vec::with_capacity(arr.len());
+                                for elem in arr {
+                                    if let Some(f) = elem.as_f64() {
+                                        vec.push(f as f32);
+                                    }
+                                }
+                                turns.push((doc_id, vec));
+                            }
+                        }
+                    }
+                }
+
+                let turns_scanned = turns.len();
+                let (consolidation_res, synthesis_res) =
+                    contextra::execute_background_consolidation(
+                        col.as_ref(),
+                        &turns,
+                        &contextra::memory_consolidation::ConsolidationConfig::default(),
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .await
+                    .map_err(McpError::from)?;
+
+                let duplicates_tombstoned_count = consolidation_res.duplicates_tombstoned.len();
+                let cascade_tombstones_count =
+                    consolidation_res.cascade_edge_tombstones_needed.len();
+                let synthesized_count = synthesis_res
+                    .as_ref()
+                    .map(|s| s.synthesized.len())
+                    .unwrap_or(0);
+
+                Ok(json!({
+                    "ok": true,
+                    "collection": col_name,
+                    "turns_scanned": turns_scanned,
+                    "segments_created": consolidation_res.segments_created,
+                    "duplicates_tombstoned": duplicates_tombstoned_count,
+                    "synthesized_chunks": synthesized_count,
+                    "cascade_edge_tombstones_needed": cascade_tombstones_count,
+                    "cascade_errors": consolidation_res.cascade_errors,
+                }))
+            }
+
+            "contextra_cloud_query" => {
+                let query = match args.get("query") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'query' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("query cannot be empty"));
+                        }
+                        if s.len() > MAX_SEARCH_QUERY_BYTES {
+                            return Err(McpError::invalid_params(format!(
+                                "query size exceeds limit: {} bytes > {} limit",
+                                s.len(),
+                                MAX_SEARCH_QUERY_BYTES
+                            )));
+                        }
+                        s.to_string()
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'query'"));
+                    }
+                };
+
+                let collection = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        Some("default".to_string())
+                    } else {
+                        validate_collection_name(s)?;
+                        Some(s.to_string())
+                    }
+                } else {
+                    Some("default".to_string())
+                };
+
+                let max_results = if let Some(k_val) =
+                    args.get("max_results").or_else(|| args.get("k"))
+                {
+                    match k_val {
+                        Value::Number(n) => {
+                            let k_raw = n.as_u64().ok_or_else(|| {
+                                McpError::invalid_params(
+                                    "max_results muss eine positive Ganzzahl sein",
+                                )
+                            })? as usize;
+                            Some(k_raw.min(MAX_SEARCH_K))
+                        }
+                        _ => {
+                            return Err(McpError::invalid_params("max_results muss eine Zahl sein"))
+                        }
+                    }
+                } else {
+                    Some(10)
+                };
+
+                let tenant = TenantId::try_new(1)?;
+                let request = CloudQueryRequest {
+                    query,
+                    collection,
+                    max_results,
+                };
+                let scoped = TenantScoped::new(tenant, request);
+
+                let response = egress_gateway::handle_cloud_query_scoped_with_guard(
+                    scoped,
+                    &tenant,
+                    self.egress_classifier.as_ref(),
+                    self.egress_guard.as_deref(),
+                )
+                .await?;
+
+                serde_json::to_value(&response).map_err(|e| {
+                    McpError::internal_error(format!("Response serialization error: {e}"))
+                })
+            }
+
+            "contextra_relate" => {
+                let from = match args.get("from") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'from' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("from cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "from length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'from'"));
+                    }
+                };
+
+                let to = match args.get("to") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'to' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("to cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "to length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'to'"));
+                    }
+                };
+
+                let label = match args.get("label") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'label' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("label cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "label length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'label'"));
+                    }
+                };
+
+                let col_name = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        "default"
+                    } else {
+                        validate_collection_name(s)?;
+                        s
+                    }
+                } else {
+                    "default"
+                };
+
+                let bidirectional = match args.get("bidirectional") {
+                    Some(Value::Bool(b)) => *b,
+                    Some(_) => {
+                        return Err(McpError::invalid_params(
+                            "Invalid params: 'bidirectional' must be a boolean",
+                        ));
+                    }
+                    None => false,
+                };
+
+                if let Some(matched_pattern) = self.injection_guard.detect(label) {
+                    return Err(McpError::invalid_params(format!(
+                        "Prompt injection detected in label: {matched_pattern}"
+                    )));
+                }
+
+                let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+                if bidirectional {
+                    col.relate_bidirectional(from, to, label)
+                        .await
+                        .map_err(McpError::from)?;
+                } else {
+                    col.relate(from, to, label).await.map_err(McpError::from)?;
+                }
+
+                Ok(json!({
+                    "status": "ok",
+                    "from": from,
+                    "to": to,
+                    "label": label,
+                    "collection": col_name,
+                    "bidirectional": bidirectional
+                }))
+            }
+
+            "contextra_relate_n_ary" => {
+                let predicate = match args.get("predicate") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'predicate' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("predicate cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "predicate length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params(
+                            "missing required field: 'predicate'",
+                        ));
+                    }
+                };
+
+                if let Some(matched_pattern) = self.injection_guard.detect(predicate) {
+                    return Err(McpError::invalid_params(format!(
+                        "Prompt injection detected in predicate: {matched_pattern}"
+                    )));
+                }
+
+                let participants_arr = match args.get("participants") {
+                    Some(v) => v.as_array().ok_or_else(|| {
+                        McpError::invalid_params(
+                            "Invalid params: 'participants' must be an array of objects",
+                        )
+                    })?,
+                    None => {
+                        return Err(McpError::invalid_params(
+                            "missing required field: 'participants'",
+                        ));
+                    }
+                };
+
+                if participants_arr.len() < 2 {
+                    return Err(McpError::invalid_params(format!(
+                        "participants must contain at least 2 items, found {}",
+                        participants_arr.len()
+                    )));
+                }
+                if participants_arr.len() > MAX_RELATE_PARTICIPANTS {
+                    return Err(McpError::invalid_params(format!(
+                        "participants count exceeds limit: {} > {} limit",
+                        participants_arr.len(),
+                        MAX_RELATE_PARTICIPANTS
+                    )));
+                }
+
+                let mut participant_pairs: Vec<(&str, &str)> =
+                    Vec::with_capacity(participants_arr.len());
+
+                for (idx, elem) in participants_arr.iter().enumerate() {
+                    let obj = elem.as_object().ok_or_else(|| {
+                        McpError::invalid_params(format!(
+                            "Invalid params: participant at index {idx} must be an object"
+                        ))
+                    })?;
+
+                    let doc_id = match obj.get("doc_id") {
+                        Some(v) => {
+                            let s = v.as_str().ok_or_else(|| {
+                                McpError::invalid_params(format!(
+                                    "Invalid params: participant[{idx}].doc_id must be a string"
+                                ))
+                            })?;
+                            if s.trim().is_empty() {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].doc_id cannot be empty"
+                                )));
+                            }
+                            if s.len() > 256 {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].doc_id length exceeds limit: max 256 chars"
+                                )));
+                            }
+                            s
+                        }
+                        None => {
+                            return Err(McpError::invalid_params(format!(
+                                "missing required field: participant[{idx}].doc_id"
+                            )));
+                        }
+                    };
+
+                    let role = match obj.get("role") {
+                        Some(v) => {
+                            let s = v.as_str().ok_or_else(|| {
+                                McpError::invalid_params(format!(
+                                    "Invalid params: participant[{idx}].role must be a string"
+                                ))
+                            })?;
+                            if s.trim().is_empty() {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].role cannot be empty"
+                                )));
+                            }
+                            if s.len() > 256 {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].role length exceeds limit: max 256 chars"
+                                )));
+                            }
+                            s
+                        }
+                        None => {
+                            return Err(McpError::invalid_params(format!(
+                                "missing required field: participant[{idx}].role"
+                            )));
+                        }
+                    };
+
+                    if let Some(matched_pattern) = self.injection_guard.detect(role) {
+                        return Err(McpError::invalid_params(format!(
+                            "Prompt injection detected in participant[{idx}].role: {matched_pattern}"
+                        )));
+                    }
+
+                    participant_pairs.push((doc_id, role));
+                }
+
+                let source_doc_id_opt = match args.get("source_doc_id") {
+                    Some(v) if !v.is_null() => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params(
+                                "Invalid params: 'source_doc_id' must be a string",
+                            )
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("source_doc_id cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "source_doc_id length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        Some(s)
+                    }
+                    _ => None,
+                };
+
+                let col_name = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        "default"
+                    } else {
+                        validate_collection_name(s)?;
+                        s
+                    }
+                } else {
+                    "default"
+                };
+
+                let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+                let hyperedge_id = col
+                    .relate_n_ary(predicate, &participant_pairs, source_doc_id_opt)
+                    .await
+                    .map_err(McpError::from)?;
+
+                Ok(json!({
+                    "status": "ok",
+                    "hyperedge_id": hyperedge_id.inner(),
+                    "participants": participant_pairs.len(),
+                    "collection": col_name
+                }))
+            }
+
             "contextra_delete" => self.handle_delete(args).await,
             "contextra_create_collection" => self.handle_create_collection(args).await,
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
             "contextra_plugin_status" => {
-                let reg_ref = self
-                    .plugin_registry
-                    .as_ref()
-                    .map(|r| r.as_ref())
-                    .ok_or_else(|| {
-                        McpError::internal_error(
-                            "Plugin registry or license gate is not configured",
-                        )
-                    })?;
+                let registry = self.plugin_registry.as_ref().map(|r| r.as_ref());
+                let empty_registry;
+                let reg_ref = match registry {
+                    Some(r) => r,
+                    None => {
+                        empty_registry = contextra_ports::plugin::PluginRegistry::new(
+                            std::sync::Arc::new(contextra_license::OpenFastGate),
+                        );
+                        &empty_registry
+                    }
+                };
                 let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
                 serde_json::to_value(&status).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))

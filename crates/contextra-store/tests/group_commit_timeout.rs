@@ -7,8 +7,7 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
+use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS};
 use std::sync::atomic::Ordering;

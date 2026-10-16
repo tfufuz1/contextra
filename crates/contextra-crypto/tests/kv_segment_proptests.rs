@@ -3,7 +3,6 @@
 // STAND: TS:2026-09-09T13:17:00Z (SESSION: a413a598)
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use contextra_types::TenantId;

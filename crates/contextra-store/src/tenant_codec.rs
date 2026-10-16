@@ -15,10 +15,7 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_types::{CollectionId, DocId, TenantId, TxId};
-use contextra_ports::StorageStats;
-use contextra_crypto::deletion_witness::LayerWitness;
-use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope};
+use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
 use contextra_ports::{BoxFuture, Result, StorageEngine};
 use std::ops::Bound;
 use std::sync::Arc;
@@ -187,18 +184,6 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>>;
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>>;
-    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
-        None
-    }
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        self.erasure_backend_handle()
-    }
 }
 
 impl StorageEngineHandle for LsmStorage {
@@ -342,39 +327,25 @@ impl StorageEngineHandle for LsmStorage {
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
         self.scan_bounded(start, end, limit, cursor)
     }
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>> {
-        Box::pin(self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx))
-    }
-    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
-        Some(self)
-    }
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        Some(self)
-    }
 }
 
-impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
+impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
     fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_handle(key)
+        (**self).get(key)
     }
     fn get_at_seq_handle<'a>(
         &'a self,
         key: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_handle(key, seq_no)
+        (**self).get_at_seq(key, seq_no)
     }
     fn get_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         key: &'a [u8],
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_tracked_handle(tx_id, key)
+        (**self).get_tracked(tx_id, key)
     }
     fn get_at_seq_tracked_handle<'a>(
         &'a self,
@@ -382,17 +353,17 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         seq: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_tracked_handle(tx_id, key, seq)
+        (**self).get_at_seq_tracked(tx_id, key, seq)
     }
     fn scan_prefix_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_tracked_handle(tx_id, prefix)
+        (**self).scan_prefix_tracked(tx_id, prefix)
     }
     fn supports_ssi_tracking_handle(&self) -> bool {
-        (**self).supports_ssi_tracking_handle()
+        (**self).supports_ssi_tracking()
     }
     fn put_handle<'a>(
         &'a self,
@@ -400,7 +371,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_handle(tx_id, key, value)
+        (**self).put(tx_id, key, value)
     }
     fn put_if_absent_handle<'a>(
         &'a self,
@@ -408,64 +379,64 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
-        (**self).put_if_absent_handle(tx_id, key, value)
+        (**self).put_if_absent(tx_id, key, value)
     }
     fn put_batch_handle<'a>(
         &'a self,
         tx_id: TxId,
         entries: &'a [(Vec<u8>, Vec<u8>)],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_batch_handle(tx_id, entries)
+        (**self).put_batch(tx_id, entries)
     }
     fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        (**self).delete_handle(tx_id, key)
+        (**self).delete(tx_id, key)
     }
     fn delete_many_handle<'a>(
         &'a self,
         tx_id: TxId,
         keys: Vec<Vec<u8>>,
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_many_handle(tx_id, keys)
+        (**self).delete_many(tx_id, keys)
     }
     fn delete_prefix_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_prefix_handle(tx_id, prefix)
+        (**self).delete_prefix(tx_id, prefix)
     }
     fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).commit_handle(tx_id)
+        (**self).commit(tx_id)
     }
     fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_handle(tx_id)
+        (**self).rollback(tx_id)
     }
     fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_to_tx_handle(tx_id)
+        (**self).rollback_to_tx(tx_id)
     }
     fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        (**self).flush_handle()
+        (**self).flush()
     }
     fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        (**self).stats_handle()
+        (**self).stats()
     }
     fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        (**self).last_seq_no_handle()
+        (**self).last_seq_no()
     }
     fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        (**self).last_tx_id_handle()
+        (**self).last_tx_id()
     }
     fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).pin_checkpoint_handle(seq_no)
+        (**self).pin_checkpoint(seq_no)
     }
     fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).unpin_checkpoint_handle(seq_no)
+        (**self).unpin_checkpoint(seq_no)
     }
     fn scan_prefix_handle<'a>(
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_handle(prefix)
+        (**self).scan_prefix(prefix)
     }
     fn scan_prefix_bounded_handle<'a>(
         &'a self,
@@ -473,14 +444,14 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_prefix_bounded_handle(prefix, limit, cursor)
+        (**self).scan_prefix_bounded(prefix, limit, cursor)
     }
     fn scan_prefix_at_handle<'a>(
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_at_handle(prefix, seq_no)
+        (**self).scan_prefix_at(prefix, seq_no)
     }
     fn scan_handle<'a>(
         &'a self,
@@ -488,7 +459,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         end: Bound<&'a [u8]>,
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_handle(start, end, limit)
+        (**self).scan(start, end, limit)
     }
     fn scan_bounded_handle<'a>(
         &'a self,
@@ -497,21 +468,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_bounded_handle(start, end, limit, cursor)
-    }
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>> {
-        (**self).issue_memtable_witness_handle(deleted_keys, prefixes, as_of_tx)
-    }
-    fn erasure_backend_handle(&self) -> Option<&dyn ErasureBackend> {
-        (**self).erasure_backend_handle()
-    }
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        (**self).erasure_capabilities_handle()
+        (**self).scan_bounded(start, end, limit, cursor)
     }
 }
 
@@ -533,23 +490,6 @@ impl<S> TenantScopedStorage<S> {
     /// Returns the immutable `TenantId` bound to this storage wrapper.
     pub fn tenant_id(&self) -> TenantId {
         self.codec.tenant_id
-    }
-
-    /// Issues a [`LayerWitness`] for memtables after encoding the unencoded target keys and prefixes with tenant prefix.
-    pub async fn issue_memtable_witness(
-        &self,
-        deleted_keys: &[Vec<u8>],
-        prefixes: &[Vec<u8>],
-        as_of_tx: TxId,
-    ) -> Result<LayerWitness>
-    where
-        S: StorageEngineHandle,
-    {
-        let physical_keys: Vec<Vec<u8>> = deleted_keys.iter().map(|k| self.make_key(k)).collect();
-        let physical_prefixes: Vec<Vec<u8>> = prefixes.iter().map(|p| self.make_key(p)).collect();
-        self.inner
-            .issue_memtable_witness_handle(&physical_keys, &physical_prefixes, as_of_tx)
-            .await
     }
 
     #[inline]
@@ -888,160 +828,11 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
             Ok((stripped_batch, stripped_cursor))
         })
     }
-
-    fn erasure_backend(&self) -> Option<&dyn ErasureBackend> {
-        if self.inner.erasure_backend_handle().is_some() {
-            Some(self)
-        } else {
-            None
-        }
-    }
-
-    #[allow(deprecated)]
-    fn erasure_capabilities(&self) -> Option<&dyn ErasureBackend> {
-        self.erasure_backend()
-    }
-}
-
-impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, contextra_ports::erasure::ErasureError> {
-        if scope.tenant_id() != self.codec.tenant_id {
-            return Err(contextra_ports::erasure::ErasureError::ForeignScope);
-        }
-        if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.physical_scope(scope)
-        } else {
-            Err(contextra_ports::erasure::ErasureError::NotAvailable)
-        }
-    }
-
-    fn acquire_fence(
-        &self,
-        scope: &PhysicalScope,
-        id: contextra_ports::erasure::PurgeId,
-    ) -> std::result::Result<contextra_ports::erasure::FenceGuard, contextra_ports::erasure::ErasureError> {
-        if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.acquire_fence(scope, id)
-        } else {
-            Err(contextra_ports::erasure::ErasureError::NotAvailable)
-        }
-    }
-
-    fn purge_physical(
-        &self,
-        scope: &PhysicalScope,
-        as_of: TxId,
-        probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
-        fence: &contextra_ports::erasure::FenceGuard,
-    ) -> std::result::Result<contextra_ports::erasure::PurgeOutput, contextra_ports::erasure::PurgeError> {
-        if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.purge_physical(scope, as_of, probe, fence)
-        } else {
-            Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Underlying storage engine does not support ErasureBackend",
-            )))
-        }
-    }
-
-    fn dispose(
-        &self,
-        files: &[contextra_ports::erasure::ObsoleteFile],
-    ) -> std::result::Result<contextra_ports::erasure::DisposeReport, contextra_ports::erasure::DisposeError> {
-        if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.dispose(files)
-        } else {
-            Err(contextra_ports::erasure::DisposeError::ScrubRefused {
-                file: String::new(),
-                reason: "Underlying storage engine does not support ErasureBackend".to_string(),
-            })
-        }
-    }
-
-    fn snapshot_write_seq(&self, prefixes: &[Vec<u8>]) -> u64 {
-        if let Some(backend) = self.inner.erasure_backend_handle() {
-            backend.snapshot_write_seq(prefixes)
-        } else {
-            0
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_erasure_backend_tenant_matrix() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let config = crate::lsm::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm = Arc::new(LsmStorage::open(config).await.unwrap());
-
-        let tenant_1 = TenantId::try_new(101).unwrap();
-        let tenant_2 = TenantId::try_new(202).unwrap();
-
-        let storage_t1 = TenantScopedStorage::new(lsm.clone(), tenant_1);
-        let storage_t2 = TenantScopedStorage::new(lsm.clone(), tenant_2);
-
-        // 1. Verify erasure_capabilities()
-        assert!(lsm.erasure_capabilities().is_some());
-        assert!(storage_t1.erasure_capabilities().is_some());
-
-        let eb_t1 = storage_t1.erasure_capabilities().unwrap();
-
-        // 2. Physical scope resolution with matching TenantId
-        let doc_scope = LogicalScope::Document {
-            doc_id: DocId(1),
-            collection_id: CollectionId(10),
-            tenant_id: tenant_1,
-        };
-        let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-        assert_eq!(phys_scope.prefixes().len(), 1);
-        assert_eq!(phys_scope.prefixes()[0], b"t:101:10:");
-        assert_eq!(phys_scope.keys().len(), 0); // subsumed by prefix
-
-        // 3. Physical scope resolution with mismatched TenantId MUST fail closed
-        let mismatched_scope = LogicalScope::Document {
-            doc_id: DocId(1),
-            collection_id: CollectionId(10),
-            tenant_id: tenant_2,
-        };
-        let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
-        match err {
-            contextra_ports::erasure::ErasureError::ForeignScope => {}
-            _ => panic!("Expected ForeignScope error, got {:?}", err),
-        }
-
-        // 4. Collection scope with matching TenantId
-        let col_scope = LogicalScope::Collection {
-            collection_id: CollectionId(55),
-            tenant_id: tenant_1,
-        };
-        let phys_col_scope = eb_t1.physical_scope(&col_scope).unwrap();
-        assert_eq!(phys_col_scope.prefixes(), &[b"t:101:55:".to_vec()]);
-
-        // 5. Put data for both tenants
-        let tx1 = TxId::try_new(10).unwrap();
-        storage_t1.put(tx1, b"doc:1", b"val_tenant1").await.unwrap();
-        storage_t2.put(tx1, b"doc:1", b"val_tenant2").await.unwrap();
-        storage_t1.commit(tx1).await.unwrap();
-
-        // Flush memtable to SSTable
-        storage_t1.flush().await.unwrap();
-
-        // Verify tenant 1 value
-        let get_t1 = storage_t1.get(b"doc:1").await.unwrap();
-        assert_eq!(get_t1.unwrap().as_ref(), b"val_tenant1");
-
-        // Verify tenant 2 value remains untouched
-        let get_t2 = storage_t2.get(b"doc:1").await.unwrap();
-        assert_eq!(get_t2.unwrap().as_ref(), b"val_tenant2");
-
-        lsm.close().await.unwrap();
-    }
 
     #[test]
     fn test_encode_decode_roundtrip() {

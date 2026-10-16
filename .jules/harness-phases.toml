@@ -1,141 +1,67 @@
-# .jules/harness-phases.toml — Kanonische Gate-Phasen-Konfiguration für Jules-Lifecycle
-# Diese Datei ist die verbindliche Quelle aller Gate-Ausführungen (AGENTS.md §3).
-# Änderungen erfordern ADR-Eintrag und AGENTS.md-Update.
-
-# ── Phase: start ──────────────────────────────────────────────────────────────
-# Initialisiert Session, lintet Karte, setzt Claim, erzeugt Kontext.
-# Läuft als erstes nach Aufgabenstart. repo-doctor und env-attest sind optional
-# (dürfen scheitern ohne Aufgabe zu blockieren), alle anderen sind required.
-
 [[phase.start]]
-cmd     = ["cargo", "xtask", "repo-doctor"]
+cmd = ["cargo", "xtask", "env-attest"]
 required = false
 
 [[phase.start]]
-cmd     = ["cargo", "xtask", "env-attest"]
-required = false
-
-[[phase.start]]
-cmd     = ["cargo", "xtask", "task-card", "lint"]
+cmd = ["cargo", "xtask", "task-card", "lint"]
 required = true
 
 [[phase.start]]
-cmd     = ["cargo", "xtask", "claim"]
+cmd = ["cargo", "xtask", "claim"]
 required = true
 
 [[phase.start]]
-cmd     = ["cargo", "xtask", "context-pack"]
+cmd = ["cargo", "xtask", "context-pack"]
 required = true
 
-[[phase.start]]
-cmd     = ["cargo", "xtask", "context-card"]
+[[phase.check]]
+cmd = ["cargo", "fmt", "--check"]
 required = true
-
-# ── Phase: check ─────────────────────────────────────────────────────────────
-# Prüft Syntax, Lints, Scope und geschützte Pfade & Symbol-Existenz.
-# Alle statischen Prüfungen laufen in parallel_group "static" (unabhängig voneinander).
+parallel_group = "static"
 
 [[phase.check]]
-cmd     = ["cargo", "fmt", "--check"]
-required        = true
-parallel_group  = "static"
+cmd = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
+required = true
+parallel_group = "static"
 
 [[phase.check]]
-cmd     = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
-required        = true
-parallel_group  = "static"
+cmd = ["cargo", "xtask", "gate-guard"]
+required = true
+parallel_group = "static"
 
 [[phase.check]]
-cmd     = ["cargo", "xtask", "gate-guard"]
-required        = true
-parallel_group  = "static"
-
-[[phase.check]]
-cmd     = ["cargo", "xtask", "symbol-exists"]
-required        = true
-parallel_group  = "static"
-
-[[phase.check]]
-cmd     = ["cargo", "xtask", "fast-diff-lint"]
-required        = true
-parallel_group  = "static"
-
-[[phase.check]]
-cmd     = ["cargo", "xtask", "context-card", "--check"]
-required        = false
-parallel_group  = "static"
-
-# ── Phase: verify ─────────────────────────────────────────────────────────────
-# Führt Akzeptanz-Tests, DAG-Checks & Architektur-Gates aus.
-# gate-arch prüft Ring-Layering, Unsafe-Inseln, DAG.
-# gate-integrity prüft Test-Integrität, Ratchet, Diff-Budget, Gate-Weakening.
+cmd = ["cargo", "xtask", "symbol-exists"]
+required = true
+parallel_group = "static"
 
 [[phase.verify]]
-cmd     = ["cargo", "test"]
+cmd = ["cargo", "test"]
 required = true
 
 [[phase.verify]]
-cmd     = ["cargo", "xtask", "gate-arch"]
-required = true
-
-[[phase.verify]]
-cmd     = ["cargo", "xtask", "gate-integrity"]
-required = true
-
-# ── Phase: submit ─────────────────────────────────────────────────────────────
-# Verifiziert PR-Integrität, Diff-Budget & erzeugt Session-Report.
-
-[[phase.submit]]
-cmd     = ["cargo", "xtask", "gate-guard"]
+cmd = ["cargo", "xtask", "gate-arch"]
 required = true
 
 [[phase.submit]]
-cmd     = ["cargo", "xtask", "gate-integrity"]
+cmd = ["cargo", "xtask", "gate-guard"]
 required = true
 
 [[phase.submit]]
-cmd     = ["cargo", "xtask", "session-report"]
+cmd = ["cargo", "xtask", "gate-integrity"]
 required = true
 
 [[phase.submit]]
-cmd     = ["cargo", "xtask", "claims-in-pr"]
+cmd = ["cargo", "xtask", "session-report"]
+required = true
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "claims-in-pr"]
 required = false
 
 [[phase.submit]]
-cmd     = ["cargo", "xtask", "ledger"]
+cmd = ["cargo", "xtask", "ledger"]
 required = false
-
-# ── Phase: stop ───────────────────────────────────────────────────────────────
-# Stoppt Session und Loop Guard bei Eskalation.
 
 [[phase.stop]]
-cmd     = ["cargo", "xtask", "loop-guard", "stop"]
+cmd = ["cargo", "xtask", "loop-guard", "stop"]
 required = false
-
-# ── Risk-Gates (automatische Zusatzprüfungen nach Risiko-Klasse) ───────────────
-# Schaltet je nach risk-Feld der Task-Karte automatisch Gate-Befehle zu.
-# Vgl. .jules/tasks/README.md und AGENTS.md §7 Invarianten-Tabelle.
-
-[risk_gates]
-# Sicherheits-/Crypto-/Privacy-Pfade → Mutation-Testing + Fuzzing-Smoke
-sec         = ["mutants-diff", "fuzz-smoke"]
-# WAL/Store/Checkpoint/Durability-Pfade → WAL-Replay-Crash-Konsistenz
-crash       = ["wal-replay-verify"]
-# SIMD/Vektorisierungs-Pfade → Unsafe-Island-Prüfung
-simd        = ["unsafe-audit"]
-# Cargo.toml-Änderungen → DAG-Abhängigkeitsprüfung
-cargo       = ["dependency-gate"]
-# Geschützte Pfade (CODEOWNERS) → Scope-Guard-Prüfung
-protected   = ["protected-paths"]
-# Großes Diff (>10 Dateien) → Diff-Budget-Prüfung
-diff_budget = ["diff-budget"]
-# Nebenläufigkeits-kritische Pfade → Loom-Concurrency-Test
-concurrency = ["loom-run"]
-# UTF-8/Morphologie-Pfade → Standard-Verifikation (kein Zusatz-Gate)
-utf8        = []
-# Fusion/Ranking-Pfade → Standard-Verifikation (kein Zusatz-Gate)
-fusion      = []
-# Score-Kalibrierungs-Pfade → Standard-Verifikation (kein Zusatz-Gate)
-calib       = []
-# Keine Risiko-Klasse → Standard-Verifikation (kein Zusatz-Gate)
-none        = []

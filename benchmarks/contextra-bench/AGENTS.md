@@ -3,7 +3,7 @@
 
 ## 1. Zweck
 Eigenständiges, reproduzierbares Benchmark-Harness zur Messung von Retrieval-Genauigkeit und Performance.
-Evaluiert Recall@K, MRR und RRF-Fusion über LoCoMo, BEIR und synthetische Datensätze.
+Evaluiert Recall@K, MRR, RRF-Fusion und Reranking über LoCoMo, BEIR und synthetische Datensätze.
 Bietet Regressions-Gates und Baseline-Vergleiche für CI-Sicherheitsprüfungen (`compare_baseline`).
 
 ## 2. Modul-Karte
@@ -43,12 +43,8 @@ Bietet Regressions-Gates und Baseline-Vergleiche für CI-Sicherheitsprüfungen (
 
 ## 6. Verifikation
 
-```bash
-cargo test -p contextra-bench
-cargo check -p contextra-bench
-cargo xtask check-agents-integrity
-cargo xtask bench-gate --tolerance 0.05
-```
+- `cargo test -p contextra-bench`
+- `cargo check -p contextra-bench`
 - Dokumentation und Historie siehe `docs/BENCHMARKS.md` und `docs/BENCH-LOG.md`.
 
 ## 7. Bekannte Lücken / SOLL

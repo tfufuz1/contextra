@@ -1,0 +1,8 @@
+title = "Scope-Überwachung"
+what = "Es wurden Dateien außerhalb des zugewiesenen Arbeitsbereichs verändert."
+why = "Bei paralleler Arbeit führen Änderungen an fremden Dateien zu Merge-Konflikten und unberechtigten Eingriffen."
+fix = "Entferne Änderungen an fremden Dateien aus deinem Commit/Branch."
+anti_fix = "Ändere nicht die Arbeitsbereichsdefinition in der Task-Karte."
+adr = ["ADR-035"]
+related = ["protected-paths", "task-card"]
+sources = ["CONSTITUTION.md"]

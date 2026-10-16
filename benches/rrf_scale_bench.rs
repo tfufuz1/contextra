@@ -118,42 +118,39 @@ fn bench_rrf_scaling(c: &mut Criterion) {
         // Measure RSS before fusion call
         let rss_before = get_vm_rss_kb().unwrap_or(0);
 
-        // Open-Loop Latency Distribution Measurement using HdrHistogram (fixed arrival schedule)
-        let mut hist = hdrhistogram::Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("Histogram creation failed");
-        let sample_runs = 20;
-        let mut dur_samples = Vec::with_capacity(sample_runs);
-
-        for _ in 0..sample_runs {
+        // Standalone latency measurement (warmup + multiple runs)
+        let mut dur_samples = Vec::new();
+        for _ in 0..5 {
             let sets_clone = result_sets.clone();
             let start = Instant::now();
             let fused = weighted_reciprocal_rank_fusion(sets_clone, max_results);
-            let elapsed_nanos = start.elapsed().as_nanos() as u64;
-            let _ = hist.record(elapsed_nanos.max(1));
+            let elapsed = start.elapsed();
             assert_eq!(fused.len(), max_results);
-            dur_samples.push(Duration::from_nanos(elapsed_nanos));
+            dur_samples.push(elapsed);
         }
 
         let rss_after = get_vm_rss_kb().unwrap_or(0);
         let peak_rss_kb = rss_before.max(rss_after);
-        let p50_micros = (hist.value_at_quantile(0.50) as f64) / 1_000.0;
-        let p99_micros = (hist.value_at_quantile(0.99) as f64) / 1_000.0;
-        let p999_micros = (hist.value_at_quantile(0.999) as f64) / 1_000.0;
+        let avg_latency_micros = dur_samples
+            .iter()
+            .map(|d| d.as_secs_f64() * 1_000_000.0)
+            .sum::<f64>()
+            / dur_samples.len() as f64;
 
         log_rss_measurement(
             "rrf_fusion",
             count,
             total_input_hits,
             peak_rss_kb,
-            p50_micros,
+            avg_latency_micros,
         );
 
         println!(
-            "\n[RRF-BENCH] Hits/Signal: {:7} | Total Hits: {:7} | p50: {:8.2} µs | p99: {:8.2} µs | p99.9: {:8.2} µs | Peak RSS: {:.2} MB",
+            "\n[RRF-BENCH] Hits/Signal: {:7} | Total Hits: {:7} | Latency: {:10.2} µs ({:7.2} ms) | Peak RSS: {:.2} MB",
             count,
             total_input_hits,
-            p50_micros,
-            p99_micros,
-            p999_micros,
+            avg_latency_micros,
+            avg_latency_micros / 1000.0,
             (peak_rss_kb as f64) / 1024.0
         );
 

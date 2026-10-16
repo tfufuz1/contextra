@@ -4,11 +4,8 @@ use crate::hardlink_cloner::{
 };
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
-#[allow(deprecated)]
-use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
-use crate::restore_filter::CpyRestoreFilter;
-use contextra_mvcc::SnapshotRegistry;
+use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
@@ -26,29 +23,6 @@ pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
 
     fn orphan_registry(&self) -> Option<&Arc<InstanceOrphanRegistry>> {
         None
-    }
-
-    fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        if let Some(registry) = self.orphan_registry() {
-            registry.register_orphan(pin_id)
-        } else {
-            Ok(())
-        }
-    }
-
-    fn create_hardlink_clone<'a>(
-        &'a self,
-        seq_no: u64,
-        source_dir: &'a Path,
-        target_dir: &'a Path,
-        snapshot_registry: &'a Arc<SnapshotRegistry>,
-    ) -> BoxFuture<'a, Result<HardlinkCloneResult>> {
-        Box::pin(async move {
-            let _ = (seq_no, source_dir, target_dir, snapshot_registry);
-            Err(ContextraError::Internal(
-                "Hardlink clone not supported for this registry".into(),
-            ))
-        })
     }
 
     fn recover_orphaned_pins<'a>(&'a self) -> BoxFuture<'a, Result<Vec<PinId>>> {
@@ -72,7 +46,7 @@ pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
 /// **Architektur- und Sicherheitsvorteil (P-23):**
 /// Durch die Vereinigung zweier ehemals separater Maps/Locks in ein einziges `CheckpointIndex`-RwLock
 /// werden potenzielle Deadlock-Fenster durch unterschiedliche Lock-Erwerbsreihenfolgen (Name-First vs. Seq-First)
-/// vollständig ausgeschlossen. Sämtliche Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
+/// vollständig ausgeschlossen. Säufige Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
 /// erfolgen strikt atomar.
 #[derive(Debug, Default)]
 struct CheckpointIndex {
@@ -144,23 +118,11 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     let bytes =
         serde_json::to_vec(&meta).map_err(|e| ContextraError::Serialization(e.to_string()))?;
     let key = format!("{namespace}:checkpoint:__sys_tx_counter__");
-    #[allow(deprecated)]
     let tx = TxId::new(TxId::INTERNAL_BASE + hwm);
     storage.put(tx, key.as_bytes(), &bytes).await?;
     storage.commit(tx).await?;
     storage.flush().await?;
     Ok(())
-}
-
-#[derive(Debug, Default)]
-struct DefaultCheckpointIdGenerator {
-    next: AtomicU64,
-}
-
-impl contextra_ports::IdGenerator for DefaultCheckpointIdGenerator {
-    fn next_id(&self) -> u64 {
-        self.next.fetch_add(1, Ordering::SeqCst)
-    }
 }
 
 /// Registry für gespeicherte Checkpoints mit Thread-sicherem Zustand.
@@ -191,12 +153,6 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
     clock: Arc<dyn contextra_ports::Clock>,
-    /// Injizierbarer ID-Generator (P28)
-    id_generator: Arc<dyn contextra_ports::IdGenerator>,
-    /// Option: Checkpoint-Scrubbing bei Dokument-Löschung (§5.10 / E31)
-    checkpoint_scrub_on_erase: bool,
-    /// Injizierter Anti-Resurrection Restore-Filter (N9, Fail-Closed Default)
-    restore_filter: Option<Arc<dyn CpyRestoreFilter>>,
     /// Injected metrics sink for operational monitoring
     metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
@@ -289,8 +245,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let checkpoint_counter = Arc::new(AtomicU64::new(0));
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
         let clock = orphan_registry.clock().clone();
-        let id_generator: Arc<dyn contextra_ports::IdGenerator> =
-            Arc::new(DefaultCheckpointIdGenerator::default());
 
         Ok(Self {
             storage,
@@ -304,9 +258,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             checkpoint_counter,
             skipped_rollbacks,
             clock,
-            id_generator,
-            checkpoint_scrub_on_erase: false,
-            restore_filter: None,
             metrics_sink: None,
         })
     }
@@ -400,7 +351,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
         }
 
-        #[allow(deprecated)]
         Ok(TxId::new(TxId::INTERNAL_BASE + raw))
     }
 
@@ -430,115 +380,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
-    }
-
-    /// Setzt den ID-Generator für den `PersistentCheckpointStore`.
-    pub fn with_id_generator(mut self, id_gen: Arc<dyn contextra_ports::IdGenerator>) -> Self {
-        self.id_generator = id_gen;
-        self
-    }
-
-    pub fn set_id_generator(&mut self, id_gen: Arc<dyn contextra_ports::IdGenerator>) {
-        self.id_generator = id_gen;
-    }
-
-    pub fn id_generator(&self) -> &Arc<dyn contextra_ports::IdGenerator> {
-        &self.id_generator
-    }
-
-    /// Konfiguriert die Option `checkpoint_scrub_on_erase` (§5.10, E31).
-    pub fn with_checkpoint_scrub_on_erase(mut self, scrub: bool) -> Self {
-        self.checkpoint_scrub_on_erase = scrub;
-        self
-    }
-
-    pub fn set_checkpoint_scrub_on_erase(&mut self, scrub: bool) {
-        self.checkpoint_scrub_on_erase = scrub;
-    }
-
-    pub fn checkpoint_scrub_on_erase(&self) -> bool {
-        self.checkpoint_scrub_on_erase
-    }
-
-    /// Scrubt und entfernt einen Checkpoint deterministisch und atomar (§5.10).
-    /// Nullt die Daten des Checkpoints im Storage vor dem eigentlichen Löschen und Entpinnen.
-    pub async fn scrub_checkpoint(&self, name: &str) -> Result<()> {
-        validate_identifier("Checkpoint name", name)?;
-        let _guard = self.write_lock.lock().await;
-
-        if let Some(checkpoint) = self.get_checkpoint_internal(name).await? {
-            let key = format!("{}:checkpoint:{}", self.namespace, name);
-            let unique_tx = self.allocate_tx().await?;
-
-            // Zeroize stored payload before unlinking
-            let dummy_payload = vec![0u8; 128];
-            if let Ok(()) = self
-                .storage
-                .put(unique_tx, key.as_bytes(), &dummy_payload)
-                .await
-            {
-                let _ = self.storage.commit(unique_tx).await;
-            }
-
-            let del_tx = self.allocate_tx().await?;
-            if let Err(e) = self.storage.delete(del_tx, key.as_bytes()).await {
-                let _ = self.storage.rollback(del_tx).await;
-                return Err(e);
-            }
-            if let Err(e) = self.storage.commit(del_tx).await {
-                let _ = self.storage.rollback(del_tx).await;
-                return Err(e);
-            }
-
-            if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
-                tracing::warn!(seq = checkpoint.seq_no, "Unpin after scrub failed: {e}");
-            }
-
-            self.index.write().remove_by_name(&checkpoint.name);
-        }
-        Ok(())
-    }
-
-    /// Scrubt und entfernt alle Checkpoints, die zu einer spezifischen Collection gehören (§5.10 / E31).
-    pub async fn scrub_collection_checkpoints(&self, collection_id: &str) -> Result<usize> {
-        let all_checkpoints = self.list_checkpoints().await?;
-        let mut count = 0;
-        for cp in all_checkpoints {
-            if cp.collection_id == collection_id {
-                self.scrub_checkpoint(&cp.name).await?;
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    /// Scrubt und entfernt alle Checkpoints eines Mandanten / Namespace (§5.10 / E31).
-    pub async fn scrub_tenant_checkpoints(&self, tenant_id: &str) -> Result<usize> {
-        let all_checkpoints = self.list_checkpoints().await?;
-        let mut count = 0;
-        for cp in all_checkpoints {
-            if cp.collection_id.contains(tenant_id) || self.namespace.contains(tenant_id) {
-                self.scrub_checkpoint(&cp.name).await?;
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    /// Sets the anti-resurrection restore filter for the store (N9, fail-closed default).
-    ///
-    /// # Fail-Closed Default
-    /// Without an explicitly set `restore_filter`, restoring a checkpoint when a deletion history exists
-    /// (`last_tx > meta.tx_id`) will fail closed to prevent resurrection of erased data.
-    /// To bypass filtering explicitly, set `NoOpRestoreFilter` via `with_restore_filter(Arc::new(NoOpRestoreFilter))`.
-    pub fn with_restore_filter(mut self, filter: Arc<dyn CpyRestoreFilter>) -> Self {
-        self.restore_filter = Some(filter);
-        self
-    }
-
-    /// Sets the anti-resurrection restore filter dynamically.
-    pub fn set_restore_filter(&mut self, filter: Arc<dyn CpyRestoreFilter>) {
-        self.restore_filter = Some(filter);
     }
 
     pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
@@ -798,14 +639,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Restores the system to a specific checkpoint by name.
-    /// This will rollback the underlying storage to the transaction ID of the checkpoint,
-    /// and then apply the anti-resurrection `CpyRestoreFilter` (if configured or required).
+    /// This will rollback the underlying storage to the transaction ID of the checkpoint.
     ///
-    /// # Serialisierungsbarriere & Anti-Resurrection
-    /// - Wenn neuere committete Transaktionen (`last_tx > meta.tx_id`) existieren, schlägt die Wiederherstellung
-    ///   ohne konfigurierten `restore_filter` fail-closed fehl, um die Wiederauferstehung gelöschter Daten zu verhindern.
-    /// - Nach dem Rollback werden alle verbliebenen Datensätze gescannt und per `restore_filter.drop_record` geprüft;
-    ///   gelöschte Datensätze werden atomar aus dem Speicher entfernt.
+    /// # Serialisierungsbarriere
+    /// Wenn neuere committete Transaktionen (`last_tx > meta.tx_id`) existieren, schlägt die Wiederherstellung
+    /// mit einem Fehler fehl.
     pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> {
         validate_identifier("Checkpoint name", name)?;
         let _guard = self.write_lock.lock().await;
@@ -816,11 +654,9 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             .ok_or(ContextraError::CheckpointNotFound)?;
 
         let last_tx = self.storage.last_tx_id().await?;
-        let has_deletion_history = last_tx > meta.tx_id;
-
-        if has_deletion_history && self.restore_filter.is_none() {
+        if last_tx > meta.tx_id {
             return Err(ContextraError::Transaction(format!(
-                "Fail-closed restore barrier: Cannot restore checkpoint '{}' (TxId {}) without a CpyRestoreFilter when subsequent transactions exist (last TxId {}). Anti-resurrection filter is required.",
+                "Serialization barrier violation: Cannot restore checkpoint '{}' at TxId {} because newer committed transaction TxId {} exists in storage",
                 name,
                 meta.tx_id.inner(),
                 last_tx.inner()
@@ -830,42 +666,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         // 1. Rollback storage state
         self.storage.rollback_to_tx(meta.tx_id).await?;
 
-        // 2. Anti-Resurrection filter application (if filter present)
-        if let Some(ref filter) = self.restore_filter {
-            let all_entries = self
-                .storage
-                .scan(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded, None)
-                .await?;
-
-            let cp_tx = meta.tx_id.inner();
-            let mut keys_to_drop = Vec::new();
-
-            for (key, _val) in all_entries {
-                if filter.drop_record(&key, cp_tx) {
-                    keys_to_drop.push(key);
-                }
-            }
-
-            if !keys_to_drop.is_empty() {
-                let purger_tx = self.allocate_tx().await?;
-                for k in keys_to_drop {
-                    if let Err(e) = self.storage.delete(purger_tx, &k).await {
-                        if let Err(rb) = self.storage.rollback(purger_tx).await {
-                            tracing::warn!(tx = ?purger_tx, error = %rb, "Storage rollback failed during restore filter purge");
-                        }
-                        return Err(e);
-                    }
-                }
-                if let Err(e) = self.storage.commit(purger_tx).await {
-                    if let Err(rb) = self.storage.rollback(purger_tx).await {
-                        tracing::warn!(tx = ?purger_tx, error = %rb, "Storage rollback failed during restore filter commit");
-                    }
-                    return Err(e);
-                }
-            }
-        }
-
-        // 3. Synchronize cache
+        // 2. Synchronize cache
         self.list_checkpoints().await?;
 
         Ok(meta)
@@ -914,16 +715,15 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
-        let mut recovered = self
-            .orphan_registry
-            .recover_and_clean(&*self.storage)
-            .await?;
-        #[allow(deprecated)]
-        if let Ok(global_recovered) = global_orphan_registry()
-            .recover_and_clean(&*self.storage)
-            .await
-        {
-            recovered.extend(global_recovered);
+        let orphans = self.orphan_registry.get_orphan_pins();
+        let mut recovered = Vec::new();
+        for orphan in orphans {
+            if let Err(e) = self.storage.unpin_checkpoint(orphan.seq_no).await {
+                tracing::warn!(pin_id = orphan.seq_no, error = %e, "Failed to unpin orphaned pin during recovery");
+            } else {
+                recovered.push(orphan.seq_no);
+                self.orphan_registry.clear_orphan_pin(orphan.seq_no);
+            }
         }
         Ok(recovered)
     }
@@ -973,68 +773,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
             .await
     }
-
-    /// Returns registered copies from `registry` for observability and exclusion set creation.
-    pub fn registered_copies<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
-        &self,
-        registry: &R,
-    ) -> Vec<crate::copy_registry::CopyRegEntry> {
-        registry.list()
-    }
-
-    /// Purges a registered copy checkpoint idempotently and crash-consistently.
-    /// Unlinks hardlink files via `durable_remove` without modifying underlying contents,
-    /// marks metadata as removed, and removes registry entry.
-    pub async fn purge_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
-        &self,
-        copy_id: [u8; 16],
-        registry: &mut R,
-        clone_dir: &Path,
-    ) -> Result<()> {
-        purge_registered_checkpoint(copy_id, registry, clone_dir).await
-    }
-}
-
-/// Purges a registered copy checkpoint idempotently and crash-consistently.
-pub async fn purge_registered_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
-    copy_id: [u8; 16],
-    registry: &mut R,
-    clone_dir: &Path,
-) -> Result<()> {
-    let entries = registry.list();
-    let target_entry = entries.into_iter().find(|e| e.copy_id == copy_id);
-
-    if let Some(entry) = target_entry {
-        // 1. Unlink target hardlink files safely using durable_remove
-        if clone_dir.exists() {
-            if let Ok(mut read_dir) = tokio::fs::read_dir(clone_dir).await {
-                while let Ok(Some(dir_entry)) = read_dir.next_entry().await {
-                    let path = dir_entry.path();
-                    if path.is_file() {
-                        if let Some(fname) = path.file_name().and_then(|f| f.to_str()) {
-                            let fid = crate::copy_registry::file_id_for_name(fname);
-                            if entry.file_ids.contains(&fid) {
-                                if let Err(e) = tokio::fs::remove_file(&path).await {
-                                    if e.kind() != std::io::ErrorKind::NotFound {
-                                        tracing::warn!(
-                                            path = %path.display(),
-                                            error = %e,
-                                            "Failed to remove hardlink file during purge"
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 2. Remove registry entry
-        registry.remove(&copy_id).await?;
-    }
-
-    Ok(())
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
@@ -1062,23 +800,6 @@ impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpo
 
     fn orphan_registry(&self) -> Option<&Arc<InstanceOrphanRegistry>> {
         Some(&self.orphan_registry)
-    }
-
-    fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        self.orphan_registry.register_orphan(pin_id)
-    }
-
-    fn create_hardlink_clone<'a>(
-        &'a self,
-        seq_no: u64,
-        source_dir: &'a Path,
-        target_dir: &'a Path,
-        snapshot_registry: &'a Arc<SnapshotRegistry>,
-    ) -> BoxFuture<'a, Result<HardlinkCloneResult>> {
-        Box::pin(async move {
-            self.create_hardlink_clone(seq_no, source_dir, target_dir, snapshot_registry)
-                .await
-        })
     }
 
     fn recover_orphaned_pins<'a>(&'a self) -> BoxFuture<'a, Result<Vec<PinId>>> {

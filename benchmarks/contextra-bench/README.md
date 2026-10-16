@@ -1,12 +1,12 @@
 # Contextra Benchmark Harness (`contextra-bench`)
 
-This crate provides a reproducible evaluation harness for retrieval quality, contextual retrieval, and standardized long-term conversational memory benchmarks.
+This crate provides a reproducible evaluation harness for retrieval quality, contextual retrieval, cross-encoder reranking, and standardized long-term conversational memory benchmarks.
 
 ---
 
 ## 1. Running the Standard Synthetic Benchmark
 
-The built-in synthetic benchmark evaluates contextual retrieval prefixing over a synthetic multi-domain corpus.
+The built-in synthetic benchmark evaluates contextual retrieval prefixing and cross-encoder reranking over a synthetic multi-domain corpus.
 
 ```bash
 cargo run -p contextra-bench -- synthetic

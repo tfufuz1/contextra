@@ -1,0 +1,8 @@
+title = "Typ- & Crate-Registrierungsprüfung"
+what = "Ein neuer Crate oder Typ ist nicht korrekt in `capabilities.toml` oder der Workspace-Struktur eingetragen."
+why = "Alle Subsysteme müssen zentral erfasst sein, um Architekturgrenzen und Tiers korrekt durchzusetzen."
+fix = "Trage das Crate bzw. den Typ in `capabilities.toml` ein und starte `cargo xtask sync-docs`."
+anti_fix = "Erstelle keine inoffiziellen Workspace-Mitglieder ohne Eintrag."
+adr = ["ADR-N08"]
+related = ["doc-truth", "check-dag"]
+sources = ["capabilities.toml", "Cargo.toml"]

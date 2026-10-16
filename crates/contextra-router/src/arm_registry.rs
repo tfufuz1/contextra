@@ -1,0 +1,152 @@
+#[cfg(feature = "flow-corrected-thompson")]
+use contextra_adapt::{FcTsArmSet, FcTsConfig, FcTsError, FlowCorrectedThompsonBandit};
+use contextra_types::RetrievalStrategy;
+
+/// Verlustfreie, deterministische Abbildung Arm-Index <-> RetrievalStrategy.
+/// Lebt in contextra-router (wo Arme registriert werden), NICHT im BanditPolicy-Port.
+#[derive(Debug, Clone, Copy)]
+pub struct ArmRegistry {
+    arms: [RetrievalStrategy; 5],
+}
+
+/// Fehlerklasse für ungültige Arm-Indizes — crate-lokal, P6-konform an Grenze konvertierbar.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum ArmRegistryError {
+    /// Der angegebene Arm-Index liegt außerhalb des gültigen Bereichs (0..=4).
+    #[error("arm index {0} out of range, expected 0..=4")]
+    OutOfRange(u32),
+}
+
+impl Default for ArmRegistry {
+    fn default() -> Self {
+        // Feste, deterministische Reihenfolge (Determinismus-Invariante, §3.2 Punkt 3).
+        Self {
+            arms: [
+                RetrievalStrategy::Vector,
+                RetrievalStrategy::Text,
+                RetrievalStrategy::Graph,
+                RetrievalStrategy::Hybrid,
+                RetrievalStrategy::Global {
+                    max_community_nodes: None,
+                    min_community_size: None,
+                },
+            ],
+        }
+    }
+}
+
+impl ArmRegistry {
+    /// Liefert die `RetrievalStrategy` für den gegebenen Arm-Index (0..=4).
+    pub fn strategy_for(&self, arm: u32) -> Result<RetrievalStrategy, ArmRegistryError> {
+        self.arms
+            .get(arm as usize)
+            .copied()
+            .ok_or(ArmRegistryError::OutOfRange(arm))
+    }
+
+    /// Liefert den Arm-Index (0..=4) für die gegebene `RetrievalStrategy`.
+    ///
+    /// Die Implementierung verwendet ein `match` über alle bekannten Varianten mit einem
+    /// sicheren Fallback für das von Rust bei Crate-übergreifenden `#[non_exhaustive]` Enums
+    /// erzwungene Wildcard-Pattern (`_`), um die Zero-Panic-Doktrin (P7) strikt einzuhalten.
+    pub fn arm_for(&self, strategy: RetrievalStrategy) -> u32 {
+        match strategy {
+            RetrievalStrategy::Vector => 0,
+            RetrievalStrategy::Text => 1,
+            RetrievalStrategy::Graph => 2,
+            RetrievalStrategy::Hybrid => 3,
+            RetrievalStrategy::Global { .. } => 4,
+            _ => 0,
+        }
+    }
+
+    /// Erzeugt ein `FcTsArmSet` mit `count` Armen der Dimension `dim`.
+    #[cfg(feature = "flow-corrected-thompson")]
+    pub fn create_fc_ts_arm_set(&self, count: usize, dim: usize) -> Result<FcTsArmSet, FcTsError> {
+        if count == 0 {
+            return Err(FcTsError::InvalidConfig("FcTsArmSet is empty".to_string()));
+        }
+        let mut arms = Vec::with_capacity(count);
+        let cfg = FcTsConfig {
+            dim,
+            ..Default::default()
+        };
+        for _ in 0..count {
+            let arm = FlowCorrectedThompsonBandit::new(cfg.clone())?;
+            arms.push(arm);
+        }
+        Ok(FcTsArmSet { arms })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arm_registry_bijection() {
+        let registry = ArmRegistry::default();
+        let strategies = [
+            RetrievalStrategy::Vector,
+            RetrievalStrategy::Text,
+            RetrievalStrategy::Graph,
+            RetrievalStrategy::Hybrid,
+            RetrievalStrategy::Global {
+                max_community_nodes: None,
+                min_community_size: None,
+            },
+        ];
+
+        for (expected_arm, &strategy) in strategies.iter().enumerate() {
+            let arm = expected_arm as u32;
+            let mapped_strategy = registry
+                .strategy_for(arm)
+                .unwrap_or(RetrievalStrategy::Vector);
+            assert_eq!(mapped_strategy, strategy);
+
+            let mapped_arm = registry.arm_for(strategy);
+            assert_eq!(mapped_arm, arm);
+        }
+    }
+
+    #[test]
+    fn test_arm_registry_out_of_range() {
+        let registry = ArmRegistry::default();
+        assert_eq!(
+            registry.strategy_for(5),
+            Err(ArmRegistryError::OutOfRange(5))
+        );
+        assert_eq!(
+            registry.strategy_for(100),
+            Err(ArmRegistryError::OutOfRange(100))
+        );
+    }
+
+    #[test]
+    fn test_arm_registry_determinism() {
+        let reg1 = ArmRegistry::default();
+        let reg2 = ArmRegistry::default();
+
+        for arm in 0..5 {
+            assert_eq!(reg1.strategy_for(arm).ok(), reg2.strategy_for(arm).ok());
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "flow-corrected-thompson")]
+    fn test_arm_registry_create_fc_ts_arm_set() {
+        let registry = ArmRegistry::default();
+        let set = registry
+            .create_fc_ts_arm_set(3, 4)
+            .expect("valid arm set creation");
+        assert_eq!(set.arms.len(), 3);
+
+        let err = registry
+            .create_fc_ts_arm_set(0, 4)
+            .expect_err("should fail for empty count");
+        match err {
+            FcTsError::InvalidConfig(msg) => assert!(msg.contains("empty")),
+            _ => panic!("unexpected error variant"),
+        }
+    }
+}

@@ -15,6 +15,7 @@ ring = "0"
 [features]
 default = []
 docid-128 = []
+auto-extraction-opt-out = []
 
 [dependencies]
 thiserror = { workspace = true }

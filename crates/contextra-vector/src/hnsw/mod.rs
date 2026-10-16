@@ -9,23 +9,16 @@
 pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
-pub mod durable_fs;
-pub mod residue_scan;
 pub mod sq8_bias;
-pub mod verify;
-pub mod witness;
 
 mod acorn_filtered;
 mod batch;
 mod config;
-mod connections;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
 mod types;
 mod vector_index_impl;
-
-pub use connections::MmapBacklinkOverlay;
 
 #[cfg(test)]
 mod tests;
@@ -35,12 +28,9 @@ pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
-pub use durable_fs::{atomic_replace, durable_remove};
-pub use residue_scan::{ResDepth, ResHnswEvidence};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
-pub use verify::{GhostScan, IncompleteReason};

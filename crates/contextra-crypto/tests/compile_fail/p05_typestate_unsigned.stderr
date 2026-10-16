@@ -1,8 +1,0 @@
-error[E0599]: no method named `finish` found for struct `DeletionProofBuilder<Cleaned>` in the current scope
-  --> tests/compile_fail/p05_typestate_unsigned.rs:22:26
-   |
-22 |     let _proof = builder.finish();
-   |                          ^^^^^^ method not found in `DeletionProofBuilder<Cleaned>`
-   |
-   = note: the method was found for
-           - `DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned>`

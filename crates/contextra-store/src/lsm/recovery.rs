@@ -1,14 +1,14 @@
 use super::*;
 use crate::compaction::{CompactionEngine, MergeOperator};
-use crate::lsm::gc_floor::GcFloor;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
-use crate::wal::{Wal, WalOp, WalReplayOptions};
-use contextra_types::{ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT, TxId};
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
-use contextra_mvcc::snapshot::SnapshotFloor;
+use crate::wal::{Wal, WalOp};
+use contextra_core::{
+    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
+    TOMBSTONE_BIT,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -27,8 +27,8 @@ pub(crate) fn next_temp_file_counter() -> u64 {
 /// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
 pub(crate) fn generate_crypto_salt() -> [u8; 32] {
     let mut buf = [0u8; 32];
-    let rng = contextra_ports::SystemRng::new();
-    contextra_ports::Rng::fill_bytes(&rng, &mut buf);
+    use rand::Rng;
+    rand::thread_rng().fill(&mut buf);
     buf
 }
 
@@ -191,16 +191,11 @@ impl LsmStorage {
             }
         };
 
-        let key_manager = match &config.encryption_passphrase {
-            Some(p) => {
-                let header = contextra_crypto::KdfHeader::new(
-                    contextra_crypto::KdfParams::default(),
-                    salt.clone(),
-                )?;
-                Some(Arc::new(KeyManager::try_new_strict(p, &header)?))
-            }
-            None => None,
-        };
+        let key_manager = config
+            .encryption_passphrase
+            .as_ref()
+            .map(|p| KeyManager::try_new(p, &salt).map(Arc::new))
+            .transpose()?;
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
@@ -272,30 +267,9 @@ impl LsmStorage {
         let mut replayed_hmac_set = std::collections::HashSet::new();
         replayed_hmac_set.insert([0u8; 32]);
 
-        let salt_bytes: [u8; 32] = salt.as_slice().try_into().unwrap_or([0u8; 32]);
-        let ledger_key = crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes);
-        let db_has_data = !directory_is_pristine(&config.path).await?;
-        let (ledger_opt, ledger_status) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
-            &config.path,
-            ledger_key,
-            db_has_data,
-            None,
-        ).await?;
-
-        let read_only = !matches!(
-            ledger_status,
-            crate::erasure_ledger::LedgerOpenStatus::Ok | crate::erasure_ledger::LedgerOpenStatus::Fresh
-        );
-
-        let erasure_ledger_handle = ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
-
-        let mut replay_options = WalReplayOptions::default();
-        if let Some(ref handle) = erasure_ledger_handle {
-            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(Arc::clone(handle))));
-        }
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let (wal_entries, _report) = wal.replay_with_filter(replay_options.filter.as_deref()).await?;
+            let wal_entries = wal.replay().await?;
 
             if let Some((_, last_entry, _)) = wal_entries.last() {
                 last_replayed_hmac = Some(last_entry.checksum);
@@ -417,7 +391,7 @@ impl LsmStorage {
             }
         }
 
-        let tx_buffer = Arc::new(TxBuffer::new_with_config(16, config.tx_timeout));
+        let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
 
         let mut pending_rollbacks = Vec::new();
         let mut entries = tokio::fs::read_dir(&config.path)
@@ -458,44 +432,13 @@ impl LsmStorage {
             let path = entry.path();
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if file_name.ends_with(".tmp")
-                || file_name.ends_with(".purge_tmp")
-                || path.extension().is_some_and(|ext| ext == "tmp" || ext == "purge_tmp")
+                || path.extension().is_some_and(|ext| ext == "tmp")
                 || file_name.starts_with("SALT.tmp.")
                 || file_name.starts_with("MANIFEST.new.")
             {
-                tracing::warn!("Scrubbing and removing leftover temp file: {:?}", path);
-                let p = path.clone();
-                let res = tokio::task::spawn_blocking(move || {
-                    match contextra_durable_fs::scrub_if_safe(
-                        &p,
-                        contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                        false,
-                        false,
-                    ) {
-                        Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                        | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                        Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                            contextra_durable_fs::durable_remove(&p)
-                        }
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                        Err(e) => Err(e),
-                    }
-                })
-                .await;
-                match res {
-                    Ok(Ok(_)) => {}
-                    Ok(Err(e)) => {
-                        return Err(ContextraError::Storage(format!(
-                            "Failed to scrub leftover temp file {:?}: {}",
-                            path, e
-                        )));
-                    }
-                    Err(join_err) => {
-                        return Err(ContextraError::Storage(format!(
-                            "Join error scrubbing leftover temp file {:?}: {}",
-                            path, join_err
-                        )));
-                    }
+                tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
+                if let Err(e) = tokio::fs::remove_file(&path).await {
+                    tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
                 }
             } else if path.extension().is_some_and(|ext| ext == "sst") {
                 if let Some(ref valid_set) = valid_manifest_sstables {
@@ -506,39 +449,9 @@ impl LsmStorage {
                         .as_ref()
                         .is_some_and(|dead_set| dead_set.contains(path_key))
                     {
-                        tracing::info!("Scrubbing and removing dead SSTable file proven by MANIFEST: {:?}", path);
-                        let p = path.clone();
-                        let res = tokio::task::spawn_blocking(move || {
-                            match contextra_durable_fs::scrub_if_safe(
-                                &p,
-                                contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                                false,
-                                false,
-                            ) {
-                                Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                                | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                                Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                                    contextra_durable_fs::durable_remove(&p)
-                                }
-                                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                                Err(e) => Err(e),
-                            }
-                        })
-                        .await;
-                        match res {
-                            Ok(Ok(_)) => {}
-                            Ok(Err(e)) => {
-                                return Err(ContextraError::Storage(format!(
-                                    "Failed to scrub dead SSTable {:?}: {}",
-                                    path, e
-                                )));
-                            }
-                            Err(join_err) => {
-                                return Err(ContextraError::Storage(format!(
-                                    "Join error scrubbing dead SSTable {:?}: {}",
-                                    path, join_err
-                                )));
-                            }
+                        tracing::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
+                        if let Err(e) = tokio::fs::remove_file(&path).await {
+                            tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
                         tracing::warn!(
@@ -599,64 +512,6 @@ impl LsmStorage {
             manifest.append_batch(&add_entries).await?;
         }
 
-        // --- Recovery Bausteine Wiring ---
-        // 1. Resumption von unterbrochenen Purge-Operationen (Verdrahtung Punkt 2 & 3)
-        let purge_wiring = crate::lsm::purge::PurgeWiring::build_default(&config.path)?;
-        if let Err(e) = purge_wiring.resume_pending().await {
-            tracing::error!(
-                error = %e,
-                path = ?config.path,
-                "Interrupted purge resumption failed during LsmStorage recovery"
-            );
-            return Err(ContextraError::Storage(format!("Purge resumption failed: {e}")));
-        }
-
-        // 2. Witness Scan über SSTable Dateiklassen (Verdrahtung Punkt 4)
-        let sst_read = sstables.read().await;
-        let live_sst_paths: Vec<_> = sst_read.iter().map(|s| s.file_path().to_path_buf()).collect();
-        drop(sst_read);
-
-        let witness_res = crate::sstable::collect_witnesses(
-            &config.path,
-            live_sst_paths.clone(),
-            1,
-            max_tx,
-            Vec::new(),
-            Vec::new(),
-            key_manager.clone(),
-        );
-        if let Err(e) = witness_res {
-            tracing::warn!(
-                error = %e,
-                path = ?config.path,
-                "Witness scan encountered unclassifiable or unwitnessable file during recovery"
-            );
-        }
-
-        // 3. Orphan GC gegen Manifest-Sicht (Verdrahtung Punkt 5)
-        let initial_flush_counter = max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0);
-        let manifest_gen = 1 + initial_flush_counter;
-        let witness_inputs = crate::sstable::witness_types::SstScanInputs {
-            data_dirs: vec![config.path.clone()],
-            live_files: live_sst_paths,
-            pending_delete_files: Vec::new(),
-            manifest_generation: manifest_gen,
-            as_of_tx: max_tx,
-            depth: 1,
-        };
-        if let Ok(inventory) = crate::sstable::witness_inventory::SstInventory::build(&witness_inputs) {
-            let orphan_plan = crate::sstable::orphan_gc::plan_orphan_removal(&inventory, &[]);
-            if !orphan_plan.files_to_remove.is_empty() {
-                tracing::info!(
-                    files_to_remove = orphan_plan.files_to_remove.len(),
-                    "Cleaning up orphaned/temp SSTable files via scrub_and_remove"
-                );
-                crate::sstable::orphan_gc::remove_orphans(&orphan_plan).map_err(|e| {
-                    ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
-                })?;
-            }
-        }
-
         let snapshot_registry = Arc::new(SnapshotRegistry::new());
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
@@ -688,22 +543,9 @@ impl LsmStorage {
                 .await;
         });
 
-        // TODO(Implementer): [P02 / F-01 / CRITICAL / JULES-P02-01]
-        // TxBuffer-Anbindung für CompactionEngine (Invariante I-2):
-        // `CompactionEngine` benötigt Zugriff auf `tx_buffer` (oder eine Watermark-Provider-Abstraktion),
-        // damit die Kompaktion aktive MVCC-Lesetransaktionen aus `TxBuffer::min_read_snapshot()` berücksichtigt
-        // und keine Daten löscht, die von laufenden Abfragen noch benötigt werden.
-        let last_applied_seq = Arc::new(AtomicU64::new(max_seq));
-
-        let gc_floor: Arc<dyn SnapshotFloor> = Arc::new(GcFloor::new(
-            Arc::clone(&snapshot_registry),
-            Arc::clone(&tx_buffer),
-            Arc::clone(&last_applied_seq),
-        ));
-
         let mut compaction_engine_builder = CompactionEngine::new(
             config.compaction.clone(),
-            Arc::clone(&gc_floor),
+            Arc::clone(&snapshot_registry),
             Arc::clone(&block_cache),
             key_manager.clone(),
             Arc::clone(&resource_tracker),
@@ -711,20 +553,23 @@ impl LsmStorage {
         )
         .with_pressure_rx(pressure_rx.clone());
 
-        if config.compaction.enable_adaptive_compaction {
-            let planner = Arc::new(crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
-                config.compaction.adaptive_read_ratio_threshold,
-                config.compaction.min_sstables_per_tier,
-                config.compaction.size_ratio,
-            ));
-            compaction_engine_builder = compaction_engine_builder.with_adaptive_planner(planner);
-        }
-
         if let Some(mo) = merge_operator {
             compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);
         }
 
         let compaction_engine = Arc::new(compaction_engine_builder);
+
+        let compaction_engine_for_loop = Arc::clone(&compaction_engine);
+        let compaction_sstables = Arc::clone(&sstables);
+        let compaction_path = config.path.clone();
+
+        let ct_clone = cancel_token.clone();
+        task_tracker.spawn(async move {
+            compaction_engine_for_loop
+                .run_loop(compaction_sstables, compaction_path, ct_clone)
+                .await;
+        });
+        task_tracker.close();
 
         let flush_notify = Arc::new(tokio::sync::Notify::new());
         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
@@ -744,12 +589,11 @@ impl LsmStorage {
             block_cache,
             wal: RwLock::new(Arc::new(wal)),
             snapshot_registry,
-            floor: gc_floor,
             compaction_engine,
             manifest,
             next_seq_no: AtomicU64::new(max_seq.saturating_add(1)),
             last_committed_tx: AtomicU64::new(max_tx),
-            last_applied_seq,
+            last_applied_seq: AtomicU64::new(max_seq),
             flush_notify,
             health,
             commit_mutex: tokio::sync::Mutex::new(()),
@@ -770,28 +614,7 @@ impl LsmStorage {
                     .with_metrics_sink(Arc::clone(&metrics_sink_container)),
             ),
             metrics_sink: metrics_sink_container,
-            erasure_fence: Arc::new(super::fence::ErasureFence::new()),
-            erasure_ledger_handle,
-            read_only,
-            ledger_status,
-            backend_id: {
-                use contextra_ports::{EntropyRng, SystemRng};
-                let mut bytes = [0u8; 8];
-                SystemRng::new().fill_bytes(&mut bytes);
-                u64::from_le_bytes(bytes)
-            },
         };
-
-        let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
-        let compaction_sstables = Arc::clone(&storage.sstables);
-        let compaction_path = storage.config.path.clone();
-        let ct_clone = storage.cancel_token.clone();
-
-        storage.spawn_tracked(async move {
-            compaction_engine_for_loop
-                .run_loop(compaction_sstables, compaction_path, ct_clone)
-                .await;
-        });
 
         if replayed_size > 0 && !wal_files.is_empty() {
             tracing::info!(
@@ -810,56 +633,18 @@ impl LsmStorage {
             };
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
-                    let p = old_wal_path.clone();
-                    let remove_res = tokio::task::spawn_blocking(move || {
-                        contextra_durable_fs::durable_remove(&p)
-                    })
-                    .await;
-                    match remove_res {
-                        Ok(Err(e)) => {
-                            if e.kind() != std::io::ErrorKind::NotFound {
-                                tracing::warn!(
-                                    "Failed to remove old WAL file {:?}: {}",
-                                    old_wal_path,
-                                    e
-                                );
-                            }
-                        }
-                        Err(join_err) => {
-                            tracing::warn!(
-                                "Join error removing old WAL file {:?}: {}",
-                                old_wal_path,
-                                join_err
+                    if let Err(e) = tokio::fs::remove_file(old_wal_path).await {
+                        tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
+                    } else {
+                        tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
+                        let uuid_sidecar =
+                            PathBuf::from(format!("{}.uuid", old_wal_path.display()));
+                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+                            tracing::debug!(
+                                "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
+                                uuid_sidecar,
+                                e
                             );
-                        }
-                        Ok(Ok(())) => {
-                            tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
-                            let uuid_sidecar =
-                                PathBuf::from(format!("{}.uuid", old_wal_path.display()));
-                            let sidecar = uuid_sidecar.clone();
-                            let sidecar_res = tokio::task::spawn_blocking(move || {
-                                contextra_durable_fs::durable_remove(&sidecar)
-                            })
-                            .await;
-                            match sidecar_res {
-                                Ok(Err(e)) => {
-                                    if e.kind() != std::io::ErrorKind::NotFound {
-                                        tracing::debug!(
-                                            "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
-                                            uuid_sidecar,
-                                            e
-                                        );
-                                    }
-                                }
-                                Err(join_err) => {
-                                    tracing::debug!(
-                                        "Join error removing WAL UUID sidecar {:?}: {} (non-critical)",
-                                        uuid_sidecar,
-                                        join_err
-                                    );
-                                }
-                                Ok(Ok(())) => {}
-                            }
                         }
                     }
                 }
@@ -1057,39 +842,14 @@ impl LsmStorage {
 
         let mut manifest_batch = Vec::new();
         for path in sst_to_remove {
-            tracing::info!("Scrubbing and removing SSTable during rollback: {:?}", path);
+            tracing::info!("Removing SSTable during rollback: {:?}", path);
             manifest_batch.push(crate::manifest::ManifestEntry::Remove { path: path.clone() });
-            let p = path.clone();
-            let res = tokio::task::spawn_blocking(move || {
-                match contextra_durable_fs::scrub_if_safe(
-                    &p,
-                    contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                    false,
-                    false,
-                ) {
-                    Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                    | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                    Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                        contextra_durable_fs::durable_remove(&p)
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                    Err(e) => Err(e),
-                }
-            })
-            .await;
-            match res {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => {
-                    return Err(ContextraError::Storage(format!(
-                        "Failed to scrub rolled back SSTable {:?}: {}",
-                        path, e
-                    )));
-                }
-                Err(join_err) => {
-                    return Err(ContextraError::Storage(format!(
-                        "Join error scrubbing rolled back SSTable {:?}: {}",
-                        path, join_err
-                    )));
+            if let Err(e) = tokio::fs::remove_file(&path).await {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    tracing::error!(
+                        path = ?path,
+                        "Orphaned SSTable konnte nicht entfernt werden: {e}. Manuelles Cleanup nötig."
+                    );
                 }
             }
         }
@@ -1128,112 +888,6 @@ impl LsmStorage {
             max_seq,
             target_offset
         );
-
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[tokio::test]
-    async fn recovery_removes_old_wal_via_durable_remove() -> Result<()> {
-        let tmp = TempDir::new().map_err(|e| ContextraError::Storage(e.to_string()))?;
-        let db_path = tmp.path().to_path_buf();
-
-        tokio::fs::write(db_path.join("SALT"), &[0u8; 32])
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-        let old_wal_path = db_path.join("wal-00000000000000000001.log");
-        let active_wal_path = db_path.join("wal-00000000000000000002.log");
-        let old_sidecar_path = std::path::PathBuf::from(format!("{}.uuid", old_wal_path.display()));
-        let active_sidecar_path =
-            std::path::PathBuf::from(format!("{}.uuid", active_wal_path.display()));
-
-        {
-            let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
-            let op_put1 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(1),
-                key: b"key1".to_vec(),
-                value: b"val1".to_vec(),
-            };
-            let op_end1 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(1),
-                committed: true,
-            };
-            let (batch1, _) = old_wal
-                .prepare_batch(vec![(op_put1, 1), (op_end1, 2)])
-                .await?;
-            old_wal.append_batch(batch1).await?;
-            old_wal.close().await?;
-
-            let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
-            let op_put2 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(2),
-                key: b"key2".to_vec(),
-                value: b"val2".to_vec(),
-            };
-            let op_end2 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(2),
-                committed: true,
-            };
-            let (batch2, _) = active_wal
-                .prepare_batch(vec![(op_put2, 3), (op_end2, 4)])
-                .await?;
-            active_wal.append_batch(batch2).await?;
-            active_wal.close().await?;
-        }
-
-        Wal::load_or_create_wal_uuid(&old_wal_path).await?;
-        Wal::load_or_create_wal_uuid(&active_wal_path).await?;
-
-        assert!(old_wal_path.exists());
-        assert!(old_sidecar_path.exists());
-        assert!(active_wal_path.exists());
-        assert!(active_sidecar_path.exists());
-
-        let dir_mtime_before = std::fs::metadata(&db_path).and_then(|m| m.modified()).ok();
-
-        let config = LsmConfig {
-            path: db_path.clone(),
-            ..Default::default()
-        };
-
-        let storage = LsmStorage::new(config).await?;
-
-        assert!(
-            !old_wal_path.exists(),
-            "Old WAL file {:?} should be removed after recovery",
-            old_wal_path
-        );
-        assert!(
-            !old_sidecar_path.exists(),
-            "Old WAL UUID sidecar {:?} should be removed after recovery",
-            old_sidecar_path
-        );
-
-        let current_active_wal_path = storage.wal.read().await.path().to_path_buf();
-        assert!(
-            current_active_wal_path.exists(),
-            "Active WAL file {:?} must be preserved",
-            current_active_wal_path
-        );
-
-        let val1 = storage.get(b"key1").await?;
-        assert_eq!(val1, Some(Bytes::from("val1")));
-        let val2 = storage.get(b"key2").await?;
-        assert_eq!(val2, Some(Bytes::from("val2")));
-
-        let dir_mtime_after = std::fs::metadata(&db_path).and_then(|m| m.modified()).ok();
-        if let (Some(before), Some(after)) = (dir_mtime_before, dir_mtime_after) {
-            assert!(
-                after >= before,
-                "Directory modification time updated after durable_remove and sync"
-            );
-        }
 
         Ok(())
     }

@@ -6,7 +6,7 @@
 // FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
 // Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
 
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;
@@ -37,18 +37,6 @@ pub enum ManifestEntry {
     },
     /// A WAL high-water-mark entry recording the valid WAL-tail HMAC at flush/checkpoint time.
     WalCheckpoint { hmac: [u8; 32] },
-    /// Records highest format version written for a file kind.
-    FormatVersionRecord {
-        file_kind: u8,
-        max_version: u16,
-        migrated_from: u16,
-    },
-    /// Records the highest active ErasureMode watermark.
-    ErasureWatermarkRecord { mode: u8 },
-    /// Records the current ledger head state (seq and HMAC).
-    LedgerHeadRecord { seq: u64, mac: [u8; 32] },
-    /// Records the persistent u64 backend identifier.
-    BackendIdRecord { backend_id: u64 },
 }
 
 impl ManifestEntry {
@@ -99,29 +87,6 @@ impl ManifestEntry {
             ManifestEntry::WalCheckpoint { hmac } => {
                 payload.push(4u8); // op_tag = 4
                 payload.extend_from_slice(hmac);
-            }
-            ManifestEntry::FormatVersionRecord {
-                file_kind,
-                max_version,
-                migrated_from,
-            } => {
-                payload.push(5u8); // op_tag = 5
-                payload.push(*file_kind);
-                payload.extend_from_slice(&max_version.to_le_bytes());
-                payload.extend_from_slice(&migrated_from.to_le_bytes());
-            }
-            ManifestEntry::ErasureWatermarkRecord { mode } => {
-                payload.push(6u8); // op_tag = 6
-                payload.push(*mode);
-            }
-            ManifestEntry::LedgerHeadRecord { seq, mac } => {
-                payload.push(7u8); // op_tag = 7
-                payload.extend_from_slice(&seq.to_le_bytes());
-                payload.extend_from_slice(mac);
-            }
-            ManifestEntry::BackendIdRecord { backend_id } => {
-                payload.push(8u8); // op_tag = 8
-                payload.extend_from_slice(&backend_id.to_le_bytes());
             }
         }
 
@@ -395,90 +360,6 @@ impl ManifestEntry {
                     .try_into()
                     .map_err(|_| ContextraError::Serialization("Invalid hmac format".into()))?;
                 Ok(ManifestEntry::WalCheckpoint { hmac })
-            }
-            5 => {
-                // FormatVersionRecord
-                if remaining.len() != 5 {
-                    return Err(ContextraError::Serialization(format!(
-                        "FormatVersionRecord payload length mismatch: expected 5, got {}",
-                        remaining.len()
-                    )));
-                }
-                let file_kind = *remaining.first().ok_or_else(|| {
-                    ContextraError::Serialization("FormatVersionRecord file_kind missing".into())
-                })?;
-                let max_version_bytes = remaining.get(1..3).ok_or_else(|| {
-                    ContextraError::Serialization("FormatVersionRecord max_version missing".into())
-                })?;
-                let max_version =
-                    u16::from_le_bytes(max_version_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid max_version".into())
-                    })?);
-                let migrated_from_bytes = remaining.get(3..5).ok_or_else(|| {
-                    ContextraError::Serialization(
-                        "FormatVersionRecord migrated_from missing".into(),
-                    )
-                })?;
-                let migrated_from =
-                    u16::from_le_bytes(migrated_from_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid migrated_from".into())
-                    })?);
-                Ok(ManifestEntry::FormatVersionRecord {
-                    file_kind,
-                    max_version,
-                    migrated_from,
-                })
-            }
-            6 => {
-                // ErasureWatermarkRecord
-                if remaining.len() != 1 {
-                    return Err(ContextraError::Serialization(format!(
-                        "ErasureWatermarkRecord payload length mismatch: expected 1, got {}",
-                        remaining.len()
-                    )));
-                }
-                let mode = *remaining.first().ok_or_else(|| {
-                    ContextraError::Serialization("ErasureWatermarkRecord mode missing".into())
-                })?;
-                Ok(ManifestEntry::ErasureWatermarkRecord { mode })
-            }
-            7 => {
-                // LedgerHeadRecord
-                if remaining.len() != 40 {
-                    return Err(ContextraError::Serialization(format!(
-                        "LedgerHeadRecord payload length mismatch: expected 40, got {}",
-                        remaining.len()
-                    )));
-                }
-                let seq_bytes = remaining.get(0..8).ok_or_else(|| {
-                    ContextraError::Serialization("LedgerHeadRecord seq missing".into())
-                })?;
-                let seq = u64::from_le_bytes(seq_bytes.try_into().map_err(|_| {
-                    ContextraError::Serialization("Invalid LedgerHeadRecord seq".into())
-                })?);
-                let mac_bytes = remaining.get(8..40).ok_or_else(|| {
-                    ContextraError::Serialization("LedgerHeadRecord mac missing".into())
-                })?;
-                let mac: [u8; 32] = mac_bytes.try_into().map_err(|_| {
-                    ContextraError::Serialization("Invalid LedgerHeadRecord mac".into())
-                })?;
-                Ok(ManifestEntry::LedgerHeadRecord { seq, mac })
-            }
-            8 => {
-                // BackendIdRecord
-                if remaining.len() != 8 {
-                    return Err(ContextraError::Serialization(format!(
-                        "BackendIdRecord payload length mismatch: expected 8, got {}",
-                        remaining.len()
-                    )));
-                }
-                let backend_id_bytes = remaining.get(0..8).ok_or_else(|| {
-                    ContextraError::Serialization("BackendIdRecord backend_id missing".into())
-                })?;
-                let backend_id = u64::from_le_bytes(backend_id_bytes.try_into().map_err(|_| {
-                    ContextraError::Serialization("Invalid BackendIdRecord backend_id".into())
-                })?);
-                Ok(ManifestEntry::BackendIdRecord { backend_id })
             }
             _ => Err(ContextraError::Serialization(format!(
                 "Unknown Manifest op tag: {}",

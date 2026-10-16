@@ -1,17 +1,11 @@
 # Contextra — Feature-Veto-Register (VETOES.md)
 
-> **Governance-Eskalationsvermerk (2026-10-14, M1a / TP-22):**
-> Die ursprüngliche Review-Frist (2026-10-07) für VETO-F02 und VETO-OP03 war formal abgelaufen.
-> Gemäß Mandat M1a wird der Status in VETOES.md NICHT eigenmächtig geändert.
-> Die Bestätigung der Veto-Sperren ohne Statusänderung erfolgte über ADR-VETO-REVIEW-F02-OP03-2026-10.md mit neuer Fälligkeit 2027-10-12. Dieser Sachverhalt wird als formale Eskalation im PR und Feature-Register vermerkt.
-
 ## VETO-F02
 
 feature_id: F-02
 status: conditionally_accepted
-conditional_review_due: 2027-10-12
-last_verified: 2026-10-12
-adr_ref: docs/decisions/ADR-VETO-REVIEW-F02-OP03-2026-10.md
+conditional_review_due: 2026-10-07
+adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
 affected_paths: ["crates/contextra-vector/", "crates/contextra-store/"]
 keywords: ["partial hnsw rebuild", "nucleation", "rebuild_region", "F-02"]
 reason: >
@@ -29,9 +23,8 @@ reason: >
 
 feature_id: OP-03
 status: conditionally_accepted
-conditional_review_due: 2027-10-12
-last_verified: 2026-10-12
-adr_ref: docs/decisions/ADR-VETO-REVIEW-F02-OP03-2026-10.md
+conditional_review_due: 2026-10-07
+adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
 keywords: ["voice assistant", "speech-to-text", "realtime-audio", "jarvis", "OP-03"]
 reason: >
   Keine Realtime-Audio-, Speech-to-Text-, Voice- oder Jarvis-Assistenten-Funktionen (OP-03) integrieren, da Audio-Streaming nicht zum bi-temporalen Speichersubstrat gehört.

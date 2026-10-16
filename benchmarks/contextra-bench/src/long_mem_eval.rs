@@ -3,9 +3,8 @@
 // ZWECK: Loader, Evaluation Harness und Regressions-Suite für das LongMemEval Benchmark (ICLR 2025 / arXiv:2410.10813)
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
+use contextra_core::{ContextraError, Result, StorageEngine, VectorIndex};
 use contextra_db::Collection;
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -88,8 +87,6 @@ impl LongMemEvalCase {
 pub struct LongMemEvalReport {
     pub per_category_accuracy: HashMap<LongMemEvalQuestionType, f64>,
     pub overall_accuracy: f64,
-    pub ci_lower_95: f64,
-    pub ci_upper_95: f64,
     pub total_cases: usize,
 }
 
@@ -1357,33 +1354,15 @@ where
         per_category_accuracy.insert(cat, acc);
     }
 
-    let n = cases.len() as f64;
-    let overall_accuracy = if n > 0.0 {
-        total_correct as f64 / n
+    let overall_accuracy = if !cases.is_empty() {
+        total_correct as f64 / cases.len() as f64
     } else {
         0.0
-    };
-
-    // Wilson Score Interval for 95% Confidence Interval (z = 1.96)
-    let (ci_lower_95, ci_upper_95) = if n > 0.0 {
-        let z: f64 = 1.96;
-        let p = overall_accuracy;
-        let denominator = 1.0 + z * z / n;
-        let center = p + z * z / (2.0 * n);
-        let margin = z * ((p * (1.0 - p) / n) + (z * z / (4.0 * n * n))).sqrt();
-        (
-            ((center - margin) / denominator).max(0.0),
-            ((center + margin) / denominator).min(1.0),
-        )
-    } else {
-        (0.0, 0.0)
     };
 
     Ok(LongMemEvalReport {
         per_category_accuracy,
         overall_accuracy,
-        ci_lower_95,
-        ci_upper_95,
         total_cases: cases.len(),
     })
 }

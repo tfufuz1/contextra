@@ -1,8 +1,9 @@
 use ahash::AHashSet;
 use roaring::RoaringTreemap;
-use std::sync::atomic::{compiler_fence, Ordering};
+use std::sync::atomic::Ordering;
 
-use contextra_types::{ContextraError, DocId, Result};
+use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::SaturatingU8;
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
@@ -66,7 +67,7 @@ impl HnswIndexCore {
                 } else {
                     guard = self.cold.quantizer.read();
                     guard.as_ref().ok_or_else(|| {
-                        contextra_types::ContextraError::Index("Quantizer not trained".into())
+                        contextra_core::ContextraError::Index("Quantizer not trained".into())
                     })?
                 };
                 if let Some(qq) = query_quantized {
@@ -94,7 +95,7 @@ impl HnswIndexCore {
             } else {
                 guard = self.cold.quantizer.read();
                 guard.as_ref().ok_or_else(|| {
-                    contextra_types::ContextraError::Index("Quantizer not trained".into())
+                    contextra_core::ContextraError::Index("Quantizer not trained".into())
                 })?
             };
             if let Some(qq) = query_quantized {
@@ -121,7 +122,7 @@ impl HnswIndexCore {
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_types::ContextraError::Index("Quantizer not trained".into())
+                        contextra_core::ContextraError::Index("Quantizer not trained".into())
                     })?
                     .symmetric_dist(a, b, self.cold.config.distance_metric)
             }
@@ -225,11 +226,11 @@ impl HnswIndexCore {
                     Ok(VectorData::F32(v))
                 };
             }
-            if let Some(node) = ctx.nodes.get(idx - ctx.mmap_node_count) {
-                return Ok(node.vector.clone());
-            }
-        } else if let Some(node) = ctx.nodes.get(idx) {
-            return Ok(node.vector.clone());
+            return Ok(ctx.nodes[idx - ctx.mmap_node_count].vector.clone());
+        }
+
+        if idx < ctx.nodes.len() {
+            return Ok(ctx.nodes[idx].vector.clone());
         }
 
         Err(ContextraError::Index(format!(
@@ -247,26 +248,20 @@ impl HnswIndexCore {
         pending_vector: &VectorData,
         prior_prepared: &[PreparedInsert],
     ) -> Result<f32> {
-        let data_a = match self.resolve_vector_data_with_batch(
+        let data_a = self.resolve_vector_data_with_batch(
             idx_a,
             ctx,
             pending_idx,
             pending_vector,
             prior_prepared,
-        ) {
-            Ok(d) => d,
-            Err(_) => return Ok(f32::MAX),
-        };
-        let data_b = match self.resolve_vector_data_with_batch(
+        )?;
+        let data_b = self.resolve_vector_data_with_batch(
             idx_b,
             ctx,
             pending_idx,
             pending_vector,
             prior_prepared,
-        ) {
-            Ok(d) => d,
-            Err(_) => return Ok(f32::MAX),
-        };
+        )?;
         self.compute_symmetric_distance(&data_a, &data_b)
     }
 
@@ -350,143 +345,84 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
-    /// Deletes a document by removing its DocId mapping and recording a tombstone.
-    ///
-    /// If `is_safe_to_free` is true (i.e., no active snapshot pin requires the node's retention sequence),
-    /// the node's vector memory in process RAM (`nodes[ram_idx].vector`) is explicitly zeroized
-    /// prior to returning `ram_idx` to the arena free-list.
-    /// If `is_safe_to_free` is false, the node remains deferred and un-freed in the RAM nodes array.
-    ///
-    /// # Residual Risk / Mmap Note
-    /// Memory-mapped bytes (`mmap_index`) remain read-only and unmapped/closed via OS operations.
-    /// Persistent mmap nodes cannot be zeroized in-place and represent an explicit residual risk.
-    pub(super) fn do_delete_node_idx(&self, idx: usize, id: DocId) -> Result<()> {
-        self.cold.deleted_nodes.write().insert(idx as u64);
-        self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
-
-        let mmap_node_count = self
-            .cold
-            .mmap_index
-            .read()
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-        if idx >= mmap_node_count {
-            let ram_idx = idx - mmap_node_count;
-            let seq_log = self.cold.seq_log.read();
-            let is_safe_to_free = match (seq_log.min_retention_seq(), seq_log.deletion_seq(id)) {
-                (Some(min_seq), Some(del_seq)) => del_seq < min_seq,
-                (None, _) => true,
-                _ => false,
-            };
-            if is_safe_to_free {
-                {
-                    let mut nodes = self.hot.nodes.write();
-                    if let Some(node) = nodes.get_mut(ram_idx) {
-                        match &mut node.vector {
-                            VectorData::F32(v) => {
-                                v.fill(0.0);
-                                std::hint::black_box(&mut *v);
-                                compiler_fence(Ordering::SeqCst);
-                            }
-                            VectorData::U8(v) => {
-                                v.fill(0);
-                                std::hint::black_box(&mut *v);
-                                compiler_fence(Ordering::SeqCst);
-                            }
-                        }
-                    }
-                }
-                self.hot
-                    .arena
-                    .clear_node_connections(ram_idx, self.cold.config.m);
-                self.hot.arena.free_node(ram_idx);
-            }
-        }
-
-        self.hot.index_epoch.fetch_add(1, Ordering::SeqCst);
-        let ep_val = self.hot.get_entry_point();
-        let ram_ep_val = self.hot.get_ram_entry_point();
-
-        if ep_val == Some(idx) || ram_ep_val == Some(idx) {
-            let nodes = self.hot.nodes.read();
-            let mmap_guard = self.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
-            let deleted = self.cold.deleted_nodes.read();
-
-            let mut best_node = None;
-            let mut best_ram_node = None;
-            let mut max_layer = 0;
-            let mut max_ram_layer = 0;
-
-            if let Some(mmap) = mmap_guard.as_ref() {
-                for i in 0..mmap_node_count {
-                    if i != idx && !deleted.contains(i as u64) {
-                        let record = match mmap.get_node_record(i) {
-                            Ok(r) => r,
-                            Err(_) => continue,
-                        };
-                        if record.max_layer as usize >= max_layer {
-                            max_layer = record.max_layer as usize;
-                            best_node = Some(i);
-                        }
-                    }
-                }
-            }
-
-            for (i, node) in nodes.iter().enumerate() {
-                let global_idx = mmap_node_count + i;
-                if global_idx != idx && !deleted.contains(global_idx as u64) {
-                    if node.max_layer >= max_layer {
-                        max_layer = node.max_layer;
-                        best_node = Some(global_idx);
-                    }
-                    if node.max_layer >= max_ram_layer {
-                        max_ram_layer = node.max_layer;
-                        best_ram_node = Some(global_idx);
-                    }
-                }
-            }
-
-            if ep_val == Some(idx) {
-                self.hot.set_entry_point(best_node);
-                if let Some(new_idx) = best_node {
-                    let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
-                        if new_idx < mmap_node_count {
-                            mmap.get_node_record(new_idx)
-                                .map(|r| r.max_layer as usize)
-                                .unwrap_or(0)
-                        } else {
-                            nodes
-                                .get(new_idx - mmap_node_count)
-                                .map(|n| n.max_layer)
-                                .unwrap_or(0)
-                        }
-                    } else {
-                        nodes.get(new_idx).map(|n| n.max_layer).unwrap_or(0)
-                    };
-                    self.hot
-                        .max_layer
-                        .store(node_max_layer as u64, Ordering::SeqCst);
-                } else {
-                    self.hot.max_layer.store(0, Ordering::SeqCst);
-                }
-            }
-
-            if ram_ep_val == Some(idx) {
-                self.hot.set_ram_entry_point(best_ram_node);
-            }
-        }
-        Ok(())
-    }
-
     pub(super) fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
-            self.do_delete_node_idx(idx, id)?;
+            self.cold.deleted_nodes.write().insert(idx as u64);
+            self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
+
+            let ep_val = self.hot.get_entry_point();
+            let ram_ep_val = self.hot.get_ram_entry_point();
+
+            if ep_val == Some(idx) || ram_ep_val == Some(idx) {
+                let nodes = self.hot.nodes.read();
+                let mmap_guard = self.cold.mmap_index.read();
+                let mmap_node_count = mmap_guard
+                    .as_ref()
+                    .map(|m| m.header.node_count() as usize)
+                    .unwrap_or(0);
+                let deleted = self.cold.deleted_nodes.read();
+
+                let mut best_node = None;
+                let mut best_ram_node = None;
+                let mut max_layer = 0;
+                let mut max_ram_layer = 0;
+
+                if let Some(mmap) = mmap_guard.as_ref() {
+                    for i in 0..mmap_node_count {
+                        if i != idx && !deleted.contains(i as u64) {
+                            let record = match mmap.get_node_record(i) {
+                                Ok(r) => r,
+                                Err(_) => continue,
+                            };
+                            if record.max_layer as usize >= max_layer {
+                                max_layer = record.max_layer as usize;
+                                best_node = Some(i);
+                            }
+                        }
+                    }
+                }
+
+                for (i, node) in nodes.iter().enumerate() {
+                    let global_idx = mmap_node_count + i;
+                    if global_idx != idx && !deleted.contains(global_idx as u64) {
+                        if node.max_layer >= max_layer {
+                            max_layer = node.max_layer;
+                            best_node = Some(global_idx);
+                        }
+                        if node.max_layer >= max_ram_layer {
+                            max_ram_layer = node.max_layer;
+                            best_ram_node = Some(global_idx);
+                        }
+                    }
+                }
+
+                if ep_val == Some(idx) {
+                    self.hot.set_entry_point(best_node);
+                    if let Some(new_idx) = best_node {
+                        let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
+                            if new_idx < mmap_node_count {
+                                mmap.get_node_record(new_idx)
+                                    .map(|r| r.max_layer as usize)
+                                    .unwrap_or(0)
+                            } else {
+                                nodes[new_idx - mmap_node_count].max_layer
+                            }
+                        } else {
+                            nodes[new_idx].max_layer
+                        };
+                        self.hot
+                            .max_layer
+                            .store(node_max_layer as u64, Ordering::SeqCst);
+                    } else {
+                        self.hot.max_layer.store(0, Ordering::SeqCst);
+                    }
+                }
+
+                if ram_ep_val == Some(idx) {
+                    self.hot.set_ram_entry_point(best_ram_node);
+                }
+            }
         }
         Ok(())
     }
@@ -614,7 +550,6 @@ impl HnswIndexCore {
 
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
-            self.hot.index_epoch.fetch_add(1, Ordering::SeqCst);
             *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
             self.cold
                 .consecutive_rapid_rebuilds
@@ -809,19 +744,14 @@ impl HnswIndexCore {
 
             if !train_data.is_empty() {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let new_q = crate::quantize::ScalarQuantizer::try_train(
+                let new_q = crate::quantize::ScalarQuantizer::train(
                     &training_refs,
                     self.cold.config.dimension,
-                )?;
+                );
                 let bias =
                     Sq8Bias::calibrate(&training_refs, &new_q, self.cold.config.distance_metric);
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
                 *new_index.inner.cold.sq8_bias.write() = bias;
-                for sample in &mut train_data {
-                    sample.fill(0.0);
-                    std::hint::black_box(&mut *sample);
-                    compiler_fence(Ordering::SeqCst);
-                }
             } else {
                 *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
             }
@@ -833,7 +763,7 @@ impl HnswIndexCore {
                     new_index.inner.do_insert(doc_id, &v, committed_tx)?;
                 }
                 VectorData::U8(v) => {
-                    let mut dequantized = {
+                    let dequantized = {
                         let q = quantizer_guard.as_ref().ok_or_else(|| {
                             ContextraError::Index("Quantizer missing during rebuild".into())
                         })?;
@@ -842,35 +772,10 @@ impl HnswIndexCore {
                     new_index
                         .inner
                         .do_insert(doc_id, &dequantized, committed_tx)?;
-                    dequantized.fill(0.0);
-                    std::hint::black_box(&mut *dequantized);
-                    compiler_fence(Ordering::SeqCst);
                 }
             }
             if is_deleted {
-                let mmap_count = new_index
-                    .inner
-                    .cold
-                    .mmap_index
-                    .read()
-                    .as_ref()
-                    .map(|m| m.header.node_count() as usize)
-                    .unwrap_or(0);
-                let ram_len = new_index.inner.hot.nodes.read().len();
-                if ram_len > 0 {
-                    let global_idx = (mmap_count + ram_len - 1) as u64;
-                    new_index
-                        .inner
-                        .cold
-                        .deleted_nodes
-                        .write()
-                        .insert(global_idx);
-                    new_index
-                        .inner
-                        .hot
-                        .deleted_count
-                        .fetch_add(1, Ordering::SeqCst);
-                }
+                new_index.inner.do_delete(doc_id)?;
             }
         }
 
@@ -895,7 +800,7 @@ impl HnswIndexCore {
 
         for change in delta_changes {
             match change {
-                contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
+                contextra_core::SeqLogChange::Insert { doc_id, seq } => {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
@@ -919,7 +824,7 @@ impl HnswIndexCore {
                     };
 
                     if let Some(vector) = vector_opt {
-                        let mut f32_vec = match vector {
+                        let f32_vec = match vector {
                             VectorData::F32(v) => v,
                             VectorData::U8(v) => {
                                 let q_guard = self.cold.quantizer.read();
@@ -934,12 +839,9 @@ impl HnswIndexCore {
                         };
 
                         new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
-                        f32_vec.fill(0.0);
-                        std::hint::black_box(&mut *f32_vec);
-                        compiler_fence(Ordering::SeqCst);
                     }
                 }
-                contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
+                contextra_core::SeqLogChange::Delete { doc_id, .. } => {
                     new_index.inner.do_delete(doc_id)?;
                 }
             }

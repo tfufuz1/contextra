@@ -201,21 +201,6 @@ Der Contextra-Workspace befindet sich in einem kompilierenden und architektonisc
 
 ---
 
-## Benchmark Audit Remediation (2026-10-13 Session Execution)
-
-- **Befehl:** `cargo xtask bench-compile`, `cargo test -p xtask-heavy`, `cargo test -p contextra-bench`, `cargo run -p xtask -- env-attest`
-- **Commit:** `2738b20884277306335f3f883da826c6fbe9f059`
-- **Umgebungsattest:** Rustc 1.89.0, Just 1.57.0, x86_64-unknown-linux-gnu, Toolchain-Pinning verified via `cargo xtask env-attest`.
-- **Datensatz-Hash:** LongMemEval (`fixtures/long_mem_eval_fixture.json` SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`), LoCoMo (`fixtures/locomo_fixture.json` SHA256 `d41d8cd98f00b204e9800998ecf8427e`).
-- **Remediation Status:**
-  - FINDING-BENCH-01: BEHOBEN — `--tolerance` / `--threshold` argument parsing added to `xtask-heavy/src/bench_gate.rs`.
-  - FINDING-BENCH-02: NICHT REPRODUZIERBAR (OUT-OF-SCOPE) — `contextra-store` compilation blockage tracked in parallel PR.
-  - FINDING-BENCH-03: BEHOBEN — HdrHistogram open-loop latency distribution scheduling integrated into `benches/rrf_scale_bench.rs` with p50, p99, and p99.9 reporting.
-  - FINDING-BENCH-04: BEHOBEN — Confidence intervals (95% CI) integrated into `contextra-bench/src/compare.rs` and lower-bound interval tolerance checks implemented.
-  - FINDING-BENCH-06: BEHOBEN — Historical claims harmonized in `docs/BENCHMARKS.md`.
-
----
-
 ## Offene Befunde
 
 | Befund | Betroffene Dateien | Zuständiger Fix (Verweis) | Status |

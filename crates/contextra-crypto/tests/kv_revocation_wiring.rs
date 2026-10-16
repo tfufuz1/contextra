@@ -1,7 +1,6 @@
 //! Integration tests for KvSegmentCipher and RevocationLog wiring in contextra-crypto.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::{
     crypto::KeyManager,
@@ -30,7 +29,7 @@ fn test_kv_segment_cipher_with_revocation_log_persistence() {
 
     let master_km = KeyManager::try_new("master-passphrase", b"master-salt")
         .expect("Failed to create KeyManager");
-    let cipher = KvSegmentCipher::new(master_km, log_arc.clone());
+    let cipher = KvSegmentCipher::new(master_km).with_revocation_log(log_arc.clone());
 
     let group_id = 999;
 

@@ -91,15 +91,6 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
         return Err(MutationGateError::NoHistoryFound(crate_name.to_string()));
     }
 
-    let head_commit = match std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .current_dir(root)
-        .output()
-    {
-        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
-        _ => "unknown".to_string(),
-    };
-
     let file = fs::File::open(&history_file).map_err(|e| {
         MutationGateError::IoError(format!("Failed to open {}: {}", history_file.display(), e))
     })?;
@@ -133,9 +124,8 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
         }
     }
 
-    let entry = last_matching.ok_or_else(|| {
-        MutationGateError::NoHistoryFound(format!("{} (HEAD commit: {})", crate_name, head_commit))
-    })?;
+    let entry =
+        last_matching.ok_or_else(|| MutationGateError::NoHistoryFound(crate_name.to_string()))?;
 
     let score_pct = if entry.total_mutants > 0 {
         (entry.caught as f64 / entry.total_mutants as f64) * 100.0

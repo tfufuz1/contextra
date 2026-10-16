@@ -1,13 +1,13 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_types::TxId;
+use contextra_core::TxId;
 use contextra_store::wal::{
     Wal, WalOp, FAIL_APPEND_AFTER_PARTIAL_BYTES, FAIL_APPEND_PARTIAL_ONCE, FAIL_TRUNCATE_ONCE,
 };
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types::Result<()> {
+async fn test_flusher_rollback_after_partial_append_failure() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("flusher_rollback.wal");
 
@@ -72,7 +72,7 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
 }
 
 #[tokio::test]
-async fn test_flusher_truncate_failure_preserves_state() -> contextra_types::Result<()> {
+async fn test_flusher_truncate_failure_preserves_state() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("truncate_fail.wal");
 

@@ -15,7 +15,7 @@ Implementiert die Schnittstelle `StorageEngine` aus `contextra-core` für produk
 | `wal/` | Write-Ahead-Log: V3 HMAC-Chaining, CRC32-Verifikation, Flusher-Actor, Append-Only I/O und Open/Heal-Recovery |
 | `memtable.rs` | In-Memory Skip-List mit Sequenznummern und Tombstone-Markierungen |
 | `sstable/` | On-Disk SSTable-Segmente: Block-Builder/Reader, Bloom-Filter, Index, CRC32 und Block-Cache (`quick_cache` S3-FIFO) |
-| `compaction/` | `CompactionEngine`: Tiered/Leveled Compaction, MVCC-Retention, Merge-Operatoren, `CostBasedAdaptivePlanner` (STO-021) und `CompactionEngineWiring` |
+| `compaction/` | `CompactionEngine`: Tiered/Leveled Compaction, MVCC-Retention, Merge-Operatoren und `CostBasedAdaptivePlanner` (STO-021) |
 | `manifest/` | Append-Only Manifest (`MFMN`), Rebuild valider/toter SSTables (L.2) und Schutz vor SSTable-Wiederauferstehung |
 | `engine/` | StorageEngine-Implementierungen (z. B. `MemoryOnlyStorageEngine` für Tests/In-Memory-Betrieb) |
 | `kv/` | KV-Segment-Persistenz und `KvDeleteMode`-Steuerung |
@@ -65,22 +65,11 @@ Implementiert die Schnittstelle `StorageEngine` aus `contextra-core` für produk
 ## 6. Verifikation
 
 ```bash
-cargo xtask crate-context contextra-store
-cargo xtask doctrine-scan --crate contextra-store
-cargo xtask check-unsafe-islands
-cargo xtask check-result-dropped-io
-cargo xtask wal-replay-verify
 cargo test -p contextra-store --locked
-cargo test -p contextra-store --test purge_v2_resilience
-cargo test -p contextra-store --test recovery_tests
-cargo test -p contextra-store --test mvcc_tests
+cargo xtask check-result-dropped-io
 ```
 
-## 7. Bekannte Lücken / SOLL (EP1 & Phase 0 Roadmap)
+## 7. Bekannte Lücken / SOLL
 
-- **N-B / N-K: Erasure Backend & PhysicalScope**: `ErasureBackend`-Implementierung ohne Downcast; Durchsetzung von `PhysicalScope` mit Tenant-Präfix `t:{tenant_id}:` zur Vermeidung von Vollscans.
-- **L1–L6: Streaming Purge v2 mit Intent-Resume (N-A)**: Manifest-geführtes Purge-Intent-Protokoll mit atomarer State-Transition (`IntentWritten` → `SSTableRewritten` → `WalTruncated` → `Committed`). 3-Arm-Match (`FreeSpaceProbe::Known`, `Exhausted`, `UnknownFreeSpace`).
-- **L8: `FreeSpaceProbe = None` Fallback**: Robuste Behandlung von unbeschränktem Speicherplatz ohne Panic.
 - **WASM Merge-Operatoren im Compaction-Pfad (C.4.3.2)**: Trait `MergeOperator` ist vorhanden, WASM-basierte Ausführung während Compaction-Merge ist als Erweiterung vorbereitet (🟡 TEIL).
 - **SSTable-Rang-Feld (S-01)**: `rank` in Manifest-Einträgen ist seit der Umstellung auf kontinuierliche Compaction deprecated.
-

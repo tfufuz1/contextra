@@ -1,8 +1,6 @@
 target/
 **/target/
 *.swp
-*.kate-swp
-*~
 *.swo
 .idea/
 .vscode/
@@ -61,4 +59,3 @@ results/
 /.jules/gate_ledger.json
 /.jules/session.env
 /.jules/local/
-mutants*.out

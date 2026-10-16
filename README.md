@@ -1,93 +1,58 @@
 # Contextra
 
-Contextra ist eine air-gap-fähige Memory-Engine für KI-Agenten — als Git-Abhängigkeit einbindbar, ohne externen Serverprozess. Sie vereint Vektor-Einbettungen (HNSW), Volltextsuche (BM25), deterministische Speichermodelle und hybride Signal-Fusion in einer modularen Pure-Rust-Bibliothek.
+Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25; BM25F-Spezifikation), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
-> **Dokumentationsstand (16.10.2026):** Normativ abgestimmt mit der Gesamtspezifikation. Im Hauptzweig ist ausschließlich der EP1-Kern enthalten. EP2 bis EP6 sind in gesonderten Tags geparkt.
-
----
-
-## Umfang
-
-Im Hauptzweig ist der Kern (EP1) enthalten:
-- **Speicher & MVCC:** LSM-Tree Storage Engine (`contextra-store`), Durable Filesystem (`contextra-durable-fs`), MVCC Snapshot Isolation (`contextra-mvcc`), Checkpoints (`contextra-checkpoint`).
-- **Hybridsuche & Ranking:** HNSW Vektorsuche (`contextra-vector`), BM25 Inverted-Index Volltextsuche (`contextra-text`), Score-Fusion & Kalibrierung (`contextra-rank`).
-- **Mandanten-Isolation & Facade:** Multi-Tenant Isolation, MCP Gateway (`contextra-mcp`), Engine Facade (`contextra`, `contextra-db`, `contextra-engine`).
-- **Löschung (Erasure Modes):** Die Modi `ErasureMode::Off` und `ErasureMode::Assured` sind im Kern enthalten. Der Modus `ErasureMode::Attested` (kryptografisch signierte Löschnachweise) ist als Plugin konzipiert (EP2) und nicht im Hauptzweig enthalten.
-
-Features der weiteren Produktstufen (Graph, PathRAG, Router, Agent, Kognition, KV-Cache, LinUCB Bandits, Privacy, Sandbox, Guard, Audit-Export) existieren nicht im Hauptzweig und sind über die geparkten Tags (`park/EPn/v1`) gesichert.
+> **Dokumentationsstand:** Normativ abgestimmt mit der **[Systemspezifikation v15 (30.09.2026)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
 ---
 
 ## Produktthese & Alleinstellungsmerkmale
 
-1. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys und ohne Telemetrie im selben Prozess wie die Anwendung.
-2. **Deterministische Performance:** Injektion aller Zeit-, Zufalls- und ID-Quellen über Ports (`contextra-ports`), konsequente `f64::total_cmp`-Gleitkomma-Sortierung und Zero-Panic-Doktrin (0 `unwrap()` im Produktionspfad).
-3. **Flexible Inferenz-Portschnittstellen:** Anbindung von Inferenz- und Embedding-Anbietern über entkoppelte Trait-Schnittstellen (`EmbeddingProvider`). Externe Inferenz-Module sind im Tag `park/EP4/v1` gesichert.
-4. **Garantierte Datenlöschung (Off & Assured):** Unterstützung für logische und physische Löschung im Kern (`ErasureMode::Off` und `ErasureMode::Assured`).
+1. **Beweisbarkeit statt Zusage:** Löschung (`DeletionProof`), Datenzugriff und Agentenhandlungen sind kryptographisch nachprüfbar und ohne Contextra-Zugriff extern verifizierbar.
+2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`).
+3. **Pure Rust Inferenz (Candle):** Lokale GGUF-Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen.
+4. **Deterministische Performance:** Pure Rust, kein GC, In-Memory-Search-Latenz p50 = 2,61 ms bis 5,13 ms (1k–10k Chunks, siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1), angestrebtes Zero-Panic-Ziel im Produktionspfad (P7, schrittweise Reduzierung verbleibender Panic-Stellen über CI-Ratchet-Mechanismus) und injizierter Determinismus (P28).
+5. **Drei abgestufte Feature-Ringe:**
+   - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Candle-Inferenz, Bandit-Routing.
+   - **Ring `sovereign`:** Quelloffener Krypto-Code (Löschbeweis, Privacy-Gateway, Zero-Net-Traffic).
+   - **Ring `compliance`:** Kommerziell (Lizenzschicht, Mandanten-Scoping, BSI/DSGVO-Reporting).
 
 ---
 
-## Die 6 Disjunktiven Endprodukte (EP1 bis EP6)
+## Capability Overview
 
-Contextra ist modular in sechs klar abgegrenzte Produktkomponenten aufgeteilt:
-
-| Komponente | Bezeichnung | Status | Kernversprechen & Disjunktive Crates / Tags |
-|---|---|---|---|
-| **EP1** | **Contextra Memory** | 🟢 **Release 1.0** | Lokaler Hybrid-Speicher, SSI-Transaktionen, Mandanten-Scoping, Purge v2 (im Hauptzweig aktiv: `contextra`, `contextra-engine`, `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-mvcc`, `contextra-db`, `contextra-mcp`, etc.). |
-| **EP2** | **Contextra Proof** | 📦 **Geparkt** | Attested-Löschnachweise (BSI TR-02102, Ed25519), Standalone-Verifier, Art. 30 / AVV-Template (Code gesichert in Tag `park/EP2/v1`). |
-| **EP3** | **Contextra Retrieval+** | 📦 **Geparkt** | Relationale Wissensgraphen (CSR), OpenIE Extraktion, Budgeted k-Path Diffusion (`PathRAG`), Conformal Fusion Calibration (Code gesichert in Tag `park/EP3/v1`). |
-| **EP4** | **Contextra Inference** | 📦 **Geparkt** | Irminsul Radix-Trie Prefix-Reuse, KIVI 2-Bit Quantisierung, SnapKV Attention Eviction (Code gesichert in Tag `park/EP4/v1`). |
-| **EP5** | **Contextra Cognition** | 📦 **Geparkt** | Adaptive Kognition, Sketched LinUCB Bandits, PID Latency Controller, Hyperedge Spectral SVD (Code gesichert in Tag `park/EP5/v1`). |
-| **EP6** | **Contextra Guard** | 📦 **Geparkt** | Egress-Firewall (Luhn/IBAN DLP), Fail-Closed Gateway, Hash-Chained Audit Trace, WASM Sandbox Isolation (Code gesichert in Tag `park/EP6/v1`). |
-
----
-
-## Entwickler- & Agenten-Workflow (`cargo xtask`)
-
-Contextra verwendet `cargo xtask` als **einzige Quelle der Wahrheit** für Analyse, Diagnose, Refactoring und Governance.
-
-### Schnelleinstieg für Entwickler & Agenten:
-
-```bash
-# 1. Systemdiagnose & Status-Dashboard
-cargo xtask repo-doctor
-
-# 2. Workspace-weites Lücken-Audit (undokumentierte & unverdrahtete Symbole)
-cargo xtask find-unwired-gaps
-
-# 3. Kontext eines spezifischen Crates abrufen
-cargo xtask crate-context <crate-name>          # z.B. contextra-store, contextra-vector
-
-# 4. Doktrin- und Zero-Panic-Prüfung für ein Crate
-cargo xtask doctrine-scan --crate <crate-name>
-
-# 5. Unverdrahtete Traits & isolierte Ports identifizieren
-cargo xtask unwired-ports --only-unwired
-
-# 6. Ring-Architektur, Unsafe-Inseln und DAG-Integrität prüfen
-cargo xtask check-ring-capabilities-consistency
-cargo xtask check-unsafe-islands
-cargo xtask dependency-graph-audit
-
-# 7. Vor Änderungen: Prüfen ob Ziel-Symbol existiert
-cargo xtask symbol-exists <modul::Pfad::Symbol>
-
-# 8. Vollständiger Verifikations-Lauf vor Commits
-cargo xtask verify --tier kernel
-```
-
-Ausführliche Anweisungen und Richtlinien für LLM-Agenten finden sich in [`AGENTS.md`](AGENTS.md).  
-Das Entwickler-Handbuch für lokale Hardware-Workflows befindet sich in [`docs/SOLO_DEVELOPER_GUIDE.md`](docs/SOLO_DEVELOPER_GUIDE.md).
+| Feature | Ring | Subsystem / Crate | Status | Anmerkung |
+|---|---|---|---|---|
+| **Vector Search (HNSW / DiskANN)** | `fast` | `contextra-vector` | 🟢 Produktiv | HNSW, DiskANN, SQ8 / RaBitQ Quantisierung. |
+| **Full-Text Search (BM25 / BM25F)** | `fast` | `contextra-text` | 🟢 Produktiv / 🟡 Geplant | BM25 produktiv (Block-Max WAND & deutsche Morphologie); BM25F spezifiziert, Implementierung ausstehend. |
+| **Knowledge Graph & PPR** | `fast` | `contextra-graph` | 🟢 Produktiv | CSR-Graph, Forward-Push PPR, Leiden-Community-Detection, Hyperkanten. |
+| **4-Signal-Fusion & Kalibrierung** | `fast` | `contextra-rank` | 🟢 Produktiv | Multi-Signal-Fusion (RRF), Isotonic- / Platt-Kalibrierung & Drift. |
+| **Contextual-Bandit-Routing** | `fast` | `contextra-adapt` | 🟡 In Arbeit | Kernmechanismen (LinUCB, Sherman-Morrison, FC-TS) implementiert, Produktionsverdrahtung in Arbeit. |
+| **LSM Storage Engine & WAL** | `fast` | `contextra-store` | 🟢 Produktiv | LSM-Tree, WAL (Group-Commit, HMAC-Kette), MVCC-Pinning. |
+| **KV-Cache v2 & Zero-Copy IPC** | `fast` | `contextra-kvcache` | 🟡 In Arbeit | Kernmechanismen (Prefix-Radix-Baum, Tiering, AEAD) implementiert, Produktionsverdrahtung in Arbeit. |
+| **Local Inference Backend (Candle)** | `fast` | `contextra-infer-candle` | 🟢 Produktiv | Pure Rust GGUF/Candle als Standard-Inferenzbackend. |
+| **Opt-in Inference Backends** | `fast` | `contextra-infer-ollama`, `contextra-infer-onnx` | 🟢 Produktiv | Ollama HTTP & ONNX/ort Reranker (explizites Opt-in). |
+| **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten (`contextra` ohne Ollama). |
+| **Python Bindings (`contextra-py`)** | Opt-in | `contextra-py` | 🟢 Produktiv | FFI-Bindings für Python (aus default-members entfernt). |
+| **WASM-Sandbox** | Opt-in | `contextra-sandbox` | 🟢 Produktiv | Wasmtime Isolation (aus default-members entfernt). |
+| **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟢 Produktiv | `DeletionProof` (7 Ebenen), AEAD-Schlüsselhierarchie, Anti-Tamper. |
+| **Privacy Gateway** | `sovereign` | `contextra-privacy` | 🟢 Produktiv | Egress-Gateway, PII-Vault, DLP, Prompt-Injection-Filter. |
+| **AVV Generator (Art. 28 DSGVO)** | `sovereign` | `contextra-avv-generator` | 🟢 Produktiv | AVV-Vertragstemplate-Generator mit technischen Garantien. |
+| **Audit- & Art.-30-Export** | `sovereign` | `contextra-audit-export` | 🟢 Produktiv | BSI TR-02102-1 Kryptomapping und DSGVO Art. 30 Export. |
+| **Memory Consolidation & Cognition** | `fast` | `contextra-cognition` | 🟢 Produktiv | Konsolidierung, LLM-Kompaktierung, MaintenanceScheduler. |
+| **Persistent Checkpoint Engine** | `fast` | `contextra-checkpoint` | 🟢 Produktiv | persistent_checkpoint_store, Hardlink-Cloner, Blake3-Manifest. |
+| **Persistent Agent Workflows** | `fast` | `contextra-agent` | 🟢 Produktiv | Agenten-Workflow-Engine, Checkpoint/Execute/Audit-Loop. |
+| **Lizenz- & Compliance-Schicht** | `compliance` | `contextra-license` | 🔒 Closed | Lizenzdurchsetzung, Ring-Gating, Mandanten-Scoping. | <!-- crate-ref-ignore -->
 
 ---
 
 ## Installation & Einbindung
 
-Da Contextra als eingebettete Engine konzipiert ist, binde `contextra` als Git-Abhängigkeit in deine `Cargo.toml` ein:
+Füge `contextra` zu deiner `Cargo.toml` hinzu:
 
 ```toml
 [dependencies]
-contextra = { git = "https://github.com/tfufuz1/contextra" }
+contextra = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 ```
@@ -97,7 +62,7 @@ serde_json = "1.0"
 ## Quick Start (Rust)
 
 ```rust
-use contextra::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,20 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db.insert(
         "rust-lang",
         &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({
-            "topic": "programming",
-            "text": "Rust is a systems programming language with zero-cost abstractions"
-        })),
+        Some(serde_json::json!({"topic": "programming", "text": "Rust is a systems programming language"})),
     )
     .await?;
 
     db.insert(
         "python-lang",
         &[0.9, 0.1, 0.0, 0.0],
-        Some(serde_json::json!({
-            "topic": "programming",
-            "text": "Python is great for AI and rapid prototyping"
-        })),
+        Some(serde_json::json!({"topic": "programming", "text": "Python is great for AI and data science"})),
     )
     .await?;
 
@@ -134,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let results = db.search(&query, 2).await?;
 
     for result in &results {
-        println!("Hit: {} (Score: {:.4})", result.id, result.score);
+        println!("{} (score: {:.4})", result.id, result.score);
     }
 
     // 4. Dokument per ID abrufen
@@ -152,24 +111,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## Verbindliche Dokumentation & Spezifikationen
+## Dokumentation & Spezifikationen
 
-- **Agenten-Betriebsanleitung & Harness:** [`AGENTS.md`](AGENTS.md)
-- **Disjunktive Endprodukt-Gesamtspezifikation:** [`docs/IMPLEMENTIERUNGSSPEZIFIKATION_ENDPRODUKTE_DISJUNKTIV.md`](docs/IMPLEMENTIERUNGSSPEZIFIKATION_ENDPRODUKTE_DISJUNKTIV.md)
-- **EP1 Memory Feinspezifikation:** [`docs/SPEZIFIKATION_EP1_CONTEXTRA_MEMORY.md`](docs/SPEZIFIKATION_EP1_CONTEXTRA_MEMORY.md)
-- **EP2 Proof Feinspezifikation (Archiv):** [`docs/archive/ep-specs/EP2_CONTEXTRA_PROOF_SPEC.md`](docs/archive/ep-specs/EP2_CONTEXTRA_PROOF_SPEC.md)
-- **EP3 Retrieval+ Feinspezifikation (Archiv):** [`docs/archive/ep-specs/EP3_CONTEXTRA_RETRIEVAL_PLUS_SPEC.md`](docs/archive/ep-specs/EP3_CONTEXTRA_RETRIEVAL_PLUS_SPEC.md)
-- **EP4 Inference Feinspezifikation (Archiv):** [`docs/archive/ep-specs/EP4_CONTEXTRA_INFERENCE_SPEC.md`](docs/archive/ep-specs/EP4_CONTEXTRA_INFERENCE_SPEC.md)
-- **EP5 Cognition Feinspezifikation (Archiv):** [`docs/archive/ep-specs/EP5_CONTEXTRA_COGNITION_ROUTER_SPEC.md`](docs/archive/ep-specs/EP5_CONTEXTRA_COGNITION_ROUTER_SPEC.md)
-- **EP6 Guard Feinspezifikation (Archiv):** [`docs/archive/ep-specs/EP6_CONTEXTRA_GUARD_SANDBOX_SPEC.md`](docs/archive/ep-specs/EP6_CONTEXTRA_GUARD_SANDBOX_SPEC.md)
-- **Solo-Entwickler Hardware-Handbuch:** [`docs/SOLO_DEVELOPER_GUIDE.md`](docs/SOLO_DEVELOPER_GUIDE.md)
-- **Domänentypen-Register:** [`docs/TYPE_REGISTRY.md`](docs/TYPE_REGISTRY.md)
-- **Capabilities & Ring-Definition:** [`capabilities.toml`](capabilities.toml)
+- **Normative Gesamtspezifikation (Synthese):** [`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)
+- **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- **Agenten-Betriebsanleitung:** [`AGENTS.md`](AGENTS.md)
+- **Sicherheitsrichtlinie:** [`SECURITY.md`](SECURITY.md)
+- **Beitragswesen:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
+
+---
+
+## Benchmark-Kennzahlen
+
+Die folgenden Leistungskennzahlen stammen aus reproduzierbaren Läufen der `criterion`-Benchmark-Suite (`benchmarks/contextra-bench`) sowie systematischen Messberichten (siehe [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md), [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) und [`docs/BENCHMARKS_DELETION_PROOF.md`](docs/BENCHMARKS_DELETION_PROOF.md)):
+
+> **Wichtiger Hinweis zur Latenz-Abgrenzung:** Misst ausschließlich Speicher- und Indexlatenz. Embedding-Inferenz (Ollama, ONNX, Candle) addiert je nach Modell und Hardware 10-500 ms pro Anfrage.
+
+| Kennzahl | Contextra (Sovereign Local Engine) | Beschreibung & Rahmenbedingungen |
+|---|---|---|
+| **1. Kaltstart / Recovery** | **Offen / Messung in Arbeit** | Recovery-Zeit für 1 Mio. Einträge in [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) (§2.e) als nicht gemessen / fehlerhaft dokumentiert (File-Descriptor-Thematik). |
+| **2. Footprint** | **~5,5–12,8 MB Base RSS / 148,85 MB Peak** | RAM Base-Footprint ~5,5–12,8 MB bei kleinen Korpora bis 100 Chunks ([`benches/results/scale_rss.csv`](benches/results/scale_rss.csv)); Peak VmRSS 148,85 MB bei 1.000 Chunks im VM-Messlauf ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1). |
+| **3. Search- & Punktabfrage-Latenz** | **p50 = 2,61 ms (1k) – 5,13 ms (10k) / ~6,9 µs Punktabfrage** | In-Memory-Suchlatenz p50 = 2,61 ms bei 1.000 Chunks, 5,13 ms bei 10.000 Chunks ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §1). Punktabfragen: 690,71 ms für 100.000 Lookups (ca. 6,9 µs je Lookup, [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) §2.b). 4-Signal-Hybrid p99: Zielwert (< 15 ms), nicht gemessen ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §0). |
+| **4. LoCoMo / LongMemEval-Score** | **78,6 % Accuracy (LongMemEval_s) / 100,0 % Recall@5 (LoCoMo Fixture)** | 78,6 % Accuracy auf LongMemEval-S (500 Testfälle, [`benchmarks/contextra-bench/baseline_metrics.json`](benchmarks/contextra-bench/baseline_metrics.json)); 100,0 % Recall@5 auf synthetischem LoCoMo-Fixture (1 Gespräch, [`benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json`](benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json); im vollen LoCoMo-10 mit 1.540 Fällen beträgt der Recall@5 0,45 %, [`benchmarks/contextra-bench/baseline_metrics.json`](benchmarks/contextra-bench/baseline_metrics.json)). |
+| **5. Löschbeweis-Zeit** | **2,28 µs (O(1) Verifikation) / 2,49 µs (1 Key Erzeugung)** | Rechnerische Latenz für kryptographische DSGVO Art. 17 `DeletionProof`-Erzeugung und -Verifikation (Blake3/HMAC-SHA256, ohne Disk-Cleanup; [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) §3 und [`docs/BENCHMARKS_DELETION_PROOF.md`](docs/BENCHMARKS_DELETION_PROOF.md) §1). |
+
+### Einordnung im Vergleich zu externen Systemen
+
+Direkte, reproduzierbare Vergleichsmessungen mit standardisierten Datensätzen gegen externe Systeme (z. B. Mem0, Zep, Graphiti, ChromaDB) liegen für das aktuelle Release nicht vor (siehe [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) §4). Contextra ist als eingebettete, rein lokale Engine konzipiert und führt Retrieval, Graph-Traversierungen und kryptographische Löschbeweise im selben Prozess ohne Netzwerk- oder Server-Overhead aus.
 
 ---
 
 ## Lizenzierung
 
 Contextra ist unter folgender Dual-Lizenz freigegeben:
-- **Core Engine (Ring `fast`):** MIT oder Apache-2.0
-- **Sovereign Extensions (Ring `sovereign`):** BSL 1.1 / Open-Source konforme Krypto-Lizenzen
+
+- **Apache License, Version 2.0** ([`LICENSE-APACHE`](LICENSE-APACHE) oder [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
+- **MIT License** ([`LICENSE-MIT`](LICENSE-MIT) oder [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))

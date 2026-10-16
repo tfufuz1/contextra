@@ -30,17 +30,13 @@
 // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
 
-pub mod copy_registry;
 mod guard;
 mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
-pub mod restore_filter;
 mod store;
-pub mod wiring;
 
-pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
 pub use guard::{CheckpointGuard, PinGuard};
 pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
 pub use manifest::CheckpointManifest;
@@ -53,5 +49,4 @@ pub use orphan::{
     pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
     InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan,
 };
-pub use restore_filter::{filter_restore_records, CpyRestoreFilter, NoOpRestoreFilter};
-pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};
+pub use store::{CheckpointRegistry, PersistentCheckpointStore};

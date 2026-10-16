@@ -1,5 +1,5 @@
 use bytes::BufMut;
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 
 /// SPECCED: Speichereffizienter Bloom-Filter für SSTable-Pre-Checks.
 /// Ziel: False-Positive-Rate p ≤ 0.01.

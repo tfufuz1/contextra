@@ -7,7 +7,7 @@
 // 2. Nebenläufig (Append-Phase): Bei richtiger Lese-Reihenfolge (erst wal.size(), dann fs::metadata)
 //    gilt während Append: mem_size <= disk_size (weil fetch_add nach dem Schreiben erfolgt).
 
-use contextra_types::{Result, TxId};
+use contextra_core::{Result, TxId};
 use contextra_store::wal::{Wal, WalOp};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -40,9 +40,7 @@ async fn oracle_sequential_wal_size_matches_disk_metadata() -> Result<()> {
             key: format!("oracle_k_{i}_2").into_bytes(),
             value: format!("oracle_v_{i}_2").into_bytes(),
         };
-        let (batch, _) = wal
-            .prepare_batch(vec![(op1, i * 2 - 1), (op2, i * 2)])
-            .await?;
+        let (batch, _) = wal.prepare_batch(vec![(op1, i * 2 - 1), (op2, i * 2)]).await?;
         wal.append_batch(batch).await?;
 
         // Oracle verification after completed append

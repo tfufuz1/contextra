@@ -34,11 +34,9 @@ fn committed_writes_bounded() {
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys);
 
     for i in 0..1_000_000 {
-        let seq = u64::try_from(i).unwrap_or(0) + 1;
-        validator.record_commit_key(format!("key_{i}").as_bytes(), seq);
+        validator.record_commit_key(format!("key_{i}").as_bytes(), i as u64 + 1);
         if (i + 1) % 5 == 0 {
-            let prune_seq = u64::try_from(i + 1).unwrap_or(0);
-            let removed = validator.prune_through(prune_seq);
+            let removed = validator.prune_through((i + 1) as u64);
             assert!(removed > 0);
         }
     }

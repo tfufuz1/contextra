@@ -1,4 +1,4 @@
-use contextra_types::TOMBSTONE_BIT;
+use contextra_core::TOMBSTONE_BIT;
 
 /// Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING)
 /// according to MVCC retention rules given a `floor` sequence number.
@@ -13,13 +13,12 @@ pub fn retain_key_versions<T, F>(entries: Vec<T>, get_seq: F, floor_seq: u64) ->
 where
     F: Fn(&T) -> u64,
 {
-    let floor_seq_masked = floor_seq & !TOMBSTONE_BIT;
     let mut retained = Vec::with_capacity(entries.len());
     let mut found_floor_version = false;
 
     for entry in entries {
         let raw_seq = get_seq(&entry) & !TOMBSTONE_BIT;
-        if floor_seq == u64::MAX || raw_seq > floor_seq_masked {
+        if raw_seq > floor_seq {
             retained.push(entry);
         } else if !found_floor_version {
             retained.push(entry);

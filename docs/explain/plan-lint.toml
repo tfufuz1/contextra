@@ -1,0 +1,8 @@
+title = "Plan-Strukturprüfung"
+what = "Der Ausführungsplan entspricht nicht den Vorgaben (z. B. fehlender Pre-Commit-Schritt)."
+why = "Ein vollständiger Plan garantiert die Einhaltung aller Qualitätsschritte und Verifikationen."
+fix = "Überarbeite den Plan und füge den vorgeschriebenen Pre-Commit-Schritt ein."
+anti_fix = "Beginne keine Implementierung ohne freigegebenen und konformen Plan."
+adr = ["ADR-035"]
+related = ["task-card", "verdict"]
+sources = ["CONSTITUTION.md"]

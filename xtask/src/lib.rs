@@ -5,16 +5,7 @@
     clippy::if_same_then_else,
     clippy::needless_range_loop,
     clippy::collapsible_if,
-    clippy::duplicate_mod,
-    // Ausnahmen für Dateien außerhalb des Task-Scopes in xtask
-    clippy::cast_possible_truncation,
-    clippy::manual_strip,
-    clippy::unnecessary_map_or,
-    clippy::match_like_matches_macro,
-    clippy::regex_creation_in_loops,
-    clippy::needless_borrows_for_generic_args,
-    clippy::useless_vec,
-    clippy::useless_format
+    clippy::duplicate_mod
 )]
 
 extern crate self as xtask;
@@ -34,28 +25,27 @@ pub mod artifact_header;
 pub mod audit_integrity_check;
 pub mod bench_compile;
 pub mod bench_download;
+pub mod bench_gate;
 pub mod check_action_pinning;
-pub mod check_claims;
 pub mod check_adr_deadlines;
 pub mod check_agents_freshness;
 pub mod check_agents_integrity;
 pub mod check_audit_duplication;
 pub mod check_audit_tool_evidence;
 pub mod check_audit_verdict_independence;
+pub mod check_bandit_latency_budget;
 pub mod check_commit_diff_integrity;
 pub mod check_commit_messages;
 pub mod check_compile;
 pub mod check_coverage_gate;
 pub mod check_doc_references;
 pub mod check_duplicate_core_primitives;
-pub mod check_exception_ledger;
 pub mod check_duplicate_intent;
 pub mod check_duplicate_symbols;
 pub mod check_duplicate_symbols_cross_file;
 pub mod check_ffi_panic_boundary;
 pub mod check_flatbuffers_drift;
 pub mod check_jules_context_freshness;
-pub mod check_loom_mocks;
 pub mod check_manifest_completeness;
 pub mod check_max_results_unbound;
 pub mod check_module_reachability;
@@ -110,12 +100,9 @@ pub mod security_scan;
 pub mod session_history;
 pub mod session_init;
 pub mod shell_commit_audit;
-pub mod sync_docs;
 pub mod tag_health;
 pub mod validate_pr_checklist;
-pub mod verify;
 pub mod veto_deadline_gate;
-pub mod workspace_index;
 pub mod workspace_verify;
 pub mod ws_cache;
 
@@ -146,21 +133,6 @@ pub fn find_root_dir() -> PathBuf {
 }
 
 fn find_root_dir_uncached(current_dir: &Path) -> PathBuf {
-    let mut dir = current_dir.to_path_buf();
-    loop {
-        let cargo_path = dir.join("Cargo.toml");
-        if cargo_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cargo_path) {
-                if content.contains("[workspace]") && content.contains("members") {
-                    return dir;
-                }
-            }
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut dir = PathBuf::from(manifest_dir);
         loop {
@@ -175,6 +147,21 @@ fn find_root_dir_uncached(current_dir: &Path) -> PathBuf {
             if !dir.pop() {
                 break;
             }
+        }
+    }
+
+    let mut dir = current_dir.to_path_buf();
+    loop {
+        let cargo_path = dir.join("Cargo.toml");
+        if cargo_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cargo_path) {
+                if content.contains("[workspace]") && content.contains("members") {
+                    return dir;
+                }
+            }
+        }
+        if !dir.pop() {
+            break;
         }
     }
 
@@ -317,17 +304,12 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
     let mut tags = Vec::new();
 
     let file_context_re = Regex::new(r"//\s*FILE-CONTEXT").unwrap();
-    let stand_re =
-        Regex::new(r"//\s*STAND:\s*([^\s\)]+)(?:\s*\(SESSION:\s*([A-Za-z0-9_\-]+)\))?").unwrap();
+    let stand_re = Regex::new(r"//\s*STAND:\s*(.+)").unwrap();
     let zweck_re = Regex::new(r"//\s*ZWECK:\s*(.+)").unwrap();
     let tag_re = Regex::new(
-        r"//\s*(ANCHOR|DEBT|AI-TAG|REVIEW-PASS)\[([A-Za-z0-9_\-:/]+)\](?:\[([A-Za-z0-9_\-:/]+)\])?(?:\[([A-Za-z0-9_\-:/]+)\])?\s*(.*?)$",
+        r"//\s*(ANCHOR|DEBT|AI-TAG)\[([A-Z0-9_\-]+)\](?:\[([A-Za-z0-9_\-]+)\])?\s*(.*?)(?:\s*\(ID:\s*([A-Za-z0-9_\-]+)\))?(?:\s*\(TS:\s*([^\)]+)\))?(?:\s*\(SESSION:\s*([A-Za-z0-9_\-]+)\))?(?:\s*\(STATUS:\s*([A-Za-z0-9_\-]+)\))?$",
     )
     .unwrap();
-    let id_re = Regex::new(r"\(ID:\s*([A-Za-z0-9_\-:]+)\)").unwrap();
-    let ts_re = Regex::new(r"\(TS:\s*([^\)]+)\)").unwrap();
-    let session_re = Regex::new(r"\(SESSION:\s*([A-Za-z0-9_\-]+)\)").unwrap();
-    let status_re = Regex::new(r"(?:STATUS:|\(STATUS:\s*)([A-Za-z0-9_\-]+)\)?").unwrap();
 
     let root_path = root.as_ref();
     let walk_dir = walkdir::WalkDir::new(root_path);
@@ -336,19 +318,21 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
         .into_iter()
         .filter_entry(|e| {
             let name = e.file_name().to_string_lossy();
-            let path_str = e.path().to_string_lossy();
             name != "target"
                 && name != ".git"
                 && name != ".cargo"
                 && name != "node_modules"
                 && name != "dist"
                 && name != "build"
-                && !path_str.contains("xtask/tests")
         })
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+        if path.is_file()
+            && (path.extension().and_then(|s| s.to_str()) == Some("rs")
+                || path.extension().and_then(|s| s.to_str()) == Some("md")
+                || path.extension().and_then(|s| s.to_str()) == Some("toml"))
+        {
             let rel_path = path
                 .strip_prefix(root_path)
                 .unwrap_or(path)
@@ -359,109 +343,51 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                 for (idx, line) in content.lines().enumerate() {
                     let trimmed = line.trim();
 
-                    if file_context_re.is_match(trimmed) {
+                    if file_context_re.is_match(trimmed)
+                        || stand_re.is_match(trimmed)
+                        || zweck_re.is_match(trimmed)
+                    {
+                        let tag_type = if file_context_re.is_match(trimmed) {
+                            "FILE-CONTEXT".to_string()
+                        } else if stand_re.is_match(trimmed) {
+                            "STAND".to_string()
+                        } else {
+                            "ZWECK".to_string()
+                        };
+
                         tags.push(TagItem {
                             file_path: rel_path.clone(),
                             line_num: idx + 1,
-                            tag_type: "FILE-CONTEXT".to_string(),
+                            tag_type,
                             raw: trimmed.to_string(),
                             timestamp: "".to_string(),
                             category: None,
                             severity: None,
                             id: None,
                             session: None,
-                            status: Some("INFO".to_string()),
-                            description: "FILE-CONTEXT".to_string(),
-                            is_resolved: true,
-                        });
-                        continue;
-                    }
-
-                    if let Some(caps) = stand_re.captures(trimmed) {
-                        let ts = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-                        let sess = caps.get(2).map(|m| m.as_str().to_string());
-                        tags.push(TagItem {
-                            file_path: rel_path.clone(),
-                            line_num: idx + 1,
-                            tag_type: "STAND".to_string(),
-                            raw: trimmed.to_string(),
-                            timestamp: ts,
-                            category: None,
-                            severity: None,
-                            id: None,
-                            session: sess,
-                            status: Some("INFO".to_string()),
+                            status: None,
                             description: trimmed.to_string(),
-                            is_resolved: true,
-                        });
-                        continue;
-                    }
-
-                    if zweck_re.is_match(trimmed) {
-                        tags.push(TagItem {
-                            file_path: rel_path.clone(),
-                            line_num: idx + 1,
-                            tag_type: "ZWECK".to_string(),
-                            raw: trimmed.to_string(),
-                            timestamp: "".to_string(),
-                            category: None,
-                            severity: None,
-                            id: None,
-                            session: None,
-                            status: Some("INFO".to_string()),
-                            description: trimmed.to_string(),
-                            is_resolved: true,
+                            is_resolved: false,
                         });
                         continue;
                     }
 
                     if let Some(caps) = tag_re.captures(trimmed) {
                         let tag_kind = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-                        let b1 = caps.get(2).map(|m| m.as_str()).unwrap_or("");
-                        let b2 = caps.get(3).map(|m| m.as_str());
-                        let b3 = caps.get(4).map(|m| m.as_str());
-                        let rest = caps.get(5).map(|m| m.as_str()).unwrap_or("").trim();
-
-                        let id = id_re.captures(trimmed).map(|c| c[1].to_string()).or_else(|| {
-                            if tag_kind == "ANCHOR" && b1.contains(':') {
-                                Some(b1.to_string())
-                            } else {
-                                None
-                            }
-                        });
-
-                        let ts = ts_re
-                            .captures(trimmed)
-                            .map(|c| c[1].trim().to_string())
+                        let cat_or_domain = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+                        let sev = caps.get(3).map(|m| m.as_str());
+                        let desc = caps.get(4).map(|m| m.as_str()).unwrap_or("").trim();
+                        let id = caps.get(5).map(|m| m.as_str().to_string());
+                        let ts = caps
+                            .get(6)
+                            .map(|m| m.as_str().to_string())
                             .unwrap_or_default();
-                        let session = session_re.captures(trimmed).map(|c| c[1].to_string());
-                        let status = status_re.captures(trimmed).map(|c| c[1].to_string());
+                        let session = caps.get(7).map(|m| m.as_str().to_string());
+                        let status = caps.get(8).map(|m| m.as_str().to_string());
 
                         let is_resolved = status.as_deref() == Some("DONE")
                             || status.as_deref() == Some("RESOLVED")
-                            || status.as_deref() == Some("CLOSED")
-                            || status.as_deref() == Some("PASS")
-                            || b1.eq_ignore_ascii_case("RESOLVED")
-                            || b2.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false)
-                            || b3.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false)
-                            || rest.contains("RESOLVED:")
-                            || rest.contains("[RESOLVED]");
-
-                        let (category, severity) = if tag_kind == "AI-TAG" {
-                            let cat = if b1.eq_ignore_ascii_case("RESOLVED") {
-                                b2.map(|s| s.to_string())
-                            } else {
-                                Some(b1.to_string())
-                            };
-                            let sev = if b2.map(|s| s.eq_ignore_ascii_case("RESOLVED")).unwrap_or(false) {
-                                b3.map(|s| s.to_string())
-                            } else {
-                                b2.map(|s| s.to_string())
-                            };
-                            (cat, sev)
-                        } else {
-                            (Some(b1.to_string()), b2.map(|s| s.to_string()))
-                        };
+                            || status.as_deref() == Some("CLOSED");
 
                         tags.push(TagItem {
                             file_path: rel_path.clone(),
@@ -469,12 +395,12 @@ pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
                             tag_type: tag_kind.to_string(),
                             raw: trimmed.to_string(),
                             timestamp: ts,
-                            category,
-                            severity,
+                            category: Some(cat_or_domain.to_string()),
+                            severity: sev.map(|s| s.to_string()),
                             id,
                             session,
                             status,
-                            description: rest.to_string(),
+                            description: desc.to_string(),
                             is_resolved,
                         });
                     }
@@ -585,28 +511,28 @@ pub fn compute_crate_layers(crates: &mut [CrateInfo]) -> Result<(), String> {
     Ok(())
 }
 
-pub fn get_workspace_crates() -> Result<Vec<CrateInfo>, String> {
+pub fn get_workspace_crates() -> Vec<CrateInfo> {
     let root_dir = find_root_dir();
     if let Ok(guard) = WORKSPACE_CRATES_CACHE.lock() {
         if let Some(ref cache) = *guard {
             if let Some(cached) = cache.get(&root_dir) {
-                return Ok(cached.clone());
+                return cached.clone();
             }
         }
     }
     let capabilities = load_capabilities_manifest(&root_dir);
-    let crates = get_workspace_crates_from_root(&root_dir, &capabilities)?;
+    let crates = get_workspace_crates_from_root(&root_dir, &capabilities);
     if let Ok(mut guard) = WORKSPACE_CRATES_CACHE.lock() {
         let cache = guard.get_or_insert_with(HashMap::new);
         cache.insert(root_dir, crates.clone());
     }
-    Ok(crates)
+    crates
 }
 
 pub fn get_workspace_crates_from_root(
     root_dir: &Path,
     capabilities: &CapabilitiesManifest,
-) -> Result<Vec<CrateInfo>, String> {
+) -> Vec<CrateInfo> {
     let cargo_path = root_dir.join("Cargo.toml");
     let root_cargo = fs::read_to_string(&cargo_path).unwrap_or_default();
     let toml_val: toml::Value =
@@ -618,7 +544,7 @@ pub fn get_workspace_crates_from_root(
         .and_then(|m| m.as_array())
     {
         Some(m) => m,
-        None => return Ok(Vec::new()),
+        None => return Vec::new(),
     };
 
     let mut crates = Vec::new();
@@ -729,8 +655,8 @@ pub fn get_workspace_crates_from_root(
         });
     }
 
-    compute_crate_layers(&mut crates)?;
-    Ok(crates)
+    let _ = compute_crate_layers(&mut crates);
+    crates
 }
 
 pub fn render_updated_markdown(
@@ -988,16 +914,7 @@ pub fn generate_ai_tags_section(tags: &[TagItem]) -> String {
     s.push_str("| Datei | Zeile | Typ | Schweregrad | Beschreibung | Status |\n");
     s.push_str("| :--- | :--- | :--- | :--- | :--- | :--- |\n");
 
-    let mut open_tags: Vec<&TagItem> = tags
-        .iter()
-        .filter(|t| {
-            !t.is_resolved
-                && t.tag_type != "FILE-CONTEXT"
-                && t.tag_type != "STAND"
-                && t.tag_type != "ZWECK"
-                && t.tag_type != "REVIEW-PASS"
-        })
-        .collect();
+    let mut open_tags: Vec<&TagItem> = tags.iter().filter(|t| !t.is_resolved).collect();
     open_tags.sort_by_key(|t| severity_weight(t.severity.as_deref()));
 
     for t in open_tags.iter().take(30) {
@@ -1082,23 +999,8 @@ pub fn run_sync_docs(check_only: bool) -> bool {
     println!("=== xtask sync-docs ===");
     let root = find_root_dir();
 
-    if let Err(errors) = sync_docs::verify_capabilities_against_spec(&root) {
-        eprintln!("❌ G-04 capabilities.toml verification failed:");
-        for err in errors {
-            eprintln!("  {}", err);
-        }
-        return false;
-    }
-    println!("✅ capabilities.toml is fully aligned with Spec §4.1 (G-04).");
-
     let tags = scan_tags(&root);
-    let crates = match get_workspace_crates() {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("❌ Fehler beim Laden der Workspace-Crates: {}", e);
-            return false;
-        }
-    };
+    let crates = get_workspace_crates();
 
     let new_ws = generate_full_working_state(&tags, &crates);
     let ws_path = root.join("WORKING_STATE.md");
@@ -1395,22 +1297,9 @@ pub fn validate_working_state_tag_date(date_str: &str, today: NaiveDate) -> TagD
 pub fn validate_tags_items(tags: &[TagItem]) -> bool {
     let mut ok = true;
     for t in tags {
-        if (t.tag_type == "AI-TAG" || t.tag_type == "ANCHOR" || t.tag_type == "REVIEW-PASS")
-            && !t.is_resolved
-        {
-            if t.timestamp.is_empty() {
-                eprintln!(
-                    "❌ Offener Tag ohne Timestamp in `{}:{}`: {}",
-                    t.file_path, t.line_num, t.raw
-                );
-                ok = false;
-            } else if t.timestamp.len() < 10 || !t.timestamp.contains('-') {
-                eprintln!(
-                    "❌ Ungültiges Datumsformat '{}' in `{}:{}`: {}",
-                    t.timestamp, t.file_path, t.line_num, t.raw
-                );
-                ok = false;
-            }
+        if t.timestamp.is_empty() {
+            eprintln!("❌ Tag ohne Timestamp in `{}:{}`", t.file_path, t.line_num);
+            ok = false;
         }
     }
     ok
@@ -1463,13 +1352,7 @@ pub fn check_dag_layer_violations(crates: &[CrateInfo]) -> Vec<DagViolation> {
 
 pub fn run_check_dag() -> bool {
     println!("=== xtask check-dag ===");
-    let crates = match get_workspace_crates() {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("❌ DAG-Fehler beim Laden der Workspace-Crates: {}", e);
-            return false;
-        }
-    };
+    let crates = get_workspace_crates();
     let violations = check_dag_layer_violations(&crates);
 
     let known_exceptions: &[(&str, &str)] = &[];

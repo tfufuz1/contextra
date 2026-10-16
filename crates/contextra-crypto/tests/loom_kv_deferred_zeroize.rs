@@ -1,10 +1,4 @@
-#![allow(
-    unexpected_cfgs,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation
-)]
+#![allow(unexpected_cfgs)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für Deferred Zeroize in `contextra-security` (`crates/contextra-crypto`).
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-security --test loom_kv_deferred_zeroize -- --nocapture

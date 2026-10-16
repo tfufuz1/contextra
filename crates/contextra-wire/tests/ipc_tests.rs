@@ -119,7 +119,6 @@ fn test_search_response_full_roundtrip() {
     let resp_offset = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
-            version: 1,
             results: Some(results_vec),
             total_hits: 1000,
             processing_time_ms: 12.34,
@@ -199,7 +198,6 @@ fn test_fault_injection_and_corruption_no_panic() {
     let resp = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
-            version: 1,
             results: Some(results),
             total_hits: 1,
             processing_time_ms: 1.0,
@@ -233,7 +231,7 @@ fn test_concurrency_parallel_serialization() {
     let threads: Vec<_> = (0..8)
         .map(|t_id| {
             thread::spawn(move || {
-                for i in 0..100u32 {
+                for i in 0..100 {
                     let mut builder = FlatBufferBuilder::new();
                     let doc_id = format!("thread-{}-doc-{}", t_id, i);
                     let id_offset = builder.create_string(&doc_id);
@@ -247,13 +245,11 @@ fn test_concurrency_parallel_serialization() {
                         },
                     );
                     let results = builder.create_vector(&[doc]);
-                    // FIX(2026-03-30): Use u32 loop variable to avoid clippy::cast_sign_loss
                     let resp = SearchResponse::create(
                         &mut builder,
                         &SearchResponseArgs {
-                            version: 1,
                             results: Some(results),
-                            total_hits: i + 1,
+                            total_hits: (i + 1) as u32,
                             processing_time_ms: 0.5,
                         },
                     );
@@ -262,8 +258,7 @@ fn test_concurrency_parallel_serialization() {
                     let buf = builder.finished_data();
                     let parsed =
                         root_as_search_response(buf).expect("Parallel verification failed");
-                    // FIX(2026-03-30): Use u32 loop variable to avoid clippy::cast_sign_loss
-                    assert_eq!(parsed.total_hits(), i + 1);
+                    assert_eq!(parsed.total_hits(), (i + 1) as u32);
                     let res = parsed.results().unwrap();
                     assert_eq!(res.get(0).id(), Some(doc_id.as_str()));
                 }
@@ -293,7 +288,6 @@ fn test_shared_buffer_concurrency() {
     let resp = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
-            version: 1,
             results: Some(results),
             total_hits: 42,
             processing_time_ms: 2.5,

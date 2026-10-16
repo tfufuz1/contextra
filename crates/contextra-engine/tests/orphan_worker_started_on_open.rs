@@ -6,11 +6,8 @@ use std::time::Duration;
 #[tokio::test]
 async fn test_db_transaction_raii_drop_cleans_up_staged_writes() {
     let temp_dir = tempfile::tempdir().expect("create temp dir");
-    let config = ContextraConfig {
-        group_commit_window_micros: 0,
-        consolidation_enabled: false,
-        ..Default::default()
-    };
+    let mut config = ContextraConfig::default();
+    config.group_commit_window_micros = 0;
 
     let engine = Contextra::open_with_config(temp_dir.path(), config)
         .await
@@ -53,11 +50,8 @@ async fn test_db_transaction_raii_drop_cleans_up_staged_writes() {
 #[tokio::test]
 async fn test_raw_tx_id_manual_rollback_cleans_up_staged_writes() {
     let temp_dir = tempfile::tempdir().expect("create temp dir");
-    let config = ContextraConfig {
-        group_commit_window_micros: 0,
-        consolidation_enabled: false,
-        ..Default::default()
-    };
+    let mut config = ContextraConfig::default();
+    config.group_commit_window_micros = 0;
 
     let engine = Contextra::open_with_config(temp_dir.path(), config)
         .await

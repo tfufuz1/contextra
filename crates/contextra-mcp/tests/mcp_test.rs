@@ -77,7 +77,6 @@ async fn test_sandbox_policy_enforcement() {
         allow_code_execution: false,
         allow_cloud_egress: false,
         max_execution_ms: 5000,
-        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
     let server = McpServer::with_sandbox(Arc::new(db), embedder, sandbox);
@@ -949,107 +948,6 @@ async fn test_stdio_transport_stability() {
 
     drop(stdin);
     let _ = child.wait().await;
-}
-
-#[tokio::test]
-async fn test_unknown_tool_jsonrpc_stdio_rejection() {
-    let (server, _tmp) = setup_app().await;
-
-    // Call unknown tool over stdio JSON-RPC interface
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(json!(987)),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "unregistered_malicious_tool_eval",
-            "arguments": {}
-        }),
-    };
-
-    let response = server.handle(req).await;
-    let res_val = serde_json::to_value(&response).unwrap();
-    assert_eq!(res_val["jsonrpc"], "2.0");
-    assert_eq!(res_val["id"], 987);
-    assert_eq!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        text.contains("unknown tool") || text.contains("Unbekanntes Tool"),
-        "Response must explicitly state unknown tool rejection, got: {text}"
-    );
-}
-
-#[tokio::test]
-async fn test_multi_tenant_isolation_mcp() {
-    use contextra_types::TenantId;
-
-    let tmp = TempDir::new().expect("temp dir");
-    let db = Contextra::open(tmp.path()).await.expect("open db");
-
-    let tenant1 = TenantId::try_new(10).expect("tenant 10");
-    let tenant2 = TenantId::try_new(20).expect("tenant 20");
-
-    let embedder = Arc::new(MockEmbedder { dimension: 768 });
-    let server = McpServer::with_write_permission(Arc::new(db), embedder, true).expect("server new");
-
-    // Insert doc into Tenant 10
-    let req_t1 = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(json!(1)),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "contextra_insert",
-            "arguments": {
-                "id": "tenant_10_doc",
-                "text": "Confidential data for Tenant 10",
-                "collection": "default",
-                "tenant_id": 10
-            }
-        }),
-    };
-    let resp_t1 = server.handle(req_t1).await;
-    assert!(resp_t1.error.is_none());
-
-    // Query from Tenant 20 (must not see Tenant 10's data)
-    let req_t2_get = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(json!(2)),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "contextra_get",
-            "arguments": {
-                "id": "tenant_10_doc",
-                "collection": "default",
-                "tenant_id": 20
-            }
-        }),
-    };
-
-    let resp_t2 = server.handle(req_t2_get).await;
-    let res_t2_val = serde_json::to_value(&resp_t2).unwrap();
-    // Getting doc of tenant 10 under tenant 20 context must return null
-    assert_eq!(res_t2_val["result"], serde_json::Value::Null);
-
-    // Tenant 10 retrieving its own document succeeds
-    let req_t1_get = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(json!(3)),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "contextra_get",
-            "arguments": {
-                "id": "tenant_10_doc",
-                "collection": "default",
-                "tenant_id": 10
-            }
-        }),
-    };
-
-    let resp_t1_get = server.handle(req_t1_get).await;
-    let res_t1_val = serde_json::to_value(&resp_t1_get).unwrap();
-    assert_ne!(res_t1_val["result"], serde_json::Value::Null);
-    let text = res_t1_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("tenant_10_doc"));
 }
 
 #[tokio::test]

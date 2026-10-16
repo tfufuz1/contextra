@@ -11,8 +11,7 @@
 )]
 
 use bytes::Bytes;
-use contextra_types::TxId;
-use contextra_types::TOMBSTONE_BIT;
+use contextra_core::{TxId, TOMBSTONE_BIT};
 use contextra_store::memtable::{MemTable, RESERVED_PREFIXES};
 use proptest::prelude::*;
 use std::collections::BTreeMap;

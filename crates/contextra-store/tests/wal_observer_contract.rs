@@ -1,8 +1,7 @@
 #![allow(unexpected_cfgs)]
 #![cfg(not(loom))]
 
-use contextra_ports::StorageEngine;
-use contextra_types::TxId;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver};
 use contextra_testkit::ManualClock;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

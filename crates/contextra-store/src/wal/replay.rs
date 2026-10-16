@@ -1,23 +1,11 @@
-#![allow(clippy::cast_possible_truncation)]
-
-//! FILE-CONTEXT:
-//! STAND: 2026-10-06
-//! ZWECK: Implementierung von WAL-Replay, Mmap-/Stream-Scans, CRC/HMAC-Tail-Truncation und Bak-Recovery.
-//! INVARIANTEN:
-//! - I-1: HMAC-Verkettung muss intakt sein. Nach verworfenem Tail dürfen keine weiteren Frames verarbeitet werden.
-//! - I-3: Torn Writes am physischen Dateiende (pos >= file_size) werden abgeschnitten; Bitrot (pos < file_size) liefert WalCorruption.
-//! - I-6: Verzeichnis-Fsync (fsync_parent_dir) nach allen .bak Recovery-Verzeichnis-Mutationen.
-
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
-#[cfg(feature = "wal-integrity")]
-use super::legacy_integrity_key;
 use super::{
-    Wal, WalEntry, WalOp, WalParseError, WalReplayFilter, WalReplayReport, WalVersion,
-    MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
+    legacy_integrity_key, Wal, WalEntry, WalOp, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE,
+    WAL_V2_HEADER, WAL_V3_HEADER,
 };
 
 pub type WalSeq = u64;
@@ -38,28 +26,30 @@ impl Wal {
         pos: u64,
         file_size: u64,
     ) -> Option<ContextraError> {
-        if pos >= file_size {
-            tracing::warn!(
-                "WAL truncation at tail (offset {}), partial entry: {}",
-                chunk_start_pos,
-                e
-            );
-            None
-        } else {
-            match e {
-                WalParseError::CrcMismatch { stored, computed } => {
+        match e {
+            WalParseError::CrcMismatch { stored, computed } => {
+                Some(ContextraError::wal_corruption(
+                    chunk_start_pos,
+                    format!(
+                        "CRC validation failed: stored={:#010x}, computed={:#010x}",
+                        stored, computed
+                    ),
+                ))
+            }
+            _ => {
+                if pos >= file_size {
+                    tracing::warn!(
+                        "WAL truncation at tail (offset {}), partial entry: {}",
+                        chunk_start_pos,
+                        e
+                    );
+                    None
+                } else {
                     Some(ContextraError::wal_corruption(
                         chunk_start_pos,
-                        format!(
-                            "CRC validation failed: stored={:#010x}, computed={:#010x}",
-                            stored, computed
-                        ),
+                        format!("Deserialization failed: {}", e),
                     ))
                 }
-                _ => Some(ContextraError::wal_corruption(
-                    chunk_start_pos,
-                    format!("Deserialization failed: {}", e),
-                )),
             }
         }
     }
@@ -70,69 +60,17 @@ impl Wal {
         self.replay_with_sink(&NoopReplayProgressSink).await
     }
 
-    /// Replays the WAL while filtering entries using the optional `WalReplayFilter`.
-    pub async fn replay_with_filter(
-        &self,
-        filter: Option<&dyn WalReplayFilter>,
-    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalReplayReport)> {
-        let all_entries = self.replay().await?;
-        let mut report = WalReplayReport::default();
-        let mut filtered = Vec::with_capacity(all_entries.len());
-
-        for (seq, entry, pos) in all_entries {
-            let drop = match &entry.op {
-                WalOp::Put { tx_id, key, .. } => {
-                    if let Some(f) = filter {
-                        f.drop_record(key, tx_id.inner())
-                    } else {
-                        false
-                    }
-                }
-                WalOp::Delete { tx_id, key } => {
-                    if let Some(f) = filter {
-                        f.drop_record(key, tx_id.inner())
-                    } else {
-                        false
-                    }
-                }
-                WalOp::TxEnd { .. } => false,
-            };
-
-            if drop {
-                report.records_dropped_by_filter += 1;
-            } else {
-                report.records_replayed += 1;
-                filtered.push((seq, entry, pos));
-            }
-        }
-
-        Ok((filtered, report))
-    }
-
     /// Replays the WAL while notifying the provided `ReplayProgressSink` of progress.
     pub async fn replay_with_sink<S: ReplayProgressSink>(
         &self,
         sink: &S,
     ) -> Result<Vec<(u64, WalEntry, u64)>> {
-        match self.replay_mmap_with_sink(sink).await {
-            Ok((entries, _)) => Ok(entries),
-            Err(e) => {
-                tracing::warn!("WAL mmap replay failed ({e}), falling back to stream reader");
-                self.replay_stream().await
-            }
-        }
+        let (entries, _) = self.replay_mmap_with_sink(sink).await?;
+        Ok(entries)
     }
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let (entries, _) = self.replay_stream_with_version().await?;
-        Ok(entries)
-    }
-
-    /// Replays the WAL using the stream reader (`BufReader`), returning entries and detected version.
-    pub async fn replay_stream_with_version(
-        &self,
-    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let metadata = crate::wal::fs::metadata(&self.path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
@@ -143,7 +81,8 @@ impl Wal {
                 true
             })
             .await?;
-        Ok((entries, version))
+        let _ = version;
+        Ok(entries)
     }
 
     /// Replays the WAL and returns all entries with seq_no > since_seq_no.
@@ -156,7 +95,7 @@ impl Wal {
             .collect())
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -164,10 +103,10 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
-        _file_size: u64,
+        file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         match self.replay_mmap().await {
             Ok(res) => Ok(res),
@@ -177,7 +116,14 @@ impl Wal {
                     self.path,
                     e
                 );
-                self.replay_stream_with_version().await
+                let mut entries = Vec::new();
+                let version = self
+                    .scan_entries_with_callback(file_size, |seq, entry, pos| {
+                        entries.push((seq, entry, pos));
+                        true
+                    })
+                    .await?;
+                Ok((entries, version))
             }
         }
     }
@@ -190,46 +136,26 @@ impl Wal {
     }
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`) with progress callback.
-    /// Falls back to stream replay if mmap or parsing fails.
     #[allow(clippy::type_complexity)]
     pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-            let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
-            })?;
-            let metadata = std_file.metadata().map_err(|e| {
-                ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}"))
-            })?;
-            let file_size = metadata.len();
+        let std_file = std::fs::File::open(&self.path)
+            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
+        let metadata = std_file
+            .metadata()
+            .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
+        let file_size = metadata.len();
 
-            if file_size == 0 {
-                return Ok((Vec::new(), WalVersion::V1));
-            }
-
-            let mmap = contextra_sys::mmap_readonly(&std_file)
-                .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
-
-            self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
-        })();
-
-        match mmap_res {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                tracing::warn!(
-                    path = %self.path.display(),
-                    error = %e,
-                    "WAL mmap replay failed, falling back to stream reader"
-                );
-                let (entries, version) = self.replay_stream_with_version().await?;
-                for (seq, _, _) in &entries {
-                    sink.on_entry_replayed(*seq, None);
-                }
-                Ok((entries, version))
-            }
+        if file_size == 0 {
+            return Ok((Vec::new(), WalVersion::V1));
         }
+
+        let mmap = contextra_sys::mmap_readonly(&std_file)
+            .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
+
+        self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
     #[allow(dead_code, clippy::type_complexity)]
@@ -402,7 +328,6 @@ impl Wal {
         let integrity_key = self.get_integrity_key()?;
         #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
-        #[cfg(feature = "wal-integrity")]
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -418,16 +343,6 @@ impl Wal {
                     pos = 0;
                 }
             }
-        }
-
-        let allow_legacy_fallback = self
-            .allow_legacy_integrity_key_fallback
-            .load(std::sync::atomic::Ordering::SeqCst);
-        if version < self.min_wal_version || (version != WalVersion::V3 && !allow_legacy_fallback) {
-            return Err(ContextraError::invalid_input(format!(
-                "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
-                version, self.min_wal_version, allow_legacy_fallback
-            )));
         }
 
         'scan_loop: loop {
@@ -788,7 +703,6 @@ impl Wal {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {
         let bak_path = PathBuf::from(format!("{}.{}", wal_path.display(), suffix));
@@ -816,21 +730,18 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                         .map_err(|e| {
                             ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
                         })?;
-                    crate::wal::fs::remove_file(&bak_path).await.map_err(|e| {
-                        ContextraError::Storage(format!("WAL backup recovery remove failed: {e}"))
-                    })?;
+                    let _ = crate::wal::fs::remove_file(&bak_path).await;
                 }
             }
-            let f = crate::wal::fs::OpenOptions::new()
+            if let Ok(f) = crate::wal::fs::OpenOptions::new()
                 .write(true)
                 .open(wal_path)
                 .await
-                .map_err(|e| ContextraError::Storage(format!("WAL recovery open failed: {e}")))?;
-            f.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
-            })?;
-
-            crate::util::fsync_parent_dir(wal_path).await?;
+            {
+                f.sync_all().await.map_err(|e| {
+                    ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
+                })?;
+            }
             return Ok(true);
         }
     }

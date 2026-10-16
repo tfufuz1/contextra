@@ -98,7 +98,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as language bindings and client drivers).
+/// (such as `contextra-py` and `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
@@ -354,17 +354,6 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
-
-    /// Active read snapshot has expired due to max_snapshot_age policy.
-    #[error("Snapshot {seq_no} expired (age: {age_ticks} ticks > max_snapshot_age: {max_age_ticks} ticks)")]
-    SnapshotExpired {
-        /// Sequence number of expired snapshot.
-        seq_no: u64,
-        /// Age of snapshot in ticks.
-        age_ticks: u64,
-        /// Maximum allowed snapshot age in ticks.
-        max_age_ticks: u64,
-    },
 }
 
 impl ContextraError {
@@ -436,51 +425,9 @@ impl ContextraError {
         Self::KvQuantization(msg.into())
     }
 
-    /// Constructs a `ContextraError` from an error kind identifier and detail message.
-    pub fn from_kind_and_message(kind: &str, msg: impl Into<String>) -> Self {
-        let msg = msg.into();
-        match kind {
-            "DurabilityConfig" => Self::durability_config(msg),
-            "OrphanedVectorReference" => {
-                let parts: Vec<&str> = msg.split("->").collect();
-                if parts.len() == 2 {
-                    Self::orphaned_vector_reference(parts[0].trim(), parts[1].trim())
-                } else {
-                    Self::orphaned_vector_reference("unknown", msg)
-                }
-            }
-            "InvalidInput" => Self::invalid_input(msg),
-            "KvQuantization" => Self::kv_quantization(msg),
-            "PinBudgetExceeded" => Self::pin_budget_exceeded(msg),
-            _ => Self::Internal(msg),
-        }
-    }
-
     /// Creates a `DurabilityConfig` error.
     pub fn durability_config(msg: impl Into<String>) -> Self {
         Self::DurabilityConfig(msg.into())
-    }
-
-    /// Helper to validate durability configuration, producing `DurabilityConfig` on failure.
-    pub fn check_durability(condition: bool, msg: impl Into<String>) -> Result<()> {
-        if condition {
-            Ok(())
-        } else {
-            Err(Self::durability_config(msg))
-        }
-    }
-
-    /// Helper to validate vector reference existence, producing `OrphanedVectorReference` on failure.
-    pub fn check_vector_reference(
-        found: bool,
-        doc_id: impl Into<String>,
-        index_id: impl Into<String>,
-    ) -> Result<()> {
-        if found {
-            Ok(())
-        } else {
-            Err(Self::orphaned_vector_reference(doc_id, index_id))
-        }
     }
 
     /// Creates a `PinBudgetExceeded` error.
@@ -496,15 +443,6 @@ impl ContextraError {
         Self::CrossDeviceLink {
             source_path: source_path.into(),
             target_path: target_path.into(),
-        }
-    }
-
-    /// Creates a `SnapshotExpired` error.
-    pub fn snapshot_expired(seq_no: u64, age_ticks: u64, max_age_ticks: u64) -> Self {
-        Self::SnapshotExpired {
-            seq_no,
-            age_ticks,
-            max_age_ticks,
         }
     }
 

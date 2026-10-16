@@ -1,6 +1,6 @@
 use super::*;
 use crate::wal::{PreparedBatch, WalConfig, WalEntry, WalOp};
-use contextra_types::TxId;
+use contextra_core::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]

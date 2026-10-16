@@ -10,35 +10,42 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 ring = "4"
 
 [dependencies]
+contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-license = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
-contextra-engine = { workspace = true }
-contextra-rank = { workspace = true }
+contextra-crypto = { workspace = true, optional = true }
+contextra-privacy = { workspace = true, optional = true }
+contextra-audit-export = { workspace = true, optional = true }
+contextra-avv-generator = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
-rand = "0.8"
+contextra-infer-candle = { workspace = true, optional = true }
+contextra-infer-ollama = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-router = { workspace = true, optional = true }
+contextra-rank = { workspace = true, optional = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 
 [features]
-default = ["fast"]
-fast = ["contextra-engine/fast"]
-
-# Sicherheit
-encryption-at-rest = ["contextra-db/encryption-at-rest"]
-
-# Löschgarantie
-erasure = ["contextra-store/erasure", "contextra-engine/erasure", "contextra-ports/backend-impl"]
-
-# Format-Features
+default = ["fast", "candle"]
+fast = []
 docid-128 = ["contextra-types/docid-128"]
+sovereign = ["contextra-crypto", "contextra-privacy"]
+compliance = ["sovereign", "audit-export", "avv-generator"]
+audit-export = ["dep:contextra-audit-export"]
+avv-generator = ["dep:contextra-avv-generator"]
+onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
+candle = ["contextra-infer-candle"]
+ollama = ["contextra-infer-ollama"]
+router = ["contextra-router", "contextra-rank"]
 
 [lints]
 workspace = true

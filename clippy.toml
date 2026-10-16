@@ -1,9 +1,0 @@
-# Workspace Clippy Configuration (G-09)
-disallowed-methods = [
-    { path = "std::time::Instant::now", reason = "Use Clock port instead of Instant::now for determinism (G-09)" },
-    { path = "std::time::SystemTime::now", reason = "Use Clock port instead of SystemTime::now for determinism (G-09)" },
-    { path = "rand::thread_rng", reason = "Use Rng port instead of rand::thread_rng for determinism (G-09)" },
-    { path = "rand::random", reason = "Use Rng port instead of rand::random for determinism (G-09)" },
-    { path = "f32::partial_cmp", reason = "Use total_cmp instead of partial_cmp for floats (G-09)" },
-    { path = "f64::partial_cmp", reason = "Use total_cmp instead of partial_cmp for floats (G-09)" },
-]

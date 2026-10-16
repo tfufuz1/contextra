@@ -16,8 +16,8 @@
 #![allow(deprecated)]
 
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
-    ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    LayerCleanupProof,
 };
 use contextra_crypto::CryptoError;
 use contextra_db::{Contextra, ContextraConfig};
@@ -96,7 +96,7 @@ async fn run_operator_role(
     println!("  [Betreiber] Collection '{col_name}' mit sensiblen Daten angelegt.");
 
     // 4. Physikalische Löschung der Collection ausführen
-    let proof_key_hmac = b"hmac-key-for-internal-drop-32bytes!!";
+    let proof_key_hmac = b"hmac-key-for-internal-drop";
     let _internal_proof = db
         .drop_collection(col_name, tenant_id, proof_key_hmac)
         .await?;
@@ -108,14 +108,10 @@ async fn run_operator_role(
         tenant_id,
     };
 
-    let create_example_layer_proof = |layer| -> contextra_types::Result<LayerCleanupProof> {
-        LayerCleanupProof::verify_and_create(layer, || Ok(true))
-    };
-
     let layer_proofs = vec![
-        create_example_layer_proof(DeletionLayer::LsmMemtable)?,
-        create_example_layer_proof(DeletionLayer::SsTableAllLevels)?,
-        create_example_layer_proof(DeletionLayer::HnswIndex)?,
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?,
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?,
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
     ];
 
     let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {
@@ -124,7 +120,6 @@ async fn run_operator_role(
         attested_at: 1700000000,
     }];
 
-    let durability = DurabilityProof::new(105);
     let proof_v3 = DeletionProof::create_v3(
         scope,
         vec![
@@ -136,7 +131,6 @@ async fn run_operator_role(
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &graph_repair,
-        Some(&durability),
         keypair.signing_key(),
     )?;
 

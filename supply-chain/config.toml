@@ -6,7 +6,3 @@ version = "0.10"
 [policy]
 # By default, require audits or explicit exemptions for all direct dependency crates ("needs-review").
 # Independent audits must be recorded in supply-chain/audits.toml or imported from trusted audits.
-
-[exemptions.arc-swap]
-version = "1.9.2"
-criteria = "safe-to-deploy"

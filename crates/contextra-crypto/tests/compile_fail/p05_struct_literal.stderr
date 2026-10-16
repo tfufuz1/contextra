@@ -1,7 +1,0 @@
-error[E0560]: struct `DeletionProof` has no field named `_private`
-  --> tests/compile_fail/p05_struct_literal.rs:21:9
-   |
-21 |         _private: (),
-   |         ^^^^^^^^ `DeletionProof` does not have this field
-   |
-   = note: all struct fields are already assigned

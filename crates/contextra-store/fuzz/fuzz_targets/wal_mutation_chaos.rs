@@ -1,7 +1,7 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use contextra_types::TxId;
+use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
 use libfuzzer_sys::fuzz_target;
 use tempfile::tempdir;

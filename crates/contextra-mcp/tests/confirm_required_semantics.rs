@@ -50,7 +50,6 @@ async fn create_mock_server() -> (Arc<McpServer>, TempDir) {
         allow_code_execution: false,
         allow_cloud_egress: true,
         max_execution_ms: 5_000,
-        sidecar_limits: contextra_mcp::sandbox::SidecarLimits::default(),
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
     let server = Arc::new(McpServer::with_sandbox(
@@ -68,7 +67,7 @@ async fn test_confirm_required_semantics_table_test() {
     // Set deletion proof key environment variable for drop_collection tests requiring proof key
     std::env::set_var(
         "CONTEXTRA_DELETION_PROOF_KEY",
-        "test_key_32_bytes_long_exact!!!!",
+        "test_key_32_bytes_long_exact!!",
     );
 
     struct TestCase {

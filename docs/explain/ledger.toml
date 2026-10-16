@@ -1,0 +1,8 @@
+title = "Gate-Ledger-Protokollierung"
+what = "Testergebnisse oder Gate-Entscheidungen wurden nicht im Gate-Ledger aufgezeichnet."
+why = "Lückenlose Nachvollziehbarkeit im Gate-Ledger ist Voraussetzung für Freigaben und Audits."
+fix = "Führe die Verifikation über das reguläre xtask-Tooling aus, um das Ledger zu aktualisieren."
+anti_fix = "Erstelle keine manuell gefälschten Ledger-Einträge."
+adr = ["ADR-035"]
+related = ["verdict", "env-attest"]
+sources = ["CONSTITUTION.md"]

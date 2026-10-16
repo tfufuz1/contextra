@@ -1,5 +1,5 @@
 use super::{MAX_KEY_SIZE, MAX_VALUE_SIZE};
-use contextra_types::{ContextraError, DocId, Result};
+use contextra_core::{ContextraError, DocId, Result};
 
 pub fn validate_key(key: &[u8]) -> Result<()> {
     if key.is_empty() {

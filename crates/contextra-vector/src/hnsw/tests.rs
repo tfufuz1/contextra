@@ -1,6 +1,5 @@
 use super::*;
-use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
+use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::Rng;
 use parking_lot::Mutex;
 
@@ -361,8 +360,8 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     drop(cnts);
 
-    // Wait for exponential backoff cooldown (800ms) to expire
-    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    // Wait for exponential backoff cooldown (400ms) to expire
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     // Rebuild after cooldown expires -> succeeds
     index

@@ -12,7 +12,6 @@ async fn main() -> contextra_types::Result<()> {
     // 1. Open (or create) a database with 4-dimensional vectors
     let config = ContextraConfig {
         dimension: 4,
-        consolidation_enabled: false,
         ..Default::default()
     };
     let db = Contextra::open_with_config("./example_data", config).await?;

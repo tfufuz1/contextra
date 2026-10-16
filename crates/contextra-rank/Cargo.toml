@@ -21,6 +21,10 @@ ahash.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 
+[features]
+dibud = []
+
 [dev-dependencies]
+contextra-adapt.workspace = true
 proptest = "1"
 tokio = { workspace = true, features = ["full"] }

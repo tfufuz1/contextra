@@ -174,8 +174,6 @@ impl TokenBudget {
     }
 
     /// Calculates the effective token limit based on strategy.
-    // FIX(2026-10-05): Safe non-negative float multiplication scaled from positive usize token budget.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn effective_limit(&self) -> usize {
         match self.strategy {
             BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
@@ -209,12 +207,38 @@ impl TokenBudget {
     /// Reserviert `amount` Tokens atomar. Schlägt fehl, wenn das verfügbare Budget
     /// (limit - reserved - consumed) unterschritten würde.
     pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>> {
-        self.try_reserve(amount)?;
-        Ok(Reservation {
-            budget: self,
-            amount,
-            settled: AtomicBool::new(false),
-        })
+        loop {
+            let current_consumed = self.consumed.load(Ordering::Acquire);
+            let effective = self.effective_limit();
+            let avail = effective
+                .saturating_sub(self.reserved)
+                .saturating_sub(current_consumed);
+
+            if avail == 0 || avail < amount {
+                return Err(ContextraError::Internal(format!(
+                    "Token budget exhausted before step execution (available: {}, required: {})",
+                    avail, amount
+                )));
+            }
+
+            let next_consumed = current_consumed.saturating_add(amount);
+            if self
+                .consumed
+                .compare_exchange_weak(
+                    current_consumed,
+                    next_consumed,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                return Ok(Reservation {
+                    budget: self,
+                    amount,
+                    settled: AtomicBool::new(false),
+                });
+            }
+        }
     }
 
     /// Tries to reserve `tokens` from the available budget before step execution.
@@ -287,7 +311,12 @@ impl<'a> Drop for Reservation<'a> {
 
 impl Default for TokenBudget {
     fn default() -> Self {
-        Self::for_model("default").with_reserved(512, 0)
+        Self {
+            limit: 8192,
+            strategy: BudgetStrategy::Conservative,
+            reserved: 512,
+            consumed: AtomicUsize::new(0),
+        }
     }
 }
 
@@ -398,8 +427,6 @@ impl ResourceTracker {
     }
 
     /// Returns true if memory usage is below 95% of the limit.
-    // FIX(2026-10-05): Safe non-negative float multiplication for 95% memory threshold calculation.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn has_memory_capacity(&self) -> bool {
         self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
     }

@@ -8,8 +8,7 @@
 
 #[cfg(loom)]
 mod loom_tests {
-    use contextra_types::{DocId, TxId};
-use contextra_ports::{VectorIndex};
+    use contextra_core::{DocId, TxId, VectorIndex};
     use contextra_vector::{HnswConfig, HnswIndex};
     use loom::sync::Arc;
     use loom::thread;
@@ -84,8 +83,7 @@ use contextra_ports::{VectorIndex};
 #[cfg(not(loom))]
 #[cfg(test)]
 mod normal_tests {
-    use contextra_types::{DocId, TxId};
-use contextra_ports::{VectorIndex};
+    use contextra_core::{DocId, TxId, VectorIndex};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::Arc;
 
@@ -118,7 +116,7 @@ use contextra_ports::{VectorIndex};
                 let vec = vec![i as f32 * 10.0, i as f32 * -5.0, 1.0, 2.0];
                 index_clone.insert(tx, doc_id, &vec).await?;
                 index_clone.commit(tx).await?;
-                Ok::<(), contextra_types::ContextraError>(())
+                Ok::<(), contextra_core::ContextraError>(())
             }));
         }
 

@@ -321,10 +321,9 @@ impl<'a> flatbuffers::Follow<'a> for SearchResponse<'a> {
 }
 
 impl<'a> SearchResponse<'a> {
-  pub const VT_VERSION: flatbuffers::VOffsetT = 4;
-  pub const VT_RESULTS: flatbuffers::VOffsetT = 6;
-  pub const VT_TOTAL_HITS: flatbuffers::VOffsetT = 8;
-  pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 10;
+  pub const VT_RESULTS: flatbuffers::VOffsetT = 4;
+  pub const VT_TOTAL_HITS: flatbuffers::VOffsetT = 6;
+  pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 8;
 
   #[inline]
   pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -339,18 +338,10 @@ impl<'a> SearchResponse<'a> {
     builder.add_processing_time_ms(args.processing_time_ms);
     builder.add_total_hits(args.total_hits);
     if let Some(x) = args.results { builder.add_results(x); }
-    builder.add_version(args.version);
     builder.finish()
   }
 
 
-  #[inline]
-  pub fn version(&self) -> u32 {
-    // Safety:
-    // Created from valid Table for this object
-    // which contains a valid value in this slot
-    unsafe { self._tab.get::<u32>(SearchResponse::VT_VERSION, Some(1)).unwrap()}
-  }
   #[inline]
   pub fn results(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ScoredDocument<'a>>>> {
     // Safety:
@@ -381,7 +372,6 @@ impl flatbuffers::Verifiable for SearchResponse<'_> {
   ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
-     .visit_field::<u32>("version", Self::VT_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<ScoredDocument>>>>("results", Self::VT_RESULTS, false)?
      .visit_field::<u32>("total_hits", Self::VT_TOTAL_HITS, false)?
      .visit_field::<f32>("processing_time_ms", Self::VT_PROCESSING_TIME_MS, false)?
@@ -390,7 +380,6 @@ impl flatbuffers::Verifiable for SearchResponse<'_> {
   }
 }
 pub struct SearchResponseArgs<'a> {
-    pub version: u32,
     pub results: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ScoredDocument<'a>>>>>,
     pub total_hits: u32,
     pub processing_time_ms: f32,
@@ -399,7 +388,6 @@ impl<'a> Default for SearchResponseArgs<'a> {
   #[inline]
   fn default() -> Self {
     SearchResponseArgs {
-      version: 1,
       results: None,
       total_hits: 0,
       processing_time_ms: 0.0,
@@ -412,10 +400,6 @@ pub struct SearchResponseBuilder<'a: 'b, 'b> {
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b> {
-  #[inline]
-  pub fn add_version(&mut self, version: u32) {
-    self.fbb_.push_slot::<u32>(SearchResponse::VT_VERSION, version, 1);
-  }
   #[inline]
   pub fn add_results(&mut self, results: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<ScoredDocument<'b >>>>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SearchResponse::VT_RESULTS, results);
@@ -446,7 +430,6 @@ impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b> {
 impl core::fmt::Debug for SearchResponse<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("SearchResponse");
-      ds.field("version", &self.version());
       ds.field("results", &self.results());
       ds.field("total_hits", &self.total_hits());
       ds.field("processing_time_ms", &self.processing_time_ms());
@@ -1202,28 +1185,16 @@ pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {
 pub unsafe fn size_prefixed_root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {
   flatbuffers::size_prefixed_root_unchecked::<SearchResponse>(buf)
 }
-pub const SEARCH_RESPONSE_IDENTIFIER: &str = "CTRA";
-
-#[inline]
-pub fn search_response_buffer_has_identifier(buf: &[u8]) -> bool {
-  flatbuffers::buffer_has_identifier(buf, SEARCH_RESPONSE_IDENTIFIER, false)
-}
-
-#[inline]
-pub fn search_response_size_prefixed_buffer_has_identifier(buf: &[u8]) -> bool {
-  flatbuffers::buffer_has_identifier(buf, SEARCH_RESPONSE_IDENTIFIER, true)
-}
-
 #[inline]
 pub fn finish_search_response_buffer<'a, 'b>(
     fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     root: flatbuffers::WIPOffset<SearchResponse<'a>>) {
-  fbb.finish(root, Some(SEARCH_RESPONSE_IDENTIFIER));
+  fbb.finish(root, None);
 }
 
 #[inline]
 pub fn finish_size_prefixed_search_response_buffer<'a, 'b>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<SearchResponse<'a>>) {
-  fbb.finish_size_prefixed(root, Some(SEARCH_RESPONSE_IDENTIFIER));
+  fbb.finish_size_prefixed(root, None);
 }
 }  // pub mod IPC
 }  // pub mod Contextra

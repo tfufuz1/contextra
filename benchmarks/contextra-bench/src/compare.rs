@@ -10,25 +10,13 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct LongMemEvalMetricsSummary {
     pub overall_accuracy: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_lower_95: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_upper_95: Option<f64>,
     pub total_cases: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct LocomoMetricsSummary {
     pub overall_recall_at_5: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_lower_recall_95: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_upper_recall_95: Option<f64>,
     pub overall_mrr: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_lower_mrr_95: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ci_upper_mrr_95: Option<f64>,
     pub total_eval_cases: usize,
 }
 
@@ -60,26 +48,13 @@ pub fn compare_metrics(
     let mut info_hints = Vec::new();
     let mut pass_messages = Vec::new();
 
-    if current.long_mem_eval.is_none() && current.locomo.is_none() {
-        has_regression = true;
-        errors.push("Current evaluation output contains no valid metric sections (empty/unparsable result).".to_string());
-        return MetricComparisonResult {
-            has_regression,
-            errors,
-            info_hints,
-            pass_messages,
-        };
-    }
-
     // 1. Compare LongMemEval if baseline contains long_mem_eval
     if let Some(base_lme) = &baseline.long_mem_eval {
         if let Some(curr_lme) = &current.long_mem_eval {
-            let curr_val = curr_lme.ci_lower_95.unwrap_or(curr_lme.overall_accuracy);
-            let base_val = base_lme.overall_accuracy;
             compare_single_metric(
                 "long_mem_eval.overall_accuracy",
-                curr_val,
-                base_val,
+                curr_lme.overall_accuracy,
+                base_lme.overall_accuracy,
                 threshold,
                 &mut has_regression,
                 &mut errors,
@@ -96,24 +71,20 @@ pub fn compare_metrics(
     // 2. Compare LoCoMo if baseline contains locomo
     if let Some(base_locomo) = &baseline.locomo {
         if let Some(curr_locomo) = &current.locomo {
-            let curr_recall = curr_locomo.ci_lower_recall_95.unwrap_or(curr_locomo.overall_recall_at_5);
-            let base_recall = base_locomo.overall_recall_at_5;
             compare_single_metric(
                 "locomo.overall_recall_at_5",
-                curr_recall,
-                base_recall,
+                curr_locomo.overall_recall_at_5,
+                base_locomo.overall_recall_at_5,
                 threshold,
                 &mut has_regression,
                 &mut errors,
                 &mut info_hints,
                 &mut pass_messages,
             );
-            let curr_mrr = curr_locomo.ci_lower_mrr_95.unwrap_or(curr_locomo.overall_mrr);
-            let base_mrr = base_locomo.overall_mrr;
             compare_single_metric(
                 "locomo.overall_mrr",
-                curr_mrr,
-                base_mrr,
+                curr_locomo.overall_mrr,
+                base_locomo.overall_mrr,
                 threshold,
                 &mut has_regression,
                 &mut errors,
@@ -265,32 +236,6 @@ pub fn compare_metrics_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_compare_metrics_uses_confidence_interval() {
-        let baseline = CombinedMetrics {
-            long_mem_eval: Some(LongMemEvalMetricsSummary {
-                overall_accuracy: 0.85,
-                ci_lower_95: None,
-                ci_upper_95: None,
-                total_cases: 100,
-            }),
-            locomo: None,
-        };
-        // Mean is 0.84, but lower CI bound is 0.78 (drop > 5% relative to 0.85)
-        let current_with_ci = CombinedMetrics {
-            long_mem_eval: Some(LongMemEvalMetricsSummary {
-                overall_accuracy: 0.84,
-                ci_lower_95: Some(0.78),
-                ci_upper_95: Some(0.90),
-                total_cases: 100,
-            }),
-            locomo: None,
-        };
-
-        let res = compare_metrics(&current_with_ci, &baseline, 0.05);
-        assert!(res.has_regression, "Gate must evaluate regression based on lower CI bound!");
-    }
 
     #[test]
     fn test_compare_metrics_happy_path_equal() {

@@ -23,20 +23,15 @@ pub mod audit_chain;
 pub mod crypto;
 pub mod deletion_proof;
 pub mod deletion_proof_typestate;
-pub mod deletion_witness;
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
-pub mod keystore;
-pub mod kms;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;
 pub mod revocation_log;
-pub mod secure_buf;
 pub mod wal_completeness;
 pub mod wal_crypto;
-pub mod wiring;
 
 pub use audit_chain::{
     compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass,
@@ -45,15 +40,12 @@ pub use audit_chain::{
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
-    ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    LayerCleanupProof,
 };
-pub use deletion_witness::{LayerWitness, WitnessEvidence};
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-pub use keystore::MfksKeystore;
-pub use kms::{DestroyedKey, KmsProvider, LocalKmsProvider};
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
 pub use kv_segment::{
     eviction_worker::{emergency_wipe, EvictionWorker},
@@ -63,7 +55,4 @@ pub use kv_segment::{
 };
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
-pub use secure_buf::CchSecureBuf;
 pub use wal_completeness::verify_wal_chain_completeness;
-pub use wal_crypto::IntegrityVerifier;
-pub use wiring::{KmsWiring, KmsWiringDeps};

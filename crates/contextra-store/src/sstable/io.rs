@@ -1,4 +1,4 @@
-pub(crate) fn pread_exact(
+pub(super) fn pread_exact(
     file: &std::fs::File,
     buf: &mut [u8],
     offset: u64,
@@ -8,7 +8,7 @@ pub(crate) fn pread_exact(
 }
 
 #[cfg(windows)]
-pub(crate) fn pread_exact(
+pub(super) fn pread_exact(
     file: &std::fs::File,
     mut buf: &mut [u8],
     mut offset: u64,

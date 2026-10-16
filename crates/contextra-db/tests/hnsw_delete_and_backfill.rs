@@ -2,6 +2,7 @@
 // ZWECK: Verifiziert, dass ein Fehler beim HNSW-Delete nicht verschluckt wird und Vektorsuchen bei Tombstones durch Backfill k valide Ergebnisse liefern.
 
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_graph::CsrGraph;
 use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
@@ -100,12 +101,14 @@ async fn test_hnsw_delete_failure_propagates_error() {
         fail_delete: AtomicBool::new(false),
     });
 
+    let graph = CsrGraph::with_storage(storage.clone());
     let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
 
-    let col = contextra_db::Collection::new_without_graph(
+    let col = contextra_db::Collection::new(
         "fault_del_col".to_string(),
         storage,
         faulty_hnsw.clone(),
+        Arc::new(graph),
         next_tx,
         dim,
         contextra_text::Language::English,

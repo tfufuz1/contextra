@@ -56,8 +56,8 @@ fn bench_write_throughput(c: &mut Criterion) {
                 let tmp = TempDir::new().unwrap();
                 let db = Contextra::open(tmp.path()).await.unwrap();
 
-                // Insert in batches of 10 to stay safely within staging budget & transaction size limits
-                let batch_size = 10;
+                // Insert in batches of 100 to stay safely within max_ops_per_tx capacity
+                let batch_size = 100;
                 for chunk in docs.chunks(batch_size) {
                     db.insert_many(chunk).await.unwrap();
                 }
@@ -75,7 +75,7 @@ fn bench_hybrid_search_latency(c: &mut Criterion) {
     let tmp = TempDir::new().unwrap();
     let db = rt.block_on(Contextra::open(tmp.path())).unwrap();
 
-    let batch_size = 50;
+    let batch_size = 100;
     let mut current_batch = Vec::with_capacity(batch_size);
     for i in 0..num_docs {
         current_batch.push((

@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
-use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_ports::{VectorIndex};
+use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use std::collections::HashSet;
 
@@ -29,7 +28,7 @@ fn brute_force_search_oracle(
 }
 
 #[tokio::test]
-async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_types::Result<()> {
+async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_core::Result<()> {
     let dim = 4;
     let config = HnswConfigBuilder::new(dim)
         .m(16)
@@ -141,6 +140,68 @@ async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_types
         res_v1_after_del[0].doc_id, expected_oracle_after_del[0],
         "Top hit after deletion must match oracle"
     );
+
+    Ok(())
+}
+
+#[cfg(feature = "experimental-diskann")]
+#[tokio::test]
+async fn test_diskann_docid_high_bits_isolation() -> contextra_core::Result<()> {
+    use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
+    use tempfile::tempdir;
+
+    let dir = tempdir().map_err(contextra_core::ContextraError::Io)?;
+    let index_path = dir.path().join("high_bits_diskann.dann");
+
+    let config = DiskAnnConfig {
+        index_path,
+        dimension: 4,
+        max_degree: 8,
+        beam_width: 16,
+        ..Default::default()
+    };
+
+    let index = DiskAnnIndex::try_new(config)?;
+
+    #[cfg(feature = "docid-128")]
+    let id1 = DocId::from(1_u128);
+    #[cfg(feature = "docid-128")]
+    let id2 = DocId::from(1_u128 | (1_u128 << 64));
+
+    #[cfg(not(feature = "docid-128"))]
+    let id1 = DocId::from(1_u64);
+    #[cfg(not(feature = "docid-128"))]
+    let id2 = DocId::from(1001_u64);
+
+    let id_max = DocId::MAX;
+    let id_min = DocId::MIN;
+
+    let v1 = vec![1.0, 0.0, 0.0, 0.0];
+    let v2 = vec![0.0, 1.0, 0.0, 0.0];
+    let v_max = vec![0.0, 0.0, 1.0, 0.0];
+    let v_min = vec![0.0, 0.0, 0.0, 1.0];
+
+    index
+        .build(
+            &[v1.clone(), v2.clone(), v_max.clone(), v_min.clone()],
+            &[id1, id2, id_max, id_min],
+        )
+        .await?;
+
+    let all_doc_ids = index.all_doc_ids().await?;
+    assert_eq!(all_doc_ids.len(), 4);
+    assert!(all_doc_ids.contains(&id1));
+    assert!(all_doc_ids.contains(&id2));
+    assert!(all_doc_ids.contains(&id_max));
+    assert!(all_doc_ids.contains(&id_min));
+
+    // Delete id1 only
+    index.delete(TxId::new(1), id1).await?;
+
+    let remaining_doc_ids = index.all_doc_ids().await?;
+    assert_eq!(remaining_doc_ids.len(), 3);
+    assert!(!remaining_doc_ids.contains(&id1));
+    assert!(remaining_doc_ids.contains(&id2));
 
     Ok(())
 }

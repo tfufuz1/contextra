@@ -6,12 +6,10 @@ mod provenance;
 mod resonance;
 mod rrf;
 mod signal;
-mod rerank;
 mod topk;
 mod types;
 
 pub use contextra_types::{FusionStrategy, SignalFusionStrategies};
-pub use rerank::RerankStage;
 pub use global::{GlobalFusionConfig, GlobalFusionStrategy};
 pub use normalized::{score_normalized_fusion_with_options, weights_to_signal_factors};
 pub use provenance::ProvenanceBuilder;

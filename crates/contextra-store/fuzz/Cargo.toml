@@ -15,8 +15,7 @@ arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 tempfile = "3"
 bytes = "1"
-contextra-ports = { path = "../../contextra-ports" }
-contextra-types = { path = "../../contextra-types" }
+contextra-core = { path = "../../contextra-core" }
 contextra-store = { path = ".." }
 
 [[bin]]
@@ -64,11 +63,5 @@ doc = false
 [[bin]]
 name = "fuzz_recovery_arbitrary_state"
 path = "fuzz_targets/fuzz_recovery_arbitrary_state.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "witness_reader_sstable"
-path = "fuzz_targets/witness_reader_sstable.rs"
 test = false
 doc = false

@@ -1,5 +1,4 @@
-use contextra_types::{DocId, TxId};
-use contextra_ports::{VectorIndex};
+use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

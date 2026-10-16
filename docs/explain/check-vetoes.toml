@@ -1,0 +1,8 @@
+title = "Veto-Regeln Überwachung"
+what = "Eine im Projekt verankerte Veto-Invariante wurde verletzt."
+why = "Veto-Regeln (z.B. keine partiellen HNSW-Rebuilds, keine Mandanten-Mischung) schützen kritische Garantien."
+fix = "Lies `VETOES.md` und passe die Implementierung an die Vorgaben an."
+anti_fix = "Lösche oder editiere keine Abschnitte in `VETOES.md`."
+adr = ["ADR-035", "ADR-102"]
+related = ["check-commit-diff-integrity", "check-ring-layering"]
+sources = ["CONSTITUTION.md", "VETOES.md"]

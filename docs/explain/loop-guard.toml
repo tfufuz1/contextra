@@ -1,0 +1,8 @@
+title = "Schleifen- & Thrashing-Erkennung"
+what = "Gleicher Fehler trat mehrfach hintereinander auf (Prompt Thrashing)."
+why = "Wiederholtes Fehlverhalten signalisiert eine Sackgasse und erfordert menschliches Eingreifen."
+fix = "Stoppe die Ausführung, erstelle ein minimales Reproduktionsbeispiel und verlangen menschliches Review."
+anti_fix = "Probiere nicht blind dieselbe nicht funktionierende Änderung erneut aus."
+adr = ["ADR-035"]
+related = ["plan-lint", "verdict"]
+sources = ["CONSTITUTION.md", "AGENTS.md"]

@@ -1,5 +1,4 @@
-use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_ports::{VectorIndex};
+use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::SeededRng;
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

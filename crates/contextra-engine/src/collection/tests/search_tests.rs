@@ -2,6 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_search_dimension_mismatch_rejected() {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -28,6 +29,7 @@ async fn test_search_dimension_mismatch_rejected() {
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -43,6 +45,7 @@ async fn test_search_dimension_mismatch_rejected() {
 
 #[tokio::test]
 async fn test_checkpoint_unpin_on_search_error_path() {
+    use contextra_graph::csr::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{FilterExpr, Result, TxId};
@@ -157,6 +160,7 @@ async fn test_checkpoint_unpin_on_search_error_path() {
         "default".to_string(),
         storage.clone(),
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -191,6 +195,7 @@ async fn test_checkpoint_unpin_on_search_error_path() {
 #[tokio::test]
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -213,6 +218,7 @@ async fn test_search_k_zero_returns_canonical_error_message(
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -244,10 +250,27 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
+#[tokio::test]
+async fn test_single_pid_controller_instantiation_in_query_builder() {
+    // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
+    // is instantiated across production collection search and query_builder modules.
+    let mut pid = contextra_adapt::PidController::default();
+    assert_eq!(pid.kp, 0.5);
+    assert_eq!(pid.ki, 0.05);
+    assert_eq!(pid.kd, 0.1);
+    assert_eq!(pid.target_latency_ms, 150.0);
+    assert_eq!(pid.min_pool_size, 50);
+    assert_eq!(pid.max_pool_size, 200);
+
+    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
+    assert!(updated < 100);
+    assert!(updated >= 50);
+}
 
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
@@ -275,6 +298,7 @@ async fn test_query_builder_query_config_include_superseded_displacement(
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -323,20 +347,16 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 }
 
 #[tokio::test]
-async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Box<dyn std::error::Error>> {
-    use contextra_ports::ReadSnapshot;
+async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::EntityId;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
 
-    let snap1 = ReadSnapshot::new(42);
-    let snap2 = ReadSnapshot::new(42);
-    assert_eq!(snap1.max_seq(), 42);
-    assert_eq!(snap1.seq(), 42);
-    assert_eq!(snap1, snap2);
-
     let dir = tempdir()?;
     let storage = Arc::new(
         LsmStorage::new(contextra_store::LsmConfig {
@@ -349,146 +369,84 @@ async fn test_search_signals_share_same_read_snapshot_max_seq() -> Result<(), Bo
         dimension: 4,
         ..Default::default()
     })?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
-        Arc::new(AtomicU64::new(1)),
+        graph,
+        next_tx,
         4,
         contextra_text::Language::English,
     );
 
+    // Insert doc_a (community member) and doc_b (non-community member)
     col.insert(
-        "doc1",
+        "doc_a",
         &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "multi signal snapshot test"})),
+        Some(serde_json::json!({"text": "alpha topic"})),
+    )
+    .await?;
+    col.insert(
+        "doc_b",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "alpha topic"})),
     )
     .await?;
 
-    let snap_at_doc1 = col.snapshot_seq().await?;
-    let snapshot = ReadSnapshot::new(snap_at_doc1);
+    let eid_a = EntityId::from_key("doc_a")?;
 
-    col.insert(
-        "doc2",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "multi signal snapshot test doc2"})),
-    )
-    .await?;
+    // Relate doc_a to doc_c and run community detection so get_community(eid_a) finds target_community_id
+    col.relate("doc_a", "doc_c", "knows").await?;
+    col.run_community_detection().await?;
+    assert!(col.get_community(eid_a).await?.is_some());
 
-    let query = contextra_types::HybridQuery::builder()
-        .with_text_query("snapshot")
-        .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
-        .with_k(10)
-        .build()?;
-
-    let (results, _) = col
-        .hybrid_search_with_query_and_report_at(&query, &snapshot, contextra_types::OnSignalFailure::Fail, None)
+    // Perform hybrid search with same_community_as = doc_a
+    let results_boosted = col
+        .hybrid_search_with_strategy(
+            "alpha",
+            &[1.0, 0.0, 0.0, 0.0],
+            10,
+            None,
+            None,
+            None,
+            Some(eid_a),
+            None,
+        )
         .await?;
 
-    // At snap_at_doc1, doc2 was not yet inserted -> results across vector and text signals read at snapshot must contain doc1 and NOT doc2
-    assert!(results.iter().any(|r| r.id == "doc1"), "doc1 must be visible at snapshot");
-    assert!(!results.iter().any(|r| r.id == "doc2"), "doc2 must NOT be visible at earlier snapshot across signals");
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_reranker_called_in_search_path_via_counter() -> Result<(), Box<dyn std::error::Error>> {
-    use contextra_ports::{BoxFuture, Reranker};
-    use contextra_store::LsmStorage;
-    use contextra_types::{RerankResult, Result};
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    struct CountingReranker {
-        call_count: Arc<AtomicUsize>,
-    }
-
-    impl Reranker for CountingReranker {
-        fn rerank<'a>(
-            &'a self,
-            _query: &'a str,
-            candidates: &'a [String],
-        ) -> BoxFuture<'a, Result<Vec<RerankResult>>> {
-            self.call_count.fetch_add(1, Ordering::SeqCst);
-            Box::pin(async move {
-                let res = candidates
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, _)| RerankResult {
-                        index: idx,
-                        original_index: idx,
-                        score: 0.95 - (idx as f32 * 0.1),
-                        calibrated_score: 0.95 - (idx as f32 * 0.1),
-                    })
-                    .collect();
-                Ok(res)
-            })
-        }
-    }
-
-    let dir = tempdir()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await?,
+    // Verification 1: Non-community doc_b is NOT eliminated and remains in results!
+    assert_eq!(
+        results_boosted.len(),
+        2,
+        "Non-community doc_b must not be filtered out"
     );
-    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
-        dimension: 4,
-        ..Default::default()
-    })?);
-    let col = Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    );
-
-    col.insert(
-        "doc1",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "apple pie recipe"})),
-    )
-    .await?;
-
-    col.insert(
-        "doc2",
-        &[0.9, 0.1, 0.0, 0.0],
-        Some(serde_json::json!({"text": "banana bread recipe"})),
-    )
-    .await?;
-
-    let counter = Arc::new(AtomicUsize::new(0));
-    let reranker = CountingReranker {
-        call_count: counter.clone(),
-    };
-
-    let results = col
-        .query()
-        .text("recipe")
-        .vector(vec![1.0, 0.0, 0.0, 0.0])
-        .reranker(&reranker)
-        .k(2)
-        .execute()
-        .await?;
-
+    let ids: Vec<&str> = results_boosted.iter().map(|r| r.id.as_str()).collect();
     assert!(
-        counter.load(Ordering::SeqCst) >= 1,
-        "Reranker must be invoked in the search path"
+        ids.contains(&"doc_b"),
+        "doc_b must remain in search results"
     );
-    assert!(!results.is_empty(), "Results must not be empty after reranking");
+
+    // Verification 2: Community doc_a gets boosted post-RRF and ranks #1 ahead of doc_b
+    assert_eq!(
+        results_boosted[0].id, "doc_a",
+        "Community member doc_a must rank ahead after boost"
+    );
+    assert!(
+        results_boosted[0].score > results_boosted[1].score,
+        "Boosted community doc score ({}) must exceed non-community score ({})",
+        results_boosted[0].score,
+        results_boosted[1].score
+    );
     Ok(())
 }
 
 #[tokio::test]
 async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
 ) -> contextra_types::Result<()> {
+    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
@@ -516,6 +474,7 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
         "default".to_string(),
         storage,
         index,
+        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,

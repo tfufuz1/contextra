@@ -1,12 +1,12 @@
 // FILE-CONTEXT
-// STAND:       2026-10-15
+// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
 // ZWECK:       Binary Entry Point for Contextra MCP Stdio JSON-RPC Server
 // INVARIANTEN: Logs exclusively to stderr; stdout strictly reserved for JSON-RPC transport
 // HOTSPOTS:    main()
 // SIEHE AUCH:  ADR-010, crates/contextra-mcp/src/lib.rs
 
 use contextra::Contextra;
-use contextra_mcp::{EmbeddingConfig, McpServer};
+use contextra_mcp::{setup_routing, EmbeddingConfig, McpServer, RouterConfig};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -31,10 +31,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.provider = val.clone();
         }
     }
-
-    if let Some(i) = args.iter().position(|a| a == "--tenant-id") {
+    if let Some(i) = args.iter().position(|a| a == "--ollama-url") {
         if let Some(val) = args.get(i + 1) {
-            std::env::set_var("CONTEXTRA_TENANT_ID", val);
+            config.ollama_url = val.clone();
+        }
+    }
+    if let Some(i) = args.iter().position(|a| a == "--embed-model") {
+        if let Some(val) = args.get(i + 1) {
+            config.embed_model = val.clone();
+        }
+    }
+    if let Some(i) = args.iter().position(|a| a == "--onnx-model-path") {
+        if let Some(val) = args.get(i + 1) {
+            config.onnx_model_path = Some(std::path::PathBuf::from(val));
         }
     }
 
@@ -46,9 +55,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         contextra_mcp::is_write_allowed_by_env()
     };
 
+    let mut router_config = RouterConfig::from_env();
+    if let Some(i) = args.iter().position(|a| a == "--router-profiles-path") {
+        if let Some(val) = args.get(i + 1) {
+            let path = std::path::PathBuf::from(val);
+            if let Ok(bytes) = std::fs::read(&path) {
+                if let Ok(loaded) =
+                    serde_json::from_slice::<Vec<contextra::router::SlmProfile>>(&bytes)
+                {
+                    router_config.profiles = loaded;
+                }
+            }
+            router_config.profiles_path = Some(path);
+        }
+    }
+
     let db = Arc::new(Contextra::open(&db_path).await?);
+    let routing = setup_routing(&db, &router_config).await?;
     let embedder = config.build_provider()?;
-    let server = Arc::new(McpServer::from_env(db, embedder)?);
+    let server = Arc::new(
+        McpServer::with_write_permission(db, embedder, allow_write)?.with_routing(routing),
+    );
 
     tracing::info!(
         db_path,

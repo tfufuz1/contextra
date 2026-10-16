@@ -8,7 +8,18 @@ pub mod drift;
 pub mod explain;
 pub mod fusion;
 
-pub use calibration::{IsotonicCalibrator, PlattScaler};
+#[cfg(feature = "dibud")]
+pub mod dibud;
+
+pub use calibration::{
+    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
+    PlattScaler,
+};
+#[cfg(feature = "dibud")]
+pub use dibud::{
+    fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,
+    DiBudStep, FusionBudget,
+};
 pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
 pub use fusion::{
@@ -17,6 +28,6 @@ pub use fusion::{
     weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
     weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
     GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, RerankStage, ResonanceConfig, SearchResult, SignalCalibrationContext,
-    SignalContribution, SignalKind,
+    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
+    SignalKind,
 };

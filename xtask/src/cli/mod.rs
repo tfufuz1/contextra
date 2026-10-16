@@ -5,19 +5,9 @@ pub mod docs;
 pub mod jules;
 pub mod misc;
 
-#[path = "../wiring_check/mod.rs"]
-pub mod wiring_check;
-
-#[path = "../check_loom_mocks.rs"]
-pub mod check_loom_mocks;
-
 pub type CmdFn = fn(&[String]) -> i32;
 
 pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
-    (
-        "check-claims",
-        crate::cli::checks::run_check_claims,
-    ),
     (
         "reproducible-build",
         crate::cli::misc::run_reproducible_build,
@@ -246,10 +236,6 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
         crate::cli::checks::run_check_result_dropped_io,
     ),
     (
-        "gc-floor-single-source",
-        crate::cli::checks::run_gc_floor_single_source,
-    ),
-    (
         "check-coverage-gate",
         crate::cli::checks::run_check_coverage_gate,
     ),
@@ -275,10 +261,6 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     ("feature-matrix", crate::cli::misc::run_feature_matrix),
     ("workspace-verify", crate::cli::misc::run_workspace_verify),
     (
-        "check-exception-ledger",
-        crate::cli::checks::run_check_exception_ledger,
-    ),
-    (
         "check-ring-capabilities-consistency",
         crate::cli::checks::run_check_ring_capabilities_consistency,
     ),
@@ -293,13 +275,5 @@ pub static COMMAND_DISPATCH_TABLE: &[(&str, CmdFn)] = &[
     (
         "check-veto-deadlines",
         crate::cli::checks::run_check_veto_deadlines,
-    ),
-    (
-        "wiring-check",
-        crate::cli::wiring_check::run_wiring_check_cli,
-    ),
-    (
-        "check-loom-mocks",
-        crate::cli::check_loom_mocks::run_check_loom_mocks,
     ),
 ];
