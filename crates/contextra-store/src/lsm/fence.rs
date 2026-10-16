@@ -1,20 +1,17 @@
 // FILE-CONTEXT
-// STAND: 2026-10-14
-// ZWECK: Scope-weite und präfixbasierte Schreibsperre (ErasureGate & ErasureFence) zur Blockierung von Schreibvorgängen während der Purge-Compaction.
-// INVARIANTEN: Lock-Hierarchie einhalten, keine Locks über .await, loom-kompatibel.
+// STAND: 2026-10-16
+// ZWECK: Scope-weite und präfixbasierte Schreibsperre (ErasureGate & ErasureFence) zur Blockierung von Schreibvorgängen während der Purge-Compaction (§3, §5, ADR-V2-1).
+// INVARIANTEN: Lock-Hierarchie einhalten, keine Locks über .await, hot path ohne RMW/Sperren.
 
 use std::collections::HashSet;
-use std::time::Duration;
 
 #[cfg(loom)]
-use loom::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use loom::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 #[cfg(loom)]
 use loom::sync::{Arc, Mutex, RwLock};
 
 #[cfg(not(loom))]
-use parking_lot::Mutex;
-#[cfg(not(loom))]
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 #[cfg(not(loom))]
 use std::sync::Arc;
 
@@ -34,15 +31,19 @@ pub enum FenceError {
     CollectionDropping,
     #[error("Fence scope conflict detected")]
     Conflict,
+    #[error("Blocking lock attempted within async runtime context")]
+    AsyncRuntimeBlockingAttempt,
 }
 
+/// Registered prefix fence entry with reference counter (F-2/F-3).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrefixFence {
     pub purge_id: u64,
     pub prefixes: Vec<Vec<u8>>,
+    pub ref_count: u32,
 }
 
-/// Low-level gate managing atomic active flag, RCU prefix fence table, and inflight write batch tracking.
+/// Gate managing atomic active flag and RCU prefix fence table without inflight/RMW counters on hot paths (ADR-V2-1 #3 & #5).
 #[derive(Debug)]
 pub struct ErasureGate {
     active: AtomicBool,
@@ -50,9 +51,6 @@ pub struct ErasureGate {
     table: arc_swap::ArcSwap<Vec<PrefixFence>>,
     #[cfg(loom)]
     table: RwLock<Vec<PrefixFence>>,
-    inflight: AtomicU32,
-    drained: tokio::sync::Notify,
-    install: Mutex<()>,
 }
 
 impl ErasureGate {
@@ -63,9 +61,6 @@ impl ErasureGate {
             table: arc_swap::ArcSwap::new(Arc::new(Vec::new())),
             #[cfg(loom)]
             table: RwLock::new(Vec::new()),
-            inflight: AtomicU32::new(0),
-            drained: tokio::sync::Notify::new(),
-            install: Mutex::new(()),
         }
     }
 
@@ -75,28 +70,7 @@ impl ErasureGate {
         self.active.load(Ordering::Acquire)
     }
 
-    /// Returns current count of inflight write batches in progress.
-    #[inline]
-    pub fn inflight_count(&self) -> u32 {
-        self.inflight.load(Ordering::Acquire)
-    }
-
-    /// Increments inflight batch counter.
-    #[inline]
-    pub fn inc_inflight(&self) {
-        self.inflight.fetch_add(1, Ordering::SeqCst);
-    }
-
-    /// Decrements inflight batch counter and notifies drain waiters if count reaches zero.
-    #[inline]
-    pub fn dec_inflight(&self) {
-        let prev = self.inflight.fetch_sub(1, Ordering::SeqCst);
-        if prev == 1 && self.is_active() {
-            self.drained.notify_waiters();
-        }
-    }
-
-    /// Checks if a key violates any active prefix fence.
+    /// Checks if a key violates any active prefix fence (HOT PATH: single Acquire-load of active).
     pub fn check_write_allowed(&self, key: &[u8]) -> Result<(), FenceError> {
         if !self.is_active() {
             return Ok(());
@@ -130,127 +104,78 @@ impl ErasureGate {
         Ok(())
     }
 
-    /// Helper to test prefix overlap.
-    fn prefixes_overlap(p1: &[u8], p2: &[u8]) -> bool {
-        if p1.is_empty() || p2.is_empty() {
-            return true;
-        }
-        p1.starts_with(p2) || p2.starts_with(p1)
-    }
-
-    /// Installs a new prefix fence, drains inflight write batches until inflight == 0.
-    pub async fn acquire_fence(
-        &self,
-        purge_id: u64,
-        prefixes: Vec<Vec<u8>>,
-        timeout: Duration,
-    ) -> Result<(), FenceError> {
-        #[cfg(not(loom))]
-        let _guard = self.install.lock();
-        #[cfg(loom)]
-        let _guard = self.install.lock().unwrap();
-
-        if prefixes.is_empty() {
-            return Err(FenceError::Conflict);
-        }
-
-        // Validate internal overlaps in requested prefixes
-        for i in 0..prefixes.len() {
-            for j in (i + 1)..prefixes.len() {
-                if Self::prefixes_overlap(&prefixes[i], &prefixes[j]) {
-                    return Err(FenceError::Conflict);
-                }
-            }
-        }
-
-        // Validate overlaps against existing prefix fences
-        #[cfg(not(loom))]
-        {
-            let current_table = self.table.load();
-            for existing in current_table.iter() {
-                for ex_p in &existing.prefixes {
-                    for new_p in &prefixes {
-                        if Self::prefixes_overlap(ex_p, new_p) {
-                            return Err(FenceError::Conflict);
-                        }
-                    }
-                }
-            }
-        }
-        #[cfg(loom)]
-        {
-            if let Ok(current_table) = self.table.read() {
-                for existing in current_table.iter() {
-                    for ex_p in &existing.prefixes {
-                        for new_p in &prefixes {
-                            if Self::prefixes_overlap(ex_p, new_p) {
-                                return Err(FenceError::Conflict);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Install new fence into table
+    /// Installs or updates prefix fence entry under caller synchronization (F-1, F-2/F-3).
+    /// Overlapping or nested prefixes form a union with reference counts rather than returning Conflict.
+    pub fn install_prefix_fence(&self, purge_id: u64, prefixes: Vec<Vec<u8>>) {
         #[cfg(not(loom))]
         {
             let current_vec: &Vec<PrefixFence> = &**self.table.load();
             let mut new_table = current_vec.clone();
-            new_table.push(PrefixFence {
-                purge_id,
-                prefixes: prefixes.clone(),
-            });
+
+            let mut matched = false;
+            for pf in new_table.iter_mut() {
+                if pf.purge_id == purge_id || pf.prefixes == prefixes {
+                    pf.ref_count += 1;
+                    matched = true;
+                    break;
+                }
+            }
+
+            if !matched {
+                new_table.push(PrefixFence {
+                    purge_id,
+                    prefixes,
+                    ref_count: 1,
+                });
+            }
+
             self.table.store(Arc::new(new_table));
         }
+
         #[cfg(loom)]
         {
             if let Ok(mut table) = self.table.write() {
-                table.push(PrefixFence {
-                    purge_id,
-                    prefixes: prefixes.clone(),
-                });
+                let mut matched = false;
+                for pf in table.iter_mut() {
+                    if pf.purge_id == purge_id || pf.prefixes == prefixes {
+                        pf.ref_count += 1;
+                        matched = true;
+                        break;
+                    }
+                }
+                if !matched {
+                    table.push(PrefixFence {
+                        purge_id,
+                        prefixes,
+                        ref_count: 1,
+                    });
+                }
             }
         }
 
         self.active.store(true, Ordering::Release);
-
-        // Drain phase: wait until inflight == 0
-        let start = std::time::Instant::now();
-        loop {
-            if self.inflight.load(Ordering::Acquire) == 0 {
-                break;
-            }
-
-            if start.elapsed() >= timeout {
-                // Timeout during Drain: revert fence installation
-                self.release_fence_internal(purge_id);
-                return Err(FenceError::Conflict);
-            }
-
-            // Wait on notification or brief sleep
-            let _ = tokio::time::timeout(Duration::from_millis(2), self.drained.notified()).await;
-        }
-
-        Ok(())
     }
 
-    /// Releases a registered prefix fence by purge_id.
-    pub fn release_fence(&self, purge_id: u64) {
-        #[cfg(not(loom))]
-        let _guard = self.install.lock();
-        #[cfg(loom)]
-        let _guard = self.install.lock().unwrap();
-
-        self.release_fence_internal(purge_id);
-    }
-
-    fn release_fence_internal(&self, purge_id: u64) {
+    /// Removes or decrements reference count of registered prefix fence by purge_id or prefixes (F-5).
+    pub fn release_prefix_fence_internal(&self, purge_id: u64, prefixes: &[Vec<u8>]) {
         #[cfg(not(loom))]
         {
             let current_vec: &Vec<PrefixFence> = &**self.table.load();
             let mut new_table = current_vec.clone();
-            new_table.retain(|f| f.purge_id != purge_id);
+
+            if let Some(pos) = new_table
+                .iter()
+                .position(|f| f.purge_id == purge_id || f.prefixes == prefixes)
+            {
+                if new_table[pos].ref_count > 1 {
+                    new_table[pos].ref_count -= 1;
+                } else {
+                    new_table.remove(pos);
+                }
+            } else {
+                new_table.retain(|f| f.purge_id != purge_id);
+            }
+
             let is_empty = new_table.is_empty();
             self.table.store(Arc::new(new_table));
             if is_empty {
@@ -261,7 +186,19 @@ impl ErasureGate {
         #[cfg(loom)]
         {
             if let Ok(mut table) = self.table.write() {
-                table.retain(|f| f.purge_id != purge_id);
+                if let Some(pos) = table
+                    .iter()
+                    .position(|f| f.purge_id == purge_id || f.prefixes == prefixes)
+                {
+                    if table[pos].ref_count > 1 {
+                        table[pos].ref_count -= 1;
+                    } else {
+                        table.remove(pos);
+                    }
+                } else {
+                    table.retain(|f| f.purge_id != purge_id);
+                }
+
                 if table.is_empty() {
                     self.active.store(false, Ordering::Release);
                 }
@@ -273,24 +210,6 @@ impl ErasureGate {
 impl Default for ErasureGate {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// RAII Guard that increments inflight counter on creation and decrements on drop.
-pub struct InflightGuard<'a> {
-    gate: &'a ErasureGate,
-}
-
-impl<'a> InflightGuard<'a> {
-    pub fn new(gate: &'a ErasureGate) -> Self {
-        gate.inc_inflight();
-        Self { gate }
-    }
-}
-
-impl<'a> Drop for InflightGuard<'a> {
-    fn drop(&mut self) {
-        self.gate.dec_inflight();
     }
 }
 
@@ -317,7 +236,7 @@ impl<'a> FenFenceGuard<'a> {
 
 impl<'a> Drop for FenFenceGuard<'a> {
     fn drop(&mut self) {
-        self.fence.release_prefix_fence(self.id);
+        self.fence.release_prefix_fence(self.id, &self.prefixes);
     }
 }
 
@@ -342,6 +261,10 @@ pub struct ErasureFence {
     locked_doc_ids: parking_lot::RwLock<HashSet<Vec<u8>>>,
     scope_write_seq: AtomicU64,
     next_fence_id: AtomicU64,
+    #[cfg(not(loom))]
+    pub commit_mutex: tokio::sync::Mutex<()>,
+    #[cfg(loom)]
+    pub commit_mutex: Mutex<()>,
 }
 
 impl ErasureFence {
@@ -353,6 +276,10 @@ impl ErasureFence {
             locked_doc_ids: parking_lot::RwLock::new(HashSet::new()),
             scope_write_seq: AtomicU64::new(0),
             next_fence_id: AtomicU64::new(1),
+            #[cfg(not(loom))]
+            commit_mutex: tokio::sync::Mutex::new(()),
+            #[cfg(loom)]
+            commit_mutex: Mutex::new(()),
         }
     }
 
@@ -370,7 +297,10 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
-        self.gate.check_write_allowed(key)?;
+        if let Err(e) = self.gate.check_write_allowed(key) {
+            self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+            return Err(e);
+        }
 
         let locked_docs = self.locked_doc_ids.read();
         if locked_docs.contains(key) {
@@ -383,6 +313,16 @@ impl ErasureFence {
 
     /// Activates global scope-wide write block (`CollectionDropping`).
     pub fn acquire_scope_fence(&self) {
+        #[cfg(not(loom))]
+        let _commit_guard = if tokio::runtime::Handle::try_current().is_ok() {
+            self.commit_mutex.try_lock().ok()
+        } else {
+            Some(self.commit_mutex.blocking_lock())
+        };
+
+        #[cfg(loom)]
+        let _commit_guard = self.commit_mutex.lock().ok();
+
         let mut state = self.scope_state.write();
         *state = FenceScopeState::CollectionDropping;
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
@@ -390,12 +330,39 @@ impl ErasureFence {
 
     /// Deactivates global scope-wide write block back to `Active`.
     pub fn release_scope_fence(&self) {
+        #[cfg(not(loom))]
+        let _commit_guard = if tokio::runtime::Handle::try_current().is_ok() {
+            self.commit_mutex.try_lock().ok()
+        } else {
+            Some(self.commit_mutex.blocking_lock())
+        };
+
+        #[cfg(loom)]
+        let _commit_guard = self.commit_mutex.lock().ok();
+
         let mut state = self.scope_state.write();
         *state = FenceScopeState::Active;
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// Directly installs a prefix fence assuming external caller holding `commit_mutex`.
+    pub fn acquire_scope_fence_for_locked(&self, prefix: Vec<u8>) -> u64 {
+        let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
+        self.gate.install_prefix_fence(id, vec![prefix]);
+        self.scope_write_seq.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// Directly releases a prefix fence assuming external caller holding `commit_mutex`.
+    pub fn release_scope_fence_for_locked(&self, prefix: &[u8]) {
+        self.gate
+            .release_prefix_fence_internal(0, &[prefix.to_vec()]);
+        self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+    }
+
     /// Acquires a scope fence for specific key prefixes.
+    /// F-1: Fence-Erwerb nimmt SELBST den commit_mutex. Dadurch ist der Erwerb die Drain-Barriere:
+    /// Alle früher zugelassenen Batches sind bei der Rückkehr angewendet.
+    /// Ruft jemand ihn aus einem Async-Worker auf, darf es NICHT panicken: liefere AsyncRuntimeBlockingAttempt.
     pub fn acquire_scope_fence_for(
         &self,
         prefixes: Vec<Vec<u8>>,
@@ -405,18 +372,20 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
+        #[cfg(not(loom))]
+        if tokio::runtime::Handle::try_current().is_ok() {
+            return Err(FenceError::AsyncRuntimeBlockingAttempt);
+        }
+
+        #[cfg(not(loom))]
+        let _commit_guard = self.commit_mutex.blocking_lock();
+        #[cfg(loom)]
+        let _commit_guard = self.commit_mutex.lock().unwrap();
+
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
-        // Use blocking handle for sync caller on acquire_fence
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.gate
-                    .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
-                    .await
-            })
-        })?;
-
+        self.gate.install_prefix_fence(id, prefixes.clone());
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -427,9 +396,19 @@ impl ErasureFence {
         })
     }
 
-    /// Helper to release a registered prefix fence by ID.
-    fn release_prefix_fence(&self, id: u64) {
-        self.gate.release_fence(id);
+    /// Helper to release a registered prefix fence by ID and prefixes under commit_mutex lock.
+    fn release_prefix_fence(&self, id: u64, prefixes: &[Vec<u8>]) {
+        #[cfg(not(loom))]
+        let _commit_guard = if tokio::runtime::Handle::try_current().is_ok() {
+            self.commit_mutex.try_lock().ok()
+        } else {
+            Some(self.commit_mutex.blocking_lock())
+        };
+
+        #[cfg(loom)]
+        let _commit_guard = self.commit_mutex.lock().ok();
+
+        self.gate.release_prefix_fence_internal(id, prefixes);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 

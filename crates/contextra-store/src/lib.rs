@@ -33,6 +33,7 @@ pub mod erasure_ledger;
 #[cfg(not(loom))]
 pub mod format;
 pub mod kv;
+#[cfg(not(loom))]
 pub mod restore_guard;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -56,9 +57,8 @@ pub mod wal;
 
 // TODO(contextra-plan): LSM/WAL Persistenz-Engine Architekturentwurf & Risikobetrachtung [ref:eigenbau-lsm-wal]
 // 1. Disk-Physik (fsync-Reihenfolge): Strikte Durchsetzung des atomaren Sequenzmusters `.tmp` Schreiben -> Datei `fsync` -> Atomares `rename` -> Parent Directory `fsync`. Verhindert TOCTOU-Races und unvollständige SSTable/Manifest-Dateien nach abrupten Crashs.
-// 2. Group-Commit Scope Reduction: `commit_mutex` wird nur während der Batch-Vorbereitung und Sequenzzuordnung gehalten, vor physischen Disk-I/O-Operationen (`wal.append_batch`) freigegeben und erst zur MemTable-Aktualisierung/Sichtbarkeits-Erweiterung erneut akquiriert. Reduziert Contention und Latenzspitzen unter hoher Schreiblast.
-// 3. HMAC-Chains: Fortlaufende V3 HMAC-Kettenverifizierung über WAL-Segmente hinweg in Kombination mit der Manifest High-Water-Mark. Bietet Schutz vor unbeabsichtigter WAL-Kürzung (INV-WAL-TRUNCATION-1) und Manipulationen.
-// 4. rollback_to_tx: Rollback-Mechanismus für uncommitted WAL- und MemTable-Einträge bei Abbruch oder Transaktionsfehlern, inklusive korrekter Speicherfreigabe im MemTable-Budget und Wiederherstellung des konsistenten LsmState.
+// 2. HMAC-Chains: Fortlaufende V3 HMAC-Kettenverifizierung über WAL-Segmente hinweg in Kombination mit der Manifest High-Water-Mark. Bietet Schutz vor unbeabsichtigter WAL-Kürzung (INV-WAL-TRUNCATION-1) und Manipulationen.
+// 3. rollback_to_tx: Rollback-Mechanismus für uncommitted WAL- und MemTable-Einträge bei Abbruch oder Transaktionsfehlern, inklusive korrekter Speicherfreigabe im MemTable-Budget und Wiederherstellung des konsistenten LsmState.
 
 #[cfg(not(loom))]
 pub use compaction::{
@@ -79,4 +79,5 @@ pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+#[cfg(not(loom))]
 pub use restore_guard::StreamingRestoreGuard;
