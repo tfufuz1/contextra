@@ -190,12 +190,23 @@ pub fn create_embedding_provider(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(any(test, feature = "mock-providers"))]
         "mock" => {
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
+        #[cfg(not(any(test, feature = "mock-providers")))]
+        "mock" => Err(ContextraError::CapabilityUnsupported {
+            capability: "mock embedding provider".to_string(),
+            reason: "contextra-mcp was built without the 'mock-providers' feature".to_string(),
+        }),
+        #[cfg(any(test, feature = "mock-providers"))]
         other => Err(ContextraError::InvalidInput(format!(
             "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', 'candle', or 'mock'."
+        ))),
+        #[cfg(not(any(test, feature = "mock-providers")))]
+        other => Err(ContextraError::InvalidInput(format!(
+            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', or 'candle'."
         ))),
     }
 }
@@ -320,12 +331,23 @@ pub fn create_llm_text_generator(
                 reason: "contextra-mcp was built without the 'candle' feature".to_string(),
             })
         }
+        #[cfg(any(test, feature = "mock-providers"))]
         "mock" => {
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
+        #[cfg(not(any(test, feature = "mock-providers")))]
+        "mock" => Err(ContextraError::CapabilityUnsupported {
+            capability: "mock LLM provider".to_string(),
+            reason: "contextra-mcp was built without the 'mock-providers' feature".to_string(),
+        }),
+        #[cfg(any(test, feature = "mock-providers"))]
         other => Err(ContextraError::InvalidInput(format!(
             "Unknown LLM provider '{other}'. Expected 'ollama', 'candle', or 'mock'."
+        ))),
+        #[cfg(not(any(test, feature = "mock-providers")))]
+        other => Err(ContextraError::InvalidInput(format!(
+            "Unknown LLM provider '{other}'. Expected 'ollama' or 'candle'."
         ))),
     }
 }
@@ -378,9 +400,11 @@ impl RouterConfig {
 }
 
 /// Fallback Mock LLM Text Generator.
+#[cfg(any(test, feature = "mock-providers"))]
 #[derive(Debug, Clone, Default)]
 pub struct MockLlmGenerator;
 
+#[cfg(any(test, feature = "mock-providers"))]
 impl LlmTextGenerator for MockLlmGenerator {
     fn generate<'a>(
         &'a self,
