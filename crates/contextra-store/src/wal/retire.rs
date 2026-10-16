@@ -141,12 +141,7 @@ pub async fn retire_segments_with_stream<S: WalDirStream>(
                 (list, max_tx, max_seq)
             }
             Err(err) => {
-                tracing::warn!(
-                    wal_path = %path.display(),
-                    error = %err,
-                    "Failed replay on WAL segment during retirement check"
-                );
-                continue;
+                return Err(err);
             }
         };
 

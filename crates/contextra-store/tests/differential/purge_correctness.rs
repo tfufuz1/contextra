@@ -184,12 +184,13 @@ async fn Invariante_I1_outside_scope_snap() -> contextra_types::Result<()> {
 }
 
 // ============================================================================
-// INVARIANTE I2: Version ordering and L0 overlap
+// INVARIANTE I2: Version ordering, L0 overlap, and early empty SSTable replacement (P-2)
 // ============================================================================
 /// Invariante I2: Die Versionsreihenfolge bleibt erhalten (kein älterer Wert
-/// verdeckt einen neueren). Der Test erzwingt überlappende Bereiche in Ebene 0.
+/// verdeckt einen neueren). Der Test erzwingt überlappende Bereiche in Ebene 0
+/// sowie eine SSTable, die beim Purge vollständig leer wird, um exakte Pfad-
+/// basierte Ersetzung ohne Zuordnungsverschiebung zu beweisen (P-2/B-07).
 #[tokio::test]
-#[ignore = "BEFUND-D01: Purge as_of_tx filter missing in LsmStorage::purge_keys, Fix-Karte offen"]
 async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
@@ -199,27 +200,40 @@ async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Res
     let storage = LsmStorage::open(config).await?;
     let mut model = PurgeReferenceModel::new();
 
-    // Flush 1: L0 SSTable 1 containing key_a (seq 10) and key_b (seq 20)
-    storage.put(TxId(10), b"key_a", b"val_a_v1").await?;
-    model.put(10, b"key_a".to_vec(), b"val_a_v1".to_vec());
-    storage.put(TxId(20), b"key_b", b"val_b_v1").await?;
-    model.put(20, b"key_b".to_vec(), b"val_b_v1".to_vec());
-    storage.commit(TxId(10)).await?;
-    storage.commit(TxId(20)).await?;
+    // Flush 1: SSTable 1 (L0) contains ONLY purgeable keys (becomes empty during purge)
+    storage.put(TxId(1), b"purge:earlier_1", b"val_purge_1").await?;
+    storage.commit(TxId(1)).await?;
+    let s1 = storage.last_applied_seq();
+    model.put(s1, b"purge:earlier_1".to_vec(), b"val_purge_1".to_vec());
     StorageEngine::flush(&storage).await?;
 
-    // Flush 2: Overlapping L0 SSTable 2 containing key_a (seq 30) and key_b (seq 40)
-    storage.put(TxId(30), b"key_a", b"val_a_v2").await?;
-    model.put(30, b"key_a".to_vec(), b"val_a_v2".to_vec());
-    storage.put(TxId(40), b"key_b", b"val_b_v2").await?;
-    model.put(40, b"key_b".to_vec(), b"val_b_v2".to_vec());
-    storage.commit(TxId(30)).await?;
-    storage.commit(TxId(40)).await?;
+    // Flush 2: SSTable 2 (L0) contains key_a (v1) and key_b (v1)
+    storage.put(TxId(2), b"key_a", b"val_a_v1").await?;
+    storage.commit(TxId(2)).await?;
+    let s2 = storage.last_applied_seq();
+    model.put(s2, b"key_a".to_vec(), b"val_a_v1".to_vec());
+
+    storage.put(TxId(3), b"key_b", b"val_b_v1").await?;
+    storage.commit(TxId(3)).await?;
+    let s3 = storage.last_applied_seq();
+    model.put(s3, b"key_b".to_vec(), b"val_b_v1".to_vec());
     StorageEngine::flush(&storage).await?;
 
-    // Purge key_a up to tx 15 (purges v1 of key_a at seq 10, keeps v2 at seq 30)
-    let as_of_tx = 15u64;
-    let scope = PurgeScope::Keys(vec![b"key_a".to_vec()]);
+    // Flush 3: SSTable 3 (L0) contains key_a (v2) and key_b (v2) - overlapping
+    storage.put(TxId(4), b"key_a", b"val_a_v2").await?;
+    storage.commit(TxId(4)).await?;
+    let s4 = storage.last_applied_seq();
+    model.put(s4, b"key_a".to_vec(), b"val_a_v2".to_vec());
+
+    storage.put(TxId(5), b"key_b", b"val_b_v2").await?;
+    storage.commit(TxId(5)).await?;
+    let s5 = storage.last_applied_seq();
+    model.put(s5, b"key_b".to_vec(), b"val_b_v2".to_vec());
+    StorageEngine::flush(&storage).await?;
+
+    // Purge prefix "purge:" and key_a up to s2
+    let as_of_tx = s2;
+    let scope = PurgeScope::Prefixes(vec![b"purge:".to_vec(), b"key_a".to_vec()]);
 
     let report = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
     model.purge(&scope, as_of_tx);
@@ -228,18 +242,17 @@ async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Res
         let _ = contextra_durable_fs::durable_remove(file);
     }
 
-    // Verify MVCC point reads for key_a and key_b across snapshots
-    let val_a_snap25 = storage.get_at_seq(b"key_a", 25).await?.map(|b| b.to_vec());
-    let model_a_snap25 = model.get_at_seq(b"key_a", 25);
-    assert_eq!(val_a_snap25, model_a_snap25);
+    // Verify MVCC point reads for key_a, key_b, and purge:earlier_1
+    let val_purge = storage.get_at_seq(b"purge:earlier_1", s5 + 1).await?.map(|b| b.to_vec());
+    assert_eq!(val_purge, None, "Early empty SSTable keys must be purged");
 
-    let val_a_snap35 = storage.get_at_seq(b"key_a", 35).await?.map(|b| b.to_vec());
-    let model_a_snap35 = model.get_at_seq(b"key_a", 35);
-    assert_eq!(val_a_snap35, model_a_snap35);
+    let val_a_s5 = storage.get_at_seq(b"key_a", s5 + 1).await?.map(|b| b.to_vec());
+    let model_a_s5 = model.get_at_seq(b"key_a", s5 + 1);
+    assert_eq!(val_a_s5, model_a_s5, "Newer version in subsequent SSTable must remain intact");
 
-    let val_b_snap45 = storage.get_at_seq(b"key_b", 45).await?.map(|b| b.to_vec());
-    let model_b_snap45 = model.get_at_seq(b"key_b", 45);
-    assert_eq!(val_b_snap45, model_b_snap45);
+    let val_b_s5 = storage.get_at_seq(b"key_b", s5 + 1).await?.map(|b| b.to_vec());
+    let model_b_s5 = model.get_at_seq(b"key_b", s5 + 1);
+    assert_eq!(val_b_s5, model_b_s5, "Unrelated key_b in overlapping L0 must remain intact");
 
     Ok(())
 }
@@ -456,7 +469,6 @@ proptest! {
         .. ProptestConfig::default()
     })]
     #[test]
-    #[ignore = "BEFUND-D01: Purge as_of_tx filter missing in LsmStorage::purge_keys, Fix-Karte offen"]
     fn purge_correctness_proptest(
         ops in prop::collection::vec(diff_op_strategy(), 1..=30)
     ) {
@@ -478,25 +490,29 @@ proptest! {
                         tx_counter += 1;
                         storage.put(TxId(tx), &k, &v).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
                         storage.commit(TxId(tx)).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
-                        model.put(tx, k, v);
+                        let seq = storage.last_applied_seq();
+                        model.put(seq, k, v);
                     }
                     DifferentialOp::Delete(k) => {
                         let tx = tx_counter;
                         tx_counter += 1;
                         storage.delete(TxId(tx), &k).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
                         storage.commit(TxId(tx)).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
-                        model.delete(tx, k);
+                        let seq = storage.last_applied_seq();
+                        model.delete(seq, k);
                     }
-                    DifferentialOp::GetAtSeq(k, seq) => {
-                        let lsm_val = storage.get_at_seq(&k, seq).await.map_err(|e| TestCaseError::fail(e.to_string()))?.map(|b| b.to_vec());
-                        let model_val = model.get_at_seq(&k, seq);
+                    DifferentialOp::GetAtSeq(k, raw_seq) => {
+                        let cur_seq = storage.last_applied_seq();
+                        let query_seq = raw_seq.min(cur_seq.max(1));
+                        let lsm_val = storage.get_at_seq(&k, query_seq).await.map_err(|e| TestCaseError::fail(e.to_string()))?.map(|b| b.to_vec());
+                        let model_val = model.get_at_seq(&k, query_seq);
                         prop_assert_eq!(lsm_val, model_val, "Divergence on GetAtSeq for key {:?}", k);
                     }
                     DifferentialOp::PurgePrefix(prefix) => {
-                        let as_of_tx = tx_counter;
+                        let as_of_seq = storage.last_applied_seq();
                         let scope = PurgeScope::Prefixes(vec![prefix]);
-                        let report = storage.purge_keys(scope.clone(), as_of_tx, None).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
-                        model.purge(&scope, as_of_tx);
+                        let report = storage.purge_keys(scope.clone(), as_of_seq, None).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        model.purge(&scope, as_of_seq);
                         for file in &report.obsolete_files {
                             let _ = contextra_durable_fs::durable_remove(file);
                         }
@@ -508,7 +524,7 @@ proptest! {
             }
 
             // Compare state at latest sequence
-            let snap_seq = tx_counter;
+            let snap_seq = storage.last_applied_seq();
             let model_state = model.state_at_seq(snap_seq);
             for (k, expected_v) in model_state {
                 let actual_v = storage.get_at_seq(&k, snap_seq).await.map_err(|e| TestCaseError::fail(e.to_string()))?.map(|b| b.to_vec());

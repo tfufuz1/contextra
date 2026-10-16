@@ -9,6 +9,7 @@ use crate::manifest::ManifestEntry;
 use crate::sstable::{SstableBuilder, SstableReader};
 use contextra_ports::erasure::PurgeError;
 use contextra_ports::StorageEngine;
+use contextra_types::TOMBSTONE_BIT;
 use std::sync::Arc;
 
 impl LsmStorage {
@@ -34,7 +35,7 @@ impl LsmStorage {
         // 2. Active Memtable Flush to SSTable first
         StorageEngine::flush(self)
             .await
-            .map_err(|_| PurgeError::CompactionBusy)?;
+            .map_err(|e| PurgeError::FlushFailed(e.to_string()))?;
 
         // Snapshot existing sstables list under read lock
         let snapshot_sstables = {
@@ -42,76 +43,34 @@ impl LsmStorage {
             sst_guard.clone()
         };
 
-        // Estimate total bytes of affected SSTables for space check
-        let total_bytes: u64 = snapshot_sstables
-            .iter()
-            .map(|sst| sst.metadata().file_size)
-            .sum();
-
-        // 3. Disk space probe check (L8 fix)
-        // Probe error yields ProbeFailed. Some(0) yields InsufficientDiskSpace.
-        // None probe means unknown free space: conservative execution (1 SSTable at a time).
-        let probe_res = match space_probe {
-            Some(p) => p.available_bytes().map_err(|e| PurgeError::ProbeFailed(e.0))?,
-            None => None,
-        };
-
-        let needed_space = total_bytes.max(1024 * 1024);
-        match probe_res {
-            Some(0) => {
+        // Select candidate SSTables and verify disk space strictly over candidates (P-6)
+        let sstables_to_rewrite = match crate::compaction::purge_select::select_purge_candidates(
+            &snapshot_sstables,
+            &scope,
+            space_probe,
+        ) {
+            Ok(candidates) => candidates,
+            Err(crate::compaction::purge_filter::PurgeBlocked::InsufficientDiskSpace { needed, free }) => {
                 return Err(PurgeError::InsufficientDiskSpace {
-                    needed: needed_space,
-                    available: Some(0),
+                    needed,
+                    available: Some(free),
                 });
             }
-            Some(free_space) => {
-                if free_space < needed_space {
-                    return Err(PurgeError::InsufficientDiskSpace {
-                        needed: needed_space,
-                        available: Some(free_space),
-                    });
-                }
+            Err(crate::compaction::purge_filter::PurgeBlocked::ProbeFailed(msg)) => {
+                return Err(PurgeError::ProbeFailed(msg));
             }
-            None => {
-                // Unknown free space: permitted to start, candidate check per file
+            Err(crate::compaction::purge_filter::PurgeBlocked::ActiveSnapshot { min_seq }) => {
+                return Err(PurgeError::SnapshotPinned {
+                    oldest_pin_age: as_of_tx.saturating_sub(min_seq),
+                });
             }
-        }
-
-        let mut sstables_to_rewrite = Vec::new();
-
-        // Identify SSTables that contain keys matching scope
-        for sst in &snapshot_sstables {
-            let mut stream = sst
-                .stream()
-                .await
-                .map_err(|e| PurgeError::ReadError {
-                    file: sst.file_path().to_string_lossy().to_string(),
-                    offset: 0,
-                    source_details: e.to_string(),
-                })?;
-            let mut matches = false;
-            loop {
-                match stream.next_entry().await {
-                    Ok(Some((key, _val, _seq, _tx))) => {
-                        if scope.matches_key(&key) {
-                            matches = true;
-                            break;
-                        }
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        return Err(PurgeError::ReadError {
-                            file: sst.file_path().to_string_lossy().to_string(),
-                            offset: 0,
-                            source_details: e.to_string(),
-                        });
-                    }
-                }
+            Err(crate::compaction::purge_filter::PurgeBlocked::CompactionBusy) => {
+                return Err(PurgeError::CompactionBusy);
             }
-            if matches {
-                sstables_to_rewrite.push(Arc::clone(sst));
+            Err(other) => {
+                return Err(PurgeError::ProbeFailed(format!("{:?}", other)));
             }
-        }
+        };
 
         if sstables_to_rewrite.is_empty() {
             return Ok(PurgeReport {
@@ -128,8 +87,9 @@ impl LsmStorage {
         let mut sstables_replaced = 0usize;
 
         let mut manifest_entries = Vec::new();
-        let mut new_readers = Vec::new();
-        let mut replaced_old_paths = Vec::new();
+        let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
+            std::collections::HashMap::new();
+        let mut obsolete_files = Vec::new();
 
         for old_sst in &sstables_to_rewrite {
             let old_path = old_sst.file_path().to_path_buf();
@@ -142,20 +102,49 @@ impl LsmStorage {
                     source_details: e.to_string(),
                 })?;
 
-            let mut valid_entries = Vec::new();
+            let seq = self
+                .next_seq_no
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let count = self
+                .segment_counter
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let target_sst_name = format!("sst-purge-{:020}-{:06}.sst", seq, count % 1_000_000);
+            let tmp_path = db_path.join(format!("{}.tmp", target_sst_name));
+            let final_path = db_path.join(&target_sst_name);
+
+            let mut builder =
+                SstableBuilder::create_with_key_manager(&tmp_path, self.key_manager.clone())
+                    .await
+                    .map_err(|e| PurgeError::WriteError {
+                        file: tmp_path.to_string_lossy().to_string(),
+                        source_details: e.to_string(),
+                    })?;
+
+            builder.set_format_version(old_sst.format_version);
+            let mut entries_written = 0u64;
 
             loop {
                 match stream.next_entry().await {
                     Ok(Some((key, val, seq, tx))) => {
-                        if scope.matches_key(&key) {
+                        let raw_seq = seq & !TOMBSTONE_BIT;
+                        if scope.matches_key(&key) && raw_seq <= as_of_tx {
                             records_purged += 1;
                             bytes_reclaimed += (key.len() + val.len()) as u64;
                         } else {
-                            valid_entries.push((key, val, seq, tx));
+                            builder
+                                .add(&key, &val, seq, tx)
+                                .await
+                                .map_err(|e| PurgeError::WriteError {
+                                    file: tmp_path.to_string_lossy().to_string(),
+                                    source_details: e.to_string(),
+                                })?;
+                            entries_written += 1;
                         }
                     }
                     Ok(None) => break,
                     Err(e) => {
+                        drop(builder);
+                        let _ = tokio::fs::remove_file(&tmp_path).await;
                         return Err(PurgeError::ReadError {
                             file: old_sst.file_path().to_string_lossy().to_string(),
                             offset: 0,
@@ -166,44 +155,17 @@ impl LsmStorage {
             }
 
             sstables_replaced += 1;
-            replaced_old_paths.push(old_path.clone());
+            obsolete_files.push(old_path.clone());
 
-            if valid_entries.is_empty() {
+            if entries_written == 0 {
                 // SSTable became completely empty post-purge
+                drop(builder);
+                let _ = tokio::fs::remove_file(&tmp_path).await;
                 manifest_entries.push(ManifestEntry::Remove {
                     path: old_path.clone(),
                 });
+                replacement_map.insert(old_path, None);
             } else {
-                let seq = self
-                    .next_seq_no
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                let count = self
-                    .segment_counter
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                let target_sst_name = format!("sst-purge-{:020}-{:06}.sst", seq, count % 1_000_000);
-                let tmp_path = db_path.join(format!("{}.tmp", target_sst_name));
-                let final_path = db_path.join(&target_sst_name);
-
-                let mut builder =
-                    SstableBuilder::create_with_key_manager(&tmp_path, self.key_manager.clone())
-                        .await
-                        .map_err(|e| PurgeError::WriteError {
-                            file: tmp_path.to_string_lossy().to_string(),
-                            source_details: e.to_string(),
-                        })?;
-
-                builder.set_format_version(old_sst.format_version);
-
-                for (k, v, seq, tx) in &valid_entries {
-                    builder
-                        .add(k, v, *seq, *tx)
-                        .await
-                        .map_err(|e| PurgeError::WriteError {
-                            file: tmp_path.to_string_lossy().to_string(),
-                            source_details: e.to_string(),
-                        })?;
-                }
-
                 let meta = builder
                     .finish()
                     .await
@@ -241,14 +203,13 @@ impl LsmStorage {
                     source_details: e.to_string(),
                 })?;
 
-                new_readers.push(Arc::new(new_reader));
-
                 manifest_entries.push(ManifestEntry::Replace {
-                    removed: vec![old_path],
+                    removed: vec![old_path.clone()],
                     added: final_path,
                     added_max_tx: meta.max_tx_id,
                     rank: 0,
                 });
+                replacement_map.insert(old_path, Some(Arc::new(new_reader)));
             }
         }
 
@@ -258,46 +219,19 @@ impl LsmStorage {
             .await
             .map_err(|e| PurgeError::Manifest(e.to_string()))?;
 
-        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix)
+        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 / B-07 fix)
         //
-        // The read path iterates `sstables.iter().rev()` and takes the first match.
-        // Appending rewritten readers at the end would give them the highest priority,
-        // causing newer versions of non-purged keys (in other SSTables) to be shadowed
-        // by older versions carried over from the rewritten file.
-        //
-        // Fix: replace each old SSTable in-place at its original position.
+        // Replace each old SSTable in-place at its original position via explicit old_path keying.
         {
             let mut sst_guard = self.sstables.write().await;
-            let mut updated_sstables: Vec<Arc<SstableReader>> = sst_guard.clone();
-
-            // Build a map from old path → new reader
-            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
-                std::collections::HashMap::new();
-            for old_path in &replaced_old_paths {
-                // Default to None (removal) — will be overwritten if a replacement reader exists
-                replacement_map.insert(old_path.clone(), None);
-            }
-            // Associate new readers with old paths in order
-            let mut reader_iter = new_readers.into_iter();
-            for old_path in &replaced_old_paths {
-                // If we have a replacement reader, map it; otherwise the SSTable was empty
-                // and should be removed (already None in the map)
-                if let Some(new_reader) = reader_iter.next() {
-                    replacement_map.insert(old_path.clone(), Some(new_reader));
-                }
-            }
-
-            // Rebuild the list: replace in-place or remove
-            updated_sstables = updated_sstables
-                .into_iter()
+            let updated_sstables: Vec<Arc<SstableReader>> = sst_guard
+                .iter()
                 .filter_map(|sst| {
-                    let path = sst.file_path().to_path_buf();
-                    if let Some(replacement) = replacement_map.remove(&path) {
-                        // This was a replaced SSTable — substitute or remove
+                    let path = sst.file_path();
+                    if let Some(replacement) = replacement_map.remove(path) {
                         replacement
                     } else {
-                        // Not replaced — keep as-is
-                        Some(sst)
+                        Some(Arc::clone(sst))
                     }
                 })
                 .collect();
@@ -309,7 +243,7 @@ impl LsmStorage {
             records_purged,
             bytes_reclaimed,
             sstables_replaced,
-            obsolete_files: replaced_old_paths,
+            obsolete_files,
         })
     }
 }

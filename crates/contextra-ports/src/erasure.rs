@@ -333,6 +333,9 @@ pub enum PurgeError {
     /// Manifest log processing error.
     #[error("Manifest error: {0}")]
     Manifest(String),
+    /// Flush operation failed prior to purge execution.
+    #[error("Flush failed: {0}")]
+    FlushFailed(String),
     /// Free space probe failed.
     #[error("Probe failed: {0}")]
     ProbeFailed(String),
