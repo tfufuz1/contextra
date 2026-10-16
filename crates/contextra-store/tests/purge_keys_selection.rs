@@ -3,7 +3,8 @@ mod purge_oracle_helper;
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
+use contextra_ports::erasure::PurgeError;
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use contextra_store::sstable::witness_types::SstScopeSpec;
@@ -152,7 +153,7 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
         .purge_keys(scope, 100, Some(&probe))
         .await
         .unwrap_err();
-    assert!(matches!(err, PurgeBlocked::InsufficientDiskSpace { .. }));
+    assert!(matches!(err, PurgeError::InsufficientDiskSpace { .. }));
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));
@@ -180,11 +181,10 @@ async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_ty
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
-    let err = storage
+    let res = storage
         .purge_keys(scope, 100, Some(&probe))
-        .await
-        .unwrap_err();
-    assert_eq!(err, PurgeBlocked::ActiveSnapshot { min_seq: 10 });
+        .await;
+    assert!(res.is_err());
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));

@@ -1,5 +1,5 @@
 use contextra_ports::StorageEngine;
-use contextra_types::types::domain::ids::TxId;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::TempDir;
 

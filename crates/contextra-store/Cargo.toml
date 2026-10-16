@@ -75,6 +75,10 @@ futures = "0.3"
 redb = "2"
 
 [[test]]
+name = "ledger_format_ctraledg"
+path = "tests/ledger_format_ctraledg.rs"
+
+[[test]]
 name = "loom_fence"
 path = "tests/loom_fence.rs"
 
