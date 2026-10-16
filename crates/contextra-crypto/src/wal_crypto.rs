@@ -14,12 +14,6 @@
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
-/// Provides Key Management Strategy hooks.
-pub trait KmsProvider {
-    /// Retrieves the Data Encryption Key (DEK).
-    fn get_key(&self) -> Result<Vec<u8>>;
-}
-
 /// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
 ///
 /// # Invariants

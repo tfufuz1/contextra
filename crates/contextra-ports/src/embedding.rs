@@ -105,12 +105,6 @@ pub trait EmbeddingProvider: Send + Sync + 'static {
     }
 }
 
-/// Abstraction for text generation / LLM engines.
-pub trait TextGenerator: Send + Sync + 'static {
-    /// Generates text response for a given prompt.
-    fn generate_text<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, crate::Result<String>>;
-}
-
 /// Abstract contract for LLM text generation (summarization, importance evaluation, query expansion).
 pub trait LlmTextGenerator: Send + Sync + 'static {
     /// Generates text for a given prompt using an LLM.
