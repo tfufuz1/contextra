@@ -17,7 +17,7 @@ impl FileKind {
             FileKind::Blob => *b"MFBL",
             FileKind::Manifest => *b"MFMN",
             FileKind::Wal => *b"MFW3",
-            FileKind::Ledger => *b"ELDG",
+            FileKind::Ledger => *b"CTRA",
         }
     }
 

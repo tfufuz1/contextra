@@ -888,9 +888,6 @@ impl LsmStorage {
     }
 
     pub async fn rollback_to_tx(&self, target_tx: TxId) -> Result<()> {
-        if self.is_read_only() {
-            return Err(ContextraError::Storage("Store is in read-only mode".into()));
-        }
         let _commit_lock = self.commit_mutex.lock().await;
         let commit_guard = CommitGuard {
             _lock: &_commit_lock,
