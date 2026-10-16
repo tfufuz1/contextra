@@ -49,19 +49,31 @@ impl LsmStorage {
             .sum();
 
         // 3. Disk space probe check (L8 fix)
-        // None probe means "unknown", not "0 bytes free". Purge is permitted to start.
-        let needed_space = total_bytes.max(1024 * 1024);
-        let free_space_opt = match space_probe {
-            Some(p) => p.free_space_bytes(),
+        // Probe error yields ProbeFailed. Some(0) yields InsufficientDiskSpace.
+        // None probe means unknown free space: conservative execution (1 SSTable at a time).
+        let probe_res = match space_probe {
+            Some(p) => p.available_bytes().map_err(|e| PurgeError::ProbeFailed(e.0))?,
             None => None,
         };
 
-        if let Some(free_space) = free_space_opt {
-            if free_space < needed_space || free_space == 0 {
+        let needed_space = total_bytes.max(1024 * 1024);
+        match probe_res {
+            Some(0) => {
                 return Err(PurgeError::InsufficientDiskSpace {
                     needed: needed_space,
-                    available: Some(free_space),
+                    available: Some(0),
                 });
+            }
+            Some(free_space) => {
+                if free_space < needed_space {
+                    return Err(PurgeError::InsufficientDiskSpace {
+                        needed: needed_space,
+                        available: Some(free_space),
+                    });
+                }
+            }
+            None => {
+                // Unknown free space: permitted to start, candidate check per file
             }
         }
 
@@ -209,7 +221,12 @@ impl LsmStorage {
                     })?;
 
                 if let Some(parent) = final_path.parent() {
-                    let _ = crate::util::fsync_parent_dir(parent).await;
+                    crate::util::fsync_parent_dir(parent)
+                        .await
+                        .map_err(|e| PurgeError::WriteError {
+                            file: final_path.to_string_lossy().to_string(),
+                            source_details: format!("Parent fsync failed: {e}"),
+                        })?;
                 }
 
                 let new_reader = SstableReader::open_with_key_manager(

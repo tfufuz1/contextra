@@ -1,6 +1,7 @@
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
+use contextra_ports::erasure::PurgeError;
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use std::fs;
@@ -34,7 +35,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types::Result<()> {
+async fn test_purge_keys_executes_successfully() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -56,8 +57,8 @@ async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_types:
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
 
-    let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    let report = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap();
+    assert_eq!(report.records_purged, 2);
 
     Ok(())
 }
@@ -81,16 +82,18 @@ async fn test_purge_keys_active_snapshot_precedence() -> contextra_types::Result
 
     // Call purge_keys as_of_tx = 100 (min_active_seq 50 <= as_of_tx 100)
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(
-        res.unwrap_err(),
-        PurgeBlocked::ActiveSnapshot { min_seq: 50 }
-    );
+    match res {
+        Err(PurgeError::SnapshotPinned { oldest_pin_age }) => {
+            assert_eq!(oldest_pin_age, 50);
+        }
+        other => panic!("Expected SnapshotPinned, got {:?}", other),
+    }
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Result<()> {
+async fn test_purge_keys_leaves_sstable_files_untouched_on_blocked_snapshot() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -109,18 +112,21 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_types::Re
         "Expected at least one SSTable file after flush"
     );
 
+    // Pin snapshot
+    let _snapshot_guard = storage.snapshot_registry.acquire(|| 1);
+
     let probe = TestFreeSpaceProbe {
         free_bytes: Some(100 * 1024 * 1024),
     };
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    assert!(res.is_err());
 
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(
         sst_count_before, sst_count_after,
-        "SSTable file count must remain completely unchanged"
+        "SSTable file count must remain completely unchanged on blocked snapshot"
     );
 
     Ok(())
