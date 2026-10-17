@@ -84,15 +84,17 @@ macro_rules! contextra_crud_methods {
                 run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.upsert(&id_str, &v_owned, m)).map_err(contextra_err))
             }
 
-            /// Deletes a document by its ID.
+            /// Deletes a document by its ID and returns a deletion receipt dict.
             pub fn delete<'py>(
                 &self,
                 py: Python<'py>,
                 id: &pyo3::Bound<'py, pyo3::types::PyAny>,
-            ) -> PyResult<()> {
+            ) -> PyResult<PyObject> {
                 let id_str = validate_id_obj(id)?;
                 let rt = &self.runtime;
-                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.delete(&id_str)).map_err(contextra_err))
+                let receipt = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.delete(&id_str)).map_err(contextra_err))?;
+                let val = serde_json::to_value(&receipt).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                json_to_py(py, &val)
             }
 
             /// Performs semantic k-NN search over the embeddings.

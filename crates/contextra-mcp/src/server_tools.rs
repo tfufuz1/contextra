@@ -492,15 +492,25 @@ impl McpServer {
         };
 
         if let Some(id) = id_opt {
-            let col = self.db.collection(col_name).await.map_err(McpError::from)?;
-            col.delete(id).await.map_err(McpError::from)?;
+            let receipt = self.db.delete(id).await.map_err(McpError::from)?;
+
+            let proof_present = receipt.proof.is_some();
+            let proof_val = match &receipt.proof {
+                Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
+                None => None,
+            };
+            let layers_val = serde_json::to_value(&receipt.layers)
+                .map_err(|e| McpError::internal_error(e.to_string()))?;
 
             Ok(json!({
                 "ok": true,
                 "collection": col_name,
                 "id": id,
-                "proof": null,
-                "proof_scope": "collection_only"
+                "assurance_reached": receipt.assurance_reached,
+                "assurance_requested": receipt.assurance_requested,
+                "proof_present": proof_present,
+                "proof": proof_val,
+                "layers": layers_val,
             }))
         } else {
             let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
