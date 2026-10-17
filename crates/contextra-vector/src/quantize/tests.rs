@@ -167,7 +167,8 @@ fn test_quantize_dequantize_roundtrip() {
 
 #[test]
 fn test_quantized_search_no_panic() {
-    use contextra_ports::{Rng, SeededRng};
+    use contextra_ports::Rng;
+    use crate::hnsw::types::VectorSeededRng as SeededRng;
     let rng = SeededRng::new(12345);
     let next_range =
         |min: f32, max: f32| -> f32 { min + (rng.next_unit_f64() as f32) * (max - min) };
