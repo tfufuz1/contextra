@@ -41,7 +41,9 @@ pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
 pub use scrub::{
-    scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
+    scrub_and_remove, scrub_and_remove_with_injector, scrub_and_remove_with_mountinfo,
+    scrub_if_safe, scrub_if_safe_with_injector, scrub_if_safe_with_mountinfo, ScrubMethod,
+    ScrubOutcome, ScrubPolicy, ScrubReceipt, ScrubRefusal,
 };
 pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
 
@@ -351,66 +353,4 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
     injector.on_dir_fsync(parent)?;
     flush_dir(parent)?;
     Ok(())
-}
-
-/// Receipt returned upon successfully scrubbing and durably removing a file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScrubReceipt {
-    /// Total number of bytes overwritten with zeros prior to removal.
-    pub bytes_scrubbed: u64,
-}
-
-/// Overwrites file contents with zeros and durably removes the file using default no-op fault injector.
-pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
-    scrub_and_remove_with_injector(path, &NoFault)
-}
-
-/// Overwrites file contents with zeros and durably removes the file with a custom [`FaultInjector`].
-pub fn scrub_and_remove_with_injector<F: FaultInjector>(
-    path: &Path,
-    injector: &F,
-) -> std::io::Result<ScrubReceipt> {
-    let metadata = path.symlink_metadata()?;
-    let file_type = metadata.file_type();
-
-    if file_type.is_symlink() || !file_type.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is a symlink or not a regular file",
-        ));
-    }
-
-    let len = metadata.len();
-    if len > 0 {
-        let mut options = OpenOptions::new();
-        options.write(true);
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            options.share_access(7);
-        }
-
-        let mut file = options.open(path)?;
-
-        let zeros = [0u8; 64 * 1024];
-        let mut remaining = len;
-
-        while remaining > 0 {
-            let chunk_size = usize::try_from(remaining)
-                .unwrap_or(zeros.len())
-                .min(zeros.len());
-            injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
-            remaining -= chunk_size as u64;
-        }
-
-        injector.on_fsync(Some(path))?;
-        flush_file(&file, FlushKind::DataAndMetadata)?;
-    }
-
-    durable_remove_with_injector(path, injector)?;
-
-    Ok(ScrubReceipt {
-        bytes_scrubbed: len,
-    })
 }

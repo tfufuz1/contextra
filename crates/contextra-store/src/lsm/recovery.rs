@@ -590,9 +590,22 @@ impl LsmStorage {
                         files_to_remove = orphan_plan.files_to_remove.len(),
                         "Cleaning up orphaned/temp SSTable files via scrub_and_remove"
                     );
-                    crate::sstable::orphan_gc::remove_orphans(&orphan_plan).map_err(|e| {
-                        ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
-                    })?;
+                    for file_path in &orphan_plan.files_to_remove {
+                        if file_path.exists() {
+                            let receipt = contextra_durable_fs::scrub_and_remove(file_path).map_err(|e| {
+                                ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
+                            })?;
+                            tracing::debug!(
+                                path = ?file_path,
+                                method = ?receipt.method,
+                                bytes_scrubbed = receipt.bytes_scrubbed,
+                                nlink = receipt.nlink,
+                                fs_kind = %receipt.fs_kind,
+                                cow_fs = receipt.cow_fs,
+                                "Orphan file cleanup completed via scrub_and_remove"
+                            );
+                        }
+                    }
                 }
             }
             Err(e) => {
