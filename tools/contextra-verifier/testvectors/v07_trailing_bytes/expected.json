@@ -3,5 +3,5 @@
   "result": "INVALID",
   "exit_code": 2,
   "category": "FORMAT_ERROR",
-  "reason": "Trailing bytes after TLV stream"
+  "reason": "Truncated TLV payload"
 }
