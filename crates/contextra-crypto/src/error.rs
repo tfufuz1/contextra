@@ -21,6 +21,9 @@ pub enum CryptoError {
     #[error("invalid nonce or key length: {0}")]
     InvalidLength(String),
 
+    #[error("invalid length prefix: {0}")]
+    InvalidLengthPrefix(String),
+
     #[error("integrity check failed: authentication tag mismatch")]
     IntegrityViolation,
 
@@ -77,6 +80,7 @@ impl From<CryptoError> for contextra_types::ContextraError {
         match e {
             CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
             CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
+            CryptoError::InvalidLengthPrefix(msg) => Self::InvalidInput(msg),
             CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
                 format!("KV cache format version mismatch: expected {expected}, found {found}"),
             ),

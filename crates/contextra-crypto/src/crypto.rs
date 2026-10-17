@@ -432,6 +432,7 @@ impl KeyManager {
             note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use DeletionProofBuilder for v4 deletion proofs."
         )
     )]
+    // LEGACY: Historical API method signature requires 8 arguments for backward compatibility.
     #[allow(clippy::too_many_arguments)]
     pub fn create_deletion_proof_v3(
         keypair: &crate::deletion_proof::DeletionProofKeyPair,
@@ -444,6 +445,7 @@ impl KeyManager {
         graph_repair: &[crate::deletion_proof::GraphRepairAttestation],
     ) -> Result<crate::deletion_proof::DeletionProof> {
         let durability = crate::deletion_proof::DurabilityProof::new(deleted_after_tx.0);
+        // LEGACY: Invokes deprecated DeletionProof::create_v3 creation path for legacy v3 support.
         #[allow(deprecated)]
         crate::deletion_proof::DeletionProof::create_v3(
             scope,
@@ -480,6 +482,7 @@ impl KeyManager {
     ) -> Result<crate::deletion_proof::DeletionProof> {
         tracing::warn!("KeyManager::create_deletion_proof called for legacy symmetric HMAC proof; migrate to v3 Ed25519 proofs via create_deletion_proof_v3");
         let proof_key = self.derive_deletion_proof_key()?;
+        // LEGACY: Invokes deprecated DeletionProof::create creation path for legacy v2 support.
         #[allow(deprecated)]
         crate::deletion_proof::DeletionProof::create(
             scope,
@@ -554,7 +557,6 @@ impl KeyManager {
     }
 
     /// Provides access to raw key bytes for crate-internal key derivations.
-    #[allow(dead_code)]
     pub(crate) fn raw_key_bytes(&self) -> &[u8; 32] {
         if let Ok(array_ref) = <&[u8; 32]>::try_from(self.key.as_bytes()) {
             array_ref
