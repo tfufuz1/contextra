@@ -1,11 +1,139 @@
 //! Testfall für Sherman-Morrison 10^5 Random Updates Stabilität und Cholesky Reference Tolerance.
 
 #![cfg(feature = "bandit-routing")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
-use contextra_adapt::{cholesky_invert_f64, BanditImplementation, BanditProfileState};
+use contextra_adapt::{
+    BanditImplementation, BanditProfileState,
+    SHERMAN_MORRISON_REFACTORIZATION_INTERVAL,
+};
 
 #[test]
-fn test_sherman_morrison_100k_updates_stability_against_cholesky_reference() {
+fn test_sherman_morrison_long_run_auto_recovery() {
+    let d = 4;
+    let mut state = BanditProfileState::cold_start(d, 0.5);
+    state.implementation = BanditImplementation::ShermanMorrison;
+    // Numerisch anspruchsvolle Bedingungen mit wiederholten kollinearen Vektoren und Diskontierung
+    state.gamma = 0.99;
+
+    let x = vec![0.8f32, 0.8f32, 0.8f32, 0.8f32]; // Wiederholte kollineare Vektoren
+    let cost = 0.0;
+    let is_cloud = false;
+    let reward = 1.0;
+
+    let max_updates = 1500;
+
+    for i in 1..=max_updates {
+        let res = state.update(&x, reward, cost, is_cloud);
+        assert!(
+            res.is_ok(),
+            "update() call {i} failed unexpectedly: {res:?}"
+        );
+    }
+
+    assert!(
+        state.refactorizations >= 1,
+        "Expected at least 1 auto-refactorization within {max_updates} updates, but got {}",
+        state.refactorizations
+    );
+}
+
+#[test]
+fn test_sherman_morrison_well_conditioned_auto_recovery_at_interval() {
+    let d = 4;
+    let mut state = BanditProfileState::cold_start(d, 0.5);
+    state.implementation = BanditImplementation::ShermanMorrison;
+    state.gamma = 0.999;
+
+    let cost = 0.1;
+    let is_cloud = false;
+    let reward = 0.5;
+
+    // Normale, wohlkonditionierte orthogonale/rotierende Feature-Vektoren
+    for i in 1..=SHERMAN_MORRISON_REFACTORIZATION_INTERVAL {
+        let idx = (i as usize) % d;
+        let mut x = vec![0.1f32; d];
+        x[idx] = 1.0;
+
+        let res = state.update(&x, reward, cost, is_cloud);
+        assert!(
+            res.is_ok(),
+            "Well-conditioned update {i} failed unexpectedly: {res:?}"
+        );
+    }
+
+    assert_eq!(state.refactorizations, 0);
+
+    // Update 1001 überschreitet das Re-Faktorisierungsintervall und führt eine automatische Refaktorisierung durch
+    let x_1001 = vec![1.0f32, 0.0, 0.0, 0.0];
+    let res_1001 = state.update(&x_1001, reward, cost, is_cloud);
+    assert!(
+        res_1001.is_ok(),
+        "Update 1001 must succeed via auto-recovery: {res_1001:?}"
+    );
+    assert_eq!(
+        state.refactorizations, 1,
+        "Refactorizations counter must increment on update 1001"
+    );
+}
+
+/// Gauss-Jordan Inversion in f64 für ein d x d Array (Row-Major).
+fn naive_matrix_inverse_f64(a: &[f64], d: usize) -> Option<Vec<f64>> {
+    let mut aug = vec![0.0f64; d * 2 * d];
+    for i in 0..d {
+        for j in 0..d {
+            aug[i * 2 * d + j] = a[i * d + j];
+        }
+        aug[i * 2 * d + d + i] = 1.0;
+    }
+
+    for k in 0..d {
+        let mut max_row = k;
+        let mut max_val = aug[k * 2 * d + k].abs();
+        for i in (k + 1)..d {
+            let val = aug[i * 2 * d + k].abs();
+            if val > max_val {
+                max_val = val;
+                max_row = i;
+            }
+        }
+
+        if max_val < 1e-12 {
+            return None;
+        }
+
+        if max_row != k {
+            for j in 0..(2 * d) {
+                aug.swap(k * 2 * d + j, max_row * 2 * d + j);
+            }
+        }
+
+        let pivot = aug[k * 2 * d + k];
+        for j in 0..(2 * d) {
+            aug[k * 2 * d + j] /= pivot;
+        }
+
+        for i in 0..d {
+            if i != k {
+                let factor = aug[i * 2 * d + k];
+                for j in 0..(2 * d) {
+                    aug[i * 2 * d + j] -= factor * aug[k * 2 * d + j];
+                }
+            }
+        }
+    }
+
+    let mut inv = vec![0.0f64; d * d];
+    for i in 0..d {
+        for j in 0..d {
+            inv[i * d + j] = aug[i * 2 * d + d + j];
+        }
+    }
+    Some(inv)
+}
+
+#[test]
+fn test_sherman_morrison_100k_updates_frobenius_stability() {
     let d = 8;
     let mut state = BanditProfileState::cold_start(d, 0.5);
     state.implementation = BanditImplementation::ShermanMorrison;
@@ -47,27 +175,33 @@ fn test_sherman_morrison_100k_updates_stability_against_cholesky_reference() {
             }
         }
 
-        // Update bandit profile state. Must never return error or stop learning!
-        let update_res = state.update(&x, 1.0, 0.1, false);
-        assert!(
-            update_res.is_ok(),
-            "Update {t} failed unexpectedly: {update_res:?}"
-        );
+        let refac_before = state.refactorizations;
 
-        // Every 25,000 steps, check tolerance against f64 Cholesky reference
-        if t % 25_000 == 0 {
-            let inv_a_ref = cholesky_invert_f64(&a_ref_f64, d)
-                .expect("f64 Cholesky inversion must succeed");
+        // 2. Incremental Sherman-Morrison update in state.
+        // When interval 1000 is reached, auto-recovery refactorizes inv_a (soft restart to I).
+        let update_res = state.update(&x, 1.0, 0.0, false);
+        assert!(update_res.is_ok(), "Update {t} failed: {update_res:?}");
 
-            // Evaluate variance sqrt(x^T A^{-1} x) under Sherman-Morrison state vs Cholesky reference
-            let mut var_sm = 0.0f64;
-            let mut var_ref = 0.0f64;
+        // Reset ground-truth accumulation on soft restart
+        if state.refactorizations > refac_before {
+            a_matrix_f64 = vec![0.0f64; d * d];
+            for i in 0..d {
+                a_matrix_f64[i * d + i] = 1.0;
+            }
             for i in 0..d {
                 for j in 0..d {
-                    var_sm += (x[i] as f64) * (state.inv_a[i * d + j] as f64) * (x[j] as f64);
-                    var_ref += (x[i] as f64) * inv_a_ref[i * d + j] * (x[j] as f64);
+                    a_matrix_f64[i * d + j] =
+                        gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
                 }
             }
+        }
+
+        if t % 10_000 == 0 {
+            let ref_inv_f64 = naive_matrix_inverse_f64(&a_matrix_f64, d)
+                .expect("Ground truth matrix reinversion must succeed");
+
+            let mut diff_frob_sq = 0.0f64;
+            let mut ref_frob_sq = 0.0f64;
 
             let std_sm = var_sm.sqrt();
             let std_ref = var_ref.sqrt();
