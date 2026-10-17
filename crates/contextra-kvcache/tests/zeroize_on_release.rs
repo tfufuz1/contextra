@@ -208,9 +208,8 @@ fn test_eviction_under_load_no_unzeroed_data() {
     let store = TenantIsolatedKvStore::with_capacity(16);
     let tenant = TenantId::try_new(100).unwrap();
 
-    let inspectors: Vec<Arc<Mutex<Vec<u8>>>> = (0..100)
-        .map(|_| Arc::new(Mutex::new(Vec::new())))
-        .collect();
+    let inspectors: Vec<Arc<Mutex<Vec<u8>>>> =
+        (0..100).map(|_| Arc::new(Mutex::new(Vec::new()))).collect();
 
     for i in 0..100 {
         let mut seg = KvSegment::new(tenant, i, vec![(i % 255) as u8 + 1; 128]);
