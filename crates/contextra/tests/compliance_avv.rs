@@ -52,7 +52,9 @@ async fn test_compliance_avv_draft_generation_and_escaping() {
     );
     // "[evil_link](...)" must be escaped to "\[evil_link\]\(...\)"
     assert!(
-        draft.markdown.contains("\\[evil_link\\]\\(http://hostile.test\\)"),
+        draft
+            .markdown
+            .contains("\\[evil_link\\]\\(http://hostile.test\\)"),
         "Link markdown syntax must be escaped"
     );
     // "|" must be escaped to "\|"
@@ -88,7 +90,10 @@ async fn test_export_processing_register_returns_compliance_source_unavailable()
     };
 
     let res = db.export_processing_register(range).await;
-    assert!(res.is_err(), "Export must return error when no production source exists");
+    assert!(
+        res.is_err(),
+        "Export must return error when no production source exists"
+    );
 
     match res.err().unwrap() {
         ContextraError::CapabilityUnsupported { capability, reason } => {

@@ -14,9 +14,9 @@ pub mod query_rewriter;
 pub mod compliance;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
+pub use builder::ContextraBuilder;
 #[cfg(feature = "compliance")]
 pub use compliance::*;
-pub use builder::ContextraBuilder;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;

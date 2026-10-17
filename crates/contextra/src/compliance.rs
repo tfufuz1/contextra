@@ -12,7 +12,8 @@ use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
 /// Review header prepended to generated compliance drafts.
-pub const REVIEW_HEADER: &str = "<!-- Contextra AVV Draft Review Header: Legal review required prior to execution. -->\n";
+pub const REVIEW_HEADER: &str =
+    "<!-- Contextra AVV Draft Review Header: Legal review required prior to execution. -->\n";
 
 /// Parameters for generating an AVV (Auftragsverarbeitungsvertrag) draft document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
