@@ -53,6 +53,8 @@ class TestVerifierTestVectors(unittest.TestCase):
 
             expected_exit = meta["exit_code"]
             expected_res = meta["result"]
+            expected_cat = meta.get("category")
+            expected_reason = meta.get("reason")
             expected_origin = meta["origin"]
 
             self.assertIn(expected_origin, ("rust-issued", "python-selfsigned"))
@@ -62,6 +64,20 @@ class TestVerifierTestVectors(unittest.TestCase):
                 expected_exit,
                 f"Vector '{vec_name}' expected exit code {expected_exit}, got {exit_code} ({category}: {reason})",
             )
+
+            if expected_cat:
+                self.assertEqual(
+                    category,
+                    expected_cat,
+                    f"Vector '{vec_name}' expected category '{expected_cat}', got '{category}' ({reason})",
+                )
+
+            if expected_reason:
+                self.assertIn(
+                    expected_reason,
+                    reason,
+                    f"Vector '{vec_name}' expected reason fragment '{expected_reason}' in '{reason}'",
+                )
 
             if expected_res == "VALID":
                 self.assertEqual(exit_code, 0, f"Vector '{vec_name}' should be VALID")
