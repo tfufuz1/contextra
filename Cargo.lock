@@ -677,6 +677,7 @@ name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "contextra-adapt",
  "contextra-core",
  "contextra-db",
  "contextra-graph",
