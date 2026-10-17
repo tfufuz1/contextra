@@ -90,13 +90,6 @@ pub fn get_entry_key_at_index(
         .ok_or_else(|| ContextraError::Storage("malformed block: entry_key out of bounds".into()))
 }
 
-// TODO(Implementer): [P02 / F-02 / HIGH / JULES-P02-02]
-// Binärsuche in SSTable-Blöcken: Erste/neueste Version bei Mehrfachversionen garantieren (Invariante I-1):
-// Bei mehreren Versionen desselben Keys in einem Datenblock MUSS die Binärsuche deterministisch
-// den ersten Index (die neueste Version mit höchster Sequenznummer, da im Block absteigend sortiert)
-// zurückgeben. Sicherstellen, dass die Partition-Point-Logik (Left-Rewind) für alle Block-Suchfunktionen
-// (`binary_search_first_index_in_block`, `binary_search_index_in_block`, `binary_search_entry_in_block`)
-// ausnahmslos zum ersten Vorkommen führt, um Stale Reads zu verhindern.
 pub fn binary_search_first_index_in_block(
     block_data: &[u8],
     offsets_start: usize,
@@ -146,27 +139,17 @@ pub fn binary_search_index_in_block(
     while low < high {
         let mid = low + (high - low) / 2;
         let entry_key = get_entry_key_at_index(block_data, offsets_start, mid, is_v3)?;
+        if entry_key < key {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
 
-        match entry_key.cmp(key) {
-            std::cmp::Ordering::Less => {
-                low = mid + 1;
-            }
-            std::cmp::Ordering::Greater => {
-                high = mid;
-            }
-            std::cmp::Ordering::Equal => {
-                let mut first = mid;
-                while first > 0 {
-                    let prev_key =
-                        get_entry_key_at_index(block_data, offsets_start, first - 1, is_v3)?;
-                    if prev_key == key {
-                        first -= 1;
-                    } else {
-                        break;
-                    }
-                }
-                return Ok(Ok(first));
-            }
+    if low < num_offsets {
+        let entry_key = get_entry_key_at_index(block_data, offsets_start, low, is_v3)?;
+        if entry_key == key {
+            return Ok(Ok(low));
         }
     }
 

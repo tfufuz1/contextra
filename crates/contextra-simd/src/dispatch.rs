@@ -16,6 +16,7 @@ use contextra_core::ContextraError;
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -58,6 +59,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -100,6 +102,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -142,6 +145,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -176,6 +180,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -210,6 +215,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
     if b_bytes.len() < a.len() * 4 {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -244,6 +250,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -281,6 +288,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
         return Err(ContextraError::EmbeddingDimensionMismatch {
@@ -315,6 +323,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 /// # Complexity
 /// O(N) where N is `a.len()`.
 #[inline]
+#[allow(unsafe_code)]
 pub fn cosine_similarity_parts_u8(
     a: &[u8],
     b: &[u8],

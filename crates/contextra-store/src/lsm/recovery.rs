@@ -565,10 +565,11 @@ impl LsmStorage {
             key_manager.clone(),
         );
         if let Err(e) = witness_res {
+            // Non-fatal warning: witness collection during startup recovery is diagnostic/informational for deleted file tracking; failure must not abort engine boot (fail-open for recovery).
             tracing::warn!(
                 error = %e,
                 path = ?config.path,
-                "Witness scan encountered unclassifiable or unwitnessable file during recovery"
+                "Witness scan encountered unclassifiable or unwitnessable file during recovery; continuing startup"
             );
         }
 
@@ -581,16 +582,26 @@ impl LsmStorage {
             as_of_tx: max_tx,
             depth: 1,
         };
-        if let Ok(inventory) = crate::sstable::witness_inventory::SstInventory::build(&witness_inputs) {
-            let orphan_plan = crate::sstable::orphan_gc::plan_orphan_removal(&inventory, &[]);
-            if !orphan_plan.files_to_remove.is_empty() {
-                tracing::info!(
-                    files_to_remove = orphan_plan.files_to_remove.len(),
-                    "Cleaning up orphaned/temp SSTable files via scrub_and_remove"
+        match crate::sstable::witness_inventory::SstInventory::build(&witness_inputs) {
+            Ok(inventory) => {
+                let orphan_plan = crate::sstable::orphan_gc::plan_orphan_removal(&inventory, &[]);
+                if !orphan_plan.files_to_remove.is_empty() {
+                    tracing::info!(
+                        files_to_remove = orphan_plan.files_to_remove.len(),
+                        "Cleaning up orphaned/temp SSTable files via scrub_and_remove"
+                    );
+                    crate::sstable::orphan_gc::remove_orphans(&orphan_plan).map_err(|e| {
+                        ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
+                    })?;
+                }
+            }
+            Err(e) => {
+                // Non-fatal warning: SstInventory build failure skips orphan GC cleanup without failing recovery.
+                tracing::warn!(
+                    error = %e,
+                    path = ?config.path,
+                    "SstInventory build failed during recovery; skipping orphan GC cleanup"
                 );
-                crate::sstable::orphan_gc::remove_orphans(&orphan_plan).map_err(|e| {
-                    ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
-                })?;
             }
         }
 
@@ -625,11 +636,6 @@ impl LsmStorage {
                 .await;
         });
 
-        // TODO(Implementer): [P02 / F-01 / CRITICAL / JULES-P02-01]
-        // TxBuffer-Anbindung für CompactionEngine (Invariante I-2):
-        // `CompactionEngine` benötigt Zugriff auf `tx_buffer` (oder eine Watermark-Provider-Abstraktion),
-        // damit die Kompaktion aktive MVCC-Lesetransaktionen aus `TxBuffer::min_read_snapshot()` berücksichtigt
-        // und keine Daten löscht, die von laufenden Abfragen noch benötigt werden.
         let last_applied_seq = Arc::new(AtomicU64::new(max_seq));
 
         let gc_floor: Arc<dyn SnapshotFloor> = Arc::new(GcFloor::new(
@@ -1043,6 +1049,50 @@ impl LsmStorage {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_active_read_tx_snapshot_preserved_across_compaction() -> Result<()> {
+        let tmp = TempDir::new().map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let config = LsmConfig {
+            path: tmp.path().to_path_buf(),
+            ..Default::default()
+        };
+
+        let storage = LsmStorage::new(config).await?;
+
+        // 1. Write initial version v1 at TxId 10
+        let tx1 = storage.begin_transaction_at(TxId::try_new(10).unwrap()).await?;
+        storage.put_in_tx(&tx1, b"key_mvcc", b"value_v1").await?;
+        storage.commit_transaction(tx1).await?;
+
+        // 2. Open an active read transaction holding snapshot S at TxId 10 / seq_no
+        let read_tx = storage.begin_read_transaction().await?;
+        let snapshot_seq = read_tx.read_seq_no();
+
+        // 3. Write a newer version v2 at TxId 20
+        let tx2 = storage.begin_transaction_at(TxId::try_new(20).unwrap()).await?;
+        storage.put_in_tx(&tx2, b"key_mvcc", b"value_v2").await?;
+        storage.commit_transaction(tx2).await?;
+
+        // Flush memtable to SSTable
+        storage.flush().await?;
+
+        // 4. Force compaction
+        storage.compact_range(None, None).await?;
+
+        // 5. Verify the active read transaction holding snapshot S can still read version v1
+        let val_at_snapshot = storage.get_at_seq(b"key_mvcc", snapshot_seq).await?;
+        assert_eq!(
+            val_at_snapshot,
+            Some(Bytes::from("value_v1")),
+            "Active read transaction snapshot must preserve version v1 across compaction"
+        );
+
+        // Cleanly close read transaction
+        read_tx.end().await?;
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn recovery_removes_old_wal_via_durable_remove() -> Result<()> {

@@ -1083,4 +1083,176 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_diskann_crash_injection_matrix() {
+        let failpoints = ["temp_written", "before_rename", "after_rename", "before_wal_removal"];
+
+        for fp in failpoints {
+            let temp_dir = tempfile::tempdir().expect("tempdir creation");
+            let index_path = temp_dir.path().join(format!("crash_{fp}.idx"));
+
+            let config = DiskAnnConfig {
+                index_path: index_path.clone(),
+                dimension: 4,
+                max_degree: 4,
+                beam_width: 4,
+                distance_metric: DistanceMetric::Euclidean,
+                pending_flush_threshold: Some(10), // high threshold so auto-trigger does not race
+                ..DiskAnnConfig::default()
+            };
+
+            // 1. Build initial index with 10 vectors
+            let initial_index = DiskAnnIndex::try_new(config.clone()).expect("initial index creation");
+            let initial_vecs: Vec<Vec<f32>> = (0..10)
+                .map(|i| vec![i as f32, 0.0, 0.0, 0.0])
+                .collect();
+            let initial_ids: Vec<DocId> = (0..10).map(|i| DocId::from(100 + i as u64)).collect();
+
+            initial_index
+                .build(&initial_vecs, &initial_ids)
+                .await
+                .expect("build initial index");
+
+            // 2. Insert 2 pending vectors
+            let pending_vecs = vec![
+                (DocId::from(200u64), vec![10.0f32, 0.0, 0.0, 0.0]),
+                (DocId::from(201u64), vec![11.0f32, 0.0, 0.0, 0.0]),
+            ];
+
+            for (id, vec) in &pending_vecs {
+                initial_index
+                    .insert(TxId(1), *id, vec)
+                    .await
+                    .expect("insert pending vector");
+            }
+
+            // 3. Set failpoint and trigger persist_delta
+            initial_index.set_failpoint(fp);
+            let persist_res = initial_index.persist_delta().await;
+            assert!(
+                persist_res.is_err(),
+                "persist_delta must fail when failpoint '{fp}' is hit"
+            );
+            let err_msg = persist_res.unwrap_err().to_string();
+            assert!(
+                err_msg.contains("Test failpoint triggered"),
+                "Error message must mention failpoint: {err_msg}"
+            );
+
+            // 4. Reload index from disk (simulating restart after crash)
+            let reloaded_index = DiskAnnIndex::try_new(config.clone()).expect("reloaded index creation");
+            reloaded_index
+                .load()
+                .await
+                .expect("reloading index after crash must succeed");
+
+            // 5. Query and verify results
+            let query = vec![10.0f32, 0.0, 0.0, 0.0];
+            let search_res = reloaded_index
+                .search(&query, 1)
+                .await
+                .expect("search on reloaded index must succeed");
+
+            assert_eq!(search_res.len(), 1);
+            assert_eq!(
+                search_res[0].doc_id,
+                DocId::from(200u64),
+                "Reloaded index after crash at '{fp}' must contain pending doc_id=200"
+            );
+
+            let all_doc_ids = reloaded_index
+                .all_doc_ids()
+                .await
+                .expect("all_doc_ids on reloaded index");
+            assert_eq!(
+                all_doc_ids.len(),
+                12,
+                "Reloaded index after crash at '{fp}' must have all 12 document IDs"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_diskann_crash_injection_uninterrupted_match() {
+        let temp_dir_uninterrupted = tempfile::tempdir().expect("tempdir creation");
+        let index_path_uninterrupted = temp_dir_uninterrupted.path().join("uninterrupted.idx");
+
+        let config_uninterrupted = DiskAnnConfig {
+            index_path: index_path_uninterrupted.clone(),
+            dimension: 4,
+            max_degree: 4,
+            beam_width: 4,
+            distance_metric: DistanceMetric::Euclidean,
+            pending_flush_threshold: Some(10),
+            ..DiskAnnConfig::default()
+        };
+
+        let base_vecs: Vec<Vec<f32>> = (0..10)
+            .map(|i| vec![i as f32, 0.0, 0.0, 0.0])
+            .collect();
+        let base_ids: Vec<DocId> = (0..10).map(|i| DocId::from(100 + i as u64)).collect();
+
+        let pending_vecs = vec![
+            (DocId::from(200u64), vec![10.0f32, 0.0, 0.0, 0.0]),
+            (DocId::from(201u64), vec![11.0f32, 0.0, 0.0, 0.0]),
+        ];
+
+        // Uninterrupted run
+        let uninterrupted_idx = DiskAnnIndex::try_new(config_uninterrupted).expect("uninterrupted index");
+        uninterrupted_idx.build(&base_vecs, &base_ids).await.expect("build base");
+        for (id, vec) in &pending_vecs {
+            uninterrupted_idx.insert(TxId(1), *id, vec).await.expect("insert");
+        }
+        uninterrupted_idx.persist_delta().await.expect("persist delta");
+
+        let query = vec![10.5f32, 0.0, 0.0, 0.0];
+        let uninterrupted_search = uninterrupted_idx.search(&query, 2).await.expect("search");
+        let uninterrupted_doc_ids = uninterrupted_idx.all_doc_ids().await.expect("all_doc_ids");
+
+        // Crashed runs
+        for fp in ["temp_written", "before_rename", "after_rename", "before_wal_removal"] {
+            let temp_dir_crashed = tempfile::tempdir().expect("tempdir creation");
+            let index_path_crashed = temp_dir_crashed.path().join("crashed.idx");
+
+            let config_crashed = DiskAnnConfig {
+                index_path: index_path_crashed.clone(),
+                dimension: 4,
+                max_degree: 4,
+                beam_width: 4,
+                distance_metric: DistanceMetric::Euclidean,
+                pending_flush_threshold: Some(10),
+                ..DiskAnnConfig::default()
+            };
+
+            let crashed_idx = DiskAnnIndex::try_new(config_crashed.clone()).expect("crashed index");
+            crashed_idx.build(&base_vecs, &base_ids).await.expect("build base");
+            for (id, vec) in &pending_vecs {
+                crashed_idx.insert(TxId(1), *id, vec).await.expect("insert");
+            }
+
+            crashed_idx.set_failpoint(fp);
+            let _ = crashed_idx.persist_delta().await;
+
+            // Restart
+            let recovered_idx = DiskAnnIndex::try_new(config_crashed).expect("recovered index");
+            recovered_idx.load().await.expect("load");
+
+            let recovered_search = recovered_idx.search(&query, 2).await.expect("search");
+            let recovered_doc_ids = recovered_idx.all_doc_ids().await.expect("all_doc_ids");
+
+            assert_eq!(
+                recovered_search.len(), uninterrupted_search.len(),
+                "Search result count for failpoint '{fp}' after recovery must match uninterrupted run identically"
+            );
+            for (r, u) in recovered_search.iter().zip(uninterrupted_search.iter()) {
+                assert_eq!(r.doc_id, u.doc_id);
+                assert!((r.score - u.score).abs() < 1e-5);
+            }
+            assert_eq!(
+                recovered_doc_ids, uninterrupted_doc_ids,
+                "Doc ID set for failpoint '{fp}' after recovery must match uninterrupted run identically"
+            );
+        }
+    }
 }

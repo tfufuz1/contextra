@@ -34,6 +34,8 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 contextra-store = { version = "0.1.0", path = "../contextra-store" }
 
+[target.'cfg(loom)'.dependencies]
+
 [[bench]]
 name = "checkpoint_bench"
 harness = false

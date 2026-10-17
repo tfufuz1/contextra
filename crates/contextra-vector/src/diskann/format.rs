@@ -8,7 +8,9 @@ use contextra_core::{ContextraError, Result};
 pub(crate) const DISKANN_MAGIC: &[u8; 4] = b"DANN";
 pub(crate) const DISKANN_VERSION: u16 = 1;
 pub(crate) const DISKANN_FOOTER_MAGIC: &[u8; 4] = b"DANF";
-pub(crate) const DISKANN_INTEGRITY_KEY: &[u8; 32] = b"contextra_diskann_integri_key_32";
+/// Fixed 32-byte seed used for HMAC checksum calculations to detect accidental corruption or truncation.
+/// Note: This is a static checksum seed, not a cryptographic secret for integrity protection or authenticity.
+pub(crate) const CHECKSUM_SEED: &[u8; 32] = b"contextra_diskann_integri_key_32";
 
 pub(crate) const PENDING_WAL_MAGIC: &[u8; 4] = b"PWAL";
 pub(crate) const PENDING_WAL_VERSION: u8 = 1;

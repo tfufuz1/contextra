@@ -25,7 +25,7 @@ pub enum CopyKind {
 }
 
 /// Detailed status of a registered copy for scope / Article 17/19 verification.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CopyStatus {
     /// The copy has been physically removed / unlinked.
     Deleted,
@@ -36,13 +36,8 @@ pub enum CopyStatus {
     /// The copy is legally retained under statutory retention obligations.
     Retained { legal_basis: String },
     /// Default status for unknown or unverified copies. Blocks full proof assertions.
+    #[default]
     Unknown,
-}
-
-impl Default for CopyStatus {
-    fn default() -> Self {
-        CopyStatus::Unknown
-    }
 }
 
 impl CopyStatus {

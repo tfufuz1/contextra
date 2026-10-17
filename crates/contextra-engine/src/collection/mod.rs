@@ -41,7 +41,7 @@ use contextra_store::LsmStorage;
 use contextra_text::inverted::InvertedIndex;
 #[cfg(not(loom))]
 use contextra_text::Language;
-use contextra_types::{DocId, Result, TxId};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 #[cfg(not(loom))]
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,40 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 #[cfg(not(loom))]
 use std::sync::Arc;
+
+/// Report summarizing the results of loading vector index entries from storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndexLoadReport {
+    /// Total number of storage entries scanned.
+    pub scanned: u64,
+    /// Number of storage entries successfully decoded into `StoredDocument`.
+    pub decoded: u64,
+    /// Number of storage entries that failed deserialization.
+    pub skipped_undecodable: u64,
+    /// Number of documents that failed vector index insertion.
+    pub failed_inserts: u64,
+    /// Duration taken to complete the index load operation.
+    pub took: std::time::Duration,
+}
+
+/// Policy controlling error handling during collection index loading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LoadPolicy {
+    /// Fail immediately on the first undecodable document or failed index insertion.
+    Strict,
+    /// Allow up to `max_skipped` total skipped records (undecodable + failed inserts).
+    /// Fails if total skipped records exceed `max_skipped`.
+    Lenient {
+        /// Maximum allowable skipped records before returning an error.
+        max_skipped: u64,
+    },
+}
+
+impl Default for LoadPolicy {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
 
 /// Configuration for a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -291,6 +325,8 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) clock: parking_lot::RwLock<Arc<dyn Clock>>,
     /// Injected metrics sink port for operational observability.
     pub(super) metrics: parking_lot::RwLock<Arc<dyn MetricsSink>>,
+    /// Stores report of the last index load operation.
+    pub(super) last_load_report: parking_lot::Mutex<Option<IndexLoadReport>>,
 }
 
 #[cfg(not(loom))]
@@ -319,6 +355,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
             metrics: parking_lot::RwLock::new(self.metrics.read().clone()),
+            last_load_report: parking_lot::Mutex::new(self.last_load_report.lock().clone()),
         }
     }
 }
@@ -399,6 +436,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
             metrics: parking_lot::RwLock::new(Arc::new(NoopMetricsSink)),
+            last_load_report: parking_lot::Mutex::new(None),
         }
     }
 
@@ -416,6 +454,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Returns a cloned reference to the active metrics sink.
     pub fn metrics_sink(&self) -> Arc<dyn MetricsSink> {
         self.metrics.read().clone()
+    }
+
+    /// Returns the report from the most recent index load operation, if any.
+    pub fn last_load_report(&self) -> Option<IndexLoadReport> {
+        self.last_load_report.lock().clone()
     }
 
     /// Sets or overrides the clock implementation (builder version).
@@ -601,11 +644,19 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.index.is_empty().await
     }
 
-    /// Performs a range scan of documents in the collection.
+    /// Performs a range scan of documents in the collection using the default `Strict` load policy.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn load_index(&self) -> Result<()> {
-        // AI-TAG[CONVENTION-DRIFT][MAJOR] RESOLVED: AGT-DB-002 — load_index now scans user_keys (key_type=0) (TS:2026-08-25T00:00:00Z)
-        // because doc_keys (key_type=1) no longer contain embeddings (ID: AGT-DB-002).
+        self.load_index_with_report(LoadPolicy::Strict).await?;
+        Ok(())
+    }
+
+    /// Performs a range scan of documents in the collection and rebuilds the vector index,
+    /// returning an [`IndexLoadReport`] according to the specified [`LoadPolicy`].
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn load_index_with_report(&self, policy: LoadPolicy) -> Result<IndexLoadReport> {
+        let start_ticks = self.clock().monotonic_ticks();
+
         let scan_prefix = if self.name == "default" {
             b"".to_vec()
         } else {
@@ -616,22 +667,103 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let entries = self.storage.scan_prefix(&scan_prefix).await?;
         let tx = self.allocate_tx()?;
+
+        let mut scanned: u64 = 0;
+        let mut decoded: u64 = 0;
+        let mut skipped_undecodable: u64 = 0;
+        let mut failed_inserts: u64 = 0;
+
+        const INDEX_LOAD_SKIPPED_TOTAL: &str = "contextra_index_load_skipped_total";
+
         for (k, v) in entries {
             if self.name == "default" && k.starts_with(b"__") {
                 continue;
             }
 
+            scanned += 1;
+
             let stored: StoredDocument = match serde_json::from_slice(&v) {
                 Ok(d) => d,
-                Err(_) => continue,
+                Err(e) => {
+                    skipped_undecodable += 1;
+                    crate::metrics_names::record_counter_safe(
+                        &*self.metrics_sink(),
+                        INDEX_LOAD_SKIPPED_TOTAL,
+                        1,
+                        &[("collection", &self.name)],
+                    );
+
+                    let short_hash = blake3::hash(&k).to_hex()[..16].to_string();
+
+                    match policy {
+                        LoadPolicy::Strict => {
+                            return Err(ContextraError::Index(format!(
+                                "Undecodable document at key hash {short_hash}: {e}"
+                            )));
+                        }
+                        LoadPolicy::Lenient { max_skipped } => {
+                            let total_skipped = skipped_undecodable + failed_inserts;
+                            if total_skipped > max_skipped {
+                                return Err(ContextraError::Index(format!(
+                                    "Exceeded max_skipped limit ({max_skipped}) with undecodable document at key hash {short_hash}: {e}"
+                                )));
+                            }
+                            continue;
+                        }
+                    }
+                }
             };
+
+            decoded += 1;
+
             let doc_id = DocId::from_key(&stored.id)?;
             if let Err(e) = self.index.insert(tx, doc_id, &stored.embedding).await {
+                failed_inserts += 1;
+                crate::metrics_names::record_counter_safe(
+                    &*self.metrics_sink(),
+                    INDEX_LOAD_SKIPPED_TOTAL,
+                    1,
+                    &[("collection", &self.name)],
+                );
                 tracing::warn!(doc_id = ?doc_id, error = %e, "Konnte Dokument bei load_index nicht in Index einfügen");
+
+                let short_hash = blake3::hash(&k).to_hex()[..16].to_string();
+
+                match policy {
+                    LoadPolicy::Strict => {
+                        return Err(ContextraError::Index(format!(
+                            "Failed index insert for doc_id {doc_id:?} at key hash {short_hash}: {e}"
+                        )));
+                    }
+                    LoadPolicy::Lenient { max_skipped } => {
+                        let total_skipped = skipped_undecodable + failed_inserts;
+                        if total_skipped > max_skipped {
+                            return Err(ContextraError::Index(format!(
+                                "Exceeded max_skipped limit ({max_skipped}) with failed index insert at key hash {short_hash}: {e}"
+                            )));
+                        }
+                    }
+                }
             }
         }
+
         self.index.commit(tx).await?;
-        Ok(())
+
+        let end_ticks = self.clock().monotonic_ticks();
+        let took_nanos = end_ticks.saturating_sub(start_ticks);
+        let took = std::time::Duration::from_nanos(took_nanos);
+
+        let report = IndexLoadReport {
+            scanned,
+            decoded,
+            skipped_undecodable,
+            failed_inserts,
+            took,
+        };
+
+        *self.last_load_report.lock() = Some(report.clone());
+
+        Ok(report)
     }
 
     /// Migrates old doc_keys (with Embedding) to new doc_keys (only Metadata).
