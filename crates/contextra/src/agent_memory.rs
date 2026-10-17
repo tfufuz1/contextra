@@ -199,7 +199,7 @@ impl AgentMemory {
     /// Deletes a memory entry by its `MemoryId`.
     ///
     /// Delegates directly to `Contextra::delete`.
-    pub async fn forget(&self, id: &MemoryId) -> Result<(), ContextraError> {
+    pub async fn forget(&self, id: &MemoryId) -> Result<contextra_db::engine::forget::ForgetReceipt, ContextraError> {
         self.engine.delete(id.as_str()).await
     }
 
