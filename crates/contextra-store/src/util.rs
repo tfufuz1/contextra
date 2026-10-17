@@ -61,6 +61,16 @@ fn decide_on_lock_error(
 }
 
 #[cfg(all(test, not(loom)))]
+#[doc(hidden)]
+pub fn test_decide_on_lock_error_wrapper(
+    durability_mode: DurabilityMode,
+    lock_path: &Path,
+    err: &std::io::Error,
+) -> Result<Option<File>> {
+    decide_on_lock_error(durability_mode, lock_path, err)
+}
+
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use std::io::{Error, ErrorKind};
