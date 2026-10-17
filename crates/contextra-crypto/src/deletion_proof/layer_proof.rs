@@ -23,7 +23,23 @@ impl LayerCleanupProof {
     ///
     /// # Errors
     /// Gibt `ContextraError::Internal` zurück, wenn `remaining_live_entries != 0`.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn new_after_verified_empty(
+        layer: DeletionLayer,
+        remaining_live_entries: usize,
+    ) -> Result<Self> {
+        Self::new_after_verified_empty_internal(layer, remaining_live_entries)
+    }
+
+    #[cfg(not(any(test, feature = "test-support")))]
+    pub(crate) fn new_after_verified_empty(
+        layer: DeletionLayer,
+        remaining_live_entries: usize,
+    ) -> Result<Self> {
+        Self::new_after_verified_empty_internal(layer, remaining_live_entries)
+    }
+
+    fn new_after_verified_empty_internal(
         layer: DeletionLayer,
         remaining_live_entries: usize,
     ) -> Result<Self> {
@@ -39,6 +55,93 @@ impl LayerCleanupProof {
             layer,
             _private: (),
         })
+    }
+
+    /// Erzeugt einen [`LayerCleanupProof`] aus einem verifizierten [`LayerWitness`].
+    ///
+    /// Liest die verbleibenden Einträge aus den Evidenzdaten des Witness.
+    /// Schlägt fehl, wenn der Witness nicht verifiziert werden kann oder unvollständig ist,
+    /// oder wenn verbleibende Einträge > 0 gefunden werden.
+    ///
+    /// # Errors
+    /// Returns [`ContextraError::InvalidInput`] or [`ContextraError::Internal`] if:
+    /// - `witness.verify()` fails or returns `WitnessVerification::None`
+    /// - evidence records remaining live entries > 0
+    pub fn from_witness(witness: &crate::deletion_witness::LayerWitness) -> Result<Self> {
+        let verification = witness.verify()?;
+        if matches!(
+            verification,
+            crate::deletion_witness::WitnessVerification::None
+        ) {
+            return Err(ContextraError::InvalidInput(
+                "LayerCleanupProof creation rejected: witness contains no verified evidence".to_string(),
+            ));
+        }
+
+        let remaining = match witness.layer_evidence() {
+            Some(ev) => match ev {
+                crate::deletion_proof::evidence::WitLayerEvidence::Memtable {
+                    entries_found,
+                    tombstones_found,
+                    ..
+                } => entries_found.saturating_sub(*tombstones_found) as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::SsTables {
+                    versions_found,
+                    identifier_hits_index,
+                    tombstones_remaining,
+                    orphan_files_found,
+                    unclassified_files,
+                    ..
+                } => (*versions_found
+                    + *identifier_hits_index
+                    + *tombstones_remaining
+                    + u64::from(*orphan_files_found)
+                    + u64::from(*unclassified_files)) as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::Wal {
+                    unscrubbed_records_found,
+                    ..
+                } => *unscrubbed_records_found as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::HnswIndex {
+                    incoming_edges,
+                    pinned_by_reader,
+                    ..
+                } => *incoming_edges as usize + if *pinned_by_reader { 1 } else { 0 },
+                crate::deletion_proof::evidence::WitLayerEvidence::TextIndex {
+                    term_doc_hits,
+                    ..
+                } => *term_doc_hits as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::Relations {
+                    matching_edges_found,
+                    ..
+                } => *matching_edges_found as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::ProcessCaches {
+                    active_references,
+                    invalidation_in_flight,
+                    ..
+                } => *active_references as usize + if *invalidation_in_flight { 1 } else { 0 },
+                crate::deletion_proof::evidence::WitLayerEvidence::CheckpointClones {
+                    clones_found,
+                    ..
+                } => *clones_found as usize,
+                crate::deletion_proof::evidence::WitLayerEvidence::Keyring {
+                    dek_present,
+                    kek_epoch_destroyed,
+                    ..
+                } => if *dek_present || !*kek_epoch_destroyed { 1 } else { 0 },
+                crate::deletion_proof::evidence::WitLayerEvidence::ErasureLedger {
+                    entry_confirmed,
+                    ..
+                } => if !*entry_confirmed { 1 } else { 0 },
+                crate::deletion_proof::evidence::WitLayerEvidence::Manifest {
+                    in_flight_commits,
+                    unpersisted_edits,
+                    ..
+                } => (*in_flight_commits + *unpersisted_edits) as usize,
+            },
+            None => 0,
+        };
+
+        Self::new_after_verified_empty_internal(witness.layer().clone(), remaining)
     }
 
     /// Erzeugt einen Proof für `layer` NUR, wenn `verification` bestätigt,

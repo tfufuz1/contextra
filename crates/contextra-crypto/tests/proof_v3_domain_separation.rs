@@ -1,5 +1,7 @@
 // FILE-CONTEXT (STAND 2026-10-13, ZWECK: Verifikation der Domänentrennung v3 vs v4 und Cross-Version Replay-Schutz, INVARIANTEN: INV-DELETION-1, INV-DELETION-2, F7-Domain-Separation)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
     ExcludedScope, LayerCleanupProof,

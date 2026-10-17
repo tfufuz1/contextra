@@ -11,7 +11,7 @@
 //   - Keines: `ed25519-dalek` v2 weist S >= L und ungültige Punkte bereits in `verify()` und `verify_strict()` ab.
 
 #![forbid(unsafe_code)]
-#![allow(deprecated)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::audit_chain::{AuditChain, AuditChainHeadSignature};
 use contextra_crypto::deletion_proof::keys::{DeletionProofKeyPair, VerificationKey};

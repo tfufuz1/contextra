@@ -27,16 +27,89 @@ pub struct Cleaned;
 /// ```rust
 /// use contextra_crypto::deletion_proof::{DeletionLayer, DeletionScope, ExcludedScope, LayerCleanupProof};
 /// use contextra_crypto::deletion_proof_typestate::DeletionProofBuilder;
+/// use contextra_crypto::deletion_witness::{LayerWitness, WitnessEvidence, WitIssueArgs};
+/// use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
+/// use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
+/// use contextra_crypto::deletion_proof::probe::WitStoreGeneration;
 /// use contextra_types::{DocId, TenantId, TxId};
 ///
 /// # fn example() -> contextra_types::Result<()> {
-/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?;
-/// let sst_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?;
-/// let hnsw_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?;
-/// let wal_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::WalAllSegments { seq_after: 10 }, 0)?;
-/// let csr_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::CsrGraph, 0)?;
-/// let kv_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0)?;
-/// let emb_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0)?;
+/// let lsm_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::LsmMemtable, &[b"key1".to_vec()], TxId(100), WitnessEvidence::MemtableScan { memtables_scanned: 1 })?;
+/// let lsm_proof = LayerCleanupProof::from_witness(&lsm_wit)?;
+///
+/// let sst_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::SsTableAllLevels, &[b"key1".to_vec()], TxId(100), WitnessEvidence::SstableScan { files_scanned: 1 })?;
+/// let sst_proof = LayerCleanupProof::from_witness(&sst_wit)?;
+///
+/// let wal_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::WalAllSegments { seq_after: 10 }, &[b"key1".to_vec()], TxId(100), WitnessEvidence::WalPurge { segments_removed: 1, bytes_scrubbed: 100 })?;
+/// let wal_proof = LayerCleanupProof::from_witness(&wal_wit)?;
+///
+/// let hnsw_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::HnswIndex,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "hnsw_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::HnswIndex { node_id: 1, incoming_edges: 0, outgoing_edges: 0, pinned_by_reader: false, marked_zeroed: true },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let hnsw_proof = LayerCleanupProof::from_witness(&hnsw_wit)?;
+///
+/// let csr_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::CsrGraph,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "csr_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::Relations { edges_scanned: 1, matching_edges_found: 0 },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let csr_proof = LayerCleanupProof::from_witness(&csr_wit)?;
+///
+/// let kv_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::KvCacheSegments,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "kv_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::ProcessCaches { cache_segments_scanned: 1, active_references: 0, invalidation_in_flight: false },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let kv_proof = LayerCleanupProof::from_witness(&kv_wit)?;
+///
+/// let emb_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::EmbeddingCache,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "emb_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::ProcessCaches { cache_segments_scanned: 1, active_references: 0, invalidation_in_flight: false },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let emb_proof = LayerCleanupProof::from_witness(&emb_wit)?;
 ///
 /// let proof = DeletionProofBuilder::new(
 ///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
@@ -62,9 +135,11 @@ pub struct Cleaned;
 /// ```compile_fail
 /// use contextra_crypto::deletion_proof_typestate::DeletionProofBuilder;
 /// use contextra_crypto::deletion_proof::{DeletionLayer, DeletionScope, LayerCleanupProof};
+/// use contextra_crypto::deletion_witness::{LayerWitness, WitnessEvidence};
 /// use contextra_types::{DocId, TenantId, TxId};
 ///
-/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+/// let lsm_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::LsmMemtable, &[b"key1".to_vec()], TxId(100), WitnessEvidence::MemtableScan { memtables_scanned: 1 }).unwrap();
+/// let lsm_proof = LayerCleanupProof::from_witness(&lsm_wit).unwrap();
 /// let _ = DeletionProofBuilder::new(
 ///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
 ///     vec![],
