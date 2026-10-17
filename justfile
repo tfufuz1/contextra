@@ -101,6 +101,13 @@ check-arch-gates:
     cargo run --manifest-path xtask/Cargo.toml -- check-ring-layering-full
     cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-core-primitives
 
+# Deletion & Erasure tests suite
+erasure-tests:
+    cargo test --manifest-path crates/contextra-durable-fs/Cargo.toml
+    cargo test -p contextra-store --test 'erasure*' --test 'purge*' --test wal_scope_purge
+    cargo test -p contextra-engine --test 'deletion*' --test keyspace_conformance --test delete_concurrency
+    cargo test -p contextra-crypto --test 'deletion*' --test 'proof_binding*'
+
 # Target checks for xtask audit lints
 check-max-results-unbound:
     cargo xtask check-max-results-unbound

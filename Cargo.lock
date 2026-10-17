@@ -1238,6 +1238,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-store-redb"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "contextra-ports",
+ "contextra-testkit",
+ "contextra-types",
+ "parking_lot 0.12.5",
+ "proptest",
+ "redb",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
@@ -1305,6 +1323,7 @@ dependencies = [
  "bincode",
  "contextra-core",
  "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-ports",
  "contextra-simd",
  "contextra-sys",
