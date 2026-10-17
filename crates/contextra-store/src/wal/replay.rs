@@ -1,5 +1,3 @@
-#![allow(clippy::cast_possible_truncation)]
-
 //! FILE-CONTEXT:
 //! STAND: 2026-10-06
 //! ZWECK: Implementierung von WAL-Replay, Mmap-/Stream-Scans, CRC/HMAC-Tail-Truncation und Bak-Recovery.
@@ -156,7 +154,6 @@ impl Wal {
             .collect())
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -164,7 +161,6 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
         _file_size: u64,
@@ -248,7 +244,8 @@ impl Wal {
         file_size: u64,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let slice_len = (file_size as usize).min(mmap.len());
+        let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
+        let slice_len = file_size_usize.min(mmap.len());
         let slice = mmap
             .get(..slice_len)
             .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
@@ -391,7 +388,7 @@ impl Wal {
     {
         let mut entries_count = 0u64;
         let mut pos = 0u64;
-        let slice_len = slice.len() as u64;
+        let slice_len = u64::try_from(slice.len()).unwrap_or(u64::MAX);
 
         let mut version = WalVersion::V1;
         if file_size == 0 || slice_len == 0 {
@@ -435,7 +432,7 @@ impl Wal {
                 break;
             }
 
-            if pos + 4 > slice_len {
+            if pos.saturating_add(4) > slice_len {
                 tracing::warn!(
                     "WAL tail corruption (partial length header) at offset {}",
                     pos
@@ -443,7 +440,11 @@ impl Wal {
                 break;
             }
 
-            let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
+            let pos_usize = usize::try_from(pos).map_err(|_| {
+                ContextraError::wal_corruption(pos, "Offset exceeds usize bounds")
+            })?;
+
+            let len_bytes_slice = match slice.get(pos_usize..pos_usize.saturating_add(4)) {
                 Some(s) => s,
                 None => {
                     tracing::warn!(
@@ -463,9 +464,10 @@ impl Wal {
                 }
             };
             let len = u32::from_le_bytes(len_bytes) as usize;
+            let len_u64 = u64::try_from(len).unwrap_or(u64::MAX);
 
             if len > MAX_WAL_ENTRY_SIZE as usize {
-                if pos + 4 + len as u64 > file_size {
+                if pos.saturating_add(4).saturating_add(len_u64) > file_size {
                     if entries_count == 0 && file_size > 64 {
                         return Err(ContextraError::wal_corruption(
                             pos,
@@ -484,7 +486,10 @@ impl Wal {
                 ));
             }
 
-            if pos + 4 + len as u64 > file_size || (pos + 4 + len as u64) as usize > slice.len() {
+            let entry_end_pos = pos.saturating_add(4).saturating_add(len_u64);
+            let entry_end_usize = usize::try_from(entry_end_pos).unwrap_or(usize::MAX);
+
+            if entry_end_pos > file_size || entry_end_usize > slice.len() {
                 if entries_count == 0 && file_size > 64 {
                     return Err(ContextraError::wal_corruption(
                         pos,
@@ -498,7 +503,10 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
+            let start_slice = pos_usize.saturating_add(4);
+            let end_slice = start_slice.saturating_add(len);
+
+            let entry_data_raw = match slice.get(start_slice..end_slice) {
                 Some(data) => data,
                 None => {
                     tracing::warn!(
@@ -509,7 +517,7 @@ impl Wal {
                 }
             };
             let chunk_start_pos = pos;
-            pos += (4 + len) as u64;
+            pos = entry_end_pos;
 
             #[cfg(feature = "wal-integrity")]
             {
@@ -587,7 +595,8 @@ impl Wal {
                                     ));
                                 }
                             };
-                        let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
+                        let inner_len = usize::try_from(u32::from_le_bytes(inner_len_bytes))
+                            .unwrap_or(usize::MAX);
                         if inner_slice.len() < 4 + inner_len {
                             return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
