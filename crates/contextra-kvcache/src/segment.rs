@@ -7,7 +7,9 @@ use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
+#[cfg(feature = "kv-encryption")]
+use zeroize::ZeroizeOnDrop;
 
 use super::eviction_worker::EvictionWorker;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
@@ -28,6 +30,43 @@ pub enum KvSegmentContent {
     KiviQuantized(KiviQuantizedBlock),
 }
 
+impl Zeroize for KvSegmentContent {
+    fn zeroize(&mut self) {
+        match self {
+            KvSegmentContent::Raw(bytes) => {
+                let taken = std::mem::take(bytes);
+                match taken.try_into_mut() {
+                    Ok(mut mut_buf) => {
+                        mut_buf.as_mut().zeroize();
+                    }
+                    Err(shared_bytes) => {
+                        if !shared_bytes.is_empty() {
+                            tracing::warn!(
+                                "KvSegmentContent payload bytes are shared; in-place zeroize skipped"
+                            );
+                        }
+                    }
+                }
+            }
+            #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+            KvSegmentContent::KiviQuantized(block) => {
+                block.zeroize();
+            }
+        }
+    }
+}
+
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+impl Zeroize for KiviQuantizedBlock {
+    fn zeroize(&mut self) {
+        self.packed.zeroize();
+        self.meta.key_scales.zeroize();
+        self.meta.key_zero_points.zeroize();
+        self.meta.value_scales.zeroize();
+        self.meta.value_zero_points.zeroize();
+    }
+}
+
 /// Aktuelle Version der KV-Segment-Schlüsselableitung.
 /// Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert.
 pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
@@ -42,6 +81,7 @@ pub struct ShreddableSegmentKey {
 
 impl ShreddableSegmentKey {
     /// Erstellt einen neuen shred-fähigen Schlüssel aus Passphrase und Salt.
+    #[allow(deprecated)]
     pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self, ContextraError> {
         let km = CryptoKey::try_new(passphrase, salt)
             .map_err(|e| ContextraError::Crypto(e.to_string()))?;
@@ -140,38 +180,107 @@ impl Tier2EncryptedSegment {
 
 /// Encrypted layer representation stored inside a KvSegment when encryption is active.
 #[cfg(feature = "kv-encryption")]
-#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct EncryptedSegmentPayload {
     /// Encrypted KV layer container from contextra-crypto. Zeroized on drop.
     pub layer: EncryptedKvLayer,
 }
 
-/// Ein KV-Cache-Segment. P9-Pflicht: Zeroize-on-Drop, nie unverschlüsselt
-/// auf persistentem/auslagerbarem Speicher.
-#[derive(Zeroize, ZeroizeOnDrop)]
+#[cfg(feature = "kv-encryption")]
+impl Zeroize for EncryptedSegmentPayload {
+    fn zeroize(&mut self) {
+        self.layer.ciphertext.zeroize();
+    }
+}
+
+/// Ein KV-Cache-Segment. Zeroize-on-Drop für Nutzdaten (Puffer überschreiben vor Freigabe).
 pub struct KvSegment {
-    #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
-    #[zeroize(skip)]
     pub segment_id: u64,
     /// Versionsnummer der HKDF-Schlüsselableitung.
-    #[zeroize(skip)]
     pub key_derivation_version: u8,
-    #[zeroize(skip)]
     pub encrypted: bool,
-    #[zeroize(skip)]
     #[cfg(feature = "kv-encryption")]
     pub model_fingerprint: Option<ModelFingerprint>,
-    #[zeroize(skip)]
     pub rope_offset: Option<usize>,
-    #[zeroize(skip)]
     pub active_refs: Arc<AtomicUsize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
-    #[zeroize(skip)]
     pub content: KvSegmentContent,
     #[cfg(feature = "kv-encryption")]
     encrypted_payload: Option<EncryptedSegmentPayload>,
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub test_inspector: Option<Arc<parking_lot::Mutex<Vec<u8>>>>,
+}
+
+impl Zeroize for KvSegment {
+    fn zeroize(&mut self) {
+        #[cfg(any(test, feature = "test-support"))]
+        let mut captured = Vec::new();
+
+        if !self.data.is_empty() {
+            self.data.as_mut_slice().zeroize();
+            #[cfg(any(test, feature = "test-support"))]
+            {
+                captured = self.data.clone();
+            }
+            self.data.clear();
+        } else {
+            match &mut self.content {
+                KvSegmentContent::Raw(bytes) => {
+                    let taken = std::mem::take(bytes);
+                    match taken.try_into_mut() {
+                        Ok(mut mut_buf) => {
+                            mut_buf.as_mut().zeroize();
+                            #[cfg(any(test, feature = "test-support"))]
+                            {
+                                captured = mut_buf.to_vec();
+                            }
+                            *bytes = mut_buf.freeze();
+                        }
+                        Err(shared) => {
+                            if !shared.is_empty() {
+                                tracing::warn!(
+                                    "KvSegmentContent payload bytes are shared; in-place zeroize skipped"
+                                );
+                                #[cfg(any(test, feature = "test-support"))]
+                                {
+                                    captured = shared.to_vec();
+                                }
+                                *bytes = shared;
+                            }
+                        }
+                    }
+                }
+                #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+                KvSegmentContent::KiviQuantized(block) => {
+                    block.zeroize();
+                    #[cfg(any(test, feature = "test-support"))]
+                    {
+                        captured = block.packed.clone();
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "kv-encryption")]
+        if let Some(payload) = &mut self.encrypted_payload {
+            payload.zeroize();
+        }
+
+        #[cfg(any(test, feature = "test-support"))]
+        if let Some(inspector) = &self.test_inspector {
+            if inspector.lock().is_empty() {
+                *inspector.lock() = captured;
+            }
+        }
+    }
+}
+
+impl Drop for KvSegment {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
 }
 
 impl KvSegment {
@@ -191,6 +300,8 @@ impl KvSegment {
             content: KvSegmentContent::Raw(content_bytes),
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
+            #[cfg(any(test, feature = "test-support"))]
+            test_inspector: None,
         }
     }
 
@@ -216,6 +327,8 @@ impl KvSegment {
             content: KvSegmentContent::Raw(content_bytes),
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
+            #[cfg(any(test, feature = "test-support"))]
+            test_inspector: None,
         }
     }
 
@@ -298,6 +411,8 @@ impl KvSegment {
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
+            #[cfg(any(test, feature = "test-support"))]
+            test_inspector: None,
         })
     }
 
@@ -471,6 +586,7 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v0_legacy_backward_compatibility() {
+        #[allow(deprecated)]
         let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
@@ -495,6 +611,8 @@ mod tests {
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
+            #[cfg(any(test, feature = "test-support"))]
+            test_inspector: None,
         };
 
         let decrypted = segment.decrypt_data(&cipher).unwrap();
@@ -504,6 +622,7 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v1_vs_v0_key_separation() {
+        #[allow(deprecated)]
         let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
@@ -527,6 +646,7 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_unsupported_version_error() {
+        #[allow(deprecated)]
         let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();

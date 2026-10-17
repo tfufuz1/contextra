@@ -60,7 +60,9 @@ pub fn statvfs_available_bytes(path: &Path) -> std::io::Result<u64> {
         if res < 0 {
             return Err(std::io::Error::last_os_error());
         }
+        #[allow(clippy::unnecessary_cast)]
         let bavail = stat.f_bavail as u64;
+        #[allow(clippy::unnecessary_cast)]
         let frsize = stat.f_frsize as u64;
         Ok(bavail.saturating_mul(frsize))
     }

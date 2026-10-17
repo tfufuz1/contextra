@@ -34,7 +34,9 @@ kv-encryption = ["contextra-crypto/kv-encryption"]
 kvcache-attention-eviction = []
 kvcache-kivi-quant = []
 kivi-quantization = []
+test-support = []
 
 [dev-dependencies]
+contextra-kvcache = { path = ".", features = ["test-support"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
