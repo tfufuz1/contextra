@@ -544,4 +544,3 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
         .unwrap();
     assert_eq!(val_old.as_ref(), b"old_data");
 }
-

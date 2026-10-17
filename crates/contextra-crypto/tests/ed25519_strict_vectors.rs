@@ -18,7 +18,9 @@ use contextra_crypto::deletion_proof::keys::{DeletionProofKeyPair, VerificationK
 use contextra_crypto::deletion_proof::proof::DeletionProof;
 use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
-use contextra_crypto::deletion_proof::types::{DeletionLayer, DeletionScope, DurabilityProof, ExcludedScope};
+use contextra_crypto::deletion_proof::types::{
+    DeletionLayer, DeletionScope, DurabilityProof, ExcludedScope,
+};
 use contextra_crypto::deletion_proof::LayerCleanupProof;
 use contextra_crypto::ed25519_proof::verify_deletion_proof_v3;
 use contextra_types::{DocId, TenantId, TxId};
@@ -195,15 +197,16 @@ fn test_proof_v4_edge_case_vector_verifications() {
     proof.sign_with_signer(&signer).expect("sign_with_signer");
 
     // Case 1: Valid signature -> MUST pass
-    assert!(proof.verify_signature(&signer.public_key()).expect("verify"));
+    assert!(proof
+        .verify_signature(&signer.public_key())
+        .expect("verify"));
 
     // Case 2: S >= L (non-canonical scalar) -> MUST be rejected
     let mut proof_s_ge_l = proof.clone();
     let l_bytes: [u8; 32] = [
-        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
-        0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0x4d, 0x14,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0x4d,
+        0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x10,
     ];
     let mut carry: u16 = 0;
     for i in 0..32 {
@@ -211,21 +214,30 @@ fn test_proof_v4_edge_case_vector_verifications() {
         proof_s_ge_l.signature[32 + i] = (sum & 0xff) as u8;
         carry = sum >> 8;
     }
-    assert!(!proof_s_ge_l.verify_signature(&signer.public_key()).unwrap_or(false));
+    assert!(!proof_s_ge_l
+        .verify_signature(&signer.public_key())
+        .unwrap_or(false));
 
     // Case 3: Small-order Public Key -> MUST be rejected
-    let small_order_pk = [0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80];
+    let small_order_pk = [
+        0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0x80,
+    ];
     assert!(!proof.verify_signature(&small_order_pk).unwrap_or(false));
 
     // Case 4: Small-order R -> MUST be rejected
     let mut proof_small_r = proof.clone();
     proof_small_r.signature[..32].copy_from_slice(&small_order_pk);
-    assert!(!proof_small_r.verify_signature(&signer.public_key()).unwrap_or(false));
+    assert!(!proof_small_r
+        .verify_signature(&signer.public_key())
+        .unwrap_or(false));
 
     // Case 5: Non-canonical R -> MUST be rejected
     let mut proof_non_canon = proof.clone();
     proof_non_canon.signature[..32].fill(0xff);
-    assert!(!proof_non_canon.verify_signature(&signer.public_key()).unwrap_or(false));
+    assert!(!proof_non_canon
+        .verify_signature(&signer.public_key())
+        .unwrap_or(false));
 }
 
 #[test]
@@ -237,7 +249,8 @@ fn test_deletion_proof_v3_edge_case_vector_verifications() {
         doc_id: DocId::new(42),
         tenant_id: TenantId::try_new(1).expect("tenant"),
     };
-    let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).expect("layer_proof");
+    let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+        .expect("layer_proof");
     let durability = DurabilityProof::new(100);
 
     let proof_v3 = DeletionProof::create_v3(
@@ -250,7 +263,8 @@ fn test_deletion_proof_v3_edge_case_vector_verifications() {
         &[],
         Some(&durability),
         keypair.signing_key(),
-    ).expect("create_v3");
+    )
+    .expect("create_v3");
 
     // Case 1: Valid signature -> MUST pass
     let key = VerificationKey::Ed25519(&vk);
@@ -260,10 +274,9 @@ fn test_deletion_proof_v3_edge_case_vector_verifications() {
     // Case 2: S >= L -> MUST be rejected
     let mut proof_s_ge_l = proof_v3.clone();
     let l_bytes: [u8; 32] = [
-        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
-        0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0x4d, 0x14,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0x4d,
+        0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x10,
     ];
     let mut carry: u16 = 0;
     for i in 0..32 {

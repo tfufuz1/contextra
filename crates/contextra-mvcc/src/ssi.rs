@@ -673,8 +673,7 @@ impl SequenceLogSsiValidator {
             sink.record_gauge("mvcc_ssi_commit_register_utilization_ratio", ratio, &[]);
 
             if reached_threshold {
-                if let Some(ref blocker) =
-                    self.diagnose_pruning_blocker_internal(writes, now_ticks)
+                if let Some(ref blocker) = self.diagnose_pruning_blocker_internal(writes, now_ticks)
                 {
                     sink.record_gauge(
                         "mvcc_ssi_coarsened_buckets_total",
@@ -1147,11 +1146,9 @@ impl From<SsiError> for ContextraError {
             SsiError::UnknownTxState { tx_id, status } => {
                 ContextraError::InvalidInput(format!("Invalid state {:?} for tx {tx_id}", status))
             }
-            SsiError::TenantMismatch { expected, found } => {
-                ContextraError::PolicyViolation(format!(
-                    "Tenant mismatch: expected {expected:?}, found {found:?}"
-                ))
-            }
+            SsiError::TenantMismatch { expected, found } => ContextraError::PolicyViolation(
+                format!("Tenant mismatch: expected {expected:?}, found {found:?}"),
+            ),
             SsiError::SequenceLogDivergence { message } | SsiError::Internal { message } => {
                 ContextraError::Internal(message)
             }

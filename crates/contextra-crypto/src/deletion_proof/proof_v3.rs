@@ -5,15 +5,15 @@
 
 use super::layer_proof::LayerCleanupProof;
 use super::proof::DeletionProof;
-use super::types::{
-    DeletionScope, DurabilityProof, ExcludedScope, GraphRepairAttestation,
-};
+use super::types::{DeletionScope, DurabilityProof, ExcludedScope, GraphRepairAttestation};
 use crate::error::CryptoError;
 use contextra_types::{ContextraError, Result, TxId};
 
 impl DeletionProof {
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -28,7 +28,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_with_wal_receipt(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -44,7 +46,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_with_durability(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -60,7 +64,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_v3(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -78,7 +84,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_v3_with_audit_position(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -97,7 +105,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_with_wal_receipt_v3(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -116,7 +126,9 @@ impl DeletionProof {
     }
 
     /// Creation of Version 3 deletion proofs is forbidden per §20 and ADR-13.
-    #[deprecated(note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs.")]
+    #[deprecated(
+        note = "Creation of v3 deletion proofs is forbidden per §20 and ADR-13. Use ProofBuilder for v4 deletion proofs."
+    )]
     pub fn create_full_v3(
         _scope: DeletionScope,
         _deleted_keys: Vec<Vec<u8>>,
@@ -181,8 +193,8 @@ impl DeletionProof {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::{DeletionLayer, DeletionScope, ExcludedScope};
+    use super::*;
     use crate::ed25519_proof::SignatureVersion;
     use contextra_types::{DocId, TenantId, TxId};
 

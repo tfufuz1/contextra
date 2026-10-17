@@ -114,7 +114,9 @@ fn load_proof_key_from_file(path: &str) -> Result<Zeroizing<String>, String> {
         .map_err(|e| format!("deletion proof key file error: failed to stat '{path}': {e}"))?;
 
     if symlink_meta.file_type().is_symlink() {
-        return Err("deletion proof key file error: symlinks are forbidden for key files".to_string());
+        return Err(
+            "deletion proof key file error: symlinks are forbidden for key files".to_string(),
+        );
     }
 
     #[cfg(unix)]

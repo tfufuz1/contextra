@@ -29,13 +29,13 @@ pub mod wand;
 pub mod wiring;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
-pub use wiring::TextWiring;
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
+pub use wiring::TextWiring;
 
 use contextra_ports::{TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};

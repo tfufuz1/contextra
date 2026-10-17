@@ -23,7 +23,9 @@ fn test_j23_seq_log_expired_pins_and_set_max_pin_duration() {
 
     seq_log_arc.write().pin_snapshot_at(100, past_ticks);
 
-    let min_ret = seq_log_arc.read().min_retention_seq_at(past_ticks + 50_000_000);
+    let min_ret = seq_log_arc
+        .read()
+        .min_retention_seq_at(past_ticks + 50_000_000);
     assert_eq!(min_ret, Some(100));
 }
 

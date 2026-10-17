@@ -5,11 +5,11 @@
 
 #![forbid(unsafe_code)]
 
+use crate::erasure_ledger::{ErasureLedger, LedgerDecision};
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_ports::{RestoreGuard, RestoreVerdict};
 use contextra_types::TxId;
-use crate::erasure_ledger::{ErasureLedger, LedgerDecision};
 use std::sync::Arc;
 
 /// Streamender Anti-Resurrection Guard zur Verhinderung der Wiederbelebung gelöschter Schlüssel

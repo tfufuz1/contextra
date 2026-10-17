@@ -546,7 +546,11 @@ impl KeyRegistry {
     }
 
     /// Queries the current [`KeyLifecycleState`] for a group.
-    pub fn key_lifecycle_state(&self, group_id: u64, _current_time_nanos: u64) -> KeyLifecycleState {
+    pub fn key_lifecycle_state(
+        &self,
+        group_id: u64,
+        _current_time_nanos: u64,
+    ) -> KeyLifecycleState {
         if self.is_group_revoked(group_id) {
             KeyLifecycleState::KeyDestroyed
         } else {
@@ -580,7 +584,11 @@ impl KeyRegistry {
     ///
     /// # Aufrufvertrag (Call Contract):
     /// See [`shred_segment_key`].
-    pub fn shred_segment_key(&self, _tenant: contextra_types::TenantId, segment_id: u64) -> Result<bool> {
+    pub fn shred_segment_key(
+        &self,
+        _tenant: contextra_types::TenantId,
+        segment_id: u64,
+    ) -> Result<bool> {
         self.revoke_group(segment_id)
     }
 
@@ -752,7 +760,9 @@ impl KeyRegistry {
                     Nonce::from_slice(&payload.dek_nonce),
                     payload.wrapped_dek.as_slice(),
                 )
-                .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?,
+                .map_err(|e| {
+                    CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}"))
+                })?,
         );
 
         let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
@@ -963,12 +973,18 @@ mod tests {
 
         // Shred segment key using shred_segment_key API
         let shredded = shred_segment_key(&registry, tenant, segment_id)?;
-        assert!(shredded, "shred_segment_key must return Ok(true) on first shred");
+        assert!(
+            shredded,
+            "shred_segment_key must return Ok(true) on first shred"
+        );
         assert!(!registry.is_group_active(segment_id));
 
         // Subsequent shred attempt returns Ok(false)
         let shredded_again = shred_segment_key(&registry, tenant, segment_id)?;
-        assert!(!shredded_again, "shred_segment_key must return Ok(false) on second shred");
+        assert!(
+            !shredded_again,
+            "shred_segment_key must return Ok(false) on second shred"
+        );
 
         Ok(())
     }

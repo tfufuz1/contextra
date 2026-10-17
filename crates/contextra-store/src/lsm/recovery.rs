@@ -6,9 +6,11 @@ use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp, WalReplayOptions};
-use contextra_types::{ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT, TxId};
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_types::{
+    ContextraError, ResourceBudget, ResourceTracker, Result, TxId, TOMBSTONE_BIT,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -275,27 +277,35 @@ impl LsmStorage {
         let salt_bytes: [u8; 32] = salt.as_slice().try_into().unwrap_or([0u8; 32]);
         let ledger_key = crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes);
         let db_has_data = !directory_is_pristine(&config.path).await?;
-        let (ledger_opt, ledger_status) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
-            &config.path,
-            ledger_key,
-            db_has_data,
-            None,
-        ).await?;
+        let (ledger_opt, ledger_status) =
+            crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
+                &config.path,
+                ledger_key,
+                db_has_data,
+                None,
+            )
+            .await?;
 
         let read_only = !matches!(
             ledger_status,
-            crate::erasure_ledger::LedgerOpenStatus::Ok | crate::erasure_ledger::LedgerOpenStatus::Fresh
+            crate::erasure_ledger::LedgerOpenStatus::Ok
+                | crate::erasure_ledger::LedgerOpenStatus::Fresh
         );
 
-        let erasure_ledger_handle = ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
+        let erasure_ledger_handle =
+            ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
 
         let mut replay_options = WalReplayOptions::default();
         if let Some(ref handle) = erasure_ledger_handle {
-            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(Arc::clone(handle))));
+            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(
+                Arc::clone(handle),
+            )));
         }
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let (wal_entries, _report) = wal.replay_with_filter(replay_options.filter.as_deref()).await?;
+            let (wal_entries, _report) = wal
+                .replay_with_filter(replay_options.filter.as_deref())
+                .await?;
 
             if let Some((_, last_entry, _)) = wal_entries.last() {
                 last_replayed_hmac = Some(last_entry.checksum);
@@ -547,12 +557,17 @@ impl LsmStorage {
                 path = ?config.path,
                 "Interrupted purge resumption failed during LsmStorage recovery"
             );
-            return Err(ContextraError::Storage(format!("Purge resumption failed: {e}")));
+            return Err(ContextraError::Storage(format!(
+                "Purge resumption failed: {e}"
+            )));
         }
 
         // 2. Witness Scan über SSTable Dateiklassen (Verdrahtung Punkt 4)
         let sst_read = sstables.read().await;
-        let live_sst_paths: Vec<_> = sst_read.iter().map(|s| s.file_path().to_path_buf()).collect();
+        let live_sst_paths: Vec<_> = sst_read
+            .iter()
+            .map(|s| s.file_path().to_path_buf())
+            .collect();
         drop(sst_read);
 
         let witness_res = crate::sstable::collect_witnesses(
@@ -581,7 +596,9 @@ impl LsmStorage {
             as_of_tx: max_tx,
             depth: 1,
         };
-        if let Ok(inventory) = crate::sstable::witness_inventory::SstInventory::build(&witness_inputs) {
+        if let Ok(inventory) =
+            crate::sstable::witness_inventory::SstInventory::build(&witness_inputs)
+        {
             let orphan_plan = crate::sstable::orphan_gc::plan_orphan_removal(&inventory, &[]);
             if !orphan_plan.files_to_remove.is_empty() {
                 tracing::info!(

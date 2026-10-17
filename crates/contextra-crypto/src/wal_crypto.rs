@@ -490,8 +490,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_encrypted_wal_from_kms_roundtrip() -> Result<()> {
-        use crate::kms::LocalKmsProvider;
         use crate::keystore::MfksKeystore;
+        use crate::kms::LocalKmsProvider;
         use crate::kv_shredding::KeyRegistry;
         use crate::revocation_log::RevocationLog;
         use contextra_ports::SystemClock;

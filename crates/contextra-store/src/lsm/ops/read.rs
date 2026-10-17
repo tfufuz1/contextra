@@ -2,8 +2,8 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_types::{Result, TOMBSTONE_BIT};
 use contextra_ports::StorageEngine;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
 pub(crate) async fn get_tracked(

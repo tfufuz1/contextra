@@ -18,7 +18,11 @@ pub struct SnapshotLease {
 
 impl SnapshotLease {
     /// Creates a new `SnapshotLease`.
-    pub fn new(registry: Arc<SnapshotRegistry>, seq_no: u64, created_at_ticks: Option<u64>) -> Self {
+    pub fn new(
+        registry: Arc<SnapshotRegistry>,
+        seq_no: u64,
+        created_at_ticks: Option<u64>,
+    ) -> Self {
         Self {
             registry,
             seq_no,

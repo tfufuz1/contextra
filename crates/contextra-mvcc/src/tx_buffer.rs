@@ -228,8 +228,7 @@ impl<T: Clone> TxBuffer<T> {
             shards.push(RwLock::new(TxShard::new()));
             key_shards.push(RwLock::new(KeyShard::new()));
         }
-        let tx_timeout_ticks =
-            u64::try_from(config.tx_timeout.as_nanos()).unwrap_or(u64::MAX);
+        let tx_timeout_ticks = u64::try_from(config.tx_timeout.as_nanos()).unwrap_or(u64::MAX);
         Self {
             shards,
             key_shards,
@@ -298,7 +297,11 @@ impl<T: Clone> TxBuffer<T> {
     pub fn begin_at(&self, tx: TxId, at_ticks: u64) {
         let lease = self.snapshot_registry.as_ref().map(|reg| {
             let la = self.last_applied.as_ref();
-            SnapshotRegistry::acquire_at(reg, || la.map_or(0, |a| a.load(Ordering::Acquire)), at_ticks)
+            SnapshotRegistry::acquire_at(
+                reg,
+                || la.map_or(0, |a| a.load(Ordering::Acquire)),
+                at_ticks,
+            )
         });
 
         let shard_idx = self.shard_idx(tx);
@@ -505,10 +508,7 @@ impl<T: Clone> TxBuffer<T> {
         }
 
         let max_ops = self.config.max_ops_per_tx;
-        let entry = shard
-            .ops
-            .entry(tx)
-            .or_insert_with(|| (Vec::new(), 0));
+        let entry = shard.ops.entry(tx).or_insert_with(|| (Vec::new(), 0));
 
         if entry.0.len() + ops_vec.len() > max_ops {
             return Err(ContextraError::Transaction(format!(

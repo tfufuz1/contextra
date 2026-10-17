@@ -145,7 +145,10 @@ impl SequenceLog {
     /// Pins a historical sequence number at a specific timestamp in ticks (`at_ticks`) for deterministic testing and lease tracking.
     pub fn pin_snapshot_at(&mut self, seq_no: u64, at_ticks: u64) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
-        self.pinned_snapshots.entry(seq_no).or_default().push(at_ticks);
+        self.pinned_snapshots
+            .entry(seq_no)
+            .or_default()
+            .push(at_ticks);
     }
 
     /// Unpins a historical sequence number.

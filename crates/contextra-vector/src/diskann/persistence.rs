@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
 use super::format::{
-    DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC, DISKANN_INTEGRITY_KEY, DISKANN_MAGIC,
+    DiskAnnFooter, DiskAnnHeader, CHECKSUM_SEED, DISKANN_FOOTER_MAGIC, DISKANN_MAGIC,
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
@@ -15,6 +15,29 @@ use contextra_core::{ContextraError, DocId, Result};
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
+    pub(crate) fn remove_wal_file_robust(path: &std::path::Path) -> Result<()> {
+        if !path.exists() {
+            return Ok(());
+        }
+        if let Err(e) = std::fs::remove_file(path) {
+            if !path.exists() {
+                return Ok(());
+            }
+            if let Err(retry_err) = std::fs::remove_file(path) {
+                if path.exists() {
+                    return Err(ContextraError::Io(std::io::Error::new(
+                        retry_err.kind(),
+                        format!(
+                            "WAL file {} removal failed after retry; file remains intact and safe to replay: {retry_err} (initial error: {e})",
+                            path.display()
+                        ),
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn trigger_background_persist_delta(&self) {
         if !self.inner.flushing_in_progress.swap(true, Ordering::AcqRel) {
             let index_clone = self.clone();
@@ -39,16 +62,13 @@ impl DiskAnnIndex {
 
     pub fn persist_delta_sync(&self) -> Result<()> {
         let pending = {
-            let mut guard = self.inner.pending_inserts.write();
-            self.inner.pending_count.store(0, Ordering::Relaxed);
-            std::mem::take(&mut *guard)
+            let guard = self.inner.pending_inserts.read();
+            guard.clone()
         };
 
         if pending.is_empty() {
             let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-            if pending_wal.exists() {
-                let _ = std::fs::remove_file(&pending_wal);
-            }
+            Self::remove_wal_file_robust(&pending_wal)?;
             return Ok(());
         }
 
@@ -70,13 +90,20 @@ impl DiskAnnIndex {
         let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
         self.write_incremental_to_file_sync(&tmp_path, &pending)?;
 
-        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
-        let index_path = self.inner.config.index_path.clone();
         let tmp_file = std::fs::File::open(&tmp_path)?;
         tmp_file
             .sync_all()
             .map_err(|e| ContextraError::Storage(format!("fsync tmp: {e}")))?;
         drop(tmp_file);
+
+        #[cfg(test)]
+        self.maybe_failpoint("temp_written")?;
+
+        #[cfg(test)]
+        self.maybe_failpoint("before_rename")?;
+
+        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
+        let index_path = self.inner.config.index_path.clone();
         std::fs::rename(&tmp_path, &index_path)
             .map_err(|e| ContextraError::Storage(format!("rename: {e}")))?;
         if let Some(parent) = index_path.parent() {
@@ -86,12 +113,29 @@ impl DiskAnnIndex {
             }
         }
 
+        #[cfg(test)]
+        self.maybe_failpoint("after_rename")?;
+
+        self.load_sync()?; // Mmap neu laden
+
+        #[cfg(test)]
+        self.maybe_failpoint("before_wal_removal")?;
+
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        if pending_wal.exists() {
-            let _ = std::fs::remove_file(&pending_wal);
+        Self::remove_wal_file_robust(&pending_wal)?;
+
+        {
+            let mut guard = self.inner.pending_inserts.write();
+            if guard.len() >= pending.len() {
+                guard.drain(..pending.len());
+            } else {
+                guard.clear();
+            }
+            let remaining = guard.len() as u64;
+            self.inner.pending_count.store(remaining, Ordering::Relaxed);
         }
 
-        self.load_sync() // Mmap neu laden
+        Ok(())
     }
 
     #[allow(clippy::unnecessary_cast)]
@@ -173,7 +217,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
@@ -315,7 +359,7 @@ impl DiskAnnIndex {
                         ContextraError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
