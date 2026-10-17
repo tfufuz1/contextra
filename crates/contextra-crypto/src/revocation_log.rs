@@ -1005,7 +1005,7 @@ mod tests {
             "RAM entries count MUST remain 0 on write failure"
         );
         assert!(
-            !log.is_revoked(&target),
+            !log.revoked_targets.read().contains(&target),
             "Target MUST NOT be marked revoked in RAM on write failure"
         );
 
