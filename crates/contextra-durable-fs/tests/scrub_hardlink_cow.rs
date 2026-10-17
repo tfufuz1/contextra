@@ -4,7 +4,9 @@
 // INVARIANTEN: Zero-Panic, pure safe Rust, Hardlinks werden bei scrub_and_remove NIEMALS überschrieben.
 
 use contextra_durable_fs::{
-    scrub_and_remove, scrub_and_remove_with_injector, FaultInjector, ScrubMethod, ScrubReceipt,
+    scrub_and_remove, scrub_and_remove_with_injector, scrub_and_remove_with_mountinfo,
+    scrub_if_safe_with_mountinfo, FaultInjector, NoFault, ScrubMethod, ScrubOutcome,
+    ScrubPolicy, ScrubReceipt, ScrubRefusal,
 };
 use tempfile::TempDir;
 
@@ -51,6 +53,47 @@ fn test_scrub_normal_file_overwrites_and_removes() -> std::io::Result<()> {
     assert_eq!(receipt.bytes_scrubbed, 1024);
     assert_eq!(receipt.nlink, 1);
     assert!(!file_path.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_cow_detection_with_injected_mountinfo() -> std::io::Result<()> {
+    let tmp_dir = TempDir::new()?;
+    let file_path = tmp_dir.path().join("cow_test.dat");
+
+    let data = b"COW_FILESYSTEM_TEST_DATA";
+    std::fs::write(&file_path, data)?;
+
+    // Mock mountinfo text indicating btrfs on /tmp or target dir
+    let mount_dir = tmp_dir.path().to_string_lossy();
+    let injected_mountinfo = format!(
+        "28 21 0:25 / {} rw,relatime master:1 - btrfs /dev/sda1 rw,space_cache\n",
+        mount_dir
+    );
+
+    // Test scrub_and_remove_with_mountinfo
+    let receipt = scrub_and_remove_with_mountinfo(&file_path, &NoFault, Some(&injected_mountinfo))?;
+
+    assert_eq!(receipt.method, ScrubMethod::UnlinkOnly);
+    assert_eq!(receipt.bytes_scrubbed, 0);
+    assert!(receipt.cow_fs);
+
+    // Test scrub_if_safe_with_mountinfo on a fresh file
+    let file_path_2 = tmp_dir.path().join("cow_test_2.dat");
+    std::fs::write(&file_path_2, data)?;
+
+    let outcome = scrub_if_safe_with_mountinfo(
+        &file_path_2,
+        ScrubPolicy::OverwriteZeros,
+        false,
+        false,
+        &NoFault,
+        Some(&injected_mountinfo),
+    )?;
+
+    assert_eq!(outcome, ScrubOutcome::Refused(ScrubRefusal::CopyOnWriteFilesystem));
+    assert!(file_path_2.exists());
 
     Ok(())
 }

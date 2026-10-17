@@ -41,7 +41,9 @@ pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
 pub use scrub::{
-    scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
+    scrub_and_remove, scrub_and_remove_with_injector, scrub_and_remove_with_mountinfo,
+    scrub_if_safe, scrub_if_safe_with_injector, scrub_if_safe_with_mountinfo, ScrubMethod,
+    ScrubOutcome, ScrubPolicy, ScrubReceipt, ScrubRefusal,
 };
 pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
 
@@ -351,44 +353,4 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
     injector.on_dir_fsync(parent)?;
     flush_dir(parent)?;
     Ok(())
-}
-
-/// Method used when removing a file during a scrub operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScrubMethod {
-    /// File contents were overwritten with zero bytes prior to unlinking.
-    OverwriteZeros,
-    /// Overwriting was skipped due to safety checks (e.g., hardlinks or CoW filesystem); file was unlinked without zeroing.
-    UnlinkOnly,
-}
-
-/// Receipt returned upon removing a file during a scrub operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ScrubReceipt {
-    /// Scrubbing execution method (zero-overwrite vs unlink-only).
-    pub method: ScrubMethod,
-    /// Total number of bytes overwritten with zeros prior to removal.
-    pub bytes_scrubbed: u64,
-    /// Link count (nlink) of the target file at removal time.
-    pub nlink: u64,
-    /// Detected filesystem type string (e.g. "ext4", "xfs", "btrfs", "unknown").
-    pub fs_kind: String,
-    /// Indicates whether the filesystem is classified as Copy-on-Write (CoW).
-    pub cow_fs: bool,
-}
-
-/// Removes a file and returns a [`ScrubReceipt`].
-///
-/// Overwrites file contents with zeros ONLY if `nlink == 1`, the filesystem is NOT Copy-on-Write,
-/// and no active readers are reported. Otherwise, skips zero-overwriting and durably unlinks the file.
-pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
-    scrub_and_remove_with_injector(path, &NoFault)
-}
-
-/// Removes a file with a custom [`FaultInjector`] and returns a [`ScrubReceipt`].
-pub fn scrub_and_remove_with_injector<F: FaultInjector>(
-    path: &Path,
-    injector: &F,
-) -> std::io::Result<ScrubReceipt> {
-    scrub::scrub_and_remove_with_injector(path, injector)
 }
