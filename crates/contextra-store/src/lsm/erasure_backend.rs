@@ -3,17 +3,21 @@
 // ZWECK: Implementation of ErasureBackend trait for LsmStorage (§5.11, F-05, REG-15).
 // INVARIANTEN: Zero-panic, physical scope derivation without downcasts, fail-closed errors.
 
-use contextra_types::{ContextraError, TxId};
 use contextra_ports::erasure::{
-    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, PurgeOutput,
+    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
+    PurgeOutput,
 };
+use contextra_types::{ContextraError, TxId};
 
 use crate::compaction::purge_filter::PurgeScope;
 use crate::lsm::engine::LsmStorage;
 use crate::tenant_codec::TenantKeyCodec;
 
 impl ErasureBackend for LsmStorage {
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError> {
+    fn physical_scope(
+        &self,
+        scope: &LogicalScope,
+    ) -> std::result::Result<PhysicalScope, ContextraError> {
         match scope {
             LogicalScope::Document {
                 doc_id,
@@ -22,7 +26,8 @@ impl ErasureBackend for LsmStorage {
             } => {
                 let codec = TenantKeyCodec::new(*tenant_id);
                 let col_prefix = codec.collection_prefix(collection_id);
-                let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
+                let doc_key =
+                    format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
                 PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![col_prefix])
             }
             LogicalScope::Collection {
@@ -41,7 +46,11 @@ impl ErasureBackend for LsmStorage {
         }
     }
 
-    fn acquire_fence(&self, _scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError> {
+    fn acquire_fence(
+        &self,
+        _scope: &PhysicalScope,
+        id: PurgeId,
+    ) -> std::result::Result<FenceGuard, ContextraError> {
         self.erasure_fence.acquire_scope_fence();
         Ok(FenceGuard { purge_id: id })
     }
@@ -58,11 +67,18 @@ impl ErasureBackend for LsmStorage {
             PurgeScope::Keys(scope.keys().to_vec())
         };
 
-        let handle = tokio::runtime::Handle::try_current()
-            .map_err(|e| PurgeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+            PurgeError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                e.to_string(),
+            ))
+        })?;
 
         let report = handle
-            .block_on(async { self.purge_keys(purge_scope, as_of.inner(), Some(probe)).await })
+            .block_on(async {
+                self.purge_keys(purge_scope, as_of.inner(), Some(probe))
+                    .await
+            })
             .map_err(|blocked| {
                 PurgeError::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,

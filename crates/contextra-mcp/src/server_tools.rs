@@ -98,10 +98,9 @@ impl McpServer {
 
         let k_val = args.get("k").or_else(|| args.get("limit"));
         let k_raw = match k_val {
-            Some(Value::Number(n)) => n
-                .as_u64()
-                .ok_or_else(|| McpError::invalid_params("k/limit muss eine positive Ganzzahl sein"))?
-                as usize,
+            Some(Value::Number(n)) => n.as_u64().ok_or_else(|| {
+                McpError::invalid_params("k/limit muss eine positive Ganzzahl sein")
+            })? as usize,
             Some(_) => return Err(McpError::invalid_params("k/limit muss eine Zahl sein")),
             None => 10,
         };
@@ -163,10 +162,7 @@ impl McpServer {
     }
 
     /// Hilfsfunktion zur Extraktion und Validierung der gemeinsamen Einfügeparameter (ID, Vektor, Text, Metadaten).
-    fn parse_insert_params<'a>(
-        &self,
-        args: &'a Value,
-    ) -> Result<ParsedInsertParams<'a>, McpError> {
+    fn parse_insert_params<'a>(&self, args: &'a Value) -> Result<ParsedInsertParams<'a>, McpError> {
         let collection_name = if let Some(col_val) = args.get("collection") {
             let s = col_val.as_str().ok_or_else(|| {
                 McpError::invalid_params("Invalid params: 'collection' must be a string")
@@ -505,12 +501,10 @@ impl McpServer {
         } else {
             let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
                 .key
-                .ok_or_else(|| {
-                    McpError::invalid_params("deletion proof key not configured")
-                })?;
+                .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
 
-            let tenant_id = contextra_types::TenantId::try_new(1)
-                .unwrap_or(contextra_types::TenantId::SYSTEM);
+            let tenant_id =
+                contextra_types::TenantId::try_new(1).unwrap_or(contextra_types::TenantId::SYSTEM);
 
             let proof = self
                 .db
@@ -595,22 +589,20 @@ impl McpServer {
         }
 
         let turns_scanned = turns.len();
-        let (consolidation_res, synthesis_res) =
-            contextra::execute_background_consolidation(
-                col.as_ref(),
-                &turns,
-                &contextra::memory_consolidation::ConsolidationConfig::default(),
-                None,
-                None,
-                None,
-                None,
-            )
-            .await
-            .map_err(McpError::from)?;
+        let (consolidation_res, synthesis_res) = contextra::execute_background_consolidation(
+            col.as_ref(),
+            &turns,
+            &contextra::memory_consolidation::ConsolidationConfig::default(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .map_err(McpError::from)?;
 
         let duplicates_tombstoned_count = consolidation_res.duplicates_tombstoned.len();
-        let cascade_tombstones_count =
-            consolidation_res.cascade_edge_tombstones_needed.len();
+        let cascade_tombstones_count = consolidation_res.cascade_edge_tombstones_needed.len();
         let synthesized_count = synthesis_res
             .as_ref()
             .map(|s| s.synthesized.len())
@@ -692,9 +684,8 @@ impl McpServer {
         let response =
             egress_gateway::handle_cloud_query(request, self.egress_classifier.as_ref()).await?;
 
-        serde_json::to_value(&response).map_err(|e| {
-            McpError::internal_error(format!("Response serialization error: {e}"))
-        })
+        serde_json::to_value(&response)
+            .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
     }
 
     /// Handler für `contextra_relate`.
@@ -817,8 +808,7 @@ impl McpServer {
         &self,
         participants_arr: &'a [Value],
     ) -> Result<Vec<(&'a str, &'a str)>, McpError> {
-        let mut participant_pairs: Vec<(&str, &str)> =
-            Vec::with_capacity(participants_arr.len());
+        let mut participant_pairs: Vec<(&str, &str)> = Vec::with_capacity(participants_arr.len());
 
         for (idx, elem) in participants_arr.iter().enumerate() {
             let obj = elem.as_object().ok_or_else(|| {
@@ -957,9 +947,7 @@ impl McpServer {
         let source_doc_id_opt = match args.get("source_doc_id") {
             Some(v) if !v.is_null() => {
                 let s = v.as_str().ok_or_else(|| {
-                    McpError::invalid_params(
-                        "Invalid params: 'source_doc_id' must be a string",
-                    )
+                    McpError::invalid_params("Invalid params: 'source_doc_id' must be a string")
                 })?;
                 if s.trim().is_empty() {
                     return Err(McpError::invalid_params("source_doc_id cannot be empty"));
@@ -1013,16 +1001,15 @@ impl McpServer {
         let reg_ref = match registry {
             Some(r) => r,
             None => {
-                empty_registry = contextra_ports::plugin::PluginRegistry::new(
-                    std::sync::Arc::new(contextra_license::OpenFastGate),
-                );
+                empty_registry = contextra_ports::plugin::PluginRegistry::new(std::sync::Arc::new(
+                    contextra_license::OpenFastGate,
+                ));
                 &empty_registry
             }
         };
         let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
-        serde_json::to_value(&status).map_err(|e| {
-            McpError::internal_error(format!("Response serialization error: {e}"))
-        })
+        serde_json::to_value(&status)
+            .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
     }
 }
 

@@ -3,10 +3,10 @@
 // ZWECK: Persistenter Purge-Intent für Crash-Konsistency (Spezifikation C5.1/C5.6).
 // INVARIANTEN: Atomare Persistenz via atomic_replace mit CRC32C-Schutz, Korruptionserkennung propagiert Err.
 
-pub use contextra_ports::PurgeState;
 use super::plan::PurgePhase;
 use crate::compaction::purge_filter::PurgeScope;
 use contextra_durable_fs::atomic_replace;
+pub use contextra_ports::PurgeState;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Error, ErrorKind, Result};

@@ -251,12 +251,20 @@ impl SnapshotRegistry {
     /// Checks if a given snapshot lease is still valid at `now_ticks`.
     ///
     /// Returns `Err(ContextraError::SnapshotExpired)` if the age of the lease exceeds `max_snapshot_age_ticks`.
-    pub fn check_lease_valid(&self, lease: &SnapshotLease, now_ticks: u64) -> Result<(), ContextraError> {
+    pub fn check_lease_valid(
+        &self,
+        lease: &SnapshotLease,
+        now_ticks: u64,
+    ) -> Result<(), ContextraError> {
         if let Some(created_at) = lease.created_at_ticks() {
             let age = now_ticks.saturating_sub(created_at);
             let max_age = self.max_snapshot_age_ticks();
             if age > max_age {
-                return Err(ContextraError::snapshot_expired(lease.seq_no(), age, max_age));
+                return Err(ContextraError::snapshot_expired(
+                    lease.seq_no(),
+                    age,
+                    max_age,
+                ));
             }
         }
         Ok(())

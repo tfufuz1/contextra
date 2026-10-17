@@ -323,10 +323,8 @@ async fn test_refutation_tampered_proof_or_witness_fails_verification() {
         tenant_id,
     };
 
-    let lsm_proof = LayerCleanupProof::verify_and_create(
-        DeletionLayer::LsmMemtable,
-        || Ok(true),
-    ).unwrap();
+    let lsm_proof =
+        LayerCleanupProof::verify_and_create(DeletionLayer::LsmMemtable, || Ok(true)).unwrap();
 
     let proof = DeletionProof::create(
         scope,
@@ -335,7 +333,8 @@ async fn test_refutation_tampered_proof_or_witness_fails_verification() {
         vec![lsm_proof],
         vec![],
         proof_key,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Verify valid base proof succeeds
     assert!(proof.verify(proof_key).unwrap());

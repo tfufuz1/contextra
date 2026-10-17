@@ -68,8 +68,8 @@ pub(super) use crate::memtable::MemTable;
 pub(super) use crate::sstable::{SstableBuilder, SstableReader};
 pub(super) use crate::wal::{Wal, WalOp};
 pub(super) use bytes::Bytes;
-pub(super) use contextra_types::{ContextraError, Result, TxId};
 pub(super) use contextra_ports::{BoxFuture, StorageEngine};
+pub(super) use contextra_types::{ContextraError, Result, TxId};
 pub(super) use std::path::PathBuf;
 pub(super) use std::sync::atomic::Ordering;
 

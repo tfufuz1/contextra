@@ -28,7 +28,10 @@ async fn test_lsm_storage_backpressure_throttles_writes_and_resumes() {
     let start_normal = Instant::now();
     for i in 1..=3 {
         let tx = TxId::new(i);
-        storage.put(tx, format!("key_{i}").as_bytes(), b"val").await.expect("put");
+        storage
+            .put(tx, format!("key_{i}").as_bytes(), b"val")
+            .await
+            .expect("put");
         storage.commit(tx).await.expect("commit");
     }
     let normal_duration = start_normal.elapsed();
@@ -48,12 +51,18 @@ async fn test_lsm_storage_backpressure_throttles_writes_and_resumes() {
             break;
         }
     }
-    assert!(transitioned, "System pressure monitor should transition pressure_rx to Critical");
+    assert!(
+        transitioned,
+        "System pressure monitor should transition pressure_rx to Critical"
+    );
 
     // Measure write latency under Critical pressure
     let start_critical = Instant::now();
     let tx_crit = TxId::new(100);
-    storage.put(tx_crit, b"key_crit", b"val_crit").await.expect("put crit");
+    storage
+        .put(tx_crit, b"key_crit", b"val_crit")
+        .await
+        .expect("put crit");
     storage.commit(tx_crit).await.expect("commit crit");
     let critical_duration = start_critical.elapsed();
 
@@ -78,12 +87,18 @@ async fn test_lsm_storage_backpressure_throttles_writes_and_resumes() {
             break;
         }
     }
-    assert!(resumed, "System pressure monitor should transition pressure_rx back to Normal");
+    assert!(
+        resumed,
+        "System pressure monitor should transition pressure_rx back to Normal"
+    );
 
     // Measure write latency under Normal pressure again
     let start_resumed = Instant::now();
     let tx_resumed = TxId::new(200);
-    storage.put(tx_resumed, b"key_resumed", b"val_resumed").await.expect("put resumed");
+    storage
+        .put(tx_resumed, b"key_resumed", b"val_resumed")
+        .await
+        .expect("put resumed");
     storage.commit(tx_resumed).await.expect("commit resumed");
     let resumed_duration = start_resumed.elapsed();
 

@@ -26,12 +26,10 @@ pub mod wiring;
 pub use floor::{GcFloor, SnapshotFloor};
 pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{
-    SnapshotRegistry, DEFAULT_MAX_SNAPSHOT_AGE_TICKS, DEFAULT_PIN_GRACE_TICKS,
-};
+pub use snapshot::{SnapshotRegistry, DEFAULT_MAX_SNAPSHOT_AGE_TICKS, DEFAULT_PIN_GRACE_TICKS};
 pub use ssi::{
-    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate,
-    SsiError, SsiValidator, TxSsiState, TxStateStatus,
+    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate, SsiError,
+    SsiValidator, TxSsiState, TxStateStatus,
 };
 pub use tx_buffer::{IndexOp, TxBuffer};
 pub use wiring::{MvccWiring, MvccWiringDeps};

@@ -32,8 +32,8 @@
 //! - **INVARIANT 4**: rollback(tx_id) removes ALL entries from that transaction atomically.
 
 use bytes::Bytes;
-use contextra_types::{TOMBSTONE_BIT, TxId};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::ops::Bound;
@@ -343,7 +343,7 @@ impl MemTable {
         let entries = self.shards[shard_idx].entries.read();
         let versions = entries.get(key)?;
 
-        use contextra_types::{TOMBSTONE_BIT, TxId};
+        use contextra_types::{TxId, TOMBSTONE_BIT};
 
         let target_raw_seq = seq_no & !TOMBSTONE_BIT;
 

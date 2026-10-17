@@ -3,12 +3,12 @@
 // ZWECK: Tenant-Matrix-Tests (REG-15) für ErasureBackend über LsmStorage und TenantScopedStorage
 // INVARIANTEN: Strikte Mandanten-Isolation, fail-closed Mandanten-Auflösung, Pflicht-TenantId bei remove_doc_segments
 
-use std::sync::Arc;
-use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope, PurgeOutput};
 use contextra_ports::{KvLifecycleHooks, StorageEngine};
 use contextra_store::lsm::LsmStorage;
 use contextra_store::tenant_codec::TenantScopedStorage;
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
@@ -82,7 +82,9 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
 struct DummyProbe;
 
 impl contextra_ports::erasure::FreeSpaceProbe for DummyProbe {
-    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::erasure::ProbeError> {
+    fn available_bytes(
+        &self,
+    ) -> std::result::Result<Option<u64>, contextra_ports::erasure::ProbeError> {
         Ok(Some(1024 * 1024 * 1024))
     }
 }
@@ -96,8 +98,10 @@ impl KvLifecycleHooks for TestKvHooks {
     fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
 
     fn remove_doc_segments(&self, tenant: TenantId, doc: DocId) {
-        self.last_removed_tenant.store(tenant.inner(), std::sync::atomic::Ordering::SeqCst);
-        self.last_removed_doc.store(doc.inner(), std::sync::atomic::Ordering::SeqCst);
+        self.last_removed_tenant
+            .store(tenant.inner(), std::sync::atomic::Ordering::SeqCst);
+        self.last_removed_doc
+            .store(doc.inner(), std::sync::atomic::Ordering::SeqCst);
     }
 
     fn purge_tenant(&self, _tenant: TenantId) {}
@@ -115,6 +119,16 @@ fn test_remove_doc_segments_requires_mandatory_tenant_id() {
 
     hooks.remove_doc_segments(tenant, doc);
 
-    assert_eq!(hooks.last_removed_tenant.load(std::sync::atomic::Ordering::SeqCst), 42);
-    assert_eq!(hooks.last_removed_doc.load(std::sync::atomic::Ordering::SeqCst), 99);
+    assert_eq!(
+        hooks
+            .last_removed_tenant
+            .load(std::sync::atomic::Ordering::SeqCst),
+        42
+    );
+    assert_eq!(
+        hooks
+            .last_removed_doc
+            .load(std::sync::atomic::Ordering::SeqCst),
+        99
+    );
 }

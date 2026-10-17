@@ -112,10 +112,7 @@ async fn test_single_doc_delete_does_not_contain_proof_field() {
         .await
         .expect("handle_delete success");
 
-    assert_eq!(
-        delete_res.get("ok").and_then(|v| v.as_bool()),
-        Some(true)
-    );
+    assert_eq!(delete_res.get("ok").and_then(|v| v.as_bool()), Some(true));
     assert_eq!(
         delete_res.get("id").and_then(|v| v.as_str()),
         Some("doc_123")

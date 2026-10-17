@@ -217,8 +217,10 @@ impl LsmStorage {
             let mut updated_sstables: Vec<Arc<SstableReader>> = sst_guard.clone();
 
             // Build a map from old path → new reader
-            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
-                std::collections::HashMap::new();
+            let mut replacement_map: std::collections::HashMap<
+                std::path::PathBuf,
+                Option<Arc<SstableReader>>,
+            > = std::collections::HashMap::new();
             for old_path in &replaced_old_paths {
                 // Default to None (removal) — will be overwritten if a replacement reader exists
                 replacement_map.insert(old_path.clone(), None);

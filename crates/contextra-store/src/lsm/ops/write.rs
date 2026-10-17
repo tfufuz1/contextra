@@ -16,10 +16,10 @@ use super::super::group_commit::{
 use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT, TxId};
-use contextra_ports::StorageEngine;
 use contextra_mvcc::IndexOp;
 use contextra_mvcc::SsiValidator;
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -761,7 +761,9 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     storage.cleanup_intent_locks_for_txs(&batch_txs);
                     let err_msg = format!("Commit rejected by erasure fence: {e}");
                     for req in requests {
-                        let _ = req.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                        let _ = req
+                            .sender
+                            .send(Err(ContextraError::Storage(err_msg.clone())));
                     }
                     return Err(ContextraError::Storage(err_msg));
                 }

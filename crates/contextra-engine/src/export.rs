@@ -111,6 +111,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 let stored: StoredDocument = match serde_json::from_slice(&v) {
                     Ok(d) => d,
+                    // SAFE-SKIP: Corrupted or non-StoredDocument payload under user prefix is omitted from export
                     Err(_) => continue,
                 };
 

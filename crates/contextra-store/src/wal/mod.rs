@@ -273,9 +273,9 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-use contextra_types::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 pub use contextra_crypto::crypto::KeyManager;
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

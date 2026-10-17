@@ -5,11 +5,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_types::{TenantId, TxId};
 use contextra_mvcc::{
-    CommitDecision, MvccWiring, MvccWiringDeps, ReadSet, SequenceLog,
-    SnapshotRegistry, SsiError, TxBuffer, TxSsiState, TxStateStatus,
+    CommitDecision, MvccWiring, MvccWiringDeps, ReadSet, SequenceLog, SnapshotRegistry, SsiError,
+    TxBuffer, TxSsiState, TxStateStatus,
 };
+use contextra_types::{TenantId, TxId};
 
 #[test]
 fn test_ssi_write_skew_cahill_fekete_rejection() {
@@ -134,8 +134,7 @@ fn test_fail_closed_on_missing_read_tracking_and_unknown_state() {
     let seq_log = SequenceLog::new();
     let tenant_id = TenantId::try_new(1).expect("valid tenant");
 
-    let tx_no_tracking = TxSsiState::new(TxId::new(401), tenant_id, 10)
-        .with_read_tracking(false);
+    let tx_no_tracking = TxSsiState::new(TxId::new(401), tenant_id, 10).with_read_tracking(false);
 
     let err1 = wiring
         .ssi_commit_gate
@@ -147,8 +146,8 @@ fn test_fail_closed_on_missing_read_tracking_and_unknown_state() {
         "Expected MissingReadTracking error, found: {err1:?}"
     );
 
-    let tx_aborted = TxSsiState::new(TxId::new(402), tenant_id, 10)
-        .with_status(TxStateStatus::Aborted);
+    let tx_aborted =
+        TxSsiState::new(TxId::new(402), tenant_id, 10).with_status(TxStateStatus::Aborted);
 
     let err2 = wiring
         .ssi_commit_gate

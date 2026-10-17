@@ -2,9 +2,7 @@
 #![cfg(not(loom))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::{
-    DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
-};
+use contextra_engine::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
 use contextra_types::{CollectionId, TenantId, TxId};
 
 fn test_proof_and_key() -> (DeletionProof, Vec<u8>) {
@@ -15,11 +13,11 @@ fn test_proof_and_key() -> (DeletionProof, Vec<u8>) {
     };
     let deleted_keys = vec![b"key1".to_vec(), b"key2".to_vec()];
     let tx_id = TxId(100);
-    let layer_proofs = vec![LayerCleanupProof::new_after_verified_empty(
-        DeletionLayer::SsTableAllLevels,
-        0,
-    )
-    .expect("layer proof")];
+    let layer_proofs =
+        vec![
+            LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
+                .expect("layer proof"),
+        ];
 
     let proof = DeletionProof::create(scope, deleted_keys, tx_id, layer_proofs, vec![], &key)
         .expect("create proof");

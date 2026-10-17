@@ -187,8 +187,8 @@ impl super::proof::DeletionProof {
         durability: Option<&super::types::DurabilityProof>,
         signing_key: &ed25519_dalek::SigningKey,
     ) -> contextra_types::Result<Self> {
-        let durability_proof =
-            durability.ok_or_else(|| contextra_types::ContextraError::from(CryptoError::NotDurable))?;
+        let durability_proof = durability
+            .ok_or_else(|| contextra_types::ContextraError::from(CryptoError::NotDurable))?;
         if durability_proof.confirmed_seq_no < deleted_after_tx.0 {
             return Err(CryptoError::NotDurable.into());
         }
@@ -198,7 +198,9 @@ impl super::proof::DeletionProof {
         let covered_layers: Vec<super::types::DeletionLayer> =
             covered_layers.into_iter().map(|p| p.layer).collect();
 
-        if covered_layers.contains(&super::types::DeletionLayer::HnswIndex) && graph_repair.is_empty() {
+        if covered_layers.contains(&super::types::DeletionLayer::HnswIndex)
+            && graph_repair.is_empty()
+        {
             return Err(contextra_types::ContextraError::GraphRepairFailed(
                 contextra_types::error::HnswDeletionError::VerificationFailed {
                     remaining_pointers: 1,

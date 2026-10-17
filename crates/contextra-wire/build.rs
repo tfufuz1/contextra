@@ -115,7 +115,10 @@ fn post_process_generated_code(output_file: &Path) {
             new_content.push('\n');
         }
         if std::fs::write(output_file, new_content).is_err() {
-            eprintln!("Failed to write post-processed code to {}", output_file.display());
+            eprintln!(
+                "Failed to write post-processed code to {}",
+                output_file.display()
+            );
         }
     }
 }

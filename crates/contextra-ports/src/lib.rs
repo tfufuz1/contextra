@@ -75,10 +75,10 @@ pub mod rng;
 pub mod snapshot;
 /// Key-value storage engine traits.
 pub mod storage;
-/// Time port traits (§7.4).
-pub mod time;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
 pub mod text_index;
+/// Time port traits (§7.4).
+pub mod time;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
 /// Composition Root wiring module.

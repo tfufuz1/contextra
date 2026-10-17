@@ -33,13 +33,13 @@ pub mod erasure_ledger;
 #[cfg(not(loom))]
 pub mod format;
 pub mod kv;
-pub mod restore_guard;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
 pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
+pub mod restore_guard;
 #[cfg(not(loom))]
 pub mod sstable;
 #[cfg(not(loom))]
@@ -75,8 +75,8 @@ pub use lsm::{
 };
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
+pub use restore_guard::StreamingRestoreGuard;
 #[cfg(not(loom))]
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
-pub use restore_guard::StreamingRestoreGuard;

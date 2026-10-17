@@ -1,8 +1,8 @@
 // ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};
-use contextra_types::{ContextraError, TxId};
 use contextra_ports::{Clock, SystemClock};
+use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, RecvTimeoutError, SyncSender};
 use std::sync::Arc;
