@@ -5,7 +5,7 @@
 
 use super::witness_inventory::SstInventory;
 use super::witness_types::WitnessReadError;
-use contextra_durable_fs::scrub_and_remove;
+use contextra_durable_fs::durable_remove;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,7 +51,7 @@ pub fn plan_orphan_removal(inventory: &SstInventory, running_ops: &[PathBuf]) ->
     OrphanPlan { files_to_remove }
 }
 
-/// Executes orphan removal using scrub_and_remove for APM-1 durability compliance.
+/// Executes orphan removal using durable_remove for APM-1 durability compliance.
 pub fn remove_orphans(plan: &OrphanPlan) -> Result<OrphanGcReceipt, WitnessReadError> {
     let mut receipt = OrphanGcReceipt::default();
 
@@ -65,8 +65,8 @@ pub fn remove_orphans(plan: &OrphanPlan) -> Result<OrphanGcReceipt, WitnessReadE
             Err(_) => 0,
         };
 
-        let _scrub_receipt = scrub_and_remove(file_path).map_err(|e| {
-            WitnessReadError::Io(format!("Failed to scrub and remove orphan file: {e}"))
+        durable_remove(file_path).map_err(|e| {
+            WitnessReadError::Io(format!("Failed to durably remove orphan file: {e}"))
         })?;
 
         receipt.files_removed += 1;
