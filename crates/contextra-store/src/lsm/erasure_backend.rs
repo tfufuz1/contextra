@@ -31,10 +31,10 @@ impl LsmStorage {
             .purge_keys(purge_scope, as_of.inner(), Some(probe))
             .await
             .map_err(|blocked| {
-                PurgeError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Purge compaction blocked: {:?}", blocked),
-                ))
+                PurgeError::Io(std::io::Error::other(format!(
+                    "Purge compaction blocked: {:?}",
+                    blocked
+                )))
             })?;
 
         Ok(PurgeOutput {
