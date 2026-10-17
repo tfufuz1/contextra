@@ -99,7 +99,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         updated_links = true;
                     }
                 }
-            } else if let Ok(mut full) = serde_json::from_slice::<StoredDocument>(&bytes) {
+            } else if let Ok(mut full) = StoredDocument::from_slice(&bytes) {
                 doc_id_str = Some(full.id.clone());
                 let full_obj = full.metadata.get_or_insert_with(|| serde_json::json!({}));
                 if let Some(obj) = full_obj.as_object_mut() {
@@ -140,7 +140,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .await?
                     {
                         if let Ok(mut full_doc) =
-                            serde_json::from_slice::<StoredDocument>(&user_bytes)
+                            StoredDocument::from_slice(&user_bytes)
                         {
                             let doc_obj = full_doc
                                 .metadata
@@ -165,7 +165,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                         )
                                     })?;
                                     obj.insert("links".to_string(), links_val);
-                                    let new_user_bytes = serde_json::to_vec(&full_doc)?;
+                                    let new_user_bytes = full_doc.encode_v2()?;
                                     self.storage.put(tx, &user_key, &new_user_bytes).await?;
                                 }
                             }
@@ -208,7 +208,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .and_then(|v| serde_json::from_value(v.clone()).ok())
                         .unwrap_or_default());
                 }
-            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&bytes) {
+            } else if let Ok(full) = StoredDocument::from_slice(&bytes) {
                 if let Some(obj) = full.metadata.as_ref().and_then(|m| m.as_object()) {
                     return Ok(obj
                         .get("links")

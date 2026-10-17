@@ -52,7 +52,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             total_sampled += 1;
             let doc_metadata = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(v) {
                 meta.metadata
-            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(v) {
+            } else if let Ok(full) = StoredDocument::from_slice(v) {
                 full.metadata
             } else {
                 None
@@ -95,7 +95,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let (id, doc_metadata) =
                 if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&v) {
                     (meta.id, meta.metadata)
-                } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&v) {
+                } else if let Ok(full) = StoredDocument::from_slice(&v) {
                     (full.id, full.metadata)
                 } else {
                     continue;
@@ -133,7 +133,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let (id_str, doc_metadata) =
                 if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&v) {
                     (meta.id, meta.metadata)
-                } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&v) {
+                } else if let Ok(full) = StoredDocument::from_slice(&v) {
                     (full.id, full.metadata)
                 } else {
                     continue;

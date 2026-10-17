@@ -61,9 +61,26 @@ pub struct IndexLoadReport {
     pub skipped_undecodable: u64,
     /// Number of documents that failed vector index insertion.
     pub failed_inserts: u64,
+    /// Number of legacy v1 documents migrated to v2 format on disk during index load.
+    #[serde(default)]
+    pub migrated_v1: u64,
     /// Duration taken to complete the index load operation.
     pub took: std::time::Duration,
 }
+
+/// Format version identifier for on-disk `StoredDocument` payloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoredDocumentVersion {
+    /// Legacy JSON text format (v1).
+    V1,
+    /// Binary format (v2) with magic header `b"CXSD"` and 0x02 version byte.
+    V2,
+}
+
+/// Magic header byte signature for binary `StoredDocument` v2 payloads ("CXSD").
+pub const STORED_DOCUMENT_MAGIC: [u8; 4] = *b"CXSD";
+/// Format version byte for `StoredDocument` v2 payloads.
+pub const STORED_DOCUMENT_VERSION_V2: u8 = 2;
 
 /// Policy controlling error handling during collection index loading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,11 +117,299 @@ impl Default for CollectionConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StoredDocument {
     pub id: String,
     pub embedding: Vec<f32>,
     pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct StoredDocumentUnversioned {
+    id: String,
+    embedding: Vec<f32>,
+    metadata: Option<serde_json::Value>,
+}
+
+impl StoredDocument {
+    /// Encodes this document into v2 binary format:
+    /// Magic (`b"CXSD"`, 4B) | Version (`0x02`, 1B) | `id_len` (4B BE) | `id` | `emb_len` (4B BE) | `embedding` (4B LE per f32) | `meta_len` (4B BE) | `metadata` (JSON)
+    pub fn encode_v2(&self) -> Result<Vec<u8>> {
+        for &val in &self.embedding {
+            if !val.is_finite() {
+                return Err(ContextraError::invalid_input(
+                    "Cannot encode StoredDocument v2: embedding contains non-finite f32 value",
+                ));
+            }
+        }
+
+        let id_bytes = self.id.as_bytes();
+        let id_len = u32::try_from(id_bytes.len()).map_err(|_| {
+            ContextraError::invalid_input("Document ID length exceeds u32 limit for v2 binary encoding")
+        })?;
+
+        let emb_len = u32::try_from(self.embedding.len()).map_err(|_| {
+            ContextraError::invalid_input("Embedding vector length exceeds u32 limit for v2 binary encoding")
+        })?;
+
+        let meta_bytes = match &self.metadata {
+            Some(meta) => serde_json::to_vec(meta).map_err(|e| {
+                ContextraError::Serialization(format!("Failed to serialize metadata for v2 binary encoding: {e}"))
+            })?,
+            None => Vec::new(),
+        };
+
+        let meta_len = u32::try_from(meta_bytes.len()).map_err(|_| {
+            ContextraError::invalid_input("Metadata byte length exceeds u32 limit for v2 binary encoding")
+        })?;
+
+        let total_cap = 5 + 4 + id_bytes.len() + 4 + (self.embedding.len() * 4) + 4 + meta_bytes.len();
+        let mut buf = Vec::with_capacity(total_cap);
+
+        buf.extend_from_slice(&STORED_DOCUMENT_MAGIC);
+        buf.push(STORED_DOCUMENT_VERSION_V2);
+
+        buf.extend_from_slice(&id_len.to_be_bytes());
+        buf.extend_from_slice(id_bytes);
+
+        buf.extend_from_slice(&emb_len.to_be_bytes());
+        for &f in &self.embedding {
+            buf.extend_from_slice(&f.to_le_bytes());
+        }
+
+        buf.extend_from_slice(&meta_len.to_be_bytes());
+        if !meta_bytes.is_empty() {
+            buf.extend_from_slice(&meta_bytes);
+        }
+
+        Ok(buf)
+    }
+
+    /// Decodes a `StoredDocument` from bytes, accepting both v1 (JSON text) and v2 binary formats.
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        Self::from_slice_versioned(bytes).map(|(doc, _)| doc)
+    }
+
+    /// Decodes a `StoredDocument` from bytes and returns the format version along with the document.
+    pub fn from_slice_versioned(bytes: &[u8]) -> Result<(Self, StoredDocumentVersion)> {
+        if bytes.len() >= 4 && &bytes[0..4] == STORED_DOCUMENT_MAGIC {
+            if bytes.len() < 5 {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2 binary header".into(),
+                ));
+            }
+            let version = bytes[4];
+            if version != STORED_DOCUMENT_VERSION_V2 {
+                return Err(ContextraError::Serialization(format!(
+                    "Unsupported StoredDocument binary version: {version}"
+                )));
+            }
+
+            let mut offset = 5;
+
+            if bytes.len() < offset + 4 {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing id_len".into(),
+                ));
+            }
+            let id_len = u32::from_be_bytes([
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3],
+            ]) as usize;
+            offset += 4;
+
+            if bytes.len() < offset + id_len {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing id bytes".into(),
+                ));
+            }
+            let id = std::str::from_utf8(&bytes[offset..offset + id_len])
+                .map_err(|e| {
+                    ContextraError::Serialization(format!("Invalid UTF-8 in StoredDocument v2 id: {e}"))
+                })?
+                .to_string();
+            offset += id_len;
+
+            if bytes.len() < offset + 4 {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing emb_len".into(),
+                ));
+            }
+            let emb_len = u32::from_be_bytes([
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3],
+            ]) as usize;
+            offset += 4;
+
+            let emb_bytes_len = emb_len.checked_mul(4).ok_or_else(|| {
+                ContextraError::Serialization("Overflow calculating embedding byte size".into())
+            })?;
+
+            if bytes.len() < offset + emb_bytes_len {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing embedding bytes".into(),
+                ));
+            }
+
+            let mut embedding = Vec::with_capacity(emb_len);
+            for chunk in bytes[offset..offset + emb_bytes_len].chunks_exact(4) {
+                let arr: [u8; 4] = chunk.try_into().map_err(|_| {
+                    ContextraError::Serialization("Slice conversion failed for f32 byte chunk".into())
+                })?;
+                let val = f32::from_le_bytes(arr);
+                if !val.is_finite() {
+                    return Err(ContextraError::Serialization(
+                        "Decoded StoredDocument v2 contains non-finite f32 embedding value".into(),
+                    ));
+                }
+                embedding.push(val);
+            }
+            offset += emb_bytes_len;
+
+            if bytes.len() < offset + 4 {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing meta_len".into(),
+                ));
+            }
+            let meta_len = u32::from_be_bytes([
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3],
+            ]) as usize;
+            offset += 4;
+
+            if bytes.len() < offset + meta_len {
+                return Err(ContextraError::Serialization(
+                    "Truncated StoredDocument v2: missing metadata bytes".into(),
+                ));
+            }
+
+            let metadata = if meta_len > 0 {
+                let meta_slice = &bytes[offset..offset + meta_len];
+                let val: serde_json::Value = serde_json::from_slice(meta_slice).map_err(|e| {
+                    ContextraError::Serialization(format!("Invalid metadata JSON in StoredDocument v2: {e}"))
+                })?;
+                Some(val)
+            } else {
+                None
+            };
+            offset += meta_len;
+
+            if offset != bytes.len() {
+                return Err(ContextraError::Serialization(
+                    "Trailing bytes after StoredDocument v2 binary payload".into(),
+                ));
+            }
+
+            Ok((
+                StoredDocument {
+                    id,
+                    embedding,
+                    metadata,
+                },
+                StoredDocumentVersion::V2,
+            ))
+        } else {
+            // Attempt v1 (JSON) deserialization
+            let doc: StoredDocumentUnversioned = serde_json::from_slice(bytes).map_err(|e| {
+                ContextraError::Serialization(format!(
+                    "Failed to deserialize StoredDocument (not v2 binary magic CXSD nor valid v1 JSON): {e}"
+                ))
+            })?;
+
+            for &val in &doc.embedding {
+                if !val.is_finite() {
+                    return Err(ContextraError::Serialization(
+                        "Decoded StoredDocument v1 contains non-finite f32 embedding value".into(),
+                    ));
+                }
+            }
+
+            Ok((
+                StoredDocument {
+                    id: doc.id,
+                    embedding: doc.embedding,
+                    metadata: doc.metadata,
+                },
+                StoredDocumentVersion::V1,
+            ))
+        }
+    }
+}
+
+impl Serialize for StoredDocument {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let bytes = self.encode_v2().map_err(serde::ser::Error::custom)?;
+        serializer.serialize_bytes(&bytes)
+    }
+}
+
+impl<'de> Deserialize<'de> for StoredDocument {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = StoredDocument;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a v1 JSON StoredDocument or v2 binary StoredDocument")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                StoredDocument::from_slice(v).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                StoredDocument::from_slice(&v).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                StoredDocument::from_slice(v.as_bytes()).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                let helper = StoredDocumentUnversioned::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?;
+                for &val in &helper.embedding {
+                    if !val.is_finite() {
+                        return Err(serde::de::Error::custom(
+                            "Decoded StoredDocument contains non-finite f32 embedding value",
+                        ));
+                    }
+                }
+                Ok(StoredDocument {
+                    id: helper.id,
+                    embedding: helper.embedding,
+                    metadata: helper.metadata,
+                })
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 /// Leichtgewichtige Metadaten (für doc_key, key_type=1) — KEIN Embedding.
@@ -547,9 +852,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.kv_store.as_ref()
     }
 
+    /// Returns the tenant ID associated with this collection.
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        contextra_types::TenantId::default()
+    }
+
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<crate::TenantIsolatedKvStore>> {
+    pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
         None
     }
 
@@ -672,6 +982,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut decoded: u64 = 0;
         let mut skipped_undecodable: u64 = 0;
         let mut failed_inserts: u64 = 0;
+        let mut migrated_v1: u64 = 0;
+
+        let mut v1_migrations: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
 
         const INDEX_LOAD_SKIPPED_TOTAL: &str = "contextra_index_load_skipped_total";
 
@@ -682,8 +995,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             scanned += 1;
 
-            let stored: StoredDocument = match serde_json::from_slice(&v) {
-                Ok(d) => d,
+            let (stored, version) = match StoredDocument::from_slice_versioned(&v) {
+                Ok(res) => res,
                 Err(e) => {
                     skipped_undecodable += 1;
                     crate::metrics_names::record_counter_safe(
@@ -713,6 +1026,34 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
             };
+
+            if version == StoredDocumentVersion::V1 {
+                let v2_bytes = match stored.encode_v2() {
+                    Ok(b) => b,
+                    Err(e) => {
+                        let short_hash = blake3::hash(&k).to_hex()[..16].to_string();
+                        match policy {
+                            LoadPolicy::Strict => {
+                                return Err(ContextraError::Index(format!(
+                                    "Failed to encode v2 migrated payload for doc {} at key hash {short_hash}: {e}",
+                                    stored.id
+                                )));
+                            }
+                            LoadPolicy::Lenient { max_skipped } => {
+                                skipped_undecodable += 1;
+                                let total_skipped = skipped_undecodable + failed_inserts;
+                                if total_skipped > max_skipped {
+                                    return Err(ContextraError::Index(format!(
+                                        "Exceeded max_skipped limit ({max_skipped}) during v1 migration encoding: {e}"
+                                    )));
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                };
+                v1_migrations.push((k.clone(), v2_bytes));
+            }
 
             decoded += 1;
 
@@ -747,6 +1088,34 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
+        if !v1_migrations.is_empty() {
+            let mig_tx = self.allocate_tx()?;
+            for (key, v2_data) in v1_migrations {
+                if let Err(e) = self.storage.put(mig_tx, &key, &v2_data).await {
+                    if let Err(rb_err) = self.storage.rollback(mig_tx).await {
+                        tracing::error!("Failed to rollback migration transaction: {rb_err}");
+                    }
+                    return Err(ContextraError::Index(format!(
+                        "Failed to put v2 document in storage during migration: {e}"
+                    )));
+                }
+                migrated_v1 += 1;
+            }
+            if let Err(e) = self.storage.commit(mig_tx).await {
+                if let Err(rb_err) = self.storage.rollback(mig_tx).await {
+                    tracing::error!("Failed to rollback migration transaction: {rb_err}");
+                }
+                return Err(ContextraError::Index(format!(
+                    "Failed to commit migration transaction during load_index: {e}"
+                )));
+            }
+            tracing::info!(
+                migrated = migrated_v1,
+                collection = %self.name,
+                "Successfully migrated v1 documents to v2 binary format"
+            );
+        }
+
         self.index.commit(tx).await?;
 
         let end_ticks = self.clock().monotonic_ticks();
@@ -758,6 +1127,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             decoded,
             skipped_undecodable,
             failed_inserts,
+            migrated_v1,
             took,
         };
 
@@ -784,7 +1154,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         for (k, v) in entries {
             // Try parsing as full document first (which indicates it needs migration)
-            if let Ok(full) = serde_json::from_slice::<StoredDocument>(&v) {
+            if let Ok(full) = StoredDocument::from_slice(&v) {
                 let meta_only = StoredDocumentMeta::from(&full);
                 if let Ok(meta_data) = serde_json::to_vec(&meta_only) {
                     self.storage.put(tx, &k, &meta_data).await?;

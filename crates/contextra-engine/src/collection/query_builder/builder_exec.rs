@@ -352,7 +352,7 @@ where
                 {
                     (meta.id, meta.metadata)
                 } else if let Ok(full) =
-                    serde_json::from_slice::<crate::collection::StoredDocument>(&bytes)
+                    crate::collection::StoredDocument::from_slice(&bytes)
                 {
                     (full.id, full.metadata)
                 } else {
