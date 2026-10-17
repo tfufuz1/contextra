@@ -2,9 +2,10 @@
 // STAND: 2026-10-12
 // ZWECK: Tests für präzise Scope-Fences (ErasureFence) und Invarianten.
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::fence::{ErasureFence, FenceError};
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -173,6 +174,145 @@ async fn test_all_write_paths_respect_fence() {
 
     let commit_res = storage.commit(tx_staged).await;
     assert!(commit_res.is_err());
+
+    storage.close().await.unwrap();
+}
+
+use contextra_ports::erasure::{ErasureBackend, FreeSpaceProbe, PhysicalScope, ProbeError};
+use contextra_types::TenantId;
+
+struct TestProbe;
+impl FreeSpaceProbe for TestProbe {
+    fn available_bytes(&self) -> Result<Option<u64>, ProbeError> {
+        Ok(Some(100_000_000))
+    }
+}
+
+#[test]
+fn test_fence_no_runtime() {
+    let fence = ErasureFence::new();
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fence.acquire_scope_fence_for(vec![b"prefix:".to_vec()])
+    }));
+    assert!(res.is_ok(), "Expected success without runtime");
+    assert!(res.unwrap().is_ok());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_fence_current_thread_runtime() {
+    let fence = ErasureFence::new();
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fence.acquire_scope_fence_for(vec![b"prefix:".to_vec()])
+    }));
+    assert!(res.is_ok(), "Expected success in current_thread runtime");
+    assert!(res.unwrap().is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_fence_multi_thread_runtime() {
+    let fence = ErasureFence::new();
+    let res = fence.acquire_scope_fence_for(vec![b"prefix:".to_vec()]);
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
+async fn test_fence_async_task_context() {
+    let fence = std::sync::Arc::new(ErasureFence::new());
+    let fence_clone = fence.clone();
+    let handle = tokio::spawn(async move {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let res = fence_clone.acquire_scope_fence_for(vec![b"prefix:".to_vec()]);
+            res.is_ok()
+        }))
+    });
+    let res = handle.await.unwrap();
+    assert!(res.is_ok(), "Expected success in async task");
+    assert!(res.unwrap());
+}
+
+#[test]
+fn test_purge_physical_no_runtime() {
+    let tmp = tempdir().unwrap();
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let storage = rt.block_on(async { LsmStorage::open(config).await.unwrap() });
+    let scope = PhysicalScope::try_new(TenantId(1), vec![], vec![b"t:1:col_a:".to_vec()]).unwrap();
+    let probe = TestProbe;
+
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        storage.purge_physical(&scope, TxId::new(1), &probe)
+    }));
+    assert!(res.is_ok(), "Expected success without runtime");
+    assert!(res.unwrap().is_ok());
+
+    rt.block_on(async { storage.close().await.unwrap() });
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_purge_physical_current_thread() {
+    let tmp = tempdir().unwrap();
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::open(config).await.unwrap();
+    let scope = PhysicalScope::try_new(TenantId(1), vec![], vec![b"t:1:col_a:".to_vec()]).unwrap();
+    let probe = TestProbe;
+
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        storage.purge_physical(&scope, TxId::new(1), &probe)
+    }));
+    assert!(res.is_ok(), "Expected success in current_thread runtime");
+    assert!(res.unwrap().is_ok());
+
+    storage.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_purge_physical_multi_thread() {
+    let tmp = tempdir().unwrap();
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::open(config).await.unwrap();
+    let scope = PhysicalScope::try_new(TenantId(1), vec![], vec![b"t:1:col_a:".to_vec()]).unwrap();
+    let probe = TestProbe;
+
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        storage.purge_physical(&scope, TxId::new(1), &probe)
+    }));
+    assert!(res.is_ok(), "Expected success in multi_thread runtime");
+    assert!(res.unwrap().is_ok());
+
+    storage.close().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_purge_physical_async_context() {
+    let tmp = tempdir().unwrap();
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::open(config).await.unwrap();
+    let scope = PhysicalScope::try_new(TenantId(1), vec![], vec![b"t:1:col_a:".to_vec()]).unwrap();
+    let probe = TestProbe;
+
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        storage.purge_physical(&scope, TxId::new(1), &probe)
+    }));
+    assert!(
+        res.is_ok(),
+        "Expected no panic when calling purge_physical inside async context"
+    );
+    assert!(res.unwrap().is_ok());
 
     storage.close().await.unwrap();
 }
