@@ -8,8 +8,9 @@ use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
 use contextra_crypto::deletion_proof::types::{
-    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionProof, DeletionScope,
+    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope,
 };
+use contextra_crypto::deletion_proof::ProofV4;
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_store::compaction::purge_filter::PurgeScope;
@@ -36,7 +37,7 @@ pub struct ForgetReceipt {
     /// Per-layer verification status.
     pub layers: Vec<LayerStatus>,
     /// Sealed v4 cryptographic deletion proof, present iff `assurance_reached >= assurance_requested`.
-    pub proof: Option<DeletionProof>,
+    pub proof: Option<ProofV4>,
     /// Wait policy applied during deletion.
     pub wait: Wait,
 }
@@ -47,7 +48,7 @@ pub enum LayerStatus {
     /// Layer verified with measured witness backing specified key families.
     Verified {
         layer: DeletionLayer,
-        families: Vec<&'static str>,
+        families: Vec<String>,
     },
     /// Physical purge or key destruction pending for layer.
     Pending {
@@ -85,7 +86,7 @@ impl Contextra {
             footprint,
             vec![id.to_string()],
             as_of_tx,
-            opts,
+            &opts,
             Some((col.tenant_id(), id, doc_id)),
         )
         .await
@@ -112,7 +113,7 @@ impl Contextra {
         let footprint = legacy_footprint.to_erasure_footprint();
 
         let scope = DeletionScope::Collection {
-            collection_name: name.to_string(),
+            collection_id: CollectionId::new(1),
             tenant_id,
         };
 
@@ -202,7 +203,7 @@ impl Contextra {
             for w in store_witnesses {
                 layer_statuses.push(LayerStatus::Verified {
                     layer: w.layer().clone(),
-                    families: vec!["CollectionDocData", "DocIdMapping"],
+                    families: vec!["CollectionDocData".to_string(), "DocIdMapping".to_string()],
                 });
                 witnesses.push(w);
             }
@@ -238,7 +239,7 @@ impl Contextra {
         }) {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::HnswIndex,
-                families: vec!["CollectionIndex"],
+                families: vec!["CollectionIndex".to_string()],
             });
             witnesses.push(hnsw_witness);
         }
@@ -250,7 +251,7 @@ impl Contextra {
         {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::TextIndex,
-                families: vec!["TextIndex"],
+                families: vec!["TextIndex".to_string()],
             });
             witnesses.push(text_witness);
         }
@@ -262,7 +263,7 @@ impl Contextra {
         {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::Relations,
-                families: vec!["Relations"],
+                families: vec!["Relations".to_string()],
             });
             witnesses.push(rel_witness);
         }
@@ -289,7 +290,7 @@ impl Contextra {
         }) {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::ErasureLedger,
-                families: vec!["SystemMeta"],
+                families: vec!["SystemMeta".to_string()],
             });
             witnesses.push(ledger_witness);
         }
@@ -297,7 +298,7 @@ impl Contextra {
         // Handle Physical Purge when requested (opts.purge != PurgeMode::None)
         if opts.purge != PurgeMode::None {
             let db_dir = self.storage.db_dir();
-            if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
+            if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]) {
                 let driver = DpiPurgeDriver::new(&self.storage, &runtime, DpiPurgeDriverConfig::default());
                 let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
                 let logical_handle = FonLogicalHandle {
@@ -330,29 +331,29 @@ impl Contextra {
                 let revoked = registry.revoke_record(tenant_id.inner(), d_id.inner()).unwrap_or(false);
                 if revoked {
                     layer_statuses.push(LayerStatus::Verified {
-                        layer: DeletionLayer::KeyRevocationLog,
-                        families: vec!["SystemMeta"],
+                        layer: DeletionLayer::Keyring,
+                        families: vec!["SystemMeta".to_string()],
                     });
                 } else {
                     layer_statuses.push(LayerStatus::Pending {
-                        layer: DeletionLayer::KeyRevocationLog,
+                        layer: DeletionLayer::Keyring,
                     });
                 }
             } else if let DeletionScope::Tenant { tenant_id } = &scope {
                 let revoked = registry.revoke_group(tenant_id.inner()).unwrap_or(false);
                 if revoked {
                     layer_statuses.push(LayerStatus::Verified {
-                        layer: DeletionLayer::KeyRevocationLog,
-                        families: vec!["SystemMeta"],
+                        layer: DeletionLayer::Keyring,
+                        families: vec!["SystemMeta".to_string()],
                     });
                 } else {
                     layer_statuses.push(LayerStatus::Pending {
-                        layer: DeletionLayer::KeyRevocationLog,
+                        layer: DeletionLayer::Keyring,
                     });
                 }
             } else {
                 layer_statuses.push(LayerStatus::Pending {
-                    layer: DeletionLayer::KeyRevocationLog,
+                    layer: DeletionLayer::Keyring,
                 });
             }
         }
@@ -387,7 +388,7 @@ impl Contextra {
             let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
 
             let db_dir = self.storage.db_dir();
-            if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
+            if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]) {
                 runtime
                     .finalize_logical(logical_input, opts, None, probes)
                     .ok()

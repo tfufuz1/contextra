@@ -29,6 +29,8 @@ pub use registry::{
     DeletionScopeRef, EraseUnit, Footprint, KeyFamilyEntry, KeyFamilyRegistry, PurgeScopeTarget,
     ALL_KEY_FAMILIES,
 };
+pub use relations_witness::issue_relations_witness;
+pub use text_witness::issue_text_index_witness;
 pub use restore_filter::DpiRestoreFilter;
 pub use reverse_sweep::{
     reverse_sweep, FprNeedles, FprSweepReport, FprSweepSource, FprUnregisteredResidue, SweepDepth,

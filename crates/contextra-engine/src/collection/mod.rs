@@ -549,7 +549,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<crate::TenantIsolatedKvStore>> {
+    pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
         None
     }
 
@@ -618,6 +618,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Returns the namespaced prefix for user document keys in this collection.
     pub fn user_key_prefix(&self) -> Vec<u8> {
         self.namespaced_key(b"", 0)
+    }
+
+    /// Returns the bound TenantId for this collection.
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        contextra_types::TenantId::SYSTEM
     }
 
     /// Returns the name of the collection.
