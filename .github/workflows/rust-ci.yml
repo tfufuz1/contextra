@@ -298,6 +298,13 @@ jobs:
       - uses: taiki-e/install-action@45fceba0fc176f41d2aee1ca9d6598ba628eea62 # nextest
       - name: Run Tests with Nextest
         run: cargo nextest run --locked --workspace --retries 0 --no-fail-fast
+      - name: Run contextra-durable-fs Tests
+        run: cargo test --manifest-path crates/contextra-durable-fs/Cargo.toml
+      - name: Run Erasure & Deletion Tests
+        run: |
+          cargo test -p contextra-store --test 'erasure*' --test 'purge*' --test wal_scope_purge
+          cargo test -p contextra-engine --test 'deletion*' --test keyspace_conformance --test delete_concurrency
+          cargo test -p contextra-crypto --test 'deletion*' --test 'proof_binding*'
       - name: Report flaky tests
         if: always()
         run: |
