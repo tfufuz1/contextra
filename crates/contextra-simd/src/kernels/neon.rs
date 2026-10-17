@@ -2,6 +2,10 @@
 // ZWECK: ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
 // INVARIANTEN: Target-Architektur aarch64 / neon.
 
+#![allow(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
+#![allow(unused_unsafe)]
+
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
@@ -23,22 +27,14 @@ pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
-        vdupq_n_f32(0.0),
-        vdupq_n_f32(0.0),
-        vdupq_n_f32(0.0),
-    );
+    let (mut dot_v, mut norm_a_v, mut norm_b_v) =
+        (vdupq_n_f32(0.0), vdupq_n_f32(0.0), vdupq_n_f32(0.0));
 
     while i + 4 <= len {
         // SAFETY: The loop condition `i + 4 <= len` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)`
         // are valid for reading 4 contiguous `f32` values within slice bounds (`len == a.len() == b.len()`).
         // `vld1q_f32` performs unaligned vector loads.
-        let (va, vb) = unsafe {
-            (
-                vld1q_f32(a.as_ptr().add(i)),
-                vld1q_f32(b.as_ptr().add(i)),
-            )
-        };
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
         dot_v = vfmaq_f32(dot_v, va, vb);
         norm_a_v = vfmaq_f32(norm_a_v, va, va);
@@ -96,12 +92,7 @@ pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
         // SAFETY: The loop condition `i + 4 <= len` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)`
         // are valid for reading 4 contiguous `f32` values within slice bounds (`len == a.len() == b.len()`).
         // `vld1q_f32` performs unaligned vector loads.
-        let (va, vb) = unsafe {
-            (
-                vld1q_f32(a.as_ptr().add(i)),
-                vld1q_f32(b.as_ptr().add(i)),
-            )
-        };
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
         let diff = vsubq_f32(va, vb);
 
         sum_v = vfmaq_f32(sum_v, diff, diff);
@@ -146,12 +137,7 @@ pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
         // SAFETY: The loop condition `i + 4 <= len` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)`
         // are valid for reading 4 contiguous `f32` values within slice bounds (`len == a.len() == b.len()`).
         // `vld1q_f32` performs unaligned vector loads.
-        let (va, vb) = unsafe {
-            (
-                vld1q_f32(a.as_ptr().add(i)),
-                vld1q_f32(b.as_ptr().add(i)),
-            )
-        };
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
         dot_v = vfmaq_f32(dot_v, va, vb);
 

@@ -10,26 +10,19 @@
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
 static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
-static PROTECTED_REGEX: OnceLock<Regex> = OnceLock::new();
+const PROTECTED_PATTERN: &str =
+    r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})";
+static PROTECTED_REGEX: LazyLock<Option<Regex>> =
+    LazyLock::new(|| Regex::new(PROTECTED_PATTERN).ok());
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-#[allow(clippy::panic)]
-fn get_protected_regex() -> &'static Regex {
-    PROTECTED_REGEX.get_or_init(|| {
-        if let Ok(re) =
-            Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
-        {
-            re
-        } else if let Ok(fallback) = Regex::new(r"$^") {
-            fallback
-        } else {
-            panic!("protected regex initialization failed")
-        }
-    })
+fn get_protected_regex() -> Option<&'static Regex> {
+    PROTECTED_REGEX.as_ref()
 }
 
 fn get_shared_splitter() -> Arc<crate::morphology::GermanCompoundSplitter> {
@@ -57,7 +50,16 @@ enum TextSegment<'a> {
 }
 
 fn segment_text<'a>(text: &'a str) -> Vec<TextSegment<'a>> {
-    let re = get_protected_regex();
+    let re = match get_protected_regex() {
+        Some(re) => re,
+        None => {
+            if text.is_empty() {
+                return Vec::new();
+            } else {
+                return vec![TextSegment::Regular(text)];
+            }
+        }
+    };
     let mut segments = Vec::new();
     let mut last_idx = 0;
 
@@ -431,6 +433,47 @@ mod tests {
                 .iter()
                 .any(|t| t.contains("pruefung") || t.contains("prüfung")),
             "GermanMorphTokenizer must tokenize umlaut words across boundaries without panic"
+        );
+    }
+
+    #[test]
+    fn test_protected_regex_pattern_compilation() {
+        let compiled = Regex::new(PROTECTED_PATTERN);
+        assert!(
+            compiled.is_ok(),
+            "PROTECTED_PATTERN must be valid regex syntax"
+        );
+        assert!(
+            get_protected_regex().is_some(),
+            "get_protected_regex() must return Some(&Regex)"
+        );
+    }
+
+    #[test]
+    fn test_protected_regex_german_compounds_and_hyphenation() {
+        let text = "Für Anfragen zur IT-Infrastruktur-Anpassung erreichen Sie uns unter support-service@beispiel-firma.de oder https://beispiel-firma.de/datenschutz-bestimmungen.";
+
+        let tokens = GermanMorphTokenizer::new().tokenize(text);
+
+        // Protected tokens should remain intact
+        assert!(
+            tokens.contains(&"support-service@beispiel-firma.de".to_string()),
+            "Email should be protected as atomic token. Tokens: {:?}",
+            tokens
+        );
+        assert!(
+            tokens.contains(&"https://beispiel-firma.de/datenschutz-bestimmungen".to_string()),
+            "URL should be protected as atomic token. Tokens: {:?}",
+            tokens
+        );
+
+        // German compound words and hyphenated terms in regular segments should be processed
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
+            "Regular German hyphenated compound terms should be tokenized. Tokens: {:?}",
+            tokens
         );
     }
 }

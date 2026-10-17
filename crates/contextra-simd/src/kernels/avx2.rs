@@ -2,7 +2,9 @@
 // ZWECK: AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
 // INVARIANTEN: Target-Feature "avx2", "fma" garantiert vor Aufruf via Feature-Check.
 
+#![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![allow(unused_unsafe)]
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
@@ -27,7 +29,7 @@ pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector registers; target feature `avx2` is guaranteed by caller.
     let (mut dot_v, mut norm_a_v, mut norm_b_v) = unsafe {
         (
             _mm256_setzero_ps(),
@@ -102,7 +104,7 @@ pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector register; target feature `avx2` is guaranteed by caller.
     let mut sum_v = unsafe { _mm256_setzero_ps() };
 
     while i + 8 <= len {
@@ -153,7 +155,7 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector register; target feature `avx2` is guaranteed by caller.
     let mut dot_v = unsafe { _mm256_setzero_ps() };
 
     while i + 8 <= len {
@@ -202,7 +204,7 @@ pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector registers; target feature `avx2` is guaranteed by caller.
     let (mut dot_v, mut norm_a_v, mut norm_b_v) = unsafe {
         (
             _mm256_setzero_ps(),
@@ -282,7 +284,7 @@ pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector register; target feature `avx2` is guaranteed by caller.
     let mut sum_v = unsafe { _mm256_setzero_ps() };
 
     while i + 8 <= len {
@@ -341,7 +343,7 @@ pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_ps` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector register; target feature `avx2` is guaranteed by caller.
     let mut dot_v = unsafe { _mm256_setzero_ps() };
 
     while i + 8 <= len {
@@ -390,7 +392,7 @@ pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
-    // SAFETY: All calls use valid AVX2 vector intrinsics on `v`. `avx2` target feature is guaranteed by the caller contract.
+    // SAFETY: All operations use valid AVX2 register intrinsics on input `v`; target feature `avx2` verified by caller.
     unsafe {
         let vlow = _mm256_castps256_ps128(v);
         let vhigh = _mm256_extractf128_ps(v, 1);
@@ -419,7 +421,7 @@ pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_si256` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector registers; target feature `avx2` is guaranteed by caller.
     let (mut sum_v, zero) = unsafe { (_mm256_setzero_si256(), _mm256_setzero_si256()) };
 
     while i + 32 <= len {
@@ -478,7 +480,7 @@ pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_si256` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector registers; target feature `avx2` is guaranteed by caller.
     let (mut sum_v, zero) = unsafe { (_mm256_setzero_si256(), _mm256_setzero_si256()) };
 
     while i + 32 <= len {
@@ -540,7 +542,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimil
     let len = a.len().min(b.len());
     let mut i = 0;
 
-    // SAFETY: `_mm256_setzero_si256` requires the AVX2 target feature, guaranteed by the caller safety contract.
+    // SAFETY: Zeroing AVX2 vector registers; target feature `avx2` is guaranteed by caller.
     let (mut dot_v, mut norm_a_v, mut norm_b_v, zero) = unsafe {
         (
             _mm256_setzero_si256(),
@@ -615,7 +617,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimil
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
-    // SAFETY: All calls use valid AVX2 vector intrinsics on `v`. `avx2` target feature is guaranteed by the caller contract.
+    // SAFETY: All operations use valid AVX2 register intrinsics on input `v`; target feature `avx2` verified by caller.
     unsafe {
         let vlow = _mm256_castsi256_si128(v);
         let vhigh = _mm256_extracti128_si256(v, 1);
