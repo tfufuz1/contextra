@@ -6,6 +6,7 @@ members = [
     "crates/contextra-simd",
     "crates/contextra-core",
     "crates/contextra-store",
+    "crates/contextra-store-redb",
     "crates/contextra-vector",
     "crates/contextra-db",
     "crates/contextra-text",
@@ -112,6 +113,7 @@ contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
+contextra-store-redb = { path = "crates/contextra-store-redb" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }
