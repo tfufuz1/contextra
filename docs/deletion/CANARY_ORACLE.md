@@ -7,7 +7,7 @@ Das Canary-Orakel ist ein von der Produktionslogik vollständig unabhängiges Ve
 Es beantwortet die zentrale Prüffrage:
 > *Wenn eine Person aus der Datenbank gelöscht wird, existieren danach noch irgendwelche Fragmente oder Kodierungen ihrer Daten im gesamten Datenverzeichnis auf der Festplatte?*
 
-Der Verifikations-Scanner teilt **keinen Code** mit der zu prüfenden Produktionslogik, verwendet keine Contextra-Dekodierer und stützt sich nicht auf produktionsseitige Zeugen (`witness_scan`). Er arbeitet direkt auf den rohen Dateibytes des Dateisystems.
+Der Verifikations-Scanner teilt **keinen Code** mit der zu prüfenden Produktionslogik, verwendet keine Contextra-Dekodierer und stützt sich nicht auf produktionsseitige Zeugen (`witness_scan`). Er arbeitet direkt auf den rohen Dateibytes des Dateisystems (`crates/contextra-db/tests/p08_canary_oracle.rs:1`).
 
 ---
 
@@ -35,7 +35,7 @@ Für jeden Canary werden automatisch alle relevanten Kodierungsvarianten konstru
 
 ## 3. Test-Matrizen
 
-### 3.1 Injektions-Matrix (`p08_canary_oracle.rs`)
+### 3.1 Injektions-Matrix (`crates/contextra-db/tests/p08_canary_oracle.rs:1`)
 Zur Verifikation der Orakel-Gültigkeit wird ein Positivtest durchgeführt: Ein Canary wird absichtlich in eine Kopie jeder Dateifamilie aus `docs/deletion/KEYFAMILIES.toml` injiziert. Der Scanner **muss** jeden injizierten Canary finden:
 - WAL Log-Segmente (`.wal`)
 - SSTables (`.sst`)
@@ -48,12 +48,12 @@ Zur Verifikation der Orakel-Gültigkeit wird ein Positivtest durchgeführt: Ein 
 - Audit-Protokolle (`.log`)
 - Unbekannte Zusatzdateien (`.dat`)
 
-### 3.2 Kodierungs-Matrix (`p08_canary_oracle.rs`)
-Jede der 9 Kodierungsvarianten wird separat injiziert und muss vom Scanner mit Korrektheit von Pfad, Offset und Kodierungstyp gemeldet werden.
+### 3.2 Kodierungs-Matrix (`crates/contextra-db/tests/p08_canary_oracle.rs:1`)
+Jede der 8 Kodierungsvarianten wird separat injiziert und muss vom Scanner mit Korrektheit von Pfad, Offset und Kodierungstyp gemeldet werden.
 
 Gegenprobe: Ein sauberes Verzeichnis ohne Canaries liefert exakt **0 Treffer**.
 
-### 3.3 Echte Löschprüfung (`p08_forget_canary.rs`)
+### 3.3 Echte Löschprüfung (`crates/contextra-engine/tests/canary_after_delete_all_families.rs:1`)
 Mehrere Personen (A, B, C) werden mit verschiedenen Erinnerungsarten (Text, Vektor, Beziehungen) angelegt.
 - **Vor dem Löschen**: Der Scanner weist mindestens 1 Treffer pro Person nach.
 - **Nach dem Löschen von Person A**:
@@ -61,22 +61,7 @@ Mehrere Personen (A, B, C) werden mit verschiedenen Erinnerungsarten (Text, Vekt
   - Scanner über das gesamte Datenverzeichnis.
   - Erwartung: 0 Treffer für Person A.
   - Personen B und C bleiben zu 100% lesbar und abfragbar.
-  - Ein DeletionProof wird erstellt und mit dem öffentlichen Ed25519-Verifikationsschlüssel geprüft.
-
-### 3.4 Crash-Matrix (`p08_forget_crash.rs`)
-Re-Exec-Muster für Absturztests während des Löschvorgangs:
-- Der Elternprozess startet die Kindprozess-Workload.
-- Das Kind emittiert Fortschrittsmarkierungen auf `stdout`:
-  1. `MARKER_1_BEFORE_DELETE`
-  2. `MARKER_2_STAGING_DELETE_OPS`
-  3. `MARKER_3_BEFORE_STORAGE_FLUSH`
-  4. `MARKER_4_AFTER_STORAGE_FLUSH`
-  5. `MARKER_5_AFTER_PROOF_GENERATION`
-- Der Elternprozess beendet das Kind gezielt per `Child::kill()` an jeder Fortschrittsmarkierung.
-- Nach dem Neustart gelten exakt **zwei erlaubte atomare Ergebnisse**:
-  1. **Löschung abgeschlossen**: Scanner liefert 0 Treffer für Person A, Nachweis ist gültig (falls ausgestellt).
-  2. **Löschung zurückgerollt**: Person A ist per API wieder vollständig lesbar, kein Nachweis ausgestellt.
-- Personen B und C bleiben in jedem Fall unversehrt.
+  - Ein DeletionProof wird erstellt und mit dem öffentlichen Ed25519-Verifikationsschlüssel geprüft (`crates/contextra-crypto/src/deletion_proof/proof_v4.rs:58`).
 
 ---
 
@@ -89,14 +74,8 @@ cargo check -p contextra-db --all-targets
 # 2. Ausführung der Injektions-, Kodierungs- und Orakel-Tests
 cargo test -p contextra-db --test p08_canary_oracle
 
-# 3. Ausführung des echten Löschtests
-cargo test -p contextra-db --test p08_forget_canary
-
-# 4. Ausführung der Absturz-Matrix (Re-Exec Pattern)
-cargo test -p contextra-db --test p08_forget_crash
-
-# 5. Ausführung der interaktiven Demo
-cargo run -p contextra-db --example p08_forget_crash_demo -- 100
+# 3. Ausführung der verzeichnisweiten Löschprüfungen
+cargo test -p contextra-engine --test canary_after_delete_all_families
 ```
 
 ---

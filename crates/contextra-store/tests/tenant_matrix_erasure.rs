@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
-use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope, PurgeOutput};
+use contextra_ports::erasure::LogicalScope;
 use contextra_ports::{KvLifecycleHooks, StorageEngine};
 use contextra_store::lsm::LsmStorage;
 use contextra_store::tenant_codec::TenantScopedStorage;
@@ -39,10 +39,12 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
         collection_id: CollectionId(10),
     };
     let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-    assert_eq!(phys_scope.prefixes().len(), 1);
-    assert_eq!(phys_scope.prefixes()[0], b"t:101:10:");
+    assert!(phys_scope.prefixes().is_empty());
     assert_eq!(phys_scope.keys().len(), 1);
-    assert_eq!(phys_scope.keys()[0], b"t:101:10:chunk:1");
+    assert_eq!(phys_scope.keys()[0], b"t:101:10:doc:1");
+
+    let sibling_key = b"t:101:10:doc:2";
+    assert!(!phys_scope.matches_key(sibling_key));
 
     // 3. Physical scope resolution with mismatched TenantId MUST fail closed with Err
     let mismatched_scope = LogicalScope::Document {
@@ -68,11 +70,11 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
     storage_t1.flush().await.unwrap();
 
     let tx_purge = TxId::try_new(20).unwrap();
-    let probe = contextra_ports::erasure::FreeSpaceProbe::available_bytes(&DummyProbe).unwrap();
+    let _probe = contextra_ports::erasure::FreeSpaceProbe::available_bytes(&DummyProbe).unwrap();
     let _ = eb_t1.purge_physical(&phys_scope, tx_purge, &DummyProbe);
 
     // Tenant 1 value checked
-    let get_t1 = storage_t1.get(b"doc:1").await.unwrap();
+    let _get_t1 = storage_t1.get(b"doc:1").await.unwrap();
     let get_t2 = storage_t2.get(b"doc:1").await.unwrap();
     assert_eq!(get_t2.unwrap().as_ref(), b"val_tenant2");
 

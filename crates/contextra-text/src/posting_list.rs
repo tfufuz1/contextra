@@ -302,8 +302,13 @@ impl ResidentPostingIndex {
     }
 
     /// Inserts or replaces a PostingList for a given term.
+    /// If `list` is empty, the term is purged from the resident index.
     pub fn insert_list(&self, term: String, list: PostingList) {
-        self.index.write().insert(term, Arc::new(list));
+        if list.is_empty() {
+            self.index.write().remove(&term);
+        } else {
+            self.index.write().insert(term, Arc::new(list));
+        }
     }
 
     /// Upserts a single posting for a term using RCU (Copy-On-Write).
@@ -319,6 +324,11 @@ impl ResidentPostingIndex {
 
     /// Removes a posting for a doc_id across a list of terms using RCU.
     pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId) {
+        self.remove_terms(doc_id, terms);
+    }
+
+    /// Removes postings for a given doc_id across specified terms from the in-memory cache (e.g., on transaction rollback).
+    pub fn remove_terms(&self, doc_id: DocId, terms: &[String]) {
         let mut guard = self.index.write();
         for term in terms {
             if let Some(list) = guard.get(term).cloned() {
@@ -329,14 +339,6 @@ impl ResidentPostingIndex {
                     guard.insert(term.clone(), Arc::new(updated));
                 }
             }
-        }
-    }
-
-    /// Removes specified terms from the in-memory cache (e.g., on transaction rollback).
-    pub fn remove_terms(&self, terms: &[String]) {
-        let mut guard = self.index.write();
-        for term in terms {
-            guard.remove(term);
         }
     }
 

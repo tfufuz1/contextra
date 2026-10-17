@@ -15,8 +15,8 @@ use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_S
 ///
 /// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
 pub struct InvertedIndex<S: StorageEngine> {
-    storage: Arc<S>,
-    prefix: Vec<u8>,
+    pub(crate) storage: Arc<S>,
+    pub(crate) prefix: Vec<u8>,
     tokenizer: Arc<dyn Tokenizer>,
     pub(crate) total_docs: Arc<AtomicU64>,
     pub(crate) total_tokens: Arc<AtomicU64>,
@@ -87,6 +87,11 @@ impl<S: StorageEngine> InvertedIndex<S> {
     /// Creates a new InvertedIndex with English tokenizer (default).
     pub fn new(storage: Arc<S>, namespace: &str) -> Self {
         Self::new_with_language(storage, namespace, Language::English)
+    }
+
+    /// Returns a reference to the resident posting index.
+    pub fn resident_index(&self) -> &Arc<ResidentPostingIndex> {
+        &self.resident_index
     }
 
     /// Sets a custom tokenizer for the inverted index.
@@ -430,6 +435,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
                     self.ensure_term_loaded(term).await?;
                     let pl_doc_key = self.key_with_term_doc(term, doc_id);
                     self.storage.delete(tx, &pl_doc_key).await?;
+                    let pos_key = self.key_with_id(&format!("pos:{}:", term), doc_id.inner());
+                    self.storage.delete(tx, &pos_key).await?;
                     let tbs_key = self.key_tombstone(doc_id, term);
                     self.storage.put(tx, &tbs_key, &[]).await?;
 
@@ -438,8 +445,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                     let plb_key = self.key_batch_posting_list(term);
                     if let Some(plist) = self.resident_index.get(term) {
-                        let batch_bytes = plist.encode_compact()?;
-                        self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                        if plist.is_empty() {
+                            self.storage.delete(tx, &plb_key).await?;
+                        } else {
+                            let batch_bytes = plist.encode_compact()?;
+                            self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                        }
                     } else {
                         self.storage.delete(tx, &plb_key).await?;
                     }

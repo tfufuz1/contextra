@@ -7,7 +7,7 @@ use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
-use contextra_types::TenantId;
+use contextra_types::{DeterministicTimestamp, TenantId};
 use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 
@@ -16,11 +16,11 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
-    fn now_unix_nanos(&self) -> u64 {
-        self.now_unix_secs * 1_000_000_000
+    fn now(&self) -> DeterministicTimestamp {
+        DeterministicTimestamp::new(self.now_unix_secs * 1000, 0)
     }
 
-    fn monotonic_nanos(&self) -> u64 {
+    fn monotonic_ticks(&self) -> u64 {
         0
     }
 }

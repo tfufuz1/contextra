@@ -49,10 +49,12 @@ pub fn select_purge_candidates(
 
     // (a) Initial selection: all files whose key range intersects scope
     let mut selected_indices: Vec<usize> = Vec::new();
+    let mut is_selected = vec![false; sstables.len()];
     for (idx, sst) in sstables.iter().enumerate() {
         let meta = sst.metadata();
         if range_intersects_scope(&meta.first_key, &meta.last_key, scope) {
             selected_indices.push(idx);
+            is_selected[idx] = true;
         }
     }
 
@@ -68,24 +70,28 @@ pub fn select_purge_candidates(
         let mut max_last: Option<&[u8]> = None;
         for &idx in &selected_indices {
             let meta = sstables[idx].metadata();
-            if min_first.is_none() || meta.first_key.as_ref() < min_first.unwrap() {
-                min_first = Some(&meta.first_key);
-            }
-            if max_last.is_none() || meta.last_key.as_ref() > max_last.unwrap() {
-                max_last = Some(&meta.last_key);
-            }
+            min_first = match min_first {
+                Some(curr) if curr <= meta.first_key.as_ref() => Some(curr),
+                _ => Some(&meta.first_key),
+            };
+            max_last = match max_last {
+                Some(curr) if curr >= meta.last_key.as_ref() => Some(curr),
+                _ => Some(&meta.last_key),
+            };
         }
 
-        let b_first = min_first.unwrap_or(&[]);
-        let b_last = max_last.unwrap_or(&[]);
+        let (Some(b_first), Some(b_last)) = (min_first, max_last) else {
+            break;
+        };
 
         for (idx, sst) in sstables.iter().enumerate() {
-            if selected_indices.contains(&idx) {
+            if is_selected[idx] {
                 continue;
             }
             let meta = sst.metadata();
             if ranges_overlap(&meta.first_key, &meta.last_key, b_first, b_last) {
                 selected_indices.push(idx);
+                is_selected[idx] = true;
                 added = true;
             }
         }
@@ -165,5 +171,164 @@ mod tests {
 
         let probe_none = MockSpaceProbe { free: None };
         assert_eq!(probe_none.free_space_bytes(), None);
+    }
+
+    use crate::sstable::builder::SstableMetadata;
+    use bytes::Bytes;
+    use proptest::prelude::*;
+
+    /// Naive reference implementation of candidate selection for property test comparison
+    fn naive_select_purge_candidates(
+        sstables: &[SstableMetadata],
+        scope: &PurgeScope,
+    ) -> Vec<usize> {
+        if sstables.is_empty() {
+            return Vec::new();
+        }
+
+        let mut selected: Vec<usize> = Vec::new();
+        for (idx, meta) in sstables.iter().enumerate() {
+            if range_intersects_scope(&meta.first_key, &meta.last_key, scope) {
+                selected.push(idx);
+            }
+        }
+
+        if selected.is_empty() {
+            return Vec::new();
+        }
+
+        loop {
+            let mut added = false;
+            let mut min_first: Option<&[u8]> = None;
+            let mut max_last: Option<&[u8]> = None;
+
+            for &idx in &selected {
+                let meta = &sstables[idx];
+                min_first = match min_first {
+                    Some(curr) if curr <= meta.first_key.as_ref() => Some(curr),
+                    _ => Some(&meta.first_key),
+                };
+                max_last = match max_last {
+                    Some(curr) if curr >= meta.last_key.as_ref() => Some(curr),
+                    _ => Some(&meta.last_key),
+                };
+            }
+
+            let (Some(b_first), Some(b_last)) = (min_first, max_last) else {
+                break;
+            };
+
+            for (idx, meta) in sstables.iter().enumerate() {
+                if selected.contains(&idx) {
+                    continue;
+                }
+                if ranges_overlap(&meta.first_key, &meta.last_key, b_first, b_last) {
+                    selected.push(idx);
+                    added = true;
+                }
+            }
+
+            if !added {
+                break;
+            }
+        }
+
+        selected.sort_unstable();
+        selected.dedup();
+        selected
+    }
+
+    use crate::sstable::SstableBuilder;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(50))]
+
+        #[test]
+        fn prop_transitive_closure_properties(
+            ranges in proptest::collection::vec(
+                (0u8..100u8, 0u8..100u8),
+                1..15
+            ),
+            target_key in 0u8..100u8
+        ) {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            let (actual_indices, naive_indices, sstables_meta) = rt.block_on(async {
+                let tmp = tempfile::tempdir().unwrap();
+                let bc = crate::sstable::create_block_cache();
+                let mut sstables = Vec::new();
+                let mut sstables_meta = Vec::new();
+
+                for (i, &(a, b)) in ranges.iter().enumerate() {
+                    let min_k = a.min(b);
+                    let max_k = a.max(b);
+                    let path = tmp.path().join(format!("{}.sst", i));
+                    let mut builder = SstableBuilder::create(&path).await.unwrap();
+                    builder.add(&[min_k], b"val", 1, 1).await.unwrap();
+                    if max_k > min_k {
+                        builder.add(&[max_k], b"val", 1, 1).await.unwrap();
+                    }
+                    let meta = builder.finish().await.unwrap();
+                    let reader = SstableReader::open(&path, Arc::clone(&bc)).await.unwrap();
+                    sstables.push(Arc::new(reader));
+                    sstables_meta.push(meta);
+                }
+
+                let scope = PurgeScope::Keys(vec![vec![target_key]]);
+                let candidates = select_purge_candidates(&sstables, &scope, None).unwrap();
+                let naive_idx = naive_select_purge_candidates(&sstables_meta, &scope);
+
+                let actual_idx: Vec<usize> = candidates
+                    .iter()
+                    .map(|cand| {
+                        sstables
+                            .iter()
+                            .position(|s| Arc::ptr_eq(s, cand))
+                            .unwrap()
+                    })
+                    .collect();
+
+                (actual_idx, naive_idx, sstables_meta)
+            });
+
+            // Compare actual select_purge_candidates against naive reference
+            prop_assert_eq!(&actual_indices, &naive_indices);
+
+            // (iii) deterministically sorted and duplicate-free
+            for w in actual_indices.windows(2) {
+                prop_assert!(w[0] < w[1]);
+            }
+
+            if !actual_indices.is_empty() {
+                let scope = PurgeScope::Keys(vec![vec![target_key]]);
+                let mut b_first = &sstables_meta[actual_indices[0]].first_key;
+                let mut b_last = &sstables_meta[actual_indices[0]].last_key;
+                for &idx in &actual_indices {
+                    if sstables_meta[idx].first_key < *b_first {
+                        b_first = &sstables_meta[idx].first_key;
+                    }
+                    if sstables_meta[idx].last_key > *b_last {
+                        b_last = &sstables_meta[idx].last_key;
+                    }
+                }
+
+                // (i) Result is transitively closed
+                for (idx, meta) in sstables_meta.iter().enumerate() {
+                    if !actual_indices.contains(&idx) {
+                        prop_assert!(!ranges_overlap(&meta.first_key, &meta.last_key, b_first, b_last));
+                    }
+                }
+
+                // (ii) Result contains all directly scope-intersecting files
+                for (idx, meta) in sstables_meta.iter().enumerate() {
+                    if range_intersects_scope(&meta.first_key, &meta.last_key, &scope) {
+                        prop_assert!(actual_indices.contains(&idx));
+                    }
+                }
+            }
+        }
     }
 }

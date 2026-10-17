@@ -15,6 +15,7 @@
 
 mod index_struct;
 mod morph_index;
+pub mod residue_scan;
 mod types;
 
 #[cfg(test)]
@@ -22,4 +23,5 @@ mod tests;
 
 pub use index_struct::InvertedIndex;
 pub use morph_index::BM25MorphIndex;
+pub use residue_scan::{ResTextEvidence, TextSweepDepth};
 pub use types::{Language, TextIndexMetadata};

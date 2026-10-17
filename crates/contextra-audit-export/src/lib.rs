@@ -1,21 +1,28 @@
-//! `contextra-audit-export` — GDPR Article 30 Processing Register export generator.
+//! `contextra-audit-export` — GDPR Article 30 Processing Register and Article 12/17 Erasure Requests export generator.
 //!
 //! # Architecture Role (Ring 4)
 //! This crate provides an external interface for generating automated processing registers
-//! (Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO) based on egress gateway logs
-//! and cryptographic deletion proofs.
+//! (Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO), erasure request registers
+//! (Art. 12/17 DSGVO), and retention class matrices (Löschkonzept).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod bsi_mapping;
+pub mod erasure_requests;
 pub mod error;
 pub mod markdown_template;
+pub mod retention_classes;
 pub mod testkit;
 
 pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
+pub use erasure_requests::{
+    calculate_deadline_kpi, Art17_3Ground, Art18Ground, CivilDate, DeadlineKpiReport,
+    ErasureDecision, ErasureRequest, NonEmptyJustification,
+};
 pub use error::AuditExportError;
 pub use markdown_template::render_register_markdown;
+pub use retention_classes::{RetentionClass, RetentionMatrix, RetentionPeriod, TriggerEvent};
 
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};

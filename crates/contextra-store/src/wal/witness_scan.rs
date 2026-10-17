@@ -1,5 +1,4 @@
 #![cfg(not(loom))]
-#![allow(clippy::cast_possible_truncation)]
 
 //! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
 //! Stand: 2026-10-13
@@ -11,10 +10,10 @@
 use contextra_types::{ContextraError, Result};
 use contextra_ports::{Clock, SystemClock};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
-use super::{Wal, WalOp};
+use super::{WalEntry, WalOp, WAL_V2_HEADER, WAL_V3_HEADER};
 
 pub const ASSURANCE_LEVEL: u8 = 4;
 pub const CLAIM_TEXT_ID: u8 = 5;
@@ -169,7 +168,7 @@ pub async fn scan_wal_directory_with_clock(
     clock: &dyn Clock,
 ) -> Result<WalScanEvidence> {
     let start_nanos = clock.monotonic_nanos();
-    let timeout_nanos = inputs.timeout.as_nanos() as u64;
+    let timeout_nanos = u64::try_from(inputs.timeout.as_nanos()).unwrap_or(u64::MAX);
 
     let mut entries = match tokio::fs::read_dir(&inputs.wal_dir).await {
         Ok(e) => e,
@@ -253,39 +252,40 @@ pub async fn scan_wal_directory_with_clock(
         };
 
         let file_len = metadata.len();
-        let wal = match Wal::open_read_only(&path, None).await {
-            Ok(w) => w,
-            Err(ContextraError::Storage(msg))
-                if msg.contains("No such file") || msg.contains("not found") =>
-            {
-                // Segment was removed prior to open
-                continue;
-            }
-            Err(err) => return Err(err),
-        };
-        let mut last_logical_pos = 0u64;
-
-        let scan_res = wal
-            .scan_entries_with_callback(file_len, |_seq, entry, end_pos| {
-                last_logical_pos = end_pos;
-                let tx = entry.tx_id().inner();
-                let is_hit = match &entry.op {
-                    WalOp::Put { key, .. } => inputs.scope.matches_key(key),
-                    WalOp::Delete { key, .. } => {
-                        inputs.key_identifiers_claimed && inputs.scope.matches_key(key)
-                    }
-                    WalOp::TxEnd { .. } => false,
-                };
-
-                if is_hit {
-                    frames_matching_scope += 1;
-                    if tx > inputs.as_of_tx {
-                        post_cutoff_hits += 1;
-                    }
+        let file_bytes = match tokio::fs::read(&path).await {
+            Ok(b) => b,
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    continue;
                 }
-                true
-            })
-            .await;
+                return Err(ContextraError::Storage(format!(
+                    "Failed to read WAL segment {}: {}",
+                    path.display(),
+                    err
+                )));
+            }
+        };
+
+        let mut last_logical_pos = 0u64;
+        let scan_res = parse_wal_bytes_independently(&file_bytes, |entry, end_pos| {
+            last_logical_pos = end_pos;
+            let tx = entry.tx_id().inner();
+            let is_hit = match &entry.op {
+                WalOp::Put { key, .. } => inputs.scope.matches_key(key),
+                WalOp::Delete { key, .. } => {
+                    inputs.key_identifiers_claimed && inputs.scope.matches_key(key)
+                }
+                WalOp::TxEnd { .. } => false,
+            };
+
+            if is_hit {
+                frames_matching_scope += 1;
+                if tx > inputs.as_of_tx {
+                    post_cutoff_hits += 1;
+                }
+            }
+            true
+        });
 
         if scan_res.is_err() {
             // Unreadable or corrupted segment -> report finding
@@ -296,11 +296,11 @@ pub async fn scan_wal_directory_with_clock(
         if last_logical_pos < file_len {
             let tail_len = file_len - last_logical_pos;
             tail_bytes_raw_scanned += tail_len;
-            if inputs.key_identifiers_claimed || !inputs.scope.raw_needles.is_empty() {
-                if let Ok(tail_bytes) = read_file_tail(&path, last_logical_pos, tail_len).await {
-                    if inputs.scope.matches_raw_bytes(&tail_bytes) {
-                        frames_matching_scope += 1;
-                    }
+            let tail_start = last_logical_pos as usize;
+            if tail_start < file_bytes.len() {
+                let tail_bytes = &file_bytes[tail_start..];
+                if inputs.scope.matches_raw_bytes(tail_bytes) {
+                    frames_matching_scope += 1;
                 }
             }
         }
@@ -347,10 +347,13 @@ pub async fn scan_wal_directory_with_clock(
         }
     }
 
-    let segments_removed = initial_segment_names
-        .iter()
-        .filter(|name| !final_segment_names.contains(*name))
-        .count() as u64;
+    let segments_removed = u64::try_from(
+        initial_segment_names
+            .iter()
+            .filter(|name| !final_segment_names.contains(*name))
+            .count(),
+    )
+    .unwrap_or(u64::MAX);
 
     Ok(WalScanEvidence {
         segments_total,
@@ -364,24 +367,53 @@ pub async fn scan_wal_directory_with_clock(
     })
 }
 
-async fn read_file_tail(path: &Path, start_pos: u64, tail_len: u64) -> Result<Vec<u8>> {
-    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+/// Independent frame parser for verifying WAL file contents without relying on production `Wal` handle logic.
+pub fn parse_wal_bytes_independently<F>(bytes: &[u8], mut callback: F) -> Result<()>
+where
+    F: FnMut(WalEntry, u64) -> bool,
+{
+    if bytes.is_empty() {
+        return Ok(());
+    }
 
-    let mut file = super::fs::OpenOptions::new()
-        .read(true)
-        .open(path)
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Failed to open for tail read: {}", e)))?;
+    let mut pos = 0usize;
+    if bytes.len() >= 4 {
+        let header = &bytes[..4];
+        if header == WAL_V3_HEADER || header == WAL_V2_HEADER {
+            pos = 4;
+        }
+    }
 
-    file.seek(std::io::SeekFrom::Start(start_pos))
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Failed to seek for tail read: {}", e)))?;
+    while pos < bytes.len() {
+        if pos + 4 > bytes.len() {
+            // Truncated length header at tail
+            break;
+        }
+        let len_bytes: [u8; 4] = match bytes[pos..pos + 4].try_into() {
+            Ok(b) => b,
+            Err(_) => break,
+        };
+        let len = u32::from_le_bytes(len_bytes) as usize;
+        if len == 0 || pos + 4 + len > bytes.len() {
+            // Truncated or invalid frame payload at tail
+            break;
+        }
 
-    let buf_size = usize::try_from(tail_len).unwrap_or(0);
-    let mut buf = vec![0u8; buf_size];
-    file.read_exact(&mut buf)
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Failed to read tail bytes: {}", e)))?;
+        let frame_payload = &bytes[pos + 4..pos + 4 + len];
+        pos += 4 + len;
 
-    Ok(buf)
+        let entry = match WalEntry::from_bytes_classified(frame_payload) {
+            Ok(e) => e,
+            Err(_) => {
+                // If it's encrypted or corrupt, try searching for raw keys or treat as non-parseable
+                break;
+            }
+        };
+
+        if !callback(entry, pos as u64) {
+            break;
+        }
+    }
+
+    Ok(())
 }

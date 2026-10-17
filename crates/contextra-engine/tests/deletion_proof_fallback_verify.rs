@@ -2,9 +2,8 @@
 #![cfg(not(loom))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::{
-    DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
-};
+use contextra_crypto::{DeletionLayer, LayerCleanupProof, LayerWitness, WitnessEvidence};
+use contextra_engine::{DeletionProof, DeletionScope};
 use contextra_types::{CollectionId, TenantId, TxId};
 
 fn test_proof_and_key() -> (DeletionProof, Vec<u8>) {
@@ -15,11 +14,14 @@ fn test_proof_and_key() -> (DeletionProof, Vec<u8>) {
     };
     let deleted_keys = vec![b"key1".to_vec(), b"key2".to_vec()];
     let tx_id = TxId(100);
-    let layer_proofs = vec![LayerCleanupProof::new_after_verified_empty(
+    let witness = LayerWitness::issue_from_storage_layer(
         DeletionLayer::SsTableAllLevels,
-        0,
+        &deleted_keys,
+        tx_id,
+        WitnessEvidence::SstableScan { files_scanned: 1 },
     )
-    .expect("layer proof")];
+    .expect("witness");
+    let layer_proofs = vec![LayerCleanupProof::from_witness(&witness).expect("layer proof")];
 
     let proof = DeletionProof::create(scope, deleted_keys, tx_id, layer_proofs, vec![], &key)
         .expect("create proof");
@@ -146,4 +148,45 @@ fn test_serde_json_roundtrip_remains_verifiable() -> contextra_types::Result<()>
         "serde_json roundtripped proof must verify successfully"
     );
     Ok(())
+}
+
+#[tokio::test]
+async fn collection_delete_does_not_overclaim_layer() -> contextra_types::Result<()> {
+    let temp_dir = tempfile::tempdir().expect("tempdir");
+    let ctx = contextra_engine::Contextra::open_with_config(temp_dir.path(), contextra_engine::ContextraConfig::default())
+        .await?;
+
+    let tenant_id = TenantId::try_new(42).expect("valid tenant");
+    let _col = ctx.collection_for_tenant("test_col", tenant_id).await?;
+
+    let proof_key = vec![0x42u8; 32];
+    let proof = ctx.drop_collection("test_col", tenant_id, &proof_key).await?;
+
+    let covered_layers = proof.covered_layers;
+    assert_eq!(
+        covered_layers.len(),
+        1,
+        "Must contain exactly 1 layer proof for store API scan"
+    );
+    assert_eq!(
+        &covered_layers[0],
+        &DeletionLayer::LsmMemtable,
+        "Must be labelled LsmMemtable for stage S0 logical scan"
+    );
+    assert_ne!(
+        &covered_layers[0],
+        &DeletionLayer::SsTableAllLevels,
+        "Must NOT overclaim SsTableAllLevels"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn collection_delete_propagates_collection_id_error() {
+    let res = CollectionId::try_new(0);
+    assert!(
+        res.is_err(),
+        "CollectionId::try_new(0) must return error without unwrap_or fallback"
+    );
 }

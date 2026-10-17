@@ -4,7 +4,52 @@
 #![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
+
+/// Deterministischer SplitMix64 PRNG für Seed-basierte Zufallszahlen.
+#[derive(Debug)]
+pub struct SeededRng {
+    state: AtomicU64,
+}
+
+impl SeededRng {
+    /// Erstellt eine neue [`SeededRng`]-Instanz mit dem gegebenen Seed.
+    pub fn new(seed: u64) -> Self {
+        Self {
+            state: AtomicU64::new(seed),
+        }
+    }
+}
+
+impl contextra_ports::SeededRng for SeededRng {
+    fn next_u64(&self) -> u64 {
+        const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
+        let z = self
+            .state
+            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
+            .wrapping_add(GOLDEN_RATIO_64);
+        let mut z = z;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+
+    fn fill_bytes(&self, mut dest: &mut [u8]) {
+        while !dest.is_empty() {
+            let val = self.next_u64();
+            let bytes = val.to_le_bytes();
+            let len = dest.len().min(8);
+            dest[..len].copy_from_slice(&bytes[..len]);
+            dest = &mut dest[len..];
+        }
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
 
 /// Intervall für die periodische Re-Faktorisierung/Drift-Prüfung der Sherman-Morrison Inversen.
 // Wert ist ein konservativer Startwert, siehe PR-Diskussion für Tuning
@@ -123,6 +168,123 @@ pub enum BanditImplementation {
     },
 }
 
+/// Berechnet die Inverse einer symmetrischen, positiv definiten d x d Matrix A in f64 mittels Cholesky-Zerlegung.
+pub fn cholesky_invert_f64(a: &[f64], d: usize) -> Option<Vec<f64>> {
+    if a.len() != d * d || d == 0 {
+        return None;
+    }
+    let mut l = vec![0.0f64; d * d];
+    for i in 0..d {
+        for j in 0..=i {
+            let mut sum = a[i * d + j];
+            for k in 0..j {
+                sum -= l[i * d + k] * l[j * d + k];
+            }
+            if i == j {
+                if sum <= 0.0 {
+                    return None;
+                }
+                l[i * d + j] = sum.sqrt();
+            } else {
+                let l_jj = l[j * d + j];
+                if l_jj == 0.0 {
+                    return None;
+                }
+                l[i * d + j] = sum / l_jj;
+            }
+        }
+    }
+
+    let mut l_inv = vec![0.0f64; d * d];
+    for i in 0..d {
+        let l_ii = l[i * d + i];
+        if l_ii == 0.0 {
+            return None;
+        }
+        l_inv[i * d + i] = 1.0 / l_ii;
+        for j in (i + 1)..d {
+            let mut sum = 0.0f64;
+            for k in i..j {
+                sum -= l[j * d + k] * l_inv[k * d + i];
+            }
+            let l_jj = l[j * d + j];
+            if l_jj == 0.0 {
+                return None;
+            }
+            l_inv[j * d + i] = sum / l_jj;
+        }
+    }
+
+    let mut a_inv = vec![0.0f64; d * d];
+    for i in 0..d {
+        for j in 0..d {
+            let mut sum = 0.0f64;
+            for k in i.max(j)..d {
+                sum += l_inv[k * d + i] * l_inv[k * d + j];
+            }
+            a_inv[i * d + j] = sum;
+        }
+    }
+    Some(a_inv)
+}
+
+fn compute_probe_residual_f64(
+    a_matrix: &[f64],
+    inv_a: &[f32],
+    d: usize,
+    seed: u64,
+    v_buf: &mut [f64],
+    w_buf: &mut [f64],
+) -> f64 {
+    if d == 0
+        || a_matrix.len() != d * d
+        || inv_a.len() != d * d
+        || v_buf.len() < d
+        || w_buf.len() < d
+    {
+        return 0.0;
+    }
+    let rng = SeededRng::new(seed.wrapping_add(0x5555_5555_5555_5555));
+    let mut norm_v_sq = 0.0f64;
+    for i in 0..d {
+        let val = contextra_ports::SeededRng::next_unit_f64(&rng) - 0.5;
+        v_buf[i] = val;
+        norm_v_sq += val * val;
+    }
+    let norm_v = norm_v_sq.sqrt().max(1e-12);
+
+    for i in 0..d {
+        let mut sum = 0.0f64;
+        for j in 0..d {
+            sum += (inv_a[i * d + j] as f64) * v_buf[j];
+        }
+        w_buf[i] = sum;
+    }
+
+    let mut residual_sq = 0.0f64;
+    for i in 0..d {
+        let mut u_i = 0.0f64;
+        for j in 0..d {
+            u_i += a_matrix[i * d + j] * w_buf[j];
+        }
+        let diff = u_i - v_buf[i];
+        residual_sq += diff * diff;
+    }
+
+    residual_sq.sqrt() / norm_v
+}
+
+fn compute_inv_a_trace(inv_a: &[f32], d: usize) -> f64 {
+    if d == 0 || inv_a.len() != d * d {
+        return 0.0;
+    }
+    let mut trace = 0.0f64;
+    for i in 0..d {
+        trace += inv_a[i * d + i] as f64;
+    }
+    trace
+}
+
 /// Projektionsmatrix $R \in \mathbb{R}^{k \times d}$ für Sketched Projection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SketchMatrix {
@@ -137,6 +299,17 @@ pub struct SketchMatrix {
 }
 
 impl SketchMatrix {
+    /// Erstellt eine `SketchMatrix` mit mandantenisoliertem Seed aus `TenantId` und `base_seed`.
+    pub fn from_tenant_seed(
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        original_dim: usize,
+        projected_dim: usize,
+    ) -> Result<Self, BanditError> {
+        let seed = Self::derive_seed(tenant_id, base_seed);
+        Self::from_seed(seed, original_dim, projected_dim)
+    }
+
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
     pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
@@ -161,7 +334,7 @@ impl SketchMatrix {
         }
 
         let scale = 1.0f32 / (projected_dim as f32).sqrt();
-        let rng = contextra_ports::SeededRng::new(seed);
+        let rng = SeededRng::new(seed);
         let total_elements = projected_dim * original_dim;
         let mut data = Vec::with_capacity(total_elements);
 
@@ -296,6 +469,14 @@ fn fused_row_update(row: &mut [f32], v: &[f32], scale_row: f32, scale_v: f32) {
     }
 }
 
+fn default_drift_threshold() -> f64 {
+    1e-4
+}
+
+fn default_max_trace() -> f64 {
+    1e6
+}
+
 /// Laufzeitzustand eines LinUCB-Bandits pro Profil.
 ///
 /// # Formeln (§13.2)
@@ -312,6 +493,9 @@ fn fused_row_update(row: &mut [f32], v: &[f32], scale_row: f32, scale_v: f32) {
 /// drift_gamma = 0.95 (beschleunigter Decay nach Drift-Erkennung)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BanditProfileState {
+    /// Snapshot-Version für Abwärtskompatibilität.
+    #[serde(default)]
+    pub snapshot_version: u32,
     /// Gewichtsvektor θ_p (Dimension = Embedding-Dim).
     pub theta: Vec<f32>,
     /// Diagonale Kovarianz-Terme σ²_p (Diagonal-Approximation).
@@ -319,12 +503,24 @@ pub struct BanditProfileState {
     /// Inverser Kovarianzmatrix-Speicher A⁻¹ (d x d, Row-Major) für Sherman-Morrison O(d²).
     #[serde(default)]
     pub inv_a: AlignedF32Vec,
+    /// Schatten-Kovarianzmatrix A (d x d, Row-Major) in f64 zur Cholesky-Re-Faktorisierung bei Drift.
+    #[serde(default)]
+    pub a_matrix: Vec<f64>,
     /// Anzahl der update()-Aufrufe seit der letzten Neu-Initialisierung von inv_a.
     #[serde(default)]
     updates_since_reset: u64,
+    /// Anzahl der automatischen Re-Faktorisierungen / Soft-Restarts von inv_a.
+    #[serde(default)]
+    pub refactorizations: u64,
     /// Pre-allocated Buffer für Matrix-Vektor Produkte (d Elemente) zur Vermeidung von Hot-Path Allokationen.
     #[serde(skip, default)]
     pub work_buf: AlignedF32Vec,
+    /// Pre-allocated f64 Probe-Vektor Buffer v (d Elemente).
+    #[serde(skip, default)]
+    pub probe_v_buf: Vec<f64>,
+    /// Pre-allocated f64 Probe-Vektor Buffer w (d Elemente).
+    #[serde(skip, default)]
+    pub probe_w_buf: Vec<f64>,
     /// Exploration-Parameter α_p.
     pub alpha: f32,
     /// Cold-Start Baseline Exploration Parameter α_base (Default: 0.5).
@@ -355,12 +551,18 @@ pub struct BanditProfileState {
     /// PRNG Seed für Sketched Projection.
     #[serde(default)]
     pub seed: u64,
-    /// Optionale Sketch-Matrix für SketchedProjection.
+    /// Optionale Sketch-Matrix für SketchedProjection, einmalig als Arc hinterlegt.
     #[serde(default)]
-    pub sketch_matrix: Option<SketchMatrix>,
+    pub sketch_matrix: Option<std::sync::Arc<SketchMatrix>>,
     /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
     #[serde(default)]
     pub sketch_theta: Vec<f32>,
+    /// Maximale erlaubte Spur von A⁻¹.
+    #[serde(default = "default_max_trace")]
+    pub max_trace: f64,
+    /// Schwelle für Drift-Erkennung via Probe-Residual.
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -381,18 +583,44 @@ impl BanditPolicy for BanditProfileState {
 }
 
 impl BanditProfileState {
+    /// Rekonstruiert Schattenmatrix A aus A⁻¹ via Cholesky/Inversion, falls A leer ist.
+    pub fn ensure_a_matrix_reconstructed(&mut self) {
+        let d = self.theta.len();
+        if d > 0 && self.a_matrix.len() != d * d {
+            if self.inv_a.len() == d * d {
+                let inv_f64: Vec<f64> = self.inv_a.iter().map(|&v| v as f64).collect();
+                if let Some(a_rec) = cholesky_invert_f64(&inv_f64, d) {
+                    self.a_matrix = a_rec;
+                    return;
+                }
+            }
+            let mut a_matrix = vec![0.0f64; d * d];
+            for i in 0..d {
+                a_matrix[i * d + i] = 1.0;
+            }
+            self.a_matrix = a_matrix;
+        }
+    }
+
     /// Erstellt einen neuen Cold-Start-Zustand für Dimension `d`.
     pub fn cold_start(d: usize, alpha_base: f32) -> Self {
         let mut inv_a = vec![0.0f32; d * d];
+        let mut a_matrix = vec![0.0f64; d * d];
         for i in 0..d {
             inv_a[i * d + i] = 1.0;
+            a_matrix[i * d + i] = 1.0;
         }
         Self {
+            snapshot_version: 1,
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
             inv_a: AlignedF32Vec::new(inv_a),
+            a_matrix,
             updates_since_reset: 0,
+            refactorizations: 0,
             work_buf: AlignedF32Vec::zeros(d),
+            probe_v_buf: vec![0.0f64; d],
+            probe_w_buf: vec![0.0f64; d],
             alpha: alpha_base,
             alpha_base,
             alpha_max_multiplier: default_alpha_max_multiplier(),
@@ -406,6 +634,32 @@ impl BanditProfileState {
             seed: 0,
             sketch_matrix: None,
             sketch_theta: Vec::new(),
+            max_trace: default_max_trace(),
+            drift_threshold: default_drift_threshold(),
+        }
+    }
+
+    /// Gibt die Anzahl der Rebuilds/Re-Faktorisierungen von A⁻¹ zurück.
+    pub fn rebuild_count(&self) -> u64 {
+        self.refactorizations
+    }
+
+    /// Führt eine explizite Re-Faktorisierung/Inversion von A⁻¹ aus der Schattenmatrix A mittels Cholesky-Zerlegung durch.
+    pub fn rebuild_inv_a_from_a(&mut self) -> bool {
+        let d = self.theta.len();
+        if d == 0 || self.a_matrix.len() != d * d {
+            return false;
+        }
+        if let Some(inv_f64) = cholesky_invert_f64(&self.a_matrix, d) {
+            self.ensure_inv_a();
+            for i in 0..(d * d) {
+                self.inv_a[i] = inv_f64[i] as f32;
+            }
+            self.updates_since_reset = 0;
+            self.refactorizations += 1;
+            true
+        } else {
+            false
         }
     }
 
@@ -430,7 +684,7 @@ impl BanditProfileState {
                 .map(|s| (s.original_dim, s.projected_dim))
                 != Some((d, projected_dim))
         {
-            let sketch = SketchMatrix::from_seed(self.seed, d, projected_dim)?;
+            let sketch = std::sync::Arc::new(SketchMatrix::from_seed(self.seed, d, projected_dim)?);
             self.sketch_matrix = Some(sketch);
         }
 
@@ -455,6 +709,49 @@ impl BanditProfileState {
         Ok(())
     }
 
+    /// Initialisiert die Sketched Projection mit einem mandantenisolierten PRNG-Seed.
+    pub fn init_tenant_sketch(
+        &mut self,
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        projected_dim: usize,
+    ) -> Result<(), BanditError> {
+        self.seed = SketchMatrix::derive_seed(tenant_id, base_seed);
+        self.ensure_sketched_state(projected_dim)
+    }
+
+    fn refactorize_inv_a(&mut self, dim: usize) {
+        let mut inv_a = vec![0.0f32; dim * dim];
+        for i in 0..dim {
+            inv_a[i * dim + i] = 1.0;
+        }
+        self.inv_a = AlignedF32Vec::new(inv_a);
+        self.updates_since_reset = 0;
+        self.refactorizations = self.refactorizations.saturating_add(1);
+    }
+
+    /// Stellt sicher, dass theta, sigma_sq, inv_a und work_buf für Dimension `d` konsistent sind.
+    pub fn ensure_dimensions(&mut self) {
+        let d = self.expected_dim();
+        if self.theta.len() != d {
+            self.theta.resize(d, 0.0);
+        }
+        if self.sigma_sq.len() != d {
+            self.sigma_sq.resize(d, 1.0);
+        }
+        if self.inv_a.len() != d * d {
+            let mut inv_a = vec![0.0f32; d * d];
+            for i in 0..d {
+                inv_a[i * d + i] = 1.0;
+            }
+            self.inv_a = AlignedF32Vec::new(inv_a);
+            self.updates_since_reset = 0;
+        }
+        if self.work_buf.len() != d {
+            self.work_buf = AlignedF32Vec::zeros(d);
+        }
+    }
+
     fn ensure_inv_a(&mut self) {
         let d = self.theta.len();
         if self.inv_a.len() != d * d {
@@ -465,12 +762,25 @@ impl BanditProfileState {
             self.inv_a = AlignedF32Vec::new(inv_a);
             self.updates_since_reset = 0;
         }
+        if self.a_matrix.len() != d * d {
+            let mut a_matrix = vec![0.0f64; d * d];
+            for i in 0..d {
+                a_matrix[i * d + i] = 1.0;
+            }
+            self.a_matrix = a_matrix;
+        }
     }
 
     fn ensure_work_buf(&mut self) {
         let d = self.theta.len();
         if self.work_buf.len() != d {
             self.work_buf = AlignedF32Vec::zeros(d);
+        }
+        if self.probe_v_buf.len() != d {
+            self.probe_v_buf = vec![0.0f64; d];
+        }
+        if self.probe_w_buf.len() != d {
+            self.probe_w_buf = vec![0.0f64; d];
         }
     }
 
@@ -501,6 +811,15 @@ impl BanditProfileState {
             });
         }
 
+        if !cost.is_finite() {
+            return Err(BanditError::InvalidConfig(format!("Non-finite cost: {cost}")));
+        }
+        if x.iter().any(|v| !v.is_finite()) {
+            return Err(BanditError::InvalidConfig(
+                "Context vector x contains non-finite values (NaN/Inf)".into(),
+            ));
+        }
+
         if let BanditImplementation::SketchedProjection { projected_dim } = self.implementation {
             if projected_dim == 0 || projected_dim > expected {
                 return Err(BanditError::InvalidConfig(
@@ -510,7 +829,7 @@ impl BanditProfileState {
 
             let sketch_holder;
             let sketch = match self.sketch_matrix.as_ref() {
-                Some(s) if s.original_dim == expected && s.projected_dim == projected_dim => s,
+                Some(s) if s.original_dim == expected && s.projected_dim == projected_dim => s.as_ref(),
                 _ => {
                     sketch_holder = SketchMatrix::from_seed(self.seed, expected, projected_dim)?;
                     &sketch_holder
@@ -549,18 +868,25 @@ impl BanditProfileState {
             return Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty);
         }
 
-        let dot: f32 = dot_product_f32(&self.theta, x);
+        let dot: f32 = if self.theta.len() == expected {
+            dot_product_f32(&self.theta, x)
+        } else {
+            0.0
+        };
 
         let variance_term = match self.implementation {
-            BanditImplementation::DiagonalApproximation => self
-                .sigma_sq
-                .iter()
-                .zip(x.iter())
-                .map(|(s, xi)| xi * xi / s.max(1e-8))
-                .sum::<f32>()
-                .sqrt(),
+            BanditImplementation::DiagonalApproximation => {
+                let sum: f32 = (0..expected)
+                    .map(|i| {
+                        let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
+                        let xi = x[i];
+                        xi * xi / s.max(1e-8)
+                    })
+                    .sum();
+                sum.sqrt()
+            }
             BanditImplementation::ShermanMorrison | BanditImplementation::FlowCorrectedThompson => {
-                let d = self.theta.len();
+                let d = expected;
                 if self.inv_a.len() == d * d {
                     let var_sum: f32 = self
                         .inv_a
@@ -576,16 +902,18 @@ impl BanditProfileState {
                     }
                     var_sum.sqrt()
                 } else {
-                    self.sigma_sq
-                        .iter()
-                        .zip(x.iter())
-                        .map(|(s, xi)| xi * xi / s.max(1e-8))
-                        .sum::<f32>()
-                        .sqrt()
+                    let sum: f32 = (0..d)
+                        .map(|i| {
+                            let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
+                            let xi = x[i];
+                            xi * xi / s.max(1e-8)
+                        })
+                        .sum();
+                    sum.sqrt()
                 }
             }
             _ => {
-                let d = self.theta.len();
+                let d = expected;
                 if self.inv_a.len() == d * d {
                     let var_sum: f32 = self
                         .inv_a
@@ -601,12 +929,14 @@ impl BanditProfileState {
                     }
                     var_sum.sqrt()
                 } else {
-                    self.sigma_sq
-                        .iter()
-                        .zip(x.iter())
-                        .map(|(s, xi)| xi * xi / s.max(1e-8))
-                        .sum::<f32>()
-                        .sqrt()
+                    let sum: f32 = (0..d)
+                        .map(|i| {
+                            let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
+                            let xi = x[i];
+                            xi * xi / s.max(1e-8)
+                        })
+                        .sum();
+                    sum.sqrt()
                 }
             }
         };
@@ -634,12 +964,19 @@ impl BanditProfileState {
             });
         }
 
+        if !r_outcome.is_finite() || !cost.is_finite() || x.iter().any(|v| !v.is_finite()) {
+            return Err(BanditError::InvalidConfig(
+                "Non-finite value in update inputs".into(),
+            ));
+        }
+
+        self.ensure_dimensions();
+
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
         let r_adj = r_outcome - self.lambda * cost - privacy_penalty;
 
         // Effektiver Diskontfaktor γ (Post-Drift beschleunigter Decay vs. Normalbetrieb)
         let effective_gamma = if self.drift_steps_remaining > 0 {
-            self.drift_steps_remaining -= 1;
             self.drift_gamma
         } else {
             self.gamma
@@ -647,10 +984,13 @@ impl BanditProfileState {
 
         match self.implementation {
             BanditImplementation::DiagonalApproximation => {
-                for (i, &xi) in x.iter().enumerate().take(self.theta.len()) {
+                for i in 0..self.theta.len() {
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0);
-                    self.theta[i] += r_adj * xi / self.sigma_sq[i].max(1e-8);
-                    self.sigma_sq[i] += xi * xi;
+                    self.theta[i] += r_adj * x[i] / self.sigma_sq[i].max(1e-8);
+                    self.sigma_sq[i] += x[i] * x[i];
+                }
+                if self.drift_steps_remaining > 0 {
+                    self.drift_steps_remaining -= 1;
                 }
             }
             BanditImplementation::SketchedProjection { projected_dim } => {
@@ -667,7 +1007,6 @@ impl BanditProfileState {
                 let rx = sketch.project(x);
                 let k = projected_dim;
 
-                self.updates_since_reset += 1;
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
                 let mut xt_v_disc = 0.0f32;
@@ -678,14 +1017,32 @@ impl BanditProfileState {
                     xt_v_disc += rx[i] * v_disc_i;
                 }
 
-                let denominator = 1.0 + xt_v_disc;
-                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                    || denominator <= 0.0
-                {
-                    return Err(BanditError::PrecisionMatrixDriftDetected {
-                        updates_since_reset: self.updates_since_reset,
-                        denominator,
-                    });
+                let mut denominator = 1.0 + xt_v_disc;
+                let needs_refactorization =
+                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                        || denominator <= 0.0;
+
+                if needs_refactorization {
+                    self.refactorize_inv_a(k);
+                    xt_v_disc = 0.0f32;
+                    for (i, row) in self.inv_a.chunks_exact(k).enumerate() {
+                        let row_dot = dot_product_f32(row, &rx);
+                        let v_disc_i = gamma_inv * row_dot;
+                        self.work_buf[i] = v_disc_i;
+                        xt_v_disc += rx[i] * v_disc_i;
+                    }
+                    denominator = 1.0 + xt_v_disc;
+                    if denominator <= 0.0 || !denominator.is_finite() {
+                        return Err(BanditError::PrecisionMatrixDriftDetected {
+                            updates_since_reset: self.updates_since_reset,
+                            denominator,
+                        });
+                    }
+                }
+
+                self.updates_since_reset += 1;
+                if self.drift_steps_remaining > 0 {
+                    self.drift_steps_remaining -= 1;
                 }
 
                 let denom_safe = denominator.max(1e-8);
@@ -706,14 +1063,12 @@ impl BanditProfileState {
             }
             _ => {
                 let d = self.theta.len();
+                self.ensure_a_matrix_reconstructed();
                 self.ensure_inv_a();
                 self.ensure_work_buf();
 
-                self.updates_since_reset += 1;
-
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
-                // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc (SIMD dot_product_f32)
                 let mut xt_v_disc = 0.0f32;
                 for (i, row) in self.inv_a.chunks_exact(d).enumerate() {
                     let row_dot = dot_product_f32(row, x);
@@ -723,25 +1078,39 @@ impl BanditProfileState {
                 }
 
                 // 2. Denominator und Gain Vector k
-                let denominator = 1.0 + xt_v_disc;
+                let mut denominator = 1.0 + xt_v_disc;
+                let needs_refactorization =
+                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                        || denominator <= 0.0;
 
-                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                    || denominator <= 0.0
-                {
-                    return Err(BanditError::PrecisionMatrixDriftDetected {
-                        updates_since_reset: self.updates_since_reset,
-                        denominator,
-                    });
+                if needs_refactorization {
+                    self.refactorize_inv_a(d);
+                    xt_v_disc = 0.0f32;
+                    for (i, row) in self.inv_a.chunks_exact(d).enumerate() {
+                        let row_dot = dot_product_f32(row, x);
+                        let v_disc_i = gamma_inv * row_dot;
+                        self.work_buf[i] = v_disc_i;
+                        xt_v_disc += x[i] * v_disc_i;
+                    }
+                    denominator = 1.0 + xt_v_disc;
+                    if denominator <= 0.0 || !denominator.is_finite() {
+                        return Err(BanditError::PrecisionMatrixDriftDetected {
+                            updates_since_reset: self.updates_since_reset,
+                            denominator,
+                        });
+                    }
+                }
+
+                self.updates_since_reset += 1;
+                if self.drift_steps_remaining > 0 {
+                    self.drift_steps_remaining -= 1;
                 }
 
                 let denom_safe = denominator.max(1e-8);
 
-                // 3. Parameter Residual: r_adj - θᵀ x
                 let pred_theta_x = dot_product_f32(&self.theta, x);
                 let residual = r_adj - pred_theta_x;
 
-                // 4. Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (v_disc)ᵀ (fused_row_update)
-                // Parameter-Update: θ_new = θ_old + (r_adj - θ_oldᵀ x) * k
                 let work_slice = &self.work_buf[..d];
                 for (i, row) in self.inv_a.chunks_exact_mut(d).enumerate() {
                     let k_i = work_slice[i] / denom_safe;
@@ -750,6 +1119,31 @@ impl BanditProfileState {
 
                     self.theta[i] += residual * k_i;
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
+                }
+
+                let current_trace = compute_inv_a_trace(&self.inv_a, d);
+                if current_trace > default_max_trace() {
+                    let scale = (default_max_trace() / current_trace) as f32;
+                    for val in self.inv_a.iter_mut() {
+                        *val *= scale;
+                    }
+                }
+
+                let probe_residual = compute_probe_residual_f64(
+                    &self.a_matrix,
+                    &self.inv_a,
+                    d,
+                    self.seed,
+                    &mut self.probe_v_buf,
+                    &mut self.probe_w_buf,
+                );
+
+                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || probe_residual > default_drift_threshold()
+                {
+                    if !self.rebuild_inv_a_from_a() {
+                        tracing::warn!("Rebuild of inv_a from shadow matrix A failed on probe residual drift");
+                    }
                 }
             }
         }
@@ -763,6 +1157,15 @@ impl BanditProfileState {
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
         self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
+    }
+
+    /// Observes current non-conformity scores via a `DriftPolicyBridge` and applies drift adaptation if detected.
+    pub fn observe_and_adapt_drift(
+        &mut self,
+        bridge: &mut crate::drift::DriftPolicyBridge,
+        current_scores: &[f32],
+    ) -> crate::lyapunov::LyapunovResult {
+        bridge.observe_and_react(current_scores, self)
     }
 }
 
@@ -1103,7 +1506,7 @@ mod tests {
     }
 
     #[test]
-    fn test_drift_detected_after_1000_updates() {
+    fn test_auto_recovery_after_1000_updates() {
         let d = 2;
         let mut state = BanditProfileState::cold_start(d, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
@@ -1113,18 +1516,13 @@ mod tests {
         for _ in 0..1000 {
             state.update(&x, 1.0, 0.0, false).expect("valid update");
         }
+        assert_eq!(state.refactorizations, 0);
 
-        // The 1001st update exceeds SHERMAN_MORRISON_REFACTORIZATION_INTERVAL (1000)
+        // The 1001st update triggers automatic refactorization and succeeds
         let res = state.update(&x, 1.0, 0.0, false);
-        match res {
-            Err(BanditError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                ..
-            }) => {
-                assert_eq!(updates_since_reset, 1001);
-            }
-            other => panic!("Expected PrecisionMatrixDriftDetected, got {:?}", other),
-        }
+        assert!(res.is_ok(), "Update 1001 must succeed via auto-recovery");
+        assert_eq!(state.refactorizations, 1);
+        assert_eq!(state.updates_since_reset, 1);
     }
 
     #[test]
@@ -1147,7 +1545,7 @@ mod tests {
     }
 
     #[test]
-    fn test_drift_detected_on_nonpositive_denominator() {
+    fn test_auto_recovery_on_nonpositive_denominator() {
         let d = 2;
         let mut state = BanditProfileState::cold_start(d, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
@@ -1158,22 +1556,10 @@ mod tests {
         let x = vec![1.0f32, 0.0f32];
         let res = state.update(&x, 1.0, 0.0, false);
 
-        match res {
-            Err(BanditError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                denominator,
-            }) => {
-                assert_eq!(updates_since_reset, 1);
-                assert!(
-                    denominator <= 0.0,
-                    "Expected nonpositive denominator, got {}",
-                    denominator
-                );
-            }
-            other => panic!(
-                "Expected PrecisionMatrixDriftDetected error, got {:?}",
-                other
-            ),
-        }
+        assert!(
+            res.is_ok(),
+            "Nonpositive denominator must trigger auto-recovery and succeed"
+        );
+        assert_eq!(state.refactorizations, 1);
     }
 }

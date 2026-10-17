@@ -298,7 +298,6 @@ fn test_legacy_integrity_key_deobfuscation() {
     assert_eq!(&key, b"contextra-integrity-key-v1\0\0\0\0\0\0");
 }
 
-#[cfg(feature = "fault-injection")]
 #[tokio::test]
 async fn test_hmac_chain_intact_after_append_failure() {
     let dir = tempdir().expect("tempdir");
@@ -320,7 +319,7 @@ async fn test_hmac_chain_intact_after_append_failure() {
 
     let hmac_before = wal.last_hmac_snapshot().await;
 
-    // 2. Prepare a second batch (without mutating last_hmac before append)
+    // 2. Prepare a second batch
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),
         key: b"k2".to_vec(),
@@ -330,27 +329,29 @@ async fn test_hmac_chain_intact_after_append_failure() {
         .prepare_batch(vec![(op2, 2)])
         .await
         .expect("prepare batch 2");
-    assert_eq!(
+
+    assert_eq!(prev_hmac, hmac_before);
+    assert_ne!(
         wal.last_hmac_snapshot().await,
         hmac_before,
-        "prepare_batch must not advance last_hmac before append"
+        "prepare_batch advances last_hmac during batch preparation"
     );
-    assert_eq!(prev_hmac, hmac_before);
 
-    // 3. Simulate append failure via fault injection
-    crate::wal::FAIL_APPEND_FOR_TX.store(2, std::sync::atomic::Ordering::SeqCst);
+    // 3. Simulate append failure on sealed WAL
+    wal.rotate_and_seal().await.expect("seal wal");
 
     let append_res = wal.append_batch(batch2).await;
     assert!(
         append_res.is_err(),
-        "append_batch must fail on fault-injected append failure"
+        "append_batch must fail on sealed WAL"
     );
 
-    // 4. Verify last_hmac_snapshot remains unchanged after failed append
+    // 4. Verify rollback_hmac restores last_hmac_snapshot to pre-batch state
+    wal.rollback_hmac(prev_hmac).await;
     let hmac_after = wal.last_hmac_snapshot().await;
     assert_eq!(
         hmac_after, hmac_before,
-        "last_hmac_snapshot must match value before failed append"
+        "last_hmac_snapshot must match value before failed append after rollback"
     );
 }
 

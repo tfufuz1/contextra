@@ -334,36 +334,38 @@ impl Contextra {
             .scan_prefix(txt_data_prefix.as_bytes())
             .await?;
 
+        let total_remaining = remaining_col_data.len() + remaining_txt_data.len();
+        if total_remaining != 0 {
+            return Err(contextra_types::ContextraError::Internal(format!(
+                "CRITICAL: Collection '{name}' drop incomplete: {total_remaining} keys remained after delete"
+            )));
+        }
+
         let mut hasher = blake3::Hasher::new();
         hasher.update(name.as_bytes());
         let hash_bytes = hasher.finalize();
-        let col_id_u64 =
-            u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().unwrap_or([1; 8]));
-        let collection_id = CollectionId::try_new(col_id_u64).unwrap_or(CollectionId::new(1));
+        let slice8: [u8; 8] = hash_bytes.as_bytes()[0..8]
+            .try_into()
+            .map_err(|_| contextra_types::ContextraError::Internal("Failed to extract 8 bytes for collection ID".into()))?;
+        let col_id_u64 = u64::from_le_bytes(slice8);
+        let collection_id = CollectionId::try_new(col_id_u64)?;
 
         let scope = DeletionScope::Collection {
             collection_id,
             tenant_id,
         };
 
-        let layer_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::LsmMemtable,
-                remaining_col_data.len(),
-            ),
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::SsTableAllLevels,
-                remaining_txt_data.len(),
-            ),
-        ]
-        .into_iter()
-        .collect::<Result<Vec<_>>>()
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
+        let witness = contextra_crypto::LayerWitness::issue_from_storage_layer(
+            DeletionLayer::LsmMemtable,
+            &deleted_keys,
+            tx,
+            contextra_crypto::WitnessEvidence::MemtableScan {
+                memtables_scanned: 1,
+            },
+        )?;
+
+        let layer_proof = LayerCleanupProof::from_witness(&witness)?;
+        let layer_proofs = vec![layer_proof];
 
         let proof = DeletionProof::create(
             scope,

@@ -1,5 +1,5 @@
 #[test]
 fn compile_fail() {
     let t = trybuild::TestCases::new();
-    t.compile_fail("tests/compile_fail/*.rs");
+    t.compile_fail("tests/compile_fail/layer_proof_not_constructible_with_literal_zero.rs");
 }

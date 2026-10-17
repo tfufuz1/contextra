@@ -3,7 +3,7 @@
 
 [[family]]
 name = "CollectionDocData"
-prefix_pattern = "__col:{collection_name}:\x00"
+prefix_pattern = "__col:{collection_name}:\u0000"
 owner_crate = "contextra-engine"
 erase_unit = "Both"
 scanner = "SstScan"
@@ -14,7 +14,7 @@ contains_identifier = true
 # b"__col_idx:\x00" + name (un-tenantisiert) bzw. t:{tenant_id}:__col_idx:\x00{collection_name} (tenantisiert).
 [[family]]
 name = "CollectionIndex"
-prefix_pattern = "__col_idx:\x00{collection_name}"
+prefix_pattern = "__col_idx:\u0000{collection_name}"
 owner_crate = "contextra-engine"
 erase_unit = "PerCollection"
 scanner = "SstScan"

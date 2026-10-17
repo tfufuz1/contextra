@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::{
     ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex,
-    VectorIndexStats,
+    VectorIndexStats, VectorResidue,
 };
 
 use super::batch::{BatchContext, SearchContext};
@@ -225,6 +225,16 @@ impl VectorIndex for HnswIndex {
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<ScoredDocument>> {
         self.search_filtered_internal(query, k, filter, None).await
+    }
+
+    async fn residue(&self, id: DocId) -> Result<VectorResidue> {
+        let scan = self.scan_residue(id);
+        Ok(VectorResidue {
+            node_present: scan.node_found,
+            incoming_edges: u32::try_from(scan.incoming_edges).unwrap_or(u32::MAX),
+            outgoing_edges: u32::try_from(scan.outgoing_edges).unwrap_or(u32::MAX),
+            pinned: scan.pinned_by_reader,
+        })
     }
 
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {

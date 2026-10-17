@@ -7,10 +7,10 @@ use crate::ComputePool;
 use contextra_core::{DistanceMetric, DocId};
 use std::path::PathBuf;
 
-/// Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.
+/// Fallback behavior policy when DiskANN loading, checksum validation, or reads fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DiskAnnFallbackPolicy {
-    /// Transparently fall back to in-memory HNSW index on load failure or detected corruption.
+    /// Transparently fall back to in-memory HNSW index on load failure or detected checksum mismatch.
     #[default]
     UseHnswOnFailure,
     /// Immediately return a typed error on load failure or index corruption.
@@ -36,7 +36,7 @@ pub struct DiskAnnConfig {
     pub distance_metric: DistanceMetric,
     /// Whether to use SQ8 quantization.
     pub quantize: bool,
-    /// Fallback policy when index file loading or integrity validation fails.
+    /// Fallback policy when index file loading or checksum validation fails.
     pub fallback_policy: DiskAnnFallbackPolicy,
     /// Optionaler Override für den Pending-Flush-Threshold (für Benchmarks/Tests).
     /// None: adaptiver Threshold gemäß ADR-068 (max(50, min(1000, floor(N × 0.05)))).

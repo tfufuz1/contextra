@@ -111,6 +111,14 @@ struct TestClock {
 }
 
 impl contextra_ports::Clock for TestClock {
+    fn now(&self) -> contextra_ports::DeterministicTimestamp {
+        contextra_ports::DeterministicTimestamp::new(self.now_unix_nanos() / 1_000_000, 0)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.now_unix_nanos()
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.nanos.load(std::sync::atomic::Ordering::Relaxed)
     }

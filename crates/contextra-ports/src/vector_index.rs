@@ -11,6 +11,19 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
+/// Vector residue measurement for deletion evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VectorResidue {
+    /// True if the document node exists in the vector index.
+    pub node_present: bool,
+    /// Number of incoming graph edges pointing to this node.
+    pub incoming_edges: u32,
+    /// Number of outgoing graph edges from this node.
+    pub outgoing_edges: u32,
+    /// True if the index or document node is pinned by an active reader snapshot.
+    pub pinned: bool,
+}
+
 /// Statistics for a vector index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VectorIndexStats {
@@ -118,6 +131,17 @@ pub trait VectorIndex: Send + Sync + 'static {
                 ));
             }
             self.search(query, k).await
+        }
+    }
+
+    /// Measures residual state (node presence, edge counts, pinning status) for a document ID.
+    fn residue(&self, id: DocId) -> impl Future<Output = Result<VectorResidue>> + Send {
+        async move {
+            let _ = id;
+            Err(crate::error::ContextraError::capability_unsupported(
+                "vector_residue",
+                "Vector residue measurement is not supported by default for this vector engine",
+            ))
         }
     }
 

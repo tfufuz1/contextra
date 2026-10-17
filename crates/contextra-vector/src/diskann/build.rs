@@ -5,7 +5,7 @@
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
 use super::format::{
-    DISKANN_INTEGRITY_KEY, MAX_PENDING_WAL_DIM, PENDING_WAL_HEADER_SIZE, PENDING_WAL_MAGIC,
+    CHECKSUM_SEED, MAX_PENDING_WAL_DIM, PENDING_WAL_HEADER_SIZE, PENDING_WAL_MAGIC,
     PENDING_WAL_VERSION, TOMBSTONE_WAL_HEADER_SIZE, TOMBSTONE_WAL_MAGIC, TOMBSTONE_WAL_VERSION,
 };
 use super::types::{DiskAnnIndex, SearchCandidate};
@@ -97,7 +97,7 @@ impl DiskAnnIndex {
         Ok(pruned)
     }
 
-    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 checksum protection.
     ///
     /// # Binary Format
     /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
@@ -126,7 +126,7 @@ impl DiskAnnIndex {
         }
 
         let id_bytes = id.inner().to_le_bytes();
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -205,7 +205,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
             hmac.update(&buf_id);
             let computed_hmac = hmac.finalize();
 
@@ -222,7 +222,7 @@ impl DiskAnnIndex {
         Ok(bitset)
     }
 
-    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
+    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 checksum protection.
     ///
     /// # Binary Format
     /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
@@ -268,7 +268,7 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -281,7 +281,7 @@ impl DiskAnnIndex {
 
     /// Reads and verifies uncommitted vector entries from `pending.wal`.
     ///
-    /// # Integrity & Defensive Parsing
+    /// # Checksum & Defensive Parsing
     /// 1. Validates the 5-byte file header (`PWAL` magic + version 1). Rejects unversioned/legacy formats.
     /// 2. Validates `dim` against `MAX_PENDING_WAL_DIM` (65,536) prior to buffer allocation to prevent allocation-DoS attacks.
     /// 3. Reads entry payload and entry HMAC, computing the expected HMAC-SHA256 over `(id || dim || embedding)`.
@@ -373,7 +373,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);

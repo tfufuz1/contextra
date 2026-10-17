@@ -40,6 +40,7 @@ thiserror = { workspace = true }
 
 
 [dev-dependencies]
+contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }

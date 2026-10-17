@@ -10,8 +10,12 @@
 use crate::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
-use contextra_types::{Result, TxId};
+use crate::error::CryptoError;
+use contextra_types::TxId;
 use std::marker::PhantomData;
+
+/// Result type alias for cryptographic typestate builder operations.
+type CryptoResult<T> = std::result::Result<T, CryptoError>;
 
 /// Marker type indicating a storage layer has not yet been attested as cleaned.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,16 +31,89 @@ pub struct Cleaned;
 /// ```rust
 /// use contextra_crypto::deletion_proof::{DeletionLayer, DeletionScope, ExcludedScope, LayerCleanupProof};
 /// use contextra_crypto::deletion_proof_typestate::DeletionProofBuilder;
+/// use contextra_crypto::deletion_witness::{LayerWitness, WitnessEvidence, WitIssueArgs};
+/// use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
+/// use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
+/// use contextra_crypto::deletion_proof::probe::WitStoreGeneration;
 /// use contextra_types::{DocId, TenantId, TxId};
 ///
 /// # fn example() -> contextra_types::Result<()> {
-/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?;
-/// let sst_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?;
-/// let hnsw_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?;
-/// let wal_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::WalAllSegments { seq_after: 10 }, 0)?;
-/// let csr_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::CsrGraph, 0)?;
-/// let kv_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::KvCacheSegments, 0)?;
-/// let emb_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::EmbeddingCache, 0)?;
+/// let lsm_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::LsmMemtable, &[b"key1".to_vec()], TxId(100), WitnessEvidence::MemtableScan { memtables_scanned: 1 })?;
+/// let lsm_proof = LayerCleanupProof::from_witness(&lsm_wit)?;
+///
+/// let sst_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::SsTableAllLevels, &[b"key1".to_vec()], TxId(100), WitnessEvidence::SstableScan { files_scanned: 1 })?;
+/// let sst_proof = LayerCleanupProof::from_witness(&sst_wit)?;
+///
+/// let wal_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::WalAllSegments { seq_after: 10 }, &[b"key1".to_vec()], TxId(100), WitnessEvidence::WalPurge { segments_removed: 1, bytes_scrubbed: 100 })?;
+/// let wal_proof = LayerCleanupProof::from_witness(&wal_wit)?;
+///
+/// let hnsw_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::HnswIndex,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "hnsw_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::HnswIndex { node_id: 1, incoming_edges: 0, outgoing_edges: 0, pinned_by_reader: false, marked_zeroed: true },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let hnsw_proof = LayerCleanupProof::from_witness(&hnsw_wit)?;
+///
+/// let csr_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::CsrGraph,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "csr_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::Relations { edges_scanned: 1, matching_edges_found: 0 },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let csr_proof = LayerCleanupProof::from_witness(&csr_wit)?;
+///
+/// let kv_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::KvCacheSegments,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "kv_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::ProcessCaches { cache_segments_scanned: 1, active_references: 0, invalidation_in_flight: false },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let kv_proof = LayerCleanupProof::from_witness(&kv_wit)?;
+///
+/// let emb_wit = LayerWitness::issue(WitIssueArgs {
+///     layer: DeletionLayer::EmbeddingCache,
+///     scope_hash: [0u8; 32],
+///     scanned_at_tx: TxId(100),
+///     as_of_tx: TxId(100),
+///     assurance: WitAssurance::S1,
+///     claim: WitClaimText::S1,
+///     footprint_hash: [0u8; 32],
+///     scope_write_seq: 0,
+///     scanner_name: "emb_scanner",
+///     scanner_version: 1,
+///     store_generation: WitStoreGeneration(1),
+///     layer_evidence: WitLayerEvidence::ProcessCaches { cache_segments_scanned: 1, active_references: 0, invalidation_in_flight: false },
+///     key_identifiers_claimed: false,
+/// })?;
+/// let emb_proof = LayerCleanupProof::from_witness(&emb_wit)?;
 ///
 /// let proof = DeletionProofBuilder::new(
 ///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
@@ -45,13 +122,13 @@ pub struct Cleaned;
 ///     vec![ExcludedScope::LlmParameterMemory],
 ///     vec![0u8; 32],
 /// )
-/// .with_lsm_memtable_cleanup(lsm_proof)
-/// .with_sstable_all_levels_cleanup(sst_proof)
-/// .with_hnsw_index_cleanup(hnsw_proof)
-/// .with_wal_all_segments_cleanup(wal_proof)
-/// .with_csr_graph_cleanup(csr_proof)
-/// .with_kv_cache_segments_cleanup(kv_proof)
-/// .with_embedding_cache_cleanup(emb_proof)
+/// .with_lsm_memtable_cleanup(lsm_proof)?
+/// .with_sstable_all_levels_cleanup(sst_proof)?
+/// .with_hnsw_index_cleanup(hnsw_proof)?
+/// .with_wal_all_segments_cleanup(wal_proof)?
+/// .with_csr_graph_cleanup(csr_proof)?
+/// .with_kv_cache_segments_cleanup(kv_proof)?
+/// .with_embedding_cache_cleanup(emb_proof)?
 /// .finish()?;
 /// # Ok(())
 /// # }
@@ -62,9 +139,11 @@ pub struct Cleaned;
 /// ```compile_fail
 /// use contextra_crypto::deletion_proof_typestate::DeletionProofBuilder;
 /// use contextra_crypto::deletion_proof::{DeletionLayer, DeletionScope, LayerCleanupProof};
+/// use contextra_crypto::deletion_witness::{LayerWitness, WitnessEvidence};
 /// use contextra_types::{DocId, TenantId, TxId};
 ///
-/// let lsm_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+/// let lsm_wit = LayerWitness::issue_from_storage_layer(DeletionLayer::LsmMemtable, &[b"key1".to_vec()], TxId(100), WitnessEvidence::MemtableScan { memtables_scanned: 1 }).unwrap();
+/// let lsm_proof = LayerCleanupProof::from_witness(&lsm_wit).unwrap();
 /// let _ = DeletionProofBuilder::new(
 ///     DeletionScope::Document { doc_id: DocId(1), tenant_id: TenantId::try_new(10).unwrap() },
 ///     vec![],
@@ -72,7 +151,7 @@ pub struct Cleaned;
 ///     vec![],
 ///     vec![0u8; 32],
 /// )
-/// .with_lsm_memtable_cleanup(lsm_proof)
+/// .with_lsm_memtable_cleanup(lsm_proof).unwrap()
 /// .finish(); // Compile fail: finish() not available until all 7 layers are Cleaned
 /// ```
 #[derive(Debug)]
@@ -141,14 +220,15 @@ impl<Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Missing, Sst, Hnsw, Wal,
     pub fn with_lsm_memtable_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Cleaned, Sst, Hnsw, Wal, Csr, Kv, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::LsmMemtable),
-            "expected LayerCleanupProof for DeletionLayer::LsmMemtable, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Cleaned, Sst, Hnsw, Wal, Csr, Kv, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::LsmMemtable) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::LsmMemtable, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -158,7 +238,7 @@ impl<Sst, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Missing, Sst, Hnsw, Wal,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -167,14 +247,15 @@ impl<Lsm, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Missing, Hnsw, Wal,
     pub fn with_sstable_all_levels_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Cleaned, Hnsw, Wal, Csr, Kv, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::SsTableAllLevels),
-            "expected LayerCleanupProof for DeletionLayer::SsTableAllLevels, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Cleaned, Hnsw, Wal, Csr, Kv, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::SsTableAllLevels) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::SsTableAllLevels, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -184,7 +265,7 @@ impl<Lsm, Hnsw, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Missing, Hnsw, Wal,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -193,14 +274,15 @@ impl<Lsm, Sst, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Missing, Wal, C
     pub fn with_hnsw_index_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Sst, Cleaned, Wal, Csr, Kv, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::HnswIndex),
-            "expected LayerCleanupProof for DeletionLayer::HnswIndex, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Sst, Cleaned, Wal, Csr, Kv, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::HnswIndex) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::HnswIndex, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -210,7 +292,7 @@ impl<Lsm, Sst, Wal, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Missing, Wal, C
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -219,14 +301,15 @@ impl<Lsm, Sst, Hnsw, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Missing,
     pub fn with_wal_all_segments_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Sst, Hnsw, Cleaned, Csr, Kv, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::WalAllSegments { .. }),
-            "expected LayerCleanupProof for DeletionLayer::WalAllSegments, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Sst, Hnsw, Cleaned, Csr, Kv, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::WalAllSegments { .. }) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::WalAllSegments, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -236,7 +319,7 @@ impl<Lsm, Sst, Hnsw, Csr, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Missing,
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -245,14 +328,15 @@ impl<Lsm, Sst, Hnsw, Wal, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Mis
     pub fn with_csr_graph_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Cleaned, Kv, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::CsrGraph),
-            "expected LayerCleanupProof for DeletionLayer::CsrGraph, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Cleaned, Kv, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::CsrGraph) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::CsrGraph, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -262,7 +346,7 @@ impl<Lsm, Sst, Hnsw, Wal, Kv, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Mis
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -271,14 +355,15 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Cs
     pub fn with_kv_cache_segments_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Cleaned, Emb> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::KvCacheSegments),
-            "expected LayerCleanupProof for DeletionLayer::KvCacheSegments, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Cleaned, Emb>> {
+        if !matches!(proof.layer(), DeletionLayer::KvCacheSegments) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::KvCacheSegments, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -288,7 +373,7 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Emb> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Cs
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -297,14 +382,15 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr
     pub fn with_embedding_cache_cleanup(
         mut self,
         proof: LayerCleanupProof,
-    ) -> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Cleaned> {
-        assert!(
-            matches!(proof.layer(), DeletionLayer::EmbeddingCache),
-            "expected LayerCleanupProof for DeletionLayer::EmbeddingCache, got {:?}",
-            proof.layer()
-        );
+    ) -> CryptoResult<DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr, Kv, Cleaned>> {
+        if !matches!(proof.layer(), DeletionLayer::EmbeddingCache) {
+            return Err(CryptoError::InvalidInput(format!(
+                "expected LayerCleanupProof for DeletionLayer::EmbeddingCache, got {:?}",
+                proof.layer()
+            )));
+        }
         self.covered_layers.push(proof);
-        DeletionProofBuilder {
+        Ok(DeletionProofBuilder {
             scope: self.scope,
             deleted_keys: self.deleted_keys,
             deleted_after_tx: self.deleted_after_tx,
@@ -314,7 +400,7 @@ impl<Lsm, Sst, Hnsw, Wal, Csr, Kv> DeletionProofBuilder<Lsm, Sst, Hnsw, Wal, Csr
             proof_key: self.proof_key,
             covered_layers: self.covered_layers,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
@@ -322,7 +408,7 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
     /// Finalizes the builder and creates a fully attested version 4 [`DeletionProof`].
     ///
     /// This method is only available when all 7 storage layers have been marked as [`Cleaned`].
-    pub fn finish(self) -> Result<DeletionProof> {
+    pub fn finish(self) -> contextra_types::Result<DeletionProof> {
         let durability = crate::deletion_proof::DurabilityProof::new(self.deleted_after_tx.0);
         let signing_key = if self.proof_key.len() >= 32 {
             let mut key_bytes = [0u8; 32];
@@ -428,12 +514,19 @@ mod tests {
                 .with_wal_chain_receipt(receipt)
                 .with_graph_repair(graph_repair)
                 .with_lsm_memtable_cleanup(lsm_proof)
+                .unwrap()
                 .with_sstable_all_levels_cleanup(sst_proof)
+                .unwrap()
                 .with_hnsw_index_cleanup(hnsw_proof)
+                .unwrap()
                 .with_wal_all_segments_cleanup(wal_proof)
+                .unwrap()
                 .with_csr_graph_cleanup(csr_proof)
+                .unwrap()
                 .with_kv_cache_segments_cleanup(kv_proof)
+                .unwrap()
                 .with_embedding_cache_cleanup(emb_proof)
+                .unwrap()
                 .finish()
                 .unwrap();
 
@@ -448,8 +541,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "expected LayerCleanupProof for DeletionLayer::LsmMemtable")]
-    fn test_typestate_builder_layer_mismatch_panics() {
+    fn test_typestate_builder_layer_mismatch_returns_error() {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
@@ -457,7 +549,9 @@ mod tests {
         let wrong_proof =
             LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap();
 
-        let _ = DeletionProofBuilder::new(scope, vec![], TxId(1), vec![], test_proof_key())
+        let res = DeletionProofBuilder::new(scope, vec![], TxId(1), vec![], test_proof_key())
             .with_lsm_memtable_cleanup(wrong_proof);
+
+        assert!(matches!(res, Err(CryptoError::InvalidInput(_))));
     }
 }

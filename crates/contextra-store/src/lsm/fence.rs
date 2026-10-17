@@ -304,6 +304,11 @@ pub struct FenFenceGuard<'a> {
 }
 
 impl<'a> FenFenceGuard<'a> {
+    /// Returns unique numeric ID of this fence registration.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     /// Returns current write sequence number for this guard scope.
     pub fn scope_write_seq(&self) -> u64 {
         self.write_seq.load(Ordering::Acquire)
@@ -395,7 +400,7 @@ impl ErasureFence {
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
-    /// Acquires a scope fence for specific key prefixes.
+    /// Acquires a scope fence for specific key prefixes synchronously and runtime-independently.
     pub fn acquire_scope_fence_for(
         &self,
         prefixes: Vec<Vec<u8>>,
@@ -408,14 +413,61 @@ impl ErasureFence {
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
-        // Use blocking handle for sync caller on acquire_fence
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.gate
-                    .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
-                    .await
-            })
-        })?;
+        let run_acquire = || {
+            self.gate
+                .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
+        };
+
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+                tokio::task::block_in_place(|| handle.block_on(run_acquire()))?;
+            } else {
+                std::thread::scope(|s| {
+                    s.spawn(|| {
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .map_err(|_| FenceError::Conflict)?;
+                        rt.block_on(run_acquire())
+                    })
+                    .join()
+                    .map_err(|_| FenceError::Conflict)?
+                })?;
+            }
+        } else {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| FenceError::Conflict)?;
+            rt.block_on(run_acquire())?;
+        }
+
+        self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+
+        Ok(FenFenceGuard {
+            fence: self,
+            id,
+            prefixes,
+            write_seq,
+        })
+    }
+
+    /// Acquires a scope fence for specific key prefixes asynchronously.
+    pub async fn acquire_scope_fence_for_async(
+        &self,
+        prefixes: Vec<Vec<u8>>,
+    ) -> Result<FenFenceGuard<'_>, FenceError> {
+        let state = *self.scope_state.read();
+        if state == FenceScopeState::CollectionDropping {
+            return Err(FenceError::CollectionDropping);
+        }
+
+        let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
+        let write_seq = Arc::new(AtomicU64::new(0));
+
+        self.gate
+            .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
+            .await?;
 
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
@@ -428,7 +480,7 @@ impl ErasureFence {
     }
 
     /// Helper to release a registered prefix fence by ID.
-    fn release_prefix_fence(&self, id: u64) {
+    pub fn release_prefix_fence(&self, id: u64) {
         self.gate.release_fence(id);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }

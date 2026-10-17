@@ -1244,6 +1244,48 @@ async fn run_pathrag_sweep_cmd(
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
+    if args.iter().any(|a| a == "replay" || a == "--replay") {
+        println!("=== Running Off-Policy Replay Benchmark (Decision F8) ===");
+        let smoke = args.iter().any(|a| a == "--smoke");
+        let log_file = args
+            .windows(2)
+            .find(|w| w[0] == "--file" || w[0] == "-f")
+            .map(|w| w[1].clone());
+        let out_dir = args
+            .windows(2)
+            .find(|w| w[0] == "--out-dir" || w[0] == "-o")
+            .map(|w| w[1].clone())
+            .unwrap_or_else(|| "benchmarks/results".to_string());
+
+        let options = contextra_bench::replay::ReplayOptions {
+            smoke,
+            log_file,
+            output_dir: out_dir.clone(),
+        };
+
+        let report = contextra_bench::replay::run_replay_evaluation(options)?;
+        let json_output = serde_json::to_string_pretty(&report)?;
+        let markdown_summary =
+            contextra_bench::replay::generate_replay_markdown_summary(&report);
+
+        let results_dir = Path::new(&out_dir);
+        if !results_dir.exists() {
+            fs::create_dir_all(results_dir)?;
+        }
+
+        fs::write(results_dir.join("replay_report.json"), &json_output)?;
+        fs::write(results_dir.join("replay_report.md"), &markdown_summary)?;
+
+        println!("{}", markdown_summary);
+        println!(
+            "\nReplay benchmark report saved to `{}` and `{}`.\n",
+            results_dir.join("replay_report.json").display(),
+            results_dir.join("replay_report.md").display()
+        );
+
+        return Ok(());
+    }
+
     #[cfg(feature = "external-benchmarks")]
     {
         if args

@@ -45,6 +45,8 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
     pub(crate) tombstones: RwLock<TombstoneSet>,
     pub(crate) compute_pool: ComputePool,
+    #[cfg(test)]
+    pub(crate) failpoint: parking_lot::Mutex<Option<String>>,
 }
 
 impl Clone for DiskAnnIndex {
@@ -272,8 +274,33 @@ impl DiskAnnIndex {
                 hnsw_fallback: RwLock::new(None),
                 tombstones: RwLock::new(TombstoneSet::new()),
                 compute_pool,
+                #[cfg(test)]
+                failpoint: parking_lot::Mutex::new(None),
             }),
         })
+    }
+
+    #[cfg(test)]
+    pub fn set_failpoint(&self, point: &str) {
+        *self.inner.failpoint.lock() = Some(point.to_string());
+    }
+
+    #[cfg(test)]
+    pub fn clear_failpoint(&self) {
+        *self.inner.failpoint.lock() = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn maybe_failpoint(&self, name: &str) -> Result<()> {
+        let guard = self.inner.failpoint.lock();
+        if let Some(ref active) = *guard {
+            if active == name {
+                return Err(ContextraError::Storage(format!(
+                    "Test failpoint triggered: {name}"
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Stößt `persist_delta()` asynchron im Tokio-Hintergrund-Task an,

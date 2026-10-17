@@ -26,7 +26,7 @@ async fn open_without_gate_never_grants_sovereign() {
 }
 
 #[tokio::test]
-async fn compliance_profile_without_signed_license_returns_error() {
+async fn compliance_profile_without_integrity_license_returns_error() {
     let tmp_path = std::env::temp_dir().join(format!(
         "contextra_lic_always_2_{}_{}",
         std::process::id(),
@@ -59,7 +59,7 @@ async fn compliance_profile_without_signed_license_returns_error() {
 }
 
 #[tokio::test]
-async fn compliance_profile_with_valid_signed_license_activates_deletion_proof() {
+async fn compliance_profile_with_valid_integrity_license_activates_deletion_proof() {
     let tmp_path = std::env::temp_dir().join(format!(
         "contextra_lic_always_3_{}_{}",
         std::process::id(),
@@ -79,10 +79,10 @@ async fn compliance_profile_with_valid_signed_license_activates_deletion_proof()
     let db = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await
-        .expect("Build should succeed with valid signed license");
+        .expect("Build should succeed with valid integrity license");
 
     assert!(db.config().deletion_proof_active);
     assert_eq!(db.config().durability_mode, DurabilityMode::Full);
@@ -116,7 +116,7 @@ async fn expired_signature_rejected() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await;
 
@@ -157,7 +157,7 @@ async fn tampered_signature_rejected() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await;
 
@@ -202,7 +202,7 @@ async fn explicit_conflicting_user_value_to_profile_returns_policy_violation() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
         .with_config(config)
         .build()
         .await;

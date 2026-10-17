@@ -15,7 +15,7 @@ fn test_integration_tx_buffer_and_snapshots() {
     let registry = Arc::new(SnapshotRegistry::new());
 
     // Transaction 1
-    let tx1 = TxId::new(100);
+    let tx1 = TxId::new_unchecked(100);
     buffer.begin(tx1);
     let _ = buffer.stage(
         tx1,
@@ -26,10 +26,10 @@ fn test_integration_tx_buffer_and_snapshots() {
     );
 
     // Take a snapshot
-    let guard = registry.register(101);
+    let lease = registry.acquire(|| 101);
 
     // Transaction 2
-    let tx2 = TxId::new(102);
+    let tx2 = TxId::new_unchecked(102);
     buffer.begin(tx2);
     let _ = buffer.stage(
         tx2,
@@ -45,9 +45,9 @@ fn test_integration_tx_buffer_and_snapshots() {
     assert_eq!(drained_tx1.len(), 1);
     assert_eq!(drained_tx1[0].doc_id(), DocId::new(1));
 
-    // Snapshot guard is still holding 101 as minimum sequence number
+    // Snapshot lease is still holding 101 as minimum sequence number
     assert_eq!(registry.min_active_seqno(), 101);
-    drop(guard);
+    drop(lease);
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 
     // Clear tx2

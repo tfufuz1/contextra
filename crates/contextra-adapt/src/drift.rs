@@ -23,7 +23,7 @@ pub trait DriftDetector {
     fn is_drifting(&self) -> bool;
 }
 
-/// Catoni-M-estimator based robust drift detector (arXiv:2505.20051 & arXiv:2501.10974).
+/// Catoni-M-estimator based robust drift detector.
 ///
 /// Uses influence function $\psi(x) = \frac{x}{1 + |x|}$ for $O(1)$ robust mean estimation,
 /// paired with CUSUM sequential change-point accumulation.
@@ -70,7 +70,6 @@ impl CatoniDriftDetector {
 impl DriftDetector for CatoniDriftDetector {
     fn observe(&mut self, reward: f32) -> DriftSignal {
         let x = reward as f64 - self.catoni_mu;
-        // Influence function ψ(x) = x / (1 + |x|)
         let psi = x / (1.0 + x.abs());
         self.catoni_mu += self.alpha * psi;
 
@@ -142,6 +141,7 @@ impl EnsembleDriftWatcher {
 }
 
 /// Adapter zur Kopplung des `LyapunovDriftWatcher` mit einer `BanditPolicy`.
+#[cfg(feature = "drift-bridge")]
 #[derive(Debug, Clone)]
 pub struct DriftPolicyBridge {
     /// Der zugrundeliegende Lyapunov-Drift-Wächter.
@@ -154,6 +154,7 @@ pub struct DriftPolicyBridge {
     pub gamma: f32,
 }
 
+#[cfg(feature = "drift-bridge")]
 impl Default for DriftPolicyBridge {
     fn default() -> Self {
         Self {
@@ -165,6 +166,7 @@ impl Default for DriftPolicyBridge {
     }
 }
 
+#[cfg(feature = "drift-bridge")]
 impl DriftPolicyBridge {
     /// Erstellt eine neue `DriftPolicyBridge` mit benutzerdefinierten Parametern.
     pub fn new(window_size: usize, k_drift: f32, alpha_max: f32, gamma: f32) -> Self {
@@ -210,7 +212,6 @@ mod tests {
         for _ in 0..50 {
             detector.observe(0.5);
         }
-        // Extreme single outlier
         let sig = detector.observe(100.0);
         assert_eq!(sig, DriftSignal::Stable);
         assert!(!detector.is_drifting());
@@ -243,12 +244,12 @@ mod tests {
         let baseline: Vec<f32> = (0..100).map(|i| (i as f32 / 100.0) * 0.2).collect();
         ensemble.set_baseline(&baseline);
 
-        // Single outlier: neither or only one triggers drift
         let result = ensemble.observe_and_decide(100.0);
         assert!(!result, "Ensemble must not trigger drift on single outlier");
     }
 
     #[test]
+    #[cfg(feature = "drift-bridge")]
     #[cfg(feature = "bandit-routing")]
     fn test_drift_policy_bridge_triggers_bandit_penalty() {
         use crate::bandit::BanditProfileState;
@@ -275,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "drift-bridge")]
     #[cfg(feature = "bandit-routing")]
     fn test_drift_policy_bridge_dispatches_exact_penalty_parameters() {
         use crate::bandit::BanditPolicy;

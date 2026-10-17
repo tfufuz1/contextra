@@ -8,7 +8,7 @@ use std::sync::Arc;
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
 pub(crate) use super::durable_fs::{atomic_replace, durable_remove};
 use super::format::{
-    DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC, DISKANN_INTEGRITY_KEY, DISKANN_MAGIC,
+    DiskAnnFooter, DiskAnnHeader, CHECKSUM_SEED, DISKANN_FOOTER_MAGIC, DISKANN_MAGIC,
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
@@ -16,6 +16,29 @@ use contextra_core::{ContextraError, DocId, Result};
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
+    pub(crate) fn remove_wal_file_robust(path: &std::path::Path) -> Result<()> {
+        if !path.exists() {
+            return Ok(());
+        }
+        if let Err(e) = std::fs::remove_file(path) {
+            if !path.exists() {
+                return Ok(());
+            }
+            if let Err(retry_err) = std::fs::remove_file(path) {
+                if path.exists() {
+                    return Err(ContextraError::Io(std::io::Error::new(
+                        retry_err.kind(),
+                        format!(
+                            "WAL file {} removal failed after retry; file remains intact and safe to replay: {retry_err} (initial error: {e})",
+                            path.display()
+                        ),
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn trigger_background_persist_delta(&self) {
         if !self.inner.flushing_in_progress.swap(true, Ordering::AcqRel) {
             let index_clone = self.clone();
@@ -86,10 +109,18 @@ impl DiskAnnIndex {
         let index_path = self.inner.config.index_path.clone();
         self.write_incremental_to_file_sync(&index_path, &pending)?;
 
+        #[cfg(test)]
+        self.maybe_failpoint("after_rename")?;
+
+        self.load_sync()?; // Mmap neu laden
+
+        #[cfg(test)]
+        self.maybe_failpoint("before_wal_removal")?;
+
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         durable_remove(&pending_wal)?;
 
-        self.load_sync() // Mmap neu laden
+        Ok(())
     }
 
     #[allow(clippy::unnecessary_cast)]
@@ -294,7 +325,7 @@ impl DiskAnnIndex {
                         ContextraError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
