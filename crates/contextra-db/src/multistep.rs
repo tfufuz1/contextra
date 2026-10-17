@@ -1,11 +1,11 @@
 // FILE-CONTEXT
 // ZWECK: Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern).
-// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PID-reguliert in [50, 200].
-// STAND: TS:2026-09-12T00:00:00Z
+// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PoolController-reguliert in [50, 200].
+// STAND: TS:2026-10-17T00:00:00Z
 
 use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
-use contextra_adapt::PidController;
+use contextra_adapt::{PoolController, PoolControllerConfig};
 pub use contextra_ports::QueryRewriter;
 use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
 use contextra_types::{EntityId, Result, ScoredEntry};
@@ -65,13 +65,20 @@ pub struct MultiStepResult {
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
-    pid_controller: parking_lot::Mutex<PidController>,
+    pid_controller: parking_lot::Mutex<PoolController>,
     clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
-        let pid = PidController::new(config.latency_budget_ms as f32, 50, 200, Some(100));
+        let pool_cfg = PoolControllerConfig {
+            target_latency_ms: config.latency_budget_ms as f32,
+            min_pool: 50,
+            max_pool: 200,
+            pool_nominal: 100,
+            ..Default::default()
+        };
+        let pid = PoolController::new(pool_cfg).unwrap_or_default();
         Self {
             collection,
             config,
@@ -121,13 +128,9 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         let mut rounds_executed = 0;
         let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
 
-        // Runde 1: Standard-Suche mit PID-reguliertem Kandidatenpool
+        // Runde 1: Standard-Suche mit PoolController-reguliertem Kandidatenpool
         let start_nanos = self.clock.monotonic_nanos();
-        let current_pid_val = self
-            .pid_controller
-            .lock()
-            .current_pool_size()
-            .unwrap_or_else(|| self.pid_controller.lock().min_pool_size);
+        let current_pid_val = self.pid_controller.lock().current_pool();
         let candidate_k = (self.config.rerank_pool_multiplier * k)
             .clamp(50, current_pid_val)
             .clamp(50, 200);
@@ -144,10 +147,10 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         let round1_elapsed_nanos = self.clock.monotonic_nanos().saturating_sub(start_nanos);
         let round1_dt = std::time::Duration::from_nanos(round1_elapsed_nanos);
         let round1_elapsed_ms = round1_dt.as_secs_f32() * 1000.0;
-        // Update PID controller state for subsequent rounds and queries; returned pool size is stored in current_pool_size.
+        // Update PoolController state for subsequent rounds and queries.
         self.pid_controller
             .lock()
-            .update(round1_dt, round1_elapsed_ms);
+            .update_step(round1_dt.as_secs_f32(), round1_elapsed_ms);
 
         all_result_sets.push(round1);
         rounds_executed += 1;
@@ -189,11 +192,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             }
 
             let round_start_nanos = self.clock.monotonic_nanos();
-            let pid_val = self
-                .pid_controller
-                .lock()
-                .current_pool_size()
-                .unwrap_or_else(|| self.pid_controller.lock().min_pool_size);
+            let pid_val = self.pid_controller.lock().current_pool();
             let scaled_k = (self.config.rerank_pool_multiplier * k)
                 .clamp(50, pid_val)
                 .clamp(50, 200);
@@ -322,10 +321,10 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 .saturating_sub(round_start_nanos);
             let round_dt = std::time::Duration::from_nanos(round_elapsed_nanos);
             let round_elapsed_ms = round_dt.as_secs_f32() * 1000.0;
-            // Update PID controller state for subsequent rounds and queries; returned pool size is stored in current_pool_size.
+            // Update PoolController state for subsequent rounds and queries.
             self.pid_controller
                 .lock()
-                .update(round_dt, round_elapsed_ms);
+                .update_step(round_dt.as_secs_f32(), round_elapsed_ms);
 
             let deduped_round = deduplicate_search_results(round_results);
             all_result_sets.push(deduped_round);
