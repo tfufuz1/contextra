@@ -1,66 +1,31 @@
-# ADR-N06: Konsistenzmodell — WAL als einzige Wahrheit vs. 2PC-Härtung
+# ADR-N06: Konsistenzmodell — WAL als einzige Wahrheit (Akzeptanz Option B)
 
-* **Status:** Proposed / Pending Product-Owner-Entscheidung (offen, Gesamtspezifikation §A2.4 Nr. 1)
-* **Datum:** 2026-09-17
+* **Status:** Accepted (festgelegt durch F4 / ADR-N19)
+* **Datum:** 2026-09-17 (Aktualisiert: 2026-09-30)
 * **Kontext / Auslöser:**
   In heterogenen verteilten und mehrkomponentigen Speichersystemen wie Contextra Cognitive OS stellt sich bei Multi-Engine-Transaktionen (LSM-Store, HNSW/DiskANN-Vektorindizes, CSR-Wissensgraph, BM25-Textindizes) die Frage nach dem primären Konsistenz- und Recovery-Modell.
+  Dieses ADR untersuchte zwei Alternativen: Option A (Zweiphasiges Commit-Protokoll 2PC) und Option B (WAL als einzige Wahrheit mit abgeleiteten Indizes).
 
-  Bisher existiert ein zweiphasiges Commit-Protokoll (2PC) mit unvollständiger Intent-Key-Pessimisierung, das bei plötzlichen Prozess-Crashes oder I/O-Teilausfällen komplexe Invarianten-Verletzungen zwischen primärem Storage und Indizes auslösen kann.
+## Entscheidung (Beschluss F4 / ADR-N19)
 
-  Gemäß Gesamtspezifikation §A2.4 Nr. 1 und §20.3 muss eine fundamentale Architektur-Entscheidung zwischen zwei Konsistenzmodellen getroffen werden, ohne den Beschluss vorab im Quellcode zu präjudizieren.
+**Option B wurde formell akzeptiert** [V].
+1. **Single Source of Truth:** Nur das Write-Ahead Log (`contextra-store::wal`) und der primäre LSM-Store gelten als unumstößliche primäre Datenquelle ("Single Source of Truth") [V].
+2. **Abgeleiteter Zustand ("Derived State"):** Sämtliche Sekundärindizes (HNSW, CSR-Graph, BM25) sind reine abgeleitete Caches, die Änderungen asynchron oder synchron-gepuffert aus dem WAL konsumieren und ihren Fortschritt über einen monoton steigenden Sequenzzähler (`applied_seq` / `applied_lsn`) nachhalten [V].
+3. **Deterministischer Replay:** Bei einem Systemstart nach einem unsauberen Shutdown werden die Sekundärindizes ausgehend vom letzten validen Checkpoint aus dem WAL deterministisch neu aufgebaut [V].
 
----
+## Evaluierung der Alternativen
 
-## 1. Neutrale Evaluierung der Optionen
+### Option A: Zweiphasiges Commit-Protokoll (2PC) mit Intent-Keys
+* **Funktionsweise:** Staging/Intent-Schreibschritte über alle Subsysteme vor dem Commit.
+* **Nachteile:** Hohe Komplexität; hohe Lock-Contention; Distributed Deadlocks; fehleranfälliges Crash-Recovery.
+* **Bewertung:** Verworfen [S].
 
-### Option A: Zweiphasiges Commit-Protokoll (2PC) mit gehärteten Intent-Keys
-* **Funktionsweise:**
-  Jede Transaktion schreibt in Phase 1 Staging- bzw. Intent-Einträge ("Prepare") in alle beteiligten Subsysteme (LSM, Vektorindex, Graph, BM25) unter Verwendung expliziter Distributiv-Locks oder Intent-Schlüssel. Erst nach positiver Rückmeldung aller Subsysteme wird in Phase 2 ein globaler `Commit`-Marker im WAL und in den Systemen gesetzt.
-* **Vorteile:**
-  - Synchrones Lesen nach Commit spiegelt sofort den exakten In-Memory-Zustand aller Subsysteme wider.
-  - Keine zeitliche Asynchronität zwischen Index und Hauptspeicher.
-* **Nachteile / Risiken:**
-  - Hohe Komplexität beim Handhaben von Teil-Crashes während Phase 2 (Distributed Deadlocks, verwaiste Intents).
-  - Hoher Performance-Overhead durch Multi-Rundtrip-Protokolle und Koordinationssperren.
-  - Erhöhte Anfälligkeit für TOCTOU-Gefahren und Distributed Deadlocks unter hoher Nebenläufigkeit.
+### Option B: WAL als einzige Wahrheit (Derived State via `applied_lsn`)
+* **Funktionsweise:** Atomares WAL-Append als alleinige Commit-Garantie. Indizes konsumieren WAL-Einträge.
+* **Vorteile:** Drastische Vereinfachung des Recovery-Pfads; Beseitigung verteilter Locks; deterministische Wiederherstellung.
+* **Bewertung:** **Akzeptiert [V].**
 
-### Option B: WAL als einzige Wahrheit (Derived State via `applied_lsn`) — *Spezifikations-Empfehlung*
-* **Funktionsweise:**
-  Nur das Write-Ahead Log (`contextra-store::wal`) gilt als unumstößliche primäre Datenquelle ("Single Source of Truth"). Transaktionen schreiben ausschließlich einen sequentiellen, HMAC-gesicherten WAL-Record mit `WalOp::TxEnd { committed: true }`.
-  Secondary Indizes (HNSW, CSR-Graph, BM25) sind reine abgeleitete Sichten ("Derived State"), die Änderungen asynchron oder synchron-gepuffert konsumieren und ihren Fortschritt über eine monotonically steigende `applied_lsn` nachhalten. Bei einem Crash wird der abgeleitete Zustand ausgehend vom letzten validen `applied_lsn`-Checkpoint aus dem WAL deterministisch replayed und rekonstruiert.
-* **Vorteile:**
-  - Drastische Vereinfachung des Recovery-Pfads und Vermeidung verteilter Transaktionszustände.
-  - Höhere Schreib-Performanz durch Beseitigung von Multi-Engine 2PC-Locks.
-  - Garantierte Deterministik im Crash-Recovery-Fall.
-* **Nachteile / Risiken:**
-  - Potenziell längere Recovery-Zeiten beim Systemstart, wenn Indizes nach einem unsauberen Shutdown aus dem WAL nachgezogen werden müssen.
-  - Lese-Sichten müssen bei asynchronem Index-Replay das `applied_lsn`-Wasserzeichen berücksichtigen (Read-Your-Writes Guarantees erfordern ggf. Catch-up-Waits).
+## Konsequenzen
 
----
-
-## 2. Entscheidungskriterien & PO-Entscheidungsvorbehalt
-
-Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch Entwicklungsarbeiten präjudiziert werden. Die Entscheidung obliegt dem Product Owner basierend auf folgenden Grundlagen:
-
-1. **PO Recovery-Zeit-Ziel (RTO / Recovery Time Objective):** Der Product Owner muss das akzeptable Zeitfenster für das Wiederanlaufen des Systems nach einem harten Crash (z.B. < 500 ms vs. < 5 s) definieren.
-2. **Phase 3a Crash-Injektions-Spike (`contextra-testkit` / Fault-VFS):**
-   Als Entscheidungsgrundlage dient ein empirischer Benchmark und Crash-Simulationstest unter Verwendung der `Fault-VFS`-Infrastruktur im `contextra-testkit` (Phase 3a der Migration). Der Spike misst:
-   - Durchsatz- und Latenzunterschiede zwischen 2PC und WAL-Only im Regelbetrieb.
-   - Replay-Dauer und Speicherverbrauch bei der WAL-Rekonstruktion nach simulierten Systemabstürzen.
-
----
-
-## 3. Status & Exit-Kriterium
-
-* **Aktueller Status:** `Proposed / Pending Product-Owner-Entscheidung`
-* **Exit-Kriterium für Statusübergang zu "Beschlossen":**
-  1. Durchführung des Phase 3a Crash-Injektions-Spikes mit `contextra-testkit` (Fault-VFS).
-  2. Vorgelegter Evaluierungsbericht zur Recovery-Zeit und Durchsatz-Metriken.
-  3. Formeller Beschluss des Product Owners zur Festlegung von Option A oder Option B.
-
----
-
-## 4. Konsequenzen
-
-* Der Produktionscode darf vor dem PO-Beschluss keine Annahmen treffen, die eine der Optionen unmöglich machen.
-* Das `contextra-testkit` bereitet in Phase 0R/3a die Testwerkzeuge für die Fault-VFS Simulation vor.
+* **Querverweis:** Siehe auch ADR-N19 für die detaillierte Ausgestaltung des Konsistenzmodells und die Formalsupersedung von ADR-023 [S].
+* **Entwickler-Vorgabe:** Der Produktionscode verwendet das WAL-Append-Replay-Muster ohne verteilte 2PC-Sperren [V].
