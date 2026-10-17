@@ -75,6 +75,29 @@ impl DocEdgeIndex {
         let mut guard = self.index.write();
         guard.remove(&doc_id);
     }
+
+    /// Zählt die Anzahl der Kanten-Einträge im Index, in denen `entity` als Quell- oder Zielknoten auftaucht.
+    pub fn count_references_for_entity(&self, entity: contextra_types::EntityId) -> usize {
+        let guard = self.index.read();
+        let mut count = 0;
+        for set in guard.values() {
+            for &(from, to) in set {
+                if from == entity || to == entity {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// Entfernt alle Kanten-Registrierungen aus dem Index, in denen `entity` vorkommt.
+    pub fn purge_entity(&self, entity: contextra_types::EntityId) {
+        let mut guard = self.index.write();
+        for set in guard.values_mut() {
+            set.retain(|&(from, to)| from != entity && to != entity);
+        }
+        guard.retain(|_, set| !set.is_empty());
+    }
 }
 
 #[cfg(test)]
