@@ -14,22 +14,26 @@ use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
 static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
-static PROTECTED_REGEX: OnceLock<Regex> = OnceLock::new();
+static PROTECTED_REGEX: OnceLock<Option<Regex>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-#[allow(clippy::panic)]
-fn get_protected_regex() -> &'static Regex {
-    PROTECTED_REGEX.get_or_init(|| {
-        if let Ok(re) =
-            Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
-        {
-            re
-        } else if let Ok(fallback) = Regex::new(r"$^") {
-            fallback
-        } else {
-            panic!("protected regex initialization failed")
-        }
-    })
+fn get_protected_regex() -> Option<&'static Regex> {
+    PROTECTED_REGEX
+        .get_or_init(|| {
+            match Regex::new(
+                r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+            ) {
+                Ok(re) => Some(re),
+                Err(err) => {
+                    tracing::error!(
+                        error = %err,
+                        "Protected regex initialization failed; proceeding without URL/email protection"
+                    );
+                    None
+                }
+            }
+        })
+        .as_ref()
 }
 
 fn get_shared_splitter() -> Arc<crate::morphology::GermanCompoundSplitter> {
@@ -57,7 +61,9 @@ enum TextSegment<'a> {
 }
 
 fn segment_text<'a>(text: &'a str) -> Vec<TextSegment<'a>> {
-    let re = get_protected_regex();
+    let Some(re) = get_protected_regex() else {
+        return vec![TextSegment::Regular(text)];
+    };
     let mut segments = Vec::new();
     let mut last_idx = 0;
 
@@ -318,6 +324,40 @@ mod tests {
         let tokens = tokenizer.tokenize("Datenschutzrichtlinie");
         assert!(!tokens.is_empty());
         assert!(tokens.contains(&"datenschutzrichtlinie".to_string()));
+    }
+
+    #[test]
+    fn test_characterization_fixed_input_tokens() {
+        let text = "Contact support@contextra.io or visit https://contextra.io/docs/v1?arg=1#section! Also test multi-word.";
+        let def_toks = DefaultTokenizer.tokenize(text);
+        assert_eq!(
+            def_toks,
+            vec![
+                "contact",
+                "support@contextra.io",
+                "visit",
+                "https://contextra.io/docs/v1?arg=1#section",
+                "also",
+                "test",
+                "multi",
+                "word"
+            ]
+        );
+
+        let g_toks = GermanMorphTokenizer::new().tokenize(text);
+        assert_eq!(
+            g_toks,
+            vec![
+                "contact",
+                "support@contextra.io",
+                "visit",
+                "https://contextra.io/docs/v1?arg=1#section",
+                "also",
+                "test",
+                "multi",
+                "word"
+            ]
+        );
     }
 
     #[test]
