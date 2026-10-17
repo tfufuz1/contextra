@@ -18,7 +18,8 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
-mod types;
+pub(crate) mod types;
+pub use types::VectorSeededRng;
 mod vector_index_impl;
 
 #[cfg(test)]
