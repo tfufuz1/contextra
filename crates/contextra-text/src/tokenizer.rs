@@ -10,6 +10,7 @@
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -17,19 +18,20 @@ static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<Option<Regex>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-pub const PROTECTED_PATTERN: &str =
-    r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})";
-
 fn get_protected_regex() -> Option<&'static Regex> {
     PROTECTED_REGEX
-        .get_or_init(|| match Regex::new(PROTECTED_PATTERN) {
-            Ok(re) => Some(re),
-            Err(err) => {
-                tracing::error!(
-                    error = %err,
-                    "Protected regex initialization failed; proceeding without URL/email protection"
-                );
-                None
+        .get_or_init(|| {
+            match Regex::new(
+                r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+            ) {
+                Ok(re) => Some(re),
+                Err(err) => {
+                    tracing::error!(
+                        error = %err,
+                        "Protected regex initialization failed; proceeding without URL/email protection"
+                    );
+                    None
+                }
             }
         })
         .as_ref()
@@ -506,9 +508,7 @@ mod tests {
 
         // German compound words and hyphenated terms in regular segments should be processed
         assert!(
-            tokens
-                .iter()
-                .any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
+            tokens.iter().any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
             "Regular German hyphenated compound terms should be tokenized. Tokens: {:?}",
             tokens
         );
