@@ -353,64 +353,42 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
     Ok(())
 }
 
-/// Receipt returned upon successfully scrubbing and durably removing a file.
+/// Method used when removing a file during a scrub operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScrubReceipt {
-    /// Total number of bytes overwritten with zeros prior to removal.
-    pub bytes_scrubbed: u64,
+pub enum ScrubMethod {
+    /// File contents were overwritten with zero bytes prior to unlinking.
+    OverwriteZeros,
+    /// Overwriting was skipped due to safety checks (e.g., hardlinks or CoW filesystem); file was unlinked without zeroing.
+    UnlinkOnly,
 }
 
-/// Overwrites file contents with zeros and durably removes the file using default no-op fault injector.
+/// Receipt returned upon removing a file during a scrub operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScrubReceipt {
+    /// Scrubbing execution method (zero-overwrite vs unlink-only).
+    pub method: ScrubMethod,
+    /// Total number of bytes overwritten with zeros prior to removal.
+    pub bytes_scrubbed: u64,
+    /// Link count (nlink) of the target file at removal time.
+    pub nlink: u64,
+    /// Detected filesystem type string (e.g. "ext4", "xfs", "btrfs", "unknown").
+    pub fs_kind: String,
+    /// Indicates whether the filesystem is classified as Copy-on-Write (CoW).
+    pub cow_fs: bool,
+}
+
+/// Removes a file and returns a [`ScrubReceipt`].
+///
+/// Overwrites file contents with zeros ONLY if `nlink == 1`, the filesystem is NOT Copy-on-Write,
+/// and no active readers are reported. Otherwise, skips zero-overwriting and durably unlinks the file.
 pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
     scrub_and_remove_with_injector(path, &NoFault)
 }
 
-/// Overwrites file contents with zeros and durably removes the file with a custom [`FaultInjector`].
+/// Removes a file with a custom [`FaultInjector`] and returns a [`ScrubReceipt`].
 pub fn scrub_and_remove_with_injector<F: FaultInjector>(
     path: &Path,
     injector: &F,
 ) -> std::io::Result<ScrubReceipt> {
-    let metadata = path.symlink_metadata()?;
-    let file_type = metadata.file_type();
-
-    if file_type.is_symlink() || !file_type.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is a symlink or not a regular file",
-        ));
-    }
-
-    let len = metadata.len();
-    if len > 0 {
-        let mut options = OpenOptions::new();
-        options.write(true);
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            options.share_access(7);
-        }
-
-        let mut file = options.open(path)?;
-
-        let zeros = [0u8; 64 * 1024];
-        let mut remaining = len;
-
-        while remaining > 0 {
-            let chunk_size = usize::try_from(remaining)
-                .unwrap_or(zeros.len())
-                .min(zeros.len());
-            injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
-            remaining -= chunk_size as u64;
-        }
-
-        injector.on_fsync(Some(path))?;
-        flush_file(&file, FlushKind::DataAndMetadata)?;
-    }
-
-    durable_remove_with_injector(path, injector)?;
-
-    Ok(ScrubReceipt {
-        bytes_scrubbed: len,
-    })
+    scrub::scrub_and_remove_with_injector(path, injector)
 }

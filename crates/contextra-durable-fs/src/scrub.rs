@@ -16,7 +16,7 @@
 //! Der Rückgabetyp ([`ScrubOutcome::Scrubbed`]) und die Quittung ([`ScrubReceipt`]) bieten daher explizit
 //! **keine physische Garantie** (`physical_guarantee: None`).
 
-use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubReceipt};
+use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubMethod, ScrubReceipt};
 use contextra_sys::{flush_file, FlushKind};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -142,11 +142,120 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
         verify_zero_readback(&mut file, path, len)?;
     }
 
+    let (nlink, fs_kind_str, is_cow) = query_fs_metadata(path, &metadata);
+
     durable_remove_with_injector(path, injector)?;
 
     Ok(ScrubOutcome::Scrubbed(ScrubReceipt {
+        method: ScrubMethod::OverwriteZeros,
         bytes_scrubbed: len,
+        nlink,
+        fs_kind: fs_kind_str,
+        cow_fs: is_cow,
     }))
+}
+
+/// Helper function querying link count, filesystem kind string, and CoW status.
+fn query_fs_metadata(path: &Path, metadata: &std::fs::Metadata) -> (u64, String, bool) {
+    #[cfg(unix)]
+    let nlink = {
+        use std::os::unix::fs::MetadataExt;
+        metadata.nlink()
+    };
+    #[cfg(not(unix))]
+    let nlink = {
+        let _ = metadata;
+        1u64
+    };
+
+    let (fs_kind_str, is_cow) = query_cow_info(path);
+    (nlink, fs_kind_str, is_cow)
+}
+
+fn query_cow_info(path: &Path) -> (String, bool) {
+    #[cfg(target_os = "linux")]
+    {
+        use contextra_sys::env_observe::{cow_fs_from_fs_kind_and_options, parse_mountinfo_details, EnvTri};
+        if let Ok(mountinfo_text) = std::fs::read_to_string("/proc/self/mountinfo") {
+            let (fs_kind, _discard, opts) = parse_mountinfo_details(&mountinfo_text, path);
+            let cow_tri = cow_fs_from_fs_kind_and_options(fs_kind, &opts);
+            let fs_name = format!("{:?}", fs_kind).to_lowercase();
+            let is_cow = matches!(cow_tri, EnvTri::Yes);
+            return (fs_name, is_cow);
+        }
+    }
+    let _ = path;
+    ("unknown".to_string(), false)
+}
+
+/// Removes a file and returns a [`ScrubReceipt`].
+///
+/// Overwrites file contents with zeros ONLY if `nlink == 1`, the filesystem is NOT Copy-on-Write,
+/// and no active readers are present. Otherwise, skips zero-overwriting and durably unlinks the file.
+pub fn scrub_and_remove_with_injector<F: FaultInjector>(
+    path: &Path,
+    injector: &F,
+) -> std::io::Result<ScrubReceipt> {
+    let metadata = path.symlink_metadata()?;
+    let file_type = metadata.file_type();
+
+    if file_type.is_symlink() || !file_type.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "path is a symlink or not a regular file",
+        ));
+    }
+
+    let (nlink, fs_kind_str, is_cow) = query_fs_metadata(path, &metadata);
+    let len = metadata.len();
+
+    if nlink > 1 || is_cow {
+        durable_remove_with_injector(path, injector)?;
+        return Ok(ScrubReceipt {
+            method: ScrubMethod::UnlinkOnly,
+            bytes_scrubbed: 0,
+            nlink,
+            fs_kind: fs_kind_str,
+            cow_fs: is_cow,
+        });
+    }
+
+    if len > 0 {
+        let mut options = OpenOptions::new();
+        options.write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.share_access(7);
+        }
+
+        let mut file = options.open(path)?;
+
+        let zeros = [0u8; 64 * 1024];
+        let mut remaining = len;
+
+        while remaining > 0 {
+            let chunk_size = usize::try_from(remaining)
+                .unwrap_or(zeros.len())
+                .min(zeros.len());
+            injector.on_write(Some(path), chunk_size)?;
+            file.write_all(&zeros[..chunk_size])?;
+            remaining -= chunk_size as u64;
+        }
+
+        injector.on_fsync(Some(path))?;
+        flush_file(&file, FlushKind::DataAndMetadata)?;
+    }
+
+    durable_remove_with_injector(path, injector)?;
+
+    Ok(ScrubReceipt {
+        method: ScrubMethod::OverwriteZeros,
+        bytes_scrubbed: len,
+        nlink,
+        fs_kind: fs_kind_str,
+        cow_fs: is_cow,
+    })
 }
 
 /// Helper function to perform readback verification that file contents are zeroed out.
