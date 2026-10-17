@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_core::{
+use contextra_ports::{
     ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TOMBSTONE_BIT,
 };
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};

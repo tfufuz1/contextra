@@ -1,6 +1,6 @@
 mod support;
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

@@ -1,4 +1,4 @@
-use contextra_core::{Result, TxId};
+use contextra_ports::{Result, TxId};
 use contextra_store::wal::{KeyManager, Wal, WalConfig, WalOp};
 use tempfile::tempdir;
 use tokio::fs;

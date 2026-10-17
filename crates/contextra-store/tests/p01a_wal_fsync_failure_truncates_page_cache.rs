@@ -6,7 +6,7 @@
 //! - I-3 (Crash-Konsistenz): Nach fsync-Fehler muss die physische Datei auf size_before zurückgeschnitten sein.
 //! - I-5 (Poison-State Isolation): Ungefluste Writes hinterlassen das WAL-Handle im poisoned-Zustand.
 
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_ports::{ContextraError, Result, TxId};
 use contextra_store::wal::{Wal, WalOp};
 use tempfile::tempdir;
 

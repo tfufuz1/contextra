@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_store::compaction::adaptive::{CostBasedAdaptivePlanner, WorkloadMetricsSnapshot};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::{LsmConfig, LsmStorage};

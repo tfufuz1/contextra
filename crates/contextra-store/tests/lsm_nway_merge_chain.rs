@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use bytes::Bytes;
-use contextra_core::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
+use contextra_ports::{ResourceBudget, ResourceTracker, Result, SnapshotRegistry};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_store::wal::KeyManager;
@@ -43,7 +43,7 @@ impl MergeOperator for ErrorOnSecondMergeOperator {
         let s1 = std::str::from_utf8(existing_val).unwrap_or("");
         let s2 = std::str::from_utf8(new_val).unwrap_or("");
         if s1.contains('b') || s2.contains('b') {
-            Err(contextra_core::ContextraError::Internal(
+            Err(contextra_types::ContextraError::Internal(
                 "Forced merge error on 'b'".into(),
             ))
         } else {

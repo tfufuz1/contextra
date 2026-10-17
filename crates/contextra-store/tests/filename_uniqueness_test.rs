@@ -1,4 +1,4 @@
-use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry, TxId};
+use contextra_ports::{ResourceBudget, ResourceTracker, SnapshotRegistry, TxId};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::sstable::BlockCache;
 use contextra_store::wal::{Wal, WalOp};

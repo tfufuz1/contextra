@@ -546,6 +546,12 @@ pub struct BanditProfileState {
     /// Dauer des Post-Drift Decay-Fensters in Update-Schritten (Default: 50).
     #[serde(default = "default_drift_decay_window")]
     pub drift_decay_window: usize,
+    /// Maximale erlaubte Spur der Inversen A⁻¹ (Default: 1e6).
+    #[serde(default = "default_max_trace")]
+    pub max_trace: f64,
+    /// Schwelle für Sondierungs-Residuum Drift-Erkennung (Default: 1e-4).
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
     /// Implementierungsvariante (Default: ShermanMorrison).
     pub implementation: BanditImplementation,
     /// PRNG Seed für Sketched Projection.
@@ -624,6 +630,8 @@ impl BanditProfileState {
             drift_gamma: default_drift_gamma(),
             drift_steps_remaining: 0,
             drift_decay_window: default_drift_decay_window(),
+            max_trace: default_max_trace(),
+            drift_threshold: default_drift_threshold(),
             implementation: BanditImplementation::default(),
             seed: 0,
             sketch_matrix: None,
@@ -633,7 +641,7 @@ impl BanditProfileState {
 
     /// Gibt die Anzahl der Rebuilds/Re-Faktorisierungen von A⁻¹ zurück.
     pub fn rebuild_count(&self) -> u64 {
-        self.rebuild_count
+        self.refactorizations
     }
 
     /// Führt eine explizite Re-Faktorisierung/Inversion von A⁻¹ aus der Schattenmatrix A mittels Cholesky-Zerlegung durch.
@@ -648,7 +656,7 @@ impl BanditProfileState {
                 self.inv_a[i] = inv_f64[i] as f32;
             }
             self.updates_since_reset = 0;
-            self.rebuild_count += 1;
+            self.refactorizations = self.refactorizations.saturating_add(1);
             true
         } else {
             false

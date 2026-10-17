@@ -4,7 +4,7 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{ContextraError, TxId};
+use contextra_ports::{ContextraError, TxId};
 use contextra_store::wal::{
     Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
 };

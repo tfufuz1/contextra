@@ -10,7 +10,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

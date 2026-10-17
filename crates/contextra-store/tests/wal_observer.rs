@@ -1,6 +1,6 @@
 #![cfg(not(loom))]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_store::lsm::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

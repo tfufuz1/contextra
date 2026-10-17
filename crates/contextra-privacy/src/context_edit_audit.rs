@@ -223,6 +223,8 @@ mod tests {
     }
 
     impl Clock for FixedTestClock {
+        fn now(&self) -> contextra_ports::time::DeterministicTimestamp { contextra_ports::time::DeterministicTimestamp::from_unix_nanos(1_000_000_000) }
+        fn monotonic_ticks(&self) -> u64 { 1_000_000_000 }
         fn now_unix_nanos(&self) -> u64 {
             self.nanos
         }

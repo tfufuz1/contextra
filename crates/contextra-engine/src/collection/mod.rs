@@ -549,8 +549,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<crate::TenantIsolatedKvStore>> {
+    pub fn kv_store(&self) -> Option<&Arc<contextra_kvcache::TenantIsolatedKvStore>> {
         None
+    }
+
+    /// Returns the tenant ID associated with this collection (defaults to TenantId(0) / default).
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        contextra_types::TenantId::try_new(0).unwrap_or_default()
     }
 
     /// Sets the text embedder for this collection (consuming version).

@@ -4,7 +4,7 @@
 //! the SSTable is successfully persisted. On crash during the window between
 //! WAL delete and SSTable write, data loss would occur.
 
-use contextra_core::{Result, StorageEngine, TxId};
+use contextra_ports::{Result, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::time::Duration;
 use tempfile::TempDir;

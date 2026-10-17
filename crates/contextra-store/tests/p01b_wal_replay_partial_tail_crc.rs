@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, TxId};
+use contextra_ports::{ContextraError, TxId};
 use contextra_store::wal::{Wal, WalEntry, WalOp};
 use tempfile::tempdir;
 

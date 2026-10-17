@@ -1,6 +1,6 @@
 //! Integration test suite verifying production wiring of all 16 target symbols.
 
-use contextra_core::{CollectionId, TenantId};
+use contextra_ports::{CollectionId, TenantId};
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_ports::{Clock, SystemClock};
 use contextra_store::{
@@ -19,7 +19,7 @@ impl WalObserver for TestObserver {
         &self,
         _batch: &contextra_store::lsm::observer::CommittedBatch<'_>,
         _seq_no: u64,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
     ) {
     }
 }

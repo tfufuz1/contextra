@@ -5,7 +5,7 @@
 // INVARIANT 2: truncate() und append_batch() sind über truncate_lock serialisiert.
 // REQUIRES: Feature "fault-injection" für Test 1.
 
-use contextra_core::{Result, TxId};
+use contextra_ports::{Result, TxId};
 use contextra_store::wal::{Wal, WalEntry, WalOp};
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -172,7 +172,7 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
         res_w.expect("writer task panicked");
         res_t.expect("truncater task panicked");
 
-        Ok::<(), contextra_core::ContextraError>(())
+        Ok::<(), contextra_types::ContextraError>(())
     })
     .await;
 

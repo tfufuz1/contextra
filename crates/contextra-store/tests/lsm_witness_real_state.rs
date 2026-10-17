@@ -3,7 +3,7 @@
 // ZWECK: Integrationstests zur Verifikation realer Zustandswerte (Manifest-Gen, In-Flight Commits, Unpersisted Edits, Pending Delete Files) in Zeugnissen (A05).
 // INVARIANTEN: Keine Hartkodierungen in Zeugen-Evidenzen; dynamischer Manifest/LSM/Journal-Zustand wird exakt abgebildet.
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::DeletionLayer;

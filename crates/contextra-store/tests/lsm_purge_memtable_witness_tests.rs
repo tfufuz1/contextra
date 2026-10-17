@@ -1,4 +1,4 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::witness::MemScopeSpec;
 use contextra_store::lsm::LsmStorage;

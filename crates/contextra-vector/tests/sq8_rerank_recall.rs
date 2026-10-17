@@ -87,9 +87,9 @@ async fn test_sq8_rerank_recall_measurement() {
         .expect("Valid SQ8 config");
 
     let rng_seed = 123456789u64;
-    let idx_f32 = HnswIndex::try_new_with_rng(config_f32, Arc::new(SeededRng::new(rng_seed)))
+    let idx_f32 = HnswIndex::try_new_with_rng(config_f32, Arc::new(contextra_ports::SystemRng::new()))
         .expect("idx_f32 creation");
-    let idx_sq8 = HnswIndex::try_new_with_rng(config_sq8, Arc::new(SeededRng::new(rng_seed)))
+    let idx_sq8 = HnswIndex::try_new_with_rng(config_sq8, Arc::new(contextra_ports::SystemRng::new()))
         .expect("idx_sq8 creation");
 
     let mut data_rng = SimpleRng::new(4242);

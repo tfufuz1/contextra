@@ -3,7 +3,7 @@
 // ZWECK: Integrationstest für P02 F-01 CRITICAL — Compaction Engine respektiert MVCC TxBuffer Reader.
 // INVARIANTEN: Invariante I-2: Reader bei Seq N über TxBuffer schützt Put(50)+Tombstone(90) vor vorzeitiger Purging/GC.
 
-use contextra_core::{ResourceTracker, SnapshotRegistry, TxBuffer, TxId, TOMBSTONE_BIT};
+use contextra_ports::{ResourceTracker, SnapshotRegistry, TxBuffer, TxId, TOMBSTONE_BIT};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::lsm::GcFloor;
 use contextra_store::sstable::{create_block_cache_with_shards, SstableBuilder, SstableReader};

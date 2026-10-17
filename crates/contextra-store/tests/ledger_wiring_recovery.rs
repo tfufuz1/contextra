@@ -1,6 +1,6 @@
 //! Integration tests for ErasureLedger status checks during recovery.
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::{ContextraError, StorageEngine, TxId};
 use contextra_store::erasure_ledger::{
     LedgerEntry, LedgerEntryKind, LedgerOpenStatus, HEAD_FILENAME, LEDGER_FILENAME,
 };

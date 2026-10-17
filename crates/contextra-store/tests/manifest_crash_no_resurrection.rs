@@ -12,7 +12,7 @@
 //! 3. Scenario C: Tail-truncated Replace record at MANIFEST end.
 //!    Incomplete Replace record is safely discarded (no Err/panic), input SSTables remain active.
 
-use contextra_core::{Result, StorageEngine, TxId};
+use contextra_ports::{Result, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::path::{Path, PathBuf};
 use std::time::Duration;

@@ -26,7 +26,7 @@
 //! 22. `encode_graph_key`
 
 use bytes::Bytes;
-use contextra_core::{
+use contextra_ports::{
     CollectionId, ContextraError, DocId, ResourceBudget, ResourceTracker, SnapshotRegistry,
     StorageEngine, TenantId, TxId,
 };

@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::Arc;
 use tempfile::tempdir;

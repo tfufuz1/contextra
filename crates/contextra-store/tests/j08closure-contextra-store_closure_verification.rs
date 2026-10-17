@@ -1,4 +1,4 @@
-use contextra_core::{Result, TxId};
+use contextra_ports::{Result, TxId};
 use contextra_store::sstable::BlockBuilder;
 use contextra_store::wal::hmac::LegacyKeyStatus;
 use contextra_store::wal::{Wal, WalOp};

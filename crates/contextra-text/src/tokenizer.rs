@@ -14,6 +14,9 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
+pub const PROTECTED_PATTERN: &str =
+    r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})";
+
 static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<Option<Regex>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
@@ -21,9 +24,7 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 fn get_protected_regex() -> Option<&'static Regex> {
     PROTECTED_REGEX
         .get_or_init(|| {
-            match Regex::new(
-                r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
-            ) {
+            match Regex::new(PROTECTED_PATTERN) {
                 Ok(re) => Some(re),
                 Err(err) => {
                     tracing::error!(
