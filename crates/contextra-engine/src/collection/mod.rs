@@ -852,11 +852,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.kv_store.as_ref()
     }
 
-    /// Returns the tenant ID associated with this collection.
-    pub fn tenant_id(&self) -> contextra_types::TenantId {
-        contextra_types::TenantId::default()
-    }
-
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(not(feature = "encryption-at-rest"))]
     pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
