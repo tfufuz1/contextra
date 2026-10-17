@@ -272,7 +272,7 @@ impl HnswIndex {
     ///
     /// Uses an internal, non-cryptographic, reproducible default RNG seeded with [`DEFAULT_LAYER_SEED`].
     pub fn try_new(config: HnswConfig) -> Result<Self> {
-        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        let rng = std::sync::Arc::new(contextra_ports::SystemRng::new());
         Self::try_new_with_rng(config, rng)
     }
 
@@ -285,7 +285,7 @@ impl HnswIndex {
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
         let rng: std::sync::Arc<dyn contextra_ports::Rng> =
-            std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+            std::sync::Arc::new(contextra_ports::SystemRng::new());
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 

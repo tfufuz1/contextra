@@ -111,8 +111,14 @@ pub(super) use validate::validate_key;
 /// Maximum key size allowed for LSM operations (65,535 bytes).
 pub const MAX_KEY_SIZE: usize = 65_535;
 
-/// Maximum value size allowed for LSM operations (128MB).
-pub const MAX_VALUE_SIZE: usize = 134_217_728;
+/// Maximum value size allowed for LSM operations.
+/// Must fit within `MAX_WAL_ENTRY_SIZE` (64 MiB) minus `MAX_KEY_SIZE` and framing/encryption overhead.
+pub const MAX_VALUE_SIZE: usize = (crate::wal::MAX_WAL_ENTRY_SIZE as usize) - MAX_KEY_SIZE - 4096;
+
+const _: () = assert!(
+    MAX_VALUE_SIZE + MAX_KEY_SIZE + 4096 <= crate::wal::MAX_WAL_ENTRY_SIZE as usize,
+    "MAX_VALUE_SIZE plus MAX_KEY_SIZE and framing overhead must fit within MAX_WAL_ENTRY_SIZE"
+);
 
 /// Maximum batch size for `delete_many` operations (10,000 items).
 pub const MAX_BATCH_SIZE: usize = 10_000;
