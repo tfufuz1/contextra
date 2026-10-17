@@ -174,8 +174,8 @@ mod tests {
     }
 
     use crate::sstable::builder::SstableMetadata;
-    use proptest::prelude::*;
     use bytes::Bytes;
+    use proptest::prelude::*;
 
     /// Naive reference implementation of candidate selection for property test comparison
     fn naive_select_purge_candidates(
