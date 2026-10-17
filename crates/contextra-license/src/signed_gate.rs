@@ -10,15 +10,7 @@ use contextra_types::TenantId;
 pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[inline]
-fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
-    let mut res = 0u8;
-    for i in 0..32 {
-        res |= a[i] ^ b[i];
-    }
-    res == 0
-}
+use subtle::ConstantTimeEq;
 
 mod bytes_64 {
     use super::*;
@@ -41,6 +33,33 @@ mod bytes_64 {
     }
 }
 
+/// Local installation identity wrapper.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct InstallationId([u8; 32]);
+
+impl InstallationId {
+    /// Creates a new [`InstallationId`] from a 32-byte hash array.
+    pub const fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns an unbound installation identifier hash (`[0u8; 32]`) representing an unbound state
+    /// that never matches an installation binding.
+    pub const fn unbound() -> Self {
+        Self([0u8; 32])
+    }
+
+    /// Returns the underlying 32-byte hash array.
+    pub const fn into_bytes(self) -> [u8; 32] {
+        self.0
+    }
+
+    /// Returns a reference to the underlying 32-byte hash array.
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 /// Signed activation record binding a feature ring activation to a specific machine/deployment installation hash (§10.2, §15).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedActivation {
@@ -58,70 +77,85 @@ pub struct SignedActivation {
 impl SignedActivation {
     /// Computes the binary byte representation of the activation data fields
     /// `(ring, installation_id_hash, expires_at_unix)` used for Ed25519 signing and verification.
+    ///
+    /// # Errors
+    /// Returns a [`bincode::Error`] if serialization of the activation fields fails.
     pub fn payload_bytes(
         ring: FeatureRing,
         installation_id_hash: [u8; 32],
         expires_at_unix: i64,
-    ) -> Vec<u8> {
-        bincode::serialize(&(ring, installation_id_hash, expires_at_unix)).unwrap_or_default()
+    ) -> Result<Vec<u8>, bincode::Error> {
+        bincode::serialize(&(ring, installation_id_hash, expires_at_unix))
     }
 
     /// Creates a signed activation record given data fields and an Ed25519 signing key.
+    ///
+    /// # Errors
+    /// Returns a [`bincode::Error`] if serialization of the activation fields fails.
     pub fn create_signed(
         ring: FeatureRing,
         installation_id_hash: [u8; 32],
         expires_at_unix: i64,
         signing_key: &ed25519_dalek::SigningKey,
-    ) -> Self {
-        let payload = Self::payload_bytes(ring, installation_id_hash, expires_at_unix);
+    ) -> Result<Self, bincode::Error> {
+        let payload = Self::payload_bytes(ring, installation_id_hash, expires_at_unix)?;
         let signature = signing_key.sign(&payload).to_bytes();
-        Self {
+        Ok(Self {
             ring,
             installation_id_hash,
             expires_at_unix,
             signature,
-        }
+        })
     }
 
     /// Verifies whether the Ed25519 signature on this activation record is valid for the given verifying key.
     pub fn verify_signature(&self, verifying_key: &VerifyingKey) -> bool {
-        let payload =
-            Self::payload_bytes(self.ring, self.installation_id_hash, self.expires_at_unix);
+        let Ok(payload) =
+            Self::payload_bytes(self.ring, self.installation_id_hash, self.expires_at_unix)
+        else {
+            return false;
+        };
         let sig = Signature::from_bytes(&self.signature);
         verifying_key.verify(&payload, &sig).is_ok()
     }
 }
 
-/// Determines or generates a deterministic local installation ID hash (`[u8; 32]`).
+/// Determines or generates a local installation ID hash (`[u8; 32]`).
 ///
-/// # Status
-/// **VORLÄUFIG, BIS ZUR SCHRIFTLICHEN ENTSCHEIDUNG** (Spec Teil 15, "Offene Entscheidungen").
+/// If a storage path is provided (`Some(path)`), this function reads the persisted installation
+/// identifier from `path/installation.id` or generates and writes a new deterministic identifier
+/// `inst-<hash>` to that file.
 ///
-/// This implementation computes a stable 32-byte installation hash. If a persistent storage path is
-/// provided, it attempts to read or persist a machine-bound installation identifier (`installation.id`)
-/// and hashes its contents with BLAKE3. If no path is provided, it derives a deterministic fallback
-/// installation hash based on machine environment seeds.
-pub fn derive_local_installation_id_hash(storage_path: Option<&std::path::Path>) -> [u8; 32] {
+/// If no storage path is provided (`None`), this function returns `Ok(InstallationId::unbound().into_bytes())`,
+/// representing an unbound state (`[0u8; 32]`) that does not match any installation binding.
+///
+/// # Errors
+/// Returns an [`std::io::Error`] if directory creation or file writing fails at the specified `storage_path`.
+///
+/// # Note
+/// The persisted identifier is scoped to the specified storage directory path and does not construct
+/// hardware or machine-bound environment fingerprints.
+pub fn derive_local_installation_id_hash(
+    storage_path: Option<&std::path::Path>,
+) -> Result<[u8; 32], std::io::Error> {
     if let Some(path) = storage_path {
         let id_file = path.join("installation.id");
         if let Ok(content) = std::fs::read_to_string(&id_file) {
             let trimmed = content.trim();
             if !trimmed.is_empty() {
-                return *blake3::hash(trimmed.as_bytes()).as_bytes();
+                return Ok(*blake3::hash(trimmed.as_bytes()).as_bytes());
             }
         }
         let generated = format!(
             "inst-{}",
             blake3::hash(path.to_string_lossy().as_bytes()).to_hex()
         );
-        if std::fs::create_dir_all(path).is_ok() {
-            if let Ok(()) = std::fs::write(&id_file, &generated) {}
-        }
-        return *blake3::hash(generated.as_bytes()).as_bytes();
+        std::fs::create_dir_all(path)?;
+        std::fs::write(&id_file, &generated)?;
+        return Ok(*blake3::hash(generated.as_bytes()).as_bytes());
     }
 
-    const FALLBACK_SEED: &[u8] = b"CONTEXTRA_DEFAULT_LOCAL_INSTALLATION_ID_v1";
-    *blake3::hash(FALLBACK_SEED).as_bytes()
+    Ok(InstallationId::unbound().into_bytes())
 }
 
 /// License payload containing tenant binding, granted feature rings, optional expiration timestamp,
@@ -161,8 +195,15 @@ impl From<LegacyLicensePayload> for LicensePayload {
     }
 }
 
+/// Alias for [`SignedLicenseGate`].
+///
+/// Verifies that the payload matches the supplied verifying key; it is not license enforcement.
+pub type IntegrityGate = SignedLicenseGate;
+
 /// Cryptographic license gate verifying Ed25519 signatures over activation records ([`SignedActivation`])
 /// or legacy [`LicensePayload`].
+///
+/// Verifies that the payload matches the supplied verifying key; it is not license enforcement.
 #[derive(Clone)]
 pub struct SignedLicenseGate {
     verifying_key: Option<VerifyingKey>,
@@ -297,10 +338,15 @@ impl SignedLicenseGate {
     }
 
     /// Generates a valid signed payload, signature, and verifying key bytes for testing purposes.
+    ///
+    /// # Errors
+    /// Returns a [`bincode::Error`] if payload serialization fails.
+    #[allow(clippy::type_complexity)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn create_test_signed_payload(
         rings: Vec<FeatureRing>,
         expires_at: Option<i64>,
-    ) -> (Vec<u8>, [u8; 64], [u8; 32]) {
+    ) -> Result<(Vec<u8>, [u8; 64], [u8; 32]), bincode::Error> {
         let secret_bytes = [42u8; 32];
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
         let verifying_key_bytes = signing_key.verifying_key().to_bytes();
@@ -313,14 +359,20 @@ impl SignedLicenseGate {
             installation_id_hash: None,
         };
 
-        let payload_bytes = bincode::serialize(&payload).unwrap_or_default();
+        let payload_bytes = bincode::serialize(&payload)?;
         let signature = signing_key.sign(&payload_bytes).to_bytes();
 
-        (payload_bytes, signature, verifying_key_bytes)
+        Ok((payload_bytes, signature, verifying_key_bytes))
     }
 }
 
 impl LicenseGate for SignedLicenseGate {
+    /// Checks whether the requested [`FeatureRing`] is authorized under this gate instance.
+    ///
+    /// # Legacy Path Handling
+    /// If the gate was constructed from a legacy [`LicensePayload`] without an `installation_id_hash`,
+    /// the installation binding check is skipped with a warning log. This legacy fallback exists
+    /// strictly for backwards compatibility with legacy payloads and does not enforce installation binding.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
         // (1) Step 1: Fast Ring Bypass - INVARIANTE INV-LICENSE-2
         // Ring Fast always returns Ok unconditionally, even with corrupt, missing, or expired activation.
@@ -333,20 +385,20 @@ impl LicenseGate for SignedLicenseGate {
             return Err(LicenseError::NotActivated(ring));
         }
 
-        // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed without leaking details)
+        // (3) Step 3: Installation ID hash mismatch check (constant time via subtle::ConstantTimeEq, fail-closed without leaking details)
         if let Some(ref act) = self.activation {
             match self.local_installation_id {
-                Some(local_hash) if constant_time_eq_32(&local_hash, &act.installation_id_hash) => {
-                }
+                Some(local_hash) if local_hash.ct_eq(&act.installation_id_hash).into() => {}
                 _ => return Err(LicenseError::NotActivated(ring)),
             }
         } else if let Some(ref payload) = self.license_payload {
             if let Some(ref expected_hash) = payload.installation_id_hash {
                 match self.local_installation_id {
-                    Some(local_hash) if constant_time_eq_32(&local_hash, expected_hash) => {}
+                    Some(local_hash) if local_hash.ct_eq(expected_hash).into() => {}
                     _ => return Err(LicenseError::NotActivated(ring)),
                 }
             } else {
+                // Legacy path: payloads created without installation_id_hash skip local installation verification.
                 tracing::warn!(
                     "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
                 );
