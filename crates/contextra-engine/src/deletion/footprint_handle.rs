@@ -31,7 +31,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// - Gibt `observed_empty = true` zurück, wenn kein Eintrag für das Dokument existiert.
     /// - Führt `check_nonempty_or_observed_empty` durch.
     pub async fn erasure_footprint(&self, doc_id: DocId) -> Result<ErasureFootprint> {
-        let tenant_id = self.tenant_id();
+        let tenant_id = contextra_types::TenantId::SYSTEM;
         let storage_scope = StorageScope::Tenant(tenant_id);
 
         let id_str = doc_id.inner().to_string();
