@@ -252,7 +252,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                                 if let Some(user_val) = self.storage.get(&user_key).await? {
                                     if let Ok(stored) =
-                                        serde_json::from_slice::<StoredDocument>(&user_val)
+                                        StoredDocument::from_slice(&user_val)
                                     {
                                         stored_doc = Some(stored);
                                     }
@@ -260,7 +260,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             }
 
                             if stored_doc.is_none() {
-                                if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+                                if let Ok(full) = StoredDocument::from_slice(&val) {
                                     stored_doc = Some(full);
                                 }
                             }
@@ -378,7 +378,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 continue;
             }
 
-            let stored: StoredDocument = match serde_json::from_slice(&value) {
+            let stored: StoredDocument = match StoredDocument::from_slice(&value) {
                 Ok(d) => d,
                 Err(e) => {
                     tracing::debug!(
@@ -673,7 +673,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 "Document not found: {doc_id}"
             )));
         };
-        let mut stored: StoredDocument = serde_json::from_slice(&data)?;
+        let mut stored: StoredDocument = StoredDocument::from_slice(&data)?;
         let doc_id_typed = DocId::from_key(doc_id)?;
         let doc_key = self.namespaced_key(&doc_id_typed.inner().to_le_bytes(), 1);
 
@@ -720,7 +720,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         meta_obj.insert("model_id".to_string(), serde_json::json!(model_id));
 
         let meta_only = StoredDocumentMeta::from(&stored);
-        let user_bytes = serde_json::to_vec(&stored)?;
+        let user_bytes = stored.encode_v2()?;
         let doc_bytes = serde_json::to_vec(&meta_only)?;
 
         let _guard = self.kv_locks.lock_for(doc_id).await;
@@ -900,7 +900,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 }
 
                 for (_k, v) in batch {
-                    if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
+                    if let Ok(stored) = StoredDocument::from_slice(&v) {
                         if let Ok(eid) = EntityId::from_key(&stored.id) {
                             id_map.insert(eid, stored.id.clone());
                             embeddings.insert(eid, stored.embedding);
