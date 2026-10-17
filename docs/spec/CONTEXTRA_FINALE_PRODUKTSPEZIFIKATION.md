@@ -1437,7 +1437,7 @@ Encryption at Rest and KV-Cache Security utilities for Contextra
 - `enum DeletionLayer` ∈ {LsmMemtable, SsTableAllLevels, HnswIndex, WalAllSegments, CsrGraph, KvCacheSegments, EmbeddingCache} — Layer-explizite Coverage-Deklaration.
 - `enum ExcludedScope` ∈ {ConsolidatedAndDistilled, LlmParameterMemory} — Explizite Nicht-Abdeckung — maschinenlesbar für Audit-Systeme.
 - `enum DeletionScope` ∈ {Document, Collection, Tenant} — Target scope for physical deletion.
-- `struct DeletionProof` { signature_version, scope, deleted_keys_hash, deleted_after_tx, timestamp, signature, covered_layers, excluded_scopes, graph_repair, wal_chain_receipt… } · Methoden: create, create_with_wal_receipt, create_v3, create_with_wal_receipt_v3, signature_version_typed, verify, verify_external, export_for_audit, tenant_id
+- `struct DeletionProof` { signature_version, scope, deleted_keys_hash, deleted_after_tx, timestamp, signature, covered_layers, excluded_scopes, graph_repair, wal_chain_receipt… } · Methoden: create, create_with_wal_receipt, create_v3, create_with_wal_receipt_v3, signature_version_typed, verify, verify_external, export_for_audit, tenant_id — `verify` verifiziert im Fallback-/HMAC-Modus die HMAC-Signatur und Payload-Integrität, verifiziert jedoch nicht den physischen Storage-Zustand (Nicht-Garantie bzgl. physischer Speicherräumung bleibt bestehen).
 - `fn compute_wal_delete_receipt( prev_hmac: &[u8; 32], delete_event_payload: &[u8], integrity_key: &[u8], ) -> Result<[u8; 32]>` — Erzeugt eine WAL-Löschquittung H(hmac_prev \|\| delete_event) für den Nachweis auf WAL-Ebene gemäß DSGVO Art.
 - `fn verify_wal_delete_receipt( receipt: &[u8; 32], prev_hmac: &[u8; 32], delete_event_payload: &[u8], integrity_key: &[u8], ) -> Result<bool>` — Verifiziert eine WAL-Löschquittung in O(1) konstanter Zeit ohne Klartextzugang.
 
@@ -1507,7 +1507,6 @@ Encryption at Rest and KV-Cache Security utilities for Contextra
 
 **`wal_crypto.rs`**
 
-- `trait KmsProvider` (get_key) — Provides Key Management Strategy hooks.
 - `struct EncryptedWal` — Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads. · Methoden: new, encrypt_chunk, decrypt_chunk
 - `struct WalHmac` — Stateful wrapper around HMAC-SHA256 initialized with WAL domain separation. · Methoden: new, update, finalize
 - `struct WalEntrySnapshot` { tx_id, seq_no, op_type, key, value, checksum, prev_hmac } — Immutable snapshot of a WAL entry used for cryptographic integrity verification.
@@ -1716,7 +1715,7 @@ Contextra — Core storage, index, and transaction orchestrator engine
 - `enum no_crypto_stubs::DeletionScope` ∈ {Document, Collection, Tenant}
 - `struct no_crypto_stubs::LayerCleanupProof` { layer, remaining_count } · Methoden: new_after_verified_empty, verify_and_create
 - `enum no_crypto_stubs::ExcludedScope` ∈ {ConsolidatedAndDistilled, LlmParameterMemory}
-- `struct no_crypto_stubs::DeletionProof` { signature_version, scope, deleted_keys_hash, deleted_after_tx, timestamp, signature, covered_layers, excluded_scopes, wal_chain_receipt, integrity_warning… } · Methoden: create, tenant_id, verify, export_for_audit
+- `struct no_crypto_stubs::DeletionProof` { signature_version, scope, deleted_keys_hash, deleted_after_tx, timestamp, signature, covered_layers, excluded_scopes, wal_chain_receipt, integrity_warning… } · Methoden: create, tenant_id, verify, export_for_audit — `verify` verifiziert im Fallback-Modus die HMAC-Signatur und Payload-Integrität, verifiziert jedoch nicht den physischen Storage-Zustand (Nicht-Garantie bleibt).
 - `struct no_crypto_stubs::TenantIsolatedKvStore` · Methoden: new, purge_tenant_segments, on_rollback, remove_tenant_segment
 - `type ConsolidationLauncher = Arc< dyn Fn( Arc<Collection<LsmStorage>>, std::time::Duration, usize, tokio_util::sync::Ca`
 - `fn register_consolidation_launcher(_f: F)`
@@ -1952,7 +1951,7 @@ CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)
 - `struct ValidatedHyperEdgeCandidate` { candidate, predicate, llm_confidence, accepted } — A candidate hyperedge after LLM semantic validation.
 - `enum HyperedgeSuggestError` ∈ {LlmValidationBudgetExceeded} — Errors specific to hyperedge suggestion and validation.
 - `fn compute_co_occurrence_candidates( entities_per_document: &[(DocId, Vec<EntityId>)], min_co_occurrence: usize, ) -> Vec<HyperEdgeCandidate>` — Computes hyperedge candidates from document entity co-occurrences.
-- `fn validate_candidates_with_llm( candidates: &[HyperEdgeCandidate], entity_labels: &dyn Fn(EntityId) -> Option<String>, generator: &dyn TextGenerator, max_llm_calls_per_c` — Validates hyperedge candidates using an LLM text generator.
+- `fn validate_candidates_with_llm( candidates: &[HyperEdgeCandidate], entity_labels: &dyn Fn(EntityId) -> Option<String>, generator: &dyn LlmTextGenerator, max_llm_calls_per_c` — Validates hyperedge candidates using an LLM text generator.
 
 **`lib.rs`**
 
@@ -2516,7 +2515,6 @@ Canonical dyn-compatible port traits for Contextra subsystems
 
 - `trait Checkpoint` (take_snapshot, restore) — Abstract contract for generating consistent checkpoints.
 - `trait CheckpointCoordinator` (create_named_checkpoint, restore_named_checkpoint, drop_named_checkpoint, list_named_checkpoints) — Unified Checkpoint Coordinator Trait combining named, TxId+seq_no-scoped, persistent checkpoints.
-- `trait Snapshot` (seq_no) — Represents a point-in-time view of the database.
 
 **`clock.rs`**
 
@@ -2529,7 +2527,6 @@ Canonical dyn-compatible port traits for Contextra subsystems
 - `trait TextEmbeddingEngine` (embed, embed_batch) — Text embedding engine trait.
 - `enum EmbeddingError` ∈ {Unavailable, ComputationFailed, InputTooLong} — Error types encountered during embedding operations.
 - `trait EmbeddingProvider` (provider_name, embed, embedding_dim, embed_batch) — Abstraction for all embedding providers (OllamaEmbedder, OnnxEmbedder, MockEmbedder).
-- `trait TextGenerator` (generate_text) — Abstraction for text generation / LLM engines.
 - `trait LlmTextGenerator` (generate, generate_with_context) — Abstract contract for LLM text generation (summarization, importance evaluation, query expansion).
 - `trait LlmTextGeneratorStreaming` (generate_stream) — Abstract contract for streaming LLM text generation (token by token / chunk by chunk).
 - `struct MockEmbedder` { dim, fixed_output } — Deterministic mock embedding provider for tests. · Methoden: new, with_fixed_output · impl: EmbeddingProvider
@@ -2731,8 +2728,8 @@ Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3)
 **`processing_registry.rs`**
 
 - `enum ProcessorRole` ∈ {Controller, Processor} — Rolle bezüglich der Verarbeitungstätigkeit gemäß DSGVO. · Methoden: as_str
-- `type TenantId = String` — Identifikator eines Mandanten im System.
-- `struct ProcessingActivityRecord` { activity_name, controller_or_processor_role, purpose, data_categories, data_subject_categories, recipients, third_country_transfers, retention_period, technical_and_organizational_measures, tenant_id } — Ein Datensatz einer Verarbeitungstätigkeit gemäß Art.
+- `type TenantLabel = String` — Freies String-Label für den menschenlesbaren Export (z. B. Mandantenname oder Organisations-Bezeichnung).
+- `struct ProcessingActivityRecord` { activity_name, controller_or_processor_role, purpose, data_categories, data_subject_categories, recipients, third_country_transfers, retention_period, technical_and_organizational_measures, tenant_id } — Ein Datensatz einer Verarbeitungstätigkeit gemäß Art. 30 DSGVO (`tenant_id` vom Typ `TenantLabel`).
 - `struct ProcessingRegistryExport` { records } — Strukturierte Export-Repräsentation des Verzeichnisses von Verarbeitungstätigkeiten.
 - `fn generate_registry(records: &[ProcessingActivityRecord]) -> ProcessingRegistryExport` — Erzeugt aus einer Reihe von Datensätzen eine strukturierte Export-Repräsentation.
 - `fn render_markdown(export: &ProcessingRegistryExport) -> String` — Erzeugt eine druckfertige, deutschsprachige Markdown-Tabelle aus dem Export.
@@ -3090,39 +3087,39 @@ Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)
 - `fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError>`
 - `fn cosine_similarity_parts_u8( a: &[u8], b: &[u8], ) -> Result<CosineSimilarityPartsU8, ContextraError>`
 
-**`kernels/avx2.rs`**
+**`kernels/avx2.rs`** (Gekapselte Hardware-Kernel, interne Sichtbarkeit `pub(crate) unsafe fn`, öffentlicher Aufruf ausschließlich via safe `dispatch.rs`)
 
-- `fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32`
-- `fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32`
-- `fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32`
-- `fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn hsum256_ps_avx(v: __m256) -> f32`
-- `fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32`
-- `fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32`
-- `fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
-- `fn hsum256_epi32_avx2(v: __m256i) -> i32`
+- `pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32`
+- `pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32`
+- `pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32`
+- `pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
+- `pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32`
 
-**`kernels/avx512.rs`**
+**`kernels/avx512.rs`** (Gekapselte Hardware-Kernel, interne Sichtbarkeit `pub(crate) unsafe fn`, öffentlicher Aufruf ausschließlich via safe `dispatch.rs`)
 
-- `fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32`
-- `fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32`
-- `fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32`
-- `fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
-- `fn hsum512_ps_avx(v: __m512) -> f32`
-- `fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32`
-- `fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32`
-- `fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
-- `fn hsum512_epi32_avx512(v: __m512i) -> i32`
+- `pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32`
+- `pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32`
+- `pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32`
+- `pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32`
+- `pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8`
+- `pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32`
 
-**`kernels/neon.rs`**
+**`kernels/neon.rs`** (Gekapselte Hardware-Kernel, interne Sichtbarkeit `pub(crate) unsafe fn`, öffentlicher Aufruf ausschließlich via safe `dispatch.rs`)
 
-- `fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32`
-- `fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32`
-- `fn dot_product_neon(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32`
+- `pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32`
 
 **`kernels/scalar.rs`**
 
