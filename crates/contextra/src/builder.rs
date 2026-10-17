@@ -59,6 +59,8 @@ impl Clone for ContextraBuilder {
 
 impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
+    ///
+    /// By default, the builder initializes with [`OpenFastGate`] as its default license gate.
     pub fn new(dimension: usize) -> Self {
         Self {
             storage_path: PathBuf::from("./contextra_data"),
@@ -124,8 +126,10 @@ impl ContextraBuilder {
         self
     }
 
-    /// Attaches a cryptographic signed license gate (§14.6, §15).
-    pub fn with_signed_license(
+    /// Attaches a cryptographic integrity license gate (§14.6, §15).
+    ///
+    /// Verifies that the payload matches the supplied key; this is not license enforcement.
+    pub fn with_integrity_license(
         mut self,
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -148,6 +152,17 @@ impl ContextraBuilder {
             }
         }
         self
+    }
+
+    /// Attaches a cryptographic signed license gate (§14.6, §15).
+    #[deprecated(note = "renamed to with_integrity_license; removal 2027-01-31")]
+    pub fn with_signed_license(
+        self,
+        payload_bytes: &[u8],
+        signature: &[u8; 64],
+        verifying_key_bytes: &[u8; 32],
+    ) -> Self {
+        self.with_integrity_license(payload_bytes, signature, verifying_key_bytes)
     }
 
     /// Sets the performance profile preset for the contextra instance.
