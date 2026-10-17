@@ -10,8 +10,13 @@ pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
 
+#[cfg(feature = "compliance")]
+pub mod compliance;
+
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
+#[cfg(feature = "compliance")]
+pub use compliance::*;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
