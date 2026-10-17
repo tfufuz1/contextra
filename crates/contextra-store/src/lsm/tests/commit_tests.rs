@@ -167,7 +167,6 @@ async fn test_input_boundary_guards() {
     ));
 }
 
-#[cfg(feature = "fault-injection")]
 #[tokio::test]
 async fn test_lsm_commit_append_failure_restores_hmac() {
     let (storage, _tmp) = test_storage().await;
@@ -180,7 +179,11 @@ async fn test_lsm_commit_append_failure_restores_hmac() {
     let hmac_before = wal.last_hmac_snapshot().await;
     drop(wal);
 
-    storage.simulate_wal_append_failure_for_test().await;
+    // Seal active WAL so append fails during commit
+    {
+        let wal = storage.wal.read().await;
+        wal.rotate_and_seal().await.expect("seal wal");
+    }
 
     let tx2 = TxId::new(2);
     storage.put(tx2, b"k2", b"v2").await.unwrap();

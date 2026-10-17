@@ -422,28 +422,49 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
         let _inflight_guard = InflightGuard::new(&storage.erasure_fence.gate);
 
-        let (wal_ops, mem_updates, first_seq) = prepare_tx_ops(storage, tx_id, &ops)?;
-        let (wal_entries, _prev_hmac) = wal.prepare_batch(wal_ops).await?;
+        let start_seq = storage.next_seq_no.load(Ordering::Acquire);
+        let (wal_ops, mem_updates, first_seq) = match prepare_tx_ops(storage, tx_id, &ops) {
+            Ok(res) => res,
+            Err(e) => {
+                storage.next_seq_no.store(start_seq, Ordering::SeqCst);
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(e);
+            }
+        };
+
+        let (wal_entries, prev_hmac) = match wal.prepare_batch(wal_ops).await {
+            Ok(res) => res,
+            Err(e) => {
+                storage.next_seq_no.store(start_seq, Ordering::SeqCst);
+                if first_seq > 0 {
+                    storage.ssi_validator.forget_from(first_seq);
+                }
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(e);
+            }
+        };
+
         let entries_for_observer = if storage.has_observers() {
             wal_entries.entries().to_vec()
         } else {
             Vec::new()
         };
         let durability_mode = storage.config.durability_mode;
+        let wal_for_rollback = wal.clone();
 
         let append_handle = tokio::spawn(async move {
             match durability_mode {
                 DurabilityMode::Full | DurabilityMode::WalNoHmac => {
                     let truncate_guard = wal.truncate_lock.lock().await;
                     let start_offset = wal.size();
-                    let start_hmac = wal.last_hmac_snapshot().await;
                     let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
                     if append_res.is_err() {
-                        if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
+                        if let Err(trunc_err) = wal.truncate(start_offset, prev_hmac).await {
                             tracing::error!(
                                 "Failed to truncate WAL after failed single append_batch: {trunc_err}"
                             );
                         }
+                        wal.rollback_hmac(prev_hmac).await;
                         if wal.is_poisoned() {
                             match wal.recover_from_poison().await {
                                 Ok(()) => {
@@ -472,6 +493,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         };
 
         if let Err(e) = single_append_res {
+            wal_for_rollback.rollback_hmac(prev_hmac).await;
+            storage.next_seq_no.store(start_seq, Ordering::SeqCst);
             if first_seq > 0 {
                 storage.ssi_validator.forget_from(first_seq);
             }

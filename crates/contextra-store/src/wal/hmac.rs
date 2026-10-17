@@ -184,6 +184,12 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
+    /// Rolls back the in-memory HMAC chain head to `prev_hmac` after a failed batch append or commit.
+    pub async fn rollback_hmac(&self, prev_hmac: [u8; 32]) {
+        let mut last_hmac = self.last_hmac.lock().await;
+        *last_hmac = prev_hmac;
+    }
+
     /// Returns the legacy integrity key status for this WAL segment.
     pub fn legacy_key_status(&self) -> LegacyKeyStatus {
         if self
