@@ -5,11 +5,12 @@
 #![allow(unexpected_cfgs)]
 
 #[cfg(loom)]
-mod loom_tests {
-    #[path = "../src/lsm/fence.rs"]
-    mod fence;
+#[path = "../src/lsm/fence.rs"]
+mod fence;
 
-    use fence::ErasureFence;
+#[cfg(loom)]
+mod loom_tests {
+    use super::fence::ErasureFence;
     use loom::sync::Arc;
     use loom::thread;
 
