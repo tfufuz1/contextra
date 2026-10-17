@@ -3,5 +3,5 @@
   "result": "INVALID",
   "exit_code": 2,
   "category": "FORMAT_ERROR",
-  "reason": "Truncated TLV header or payload"
+  "reason": "Proof binary payload too short"
 }
