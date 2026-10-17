@@ -183,50 +183,52 @@ impl ContextraBuilder {
 
     /// Builds and initializes the `Contextra` engine instance.
     pub async fn build(mut self) -> Result<Contextra, ContextraError> {
-        if let Some(ref err_msg) = self.signed_license_error {
-            return Err(ContextraError::PolicyViolation(err_msg.clone()));
-        }
-
-        let requested_ring = if let Some(profile) = self.performance_profile {
-            let resolved = profile.resolve();
-            if self.explicit_user_config {
-                if self.config.durability_mode != resolved.durability_mode
-                    || self.config.deletion_proof_active != resolved.deletion_proof_active
-                    || self.config.vector_delete_mode != resolved.vector_delete_mode
-                {
-                    return Err(ContextraError::PolicyViolation(
-                        "Explicit ContextraConfig conflicts with PerformanceProfile settings"
-                            .to_string(),
-                    ));
-                }
-            } else {
-                self.config.durability_mode = resolved.durability_mode;
-                self.config.deletion_proof_active = resolved.deletion_proof_active;
-                self.config.vector_delete_mode = resolved.vector_delete_mode;
+        contextra_types::public_api!("ContextraBuilder::build", {
+            if let Some(ref err_msg) = self.signed_license_error {
+                return Err(ContextraError::PolicyViolation(err_msg.clone()));
             }
-            resolved.feature_ring
-        } else {
-            FeatureRing::Fast
-        };
 
-        let authorized_token = self
-            .license_gate
-            .authorize(requested_ring)
-            .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+            let requested_ring = if let Some(profile) = self.performance_profile {
+                let resolved = profile.resolve();
+                if self.explicit_user_config {
+                    if self.config.durability_mode != resolved.durability_mode
+                        || self.config.deletion_proof_active != resolved.deletion_proof_active
+                        || self.config.vector_delete_mode != resolved.vector_delete_mode
+                    {
+                        return Err(ContextraError::PolicyViolation(
+                            "Explicit ContextraConfig conflicts with PerformanceProfile settings"
+                                .to_string(),
+                        ));
+                    }
+                } else {
+                    self.config.durability_mode = resolved.durability_mode;
+                    self.config.deletion_proof_active = resolved.deletion_proof_active;
+                    self.config.vector_delete_mode = resolved.vector_delete_mode;
+                }
+                resolved.feature_ring
+            } else {
+                FeatureRing::Fast
+            };
 
-        let instance = Contextra::open_authorized(
-            &self.storage_path,
-            self.config,
-            &authorized_token,
-            self.license_gate,
-        )
-        .await?;
+            let authorized_token = self
+                .license_gate
+                .authorize(requested_ring)
+                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-        if let Some(embedder) = self.embedder {
-            Ok(instance.with_embedder(embedder).await)
-        } else {
-            Ok(instance)
-        }
+            let instance = Contextra::open_authorized(
+                &self.storage_path,
+                self.config,
+                &authorized_token,
+                self.license_gate,
+            )
+            .await?;
+
+            if let Some(embedder) = self.embedder {
+                Ok(instance.with_embedder(embedder).await)
+            } else {
+                Ok(instance)
+            }
+        })
     }
 }
 

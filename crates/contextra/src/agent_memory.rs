@@ -174,26 +174,29 @@ impl AgentMemory {
         text: &str,
         metadata: Option<Value>,
     ) -> Result<MemoryId, ContextraError> {
-        // Fallback documentation:
-        // (a) `uuid::Uuid::new_v4()` is no longer used to uphold Contextra's determinism promise
-        //     ("reproducible, audited context") and governance rules forbidding non-deterministic UUIDs in production code.
-        // (b) `next_fallback_id()` only triggers when no `IdGen` is injected (`id_gen == None`).
-        // (c) For production deployments requiring replay determinism across process restarts,
-        //     an explicit `IdGen` should be injected via `with_id_gen` or `new_with_id_gen`.
+        let text_owned = text.to_string();
         let id = match &self.id_gen {
             Some(gen) => gen.next_id().to_string(),
             None => next_fallback_id(),
         };
-        self.engine.insert_text_only(&id, text, metadata).await?;
-        Ok(MemoryId(id))
+        let engine = self.engine.clone();
+        let id_clone = id.clone();
+        contextra_types::public_api!("AgentMemory::remember", {
+            engine.insert_text_only(&id_clone, &text_owned, metadata).await?;
+            Ok(MemoryId(id_clone))
+        })
     }
 
     /// Retrieves top-k matching memories for a natural language query text string.
     ///
     /// Delegates directly to `Contextra::search_text` and transforms each `SearchResult` into a `Memory`.
     pub async fn recall(&self, query: &str, k: usize) -> Result<Vec<Memory>, ContextraError> {
-        let results = self.engine.search_text(query, k).await?;
-        Ok(results.into_iter().map(Memory::from).collect())
+        let query_owned = query.to_string();
+        let engine = self.engine.clone();
+        contextra_types::public_api!("AgentMemory::recall", {
+            let results = engine.search_text(&query_owned, k).await?;
+            Ok(results.into_iter().map(Memory::from).collect())
+        })
     }
 
     /// Deletes a memory entry by its `MemoryId`.
@@ -202,8 +205,12 @@ impl AgentMemory {
     pub async fn forget(
         &self,
         id: &MemoryId,
-    ) -> Result<contextra_db::engine::forget::ForgetReceipt, ContextraError> {
-        self.engine.delete(id.as_str()).await
+    ) -> Result<(), ContextraError> {
+        let id_str = id.as_str().to_string();
+        let engine = self.engine.clone();
+        contextra_types::public_api!("AgentMemory::forget", {
+            engine.delete(&id_str).await
+        })
     }
 
     /// Establishes a directed knowledge-graph relationship between two memories with a given label.
@@ -215,7 +222,13 @@ impl AgentMemory {
         to: &MemoryId,
         label: &str,
     ) -> Result<(), ContextraError> {
-        self.engine.relate(from.as_str(), to.as_str(), label).await
+        let from_str = from.as_str().to_string();
+        let to_str = to.as_str().to_string();
+        let label_owned = label.to_string();
+        let engine = self.engine.clone();
+        contextra_types::public_api!("AgentMemory::relate", {
+            engine.relate(&from_str, &to_str, &label_owned).await
+        })
     }
 
     /// Establishes an n-ary hyperedge relationship connecting two or more memories, each bound to a specific role.
@@ -235,39 +248,49 @@ impl AgentMemory {
         participants: &[(&MemoryId, &str)],
         source: Option<&MemoryId>,
     ) -> Result<RelationId, ContextraError> {
-        if predicate.trim().is_empty() {
-            return Err(ContextraError::InvalidInput(
-                "relate_n_ary predicate must not be empty".to_string(),
-            ));
-        }
+        let pred_owned = predicate.to_string();
+        let part_owned: Vec<(String, String)> = participants
+            .iter()
+            .map(|(m, r)| (m.as_str().to_string(), r.to_string()))
+            .collect();
+        let source_owned = source.map(|s| s.as_str().to_string());
+        let engine = self.engine.clone();
 
-        if participants.len() < 2 {
-            return Err(ContextraError::InvalidInput(format!(
-                "relate_n_ary requires at least 2 participants, found {}",
-                participants.len()
-            )));
-        }
-
-        for (_, role) in participants {
-            if role.trim().is_empty() {
+        contextra_types::public_api!("AgentMemory::relate_n_ary", {
+            if pred_owned.trim().is_empty() {
                 return Err(ContextraError::InvalidInput(
-                    "relate_n_ary participant role must not be empty".to_string(),
+                    "relate_n_ary predicate must not be empty".to_string(),
                 ));
             }
-        }
 
-        let collection = self.engine.collection("default").await?;
-        let participant_tuples: Vec<(&str, &str)> = participants
-            .iter()
-            .map(|(mem_id, role)| (mem_id.as_str(), *role))
-            .collect();
-        let source_str = source.map(|s| s.as_str());
+            if part_owned.len() < 2 {
+                return Err(ContextraError::InvalidInput(format!(
+                    "relate_n_ary requires at least 2 participants, found {}",
+                    part_owned.len()
+                )));
+            }
 
-        let hyperedge_id = collection
-            .relate_n_ary(predicate, &participant_tuples, source_str)
-            .await?;
+            for (_, role) in &part_owned {
+                if role.trim().is_empty() {
+                    return Err(ContextraError::InvalidInput(
+                        "relate_n_ary participant role must not be empty".to_string(),
+                    ));
+                }
+            }
 
-        Ok(RelationId(hyperedge_id.inner()))
+            let collection = engine.collection("default").await?;
+            let participant_tuples: Vec<(&str, &str)> = part_owned
+                .iter()
+                .map(|(mem_id, role)| (mem_id.as_str(), role.as_str()))
+                .collect();
+            let source_str = source_owned.as_deref();
+
+            let hyperedge_id = collection
+                .relate_n_ary(&pred_owned, &participant_tuples, source_str)
+                .await?;
+
+            Ok(RelationId(hyperedge_id.inner()))
+        })
     }
 }
 

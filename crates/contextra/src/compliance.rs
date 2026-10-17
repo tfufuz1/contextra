@@ -168,8 +168,10 @@ impl Contextra {
         &self,
         _range: TimeRange,
     ) -> Result<RegisterExport, ContextraError> {
-        Err(ContextraError::from(
-            ComplianceError::ComplianceSourceUnavailable,
-        ))
+        contextra_types::public_api!("Contextra::export_processing_register", {
+            Err(ContextraError::from(
+                ComplianceError::ComplianceSourceUnavailable,
+            ))
+        })
     }
 }
