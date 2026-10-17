@@ -155,10 +155,14 @@ impl RouterEngine {
                     let is_cloud = false;
 
                     let cost = profile.estimated_cost();
-                    if let Some(ref mut bstate) = profile.bandit_state {
-                        if let Err(err) =
-                            bstate.update(&pending_bandit_entry.context, reward, cost, is_cloud)
-                        {
+                    if let Some(ref bstate_arc) = profile.bandit_state {
+                        let mut bstate_cloned = (**bstate_arc).clone();
+                        if let Err(err) = bstate_cloned.update(
+                            &pending_bandit_entry.context,
+                            reward,
+                            cost,
+                            is_cloud,
+                        ) {
                             tracing::warn!(
                                 profile = %pending_bandit_entry.profile_name,
                                 action = pending_bandit_entry.action_idx,
@@ -166,6 +170,7 @@ impl RouterEngine {
                                 "Fehler beim BanditProfileState-Update in record_outcome"
                             );
                         } else {
+                            profile.bandit_state = Some(Arc::new(bstate_cloned));
                             tracing::debug!(
                                 profile = %pending_bandit_entry.profile_name,
                                 action = pending_bandit_entry.action_idx,
