@@ -6,12 +6,15 @@
 //! - I-5 (Poison-State Isolation): Flusher panics in close() are evaluated and propagated as ContextraError::Internal.
 
 pub mod encode;
+#[cfg_attr(not(any(feature = "wal-integrity", feature = "memory-only-storage")), allow(dead_code))]
 pub mod flusher;
 pub mod hmac;
 pub mod io;
 pub mod replay;
 pub mod replay_filter;
 pub mod retire;
+#[cfg(not(loom))]
+pub mod scope_purge;
 pub mod witness_scan;
 
 #[cfg(test)]
@@ -28,6 +31,8 @@ pub use replay::*;
 pub use replay_filter::*;
 #[cfg(not(loom))]
 pub use retire::*;
+#[cfg(not(loom))]
+pub use scope_purge::*;
 #[cfg(not(loom))]
 pub use witness_scan::*;
 
@@ -286,6 +291,9 @@ pub struct KeyManager;
 #[cfg(not(feature = "wal-integrity"))]
 impl KeyManager {
     pub fn try_new(_passphrase: &str, _salt: &[u8]) -> Result<Self> {
+        Ok(Self)
+    }
+    pub fn try_new_strict<H>(_passphrase: &str, _header: &H) -> Result<Self> {
         Ok(Self)
     }
     pub fn derive_file_key(&self, _file_id: &[u8]) -> Result<Self> {
