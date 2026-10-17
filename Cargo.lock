@@ -955,6 +955,7 @@ dependencies = [
 name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "contextra-infer-candle",
  "contextra-ports",
  "contextra-rank",
@@ -966,10 +967,12 @@ dependencies = [
  "proptest",
  "reqwest",
  "serde",
+ "sha2",
  "tempfile",
  "tokenizers 0.19.1",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1244,6 +1247,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "contextra-ports",
+ "contextra-store",
  "contextra-types",
  "parking_lot 0.12.5",
  "tempfile",
