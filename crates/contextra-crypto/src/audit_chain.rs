@@ -76,13 +76,17 @@ impl AuditChainEntry {
     ) -> Result<[u8; 32]> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&index.to_le_bytes());
-        hasher.update(&(schema_id.len() as u32).to_le_bytes());
+        let schema_len = u32::try_from(schema_id.len())
+            .map_err(|e| CryptoError::Crypto(format!("schema_id length overflow: {e}")))?;
+        hasher.update(&schema_len.to_le_bytes());
         hasher.update(schema_id.as_bytes());
         hasher.update(rules_hash);
 
         let class_bytes = bincode::serialize(&data_class)
             .map_err(|e| CryptoError::Crypto(format!("DataClass serialization failed: {e}")))?;
-        hasher.update(&(class_bytes.len() as u32).to_le_bytes());
+        let class_len = u32::try_from(class_bytes.len())
+            .map_err(|e| CryptoError::Crypto(format!("class_bytes length overflow: {e}")))?;
+        hasher.update(&class_len.to_le_bytes());
         hasher.update(&class_bytes);
 
         hasher.update(&doc_id.0.to_le_bytes());
@@ -98,6 +102,15 @@ impl AuditChainEntry {
 
         Ok(*hasher.finalize().as_bytes())
     }
+}
+
+/// Anker für die Verifizierung einer Audit-Kette gegen extern gespeicherte Zustände.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditChainAnchor {
+    /// Index des geankerten Eintrags.
+    pub index: u64,
+    /// Blake3-Hash des geankerten Eintrags.
+    pub entry_hash: [u8; 32],
 }
 
 /// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
@@ -265,7 +278,7 @@ impl AuditChain {
         })
     }
 
-    /// Verifiziert eine periodische Kettenkopf-Signatur gegen den angegebenen VerifyingKey.
+    /// Verifiziert eine periodische Kettenkopf-Signatur gegen den angegebenen VerifyingKey strikt.
     pub fn verify_head_signature(
         head_sig: &AuditChainHeadSignature,
         verifying_key: &ed25519_dalek::VerifyingKey,
@@ -274,13 +287,12 @@ impl AuditChain {
         payload.extend_from_slice(&head_sig.chain_index.to_le_bytes());
         payload.extend_from_slice(&head_sig.head_hash);
 
-        use ed25519_dalek::Verifier;
         let sig = match ed25519_dalek::Signature::from_slice(&head_sig.signature) {
             Ok(s) => s,
             Err(_) => return Ok(false),
         };
 
-        Ok(verifying_key.verify(&payload, &sig).is_ok())
+        Ok(verifying_key.verify_strict(&payload, &sig).is_ok())
     }
 
     /// Verifiziert die vollständige Kette auf Integrität.
@@ -325,5 +337,110 @@ impl AuditChain {
         }
 
         Ok(true)
+    }
+
+    /// Liefert den Anker des letzten Eintrags der Kette, oder `None` bei leerer Kette.
+    pub fn anchor(&self) -> Option<AuditChainAnchor> {
+        self.entries.last().map(|entry| AuditChainAnchor {
+            index: entry.index,
+            entry_hash: entry.entry_hash,
+        })
+    }
+
+    /// Verifiziert die Kette gegen einen externen Anker.
+    ///
+    /// Ruft zuerst [`Self::verify_chain`] zur Prüfung der internen Integrität auf.
+    /// Anschließend wird geprüft, ob an `anchor.index` ein Eintrag mit identischem `entry_hash` existiert.
+    /// Eine seit dem Anker gewachsene Kette ist gültig; eine kürzer gewordene Kette (Backup-Rollback)
+    /// oder eine abweichende Alternativhistorie (Fork) liefert `Ok(false)`.
+    pub fn verify_chain_against_anchor(&self, anchor: &AuditChainAnchor) -> Result<bool> {
+        if !self.verify_chain()? {
+            return Ok(false);
+        }
+
+        let idx = match usize::try_from(anchor.index) {
+            Ok(i) => i,
+            Err(_) => return Ok(false),
+        };
+
+        if let Some(entry) = self.entries.get(idx) {
+            Ok(entry.entry_hash == anchor.entry_hash)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Erzeugt einen Anker des aktuellen Kettenkopfs zusammen mit einer Ed25519-Kettenkopf-Signatur.
+    pub fn create_signed_anchor(
+        &self,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<(AuditChainAnchor, AuditChainHeadSignature)> {
+        let anchor = self.anchor().ok_or_else(|| {
+            CryptoError::Crypto("Cannot create anchor for an empty AuditChain".to_string())
+        })?;
+        let head_sig = self.sign_head(signing_key)?;
+        Ok((anchor, head_sig))
+    }
+
+    /// Verifiziert die Kette gegen einen Anker und prüft zusätzlich die Kettenkopf-Signatur.
+    pub fn verify_signed_anchor(
+        &self,
+        anchor: &AuditChainAnchor,
+        head_sig: &AuditChainHeadSignature,
+        verifying_key: &ed25519_dalek::VerifyingKey,
+    ) -> Result<bool> {
+        if !self.verify_chain_against_anchor(anchor)? {
+            return Ok(false);
+        }
+        Self::verify_head_signature(head_sig, verifying_key)
+    }
+
+    /// Verifiziert die Kette gegen einen externen Anker (head_hash, head_counter).
+    ///
+    /// Ein externer Anker mit größerem Zähler als die vorgelegte Kette deutet auf ein Rollback hin
+    /// und liefert ein `Err(CryptoError::Crypto(...))`.
+    /// Ebenso führen Lücken, Neuordnungen oder abweichende Hashes zu einem Fehler.
+    pub fn verify_against_anchor(&self, head_hash: &[u8; 32], head_counter: u64) -> Result<()> {
+        if !self.verify_chain()? {
+            return Err(CryptoError::Crypto(
+                "Audit chain integrity check failed: chain contains invalid entry, gap, or hash mismatch"
+                    .to_string(),
+            ));
+        }
+
+        if self.entries.is_empty() {
+            if head_counter == 0 && head_hash == &[0u8; 32] {
+                return Ok(());
+            }
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain rollback detected: chain is empty but external anchor specified head_counter {head_counter}"
+            )));
+        }
+
+        let last_index = self.entries.last().map(|e| e.index).unwrap_or(0);
+        if head_counter > last_index {
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain rollback detected: anchor counter {head_counter} is greater than chain head index {last_index}"
+            )));
+        }
+
+        let idx = usize::try_from(head_counter).map_err(|e| {
+            CryptoError::Crypto(format!("Invalid head_counter index overflow: {e}"))
+        })?;
+
+        let entry = self.entries.get(idx).ok_or_else(|| {
+            CryptoError::Crypto(format!(
+                "Audit chain entry at index {head_counter} is missing"
+            ))
+        })?;
+
+        if entry.entry_hash != *head_hash {
+            return Err(CryptoError::Crypto(format!(
+                "Audit chain anchor mismatch at index {head_counter}: expected head_hash {:?}, got {:?}",
+                head_hash, entry.entry_hash
+            )));
+        }
+
+        Ok(())
     }
 }

@@ -4,6 +4,8 @@
 // NICHT-OFFENSICHTLICH: Uses Birthday Paradox math calculation: p ~ 1 - exp(-n^2 / (2 * 2^64)) for 64-bit OsRng suffix.
 // STAND: TS:2026-08-30T19:35:00Z (SESSION: 20260830)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::CryptoKey;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};

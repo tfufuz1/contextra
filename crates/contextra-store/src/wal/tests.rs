@@ -1,5 +1,7 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 pub use super::*;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::crypto::KeyManager;
 

@@ -57,6 +57,9 @@ pub enum CryptoError {
 
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),
+
+    #[error("durability proof required: operation is not durable (MemoryOnly storage or missing fsync proof)")]
+    NotDurable,
 }
 
 impl CryptoError {

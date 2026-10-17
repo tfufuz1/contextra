@@ -4,6 +4,8 @@
 // NICHT-OFFENSICHTLICH: All expected ciphertext/hash values are independently taken from RFC standards, not auto-generated.
 // STAND: TS:2026-08-30T19:25:00Z (SESSION: 20260830)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use aes_gcm_siv::{
     aead::{Aead, KeyInit as AeadKeyInit},
     Aes256GcmSiv, Nonce,

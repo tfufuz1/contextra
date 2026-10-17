@@ -3,6 +3,8 @@
 // INVARIANTEN: Unique random nonces generated per encrypt_auto_nonce call even across identical KeyManager instances.
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::crypto::KeyManager;
 
 #[test]

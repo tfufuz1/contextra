@@ -20,6 +20,8 @@ pub mod tenant_scope;
 pub mod tombstone;
 pub mod types;
 
+pub use types::math;
+
 pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;

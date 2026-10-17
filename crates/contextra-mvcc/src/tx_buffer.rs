@@ -10,23 +10,21 @@
 //! order (index 0 to N-1), acquiring and releasing each shard lock one at a time via `try_write()`.
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z (SESSION: e459bd5f)
+// STAND: 2026-10-15T00:00:00Z
 // ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking.
 // INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention); Bounded ReadSet via try_register_read.
-// HOTSPOTS: 110-380
-// NICHT-OFFENSICHTLICH: Orphan Reaper & min_read_snapshot führen getrennte Locks pro Shard 0..N-1 durch; keinesfalls verschachtelt.
-// SIEHE AUCH: crates/contextra-mvcc/src/ssi.rs
-
-// INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
 use crate::error::{ContextraError, Result};
+use crate::lease::SnapshotLease;
+use crate::snapshot::SnapshotRegistry;
 use crate::ssi::ReadSet;
+use crate::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use crate::sync::Arc;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Single canonical constant for overhead calculation per staged entry (32 bytes).
 pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
@@ -35,22 +33,15 @@ pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 pub const DEFAULT_SHARD_COUNT: usize = 64;
 
 /// Recommended maximum operations per single transaction to guard against memory exhaustion DoS.
-// AI-TAG[SMELL][MINOR] RESOLVED: AGT-CORE-001 — Bounded staging capacity enforced (TS:2026-08-29T12:00:00Z) (SESSION: a3f29c1d)
 pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000;
 
 /// Default maximum number of read keys tracked per transaction's [`ReadSet`].
-///
-/// Prevents unbounded memory growth during large read scans (~100,000 keys * ~100B per key = ~10MB per active transaction).
 pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000;
 
 /// Default maximum staged bytes per transaction (16 MiB).
-///
-/// Bounds staging memory per individual transaction while enabling high-throughput bulk operations.
 pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024;
 
 /// Default maximum total staged bytes across all active transactions (256 MiB).
-///
-/// Guards the process memory budget against multi-transaction staging memory exhaustion.
 pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024;
 
 /// Configuration options for `TxBuffer`.
@@ -61,14 +52,10 @@ pub struct TxBufferConfig {
     /// Maximum recommended active transactions.
     pub max_active_tx: usize,
     /// Maximale Anzahl von Staging-Operationen pro Transaktion.
-    /// Verhindert OOM durch einzelne unbegrenzte Transaktionen.
-    /// Default: 10_000 (großzügig, aber bounded).
     pub max_ops_per_tx: usize,
     /// Maximale Byte-Kapazität von Staging-Einträgen pro einzelnen Transaktion.
-    /// Default: 16 MiB.
     pub max_tx_staged_bytes: usize,
     /// Maximale Gesamtkapazität von Staging-Einträgen über alle Transaktionen hinweg.
-    /// Default: 256 MiB.
     pub max_total_staged_bytes: usize,
 }
 
@@ -170,9 +157,10 @@ impl<T: Clone + StagedOpSize> IndexOp<T> {
 
 #[derive(Debug)]
 struct TxShard<T: Clone> {
-    ops: AHashMap<TxId, (Vec<IndexOp<T>>, Instant)>,
+    ops: AHashMap<TxId, (Vec<IndexOp<T>>, u64)>,
     read_sets: AHashMap<TxId, ReadSet>,
     staged_bytes: AHashMap<TxId, usize>,
+    leases: AHashMap<TxId, SnapshotLease>,
 }
 
 impl<T: Clone> TxShard<T> {
@@ -181,13 +169,13 @@ impl<T: Clone> TxShard<T> {
             ops: AHashMap::new(),
             read_sets: AHashMap::new(),
             staged_bytes: AHashMap::new(),
+            leases: AHashMap::new(),
         }
     }
 }
 
 #[derive(Debug)]
 struct KeyShard {
-    // Map: key -> Map<tx_id, is_insert>
     staged: AHashMap<Vec<u8>, AHashMap<TxId, bool>>,
 }
 
@@ -200,23 +188,16 @@ impl KeyShard {
 }
 
 /// Buffers index operations until commit or rollback.
-///
-/// Sharded into sub-buffers to reduce lock contention.
-///
-/// # INVARIANT
-/// Each shard is protected by an independent `parking_lot::RwLock`.
-/// Standard acquisition order: Read-lock for queries, Write-lock for mutations.
-/// To avoid deadlocks, cross-shard operations must never acquire more than
-/// one shard lock simultaneously. Operations that process all shards (like `reap_orphans()` or `min_read_snapshot()`)
-/// MUST iterate over shards sequentially in ascending index order (from shard 0 to N-1)
-/// and release each lock before acquiring the next.
 #[derive(Debug)]
 pub struct TxBuffer<T: Clone> {
     shards: Vec<RwLock<TxShard<T>>>,
     key_shards: Vec<RwLock<KeyShard>>,
     tx_timeout: Duration,
+    tx_timeout_ticks: u64,
     config: TxBufferConfig,
     global_staged_bytes: AtomicUsize,
+    snapshot_registry: Option<Arc<SnapshotRegistry>>,
+    last_applied: Option<Arc<AtomicU64>>,
 }
 
 impl<T: Clone> TxBuffer<T> {
@@ -226,9 +207,6 @@ impl<T: Clone> TxBuffer<T> {
     }
 
     /// Creates a new buffer with custom settings.
-    ///
-    /// If `shard_count` is 0, it defaults to 1 to prevent division-by-zero
-    /// in `shard_idx()` (§2 Zero-Panic-Gesetz).
     pub fn new_with_config(shard_count: usize, tx_timeout: Duration) -> Self {
         let config = TxBufferConfig {
             tx_timeout,
@@ -250,13 +228,40 @@ impl<T: Clone> TxBuffer<T> {
             shards.push(RwLock::new(TxShard::new()));
             key_shards.push(RwLock::new(KeyShard::new()));
         }
+        let tx_timeout_ticks =
+            u64::try_from(config.tx_timeout.as_nanos()).unwrap_or(u64::MAX);
         Self {
             shards,
             key_shards,
             tx_timeout: config.tx_timeout,
+            tx_timeout_ticks,
             config,
             global_staged_bytes: AtomicUsize::new(0),
+            snapshot_registry: None,
+            last_applied: None,
         }
+    }
+
+    /// Attaches a [`SnapshotRegistry`] to this `TxBuffer`.
+    pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
+        self.snapshot_registry = Some(registry);
+        self
+    }
+
+    /// Sets a [`SnapshotRegistry`] on this `TxBuffer`.
+    pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {
+        self.snapshot_registry = Some(registry);
+    }
+
+    /// Attaches `last_applied` atomic sequence tracker to this `TxBuffer`.
+    pub fn with_last_applied(mut self, last_applied: Arc<AtomicU64>) -> Self {
+        self.last_applied = Some(last_applied);
+        self
+    }
+
+    /// Sets `last_applied` atomic sequence tracker on this `TxBuffer`.
+    pub fn set_last_applied(&mut self, last_applied: Arc<AtomicU64>) {
+        self.last_applied = Some(last_applied);
     }
 
     /// Returns the current total staged bytes across all active transactions.
@@ -266,8 +271,10 @@ impl<T: Clone> TxBuffer<T> {
 
     #[inline]
     fn shard_idx(&self, tx: TxId) -> usize {
-        // SAFETY: Modulo-Cast u64→usize (sicher wegen %-Operator)
-        (tx.inner() % self.shards.len() as u64) as usize
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            (tx.inner() % self.shards.len() as u64) as usize
+        }
     }
 
     #[inline]
@@ -275,51 +282,94 @@ impl<T: Clone> TxBuffer<T> {
         use std::hash::Hasher;
         let mut hasher = ahash::AHasher::default();
         hasher.write(key);
-        (hasher.finish() % self.key_shards.len() as u64) as usize
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            (hasher.finish() % self.key_shards.len() as u64) as usize
+        }
     }
 
     /// Checks if the given transaction exists in the buffer.
     pub fn has_tx(&self, tx: TxId) -> bool {
-        // SAFETY: Slice-Indexing — sicher weil shard_idx = modulo len()
         let shard = &self.shards[self.shard_idx(tx)];
         shard.read().ops.contains_key(&tx)
     }
 
-    /// Registers a new transaction in the buffer at timestamp `at`.
-    pub fn begin_at(&self, tx: TxId, at: Instant) {
+    /// Registers a new transaction in the buffer at timestamp `at_ticks`, acquiring a `SnapshotLease` if registered.
+    pub fn begin_at(&self, tx: TxId, at_ticks: u64) {
+        let lease = self.snapshot_registry.as_ref().map(|reg| {
+            let la = self.last_applied.as_ref();
+            SnapshotRegistry::acquire_at(reg, || la.map_or(0, |a| a.load(Ordering::Acquire)), at_ticks)
+        });
+
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard
             .ops
             .entry(tx)
-            .or_insert_with(|| (Vec::with_capacity(16), at));
+            .or_insert_with(|| (Vec::with_capacity(16), at_ticks));
         shard.read_sets.entry(tx).or_default();
         shard.staged_bytes.entry(tx).or_insert(0);
+        if let Some(l) = lease {
+            shard.leases.insert(tx, l);
+        }
     }
 
     /// Registers a new transaction in the buffer.
     pub fn begin(&self, tx: TxId) {
-        self.begin_at(tx, Instant::now());
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+        self.begin_at(tx, now_ticks);
+    }
+
+    /// Registers a new transaction in the buffer with an explicit sequence number at timestamp `at_ticks`.
+    pub fn begin_with_seq_at(&self, tx: TxId, seq_no: u64, at_ticks: u64) {
+        let lease = self
+            .snapshot_registry
+            .as_ref()
+            .map(|reg| SnapshotRegistry::acquire_at(reg, || seq_no, at_ticks));
+
+        let shard_idx = self.shard_idx(tx);
+        let mut shard = self.shards[shard_idx].write();
+        shard
+            .ops
+            .entry(tx)
+            .or_insert_with(|| (Vec::with_capacity(16), at_ticks));
+        shard.read_sets.entry(tx).or_default();
+        shard.staged_bytes.entry(tx).or_insert(0);
+        if let Some(l) = lease {
+            shard.leases.insert(tx, l);
+        }
+    }
+
+    /// Registers a new transaction in the buffer with an explicit sequence number.
+    pub fn begin_with_seq(&self, tx: TxId, seq_no: u64) {
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+        self.begin_with_seq_at(tx, seq_no, now_ticks);
     }
 
     /// Registers a read key and its snapshot sequence number for transaction `tx`.
     pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let _ = self.try_register_read(tx, key, snapshot_seq, DEFAULT_MAX_READ_SET_KEYS);
+    }
+
+    /// Registers a range prefix read operation and its snapshot sequence number for transaction `tx`.
+    pub fn register_prefix_read(&self, tx: TxId, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard
             .read_sets
             .entry(tx)
             .or_default()
-            .record_read(key, snapshot_seq);
+            .record_prefix(prefix, snapshot_seq);
     }
 
     /// Registers a read key and its snapshot sequence number for transaction `tx`,
     /// enforcing a maximum key count limit `max_keys` on new key insertions.
-    ///
-    /// Updating an existing key's snapshot sequence is always allowed even if `max_keys` is reached.
-    ///
-    /// # Errors
-    /// Returns `Err(ContextraError::LimitExceeded)` if a new key is added and `read_set.len() >= max_keys`.
     pub fn try_register_read(
         &self,
         tx: TxId,
@@ -349,18 +399,6 @@ impl<T: Clone> TxBuffer<T> {
     }
 
     /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
-    ///
-    /// # Concurrency & Atomicity Note
-    /// Iterates through shards sequentially in ascending order (0 to N-1), acquiring and releasing a single shard read lock at a time.
-    /// The returned minimum snapshot sequence is NOT an atomic snapshot across all shards.
-    /// Callers determining a safe pruning watermark MUST compute:
-    /// `min(min_read_snapshot(), last_allocated_seq_before_call)`.
-    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` uses `min_read_snapshot()` combined with `SnapshotRegistry::min_active_seqno()` to
-    /// prevent pruning SSI write keys active transactions still depend on.
-    /// Locks each shard sequentially in ascending index order (0..N-1) without holding multiple shard locks simultaneously.
     pub fn min_read_snapshot(&self) -> Option<u64> {
         let mut overall_min: Option<u64> = None;
         for shard_lock in &self.shards {
@@ -423,7 +461,7 @@ impl<T: Clone> TxBuffer<T> {
         let entry = shard
             .ops
             .entry(tx)
-            .or_insert_with(|| (Vec::with_capacity(16), Instant::now()));
+            .or_insert_with(|| (Vec::with_capacity(16), 0));
 
         if entry.0.len() >= max_ops {
             return Err(ContextraError::Transaction(format!(
@@ -470,7 +508,7 @@ impl<T: Clone> TxBuffer<T> {
         let entry = shard
             .ops
             .entry(tx)
-            .or_insert_with(|| (Vec::new(), Instant::now()));
+            .or_insert_with(|| (Vec::new(), 0));
 
         if entry.0.len() + ops_vec.len() > max_ops {
             return Err(ContextraError::Transaction(format!(
@@ -505,14 +543,19 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
+    /// Validates that `tx` has pending operations before draining and returning them.
+    pub fn try_drain(&self, tx: TxId) -> Result<Vec<IndexOp<T>>> {
+        self.validate_pending_ops(tx)?;
+        Ok(self.drain(tx))
+    }
+
     /// Drains and returns all buffered operations for a transaction.
-    ///
-    /// Returns an empty vector if the transaction does not exist or has no operations.
-    /// This operation is atomic per shard and cleans up tracked [`ReadSet`] and byte budgets.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
+        let _ = self.validate_pending_ops(tx);
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        shard.leases.remove(&tx);
         let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
         if tx_bytes > 0 {
             self.global_staged_bytes
@@ -530,6 +573,7 @@ impl<T: Clone> TxBuffer<T> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        shard.leases.remove(&tx);
         let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
         if tx_bytes > 0 {
             self.global_staged_bytes
@@ -539,58 +583,42 @@ impl<T: Clone> TxBuffer<T> {
     }
 
     /// Returns the total number of pending transactions.
-    ///
-    /// WARNING: This iterates over all shards with individual read locks.
-    /// The result is NOT an atomic snapshot of the buffer's size.
-    /// Do not use this as a strict control metric for backpressure.
     pub fn len(&self) -> usize {
         self.shards.iter().map(|s| s.read().ops.len()).sum()
     }
 
     /// Returns true if all shards are empty.
-    ///
-    /// WARNING: Like `len()`, this is not an atomic operation across all shards.
     pub fn is_empty(&self) -> bool {
         self.shards.iter().all(|s| s.read().ops.is_empty())
     }
 
-    /// Cleans up expired transactions relative to timestamp `now`.
-    /// Reaps expired orphan transactions.
-    ///
-    /// # INVARIANT
-    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
-    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
-    pub fn reap_orphans_at(&self, now: Instant) -> Vec<TxId> {
-        self.reap_orphans_bounded_at(usize::MAX, now)
+    /// Cleans up expired transactions relative to timestamp `now_ticks`.
+    pub fn reap_orphans_at(&self, now_ticks: u64) -> Vec<TxId> {
+        self.reap_orphans_bounded_at(usize::MAX, now_ticks)
     }
 
     /// Cleans up expired transactions.
-    /// Reaps expired orphan transactions.
-    ///
-    /// # INVARIANT
-    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
-    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
     pub fn reap_orphans(&self) -> Vec<TxId> {
-        self.reap_orphans_at(Instant::now())
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+        self.reap_orphans_at(now_ticks)
     }
 
-    /// Reaps up to `max` expired orphan transactions across shards relative to timestamp `now`.
-    ///
-    /// # INVARIANT
-    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
-    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
-    pub fn reap_orphans_bounded_at(&self, max: usize, now: Instant) -> Vec<TxId> {
+    /// Reaps up to `max` expired orphan transactions across shards relative to timestamp `now_ticks`.
+    pub fn reap_orphans_bounded_at(&self, max: usize, now_ticks: u64) -> Vec<TxId> {
         let mut expired = Vec::new();
         for shard_lock in &self.shards {
             if expired.len() >= max {
                 break;
             }
             if let Some(mut shard) = shard_lock.try_write() {
-                let tx_timeout = self.tx_timeout;
+                let tx_timeout_ticks = self.tx_timeout_ticks;
                 let mut shard_expired = Vec::new();
                 shard.ops.retain(|tx, (_, created)| {
                     if expired.len() + shard_expired.len() < max
-                        && now.saturating_duration_since(*created) > tx_timeout
+                        && now_ticks.saturating_sub(*created) > tx_timeout_ticks
                     {
                         shard_expired.push(*tx);
                         false
@@ -600,6 +628,7 @@ impl<T: Clone> TxBuffer<T> {
                 });
                 for tx in &shard_expired {
                     shard.read_sets.remove(tx);
+                    shard.leases.remove(tx);
                     let tx_bytes = shard.staged_bytes.remove(tx).unwrap_or(0);
                     if tx_bytes > 0 {
                         self.global_staged_bytes
@@ -614,16 +643,17 @@ impl<T: Clone> TxBuffer<T> {
     }
 
     /// Reaps up to `max` expired orphan transactions across shards.
-    ///
-    /// # INVARIANT
-    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
-    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
     pub fn reap_orphans_bounded(&self, max: usize) -> Vec<TxId> {
-        self.reap_orphans_bounded_at(max, Instant::now())
+        let now_ticks = self
+            .snapshot_registry
+            .as_ref()
+            .map_or(0, |reg| reg.now_ticks());
+        self.reap_orphans_bounded_at(max, now_ticks)
     }
 
     /// Returns a clone of the pending operations for a transaction.
     pub fn get_ops(&self, tx: TxId) -> Option<Vec<IndexOp<T>>> {
+        let _ = self.validate_pending_ops(tx);
         let shard_idx = self.shard_idx(tx);
         let shard = self.shards[shard_idx].read();
         shard.ops.get(&tx).map(|(ops, _)| ops.clone())
@@ -666,6 +696,31 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         }
     }
 
+    /// Stages a key-value insert operation for transaction `tx` if the key is not already staged
+    /// for insert within the same transaction scope (`INV-TOCTOU-PUT-IF-ABSENT`).
+    pub fn stage_kv_if_absent(
+        &self,
+        tx: TxId,
+        doc_id: DocId,
+        key: Vec<u8>,
+        val: Vec<u8>,
+    ) -> Result<()> {
+        if self.is_key_staged_for_tx(tx, &key) {
+            return Err(ContextraError::Transaction(format!(
+                "Key '{:?}' is already staged in transaction {}",
+                String::from_utf8_lossy(&key),
+                tx
+            )));
+        }
+        self.stage_kv(
+            tx,
+            IndexOp::Insert {
+                doc_id,
+                data: (key, val),
+            },
+        )
+    }
+
     /// Stages a key-value operation and updates atomic key staging map.
     pub fn stage_kv(&self, tx: TxId, op: IndexOp<(Vec<u8>, Vec<u8>)>) -> Result<()> {
         let (key, is_insert) = match &op {
@@ -679,7 +734,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         self.track_key_stage(tx, key, is_insert);
         let key_vec = key.to_vec();
         if let Err(e) = self.stage(tx, op) {
-            // Roll back key tracking if staging fails capacity check
             let idx = self.key_shard_idx(&key_vec);
             let mut shard = self.key_shards[idx].write();
             if let std::collections::hash_map::Entry::Occupied(mut entry) =
@@ -695,10 +749,14 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         Ok(())
     }
 
+    /// Validates that `tx` has pending operations before draining key-value operations.
+    #[allow(clippy::type_complexity)]
+    pub fn try_drain_kv(&self, tx: TxId) -> Result<Vec<IndexOp<(Vec<u8>, Vec<u8>)>>> {
+        self.validate_pending_ops(tx)?;
+        Ok(self.drain_kv(tx))
+    }
+
     /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// Draining atomizes staging removal and clears the transaction's `ReadSet` and staging byte footprint.
     pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
         let ops = self.drain(tx);
         if !ops.is_empty() {
@@ -716,10 +774,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     }
 
     /// Checks if `key` is staged for insertion in the specified transaction `tx_id`.
-    ///
-    /// This method is atomic because all operations for a given `tx_id` land in the same shard
-    /// (since `shard_idx` is a pure function of `tx.inner()`), requiring only a single shard read-lock acquisition.
-    /// Use this for Read-Your-Writes isolation decisions within a specific transaction scope.
     pub fn is_key_staged_for_tx(&self, tx_id: TxId, key: &[u8]) -> bool {
         let shard_idx = self.shard_idx(tx_id);
         let shard = self.shards[shard_idx].read();
@@ -736,8 +790,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     }
 
     /// Atomisch ermittelt den Staging-Status eines Keys über alle uncommitted Transaktionen.
-    ///
-    /// Gibt `Some(true)` für Insert, `Some(false)` für Delete, oder `None` zurück.
     pub fn staged_status(&self, key: &[u8]) -> Option<bool> {
         let idx = self.key_shard_idx(key);
         let shard = self.key_shards[idx].read();
@@ -745,6 +797,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
             let mut max_tx: Option<TxId> = None;
             let mut status: Option<bool> = None;
             for (&tx_id, &is_insert) in map {
+                if is_insert && !self.is_key_staged_for_tx(tx_id, key) {
+                    continue;
+                }
                 match max_tx {
                     None => {
                         max_tx = Some(tx_id);
@@ -773,8 +828,8 @@ impl<T: Clone> Default for TxBuffer<T> {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use crate::sync::Arc;
     use proptest::{prop_assert, prop_assert_eq};
-    use std::sync::Arc;
 
     #[test]
     fn test_tx_buffer_read_set_tracking() {
@@ -788,14 +843,28 @@ mod tests {
         buffer.register_read(tx, b"key_a".to_vec(), 100);
         buffer.record_read(tx, b"key_b".to_vec(), 105);
 
-        let rs = buffer.read_set(tx).expect("read set present"); // #[cfg(test)]
+        let rs = buffer.read_set(tx).expect("read set present");
         assert_eq!(rs.len(), 2);
         assert_eq!(rs.get(b"key_a"), Some(100));
         assert_eq!(rs.get(b"key_b"), Some(105));
 
-        // Drain cleans up read_set
         buffer.drain(tx);
         assert!(buffer.get_read_set(tx).is_none());
+    }
+
+    #[test]
+    fn test_tx_buffer_prefix_read_set_tracking() {
+        let buffer = TxBuffer::<String>::new();
+        let tx = TxId::new(10);
+        buffer.begin(tx);
+
+        buffer.register_prefix_read(tx, b"user:".to_vec(), 100);
+
+        let rs = buffer.read_set(tx).expect("read set present");
+        assert_eq!(rs.len(), 1);
+        let prefixes: Vec<_> = rs.prefixes_iter().collect();
+        assert_eq!(prefixes.len(), 1);
+        assert_eq!(prefixes[0], (&b"user:".to_vec(), &100));
     }
 
     #[test]
@@ -807,18 +876,16 @@ mod tests {
         let buffer = TxBuffer::<String>::new_with_config_ext(64, Duration::from_secs(5), config);
         let tx = TxId::new(1);
         buffer.begin(tx);
-        // 3 operations succeed
         for i in 0..3 {
             let res = buffer.stage_bounded(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::from(i as u64),
+                    doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                     data: format!("data_{i}"),
                 },
             );
             assert!(res.is_ok());
         }
-        // 4th operation must fail
         let result = buffer.stage_bounded(
             tx,
             IndexOp::Insert {
@@ -838,7 +905,7 @@ mod tests {
             let res = buffer.stage(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::from(i as u64),
+                    doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                     data: format!("data_{i}"),
                 },
             );
@@ -903,13 +970,13 @@ mod tests {
     fn test_tx_buffer_reap_orphans_bounded_capping() {
         let buffer = TxBuffer::<String>::new_with_config(1, Duration::from_millis(5));
 
-        buffer.begin(TxId::new(1));
-        buffer.begin(TxId::new(2));
-        buffer.begin(TxId::new(3));
+        let t_start = 100_000_000u64; // 100ms in nanos
+        buffer.begin_at(TxId::new(1), t_start);
+        buffer.begin_at(TxId::new(2), t_start);
+        buffer.begin_at(TxId::new(3), t_start);
 
-        std::thread::sleep(Duration::from_millis(20));
-
-        let reaped = buffer.reap_orphans_bounded(2);
+        let now_ticks = t_start + 20_000_000; // 20ms later (> 5ms timeout)
+        let reaped = buffer.reap_orphans_bounded_at(2, now_ticks);
         assert_eq!(reaped.len(), 2);
         assert_eq!(buffer.len(), 1);
     }
@@ -958,8 +1025,7 @@ mod tests {
         }
 
         for h in handles {
-            // INTENT: intentional expect in tests
-            h.join().expect("task panicked"); // #[cfg(test)] // expect
+            h.join().expect("task panicked");
         }
 
         assert_eq!(buffer.len(), num_tx);
@@ -975,12 +1041,11 @@ mod tests {
     fn test_tx_buffer_reap_orphans() {
         let buffer = TxBuffer::<String>::new_with_config(1, Duration::from_millis(10));
         let tx = TxId::new(1);
-        buffer.begin(tx);
+        let t_start = 100_000_000u64;
+        buffer.begin_at(tx, t_start);
 
-        // Wait for timeout
-        std::thread::sleep(Duration::from_millis(20));
-
-        let expired = buffer.reap_orphans();
+        let now_ticks = t_start + 20_000_000;
+        let expired = buffer.reap_orphans_at(now_ticks);
         assert_eq!(expired, vec![tx]);
         assert!(buffer.is_empty());
     }
@@ -989,14 +1054,11 @@ mod tests {
     fn test_tx_buffer_reap_orphans_deterministic_time_injection() {
         let buffer = TxBuffer::<String>::new_with_config(1, Duration::from_secs(10));
         let tx = TxId::new(100);
-        let now = Instant::now();
-        let past = now.checked_sub(Duration::from_secs(15)).unwrap_or(now);
+        let t_start = 1_000_000_000u64;
+        buffer.begin_at(tx, t_start);
 
-        // Begin transaction at 15 seconds in the past
-        buffer.begin_at(tx, past);
-
-        // Reaping at `now` (elapsed 15s > timeout 10s) must reap the orphan without real-time delay
-        let expired = buffer.reap_orphans_at(now);
+        let now_ticks = t_start + 15_000_000_000; // 15s later
+        let expired = buffer.reap_orphans_at(now_ticks);
         assert_eq!(expired, vec![tx]);
         assert!(buffer.is_empty());
     }
@@ -1009,33 +1071,30 @@ mod tests {
 
         for i in 0..num_tasks {
             let buffer = buffer.clone();
-            let tx = TxId::new(i as u64 + 100);
+            let tx = TxId::new(u64::try_from(i).unwrap_or(0) + 100);
             handles.push(tokio::spawn(async move {
                 buffer.begin(tx);
                 let _ = buffer.stage(
                     tx,
                     IndexOp::Insert {
-                        doc_id: DocId::from(i as u64),
+                        doc_id: DocId::from(u64::try_from(i).unwrap_or(0)),
                         data: format!("data_{i}"),
                     },
                 );
-                // Return tx ID for caller verification
                 tx
             }));
         }
 
         let mut txs = Vec::new();
         for h in handles {
-            let tx = h.await.expect("task failed"); // #[cfg(test)]
+            let tx = h.await.expect("task failed");
             txs.push(tx);
         }
 
-        // Verify has_tx returns true for all concurrently active transactions
         for &tx in &txs {
             assert!(buffer.has_tx(tx));
         }
 
-        // Commit / drain all transactions and verify has_tx returns false
         for &tx in &txs {
             buffer.drain(tx);
             assert!(!buffer.has_tx(tx));
@@ -1049,14 +1108,11 @@ mod tests {
         let buffer = TxBuffer::<String>::new();
         let tx = TxId::new(1);
 
-        // No tx yet
         assert!(buffer.validate_pending_ops(tx).is_ok());
 
-        // Registered but empty
         buffer.begin(tx);
         assert!(buffer.validate_pending_ops(tx).is_err());
 
-        // With ops
         let _ = buffer.stage(
             tx,
             IndexOp::Insert {
@@ -1087,11 +1143,9 @@ mod tests {
                     data: (key_a.clone(), val_a.clone()),
                 },
             )
-            .expect("stage tx1"); // #[cfg(test)]
+            .expect("stage tx1");
 
-        // tx1 has key_a staged
         assert!(buffer.is_key_staged_for_tx(tx1, &key_a));
-        // tx2 does NOT have key_a staged in its transaction scope
         assert!(!buffer.is_key_staged_for_tx(tx2, &key_a));
     }
 
@@ -1115,7 +1169,6 @@ mod tests {
         let timeout = Duration::from_secs(100);
         let buffer = TxBuffer::<u8>::new_with_config(4, timeout);
         assert_eq!(buffer.tx_timeout(), timeout);
-        // Ensure we can use all shards
         for i in 0..10 {
             buffer.begin(TxId::new(i));
         }
@@ -1123,7 +1176,6 @@ mod tests {
 
     #[test]
     fn test_tx_buffer_zero_shards_defaults_to_one() {
-        // FIND-COR-001: shard_count=0 must not panic (§2 Zero-Panic)
         let buffer = TxBuffer::<u8>::new_with_config(0, Duration::from_secs(1));
         let tx = TxId::new(42);
         buffer.begin(tx);
@@ -1147,16 +1199,14 @@ mod tests {
         ) {
             let buffer = TxBuffer::<u64>::new_with_config(shard_count, Duration::from_secs(60));
 
-            // 1. Stage values for all unique TXs
             for &id in &tx_ids {
                 let tx = TxId::new(id);
                 let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(id), data: id });
             }
 
-            // 2. Verify each TX only has its own data
             for &id in &tx_ids {
                 let tx = TxId::new(id);
-                let ops = buffer.get_ops(tx).unwrap(); // #[cfg(test)]
+                let ops = buffer.get_ops(tx).unwrap();
                 for op in ops {
                     match op {
                         IndexOp::Insert { doc_id, data } => {
@@ -1168,7 +1218,6 @@ mod tests {
                 }
             }
 
-            // 3. Drain and verify emptiness
             for &id in &tx_ids {
                 let tx = TxId::new(id);
                 buffer.drain(tx);
@@ -1183,14 +1232,13 @@ mod tests {
         ) {
             let buffer = TxBuffer::<u8>::new_with_config(16, Duration::from_millis(timeout_ms));
 
+            let t_start = 100_000_000u64;
             for i in 0..tx_count {
-                buffer.begin(TxId::new(i as u64));
+                buffer.begin_at(TxId::new(i as u64), t_start);
             }
 
-            // Wait double the timeout
-            std::thread::sleep(Duration::from_millis(timeout_ms * 2));
-
-            let reaped = buffer.reap_orphans();
+            let now_ticks = t_start + timeout_ms * 2 * 1_000_000;
+            let reaped = buffer.reap_orphans_at(now_ticks);
             prop_assert_eq!(reaped.len(), tx_count);
             prop_assert!(buffer.is_empty());
         }
@@ -1204,12 +1252,10 @@ mod tests {
             let buffer = TxBuffer::<u64>::new();
             let tx = TxId::new(tx_id_raw);
 
-            // 1. Stage first batch
             for &val in &first_ops {
                 let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(val), data: val });
             }
 
-            // 2. Drain and verify matching first batch
             let drained1 = buffer.drain(tx);
             prop_assert_eq!(drained1.len(), first_ops.len());
             for (idx, op) in drained1.into_iter().enumerate() {
@@ -1222,16 +1268,13 @@ mod tests {
                 }
             }
 
-            // 3. Verify buffer is clean for this tx
             prop_assert!(buffer.get_ops(tx).is_none());
             prop_assert!(!buffer.has_tx(tx));
 
-            // 4. Stage second batch
             for &val in &second_ops {
                 let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(val), data: val });
             }
 
-            // 5. Drain and verify matching second batch exactly (no ghost leakage)
             let drained2 = buffer.drain(tx);
             prop_assert_eq!(drained2.len(), second_ops.len());
             for (idx, op) in drained2.into_iter().enumerate() {
@@ -1253,12 +1296,11 @@ mod tests {
         ) {
             let buffer = TxBuffer::<u64>::new();
 
-            // Setup unique tx ids and stage one op each
             let mut unique_txs = tx_ids;
             unique_txs.sort_unstable();
             unique_txs.dedup();
             if unique_txs.len() < 2 {
-                return Ok(()); // Skip trivial cases
+                return Ok(());
             }
 
             for &id in &unique_txs {
@@ -1266,19 +1308,16 @@ mod tests {
                 let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(id), data: id });
             }
 
-            // Determine which to discard
             let mut to_discard = std::collections::HashSet::new();
             for seed in discard_indices {
                 let idx = seed % unique_txs.len();
                 to_discard.insert(unique_txs[idx]);
             }
 
-            // Discard selected
             for &id in &to_discard {
                 buffer.discard(TxId::new(id));
             }
 
-            // Verify isolated status: discarded are gone, others remain intact
             for &id in &unique_txs {
                 let tx = TxId::new(id);
                 if to_discard.contains(&id) {
@@ -1286,7 +1325,7 @@ mod tests {
                     prop_assert!(buffer.get_ops(tx).is_none());
                 } else {
                     prop_assert!(buffer.has_tx(tx));
-                    let ops = buffer.get_ops(tx).unwrap(); // #[cfg(test)]
+                    let ops = buffer.get_ops(tx).unwrap();
                     prop_assert_eq!(ops.len(), 1);
                     match &ops[0] {
                         IndexOp::Insert { doc_id, data } => {

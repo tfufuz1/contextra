@@ -1,6 +1,6 @@
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
@@ -58,7 +58,7 @@ pub enum LegacyKeyStatus {
 impl LegacyKeyStatus {
     /// Returns `true` if the status is [`LegacyKeyStatus::LegacyActive`].
     pub const fn is_legacy(self) -> bool {
-        matches!(self, Self::LegacyActive)
+        !self.is_standard()
     }
 
     /// Returns `true` if the status is [`LegacyKeyStatus::Standard`].
@@ -68,6 +68,9 @@ impl LegacyKeyStatus {
 }
 
 /// Internal const helper for deobfuscating the legacy static integrity key bytes.
+///
+/// Only available when the `legacy-wal-key` Cargo feature is enabled because it
+/// references the obfuscated key constants that are likewise feature-gated.
 #[cfg(feature = "legacy-wal-key")]
 pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     let mut out = [0u8; 32];
@@ -79,6 +82,16 @@ pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     out
 }
 
+/// Stub used when `legacy-wal-key` is disabled: returns an all-zero sentinel.
+///
+/// This variant exists solely so that `legacy_integrity_key_for_test` compiles in all
+/// configurations (the test helper is `#[doc(hidden)]` and used only in unit tests that
+/// themselves require the feature).
+#[cfg(not(feature = "legacy-wal-key"))]
+pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
+    [0u8; 32]
+}
+
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
 #[cfg(feature = "legacy-wal-key")]
 pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
@@ -87,6 +100,7 @@ pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
 }
 
 #[cfg(not(feature = "legacy-wal-key"))]
+#[allow(dead_code)]
 pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
     Err(ContextraError::Storage(
         "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()
@@ -170,8 +184,25 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
+    /// Returns the legacy integrity key status for this WAL segment.
+    pub fn legacy_key_status(&self) -> LegacyKeyStatus {
+        if self
+            .legacy_key_used
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            LegacyKeyStatus::LegacyActive
+        } else {
+            LegacyKeyStatus::Standard
+        }
+    }
+
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
+        if self.legacy_key_status().is_standard() {
+            tracing::trace!("Using standard WAL integrity key");
+        } else {
+            tracing::trace!("Using legacy WAL integrity key");
+        }
         if let Some(km) = &self.key_manager {
             km.integrity_key().map_err(Into::into)
         } else if let Some(key) = self.fallback_integrity_key {
@@ -188,10 +219,10 @@ impl Wal {
         self.get_integrity_key()
     }
 
+    /// Returns the static legacy HMAC integrity key for testing.
     #[doc(hidden)]
-    #[allow(clippy::expect_used)]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        legacy_integrity_key().expect("Legacy WAL key support is disabled at compile time.")
+        deobfuscate_legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
@@ -237,16 +268,19 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
+            use contextra_ports::Rng;
             use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
             let mut key = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut key);
+            // CSPRNG EXCEPTION (P28): Secret key/salt generation requires cryptographically secure OS entropy via OsRng.
+            rand::rngs::OsRng.fill_bytes(&mut key);
 
+            let rng = contextra_ports::SystemRng::default();
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rng.next_u64()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -311,7 +345,18 @@ impl Wal {
 
     pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {
         let marker = Self::migration_marker_path(wal_path);
-        super::fs::try_exists(&marker).await.unwrap_or(false)
+        if let Ok(bytes) = super::fs::read(&marker).await {
+            if bytes.is_empty() {
+                return false;
+            }
+            if let Ok(content) = std::str::from_utf8(&bytes) {
+                content.starts_with("rekeyed=v3:")
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 
     pub(crate) fn calculate_retirement_marker_hash(wal_path: &Path, new_key: &[u8; 32]) -> String {
@@ -352,9 +397,10 @@ impl Wal {
             parent
         };
 
-        use rand::RngCore;
+        use contextra_ports::Rng;
         use tokio::io::AsyncWriteExt;
 
+        let rng = contextra_ports::SystemRng::default();
         let tmp_path = parent_dir.join(format!(
             "{}.tmp.{}.{}",
             marker_path
@@ -362,7 +408,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            rand::thread_rng().next_u64()
+            rng.next_u64()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -437,12 +483,13 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use rand::RngCore;
+            use contextra_ports::Rng;
             use tokio::io::AsyncWriteExt;
 
             let uuid = uuid::Uuid::new_v4();
             let bytes = *uuid.as_bytes();
 
+            let rng = contextra_ports::SystemRng::default();
             let uuid_filename = uuid_path
                 .file_name()
                 .map(|s| s.to_string_lossy())
@@ -451,7 +498,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rng.next_u64()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));
@@ -506,5 +553,97 @@ impl Wal {
                 Err(_) => read_uuid_file(&uuid_path).await,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_types::TxId;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_downgrade_attack_manipulated_file_rejected_without_explicit_migration() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("manipulated_legacy.wal");
+
+        let legacy_key = Wal::legacy_integrity_key_for_test();
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"malicious_key".to_vec(),
+            value: b"malicious_val".to_vec(),
+        };
+        let entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry creation");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&entry.to_bytes().expect("entry bytes"));
+        tokio::fs::write(&wal_path, &bytes)
+            .await
+            .expect("write manipulated wal");
+
+        let open_res = Wal::open(&wal_path).await;
+        assert!(
+            open_res.is_err(),
+            "Standard Wal::open must reject manipulated file with legacy markings without explicit migration opt-in"
+        );
+        let err_msg = open_res.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("disallowed by configuration")
+                || err_msg.contains("Explicit migration"),
+            "Unexpected error message: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_downgrade_attack_manipulated_file_with_rekeyed_marker_rejected() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("rekeyed_manipulated.wal");
+
+        let legacy_key = Wal::legacy_integrity_key_for_test();
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"forged_key".to_vec(),
+            value: b"forged_val".to_vec(),
+        };
+        let entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry creation");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&entry.to_bytes().expect("entry bytes"));
+        tokio::fs::write(&wal_path, &bytes)
+            .await
+            .expect("write wal");
+
+        Wal::write_migration_marker_atomically(&wal_path)
+            .await
+            .expect("write retirement marker");
+
+        let mig_res = Wal::open_for_legacy_migration(&wal_path, None).await;
+        assert!(
+            mig_res.is_err(),
+            "open_for_legacy_migration must fail closed when a .rekeyed marker exists and payload uses legacy key"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_has_migration_marker_validates_header_content() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("test_marker.wal");
+        let marker_path = Wal::migration_marker_path(&wal_path);
+
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        tokio::fs::write(&marker_path, b"")
+            .await
+            .expect("write empty");
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        tokio::fs::write(&marker_path, b"invalid_marker_data")
+            .await
+            .expect("write invalid");
+        assert!(!Wal::has_migration_marker(&wal_path).await);
+
+        Wal::write_migration_marker_atomically(&wal_path)
+            .await
+            .expect("write valid marker");
+        assert!(Wal::has_migration_marker(&wal_path).await);
     }
 }

@@ -1,0 +1,7 @@
+{
+  "origin": "python-selfsigned",
+  "result": "INVALID",
+  "exit_code": 1,
+  "category": "INVALID",
+  "reason": "Ed25519 signature verification failed or proof payload tampered"
+}

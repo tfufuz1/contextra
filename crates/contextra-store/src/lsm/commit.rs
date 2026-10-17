@@ -1,7 +1,7 @@
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_core::{TxId, TOMBSTONE_BIT};
+use contextra_types::{TOMBSTONE_BIT, TxId};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 
 impl LsmStorage {
@@ -12,7 +12,7 @@ impl LsmStorage {
         tx_id: TxId,
         origin: WriteOrigin,
         durable: bool,
-    ) {
+    ) -> Result<()> {
         let seq_no = entries.last().map(|e| e.seq_no).unwrap_or(0);
         let ctx = CommitContext {
             tx_id,
@@ -20,7 +20,7 @@ impl LsmStorage {
             durable,
         };
         self.observer_registry
-            .notify_with_context(entries, seq_no, ctx);
+            .notify_with_context(entries, seq_no, ctx)
     }
 
     /// Clears intent locks matching a predicate, gracefully recovering from poisoned locks.
@@ -49,8 +49,18 @@ impl LsmStorage {
         self.cleanup_intent_locks_where(|t| tx_ids.contains(&t));
     }
 
-    /// Suspends execution briefly if memory usage exceeds 80% to apply backpressure.
+    /// Suspends execution briefly if system pressure is elevated/critical or memory usage exceeds 80% to apply backpressure.
     pub(super) async fn apply_backpressure(&self) {
+        let level = self.pressure_rx.borrow().pressure_level;
+        match level {
+            crate::system_pressure::PressureLevel::Normal => {}
+            crate::system_pressure::PressureLevel::Elevated => {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            crate::system_pressure::PressureLevel::Critical => {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        }
         if self.budget.memory_used()
             >= (self.config.max_ram_mb as f64 * 1024.0 * 1024.0 * 0.80) as u64
         {
@@ -118,6 +128,12 @@ impl LsmStorage {
                         .budget_tracking_drift_bytes
                         .load(std::sync::atomic::Ordering::Relaxed),
                     "Memory budget tracking warning during commit: {e}"
+                );
+            } else {
+                tracing::debug!(
+                    delta_bytes = entry_size as u64,
+                    total_used_bytes = self.budget.memory_used(),
+                    "Memory budget consumed during commit"
                 );
             }
             memtable.put(

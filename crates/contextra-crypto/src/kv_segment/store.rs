@@ -167,7 +167,8 @@ impl TenantIsolatedKvStore {
     /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
     #[inline]
     fn shard_idx(&self, tenant: TenantId) -> usize {
-        (tenant.inner() as usize) & (self.shard_count - 1)
+        let mask = (self.shard_count.saturating_sub(1)) as u64;
+        usize::try_from(tenant.inner() & mask).unwrap_or(0)
     }
 
     /// Fügt ein Segment für einen bestimmten Tenant ein.
@@ -515,6 +516,13 @@ impl Default for TenantIsolatedKvStore {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};

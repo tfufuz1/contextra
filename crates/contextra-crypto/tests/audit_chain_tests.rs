@@ -3,11 +3,12 @@
 // INVARIANTEN: Tampering with any entry breaks chain verification. Shredded salt renders commitments indistinguishable under dictionary attacks. INV-DELETION-1 strictly enforced.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,
-    DeletionProofKeyPair, DeletionScope, EncryptedCommitmentSalt, ExcludedScope, KeyManager,
-    KeyRegistry, LayerCleanupProof,
+    DeletionProofKeyPair, DeletionScope, DurabilityProof, EncryptedCommitmentSalt, ExcludedScope,
+    KeyManager, KeyRegistry, LayerCleanupProof,
 };
 use contextra_types::{DocId, TenantId, TxId};
 
@@ -132,7 +133,7 @@ fn test_commitment_shredding_and_dictionary_attack_resilience() {
     );
 
     // 3. Shred the salt key in registry
-    assert!(registry.revoke_subkey(group_id));
+    assert!(registry.revoke_subkey(group_id).unwrap());
 
     // Decryption of salt now fails because sub-key is destroyed
     assert!(enc_salt.decrypt(&registry).is_err());
@@ -190,6 +191,7 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
     ];
 
+    let durability = DurabilityProof::new(100);
     let proof = DeletionProof::create_v3_with_audit_position(
         scope,
         vec![b"doc_500_key".to_vec()],
@@ -199,6 +201,7 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
         Some(audit_pos),
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();

@@ -6,9 +6,10 @@ use super::bloom::BloomFilter;
 use super::builder::SstableMetadata;
 use super::io::pread_exact;
 use super::stream::SstableStream;
+use crate::format::{check_openable, FileKind, FormatHeader};
 use crate::wal::KeyManager;
 use bytes::Bytes;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -352,12 +353,20 @@ impl SstableReader {
             }
         }
 
-        // Unknown format version error check (supports versions up to v4)
-        if is_mfsx && format_version > 4 {
-            return Err(ContextraError::Storage(format!(
-                "Unsupported SSTable format version: {}",
-                format_version
-            )));
+        if is_mfsx {
+            let header = FormatHeader::new(*b"MFSX", format_version);
+            check_openable(FileKind::Sstable, &header, 4)?;
+
+            if let Some(parent) = path_buf.parent() {
+                let manifest_path = parent.join("MANIFEST");
+                if manifest_path.exists() {
+                    if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
+                        let tracker =
+                            crate::manifest::ManifestFormatTracker::from_entries(&entries);
+                        tracker.verify_file_version(FileKind::Sstable, format_version)?;
+                    }
+                }
+            }
         }
 
         let mut has_bloom = false;
@@ -780,7 +789,7 @@ impl SstableReader {
             start_idx -= 1;
         }
 
-        let max_seq_raw = max_seq & !contextra_core::TOMBSTONE_BIT;
+        let max_seq_raw = max_seq & !contextra_types::TOMBSTONE_BIT;
         let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
@@ -799,6 +808,10 @@ impl SstableReader {
             let may_contain = may_contain_key_in_block_bloom(bloom_bytes, key, self.format_version);
 
             if may_contain {
+                // TODO(Implementer): [P02 / F-02 / HIGH / JULES-P02-02]
+                // Sicherstellen, dass ab `first_entry_idx` die Blockeinträge für denselben Key in strikt
+                // absteigender Sequenzreihenfolge (`raw_seq`) evaluiert werden. Bei mehreren Versionen
+                // darf niemals eine ältere Version zurückgegeben werden, wenn eine neuere sichtbare Version existiert.
                 if let Some(first_entry_idx) = binary_search_first_index_in_block(
                     &block_data,
                     offsets_start,
@@ -877,9 +890,9 @@ impl SstableReader {
                             ));
                         }
 
-                        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
+                        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
                         if raw_seq <= max_seq_raw
-                            && (tx_id <= max_tx || tx_id >= contextra_core::TxId::INTERNAL_BASE)
+                            && (tx_id <= max_tx || tx_id >= contextra_types::TxId::INTERNAL_BASE)
                         {
                             let entry_val = block_data.slice(ep_val..end_val);
                             return Ok(Some((entry_val, seq_no, tx_id)));
