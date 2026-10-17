@@ -53,6 +53,7 @@ pub async fn recover_pending_intents<S: StorageEngine>(
     for (intent_key, value) in orphaned_keys {
         let intent: CommitIntent = match serde_json::from_slice(&value) {
             Ok(i) => i,
+            // SAFE-SKIP: Corrupted or unparseable transaction intent payload cannot be reconciled and is ignored during recovery
             Err(_) => continue,
         };
 

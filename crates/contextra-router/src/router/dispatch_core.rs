@@ -210,8 +210,10 @@ impl RouterEngine {
                             .iter_mut()
                             .find(|p| p.name == selected_profile.name)
                         {
-                            if let Some(ref mut bstate) = profile_state.bandit_state {
-                                bstate.on_drift_detected(k_drift);
+                            if let Some(ref bstate_arc) = profile_state.bandit_state {
+                                let mut bstate_cloned = (**bstate_arc).clone();
+                                bstate_cloned.on_drift_detected(k_drift);
+                                profile_state.bandit_state = Some(Arc::new(bstate_cloned));
                             }
                         }
                     }
