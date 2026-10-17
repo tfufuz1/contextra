@@ -144,8 +144,7 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     let bytes =
         serde_json::to_vec(&meta).map_err(|e| ContextraError::Serialization(e.to_string()))?;
     let key = format!("{namespace}:checkpoint:__sys_tx_counter__");
-    #[allow(deprecated)]
-    let tx = TxId::new(TxId::INTERNAL_BASE + hwm);
+    let tx = TxId::try_from_internal_offset(hwm)?;
     storage.put(tx, key.as_bytes(), &bytes).await?;
     storage.commit(tx).await?;
     storage.flush().await?;
@@ -328,48 +327,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let ns_clone = ns.clone();
         let orphan_reg_clone = orphan_registry.clone();
 
-        let res = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
-                tokio::task::block_in_place(|| {
-                    handle.block_on(Self::open_with_orphan_registry(
-                        storage_clone,
-                        ns_clone,
-                        orphan_reg_clone,
-                    ))
-                })
-            } else {
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                    rt.block_on(Self::open_with_orphan_registry(
-                        storage_clone,
-                        ns_clone,
-                        orphan_reg_clone,
-                    ))
-                })
-                .join()
-                .map_err(|_| {
-                    ContextraError::Internal(
-                        "Thread panic during PersistentCheckpointStore initialization".into(),
-                    )
-                })
-                .and_then(|r| r)
-            }
-        } else {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| {
-                    ContextraError::Internal(format!("Failed to create Tokio runtime: {e}"))
-                })?;
-            rt.block_on(Self::open_with_orphan_registry(
-                storage_clone,
-                ns_clone,
-                orphan_reg_clone,
-            ))
-        };
+        let res = crate::block_on_sync(Self::open_with_orphan_registry(
+            storage_clone,
+            ns_clone,
+            orphan_reg_clone,
+        ));
 
         res.map_err(|e| {
             ContextraError::Internal(format!(
@@ -400,8 +362,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
         }
 
-        #[allow(deprecated)]
-        Ok(TxId::new(TxId::INTERNAL_BASE + raw))
+        TxId::try_from_internal_offset(raw)
     }
 
     pub fn skipped_rollback_count(&self) -> u64 {
