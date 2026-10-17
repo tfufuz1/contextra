@@ -348,10 +348,12 @@ impl<'a> DpiPurgeDriver<'a> {
 
 /// Orchestrates complete document deletion with logical Phase-A proof issuance, physical purge driver execution,
 /// reverse index sweep, and returns a verified [`ForgetOutcome`].
+///
+/// Refactored for witness honesty (INV-D5): Witness evidence must be measured from scans or injected
+/// by caller from prior scan measurements. Missing mandatory layer witnesses or invalid doc IDs fail closed.
 #[allow(clippy::too_many_arguments)]
-pub async fn forget_document<S: FprSweepSource, V: contextra_ports::VectorIndex>(
+pub async fn forget_document<S: FprSweepSource>(
     storage: &LsmStorage,
-    vector_index: &V,
     runtime: &DpiDeletionRuntime,
     doc_id_str: &str,
     as_of_tx: TxId,
@@ -359,6 +361,7 @@ pub async fn forget_document<S: FprSweepSource, V: contextra_ports::VectorIndex>
     sweep_source: &S,
     footprint: &ErasureFootprint,
     registry: &KeyFamilyRegistry,
+    injected_witnesses: Vec<LayerWitness>,
 ) -> Result<ForgetOutcome> {
     let (doc_id, tenant_id) = parse_doc_id_and_tenant(doc_id_str)?;
 
@@ -384,65 +387,24 @@ pub async fn forget_document<S: FprSweepSource, V: contextra_ports::VectorIndex>
         .await
         .map_err(|e| ContextraError::Internal(format!("WitnessFailed: store scan error: {e}")))?;
 
-    // HNSW witness from actual measurement
-    if !witnesses
-        .iter()
-        .any(|w| *w.layer() == DeletionLayer::HnswIndex)
-    {
-        let residue = vector_index.residue(doc_id).await?;
-        let marked_zeroed =
-            !residue.node_present && residue.incoming_edges == 0 && residue.outgoing_edges == 0;
+    // Append caller-injected witnesses
+    witnesses.extend(injected_witnesses);
 
-        let hnsw_witness = LayerWitness::issue(WitIssueArgs {
-            layer: DeletionLayer::HnswIndex,
-            scope_hash,
-            scanned_at_tx: as_of_tx,
-            as_of_tx,
-            assurance: opts.assurance,
-            claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-            footprint_hash,
-            scope_write_seq: 0,
-            scanner_name: "hnsw_scanner",
-            scanner_version: 1,
-            store_generation: WitStoreGeneration(0),
-            layer_evidence: WitLayerEvidence::HnswIndex {
-                node_id: doc_id.inner(),
-                incoming_edges: residue.incoming_edges,
-                outgoing_edges: residue.outgoing_edges,
-                pinned_by_reader: residue.pinned,
-                marked_zeroed,
-            },
-            key_identifiers_claimed: false,
-        })
-        .map_err(|e| ContextraError::Internal(format!("WitnessFailed: HnswIndex creation failed: {e}")))?;
+    // Enforce mandatory presence for all required layer witnesses (INV-D5)
+    let required_layers = [
+        DeletionLayer::HnswIndex,
+        DeletionLayer::TextIndex,
+        DeletionLayer::Relations,
+        DeletionLayer::ErasureLedger,
+    ];
 
-        witnesses.push(hnsw_witness);
-    }
-
-    if !witnesses
-        .iter()
-        .any(|w| *w.layer() == DeletionLayer::TextIndex)
-    {
-        let text_witness = issue_text_index_witness(
-            doc_id,
-            &footprint.ram.term_bytes,
-            scope_hash,
-            as_of_tx,
-            Some(0),
-        )?;
-        witnesses.push(text_witness);
-    }
-
-    if !witnesses
-        .iter()
-        .any(|w| *w.layer() == DeletionLayer::Relations)
-    {
-        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).map_err(|e| {
-            ContextraError::InvalidInput(format!("Failed converting relation_keys len: {e}"))
-        })?;
-        let rel_witness =
-            issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, Some(0))?;
-        witnesses.push(rel_witness);
+    for req_layer in required_layers {
+        if !witnesses.iter().any(|w| *w.layer() == req_layer) {
+            return Err(ContextraError::InvalidInput(format!(
+                "Missing required layer witness for layer {:?}",
+                req_layer
+            )));
+        }
     }
 
     let logical_input = DpiLogicalInput {
@@ -504,11 +466,11 @@ fn parse_doc_id_and_tenant(doc_id_str: &str) -> Result<(DocId, TenantId)> {
         })?;
         let doc_id = DocId::new(doc_id_num);
         Ok((doc_id, tenant_id))
+    } else if let Ok(num) = doc_id_str.parse::<u64>() {
+        Ok((DocId::new(num), TenantId::SYSTEM))
     } else {
-        let doc_id = doc_id_str
-            .parse::<u64>()
-            .map(DocId::new)
-            .unwrap_or_else(|_| DocId::from_key(doc_id_str).unwrap_or(DocId::new(0)));
+        let doc_id = DocId::from_key(doc_id_str)
+            .map_err(|e| ContextraError::InvalidInput(format!("Invalid document id '{doc_id_str}': {e}")))?;
         Ok((doc_id, TenantId::SYSTEM))
     }
 }
