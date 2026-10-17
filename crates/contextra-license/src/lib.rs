@@ -8,5 +8,6 @@ pub use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenF
 
 pub mod signed_gate;
 pub use signed_gate::{
-    derive_local_installation_id_hash, LicensePayload, SignedActivation, SignedLicenseGate,
+    derive_local_installation_id_hash, InstallationId, IntegrityGate, LicensePayload,
+    SignedActivation, SignedLicenseGate,
 };

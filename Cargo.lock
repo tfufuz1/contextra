@@ -1002,8 +1002,10 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "ed25519-dalek",
+ "proptest",
  "rand 0.8.8",
  "serde",
+ "subtle",
  "thiserror 2.0.20",
  "tracing",
 ]
@@ -1244,6 +1246,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "contextra-ports",
+ "contextra-store",
  "contextra-types",
  "parking_lot 0.12.5",
  "tempfile",
