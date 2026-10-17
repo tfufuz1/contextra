@@ -7,12 +7,57 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use contextra_ports::{Rng, SeededRng};
+use contextra_ports::Rng;
 use contextra_types::{ContextraError, Result};
 use futures_util::StreamExt;
 use serde::Deserialize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Deterministischer SplitMix64 PRNG für retry jitter.
+#[derive(Debug)]
+pub struct SeededRng {
+    state: AtomicU64,
+}
+
+impl SeededRng {
+    /// Erstellt eine neue [`SeededRng`]-Instanz mit dem gegebenen Seed.
+    pub fn new(seed: u64) -> Self {
+        Self {
+            state: AtomicU64::new(seed),
+        }
+    }
+}
+
+impl contextra_ports::SeededRng for SeededRng {
+    fn next_u64(&self) -> u64 {
+        const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
+        let z = self
+            .state
+            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
+            .wrapping_add(GOLDEN_RATIO_64);
+        let mut z = z;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+
+    fn fill_bytes(&self, mut dest: &mut [u8]) {
+        while !dest.is_empty() {
+            let val = self.next_u64();
+            let bytes = val.to_le_bytes();
+            let len = dest.len().min(8);
+            dest[..len].copy_from_slice(&bytes[..len]);
+            dest = &mut dest[len..];
+        }
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
 
 /// Default RNG seed for deterministic fallback.
 /// The Composition Root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
@@ -639,13 +684,7 @@ impl OllamaClient {
 
     /// Ensures that the specified model exists; returns `ContextraError::NotFound` with helpful instruction if missing.
     pub async fn ensure_model_available(&self, model: &str) -> Result<()> {
-        validate_model_name(model)?;
-        if !self.is_model_available(model).await {
-            return Err(ContextraError::NotFound(format!(
-                "Ollama model '{model}' not found. Run: ollama pull {model}"
-            )));
-        }
-        Ok(())
+        self.validate_model_available(model).await
     }
 
     /// Generates vector embedding with retry logic for transient failures.

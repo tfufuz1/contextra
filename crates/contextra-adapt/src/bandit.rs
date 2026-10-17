@@ -4,7 +4,52 @@
 #![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
+
+/// Deterministischer SplitMix64 PRNG für Seed-basierte Zufallszahlen.
+#[derive(Debug)]
+pub struct SeededRng {
+    state: AtomicU64,
+}
+
+impl SeededRng {
+    /// Erstellt eine neue [`SeededRng`]-Instanz mit dem gegebenen Seed.
+    pub fn new(seed: u64) -> Self {
+        Self {
+            state: AtomicU64::new(seed),
+        }
+    }
+}
+
+impl contextra_ports::SeededRng for SeededRng {
+    fn next_u64(&self) -> u64 {
+        const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
+        let z = self
+            .state
+            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
+            .wrapping_add(GOLDEN_RATIO_64);
+        let mut z = z;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+
+    fn fill_bytes(&self, mut dest: &mut [u8]) {
+        while !dest.is_empty() {
+            let val = self.next_u64();
+            let bytes = val.to_le_bytes();
+            let len = dest.len().min(8);
+            dest[..len].copy_from_slice(&bytes[..len]);
+            dest = &mut dest[len..];
+        }
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
 
 /// Intervall für die periodische Re-Faktorisierung/Drift-Prüfung der Sherman-Morrison Inversen.
 // Wert ist ein konservativer Startwert, siehe PR-Diskussion für Tuning
@@ -137,6 +182,17 @@ pub struct SketchMatrix {
 }
 
 impl SketchMatrix {
+    /// Erstellt eine `SketchMatrix` mit mandantenisoliertem Seed aus `TenantId` und `base_seed`.
+    pub fn from_tenant_seed(
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        original_dim: usize,
+        projected_dim: usize,
+    ) -> Result<Self, BanditError> {
+        let seed = Self::derive_seed(tenant_id, base_seed);
+        Self::from_seed(seed, original_dim, projected_dim)
+    }
+
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
     pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
@@ -161,7 +217,7 @@ impl SketchMatrix {
         }
 
         let scale = 1.0f32 / (projected_dim as f32).sqrt();
-        let rng = contextra_ports::SeededRng::new(seed);
+        let rng = SeededRng::new(seed);
         let total_elements = projected_dim * original_dim;
         let mut data = Vec::with_capacity(total_elements);
 
@@ -453,6 +509,17 @@ impl BanditProfileState {
         }
 
         Ok(())
+    }
+
+    /// Initialisiert die Sketched Projection mit einem mandantenisolierten PRNG-Seed.
+    pub fn init_tenant_sketch(
+        &mut self,
+        tenant_id: &contextra_types::TenantId,
+        base_seed: u64,
+        projected_dim: usize,
+    ) -> Result<(), BanditError> {
+        self.seed = SketchMatrix::derive_seed(tenant_id, base_seed);
+        self.ensure_sketched_state(projected_dim)
     }
 
     fn ensure_inv_a(&mut self) {
@@ -763,6 +830,15 @@ impl BanditProfileState {
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
         self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
+    }
+
+    /// Observes current non-conformity scores via a `DriftPolicyBridge` and applies drift adaptation if detected.
+    pub fn observe_and_adapt_drift(
+        &mut self,
+        bridge: &mut crate::drift::DriftPolicyBridge,
+        current_scores: &[f32],
+    ) -> crate::lyapunov::LyapunovResult {
+        bridge.observe_and_react(current_scores, self)
     }
 }
 
