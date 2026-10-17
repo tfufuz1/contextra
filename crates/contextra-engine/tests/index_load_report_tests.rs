@@ -129,6 +129,7 @@ async fn index_load_report_counts_match() -> contextra_types::Result<()> {
         decoded: 3,
         skipped_undecodable: 2,
         failed_inserts: 0,
+        migrated_v1: report.migrated_v1,
         took: report.took,
     };
 

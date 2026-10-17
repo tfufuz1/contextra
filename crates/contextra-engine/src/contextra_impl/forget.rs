@@ -5,37 +5,25 @@
 use std::path::Path;
 
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
-use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
-use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
+use contextra_crypto::deletion_proof::probe::WitStoreProbe;
 use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::deletion_proof::types::{
     hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope,
 };
-use contextra_crypto::deletion_proof::ProofV4 as DeletionProof;
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
-use contextra_crypto::kv_shredding::KeyRegistry;
-use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_ports::VectorIndex;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::witness::ZeuIssueRequest;
-use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
+use contextra_types::{CollectionId, ContextraError, DocId, EntityId, Result, TenantId, TxId};
 use serde::Serialize;
 
-use crate::collection::Collection;
 use crate::deletion::relations_witness::issue_relations_witness;
-use crate::deletion::text_witness::issue_text_index_witness;
+use crate::deletion::text_witness::scan_and_issue_text_index_witness;
 use crate::deletion::{
     DpiDeletionRuntime, DpiLogicalInput, DpiPurgeDriver, DpiPurgeDriverConfig, ErasureFootprint,
-    FonLogicalHandle, ForgetOptions, PurgeMode, Wait,
+    ForgetOptions, PurgeHandle, PurgeMode, Wait,
 };
 use crate::Contextra;
-
-/// Inherent extension providing `tenant_id` on [`Collection`].
-impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Returns the tenant ID for this collection (SYSTEM default).
-    pub fn tenant_id(&self) -> TenantId {
-        TenantId::SYSTEM
-    }
-}
 
 /// Structured receipt returned by `forget`, `forget_collection`, and `forget_tenant`.
 #[derive(Debug, Clone, Serialize)]
@@ -82,11 +70,15 @@ impl Contextra {
         let doc_id = DocId::from_key(id)
             .map_err(|e| ContextraError::InvalidInput(format!("Invalid doc id '{id}': {e}")))?;
 
-        let footprint = ErasureFootprint::for_document(TenantId::SYSTEM, col.name(), doc_id);
-        let scope = DeletionScope::Document {
-            doc_id,
-            tenant_id: TenantId::SYSTEM,
-        };
+        if doc_id.inner() == 0 {
+            return Err(ContextraError::InvalidInput(
+                "DocId(0) is reserved and invalid for forget target".to_string(),
+            ));
+        }
+
+        let tenant_id = col.tenant_id();
+        let footprint = ErasureFootprint::for_document(tenant_id, col.name(), doc_id);
+        let scope = DeletionScope::Document { doc_id, tenant_id };
 
         // Execute logical deletion in a transaction
         col.delete(id).await?;
@@ -99,7 +91,7 @@ impl Contextra {
             vec![id.to_string()],
             as_of_tx,
             &opts,
-            Some((TenantId::SYSTEM, id, doc_id)),
+            Some((tenant_id, col.name().to_string(), id.to_string(), doc_id)),
         )
         .await
     }
@@ -179,7 +171,7 @@ impl Contextra {
         scope_file_names: Vec<String>,
         as_of_tx: TxId,
         opts: &ForgetOptions,
-        doc_info: Option<(TenantId, &str, DocId)>,
+        doc_info: Option<(TenantId, String, String, DocId)>,
     ) -> Result<ForgetReceipt> {
         let scope_hash = hash_deleted_keys_length_prefixed(&footprint.keys.explicit);
 
@@ -187,10 +179,17 @@ impl Contextra {
         let mut witnesses = Vec::new();
 
         let manifest = self.storage.manifest_for_test();
-        let db_dir = manifest
-            .path()
-            .parent()
-            .unwrap_or_else(|| Path::new("."));
+        let db_dir = manifest.path().parent().unwrap_or_else(|| Path::new("."));
+
+        // Determine DB instance ID dynamically from ErasureLedger handle or db_dir Blake3 hash
+        let db_instance_id = if let Some(ref handle) = self.storage.erasure_ledger_handle {
+            handle.db_instance_id()
+        } else {
+            let mut id = [0xFFu8; 16];
+            let hash = blake3::hash(db_dir.to_string_lossy().as_bytes());
+            id.copy_from_slice(&hash.as_bytes()[..16]);
+            id
+        };
 
         // 1. Store (LSM MemTable, WAL, SSTable) witnesses
         let zeu_req = ZeuIssueRequest {
@@ -210,7 +209,7 @@ impl Contextra {
                 for w in store_witnesses {
                     layer_statuses.push(LayerStatus::Verified {
                         layer: w.layer().clone(),
-                        families: vec!["CollectionDocData", "DocIdMapping"],
+                        families: vec!["CollectionDocData".to_string(), "DocIdMapping".to_string()],
                     });
                     witnesses.push(w);
                 }
@@ -223,148 +222,182 @@ impl Contextra {
             }
         }
 
-        // 2. HNSW Vector Index witness
-        let node_id = doc_info.map(|(_, _, d)| d.inner()).unwrap_or(0);
-        if let Ok(hnsw_witness) = LayerWitness::issue(WitIssueArgs {
-            layer: DeletionLayer::HnswIndex,
-            scope_hash,
-            scanned_at_tx: as_of_tx,
-            as_of_tx,
-            assurance: opts.assurance,
-            claim: WitClaimText::S1,
-            footprint_hash: [0u8; 32],
-            scope_write_seq: 0,
-            scanner_name: "hnsw_scanner",
-            scanner_version: 1,
-            store_generation: WitStoreGeneration(0),
-            layer_evidence: WitLayerEvidence::HnswIndex {
-                node_id,
-                incoming_edges: 0,
-                outgoing_edges: 0,
-                pinned_by_reader: false,
-                marked_zeroed: true,
-            },
-            key_identifiers_claimed: false,
-        }) {
-            layer_statuses.push(LayerStatus::Verified {
-                layer: DeletionLayer::HnswIndex,
-                families: vec!["CollectionIndex".to_string()],
-            });
-            witnesses.push(hnsw_witness);
-        }
+        // 2. HNSW Vector Index witness (measured)
+        if let Some((_, _, _, doc_id)) = doc_info {
+            if let Ok(col) = self.default_col().await {
+                match col.vector_index().residue(doc_id).await {
+                    Ok(residue) => {
+                        let marked_zeroed = !residue.node_present
+                            && residue.incoming_edges == 0
+                            && residue.outgoing_edges == 0;
 
-        // 3. Text Index witness
-        let doc_id = doc_info.map(|(_, _, d)| d).unwrap_or(DocId::new(0));
-        if let Ok(text_witness) =
-            issue_text_index_witness(doc_id, &footprint.ram.term_bytes, scope_hash, as_of_tx, None)
-        {
-            layer_statuses.push(LayerStatus::Verified {
-                layer: DeletionLayer::TextIndex,
-                families: vec!["TextIndex".to_string()],
-            });
-            witnesses.push(text_witness);
-        }
+                        let hnsw_witness_res = LayerWitness::issue(WitIssueArgs {
+                            layer: DeletionLayer::HnswIndex,
+                            scope_hash,
+                            scanned_at_tx: as_of_tx,
+                            as_of_tx,
+                            assurance: opts.assurance,
+                            claim: WitClaimText::S1,
+                            footprint_hash: [0u8; 32],
+                            scope_write_seq: 0,
+                            scanner_name: "hnsw_scanner",
+                            scanner_version: 1,
+                            store_generation: contextra_crypto::deletion_proof::probe::WitStoreGeneration(0),
+                            layer_evidence: contextra_crypto::deletion_proof::evidence::WitLayerEvidence::HnswIndex {
+                                node_id: doc_id.inner(),
+                                incoming_edges: residue.incoming_edges,
+                                outgoing_edges: residue.outgoing_edges,
+                                pinned_by_reader: residue.pinned,
+                                marked_zeroed,
+                            },
+                            key_identifiers_claimed: false,
+                        });
 
-        // 4. Relations witness
-        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
-        if let Ok(rel_witness) =
-            issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, None)
-        {
-            layer_statuses.push(LayerStatus::Verified {
-                layer: DeletionLayer::Relations,
-                families: vec!["Relations".to_string()],
-            });
-            witnesses.push(rel_witness);
-        }
-
-        // 5. Erasure Ledger witness
-        if let Ok(ledger_witness) = LayerWitness::issue(WitIssueArgs {
-            layer: DeletionLayer::ErasureLedger,
-            scope_hash,
-            scanned_at_tx: as_of_tx,
-            as_of_tx,
-            assurance: opts.assurance,
-            claim: WitClaimText::S1,
-            footprint_hash: [0u8; 32],
-            scope_write_seq: 0,
-            scanner_name: "ledger_scanner",
-            scanner_version: 1,
-            store_generation: WitStoreGeneration(0),
-            layer_evidence: WitLayerEvidence::Memtable {
-                memtables_scanned: 1,
-                entries_found: 0,
-                tombstones_found: 0,
-            },
-            key_identifiers_claimed: false,
-        }) {
-            layer_statuses.push(LayerStatus::Verified {
-                layer: DeletionLayer::ErasureLedger,
-                families: vec!["SystemMeta".to_string()],
-            });
-            witnesses.push(ledger_witness);
-        }
-
-        let zeu_probe = self.storage.store_probe();
-
-        // Handle Physical Purge when requested (opts.purge != PurgeMode::None)
-        if opts.purge != PurgeMode::None {
-            if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]) {
-                let driver = DpiPurgeDriver::new(&self.storage, &runtime, DpiPurgeDriverConfig::default());
-                let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
-                let logical_handle = FonLogicalHandle {
-                    proof_id: [0u8; 16],
-                    proof_path: db_dir.join("proofs").join("temp.json"),
-                    full_proof_id: [0u8; 32],
-                };
-                let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
-
-                let _ = driver
-                    .run_physical(
-                        purge_scope,
-                        &scope_file_names,
-                        as_of_tx,
-                        &logical_handle,
-                        opts,
-                        None,
-                        probes,
-                        None,
-                    )
-                    .await;
+                        match hnsw_witness_res {
+                            Ok(hnsw_witness) => {
+                                witnesses.push(hnsw_witness);
+                                if marked_zeroed && residue.incoming_edges == 0 && !residue.pinned {
+                                    layer_statuses.push(LayerStatus::Verified {
+                                        layer: DeletionLayer::HnswIndex,
+                                        families: vec!["CollectionIndex".to_string()],
+                                    });
+                                } else {
+                                    layer_statuses.push(LayerStatus::Failed {
+                                        layer: DeletionLayer::HnswIndex,
+                                        reason: format!(
+                                            "HNSW index residue detected (incoming={}, outgoing={}, pinned={})",
+                                            residue.incoming_edges, residue.outgoing_edges, residue.pinned
+                                        ),
+                                    });
+                                }
+                            }
+                            Err(e) => {
+                                layer_statuses.push(LayerStatus::Failed {
+                                    layer: DeletionLayer::HnswIndex,
+                                    reason: format!("HNSW witness issuance failed: {e}"),
+                                });
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        layer_statuses.push(LayerStatus::Failed {
+                            layer: DeletionLayer::HnswIndex,
+                            reason: format!("HNSW residue scan error: {e}"),
+                        });
+                    }
+                }
+            } else {
+                layer_statuses.push(LayerStatus::Failed {
+                    layer: DeletionLayer::HnswIndex,
+                    reason: "Default collection unavailable for HNSW scan".to_string(),
+                });
             }
+        } else {
+            // Non-document scope: no collection-wide/tenant-wide HNSW scanner exists -> mark Pending
+            layer_statuses.push(LayerStatus::Pending {
+                layer: DeletionLayer::HnswIndex,
+            });
         }
+
+        // 3. Text Index witness (measured via A7/A8 scanner)
+        if let Some((_, _, _, doc_id)) = doc_info {
+            if let Ok(col) = self.default_col().await {
+                match scan_and_issue_text_index_witness(
+                    &col.text_index,
+                    doc_id,
+                    &footprint.ram.term_bytes,
+                    scope_hash,
+                    as_of_tx,
+                )
+                .await
+                {
+                    Ok(text_witness) => {
+                        witnesses.push(text_witness);
+                        layer_statuses.push(LayerStatus::Verified {
+                            layer: DeletionLayer::TextIndex,
+                            families: vec!["TextIndex".to_string()],
+                        });
+                    }
+                    Err(e) => {
+                        layer_statuses.push(LayerStatus::Failed {
+                            layer: DeletionLayer::TextIndex,
+                            reason: format!("TextIndex witness scan failed: {e}"),
+                        });
+                    }
+                }
+            } else {
+                layer_statuses.push(LayerStatus::Failed {
+                    layer: DeletionLayer::TextIndex,
+                    reason: "Collection unavailable for TextIndex scan".to_string(),
+                });
+            }
+        } else {
+            // Non-document scope: no collection-wide/tenant-wide TextIndex scanner exists -> mark Pending
+            layer_statuses.push(LayerStatus::Pending {
+                layer: DeletionLayer::TextIndex,
+            });
+        }
+
+        // 4. Relations witness (measured via CsrGraph scan)
+        if let Some((_, _, _, doc_id)) = doc_info {
+            if let Ok(col) = self.default_col().await {
+                let report = contextra_graph::residue_scan::scan_entity_residue(
+                    &col.graph_index,
+                    EntityId::from(doc_id.inner()),
+                    None,
+                );
+                let matching_edges = u64::try_from(
+                    report.outgoing_edges.len().saturating_add(report.incoming_edges.len()),
+                )
+                .unwrap_or(u64::MAX);
+                let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
+
+                match issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, Some(matching_edges)) {
+                    Ok(rel_witness) => {
+                        witnesses.push(rel_witness);
+                        if matching_edges == 0 {
+                            layer_statuses.push(LayerStatus::Verified {
+                                layer: DeletionLayer::Relations,
+                                families: vec!["Relations".to_string()],
+                            });
+                        } else {
+                            layer_statuses.push(LayerStatus::Failed {
+                                layer: DeletionLayer::Relations,
+                                reason: format!("Relational edges remaining in graph: {matching_edges}"),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        layer_statuses.push(LayerStatus::Failed {
+                            layer: DeletionLayer::Relations,
+                            reason: format!("Relations witness creation failed: {e}"),
+                        });
+                    }
+                }
+            } else {
+                layer_statuses.push(LayerStatus::Failed {
+                    layer: DeletionLayer::Relations,
+                    reason: "Collection unavailable for Relations scan".to_string(),
+                });
+            }
+        } else {
+            // Non-document scope: no collection-wide/tenant-wide CsrGraph scanner exists -> mark Pending
+            layer_statuses.push(LayerStatus::Pending {
+                layer: DeletionLayer::Relations,
+            });
+        }
+
+        // 5. Erasure Ledger witness: since no ErasureLedger residue scanner exists yet, report Pending
+        layer_statuses.push(LayerStatus::Pending {
+            layer: DeletionLayer::ErasureLedger,
+        });
 
         // Handle S4 / Key Revocation if requested
         if opts.assurance == WitAssurance::S4 {
-            let registry = KeyRegistry::new();
-            if let Some((tenant_id, _id_str, d_id)) = doc_info {
-                let revoked = registry.revoke_record(tenant_id.inner(), d_id.inner()).unwrap_or(false);
-                if revoked {
-                    layer_statuses.push(LayerStatus::Verified {
-                        layer: DeletionLayer::Keyring,
-                        families: vec!["SystemMeta"],
-                    });
-                } else {
-                    layer_statuses.push(LayerStatus::Pending {
-                        layer: DeletionLayer::Keyring,
-                    });
-                }
-            } else if let DeletionScope::Tenant { tenant_id } = &scope {
-                let revoked = registry.revoke_group(tenant_id.inner()).unwrap_or(false);
-                if revoked {
-                    layer_statuses.push(LayerStatus::Verified {
-                        layer: DeletionLayer::Keyring,
-                        families: vec!["SystemMeta"],
-                    });
-                } else {
-                    layer_statuses.push(LayerStatus::Pending {
-                        layer: DeletionLayer::Keyring,
-                    });
-                }
-            } else {
-                layer_statuses.push(LayerStatus::Pending {
-                    layer: DeletionLayer::Keyring,
-                });
-            }
+            // Durable KeyRegistry wiring pending in Prompt E5 -> mark Pending
+            layer_statuses.push(LayerStatus::Pending {
+                layer: DeletionLayer::Keyring,
+            });
         }
 
         // Calculate maximum verified stage
@@ -372,16 +405,10 @@ impl Contextra {
             .iter()
             .any(|s| matches!(s, LayerStatus::Failed { .. } | LayerStatus::Pending { .. }));
 
-        let assurance_reached = if has_failed {
-            WitAssurance::S0
-        } else if opts.purge != PurgeMode::None {
-            opts.assurance
-        } else {
-            WitAssurance::S1
-        };
+        let zeu_probe = self.storage.store_probe();
 
-        // Only generate proof if assurance_reached >= assurance_requested and no layer failed
-        let proof = if assurance_reached >= opts.assurance && !has_failed {
+        // Finalize logical deletion proof
+        let (proof, logical_handle) = if !has_failed {
             let logical_input = DpiLogicalInput {
                 scope: scope.clone(),
                 storage_scope: "lsm".to_string(),
@@ -390,21 +417,97 @@ impl Contextra {
                 observed_empty: footprint.observed_empty,
                 deleted_after_tx: as_of_tx,
                 witnesses,
-                scope_file_names,
+                scope_file_names: scope_file_names.clone(),
             };
 
             let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
 
-            let runtime_res = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]);
-            match runtime_res {
-                Ok(runtime) => {
-                    match runtime.finalize_logical(logical_input, opts, None, probes) {
-                        Ok((_, issued)) => Some(issued.proof),
-                        Err(_) => None,
+            match DpiDeletionRuntime::open(db_dir, None, db_instance_id) {
+                Ok(runtime) => match runtime.finalize_logical(logical_input, opts, None, probes) {
+                    Ok((handle, issued)) => (Some(issued.proof), Some(handle)),
+                    Err(e) => {
+                        layer_statuses.push(LayerStatus::Failed {
+                            layer: DeletionLayer::Manifest,
+                            reason: format!("finalize_logical failed: {e}"),
+                        });
+                        (None, None)
+                    }
+                },
+                Err(e) => {
+                    layer_statuses.push(LayerStatus::Failed {
+                        layer: DeletionLayer::Manifest,
+                        reason: format!("DpiDeletionRuntime::open failed: {e}"),
+                    });
+                    (None, None)
+                }
+            }
+        } else {
+            (None, None)
+        };
+
+        // Handle Physical Purge when requested (opts.purge != PurgeMode::None)
+        let mut purge_blocked = false;
+        if opts.purge != PurgeMode::None {
+            if let Some(ref handle) = logical_handle {
+                if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, db_instance_id) {
+                    let driver =
+                        DpiPurgeDriver::new(&self.storage, &runtime, DpiPurgeDriverConfig::default());
+                    let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
+                    let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
+
+                    match driver
+                        .run_physical(
+                            purge_scope,
+                            &scope_file_names,
+                            as_of_tx,
+                            handle,
+                            opts,
+                            None,
+                            probes,
+                            None,
+                        )
+                        .await
+                    {
+                        Ok(PurgeHandle::Final(_phys_handle)) => {}
+                        Ok(PurgeHandle::Pending { .. }) => {
+                            purge_blocked = true;
+                            layer_statuses.push(LayerStatus::Pending {
+                                layer: DeletionLayer::SsTableAllLevels,
+                            });
+                        }
+                        Ok(PurgeHandle::Blocked { reason, .. }) => {
+                            purge_blocked = true;
+                            layer_statuses.push(LayerStatus::Failed {
+                                layer: DeletionLayer::SsTableAllLevels,
+                                reason: format!("Physical purge blocked: {reason}"),
+                            });
+                        }
+                        Err(e) => {
+                            purge_blocked = true;
+                            layer_statuses.push(LayerStatus::Failed {
+                                layer: DeletionLayer::SsTableAllLevels,
+                                reason: format!("Physical purge execution error: {e}"),
+                            });
+                        }
                     }
                 }
-                Err(_) => None,
             }
+        }
+
+        let is_any_failed_or_pending = layer_statuses
+            .iter()
+            .any(|s| matches!(s, LayerStatus::Failed { .. } | LayerStatus::Pending { .. }));
+
+        let assurance_reached = if is_any_failed_or_pending || purge_blocked {
+            WitAssurance::S0
+        } else if opts.purge != PurgeMode::None {
+            opts.assurance
+        } else {
+            WitAssurance::S1
+        };
+
+        let proof_output = if assurance_reached >= opts.assurance {
+            proof
         } else {
             None
         };
@@ -414,7 +517,7 @@ impl Contextra {
             assurance_reached,
             assurance_requested: opts.assurance,
             layers: layer_statuses,
-            proof,
+            proof: proof_output,
             wait: opts.wait,
         })
     }

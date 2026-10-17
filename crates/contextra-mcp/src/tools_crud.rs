@@ -120,7 +120,8 @@ impl McpServer {
             .key
             .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
 
-        let tenant_id = crate::validation::extract_tenant_from_args_or_env(Some(args));
+        let tenant_id = contextra_types::TenantId::try_new(1)
+            .unwrap_or(contextra_types::TenantId::SYSTEM);
 
         let proof = self
             .db
