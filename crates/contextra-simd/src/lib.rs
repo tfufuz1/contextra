@@ -6,16 +6,11 @@
 //! Contextra SIMD — Ring 0 SIMD distance kernels and hardware runtime dispatch.
 
 #![allow(unsafe_code)]
-#![allow(clippy::undocumented_unsafe_blocks)]
-#![allow(clippy::missing_safety_doc)]
-#![allow(unused_unsafe)]
 
 pub mod dispatch;
 pub mod kernels;
 
 pub use dispatch::*;
-#[cfg(target_arch = "aarch64")]
-pub use kernels::neon;
 pub use kernels::scalar::{
     cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
     cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,
@@ -23,12 +18,19 @@ pub use kernels::scalar::{
     euclidean_distance_scalar, euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8_scalar,
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
-#[cfg(target_arch = "x86_64")]
-pub use kernels::{avx2, avx512};
 
 use contextra_core::{ContextraError, DistanceMetric};
 
 /// Validates that a vector contains no NaN or Infinite values.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`] if any element in `vec` is NaN or Infinity.
+///
+/// # Panics
+/// Guarantees zero panic.
+///
+/// # Complexity
+/// O(N) linear scan over vector elements.
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> contextra_core::Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
@@ -39,6 +41,17 @@ pub fn validate_vector(vec: &[f32]) -> contextra_core::Result<()> {
     Ok(())
 }
 
+/// Computes the distance between two vectors `a` and `b` according to `metric` after validating elements.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`] if `a` or `b` contain non-finite numbers, or if `metric` is unsupported.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a` and `b` have different lengths.
+///
+/// # Panics
+/// Guarantees zero panic.
+///
+/// # Complexity
+/// O(N) where N is vector dimension.
 #[inline]
 pub fn compute_distance(
     a: &[f32],
@@ -50,6 +63,17 @@ pub fn compute_distance(
     compute_distance_trusted(a, b, metric)
 }
 
+/// Computes the distance between two pre-validated vectors `a` and `b` according to `metric`.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`] if `metric` is unsupported.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a` and `b` have different lengths.
+///
+/// # Panics
+/// Guarantees zero panic.
+///
+/// # Complexity
+/// O(N) where N is vector dimension.
 #[inline]
 pub fn compute_distance_trusted(
     a: &[f32],
@@ -64,6 +88,17 @@ pub fn compute_distance_trusted(
     }
 }
 
+/// Computes the distance between pre-validated f32 vector `a` and byte slice `b_bytes` according to `metric`.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`] if `metric` is unsupported.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes` has fewer bytes than `a.len() * 4`.
+///
+/// # Panics
+/// Guarantees zero panic.
+///
+/// # Complexity
+/// O(N) where N is vector dimension (`a.len()`).
 #[inline]
 pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
