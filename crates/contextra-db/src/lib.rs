@@ -92,10 +92,11 @@ pub use volatile_vault::{
 };
 
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
-pub use homeostat::RerankDeadline;
+pub use homeostat::{PoolController, PoolControllerConfig, RerankDeadline};
 #[allow(deprecated)]
 pub use homeostat::RerankPidController;
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
+#[allow(deprecated)]
 pub use pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
     MIN_SCALING_FACTOR,

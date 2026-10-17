@@ -620,6 +620,7 @@ dependencies = [
  "blake3",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "proptest",
  "serde",
  "serde_json",

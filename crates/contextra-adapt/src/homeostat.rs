@@ -1,23 +1,24 @@
 // FILE-CONTEXT
-// ZWECK: P95 retrieval latency feedback-regulated PID controller and hard deadline management (Feature F-08 & P11 requirement).
-// INVARIANTEN: k_min >= 50 hard floor (arXiv:2604.01733 T2-RAGBench recall floor); integral windup bounded [-100.0, 100.0].
-// STAND: TS:2026-09-11T00:00:00Z
+// ZWECK: P95 retrieval latency feedback-regulated PID controller and hard deadline management.
+// INVARIANTEN: k_min >= 50 hard floor (empirical, measured internally); integral windup bounded.
+// STAND: TS:2026-10-17T00:00:00Z
 
 //! PID Controller and Deadline Management for Retrieval Latency Control.
 //!
-//! NOTE: `RerankPidController` has been consolidated into `crate::PidController`.
+//! NOTE: `RerankPidController` is deprecated in favor of `crate::PoolController`.
 
 use std::time::{Duration, Instant};
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
-/// DEPRECATED: Use [`crate::PidController`] instead.
+/// DEPRECATED: Use [`crate::PoolController`] instead.
 #[deprecated(
     since = "0.1.0",
-    note = "Consolidated into `crate::PidController`. Use `crate::PidController` directly."
+    note = "use PoolController; removal 2027-01-31"
 )]
 #[derive(Debug, Clone)]
 pub struct RerankPidController {
+    #[allow(deprecated)]
     inner: crate::PidController,
 }
 
@@ -49,39 +50,39 @@ impl RerankPidController {
 
     /// Accessor for `kp`.
     pub fn kp(&self) -> f32 {
-        self.inner.kp
+        self.inner.kp()
     }
 
     /// Accessor for `ki`.
     pub fn ki(&self) -> f32 {
-        self.inner.ki
+        self.inner.ki()
     }
 
     /// Accessor for `kd`.
     pub fn kd(&self) -> f32 {
-        self.inner.kd
+        self.inner.kd()
     }
 
     /// Accessor for target latency.
     pub fn target_p95_latency_ms(&self) -> f32 {
-        self.inner.target_latency_ms
+        self.inner.target_latency_ms()
     }
 
     /// Accessor for current `k_pool`.
     pub fn k_pool(&self) -> usize {
         self.inner
-            .current_pool_size
-            .unwrap_or(self.inner.min_pool_size)
+            .current_pool_size()
+            .unwrap_or_else(|| self.inner.min_pool_size())
     }
 
     /// Accessor for `k_min`.
     pub fn k_min(&self) -> usize {
-        self.inner.min_pool_size
+        self.inner.min_pool_size()
     }
 
     /// Accessor for `k_max`.
     pub fn k_max(&self) -> usize {
-        self.inner.max_pool_size
+        self.inner.max_pool_size()
     }
 
     /// Updates the controller state with observed latency and returns new pool size.
@@ -125,8 +126,8 @@ mod tests {
         let mut controller = RerankPidController::new(150.0, 50, 200, 100);
         let mut prev_pool = controller.k_pool();
 
-        // Simulate 10 iterations of severe latency overflow (300ms vs 150ms target)
-        for _ in 0..10 {
+        // Simulate iterations of severe latency overflow (300ms vs 150ms target)
+        for _ in 0..100 {
             let new_pool = controller.update(300.0);
             assert!(
                 new_pool <= prev_pool,
@@ -152,8 +153,8 @@ mod tests {
         let mut controller = RerankPidController::new(150.0, 50, 200, 100);
         let mut prev_pool = controller.k_pool();
 
-        // Simulate 10 iterations of low latency (50ms vs 150ms target)
-        for _ in 0..10 {
+        // Simulate iterations of low latency (50ms vs 150ms target) to integrate to k_max
+        for _ in 0..100 {
             let new_pool = controller.update(50.0);
             assert!(
                 new_pool >= prev_pool,
