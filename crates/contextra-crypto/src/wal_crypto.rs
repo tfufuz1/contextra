@@ -14,6 +14,19 @@
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
+/// Helper function to convert a field length (`usize`) into a 4-byte little-endian length prefix.
+///
+/// # Errors
+/// Returns `CryptoError::InvalidLengthPrefix` if `len` exceeds `u32::MAX` (4 GiB).
+pub fn len_prefix(len: usize) -> Result<[u8; 4]> {
+    let len_u32 = u32::try_from(len).map_err(|_| {
+        CryptoError::InvalidLengthPrefix(format!(
+            "Field length {len} bytes exceeds u32::MAX (4 GiB) limit"
+        ))
+    })?;
+    Ok(len_u32.to_le_bytes())
+}
+
 /// Re-export KMS Provider Trait nach Spec §20.2 (INV-KMS-1).
 pub use crate::kms::KmsProvider;
 
@@ -297,20 +310,20 @@ impl IntegrityVerifier {
         let tx_id_bytes = entry.tx_id.to_le_bytes();
         mac.update(&tx_id_bytes);
 
-        let key_len_u32 = u32::try_from(entry.key.len()).unwrap_or(u32::MAX);
-        let val_len_u32 = u32::try_from(entry.value.len()).unwrap_or(u32::MAX);
+        let key_len_bytes = len_prefix(entry.key.len())?;
 
         if entry.op_type == 0 {
             // Put
+            let val_len_bytes = len_prefix(entry.value.len())?;
             mac.update(&[0u8]);
-            mac.update(&key_len_u32.to_le_bytes());
+            mac.update(&key_len_bytes);
             mac.update(&entry.key);
-            mac.update(&val_len_u32.to_le_bytes());
+            mac.update(&val_len_bytes);
             mac.update(&entry.value);
         } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
-            mac.update(&key_len_u32.to_le_bytes());
+            mac.update(&key_len_bytes);
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd

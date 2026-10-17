@@ -30,6 +30,7 @@ impl DeletionProof {
         excluded_scopes: Vec<ExcludedScope>,
         proof_key: &[u8],
     ) -> Result<Self> {
+        // LEGACY: Calling deprecated create_v2_with_wal_receipt within legacy v2 creation path.
         #[allow(deprecated)]
         Self::create_v2_with_wal_receipt(
             scope,
