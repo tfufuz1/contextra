@@ -133,18 +133,44 @@ impl ErasureFootprint {
     /// Funktionale Konstruktor-Methode für Dokument-Scope (deutsche Bezeichnung).
     pub fn fuer_document(tenant_id: TenantId, collection_name: &str, doc_id: DocId) -> Self {
         let storage = StorageScope::Tenant(tenant_id);
-        let user_key = [
-            format!("__col:{}:\x00", collection_name).as_bytes(),
-            doc_id.to_string().as_bytes(),
-        ]
-        .concat();
-        let doc_map_key = [b"__docid:", doc_id.to_string().as_bytes()].concat();
-        let rel_prefix = [b"__rel:", doc_id.to_string().as_bytes()].concat();
+        let id_str = doc_id.to_string();
 
-        let keys = KeyScope {
-            explicit: vec![user_key, doc_map_key],
-            prefixes: vec![rel_prefix],
+        let (explicit, prefixes) = if collection_name == "default" {
+            let user_key = id_str.as_bytes().to_vec();
+            let doc_map_key = [b"__docid:", id_str.as_bytes()].concat();
+            let rel_prefix = [b"__rel:", id_str.as_bytes()].concat();
+            let txt_dl_prefix = [b"__txt:default:dl:", id_str.as_bytes()].concat();
+            let txt_fw_prefix = [b"__txt:default:fw:", id_str.as_bytes()].concat();
+            let txt_tbs_prefix = [b"__txt:default:tbs:", id_str.as_bytes()].concat();
+
+            (
+                vec![user_key, doc_map_key],
+                vec![rel_prefix, txt_dl_prefix, txt_fw_prefix, txt_tbs_prefix],
+            )
+        } else {
+            let user_key = format!("__col:{}:\x00{}", collection_name, id_str).into_bytes();
+            let doc_map_typed = format!("__col:{}:\x01{}", collection_name, id_str).into_bytes();
+            let doc_map_legacy = [b"__docid:", id_str.as_bytes()].concat();
+
+            let rel_typed_prefix = format!("__col:{}:\x02{}", collection_name, id_str).into_bytes();
+            let rel_legacy_prefix = [b"__rel:", id_str.as_bytes()].concat();
+            let txt_dl_prefix = format!("__txt:{}:dl:{}", collection_name, id_str).into_bytes();
+            let txt_fw_prefix = format!("__txt:{}:fw:{}", collection_name, id_str).into_bytes();
+            let txt_tbs_prefix = format!("__txt:{}:tbs:{}", collection_name, id_str).into_bytes();
+
+            (
+                vec![user_key, doc_map_typed, doc_map_legacy],
+                vec![
+                    rel_typed_prefix,
+                    rel_legacy_prefix,
+                    txt_dl_prefix,
+                    txt_fw_prefix,
+                    txt_tbs_prefix,
+                ],
+            )
         };
+
+        let keys = KeyScope { explicit, prefixes };
 
         let mut ram = FprRamFootprint::default();
         ram.doc_ids.push(doc_id);
@@ -212,6 +238,7 @@ impl ErasureFootprint {
             b"__tx_intent:".to_vec(),
             b"__kv_spill:".to_vec(),
             b"__session_dag:".to_vec(),
+            b"__maintenance_intent:".to_vec(),
             b"__meta:".to_vec(),
         ];
 
@@ -233,6 +260,37 @@ impl ErasureFootprint {
         };
         footprint.hash = footprint.compute_hash();
         footprint
+    }
+
+    /// Prüft, ob ein gegebener physischer oder logischer Storage-Schlüssel zu diesem Footprint gehört.
+    pub fn matches(&self, key: &[u8]) -> bool {
+        if self.keys.explicit.iter().any(|k| k.as_slice() == key)
+            || self.keys.prefixes.iter().any(|p| key.starts_with(p.as_slice()))
+        {
+            return true;
+        }
+
+        for doc_id in &self.ram.doc_ids {
+            let id_bytes = doc_id.to_string().into_bytes();
+            if key.starts_with(b"__txt:")
+                || key.starts_with(b"__col:")
+                || key.starts_with(b"__rel:")
+                || key.starts_with(b"__docid:")
+            {
+                if key.ends_with(&id_bytes) {
+                    return true;
+                }
+                let id_colon = [id_bytes.as_slice(), b":"].concat();
+                let colon_id = [b":", id_bytes.as_slice()].concat();
+                if key.windows(id_colon.len()).any(|w| w == id_colon.as_slice())
+                    || key.windows(colon_id.len()).any(|w| w == colon_id.as_slice())
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Berechnet den BLAKE3-basierten, längenpräfixierten Hash über den Footprint.

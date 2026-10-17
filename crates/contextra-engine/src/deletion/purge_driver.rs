@@ -163,7 +163,7 @@ impl<'a> DpiPurgeDriver<'a> {
 
         // (c) PurgeOrchestrator execution
         let orchestrator = PurgeOrchestrator::new(self.storage);
-        let _purge_report = match orchestrator
+        let purge_report = match orchestrator
             .execute_purge(scope.clone(), as_of_tx.inner(), space_probe, None)
             .await
         {
@@ -263,8 +263,10 @@ impl<'a> DpiPurgeDriver<'a> {
         }
         let footprint_hash = *fp_hasher.finalize().as_bytes();
 
-        let doc_id_str = scope_file_names.first().cloned().unwrap_or_default();
-        let (doc_id, tenant_id) = parse_doc_id_and_tenant(&doc_id_str)?;
+        let doc_id_str = scope_file_names
+            .first()
+            .ok_or_else(|| ContextraError::InvalidInput("run_physical: scope_file_names must not be empty".to_string()))?;
+        let (doc_id, tenant_id) = parse_doc_id_and_tenant(doc_id_str)?;
 
         let phys_scope = DeletionScope::Document { doc_id, tenant_id };
 
@@ -273,7 +275,7 @@ impl<'a> DpiPurgeDriver<'a> {
             storage_scope: "lsm".to_string(),
             deleted_keys_hash,
             footprint_hash,
-            observed_empty: true,
+            observed_empty: purge_report.records_purged > 0 || purge_report.sstables_replaced > 0,
             deleted_after_tx: as_of_tx.inner(),
             stage: 2, // Stage 2 = Physical
             supersedes: Some(supersedes_32),

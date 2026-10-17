@@ -72,11 +72,43 @@ pub static ALL_KEY_FAMILIES: &[KeyFamilyEntry] = &[
         contains_identifier: true,
     },
     KeyFamilyEntry {
+        name: "GraphData",
+        prefix_pattern: "__graph:",
+        owner_crate: "contextra-graph",
+        erase_unit: EraseUnit::Both,
+        scanner: "GraphScan",
+        contains_identifier: true,
+    },
+    KeyFamilyEntry {
         name: "TxIntent",
         prefix_pattern: "__tx_intent:",
         owner_crate: "contextra-engine",
         erase_unit: EraseUnit::PerTenant,
         scanner: "WalScan",
+        contains_identifier: false,
+    },
+    KeyFamilyEntry {
+        name: "KvCache",
+        prefix_pattern: "__kv_spill:",
+        owner_crate: "contextra-kvcache",
+        erase_unit: EraseUnit::PerTenant,
+        scanner: "CacheScan",
+        contains_identifier: true,
+    },
+    KeyFamilyEntry {
+        name: "SessionDag",
+        prefix_pattern: "__session_dag:",
+        owner_crate: "contextra-graph",
+        erase_unit: EraseUnit::PerTenant,
+        scanner: "GraphScan",
+        contains_identifier: true,
+    },
+    KeyFamilyEntry {
+        name: "MaintenanceIntent",
+        prefix_pattern: "__maintenance_intent:",
+        owner_crate: "contextra-cognition",
+        erase_unit: EraseUnit::PerTenant,
+        scanner: "none-ephemeral",
         contains_identifier: false,
     },
     KeyFamilyEntry {
@@ -262,7 +294,11 @@ impl KeyFamilyRegistry {
                     Some(format!("__docid:{}", params.join(":")).into_bytes())
                 }
             }
+            "GraphData" | "__graph:" => Some(b"__graph:".to_vec()),
             "TxIntent" | "__tx_intent:" => Some(b"__tx_intent:".to_vec()),
+            "KvCache" | "__kv_spill:" => Some(b"__kv_spill:".to_vec()),
+            "SessionDag" | "__session_dag:" => Some(b"__session_dag:".to_vec()),
+            "MaintenanceIntent" | "__maintenance_intent:" => Some(b"__maintenance_intent:".to_vec()),
             "SystemMeta" | "__meta:" => Some(b"__meta:".to_vec()),
             _ => None,
         }
@@ -362,6 +398,10 @@ impl KeyFamilyRegistry {
                     b"__rel:".to_vec(),
                     b"__docid:".to_vec(),
                     b"__tx_intent:".to_vec(),
+                    b"__kv_spill:".to_vec(),
+                    b"__session_dag:".to_vec(),
+                    b"__maintenance_intent:".to_vec(),
+                    b"__meta:".to_vec(),
                 ];
 
                 let affected_layers = vec![

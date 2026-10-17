@@ -34,7 +34,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
         if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {
-            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&data) {
+            if let Ok(stored) = StoredDocument::from_slice(&data) {
                 return Ok(Some(crate::Document {
                     id: stored.id,
                     metadata: stored.metadata,
@@ -271,7 +271,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn get_tracked(&self, tx: TxId, id: &str) -> Result<Option<StoredDocument>> {
         let key = self.namespaced_key(id.as_bytes(), 0);
         if let Some(bytes) = self.storage.get_tracked(tx, &key).await? {
-            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            let doc = StoredDocument::from_slice(&bytes)?;
             Ok(Some(doc))
         } else {
             Ok(None)
@@ -287,7 +287,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     ) -> Result<Option<StoredDocument>> {
         let key = self.namespaced_key(id.as_bytes(), 0);
         if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {
-            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            let doc = StoredDocument::from_slice(&bytes)?;
             Ok(Some(doc))
         } else {
             Ok(None)

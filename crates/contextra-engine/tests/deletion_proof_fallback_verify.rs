@@ -153,8 +153,7 @@ fn test_serde_json_roundtrip_remains_verifiable() -> contextra_types::Result<()>
 #[tokio::test]
 async fn collection_delete_does_not_overclaim_layer() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().expect("tempdir");
-    let ctx = contextra_engine::ContextraBuilder::new(temp_dir.path())
-        .build()
+    let ctx = contextra_engine::Contextra::open_with_config(temp_dir.path(), contextra_engine::ContextraConfig::default())
         .await?;
 
     let tenant_id = TenantId::try_new(42).expect("valid tenant");
@@ -163,19 +162,19 @@ async fn collection_delete_does_not_overclaim_layer() -> contextra_types::Result
     let proof_key = vec![0x42u8; 32];
     let proof = ctx.drop_collection("test_col", tenant_id, &proof_key).await?;
 
-    let covered_layers = proof.covered_layers();
+    let covered_layers = proof.covered_layers;
     assert_eq!(
         covered_layers.len(),
         1,
         "Must contain exactly 1 layer proof for store API scan"
     );
     assert_eq!(
-        covered_layers[0].layer(),
+        &covered_layers[0],
         &DeletionLayer::LsmMemtable,
         "Must be labelled LsmMemtable for stage S0 logical scan"
     );
     assert_ne!(
-        covered_layers[0].layer(),
+        &covered_layers[0],
         &DeletionLayer::SsTableAllLevels,
         "Must NOT overclaim SsTableAllLevels"
     );

@@ -231,6 +231,35 @@ jobs:
       - name: Fast Unit Tests (xtask)
         run: cargo test --manifest-path xtask/Cargo.toml --locked
 
+  erasure-and-durable-fs-tests:
+    name: Erasure & Durable FS Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Durable FS Tests
+        run: cargo test --manifest-path crates/contextra-durable-fs/Cargo.toml
+
+      - name: Erasure Tests Suite
+        run: |
+          cargo test -p contextra-store --test 'erasure*' --test 'purge*' --test wal_scope_purge
+          cargo test -p contextra-engine --test 'deletion*' --test keyspace_conformance --test delete_concurrency
+          cargo test -p contextra-crypto --test 'deletion*' --test 'proof_binding*'
+
   ring-and-safety-checks:
     name: Ring & Safety Checks
     runs-on: ubuntu-latest

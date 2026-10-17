@@ -18,6 +18,29 @@ pub const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10;
 /// Default-Seed für die deterministische HNSW-Ebenenzuweisung (wie in hnswlib üblich).
 pub const DEFAULT_LAYER_SEED: u64 = 100;
 
+#[derive(Debug)]
+pub struct VectorSeededRng(pub contextra_sys::SeededRng);
+
+impl VectorSeededRng {
+    pub fn new(seed: u64) -> Self {
+        Self(contextra_sys::SeededRng::new(seed))
+    }
+}
+
+impl contextra_ports::SeededRng for VectorSeededRng {
+    fn next_u64(&self) -> u64 {
+        self.0.next_u64()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.0.fill_bytes(dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        self.0.next_unit_f64()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum VectorData {
     /// Standard 32-bit floating point vectors.
@@ -26,13 +49,39 @@ pub enum VectorData {
     U8(Vec<u8>),
 }
 
+impl VectorData {
+    /// Zeroizes in-memory vector storage bytes.
+    pub fn zeroize(&mut self) {
+        match self {
+            VectorData::F32(v) => {
+                for element in v.iter_mut() {
+                    *element = 0.0;
+                }
+            }
+            VectorData::U8(v) => {
+                v.fill(0);
+            }
+        }
+    }
+}
+
 /// A node in the HNSW graph.
 #[derive(Debug)]
 pub struct HnswNode {
-    pub(super) doc_id: DocId,
-    pub(super) vector: VectorData,
-    pub(super) max_layer: usize,
-    pub(super) committed_tx: u64,
+    pub doc_id: DocId,
+    pub vector: VectorData,
+    pub max_layer: usize,
+    pub committed_tx: u64,
+}
+
+impl HnswNode {
+    /// Zeroizes vector data and node metadata upon document deletion.
+    pub fn zeroize(&mut self) {
+        self.vector.zeroize();
+        self.doc_id = DocId::new(0);
+        self.committed_tx = 0;
+        self.max_layer = 0;
+    }
 }
 
 /// Search candidate.
@@ -89,6 +138,12 @@ pub struct HnswIndex {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
 }
 
+impl HnswIndex {
+    pub fn inner_core(&self) -> &HnswIndexCore {
+        &self.inner
+    }
+}
+
 #[repr(align(64))]
 pub struct HnswHotCore {
     pub nodes: RwLock<Vec<HnswNode>>,
@@ -122,6 +177,10 @@ impl HnswIndexCore {
     /// Sets the metrics sink.
     pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
         *self.cold.metrics_sink.write() = sink;
+    }
+
+    pub fn get_node_connections(&self, node_idx: usize, layer: usize) -> Vec<u32> {
+        self.hot.get_ram_node_connections(node_idx, layer, self.cold.config.m)
     }
 }
 
@@ -187,6 +246,7 @@ pub struct HnswColdCore {
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
+    pub fault_injection_skip_zeroize: AtomicBool,
     #[cfg(test)]
     pub fault_injection_insert_target: AtomicU64,
     #[cfg(test)]
@@ -259,6 +319,7 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    fault_injection_skip_zeroize: AtomicBool::new(false),
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -272,7 +333,7 @@ impl HnswIndex {
     ///
     /// Uses an internal, non-cryptographic, reproducible default RNG seeded with [`DEFAULT_LAYER_SEED`].
     pub fn try_new(config: HnswConfig) -> Result<Self> {
-        let rng = std::sync::Arc::new(contextra_ports::SystemRng::new());
+        let rng = std::sync::Arc::new(VectorSeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
     }
 
@@ -285,7 +346,7 @@ impl HnswIndex {
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
         let rng: std::sync::Arc<dyn contextra_ports::Rng> =
-            std::sync::Arc::new(contextra_ports::SystemRng::new());
+            std::sync::Arc::new(VectorSeededRng::new(DEFAULT_LAYER_SEED));
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
@@ -327,6 +388,7 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    fault_injection_skip_zeroize: AtomicBool::new(false),
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -334,6 +396,14 @@ impl HnswIndex {
                 },
             }),
         }
+    }
+
+    /// Controls test fault injection to simulate incomplete deletion (skipping zeroization).
+    pub fn set_fault_injection_skip_zeroize(&self, skip: bool) {
+        self.inner
+            .cold
+            .fault_injection_skip_zeroize
+            .store(skip, Ordering::SeqCst);
     }
 
     /// Sets the target insertion count for simulating compute_insert fault injection in tests.

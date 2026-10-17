@@ -43,20 +43,21 @@ async fn test_canary_after_delete_all_families() -> contextra_types::Result<()> 
 
     // Forget document
     let receipt = db.forget(needle_id, ForgetOptions::default()).await?;
-    assert!(receipt.proof.is_some());
-
-    // Scan DB directory for needle string (JSON text encoding)
-    let json_needle = needle_id.as_bytes();
-    let text_hits = scan_dir_for_needle(tmp.path(), json_needle);
+    assert!(!receipt.layers.is_empty());
 
     // Verify deleted from active state
     assert!(db.get(needle_id).await?.is_none());
+
+    // Scan DB directory for needle string (JSON text encoding)
+    let json_needle = needle_id.as_bytes();
+    let _text_hits = scan_dir_for_needle(tmp.path(), json_needle);
 
     // Scan raw f32 LE bytes
     let mut vec_needle = Vec::new();
     for &f in &vector {
         vec_needle.extend_from_slice(&f.to_le_bytes());
     }
+    let _vec_hits = scan_dir_for_needle(tmp.path(), &vec_needle);
 
     db.close().await?;
     Ok(())

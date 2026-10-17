@@ -61,6 +61,7 @@ mod check_audit_duplication;
 mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
+mod check_callers;
 mod check_commit_diff_integrity;
 mod check_commit_messages;
 mod check_compile;
@@ -2508,6 +2509,12 @@ fn main() {
         "check-bandit-latency-budget" => {
             if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
                 eprintln!("❌ check-bandit-latency-budget failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "check-callers" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if !check_callers::run_check_callers(extra_args) {
                 process::exit(1);
             }
         }

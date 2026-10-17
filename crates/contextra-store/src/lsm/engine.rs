@@ -128,6 +128,11 @@ impl LsmStorage {
     }
 
     /// Signals the background compaction engine to stop.
+    /// Returns the database root directory path.
+    pub fn db_dir(&self) -> &std::path::Path {
+        &self.config.path
+    }
+
     pub fn shutdown(&self) {
         self.cancel_token.cancel();
         self.task_tracker.close();

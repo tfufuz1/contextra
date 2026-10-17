@@ -346,6 +346,148 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     })
 }
 
+/// Report summarizing the cascade invalidation of a deleted entity across all graph structures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntityCascadeReport {
+    /// Die gelöschte Entität.
+    pub entity_id: EntityId,
+    /// Anzahl tombstonierter CSR-Kanten (eingehend + ausgehend).
+    pub tombstoned_edge_count: usize,
+    /// Tombstonierte Hyperkanten-IDs.
+    pub tombstoned_hyperedges: Vec<crate::hyperedge::HyperEdgeId>,
+    /// Ob die Community-Zuordnung entfernt wurde.
+    pub community_removed: bool,
+    /// Anzahl aus dem `EdgeReinforcementBuffer` entfernter Signale.
+    pub buffer_signals_purged: usize,
+}
+
+impl EntityCascadeReport {
+    pub fn new(entity_id: EntityId) -> Self {
+        Self {
+            entity_id,
+            tombstoned_edge_count: 0,
+            tombstoned_hyperedges: Vec::new(),
+            community_removed: false,
+            buffer_signals_purged: 0,
+        }
+    }
+}
+
+/// Kaskadierende Bereinigung aller Bezüge zu einer Entität (`entity_id`) aus allen Graph-Teilstrukturen.
+///
+/// Bereinigt:
+/// 1. CSR-Kanten: Tombstoniert alle ausgehenden und eingehenden Kanten via `GraphIndexExt::remove_entity`.
+/// 2. Hyperkanten: Tombstoniert alle aktiven Hyperkanten, an denen die Entität als Participant beteiligt ist.
+/// 3. Community-Zuordnung: Entfernt den Eintrag der Entität aus `inner.communities` (ohne globale Neuberechnung).
+/// 4. Adjazenz-Cache (`edge_store`): Entfernt Cache-Einträge für `entity_id`.
+/// 5. Reinforcement Buffer: Purged gepufferte Signale bezüglich `entity_id`.
+/// 6. DocEdgeIndex: Entfernt Provenienz-Referenzen bezüglich `entity_id`.
+pub async fn cascade_invalidate_entity(
+    graph: &CsrGraph,
+    entity_id: EntityId,
+    wal_seq: u64,
+    #[cfg(feature = "edge-reinforcement-learning")] buffer: Option<&EdgeReinforcementBuffer>,
+) -> Result<EntityCascadeReport> {
+    #[allow(deprecated)]
+    let wal_tx = TxId::new(wal_seq);
+    let mut report = EntityCascadeReport::new(entity_id);
+
+    // 1. Collect hyperedges involving entity_id and tombstone them
+    let hyperedge_ids_to_tombstone = {
+        let inner = graph.inner_read();
+        let mut ids = Vec::new();
+        if let Some(set) = inner.hyperedge_index.get(&entity_id) {
+            for &hid in set {
+                if let Some(hedge) = inner.hyperedges.get(&hid) {
+                    if hedge.tx_valid_to.is_none() {
+                        ids.push(hid);
+                    }
+                }
+            }
+        }
+        ids
+    };
+
+    for hid in hyperedge_ids_to_tombstone {
+        if graph.tombstone_hyperedge(hid, wal_tx) {
+            report.tombstoned_hyperedges.push(hid);
+        }
+    }
+
+    // 2. Count outgoing + incoming edges for report before removal
+    let edge_count_before = {
+        let inner = graph.inner_read();
+        let mut count = 0;
+        if let Some(&idx) = inner.id_map.get(&entity_id) {
+            if idx < inner.offsets.len() - 1 {
+                for j in inner.offsets[idx]..inner.offsets[idx + 1] {
+                    if !inner.tombstoned_edges.contains(&(idx, inner.targets[j])) {
+                        count += 1;
+                    }
+                }
+            }
+            if let Some(pending) = inner.pending_edges.get(&idx) {
+                for edge in pending {
+                    if !inner.tombstoned_edges.contains(&(idx, edge.target)) {
+                        count += 1;
+                    }
+                }
+            }
+            for src_idx in 0..inner.reverse_map.len() {
+                if src_idx == idx {
+                    continue;
+                }
+                if src_idx < inner.offsets.len() - 1 {
+                    for j in inner.offsets[src_idx]..inner.offsets[src_idx + 1] {
+                        if inner.targets[j] == idx
+                            && !inner.tombstoned_edges.contains(&(src_idx, idx))
+                        {
+                            count += 1;
+                        }
+                    }
+                }
+                if let Some(pending) = inner.pending_edges.get(&src_idx) {
+                    for edge in pending {
+                        if edge.target == idx && !inner.tombstoned_edges.contains(&(src_idx, idx)) {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
+    };
+
+    // 3. Remove community assignment and clear edge_store cache BEFORE remove_entity removes id_map entry
+    {
+        let mut inner = graph.inner_write();
+        report.community_removed = inner.communities.remove(&entity_id).is_some();
+        #[cfg(feature = "edge-reinforcement-learning")]
+        {
+            inner.edge_store.remove(&entity_id);
+            for edges in inner.edge_store.values_mut() {
+                edges.retain(|e| e.target != entity_id);
+            }
+        }
+    }
+
+    // 4. Remove entity and its incident edges via remove_entity
+    use crate::GraphIndexExt;
+    graph.remove_entity(wal_tx, entity_id).await?;
+    report.tombstoned_edge_count = edge_count_before;
+
+    // 5. Purge reinforcement buffer signals
+    #[cfg(feature = "edge-reinforcement-learning")]
+    if let Some(buf) = buffer {
+        report.buffer_signals_purged = buf.purge_signals_for_entity(entity_id);
+    }
+
+    // 6. Purge DocEdgeIndex references
+    graph.doc_edge_index.purge_entity(entity_id);
+
+    Ok(report)
+}
+
 /// Verifies byte-accurately that no active (non-tombstoned) hyperedge in `graph` directly or
 /// transitively (via `child_edge_ids`) references `target_doc_id`.
 ///

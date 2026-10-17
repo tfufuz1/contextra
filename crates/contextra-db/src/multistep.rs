@@ -105,12 +105,30 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         k: usize,
         rewriter: Option<&dyn QueryRewriter>,
     ) -> Result<MultiStepResult> {
-        self.search_with_embedder(original_query, vector, k, rewriter, None)
-            .await
+        contextra_types::public_api!("MultiStepEngine::search", {
+            self.search_with_embedder(original_query, vector, k, rewriter, None)
+                .await
+        })
     }
 
     /// Führt iterative multi-signale Hybrid-Suche mit Embedder für semantische Sub-Queries durch.
     pub async fn search_with_embedder(
+        &self,
+        original_query: &str,
+        vector: &[f32],
+        k: usize,
+        rewriter: Option<&dyn QueryRewriter>,
+        embedder: Option<&dyn TextEmbeddingEngine>,
+    ) -> Result<MultiStepResult> {
+        let original_query_owned = original_query.to_string();
+        let vector_owned = vector.to_vec();
+        contextra_types::public_api!("MultiStepEngine::search_with_embedder", {
+            self.search_with_embedder_inner(&original_query_owned, &vector_owned, k, rewriter, embedder)
+                .await
+        })
+    }
+
+    async fn search_with_embedder_inner(
         &self,
         original_query: &str,
         vector: &[f32],
