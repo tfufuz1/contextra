@@ -193,7 +193,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
         let mut buf = Vec::new();
 
         let header_bytes = header.to_bytes();
