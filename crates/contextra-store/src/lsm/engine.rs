@@ -148,6 +148,8 @@ impl LsmStorage {
             Arc::clone(&*wal_guard)
         };
         active_wal.close().await?;
+        self.sstables.write().await.clear();
+        self.block_cache.clear_all();
         Ok(())
     }
 
