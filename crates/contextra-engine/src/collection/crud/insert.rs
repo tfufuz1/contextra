@@ -325,7 +325,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?;
 
-        let data = serde_json::to_vec(&stored)?;
+        let data = stored.encode_v2()?;
         self.storage.put(tx, &user_key, &data).await?;
 
         let meta_data = serde_json::to_vec(&meta_only)?;

@@ -61,6 +61,9 @@ pub struct IndexLoadReport {
     pub skipped_undecodable: u64,
     /// Number of documents that failed vector index insertion.
     pub failed_inserts: u64,
+    /// Number of v1 JSON documents migrated to v2 binary format on disk.
+    #[serde(default)]
+    pub migrated_v1: u64,
     /// Duration taken to complete the index load operation.
     pub took: std::time::Duration,
 }
@@ -100,11 +103,191 @@ impl Default for CollectionConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Magic bytes prefix for binary StoredDocument v2 (`b"CXSD"`).
+pub const STORED_DOCUMENT_MAGIC: &[u8; 4] = b"CXSD";
+/// Format version byte for binary StoredDocument v2 (`0x02`).
+pub const STORED_DOCUMENT_VERSION_V2: u8 = 0x02;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct StoredDocument {
     pub id: String,
     pub embedding: Vec<f32>,
     pub metadata: Option<serde_json::Value>,
+}
+
+impl StoredDocument {
+    /// Encodes this `StoredDocument` into the v2 binary format (`b"CXSD"` header + version byte `0x02` + LE `f32`s).
+    pub fn encode_v2(&self) -> Result<Vec<u8>> {
+        for f in &self.embedding {
+            if !f.is_finite() {
+                return Err(ContextraError::InvalidInput("embedding contains non-finite float"));
+            }
+        }
+
+        let id_bytes = self.id.as_bytes();
+        let id_len = u32::try_from(id_bytes.len())
+            .map_err(|_| ContextraError::InvalidInput("document ID too long"))?;
+
+        let embedding_count = u32::try_from(self.embedding.len())
+            .map_err(|_| ContextraError::InvalidInput("embedding vector too long"))?;
+
+        let meta_bytes = match &self.metadata {
+            Some(v) => Some(serde_json::to_vec(v).map_err(|e| ContextraError::Serialization(e.to_string()))?),
+            None => None,
+        };
+
+        let mut buf = Vec::with_capacity(
+            4 + 1 + 4 + id_bytes.len() + 4 + (self.embedding.len() * 4) + 1 + meta_bytes.as_ref().map_or(0, |b| 4 + b.len())
+        );
+
+        buf.extend_from_slice(STORED_DOCUMENT_MAGIC);
+        buf.push(STORED_DOCUMENT_VERSION_V2);
+
+        buf.extend_from_slice(&id_len.to_be_bytes());
+        buf.extend_from_slice(id_bytes);
+
+        buf.extend_from_slice(&embedding_count.to_be_bytes());
+        for &f in &self.embedding {
+            buf.extend_from_slice(&f.to_le_bytes());
+        }
+
+        if let Some(bytes) = meta_bytes {
+            buf.push(1);
+            let meta_len = u32::try_from(bytes.len())
+                .map_err(|_| ContextraError::InvalidInput("metadata payload too long"))?;
+            buf.extend_from_slice(&meta_len.to_be_bytes());
+            buf.extend_from_slice(&bytes);
+        } else {
+            buf.push(0);
+        }
+
+        Ok(buf)
+    }
+
+    /// Decodes a `StoredDocument` from a byte slice, accepting both v1 (JSON) and v2 (binary `CXSD`).
+    pub fn from_slice(data: &[u8]) -> Result<Self> {
+        let (doc, _) = Self::from_slice_versioned(data)?;
+        Ok(doc)
+    }
+
+    /// Decodes a `StoredDocument` and returns the format version encountered (`1` for v1 JSON, `2` for v2 binary).
+    pub fn from_slice_versioned(data: &[u8]) -> Result<(Self, u8)> {
+        if data.is_empty() {
+            return Err(ContextraError::Serialization("empty document payload".to_string()));
+        }
+
+        if data.starts_with(STORED_DOCUMENT_MAGIC) {
+            if data.len() < 5 {
+                return Err(ContextraError::Serialization("truncated v2 header".to_string()));
+            }
+            let version = data[4];
+            if version != STORED_DOCUMENT_VERSION_V2 {
+                return Err(ContextraError::Serialization(format!(
+                    "unsupported StoredDocument binary version: {version}"
+                )));
+            }
+
+            let mut cursor = 5;
+
+            if data.len() < cursor + 4 {
+                return Err(ContextraError::Serialization("truncated ID length".to_string()));
+            }
+            let id_len = u32::from_be_bytes(
+                data[cursor..cursor + 4]
+                    .try_into()
+                    .map_err(|_| ContextraError::Serialization("invalid ID len bytes".to_string()))?,
+            ) as usize;
+            cursor += 4;
+
+            if data.len() < cursor + id_len {
+                return Err(ContextraError::Serialization("truncated ID string".to_string()));
+            }
+            let id = std::str::from_utf8(&data[cursor..cursor + id_len])
+                .map_err(|e| ContextraError::Serialization(e.to_string()))?
+                .to_string();
+            cursor += id_len;
+
+            if data.len() < cursor + 4 {
+                return Err(ContextraError::Serialization("truncated embedding count".to_string()));
+            }
+            let vec_len = u32::from_be_bytes(
+                data[cursor..cursor + 4]
+                    .try_into()
+                    .map_err(|_| ContextraError::Serialization("invalid vec len bytes".to_string()))?,
+            ) as usize;
+            cursor += 4;
+
+            let vec_bytes_len = vec_len
+                .checked_mul(4)
+                .ok_or_else(|| ContextraError::Serialization("embedding length overflow".to_string()))?;
+
+            if data.len() < cursor + vec_bytes_len {
+                return Err(ContextraError::Serialization("truncated embedding floats".to_string()));
+            }
+
+            let mut embedding = Vec::with_capacity(vec_len);
+            for chunk in data[cursor..cursor + vec_bytes_len].chunks_exact(4) {
+                let val = f32::from_le_bytes(
+                    chunk
+                        .try_into()
+                        .map_err(|_| ContextraError::Serialization("invalid float bytes".to_string()))?,
+                );
+                if !val.is_finite() {
+                    return Err(ContextraError::Serialization("non-finite float in embedding".to_string()));
+                }
+                embedding.push(val);
+            }
+            cursor += vec_bytes_len;
+
+            if data.len() < cursor + 1 {
+                return Err(ContextraError::Serialization("truncated metadata flag".to_string()));
+            }
+            let meta_flag = data[cursor];
+            cursor += 1;
+
+            let metadata = if meta_flag == 1 {
+                if data.len() < cursor + 4 {
+                    return Err(ContextraError::Serialization("truncated metadata length".to_string()));
+                }
+                let meta_len = u32::from_be_bytes(
+                    data[cursor..cursor + 4]
+                        .try_into()
+                        .map_err(|_| ContextraError::Serialization("invalid meta len bytes".to_string()))?,
+                ) as usize;
+                cursor += 4;
+
+                if data.len() < cursor + meta_len {
+                    return Err(ContextraError::Serialization("truncated metadata json".to_string()));
+                }
+                let meta_json: serde_json::Value = serde_json::from_slice(&data[cursor..cursor + meta_len])
+                    .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+                cursor += meta_len;
+                Some(meta_json)
+            } else if meta_flag == 0 {
+                None
+            } else {
+                return Err(ContextraError::Serialization(format!(
+                    "invalid metadata flag: {meta_flag}"
+                )));
+            };
+
+            if cursor != data.len() {
+                return Err(ContextraError::Serialization("unexpected trailing bytes in v2 payload".to_string()));
+            }
+
+            Ok((StoredDocument { id, embedding, metadata }, 2))
+        } else {
+            // Fallback to v1 JSON text parsing
+            let doc: StoredDocument = serde_json::from_slice(data)
+                .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+            for f in &doc.embedding {
+                if !f.is_finite() {
+                    return Err(ContextraError::Serialization("non-finite float in v1 embedding".to_string()));
+                }
+            }
+            Ok((doc, 1))
+        }
+    }
 }
 
 /// Leichtgewichtige Metadaten (für doc_key, key_type=1) — KEIN Embedding.
@@ -672,6 +855,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut decoded: u64 = 0;
         let mut skipped_undecodable: u64 = 0;
         let mut failed_inserts: u64 = 0;
+        let mut migrated_v1: u64 = 0;
+        let mut pending_v2_rewrites: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
 
         const INDEX_LOAD_SKIPPED_TOTAL: &str = "contextra_index_load_skipped_total";
 
@@ -682,8 +867,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             scanned += 1;
 
-            let stored: StoredDocument = match serde_json::from_slice(&v) {
-                Ok(d) => d,
+            let (stored, version) = match StoredDocument::from_slice_versioned(&v) {
+                Ok(res) => res,
                 Err(e) => {
                     skipped_undecodable += 1;
                     crate::metrics_names::record_counter_safe(
@@ -713,6 +898,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
             };
+
+            if version == 1 {
+                let v2_bytes = stored.encode_v2().map_err(|e| {
+                    ContextraError::Index(format!("Failed v2 encoding during migration for document '{}': {e}", stored.id))
+                })?;
+                pending_v2_rewrites.push((k.clone(), v2_bytes));
+            }
 
             decoded += 1;
 
@@ -749,6 +941,20 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         self.index.commit(tx).await?;
 
+        if !pending_v2_rewrites.is_empty() {
+            let migration_tx = self.allocate_tx()?;
+            for (key, v2_payload) in &pending_v2_rewrites {
+                self.storage.put(migration_tx, key, v2_payload).await?;
+            }
+            self.storage.commit(migration_tx).await?;
+            migrated_v1 = pending_v2_rewrites.len() as u64;
+            tracing::info!(
+                migrated = migrated_v1,
+                collection = %self.name,
+                "Migrated v1 JSON documents to v2 binary format on disk"
+            );
+        }
+
         let end_ticks = self.clock().monotonic_ticks();
         let took_nanos = end_ticks.saturating_sub(start_ticks);
         let took = std::time::Duration::from_nanos(took_nanos);
@@ -758,6 +964,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             decoded,
             skipped_undecodable,
             failed_inserts,
+            migrated_v1,
             took,
         };
 

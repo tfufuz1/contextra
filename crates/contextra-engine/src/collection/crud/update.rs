@@ -84,7 +84,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             metadata: metadata.clone(),
         };
         let meta_only = StoredDocumentMeta::from(&stored);
-        let data = serde_json::to_vec(&stored)?;
+        let data = stored.encode_v2()?;
         let meta_data = serde_json::to_vec(&meta_only)?;
 
         self.storage.put(tx, &user_key, &data).await?;
