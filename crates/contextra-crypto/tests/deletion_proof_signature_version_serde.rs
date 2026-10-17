@@ -1,5 +1,7 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionScope, DurabilityProof, ExcludedScope, LayerCleanupProof,
 };
 use contextra_crypto::ed25519_proof::{DeletionProofError, DeletionProofKeyPair, SignatureVersion};
 use contextra_types::{DocId, TenantId, TxId};
@@ -14,10 +16,7 @@ fn test_signature_version_try_from_u8() {
         SignatureVersion::try_from(0),
         Err(DeletionProofError::UnsupportedVersion(0))
     );
-    assert_eq!(
-        SignatureVersion::try_from(4),
-        Err(DeletionProofError::UnsupportedVersion(4))
-    );
+    assert_eq!(SignatureVersion::try_from(4), Ok(SignatureVersion::V4));
     assert_eq!(
         SignatureVersion::try_from(255),
         Err(DeletionProofError::UnsupportedVersion(255))
@@ -36,6 +35,7 @@ fn test_deletion_proof_typed_signature_version_accessor() {
         timestamp: 0,
         signature: vec![],
         covered_layers: vec![],
+        uncovered_layers: vec![],
         excluded_scopes: vec![],
         graph_repair: vec![],
         wal_chain_receipt: None,
@@ -58,10 +58,7 @@ fn test_deletion_proof_typed_signature_version_accessor() {
     );
 
     proof.signature_version = 4;
-    assert_eq!(
-        proof.signature_version_typed(),
-        Err(DeletionProofError::UnsupportedVersion(4))
-    );
+    assert_eq!(proof.signature_version_typed(), Ok(SignatureVersion::V4));
 }
 
 #[test]
@@ -116,8 +113,8 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         .unwrap());
 
     // Golden JSON V3
-    let mut rng = rand::rngs::OsRng;
-    let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let keypair = DeletionProofKeyPair::generate();
+    let durability = DurabilityProof::new(30);
     let proof_v3_orig = DeletionProof::create_v3(
         scope,
         vec![b"key_a".to_vec()],
@@ -126,6 +123,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();
@@ -153,6 +151,7 @@ fn test_verify_rejects_unknown_versions_fail_closed() {
         timestamp: 0,
         signature: vec![],
         covered_layers: vec![],
+        uncovered_layers: vec![],
         excluded_scopes: vec![],
         graph_repair: vec![],
         wal_chain_receipt: None,
@@ -162,6 +161,6 @@ fn test_verify_rejects_unknown_versions_fail_closed() {
 
     assert!(proof.verify(b"secret").is_err());
 
-    proof.signature_version = 4;
+    proof.signature_version = 5;
     assert!(proof.verify(b"secret").is_err());
 }

@@ -10,7 +10,6 @@
 //! Ermöglicht Dritten (z. B. Datenschutz-Aufsichtsbehörden) die unabhängige Prüfung
 //! von Contextra-Löschbeweisen ohne Zugriff auf interne Systemgeheimnisse.
 
-use rand::RngCore;
 use thiserror::Error;
 
 pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;
@@ -31,43 +30,7 @@ pub enum DeletionProofError {
     UnsupportedVersion(u8),
 }
 
-/// Schlüsselpaar für Ed25519-Löschbeweise.
-#[derive(Debug)]
-pub struct DeletionProofKeyPair {
-    /// Privater Signierschlüssel.
-    pub signing_key: ed25519_dalek::SigningKey,
-    /// Öffentlicher Verifikationsschlüssel.
-    pub verifying_key: ed25519_dalek::VerifyingKey,
-}
-
-impl DeletionProofKeyPair {
-    /// Generiert ein neues Ed25519-Schlüsselpaar unter Nutzung eines injizierten Zufallsgenerators.
-    pub fn generate(rng: &mut impl RngCore) -> Self {
-        let mut secret_bytes = [0u8; 32];
-        rng.fill_bytes(&mut secret_bytes);
-        let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
-        let verifying_key = signing_key.verifying_key();
-        Self {
-            signing_key,
-            verifying_key,
-        }
-    }
-
-    /// Gibt die 32-Byte-Repräsentation des öffentlichen Verifikationsschlüssels zurück.
-    pub fn verifying_key_bytes(&self) -> [u8; 32] {
-        self.verifying_key.to_bytes()
-    }
-
-    /// Gibt eine Referenz auf den Signierschlüssel zurück.
-    pub fn signing_key(&self) -> &ed25519_dalek::SigningKey {
-        &self.signing_key
-    }
-
-    /// Gibt eine Referenz auf den Verifikationsschlüssel zurück.
-    pub fn verifying_key(&self) -> &ed25519_dalek::VerifyingKey {
-        &self.verifying_key
-    }
-}
+pub use crate::deletion_proof::keys::DeletionProofKeyPair;
 
 /// Signiert den kanonischen Byte-Payload eines Version-3-Löschbeweises mit Ed25519.
 ///
@@ -118,6 +81,8 @@ pub enum SignatureVersion {
     V2 = 2,
     /// Ed25519 asymmetric signature with length-prefixed key hashes (version 3)
     V3 = 3,
+    /// Ed25519 asymmetric signature with 7-layer coverage report (version 4)
+    V4 = 4,
 }
 
 impl SignatureVersion {
@@ -141,12 +106,14 @@ impl TryFrom<u8> for SignatureVersion {
             1 => Ok(SignatureVersion::V1),
             2 => Ok(SignatureVersion::V2),
             3 => Ok(SignatureVersion::V3),
+            4 => Ok(SignatureVersion::V4),
             v => Err(DeletionProofError::UnsupportedVersion(v)),
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use rand::rngs::StdRng;
@@ -155,7 +122,7 @@ mod tests {
     #[test]
     fn test_keypair_generation_and_bytes() {
         let mut rng = StdRng::seed_from_u64(42);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let vk_bytes = keypair.verifying_key_bytes();
 
         assert_eq!(vk_bytes, keypair.verifying_key.to_bytes());
@@ -168,7 +135,7 @@ mod tests {
     #[test]
     fn test_v3_sign_and_verify_roundtrip() {
         let mut rng = StdRng::seed_from_u64(100);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let payload = b"canonical_deletion_proof_payload_v3";
 
         let signature = sign_deletion_proof_v3(&keypair, payload);
@@ -181,7 +148,7 @@ mod tests {
     #[test]
     fn test_v3_tampered_payload_fails_verification() {
         let mut rng = StdRng::seed_from_u64(101);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let payload = b"canonical_deletion_proof_payload_v3";
 
         let signature = sign_deletion_proof_v3(&keypair, payload);

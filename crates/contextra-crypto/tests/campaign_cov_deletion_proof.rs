@@ -3,9 +3,9 @@
 // INVARIANTEN: DeletionProof V3 signatures are verified externally via Ed25519 verifying key without secret key.
 // NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating Ed25519 payload verification and tamper rejection.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, deprecated)]
 
-use contextra_crypto::deletion_proof::{DeletionProof, DeletionScope};
+use contextra_crypto::deletion_proof::{DeletionProof, DeletionScope, DurabilityProof};
 use contextra_types::{TenantId, TxId};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
@@ -17,6 +17,7 @@ fn test_deletion_proof_verify_external_and_tamper() {
     let tenant_id = TenantId::SYSTEM;
 
     let scope = DeletionScope::Tenant { tenant_id };
+    let durability = DurabilityProof::new(100);
     let proof = DeletionProof::create_v3(
         scope,
         vec![b"deleted_key_1".to_vec(), b"deleted_key_2".to_vec()],
@@ -25,6 +26,7 @@ fn test_deletion_proof_verify_external_and_tamper() {
         vec![],
         123456789,
         &[],
+        Some(&durability),
         &sk,
     )
     .expect("create_v3 deletion proof");

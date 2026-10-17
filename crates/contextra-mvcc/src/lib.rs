@@ -5,7 +5,7 @@
 //!
 //! This crate provides the concurrency and isolation layer:
 //! - [`SequenceLog`]: Monotonic sequence tracking and change notifications.
-//! - [`SnapshotRegistry`] / [`SnapshotGuard`]: MVCC read isolation guards.
+//! - [`SnapshotRegistry`] / [`SnapshotLease`]: MVCC read isolation guards.
 //! - [`TxBuffer`]: Sharded transaction staging with orphan reaping.
 //! - [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI) read tracking and conflict detection.
 
@@ -14,12 +14,24 @@
 
 pub use contextra_types::*;
 
+pub mod floor;
+pub mod lease;
 pub mod seq_log;
 pub mod snapshot;
 pub mod ssi;
+pub mod sync;
 pub mod tx_buffer;
+pub mod wiring;
 
+pub use floor::{GcFloor, SnapshotFloor};
+pub use lease::SnapshotLease;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
-pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
+pub use snapshot::{
+    SnapshotRegistry, DEFAULT_MAX_SNAPSHOT_AGE_TICKS, DEFAULT_PIN_GRACE_TICKS,
+};
+pub use ssi::{
+    CommitDecision, PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiCommitGate,
+    SsiError, SsiValidator, TxSsiState, TxStateStatus,
+};
 pub use tx_buffer::{IndexOp, TxBuffer};
+pub use wiring::{MvccWiring, MvccWiringDeps};

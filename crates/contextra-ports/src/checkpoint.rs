@@ -1,9 +1,10 @@
-//! Checkpoint subsystem trait definitions.
+//! Checkpoint and Snapshot subsystem trait definitions.
 
 use super::BoxFuture;
 use crate::types::*;
 use crate::Result;
 use std::future::Future;
+
 
 /// Abstract contract for generating consistent checkpoints.
 pub trait Checkpoint: Send + Sync + 'static {

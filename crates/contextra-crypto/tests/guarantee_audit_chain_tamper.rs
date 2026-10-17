@@ -13,7 +13,12 @@
 // | Tail Appending (Gültiger Eigenhash) | Nein | Ja | Erweitere Kette 0..n+k ist lokal valide, aber publizierte Head-Signatur sichert nur den früheren Head-Hash/Index. |
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(deprecated)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, AuditChainEntry, DataClass, DeletionProofKeyPair,
@@ -479,7 +484,7 @@ fn test_encrypted_commitment_salt_security_and_tamper() {
     assert!(wrong_group.decrypt(&registry).is_err());
 
     // 5. Decryption after subkey revocation (shredding) fails
-    assert!(registry.revoke_subkey(group_id));
+    assert!(registry.revoke_subkey(group_id).unwrap());
     assert!(enc_salt.decrypt(&registry).is_err());
 }
 

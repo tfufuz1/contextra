@@ -74,6 +74,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
         )
     };
     if res == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -101,6 +102,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: InitializeAcl initialises the allocated ACL buffer.
     if unsafe { InitializeAcl(p_acl, acl_size as u32, ACL_REVISION) } == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -110,6 +112,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: AddAccessAllowedAce populates the initialized ACL for owner_sid.
     if unsafe { AddAccessAllowedAce(p_acl, ACL_REVISION, GENERIC_ALL, owner_sid) } == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -217,6 +220,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     // SAFETY: GetSecurityDescriptorControl checks DACL inheritance protection.
     let status = unsafe { GetSecurityDescriptorControl(p_sec_desc, &mut control, &mut revision) };
     if status == 0 {
+        // SAFETY: Calling GetLastError immediately after failed Win32 API call on current thread.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -315,6 +319,27 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_acl_stubs_or_execution() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("contextra_acl_test_{}.tmp", std::process::id()));
+        std::fs::write(&test_file, b"acl test")?;
+
+        let res_set = set_restrictive_file_acl(&test_file);
+        assert!(res_set.is_ok(), "set_restrictive_file_acl failed: {:?}", res_set);
+
+        let res_verify = verify_file_acl_owner_only(&test_file);
+        assert!(res_verify.is_ok(), "verify_file_acl_owner_only failed: {:?}", res_verify);
+
+        let _ = std::fs::remove_file(test_file);
+        Ok(())
+    }
 }
 
 #[cfg(not(windows))]

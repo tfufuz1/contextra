@@ -356,6 +356,19 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
+            ContextraError::SnapshotExpired {
+                seq_no,
+                age_ticks,
+                max_age_ticks,
+            } => Self {
+                kind: "SnapshotExpired".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({
+                    "seq_no": seq_no,
+                    "age_ticks": age_ticks,
+                    "max_age_ticks": max_age_ticks,
+                })),
+            },
         }
     }
 }

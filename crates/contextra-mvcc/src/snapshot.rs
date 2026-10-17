@@ -4,42 +4,63 @@
 //! sequence number to prevent premature tombstone GC.
 
 // FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
+// STAND: 2026-10-15T00:00:00Z
 // ZWECK: SnapshotRegistry für MVCC-sichere Reads und minimal aktive Sequenznummern.
-// INVARIANTEN: Solange SnapshotGuard lebt -> keine Tombstone-GC für seq >= guard.seq_no.
+// INVARIANTEN: Solange SnapshotLease lebt -> keine Tombstone-GC für seq >= lease.seq_no.
 // HOTSPOTS: 40-110
 // NICHT-OFFENSICHTLICH: Lock-freie Reads von min_active_seqno() via AtomicU64 (Acquire/Release).
-// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
 
-// INVARIANT: Snapshot-Registry schützt Reads vor Compaction-GC.
-// INVARIANTE: Solange SnapshotGuard lebt → keine Tombstone-GC für seq >= guard.seq_no.
-// RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
+use contextra_ports::Clock;
+use contextra_types::ContextraError;
 
+use crate::lease::SnapshotLease;
+use crate::sync::atomic::{AtomicU64, Ordering};
+use crate::sync::{Arc, Mutex};
 use crate::types::TOMBSTONE_BIT;
-use parking_lot::Mutex;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+pub use crate::floor::SnapshotFloor;
+
+/// Default maximum snapshot age policy: 15 minutes in ticks (nanoseconds).
+pub const DEFAULT_MAX_SNAPSHOT_AGE_TICKS: u64 = 15 * 60 * 1_000_000_000;
+
+/// Default pin grace policy: 30 seconds in ticks (nanoseconds).
+pub const DEFAULT_PIN_GRACE_TICKS: u64 = 30 * 1_000_000_000;
+
+impl SnapshotFloor for SnapshotRegistry {
+    fn floor(&self) -> u64 {
+        self.min_active_seqno()
+    }
+}
 
 /// Registry for active read snapshots.
 ///
 /// ### Synchronization & Memory Ordering Strategy
 /// - **Single-Writer Exclusivity via Mutex**: All modifications to active snapshot reference
-///   counts (`register`, `pin`, `release`) acquire the `self.active` `parking_lot::Mutex`.
+///   counts (`acquire`, `pin`, `release`) acquire the `self.active` `parking_lot::Mutex`.
 ///   This guarantees serialized state transitions and single-writer updates to `min_active_seqno`.
 /// - **Lock-Free Reads with Acquire/Release**: Reads of `min_active_seqno()` perform a lockless
 ///   atomic load using `Ordering::Acquire`. Updates in `update_min()` store the calculated minimum
 ///   using `Ordering::Release`.
-/// - **Sufficiency**: `Ordering::Release` on writes paired with `Ordering::Acquire` on reads is
-///   the minimum safe memory ordering for single-writer, many-reader scenarios without holding
-///   a lock. It establishes a release-acquire ordering guarantee between registration/deregistration
-///   state changes and reader threads (such as LSM compaction workers), preventing instruction
-///   reordering across the atomic synchronization boundary.
-#[derive(Debug)]
 pub struct SnapshotRegistry {
-    active: Mutex<BTreeMap<u64, Vec<Instant>>>,
+    active: Mutex<BTreeMap<u64, Vec<u64>>>,
     min_active_seqno: AtomicU64,
+    max_snapshot_age_ticks: AtomicU64,
+    pin_grace_ticks: AtomicU64,
+    clock: Option<Arc<dyn Clock>>,
+}
+
+impl std::fmt::Debug for SnapshotRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SnapshotRegistry")
+            .field("active", &self.active)
+            .field("min_active_seqno", &self.min_active_seqno)
+            .field("max_snapshot_age_ticks", &self.max_snapshot_age_ticks)
+            .field("pin_grace_ticks", &self.pin_grace_ticks)
+            .field("has_clock", &self.clock.is_some())
+            .finish()
+    }
 }
 
 impl Default for SnapshotRegistry {
@@ -49,44 +70,131 @@ impl Default for SnapshotRegistry {
 }
 
 impl SnapshotRegistry {
-    /// Creates a new empty SnapshotRegistry.
+    /// Creates a new empty SnapshotRegistry with default pin-policy settings (15m max_snapshot_age, 30s pin_grace).
     pub fn new() -> Self {
         Self {
             active: Mutex::new(BTreeMap::new()),
             min_active_seqno: AtomicU64::new(u64::MAX),
+            max_snapshot_age_ticks: AtomicU64::new(DEFAULT_MAX_SNAPSHOT_AGE_TICKS),
+            pin_grace_ticks: AtomicU64::new(DEFAULT_PIN_GRACE_TICKS),
+            clock: None,
         }
     }
 
-    /// Registers a read snapshot. Returns an RAII guard that
-    /// automatically deregisters on drop.
-    pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
-        self.register_at(seq_no, Instant::now())
+    /// Sets the injected clock port and returns `self`.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = Some(clock);
+        self
     }
 
-    /// Registers a read snapshot at a specific creation timestamp `at`.
-    pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
-        let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
-        active.entry(seq_no).or_default().push(at);
-        self.update_min(&active);
-        SnapshotGuard {
-            registry: self.clone(),
-            seq_no,
-            created_at: Some(at),
+    /// Sets the injected clock port.
+    pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
+        self.clock = Some(clock);
+    }
+
+    /// Returns the injected clock port, if configured.
+    pub fn clock(&self) -> Option<&Arc<dyn Clock>> {
+        self.clock.as_ref()
+    }
+
+    /// Returns the current monotonic timestamp in ticks (nanoseconds) using the configured clock, or 0.
+    pub fn now_ticks(&self) -> u64 {
+        if let Some(ref clock) = self.clock {
+            clock.monotonic_nanos()
+        } else {
+            0
         }
     }
 
+    /// Sets the maximum snapshot age in ticks (nanoseconds).
+    pub fn set_max_snapshot_age_ticks(&self, ticks: u64) {
+        self.max_snapshot_age_ticks.store(ticks, Ordering::Release);
+    }
+
+    /// Returns the configured maximum snapshot age in ticks (nanoseconds).
+    pub fn max_snapshot_age_ticks(&self) -> u64 {
+        self.max_snapshot_age_ticks.load(Ordering::Acquire)
+    }
+
+    /// Sets the maximum snapshot age using a [`Duration`].
+    pub fn set_max_snapshot_age(&self, duration: Duration) {
+        let ticks = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        self.set_max_snapshot_age_ticks(ticks);
+    }
+
+    /// Returns the configured maximum snapshot age as a [`Duration`].
+    pub fn max_snapshot_age(&self) -> Duration {
+        Duration::from_nanos(self.max_snapshot_age_ticks())
+    }
+
+    /// Sets the pin grace period in ticks (nanoseconds).
+    pub fn set_pin_grace_ticks(&self, ticks: u64) {
+        self.pin_grace_ticks.store(ticks, Ordering::Release);
+    }
+
+    /// Returns the configured pin grace period in ticks (nanoseconds).
+    pub fn pin_grace_ticks(&self) -> u64 {
+        self.pin_grace_ticks.load(Ordering::Acquire)
+    }
+
+    /// Sets the pin grace period using a [`Duration`].
+    pub fn set_pin_grace(&self, duration: Duration) {
+        let ticks = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        self.set_pin_grace_ticks(ticks);
+    }
+
+    /// Returns the configured pin grace period as a [`Duration`].
+    pub fn pin_grace(&self) -> Duration {
+        Duration::from_nanos(self.pin_grace_ticks())
+    }
+
+    /// Erwirbt einen Read-Snapshot, indem `f` *innerhalb* des Registry-Locks ausgewertet wird.
+    #[cfg(loom)]
+    pub fn acquire(this: &Arc<Self>, f: impl FnOnce() -> u64) -> SnapshotLease {
+        let now = this.now_ticks();
+        SnapshotRegistry::acquire_at(this, f, now)
+    }
+
+    /// Erwirbt einen Read-Snapshot, indem `f` *innerhalb* des Registry-Locks ausgewertet wird.
+    #[cfg(not(loom))]
+    pub fn acquire(self: &Arc<Self>, f: impl FnOnce() -> u64) -> SnapshotLease {
+        let now = self.now_ticks();
+        self.acquire_at(f, now)
+    }
+
+    /// Wie [`acquire`], erlaubt aber einen expliziten Erstellungszeitstempel `at_ticks`.
+    #[cfg(loom)]
+    pub fn acquire_at(this: &Arc<Self>, f: impl FnOnce() -> u64, at_ticks: u64) -> SnapshotLease {
+        let seq_no = {
+            let mut active = match this.active.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            let seq_no = f() & !TOMBSTONE_BIT;
+            active.entry(seq_no).or_default().push(at_ticks);
+            this.update_min(&active);
+            seq_no
+        };
+        SnapshotLease::new(Arc::clone(this), seq_no, Some(at_ticks))
+    }
+
+    /// Wie [`acquire`], erlaubt aber einen expliziten Erstellungszeitstempel `at_ticks`.
+    #[cfg(not(loom))]
+    pub fn acquire_at(self: &Arc<Self>, f: impl FnOnce() -> u64, at_ticks: u64) -> SnapshotLease {
+        let seq_no = {
+            let mut active = match self.active.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            let seq_no = f() & !TOMBSTONE_BIT;
+            active.entry(seq_no).or_default().push(at_ticks);
+            self.update_min(&active);
+            seq_no
+        };
+        SnapshotLease::new(Arc::clone(self), seq_no, Some(at_ticks))
+    }
+
     /// Returns the minimum active sequence number (`u64::MAX` if none).
-    ///
-    /// Uses `Ordering::Acquire` to synchronize with `Ordering::Release` writes in `update_min`.
-    /// This allows reader threads (e.g., compaction processes) to safely query the minimum
-    /// active snapshot sequence without acquiring the `active` mutex lock.
-    /// Returns the minimum active sequence number (`u64::MAX` if none).
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` compaction workers query `min_active_seqno()` using lock-free Acquire ordering
-    /// to determine tombstone GC floors. The minimum sequence number will never exceed the creation sequence
-    /// of any live `SnapshotGuard` or active pin.
     #[inline]
     pub fn min_active_seqno(&self) -> u64 {
         self.min_active_seqno.load(Ordering::Acquire)
@@ -94,14 +202,17 @@ impl SnapshotRegistry {
 
     /// Persistent pin of a sequence number to prevent GC (SAOS Checkpoint).
     pub fn pin(&self, seq_no: u64) {
-        self.pin_at(seq_no, Instant::now());
+        self.pin_at(seq_no, self.now_ticks());
     }
 
-    /// Persistent pin of a sequence number at a specific timestamp `at`.
-    pub fn pin_at(&self, seq_no: u64, at: Instant) {
+    /// Persistent pin of a sequence number at a specific timestamp `at_ticks`.
+    pub fn pin_at(&self, seq_no: u64, at_ticks: u64) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
-        active.entry(seq_no).or_default().push(at);
+        let mut active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        active.entry(seq_no).or_default().push(at_ticks);
         self.update_min(&active);
     }
 
@@ -114,11 +225,14 @@ impl SnapshotRegistry {
         self.release_at(seq_no, None);
     }
 
-    pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<Instant>) {
+    pub(crate) fn release_at(&self, seq_no: u64, created_at_ticks: Option<u64>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
-        let mut active = self.active.lock();
+        let mut active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(timestamps) = active.get_mut(&seq_no) {
-            if let Some(ts) = created_at {
+            if let Some(ts) = created_at_ticks {
                 if let Some(pos) = timestamps.iter().position(|&t| t == ts) {
                     timestamps.swap_remove(pos);
                 } else {
@@ -130,70 +244,99 @@ impl SnapshotRegistry {
             if timestamps.is_empty() {
                 active.remove(&seq_no);
             }
-        } else {
-            // Unpinning or releasing an un-tracked sequence number is a no-op (§2 Zero-Panic).
         }
         self.update_min(&active);
     }
 
-    /// Identifies which active snapshot sequence number has been held the longest relative to `now`,
+    /// Checks if a given snapshot lease is still valid at `now_ticks`.
+    ///
+    /// Returns `Err(ContextraError::SnapshotExpired)` if the age of the lease exceeds `max_snapshot_age_ticks`.
+    pub fn check_lease_valid(&self, lease: &SnapshotLease, now_ticks: u64) -> Result<(), ContextraError> {
+        if let Some(created_at) = lease.created_at_ticks() {
+            let age = now_ticks.saturating_sub(created_at);
+            let max_age = self.max_snapshot_age_ticks();
+            if age > max_age {
+                return Err(ContextraError::snapshot_expired(lease.seq_no(), age, max_age));
+            }
+        }
+        Ok(())
+    }
+
+    /// Forcibly evicts active pins whose duration exceeds `pin_grace_ticks` relative to `now_ticks`.
+    /// Returns the list of sequence numbers whose pins were forcibly expired.
+    pub fn evict_grace_expired_pins_at(&self, now_ticks: u64) -> Vec<u64> {
+        let grace = self.pin_grace_ticks();
+        let mut active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let mut evicted = Vec::new();
+        let mut keys_to_remove = Vec::new();
+
+        for (&seq_no, timestamps) in active.iter_mut() {
+            timestamps.retain(|&ts| {
+                let age = now_ticks.saturating_sub(ts);
+                let is_expired = age > grace;
+                if is_expired {
+                    evicted.push(seq_no);
+                }
+                !is_expired
+            });
+            if timestamps.is_empty() {
+                keys_to_remove.push(seq_no);
+            }
+        }
+
+        for seq in keys_to_remove {
+            active.remove(&seq);
+        }
+
+        self.update_min(&active);
+        evicted.sort_unstable();
+        evicted.dedup();
+        evicted
+    }
+
+    /// Returns the minimum active sequence number after forcibly evicting grace-expired pins at `now_ticks`.
+    pub fn min_active_seqno_at(&self, now_ticks: u64) -> u64 {
+        let _ = self.evict_grace_expired_pins_at(now_ticks);
+        self.min_active_seqno()
+    }
+
+    /// Identifies which active snapshot sequence number has been held the longest relative to `now_ticks`,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
-    pub fn longest_active_pin_at(&self, now: Instant) -> Option<(u64, Duration)> {
-        let active = self.active.lock();
-        let mut longest: Option<(u64, Duration)> = None;
+    pub fn longest_active_pin_at(&self, now_ticks: u64) -> Option<(u64, Duration)> {
+        let active = match self.active.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let mut longest: Option<(u64, u64)> = None;
 
         for (&seq_no, timestamps) in active.iter() {
             for &ts in timestamps {
-                let duration = now.saturating_duration_since(ts);
+                let age = now_ticks.saturating_sub(ts);
                 match longest {
-                    None => longest = Some((seq_no, duration)),
-                    Some((_, max_duration)) if duration > max_duration => {
-                        longest = Some((seq_no, duration));
+                    None => longest = Some((seq_no, age)),
+                    Some((_, max_age)) if age > max_age => {
+                        longest = Some((seq_no, age));
                     }
                     _ => {}
                 }
             }
         }
 
-        longest
+        longest.map(|(seq, age)| (seq, Duration::from_nanos(age)))
     }
 
     /// Identifies which active snapshot sequence number has been held the longest,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
     pub fn longest_active_pin(&self) -> Option<(u64, Duration)> {
-        self.longest_active_pin_at(Instant::now())
+        self.longest_active_pin_at(self.now_ticks())
     }
 
-    fn update_min(&self, active: &BTreeMap<u64, Vec<Instant>>) {
-        // SAFETY: u64::MAX is the correct default when no snapshots are active.
-        // It allows the LSM compaction to garbage collect ALL tombstones, as
-        // all existing records will have seq_no < u64::MAX.
-        //
-        // Memory Ordering: Ordering::Release is required to publish all snapshot state updates
-        // made under the `active` mutex lock to concurrent readers calling `min_active_seqno()`
-        // with Ordering::Acquire.
+    fn update_min(&self, active: &BTreeMap<u64, Vec<u64>>) {
         let min = active.keys().next().copied().unwrap_or(u64::MAX);
         self.min_active_seqno.store(min, Ordering::Release);
-    }
-}
-
-/// RAII Guard for an active snapshot.
-pub struct SnapshotGuard {
-    registry: Arc<SnapshotRegistry>,
-    seq_no: u64,
-    created_at: Option<Instant>,
-}
-
-impl SnapshotGuard {
-    /// Returns the sequence number pinned by this snapshot guard.
-    pub fn seq_no(&self) -> u64 {
-        self.seq_no
-    }
-}
-
-impl Drop for SnapshotGuard {
-    fn drop(&mut self) {
-        self.registry.release_at(self.seq_no, self.created_at);
     }
 }
 
@@ -203,26 +346,25 @@ mod tests {
     use super::*;
     use proptest::prop_assert_eq;
 
-    // INTENT: Snapshot-Registry Lifecycle verified by 5 unit tests.
     #[test]
     fn test_snapshot_registry_basic() {
         let registry = Arc::new(SnapshotRegistry::new());
         assert_eq!(registry.min_active_seqno(), u64::MAX);
 
-        let guard = registry.register(100);
-        assert_eq!(guard.seq_no(), 100);
+        let lease = registry.acquire(|| 100);
+        assert_eq!(lease.seq_no(), 100);
         assert_eq!(registry.min_active_seqno(), 100);
 
-        drop(guard);
+        drop(lease);
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
     #[test]
     fn test_multiple_snapshots_min_calc() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let _g1 = registry.register(200);
-        let g2 = registry.register(100);
-        let _g3 = registry.register(300);
+        let _g1 = registry.acquire(|| 200);
+        let g2 = registry.acquire(|| 100);
+        let _g3 = registry.acquire(|| 300);
 
         assert_eq!(registry.min_active_seqno(), 100);
 
@@ -233,10 +375,10 @@ mod tests {
     #[test]
     fn test_pin_unpin() {
         let registry = Arc::new(SnapshotRegistry::new());
-        registry.pin(50);
+        registry.pin_at(50, 100);
         assert_eq!(registry.min_active_seqno(), 50);
 
-        let g = registry.register(100);
+        let g = registry.acquire_at(|| 100, 100);
         assert_eq!(registry.min_active_seqno(), 50);
 
         registry.unpin(50);
@@ -249,19 +391,18 @@ mod tests {
     #[test]
     fn test_seq_no_tombstone_masking() {
         let registry = Arc::new(SnapshotRegistry::new());
-        // seq_no with tombstone bit set
         let seq = 100 | crate::types::TOMBSTONE_BIT;
-        let guard = registry.register(seq);
+        let lease = registry.acquire(|| seq);
 
-        assert_eq!(guard.seq_no(), 100);
+        assert_eq!(lease.seq_no(), 100);
         assert_eq!(registry.min_active_seqno(), 100);
     }
 
     #[test]
     fn test_ref_counting() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let g1 = registry.register(100);
-        let g2 = registry.register(100);
+        let g1 = registry.acquire(|| 100);
+        let g2 = registry.acquire(|| 100);
 
         assert_eq!(registry.min_active_seqno(), 100);
 
@@ -275,7 +416,6 @@ mod tests {
     #[test]
     fn test_unpin_unknown_seq_no_does_not_panic() {
         let registry = Arc::new(SnapshotRegistry::new());
-        // Unpinning a sequence number that was never pinned or registered must not panic
         registry.unpin(999);
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
@@ -292,26 +432,62 @@ mod tests {
     #[test]
     fn test_double_registration_and_sequential_drop() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let g1 = registry.register(42);
-        let g2 = registry.register(42);
+        let g1 = registry.acquire(|| 42);
+        let g2 = registry.acquire(|| 42);
 
         assert_eq!(registry.min_active_seqno(), 42);
 
-        // Dropping one guard decrements ref-count to 1; seq_no 42 is still active.
         drop(g1);
         assert_eq!(
             registry.min_active_seqno(),
             42,
-            "min_active_seqno must remain 42 while second guard is active"
+            "min_active_seqno must remain 42 while second lease is active"
         );
 
-        // Dropping second guard decrements ref-count to 0 and removes entry.
         drop(g2);
         assert_eq!(
             registry.min_active_seqno(),
             u64::MAX,
-            "min_active_seqno must return u64::MAX after all guards are dropped"
+            "min_active_seqno must return u64::MAX after all leases are dropped"
         );
+    }
+
+    #[test]
+    fn test_max_snapshot_age_expired_lease() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        registry.set_max_snapshot_age_ticks(1_000_000); // 1ms
+
+        let lease = registry.acquire_at(|| 50, 100);
+        assert!(lease.check_valid_at(100 + 500).is_ok());
+
+        // Age = 1_000_001 > 1_000_000
+        let res = lease.check_valid_at(100 + 1_000_001);
+        assert!(matches!(
+            res,
+            Err(ContextraError::SnapshotExpired {
+                seq_no: 50,
+                age_ticks: 1_000_001,
+                max_age_ticks: 1_000_000
+            })
+        ));
+    }
+
+    #[test]
+    fn test_pin_grace_eviction() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        registry.set_pin_grace_ticks(30_000_000_000); // 30s
+
+        registry.pin_at(10, 1000);
+        registry.pin_at(20, 1000 + 40_000_000_000);
+
+        assert_eq!(registry.min_active_seqno(), 10);
+
+        // At t = 1000 + 35_000_000_000, pin at seq 10 is 35s old (> 30s pin_grace)
+        let evicted = registry.evict_grace_expired_pins_at(1000 + 35_000_000_000);
+        assert_eq!(evicted, vec![10]);
+
+        // Remaining active pin is seq 20 (age 5s)
+        assert_eq!(registry.min_active_seqno(), 20);
     }
 
     proptest::proptest! {
@@ -320,115 +496,91 @@ mod tests {
             seqs in proptest::collection::vec(0..1000u64, 1..50)
         ) {
             let registry = Arc::new(SnapshotRegistry::new());
-            let mut guards = Vec::new();
+            let mut leases = Vec::new();
 
             for &seq in &seqs {
-                guards.push(registry.register(seq));
+                leases.push(registry.acquire(|| seq));
             }
 
-            let min_expected = *seqs.iter().min().unwrap(); // #[cfg(test)]
+            let min_expected = *seqs.iter().min().unwrap();
             prop_assert_eq!(registry.min_active_seqno(), min_expected);
 
-            guards.pop(); // Drop last element
+            leases.pop();
 
-            // If all elements dropped, min_active is MAX, else it's min of remaining
-            if guards.is_empty() {
+            if leases.is_empty() {
                 prop_assert_eq!(registry.min_active_seqno(), u64::MAX);
             } else {
-                let remaining_min = guards.iter().map(|g| g.seq_no()).min().unwrap_or(u64::MAX);
+                let remaining_min = leases.iter().map(|l| l.seq_no()).min().unwrap_or(u64::MAX);
                 prop_assert_eq!(registry.min_active_seqno(), remaining_min);
             }
         }
 
-        /// Proptest: Proves that dropping guards one-by-one in arbitrary order
-        /// always maintains the correct min_active_seqno invariant.
-        ///
-        /// # Anti-Mirroring
-        /// Expected min is computed by maintaining an independent sorted list
-        /// of remaining sequence numbers, not by calling SnapshotRegistry methods.
         #[test]
         fn prop_snapshot_register_unregister_stress(
             seqs in proptest::collection::vec(0..5000u64, 2..80),
-            // Indices into the guards vec to determine drop order
             drop_order_seed in proptest::collection::vec(0..1000usize, 2..80),
         ) {
             let registry = Arc::new(SnapshotRegistry::new());
-            let mut guards: Vec<Option<SnapshotGuard>> = Vec::new();
+            let mut leases: Vec<Option<SnapshotLease>> = Vec::new();
 
-            // Register all
             for &seq in &seqs {
-                guards.push(Some(registry.register(seq)));
+                leases.push(Some(registry.acquire(|| seq)));
             }
 
-            // Build independent reference: sorted multiset of active seqs
             let mut active_seqs: Vec<u64> = seqs.clone();
             active_seqs.sort_unstable();
 
-            // Verify initial state
             prop_assert_eq!(registry.min_active_seqno(), active_seqs[0]);
 
-            // Drop guards one-by-one using the seed to pick which to drop
-            let mut remaining_indices: Vec<usize> = (0..guards.len()).collect();
+            let mut remaining_indices: Vec<usize> = (0..leases.len()).collect();
             for seed_val in &drop_order_seed {
                 if remaining_indices.is_empty() {
                     break;
                 }
                 let idx_in_remaining = seed_val % remaining_indices.len();
-                let guard_idx = remaining_indices.remove(idx_in_remaining);
+                let lease_idx = remaining_indices.remove(idx_in_remaining);
 
-                // Drop the guard
-                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
-                guards[guard_idx] = None;
+                let seq_val = leases[lease_idx].as_ref().unwrap().seq_no();
+                leases[lease_idx] = None;
 
-                // Remove from reference (one occurrence only)
                 if let Some(pos) = active_seqs.iter().position(|&s| s == seq_val) {
                     active_seqs.remove(pos);
                 }
 
-                // Verify invariant
                 let expected_min = active_seqs.first().copied().unwrap_or(u64::MAX);
                 prop_assert_eq!(
                     registry.min_active_seqno(),
                     expected_min,
-                    "After dropping guard for seq={}, min should be {}",
+                    "After dropping lease for seq={}, min should be {}",
                     seq_val,
                     expected_min
                 );
             }
         }
 
-        /// Proptest: Pin/Unpin combined with register/drop.
-        /// Proves that persistent pins and RAII guards coexist correctly.
-        ///
-        /// # Anti-Mirroring
-        /// Reference min is maintained in an independent BTreeMap<u64, usize>.
         #[test]
         fn prop_snapshot_pin_unpin_interleaving(
             pin_seqs in proptest::collection::vec(0..500u64, 1..20),
-            guard_seqs in proptest::collection::vec(0..500u64, 1..20),
+            lease_seqs in proptest::collection::vec(0..500u64, 1..20),
         ) {
             use std::collections::BTreeMap;
             let registry = Arc::new(SnapshotRegistry::new());
             let mut ref_counts: BTreeMap<u64, usize> = BTreeMap::new();
 
-            // Pin all
             for &seq in &pin_seqs {
-                registry.pin(seq);
+                registry.pin_at(seq, 0);
                 *ref_counts.entry(seq).or_default() += 1;
             }
 
-            // Register guards
-            let mut guards = Vec::new();
-            for &seq in &guard_seqs {
-                guards.push(registry.register(seq));
+            let mut leases = Vec::new();
+            for &seq in &lease_seqs {
+                leases.push(registry.acquire_at(|| seq, 0));
                 *ref_counts.entry(seq).or_default() += 1;
             }
 
-            // Verify combined min
             let expected_min = ref_counts.keys().next().copied().unwrap_or(u64::MAX);
             prop_assert_eq!(registry.min_active_seqno(), expected_min);
 
-            // Unpin all pins
             for &seq in &pin_seqs {
                 registry.unpin(seq);
                 if let Some(count) = ref_counts.get_mut(&seq) {
@@ -442,8 +594,7 @@ mod tests {
             let expected_min2 = ref_counts.keys().next().copied().unwrap_or(u64::MAX);
             prop_assert_eq!(registry.min_active_seqno(), expected_min2);
 
-            // Drop all guards
-            drop(guards);
+            drop(leases);
             prop_assert_eq!(registry.min_active_seqno(), u64::MAX);
         }
     }

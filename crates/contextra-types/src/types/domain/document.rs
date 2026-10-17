@@ -98,6 +98,8 @@ impl DistanceMetric {
     //          bzw. f64 (Cosine) und sättigen per .min(u32::MAX as u64). Kein Overflow möglich.
     //          Regressionstest: test_distance_metrics_u8_overflow (100_000 Elemente à 255).
     // ID: AGT-CORE-001
+    // FIX(2026-10-05): Bounded fixed-point u8 vector distance metric conversions (clamped/min-saturated).
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
             return Err(ContextraError::invalid_input(

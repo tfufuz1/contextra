@@ -1,5 +1,6 @@
 mod compaction;
 mod maintenance;
+pub mod purge;
 pub(super) mod read;
 mod write;
 
@@ -139,7 +140,7 @@ impl StorageEngine for LsmStorage {
         Box::pin(compaction::flush(self))
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(maintenance::stats(self))
     }
 
@@ -149,5 +150,9 @@ impl StorageEngine for LsmStorage {
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(maintenance::last_tx_id(self))
+    }
+
+    fn erasure_capabilities(&self) -> Option<&dyn contextra_ports::erasure::ErasureBackend> {
+        Some(self)
     }
 }

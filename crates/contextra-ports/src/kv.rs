@@ -134,6 +134,10 @@ pub struct KvPrefixHit {
 
 /// Trait defining the contract for KV prefix caching and block reuse (Spec §9.2).
 ///
+/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
+/// |---|---|---|---|
+/// | `KvPrefixStore` | `TenantPrefixKvStore` (`contextra-kvcache`) | `contextra-db` | Aktiver Port für KV-Cache-Prefix-Lokalisierung |
+///
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch synchrone Schnittstellen vtable-kompatibel (dyn-safe).
 pub trait KvPrefixStore: Send + Sync + 'static {
@@ -152,6 +156,21 @@ pub trait KvPrefixStore: Send + Sync + 'static {
     /// Evicts KV prefix entries for the given tenant and prefix key.
     /// Returns the number of blocks evicted.
     fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError>;
+}
+
+/// Trait defining lifecycle hooks for KV cache stores (rollback, document removal, tenant purge).
+///
+/// Synchronous and dyn-compatible interface without async runtime dependencies (P26).
+/// Guarantees strict tenant isolation across all lifecycle operations (INV-TENANT).
+pub trait KvLifecycleHooks: Send + Sync + 'static {
+    /// Cleans up KV cache segments associated with a rolled-back transaction.
+    fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]);
+
+    /// Removes KV cache segments associated with a specific document.
+    fn remove_doc_segments(&self, tenant: TenantId, doc: contextra_types::DocId);
+
+    /// Purges all cached KV segments and radix state for the given tenant.
+    fn purge_tenant(&self, tenant: TenantId);
 }
 
 #[cfg(test)]

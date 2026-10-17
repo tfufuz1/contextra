@@ -26,6 +26,11 @@ impl<'a> ContextSegment<'a> {
         }
     }
 
+    /// Constructs a `ContextSegment` initialized with a RoPE positional offset.
+    pub fn with_offset(chunk_id: u64, text: &'a str, offset: usize) -> Self {
+        Self::new(chunk_id, text).with_rope_offset(offset)
+    }
+
     /// Builder method to set the model fingerprint.
     pub fn with_fingerprint(mut self, fingerprint: &'a ModelFingerprint) -> Self {
         self.model_fingerprint = Some(fingerprint);
@@ -163,6 +168,7 @@ impl<T: EmbeddingProvider> TextEmbeddingEngine for T {
 }
 
 /// Deterministic mock embedding provider for tests.
+#[cfg(any(test, feature = "test-utils"))]
 pub struct MockEmbedder {
     /// Target embedding dimensionality.
     pub dim: usize,
@@ -170,6 +176,7 @@ pub struct MockEmbedder {
     pub fixed_output: Option<Vec<f32>>,
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl MockEmbedder {
     /// Creates a new `MockEmbedder` with the specified dimension.
     pub fn new(dim: usize) -> Self {
@@ -187,8 +194,14 @@ impl MockEmbedder {
             fixed_output: Some(fixed_output),
         }
     }
+
+    /// Creates a mock embedder with standard fixed unit output.
+    pub fn fixed_unit(dim: usize) -> Self {
+        Self::with_fixed_output(vec![0.1f32; dim])
+    }
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl EmbeddingProvider for MockEmbedder {
     fn provider_name(&self) -> &str {
         "mock"

@@ -1,10 +1,18 @@
-//! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
+//! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
+//! Stand: 2026-10-06
+//! Zweck: Write-Ahead Log (WAL) core structure, lifecycle management, and recovery.
+//! Invarianten:
+//! - I-3 (Crash-Konsistenz): Restores Log up to last HMAC-verified frame.
+//! - I-5 (Poison-State Isolation): Flusher panics in close() are evaluated and propagated as ContextraError::Internal.
 
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
 pub mod io;
 pub mod replay;
+pub mod replay_filter;
+pub mod retire;
+pub mod witness_scan;
 
 #[cfg(test)]
 mod tests;
@@ -14,8 +22,14 @@ mod open_heal_tests;
 
 pub use encode::*;
 pub use flusher::*;
+#[cfg(feature = "wal-integrity")]
 pub(crate) use hmac::*;
 pub use replay::*;
+pub use replay_filter::*;
+#[cfg(not(loom))]
+pub use retire::*;
+#[cfg(not(loom))]
+pub use witness_scan::*;
 
 #[cfg(not(loom))]
 pub(crate) mod fs {
@@ -89,7 +103,30 @@ pub(crate) mod fs {
             #[cfg(not(unix))]
             {
                 // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata.
-                std::fs::metadata(".").map(|m| m.permissions()).unwrap()
+                let path = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+                match std::fs::metadata(&path) {
+                    Ok(m) => m.permissions(),
+                    Err(_) => {
+                        match std::fs::metadata(std::env::temp_dir()) {
+                            Ok(m) => m.permissions(),
+                            Err(e) => {
+                                tracing::error!("Failed to query Loom mock permissions: {e}");
+                                std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
+                                tracing::error!("Retrying Loom mock permissions query failed: {e}");
+                                match std::fs::File::open(&path).and_then(|f| f.metadata()) {
+                                    Ok(m) => m.permissions(),
+                                    Err(err) => {
+                                        tracing::error!("Loom mock permissions fallback error: {err}");
+                                        std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
+                                            std::fs::metadata(&path).expect("Loom mock permissions fallback failure")
+                                        })
+                                    }
+                                }
+                            })
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -236,7 +273,7 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 pub use contextra_crypto::crypto::KeyManager;
 use std::path::{Path, PathBuf};
@@ -296,6 +333,7 @@ pub struct WalConfig {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
+    pub expected_hwm: Option<[u8; 32]>,
 }
 
 impl Default for WalConfig {
@@ -305,6 +343,7 @@ impl Default for WalConfig {
             allow_legacy_integrity_key_fallback: false,
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
+            expected_hwm: None,
         }
     }
 }
@@ -312,6 +351,11 @@ impl Default for WalConfig {
 impl WalConfig {
     pub fn with_legacy_fallback(mut self, allow: bool) -> Self {
         self.allow_legacy_integrity_key_fallback = allow;
+        self
+    }
+
+    pub fn with_expected_hwm(mut self, hwm: Option<[u8; 32]>) -> Self {
+        self.expected_hwm = hwm;
         self
     }
 }
@@ -323,6 +367,7 @@ pub struct Wal {
     pub(crate) key_manager: Option<Arc<KeyManager>>,
     pub(crate) fallback_integrity_key: Option<[u8; 32]>,
     pub(crate) allow_legacy_integrity_key_fallback: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) min_wal_version: WalVersion,
     pub(crate) legacy_key_used: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) was_legacy_rekeyed: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
@@ -335,7 +380,14 @@ pub struct Wal {
 
 impl Drop for Wal {
     fn drop(&mut self) {
-        // No-op: Flusher task loop terminates naturally when all flusher_tx senders are dropped (rx.recv() returns None).
+        if let Ok(mut tx_guard) = self.flusher_tx.write() {
+            tx_guard.take();
+        }
+        if let Ok(mut task_guard) = self.flusher_task.lock() {
+            if let Some(task) = task_guard.take() {
+                task.abort();
+            }
+        }
     }
 }
 
@@ -447,6 +499,18 @@ impl Wal {
             return Ok(false);
         }
 
+        if self
+            .was_legacy_rekeyed
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            Self::write_migration_marker_atomically(&self.path).await?;
+            self.allow_legacy_integrity_key_fallback
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            self.legacy_key_used
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            return Ok(true);
+        }
+
         if !self
             .legacy_key_used
             .load(std::sync::atomic::Ordering::SeqCst)
@@ -504,52 +568,65 @@ impl Wal {
         path: impl AsRef<Path>,
         config: WalConfig,
     ) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        let has_marker = Self::has_migration_marker(&path).await;
-        let allow_legacy_fallback = if has_marker {
-            false
-        } else {
-            config.allow_legacy_integrity_key_fallback
-        };
+        #[cfg(all(not(feature = "wal-integrity"), not(feature = "memory-only-storage")))]
+        {
+            let _ = (path, config);
+            return Err(ContextraError::Storage(
+                "WAL integrity verification is disabled at compile time ('wal-integrity' feature missing). Refusing to open persistent WAL without integrity checks.".into(),
+            ));
+        }
 
-        #[cfg(feature = "wal-integrity")]
-        let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
-            (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
-        } else {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
+        #[cfg(any(feature = "wal-integrity", feature = "memory-only-storage"))]
+        {
+            let path = path.as_ref().to_path_buf();
+            let has_marker = Self::has_migration_marker(&path).await;
+            let allow_legacy_fallback = if has_marker {
+                false
+            } else {
+                config.allow_legacy_integrity_key_fallback
+            };
 
-        #[cfg(not(feature = "wal-integrity"))]
-        let (derived_key_manager, fallback_integrity_key) = {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
+            #[cfg(feature = "wal-integrity")]
+            let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager
+            {
+                let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+                (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
+            } else {
+                let key = Self::load_or_create_integrity_key(&path).await?;
+                (None, Some(key))
+            };
 
-        let file_len = self::fs::metadata(&path)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+            #[cfg(not(feature = "wal-integrity"))]
+            let (derived_key_manager, fallback_integrity_key) = {
+                let key = Self::load_or_create_integrity_key(&path).await?;
+                (None, Some(key))
+            };
 
-        Ok(Self {
-            path,
-            size: Arc::new(std::sync::atomic::AtomicU64::new(file_len)),
-            header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
-            key_manager: derived_key_manager,
-            fallback_integrity_key,
-            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
-                allow_legacy_fallback,
-            )),
-            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
-            flusher_tx: std::sync::RwLock::new(None),
-            flusher_task: std::sync::Mutex::new(None),
-            sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
-            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        })
+            let file_len = self::fs::metadata(&path)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0);
+
+            Ok(Self {
+                path,
+                size: Arc::new(std::sync::atomic::AtomicU64::new(file_len)),
+                header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
+                key_manager: derived_key_manager,
+                fallback_integrity_key,
+                allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                    allow_legacy_fallback,
+                )),
+                min_wal_version: config.min_wal_version,
+                legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
+                flusher_tx: std::sync::RwLock::new(None),
+                flusher_task: std::sync::Mutex::new(None),
+                sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+                truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
+                poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            })
+        }
     }
 
     /// Opens or creates a WAL file with an optional KeyManager.
@@ -569,140 +646,162 @@ impl Wal {
 
     /// Opens or creates a WAL file with explicit configuration options.
     pub async fn open_with_config(path: impl AsRef<Path>, config: WalConfig) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
-
-        // Vor dem eigentlichen Öffnen der WAL-Datei: prüfen, ob ein Crash-Recovery aus
-        // einem .bak-Backup nötig ist (z. B. Crash zwischen set_len(0) und V3-Rewrite).
-        let _ = recover_from_bak_if_present(&path).await?;
-
-        // SD-09-CRYPTO-002: Use a persisted UUID v4 as file_id instead of the
-        // filename.  This makes the WAL's cryptographic sub-key independent of
-        // the filesystem path — renaming or moving the file cannot cause nonce-
-        // reuse between two WAL instances sharing the same master key.
-        #[cfg(feature = "wal-integrity")]
-        let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
-            (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
-        } else {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
-
-        #[cfg(not(feature = "wal-integrity"))]
-        let (derived_key_manager, fallback_integrity_key) = {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
-
-        let (file, is_new) = match self::fs::OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .read(true)
-            .open(&path)
-            .await
+        #[cfg(all(not(feature = "wal-integrity"), not(feature = "memory-only-storage")))]
         {
-            Ok(file) => (file, true),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = self::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .read(true)
-                    .open(&path)
-                    .await
-                    .map_err(|e| ContextraError::Storage(format!("Failed to open WAL: {}", e)))?;
-                (file, false)
-            }
-            Err(e) => {
-                return Err(ContextraError::Storage(format!(
-                    "Failed to create WAL: {}",
-                    e
-                )));
-            }
-        };
-
-        // 🛡️ SICHERUNG: Directory FSync (FIND-STO-004 / Task G)
-        if is_new {
-            file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "WAL file fsync failed for {}: {}",
-                    path.display(),
-                    e
-                ))
-            })?;
-            crate::util::fsync_parent_dir(&path).await?;
+            let _ = (path, config);
+            return Err(ContextraError::Storage(
+                "WAL integrity verification is disabled at compile time ('wal-integrity' feature missing). Refusing to open persistent WAL without integrity checks.".into(),
+            ));
         }
 
-        let metadata = file
-            .metadata()
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        #[cfg(any(feature = "wal-integrity", feature = "memory-only-storage"))]
+        {
+            let path = path.as_ref().to_path_buf();
 
-        let has_marker = Self::has_migration_marker(&path).await;
-        let allow_legacy_fallback = if has_marker {
-            false
-        } else {
-            config.allow_legacy_integrity_key_fallback
-        };
+            // Vor dem eigentlichen Öffnen der WAL-Datei: prüfen, ob ein Crash-Recovery aus
+            // einem .bak-Backup nötig ist (z. B. Crash zwischen set_len(0) und V3-Rewrite).
+            let _ = recover_from_bak_if_present(&path).await?;
 
-        let wal = Self {
-            path: path.clone(),
-            size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
-            header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
-            key_manager: derived_key_manager,
-            fallback_integrity_key,
-            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
-                allow_legacy_fallback,
-            )),
-            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
-            flusher_tx: std::sync::RwLock::new(None),
-            flusher_task: std::sync::Mutex::new(None),
-            sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        };
+            // SD-09-CRYPTO-002: Use a persisted UUID v4 as file_id instead of the
+            // filename.  This makes the WAL's cryptographic sub-key independent of
+            // the filesystem path — renaming or moving the file cannot cause nonce-
+            // reuse between two WAL instances sharing the same master key.
+            #[cfg(feature = "wal-integrity")]
+            let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager
+            {
+                let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+                (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
+            } else {
+                let key = Self::load_or_create_integrity_key(&path).await?;
+                (None, Some(key))
+            };
 
-        wal.enable_flusher_with_config(file, config.flusher_config)?;
+            #[cfg(not(feature = "wal-integrity"))]
+            let (derived_key_manager, fallback_integrity_key) = {
+                let key = Self::load_or_create_integrity_key(&path).await?;
+                (None, Some(key))
+            };
 
-        // If file is not empty, find the last valid HMAC to continue the chain
-        if metadata.len() > 0 {
-            let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
-            if version < config.min_wal_version || version != WalVersion::V3 {
-                tracing::info!(
-                    "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
-                    version,
-                    wal.path
-                );
-                let bak_suffix = match version {
-                    WalVersion::V1 => "v1.bak",
-                    WalVersion::V2 => "v2.bak",
-                    WalVersion::V3 => "v3.bak",
-                };
-                let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
-                let copy_res = self::fs::copy(&wal.path, &bak_path).await;
-                if copy_res.is_ok() {
-                    // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
-                    let bak_file = self::fs::OpenOptions::new()
-                        .write(true)
-                        .open(&bak_path)
+            let (file, is_new) = match self::fs::OpenOptions::new()
+                .create_new(true)
+                .append(true)
+                .read(true)
+                .open(&path)
+                .await
+            {
+                Ok(file) => (file, true),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    let file = self::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .read(true)
+                        .open(&path)
                         .await
                         .map_err(|e| {
+                            ContextraError::Storage(format!("Failed to open WAL: {}", e))
+                        })?;
+                    (file, false)
+                }
+                Err(e) => {
+                    return Err(ContextraError::Storage(format!(
+                        "Failed to create WAL: {}",
+                        e
+                    )));
+                }
+            };
+
+            // 🛡️ SICHERUNG: Directory FSync (FIND-STO-004 / Task G)
+            if is_new {
+                file.sync_all().await.map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "WAL file fsync failed for {}: {}",
+                        path.display(),
+                        e
+                    ))
+                })?;
+                crate::util::fsync_parent_dir(&path).await?;
+            }
+
+            let metadata = file
+                .metadata()
+                .await
+                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+            let has_marker = Self::has_migration_marker(&path).await;
+            let allow_legacy_fallback = if has_marker {
+                false
+            } else {
+                config.allow_legacy_integrity_key_fallback
+            };
+
+            let wal = Self {
+                path: path.clone(),
+                size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
+                header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
+                key_manager: derived_key_manager,
+                fallback_integrity_key,
+                allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                    allow_legacy_fallback,
+                )),
+                min_wal_version: config.min_wal_version,
+                legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
+                flusher_tx: std::sync::RwLock::new(None),
+                flusher_task: std::sync::Mutex::new(None),
+                sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
+                poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            };
+
+            wal.enable_flusher_with_config(file, config.flusher_config)?;
+
+            // If file is not empty, find the last valid HMAC to continue the chain
+            if metadata.len() > 0 {
+                let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
+                if version < config.min_wal_version
+                    || (version != WalVersion::V3 && !allow_legacy_fallback)
+                {
+                    return Err(ContextraError::invalid_input(format!(
+                        "WAL format version {:?} is disallowed by configuration (min_wal_version: {:?}, allow_legacy_integrity_key_fallback: {}). Explicit migration via open_for_legacy_migration / migrate_legacy_wal required.",
+                        version, config.min_wal_version, allow_legacy_fallback
+                    )));
+                }
+
+                if version != WalVersion::V3 {
+                    tracing::info!(
+                        "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
+                        version,
+                        wal.path
+                    );
+                    let bak_suffix = match version {
+                        WalVersion::V1 => "v1.bak",
+                        WalVersion::V2 => "v2.bak",
+                        WalVersion::V3 => "v3.bak",
+                    };
+                    let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
+                    let copy_res = self::fs::copy(&wal.path, &bak_path).await;
+                    if copy_res.is_ok() {
+                        // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
+                        let bak_file = self::fs::OpenOptions::new()
+                            .write(true)
+                            .open(&bak_path)
+                            .await
+                            .map_err(|e| {
+                                ContextraError::Storage(format!(
+                                    "Could not reopen WAL backup for fsync: {e}"
+                                ))
+                            })?;
+                        bak_file.sync_all().await.map_err(|e| {
                             ContextraError::Storage(format!(
-                                "Could not reopen WAL backup for fsync: {e}"
+                                "WAL backup fsync failed before rewrite: {e}"
                             ))
                         })?;
-                    bak_file.sync_all().await.map_err(|e| {
-                        ContextraError::Storage(format!(
-                            "WAL backup fsync failed before rewrite: {e}"
-                        ))
-                    })?;
-                    crate::util::fsync_parent_dir(&bak_path).await?;
-                }
-                let rewrite_res = wal.rewrite_as_v3(&entries).await;
+                        crate::util::fsync_parent_dir(&bak_path).await?;
+                    }
+                    let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
-                if copy_res.is_err() || rewrite_res.is_err() {
-                    if config.min_wal_version > WalVersion::V1 || version < config.min_wal_version {
+                    if copy_res.is_err() || rewrite_res.is_err() {
                         let err_msg = match (copy_res, rewrite_res) {
                             (Err(e), _) => {
                                 format!("Failed to create backup copy {:?}: {}", bak_path, e)
@@ -717,37 +816,83 @@ impl Wal {
                             version, config.min_wal_version, err_msg
                         )));
                     } else {
-                        rewrite_res?;
+                        wal.was_legacy_rekeyed
+                            .store(true, std::sync::atomic::Ordering::SeqCst);
+                    }
+                } else {
+                    let (verified_end, last_hmac) =
+                        if let Some((_, last_entry, end_pos)) = entries.last() {
+                            (*end_pos, last_entry.checksum)
+                        } else if metadata.len() >= 4 {
+                            (4u64, [0u8; 32])
+                        } else {
+                            (0u64, [0u8; 32])
+                        };
+
+                    if let Some(expected_hwm) = config.expected_hwm {
+                        let hwm_reached = entries
+                            .iter()
+                            .any(|(_, entry, _)| entry.checksum == expected_hwm)
+                            || expected_hwm == [0u8; 32];
+                        if !hwm_reached && !entries.is_empty() {
+                            return Err(ContextraError::wal_truncation_detected(
+                                expected_hwm,
+                                last_hmac,
+                            ));
+                        }
+                    }
+
+                    if verified_end < metadata.len() {
+                        let discarded_bytes = metadata.len() - verified_end;
+                        tracing::warn!(
+                            wal_path = %wal.path.display(),
+                            discarded_bytes,
+                            verified_end,
+                            file_len = metadata.len(),
+                            "Truncating torn WAL write tail on open"
+                        );
+                        wal.truncate(verified_end, last_hmac).await?;
+                        crate::util::fsync_parent_dir(&wal.path).await?;
+                    } else {
+                        let mut guard = wal.last_hmac.lock().await;
+                        *guard = last_hmac;
                     }
                 }
-            } else {
-                let (verified_end, last_hmac) =
-                    if let Some((_, last_entry, end_pos)) = entries.last() {
-                        (*end_pos, last_entry.checksum)
-                    } else if metadata.len() >= 4 {
-                        (4u64, [0u8; 32])
-                    } else {
-                        (0u64, [0u8; 32])
-                    };
+            }
 
-                if verified_end < metadata.len() {
-                    let discarded_bytes = metadata.len() - verified_end;
-                    tracing::warn!(
-                        wal_path = %wal.path.display(),
-                        discarded_bytes,
-                        verified_end,
-                        file_len = metadata.len(),
-                        "Truncating torn WAL write tail on open"
-                    );
-                    wal.truncate(verified_end, last_hmac).await?;
-                } else {
-                    let mut guard = wal.last_hmac.lock().await;
-                    *guard = last_hmac;
-                }
+            Ok(wal)
+        }
+    }
+
+    /// Gracefully closes the WAL, stopping the background flusher task and waiting for it to exit.
+    pub async fn close(&self) -> Result<()> {
+        self.sealed.store(true, std::sync::atomic::Ordering::SeqCst);
+        let flusher_tx = {
+            let mut guard = self
+                .flusher_tx
+                .write()
+                .map_err(|_| ContextraError::Storage("flusher_tx RwLock poisoned".into()))?;
+            guard.take()
+        };
+        drop(flusher_tx);
+
+        let flusher_task = {
+            let mut guard = self
+                .flusher_task
+                .lock()
+                .map_err(|_| ContextraError::Storage("flusher_task Mutex poisoned".into()))?;
+            guard.take()
+        };
+
+        if let Some(task) = flusher_task {
+            if let Err(join_err) = task.await {
+                return Err(ContextraError::Internal(format!(
+                    "WAL flusher task panicked: {join_err}"
+                )));
             }
         }
 
-        Ok(wal)
+        Ok(())
     }
 
     /// Helper to expose integrity key for tests
@@ -780,6 +925,14 @@ impl Wal {
     pub fn was_legacy_rekeyed(&self) -> bool {
         self.was_legacy_rekeyed
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn abort_flusher_for_test(&self) {
+        if let Ok(task_guard) = self.flusher_task.lock() {
+            if let Some(task) = task_guard.as_ref() {
+                task.abort();
+            }
+        }
     }
 
     /// Recovers a poisoned `Wal` handle after a suspected torn write event.
@@ -883,6 +1036,7 @@ impl Wal {
             allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
                 false,
             )),
+            min_wal_version: WalVersion::V3,
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),

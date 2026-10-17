@@ -16,11 +16,12 @@
 #![allow(unexpected_cfgs)]
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
+// STAND: 2026-10-13
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
-// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
+// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen, Registrierung vor Disk-Link.
 
-use contextra_core::SnapshotRegistry;
+use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
+use contextra_mvcc::SnapshotRegistry;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -83,12 +84,11 @@ pub struct HardlinkCloneResult {
     /// List of target paths created as hardlinks.
     pub linked_files: Vec<PathBuf>,
     /// WAL tail offset at which the clone begins accepting new mutations.
-    ///
-    /// **Known Gap / Backlog Note:**
-    /// Real-time WAL tail offset extraction requires active coordination with the WAL manager
-    /// in `contextra-store`. Currently set to `None` as a best-effort explicit placeholder
-    /// to avoid returning speculative or unverified offset values.
     pub wal_tail_offset: Option<u64>,
+    /// Registered copy identifier.
+    pub copy_id: [u8; 16],
+    /// Registered file identifiers.
+    pub file_ids: Vec<[u8; 16]>,
 }
 
 /// Trait defining the physical hardlink cloning interface for SSTables.
@@ -119,6 +119,106 @@ impl DefaultHardlinkCloner {
     pub fn new() -> Self {
         Self
     }
+
+    /// Clones SSTable hardlinks, enforcing registration and fsync persistence BEFORE creating links on disk.
+    pub async fn clone_sstable_hardlinks_registered<R>(
+        &self,
+        seq_no: u64,
+        source_dir: &Path,
+        target_dir: &Path,
+        snapshot_registry: &Arc<SnapshotRegistry>,
+        registry: &mut R,
+        created_tx: u64,
+    ) -> Result<HardlinkCloneResult>
+    where
+        R: CpyCopyRegistry + ?Sized,
+    {
+        // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
+        let _guard = snapshot_registry.acquire(|| seq_no);
+
+        // 2. Scan source directory to discover target SSTable files and calculate file_ids
+        let mut read_dir = fs::read_dir(source_dir).await.map_err(ContextraError::Io)?;
+        let mut target_file_specs = Vec::new();
+
+        while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {
+            let path = entry.path();
+            if path.is_file() {
+                let is_sst = path.extension().is_some_and(|ext| ext == "sst");
+                if is_sst {
+                    let file_name = path.file_name().ok_or_else(|| {
+                        ContextraError::invalid_input("Invalid file name in SST directory")
+                    })?;
+                    let target_path = target_dir.join(file_name);
+                    let file_name_str = file_name.to_str().ok_or_else(|| {
+                        ContextraError::invalid_input("Non-UTF8 file name in SST directory")
+                    })?;
+                    let file_id = file_id_for_name(file_name_str);
+                    target_file_specs.push((path, target_path, file_id));
+                }
+            }
+        }
+
+        // Sort target files for deterministic ordering
+        target_file_specs.sort_by(|a, b| a.1.cmp(&b.1));
+
+        let file_ids: Vec<[u8; 16]> = target_file_specs.iter().map(|spec| spec.2).collect();
+
+        // Compute copy_id
+        let copy_id_hash = blake3::hash(
+            format!("hardlink:{seq_no}:{created_tx}:{}", target_dir.display()).as_bytes(),
+        );
+        let mut copy_id = [0u8; 16];
+        copy_id.copy_from_slice(&copy_id_hash.as_bytes()[..16]);
+
+        let entry = CopyRegEntry {
+            copy_id,
+            kind: CopyKind::Hardlink,
+            file_ids: file_ids.clone(),
+            created_tx,
+        };
+
+        // 3. Register and persist (fsync) in CopyRegistry BEFORE creating any physical link files on disk.
+        // If registration or sync fails, abort immediately without modifying disk files.
+        registry.register(entry).await?;
+        registry.sync_registry().await?;
+
+        // 4. Create target directory and physical hardlink files
+        fs::create_dir_all(target_dir)
+            .await
+            .map_err(ContextraError::Io)?;
+
+        let mut linked_files = Vec::with_capacity(target_file_specs.len());
+
+        for (src_path, target_path, _) in target_file_specs {
+            // Remove existing link if present
+            if fs::metadata(&target_path).await.is_ok() {
+                fs::remove_file(&target_path)
+                    .await
+                    .map_err(ContextraError::Io)?;
+            }
+
+            if let Err(io_err) = fs::hard_link(&src_path, &target_path).await {
+                if is_cross_device_error(&io_err) {
+                    return Err(ContextraError::cross_device_link(
+                        src_path.to_string_lossy(),
+                        target_path.to_string_lossy(),
+                    ));
+                } else {
+                    return Err(ContextraError::Io(io_err));
+                }
+            }
+
+            linked_files.push(target_path);
+        }
+
+        Ok(HardlinkCloneResult {
+            source_seq_no: seq_no,
+            linked_files,
+            wal_tail_offset: None,
+            copy_id,
+            file_ids,
+        })
+    }
 }
 
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
@@ -131,7 +231,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
-            let _guard = snapshot_registry.register(seq_no);
+            let _guard = snapshot_registry.acquire(|| seq_no);
 
             // 2. Ensure target directory exists
             fs::create_dir_all(target_dir)
@@ -146,14 +246,8 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
             while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {
                 let path = entry.path();
                 if path.is_file() {
-                    let is_sst = path
-                        .extension()
-                        .is_some_and(|ext| ext == "sst" || ext == "tmp");
-                    if is_sst
-                        || path
-                            .file_name()
-                            .is_some_and(|f| f.to_string_lossy().contains(".sst"))
-                    {
+                    let is_sst = path.extension().is_some_and(|ext| ext == "sst");
+                    if is_sst {
                         let file_name = path.file_name().ok_or_else(|| {
                             ContextraError::invalid_input("Invalid file name in SST directory")
                         })?;
@@ -161,7 +255,9 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
 
                         // Remove existing link if present
                         if fs::metadata(&target_path).await.is_ok() {
-                            let _ = fs::remove_file(&target_path).await;
+                            fs::remove_file(&target_path)
+                                .await
+                                .map_err(ContextraError::Io)?;
                         }
 
                         if let Err(io_err) = fs::hard_link(&path, &target_path).await {
@@ -183,10 +279,19 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
             // Sort linked files for deterministic output ordering
             linked_files.sort();
 
+            let mut file_ids = Vec::with_capacity(linked_files.len());
+            for path in &linked_files {
+                if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+                    file_ids.push(file_id_for_name(file_name));
+                }
+            }
+
             Ok(HardlinkCloneResult {
                 source_seq_no: seq_no,
                 linked_files,
                 wal_tail_offset: None,
+                copy_id: [0u8; 16],
+                file_ids,
             })
         })
     }

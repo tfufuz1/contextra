@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// STAND: 2026-10-06T00:00:00Z (SESSION: p02a-fix)
+// ZWECK: Haupt-Storage-Engine LsmStorage (SSTable-Management, Flushes, Merges, Observer, MVCC-Anbindung).
+// INVARIANTEN: Compaction Engine berücksichtigt MVCC TxBuffer Reader (Invariante I-2); WAL before memtable; atomic manifest transitions.
+// HOTSPOTS: 100-350
+
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
@@ -8,7 +14,10 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
+use contextra_types::{ResourceTracker, Result, TxId};
+use contextra_ports::StorageEngine;
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_mvcc::snapshot::SnapshotFloor;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -28,18 +37,19 @@ pub struct LsmStorage {
     pub(super) state: RwLock<LsmState>,
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
-    pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
+    pub(super) tx_buffer: Arc<TxBuffer<(Vec<u8>, Vec<u8>)>>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
+    pub floor: Arc<dyn SnapshotFloor>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
-    pub(super) last_applied_seq: AtomicU64,
+    pub(super) last_applied_seq: Arc<AtomicU64>,
     pub(super) flush_notify: Arc<tokio::sync::Notify>,
     pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
@@ -60,6 +70,10 @@ pub struct LsmStorage {
     pub(super) observer_registry: ObserverRegistry,
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    pub erasure_fence: Arc<super::fence::ErasureFence>,
+    pub erasure_ledger_handle: Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>>,
+    pub(super) read_only: bool,
+    pub(super) ledger_status: crate::erasure_ledger::LedgerOpenStatus,
 }
 
 impl Drop for LsmStorage {
@@ -89,9 +103,34 @@ impl LsmStorage {
         self.pressure_rx.clone()
     }
 
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    pub fn ledger_state(&self) -> crate::erasure_ledger::LedgerOpenStatus {
+        self.ledger_status.clone()
+    }
+
+    /// Appends entries to the erasure ledger with atomic fsync durability.
+    pub async fn ledger_append(
+        &self,
+        entries: &[crate::erasure_ledger::LedgerEntry],
+    ) -> Result<()> {
+        if self.read_only {
+            return Err(contextra_types::ContextraError::Storage(
+                "Storage engine is read-only due to erasure ledger anomaly".into(),
+            ));
+        }
+        if let Some(ref handle) = self.erasure_ledger_handle {
+            handle.append(entries).await?;
+        }
+        Ok(())
+    }
+
     /// Signals the background compaction engine to stop.
     pub fn shutdown(&self) {
         self.cancel_token.cancel();
+        self.task_tracker.close();
     }
 
     /// Waits for all spawned tasks to shut down fully.
@@ -104,6 +143,11 @@ impl LsmStorage {
     pub async fn close(&self) -> Result<()> {
         self.wait_shutdown().await;
         self.flush().await?;
+        let active_wal = {
+            let wal_guard = self.wal.read().await;
+            Arc::clone(&*wal_guard)
+        };
+        active_wal.close().await?;
         Ok(())
     }
 
@@ -235,9 +279,23 @@ impl LsmStorage {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Returns the number of dropped events for a specific registered observer.
+    pub fn dropped_count_for(&self, observer: &Arc<dyn WalObserver>) -> u64 {
+        self.observer_registry.dropped_count_for(observer)
+    }
+
+    /// Resets the circuit breaker state for a specific observer.
+    pub fn clear_circuit_breaker(&self, observer: &Arc<dyn WalObserver>) {
+        self.observer_registry.clear_circuit_breaker(observer);
+    }
+
     /// Returns the current storage health status.
     pub fn health(&self) -> StorageHealth {
-        *self.health.read()
+        if self.observer_registry.is_any_circuit_breaker_open() {
+            StorageHealth::FlushFailing
+        } else {
+            *self.health.read()
+        }
     }
 
     /// Requests an asynchronous background flush without blocking the caller or holding commit locks.
@@ -253,6 +311,25 @@ impl LsmStorage {
     /// Returns the current `next_seq_no` value for testing verification.
     pub fn next_seq_no_for_test(&self) -> u64 {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Sets the `wal_queue_depth` value for testing backpressure transitions.
+    #[doc(hidden)]
+    pub fn set_wal_queue_depth_for_test(&self, depth: usize) {
+        self.wal_queue_depth
+            .store(depth, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Returns the current `segment_counter` value for testing verification.
+    #[doc(hidden)]
+    pub fn segment_counter_for_test(&self) -> u64 {
+        self.segment_counter
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    #[doc(hidden)]
+    pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
+        Arc::clone(&self.compaction_engine)
     }
 
     #[doc(hidden)]
@@ -292,14 +369,14 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL check: {e}"
                 )))
             }
         };
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL check: {e}"
             ))
         })? {
@@ -357,7 +434,7 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL migration: {e}"
                 )))
             }
@@ -370,14 +447,16 @@ impl LsmStorage {
         }
 
         let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))
         })?;
 
         let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
-            Some(Arc::new(crate::wal::KeyManager::try_new(
-                passphrase, &salt,
+            let header =
+                contextra_crypto::KdfHeader::new(contextra_crypto::KdfParams::default(), salt)?;
+            Some(Arc::new(crate::wal::KeyManager::try_new_strict(
+                passphrase, &header,
             )?))
         } else {
             None
@@ -386,7 +465,7 @@ impl LsmStorage {
         let mut migrated_count = 0usize;
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL migration: {e}"
             ))
         })? {
