@@ -18,7 +18,7 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
-contextra-crypto = { workspace = true, optional = true }
+contextra-crypto = { workspace = true }
 contextra-sandbox = { workspace = true, optional = true }
 contextra-store = { workspace = true }
 blake3 = { workspace = true }
@@ -62,7 +62,7 @@ default = []
 onnx = []
 reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
-encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
+encryption-at-rest = ["contextra-store/encryption-at-rest"]
 bench = []
 sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
