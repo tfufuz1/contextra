@@ -16,7 +16,7 @@ use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_S
 /// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
 pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) storage: Arc<S>,
-    prefix: Vec<u8>,
+    pub(crate) prefix: Vec<u8>,
     tokenizer: Arc<dyn Tokenizer>,
     pub(crate) total_docs: Arc<AtomicU64>,
     pub(crate) total_tokens: Arc<AtomicU64>,
@@ -445,8 +445,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                     let plb_key = self.key_batch_posting_list(term);
                     if let Some(plist) = self.resident_index.get(term) {
-                        let batch_bytes = plist.encode_compact()?;
-                        self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                        if plist.is_empty() {
+                            self.storage.delete(tx, &plb_key).await?;
+                        } else {
+                            let batch_bytes = plist.encode_compact()?;
+                            self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                        }
                     } else {
                         self.storage.delete(tx, &plb_key).await?;
                     }
