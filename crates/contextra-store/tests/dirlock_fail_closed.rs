@@ -106,6 +106,60 @@ fn test_dirlock_failure_truth_table() {
     assert!(res_mem_err.unwrap().is_none());
 }
 
+#[test]
+fn dirlock_fail_closed_nonmemory() {
+    let dummy_path = Path::new("/tmp/test_dirlock_fail_closed_nonmemory_LOCK");
+    let mock_fs_err = Error::new(
+        ErrorKind::Unsupported,
+        "Locks not supported on this mount/filesystem",
+    );
+
+    // Full mode must fail closed when lock fails
+    let full_res = contextra_store::util::test_decide_on_lock_error_wrapper(
+        DurabilityMode::Full,
+        dummy_path,
+        &mock_fs_err,
+    );
+    assert!(
+        full_res.is_err(),
+        "Full durability mode must fail closed on lock error"
+    );
+    assert!(full_res
+        .unwrap_err()
+        .to_string()
+        .contains("Dateisperre auf diesem Dateisystem nicht unterstützt"));
+
+    // WalNoHmac mode must fail closed when lock fails
+    let wal_res = contextra_store::util::test_decide_on_lock_error_wrapper(
+        DurabilityMode::WalNoHmac,
+        dummy_path,
+        &mock_fs_err,
+    );
+    assert!(
+        wal_res.is_err(),
+        "WalNoHmac durability mode must fail closed on lock error"
+    );
+    assert!(wal_res
+        .unwrap_err()
+        .to_string()
+        .contains("Dateisperre auf diesem Dateisystem nicht unterstützt"));
+
+    // MemoryOnly mode must continue without lock (Ok(None))
+    let mem_res = contextra_store::util::test_decide_on_lock_error_wrapper(
+        DurabilityMode::MemoryOnly,
+        dummy_path,
+        &mock_fs_err,
+    );
+    assert!(
+        mem_res.is_ok(),
+        "MemoryOnly durability mode must proceed without a lock"
+    );
+    assert!(
+        mem_res.unwrap().is_none(),
+        "MemoryOnly should return Ok(None) when lock fails"
+    );
+}
+
 #[tokio::test]
 async fn test_multiprocess_dirlock_conflict_full_mode() {
     handle_subprocess_child();
