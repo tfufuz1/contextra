@@ -129,7 +129,7 @@ demselben Muster (`AggregationConfig`/`AggregationPhaseResult`) eingeführt, und
 2. **Gaussian Mixture Clustering:** hochdimensionale Entitäts-Embeddings der validen Knoten werden in $m$
    disjunkte Cluster $C_j$ unterteilt; EM-Konvergenz wird über einen festen RNG-Seed (`gmm_deterministic_seed`)
    deterministisch forciert.
-3. **Abstraktion & Synthese:** je Cluster $C_j$ generiert der LLM-Synthetisierer (Port `TextGenerator`) einen
+3. **Abstraktion & Synthese:** je Cluster $C_j$ generiert der LLM-Synthetisierer (Port `LlmTextGenerator`) einen
    abstrakten Meta-Knoten $\alpha_j$ — wiederverwendet denselben `max_llm_calls_per_cycle`-Kostenschutz
    (P12) und `CommunityStabilityTracker`/`compute_community_hash`-Mechanismus wie der bestehende Generative
    Synthesis Pass, statt einen eigenen Kostenschutz-Mechanismus neu zu bauen.
@@ -144,7 +144,7 @@ bereits vorhandene Budget-Primitive auf statt sie neu zu spezifizieren):**
 
 ```rust
 use contextra_types::{TxId, DocId, ErrorClass};
-use contextra_ports::{Embedder, TextGenerator};
+use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use contextra_engine::Collection;
 // Wiederverwendung, nicht Neuerfindung:
 use crate::memory_consolidation::{ConsolidationConfig, ConsolidationPhaseResult};
@@ -180,8 +180,8 @@ impl Collection {
     /// Darf den Ring-0-Lese-Pfad nicht blockieren (P26).
     pub async fn consolidate_semantic_hyperedges(
         &self,
-        embedder: &dyn Embedder,
-        llm: &dyn TextGenerator,
+        embedder: &dyn EmbeddingProvider,
+        llm: &dyn LlmTextGenerator,
         config: &AggregationConfig,
     ) -> Result<AggregationPhaseResult, ErrorClass> {
         // 1. Budget-Vorprüfung — RUFT DIE BEREITS VORHANDENE RING-0-PRIMITIVE AUF (A4.2.1),
@@ -194,7 +194,7 @@ impl Collection {
             });
         }
         // 2. Self-Supervised Type-Denoising + deterministisches GMM-Clustering
-        // 3. Batched TextGenerator-Aufruf zur Synthese der Alpha-Knoten (max_llm_calls_per_cycle,
+        // 3. Batched LlmTextGenerator-Aufruf zur Synthese der Alpha-Knoten (max_llm_calls_per_cycle,
         //    CommunityStabilityTracker wiederverwendet)
         // 4. Super-Hyperkanten mit `child_edge_ids` schreiben (NUR wenn Vorbedingung 0 erfüllt —
         //    Aufrufer MUSS vorab per CI-Gate sicherstellen, dass das Schema die Erweiterung trägt)
