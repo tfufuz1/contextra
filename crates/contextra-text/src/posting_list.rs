@@ -302,8 +302,13 @@ impl ResidentPostingIndex {
     }
 
     /// Inserts or replaces a PostingList for a given term.
+    /// If `list` is empty, the term is purged from the resident index.
     pub fn insert_list(&self, term: String, list: PostingList) {
-        self.index.write().insert(term, Arc::new(list));
+        if list.is_empty() {
+            self.index.write().remove(&term);
+        } else {
+            self.index.write().insert(term, Arc::new(list));
+        }
     }
 
     /// Upserts a single posting for a term using RCU (Copy-On-Write).
