@@ -13,8 +13,6 @@
 //! Fallback to a full byte-for-byte copy is intentionally NOT implemented in this subsystem
 //! (backlog item C.4.1).
 
-#![allow(unexpected_cfgs)]
-
 // FILE-CONTEXT
 // STAND: 2026-10-13
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.

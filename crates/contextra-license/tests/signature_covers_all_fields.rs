@@ -17,7 +17,8 @@ fn test_signature_covers_ring() {
     let expires = 2000i64;
 
     let mut act =
-        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key)
+            .expect("create_signed succeeds");
     assert!(act.verify_signature(&verifying_key));
 
     // Alter ring field
@@ -32,7 +33,8 @@ fn test_signature_covers_installation_id_hash() {
     let expires = 2000i64;
 
     let mut act =
-        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key)
+            .expect("create_signed succeeds");
     assert!(act.verify_signature(&verifying_key));
 
     // Alter installation_id_hash field
@@ -47,7 +49,8 @@ fn test_signature_covers_expires_at_unix() {
     let expires = 2000i64;
 
     let mut act =
-        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Sovereign, hash, expires, &signing_key)
+            .expect("create_signed succeeds");
     assert!(act.verify_signature(&verifying_key));
 
     // Alter expires_at_unix field

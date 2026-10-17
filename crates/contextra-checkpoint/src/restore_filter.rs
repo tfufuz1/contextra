@@ -10,9 +10,10 @@ pub trait CpyRestoreFilter: Send + Sync {
 }
 
 impl<T: contextra_ports::RestoreGuard + ?Sized> CpyRestoreFilter for T {
-    #[allow(deprecated)]
     fn drop_record(&self, key: &[u8], tx: u64) -> bool {
-        self.admit(key, contextra_types::TxId::new(tx)) == contextra_ports::RestoreVerdict::Reject
+        let tx_id = contextra_types::TxId::try_new(tx)
+            .unwrap_or(contextra_types::TxId::INVALID);
+        self.admit(key, tx_id) == contextra_ports::RestoreVerdict::Reject
     }
 }
 

@@ -278,3 +278,101 @@ fn test_s3_overflow_behavior() {
     let huge_dot = dot_product_distance(&huge_a, &huge_b).unwrap();
     assert!(huge_dot.is_infinite());
 }
+
+#[test]
+fn test_unaligned_and_zero_length_differential_all_metrics() {
+    let unaligned_lengths = [0, 1, 2, 3, 5, 7, 9, 13, 15, 17, 31, 33, 63, 65, 127, 255];
+
+    for &len in &unaligned_lengths {
+        let a: Vec<f32> = (0..len).map(|i| (i as f32 * 0.37).sin() * 5.0).collect();
+        let b: Vec<f32> = (0..len).map(|i| (i as f32 * 0.53).cos() * 5.0).collect();
+        let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();
+
+        let a_u8: Vec<u8> = (0..len).map(|i| ((i * 37) % 256) as u8).collect();
+        let b_u8: Vec<u8> = (0..len).map(|i| ((i * 53) % 256) as u8).collect();
+
+        // 1. Cosine f32
+        let cos_s = cosine_distance_scalar(&a, &b);
+        let cos_d = cosine_distance(&a, &b).unwrap();
+        let cos_diff = (cos_s - cos_d).abs();
+        let cos_tol = 1e-4 * cos_s.abs().max(cos_d.abs()).max(1.0);
+        assert!(
+            cos_diff <= cos_tol,
+            "Cosine f32 mismatch at len {len}: scalar={cos_s}, dispatch={cos_d}, diff={cos_diff}, tol={cos_tol}"
+        );
+
+        // 2. Euclidean f32
+        let euc_s = euclidean_distance_scalar(&a, &b);
+        let euc_d = euclidean_distance(&a, &b).unwrap();
+        let euc_diff = (euc_s - euc_d).abs();
+        let euc_tol = 1e-3 * euc_s.abs().max(euc_d.abs()).max(1.0);
+        assert!(
+            euc_diff <= euc_tol,
+            "Euclidean f32 mismatch at len {len}: scalar={euc_s}, dispatch={euc_d}, diff={euc_diff}, tol={euc_tol}"
+        );
+
+        // 3. Dot Product f32
+        let dot_s = dot_product_scalar(&a, &b);
+        let dot_d = dot_product_distance(&a, &b).unwrap();
+        let dot_diff = (dot_s - dot_d).abs();
+        let dot_tol = 1e-3 * dot_s.abs().max(dot_d.abs()).max(1.0);
+        assert!(
+            dot_diff <= dot_tol,
+            "Dot product f32 mismatch at len {len}: scalar={dot_s}, dispatch={dot_d}, diff={dot_diff}, tol={dot_tol}"
+        );
+
+        // 4. Cosine f32 bytes
+        let cos_bytes_s = cosine_distance_f32_bytes_scalar(&a, &b_bytes);
+        let cos_bytes_d = cosine_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let cos_bytes_diff = (cos_bytes_s - cos_bytes_d).abs();
+        let cos_bytes_tol = 1e-4 * cos_bytes_s.abs().max(cos_bytes_d.abs()).max(1.0);
+        assert!(
+            cos_bytes_diff <= cos_bytes_tol,
+            "Cosine f32_bytes mismatch at len {len}: scalar={cos_bytes_s}, dispatch={cos_bytes_d}, diff={cos_bytes_diff}, tol={cos_bytes_tol}"
+        );
+
+        // 5. Euclidean f32 bytes
+        let euc_bytes_s = euclidean_distance_f32_bytes_scalar(&a, &b_bytes);
+        let euc_bytes_d = euclidean_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let euc_bytes_diff = (euc_bytes_s - euc_bytes_d).abs();
+        let euc_bytes_tol = 1e-3 * euc_bytes_s.abs().max(euc_bytes_d.abs()).max(1.0);
+        assert!(
+            euc_bytes_diff <= euc_bytes_tol,
+            "Euclidean f32_bytes mismatch at len {len}: scalar={euc_bytes_s}, dispatch={euc_bytes_d}, diff={euc_bytes_diff}, tol={euc_bytes_tol}"
+        );
+
+        // 6. Dot Product f32 bytes
+        let dot_bytes_s = dot_product_f32_bytes_scalar(&a, &b_bytes);
+        let dot_bytes_d = dot_product_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let dot_bytes_diff = (dot_bytes_s - dot_bytes_d).abs();
+        let dot_bytes_tol = 1e-3 * dot_bytes_s.abs().max(dot_bytes_d.abs()).max(1.0);
+        assert!(
+            dot_bytes_diff <= dot_bytes_tol,
+            "Dot product f32_bytes mismatch at len {len}: scalar={dot_bytes_s}, dispatch={dot_bytes_d}, diff={dot_bytes_diff}, tol={dot_bytes_tol}"
+        );
+
+        // 7. Dot Product u8
+        let dot_u8_s = dot_product_u8_scalar(&a_u8, &b_u8);
+        let dot_u8_d = dot_product_u8(&a_u8, &b_u8).unwrap();
+        assert_eq!(
+            dot_u8_s, dot_u8_d,
+            "Dot product u8 mismatch at len {len}: scalar={dot_u8_s}, dispatch={dot_u8_d}"
+        );
+
+        // 8. Euclidean sq u8
+        let euc_u8_s = euclidean_distance_sq_u8_scalar(&a_u8, &b_u8);
+        let euc_u8_d = euclidean_distance_sq_u8(&a_u8, &b_u8).unwrap();
+        assert_eq!(
+            euc_u8_s, euc_u8_d,
+            "Euclidean sq u8 mismatch at len {len}: scalar={euc_u8_s}, dispatch={euc_u8_d}"
+        );
+
+        // 9. Cosine similarity parts u8
+        let cos_parts_s = cosine_similarity_parts_u8_scalar(&a_u8, &b_u8);
+        let cos_parts_d = cosine_similarity_parts_u8(&a_u8, &b_u8).unwrap();
+        assert_eq!(
+            cos_parts_s, cos_parts_d,
+            "Cosine similarity parts u8 mismatch at len {len}: scalar={cos_parts_s:?}, dispatch={cos_parts_d:?}"
+        );
+    }
+}

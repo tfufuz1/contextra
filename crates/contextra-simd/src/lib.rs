@@ -5,7 +5,7 @@
 
 //! Contextra SIMD — Ring 0 SIMD distance kernels and hardware runtime dispatch.
 
-#![allow(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod dispatch;
 pub mod kernels;
