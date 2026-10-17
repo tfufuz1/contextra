@@ -133,6 +133,7 @@ impl DiskAnnIndex {
         file.write_all(&id_bytes).map_err(ContextraError::Io)?;
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
+        super::durable_fs::sync_parent_dir(path)?;
         Ok(())
     }
 
@@ -146,15 +147,9 @@ impl DiskAnnIndex {
         if !path.exists() {
             return Ok(bitset);
         }
-        let mut file = match std::fs::File::open(path) {
-            Ok(f) => f,
-            Err(_) => return Ok(bitset),
-        };
+        let mut file = std::fs::File::open(path).map_err(ContextraError::Io)?;
 
-        let file_len = match file.metadata() {
-            Ok(m) => m.len() as usize,
-            Err(_) => return Ok(bitset),
-        };
+        let file_len = file.metadata().map_err(ContextraError::Io)?.len() as usize;
 
         if file_len == 0 {
             return Ok(bitset);
@@ -280,6 +275,7 @@ impl DiskAnnIndex {
         file.write_all(&entry_bytes).map_err(ContextraError::Io)?;
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
+        super::durable_fs::sync_parent_dir(path)?;
         Ok(())
     }
 
@@ -297,15 +293,9 @@ impl DiskAnnIndex {
         if !path.exists() {
             return Ok(Vec::new());
         }
-        let mut file = match std::fs::File::open(path) {
-            Ok(f) => f,
-            Err(_) => return Ok(Vec::new()),
-        };
+        let mut file = std::fs::File::open(path).map_err(ContextraError::Io)?;
 
-        let file_len = match file.metadata() {
-            Ok(m) => m.len() as usize,
-            Err(_) => return Ok(Vec::new()),
-        };
+        let file_len = file.metadata().map_err(ContextraError::Io)?.len() as usize;
 
         if file_len == 0 {
             return Ok(Vec::new());
@@ -408,12 +398,6 @@ impl DiskAnnIndex {
     }
 
     /// Liest uncommittete Pending-Vektoren aus `pending.wal` und fügt sie in den Index ein.
-    pub fn recover_pending_delta(
-        &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize>> + Send + '_>> {
-        Box::pin(async move { self.recover_pending_delta_sync() })
-    }
-
     pub fn recover_pending_delta_sync(&self) -> Result<usize> {
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if !pending_wal.exists() {
@@ -431,7 +415,7 @@ impl DiskAnnIndex {
             }
             self.persist_delta_sync()?;
         } else {
-            Self::remove_wal_file_robust(&pending_wal)?;
+            super::persistence::durable_remove(&pending_wal)?;
         }
         Ok(count)
     }
@@ -695,22 +679,14 @@ impl DiskAnnIndex {
     }
 
     pub fn build_sync(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {
-        let tmp_path = self.inner.config.index_path.with_extension("idx.tmp");
-        self.build_to_path_sync(&tmp_path, vectors, ids)?;
-
-        std::fs::rename(&tmp_path, &self.inner.config.index_path).map_err(ContextraError::Io)?;
-
-        // Fsync parent directory after rename for POSIX atomic directory entry durability
-        if let Some(parent) = self.inner.config.index_path.parent() {
-            let parent_dir = std::fs::File::open(parent).map_err(ContextraError::Io)?;
-            parent_dir.sync_all().map_err(ContextraError::Io)?;
-        }
+        self.build_to_path_sync(&self.inner.config.index_path, vectors, ids)?;
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        Self::remove_wal_file_robust(&pending_wal)?;
+        super::persistence::durable_remove(&pending_wal)?;
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
-        Self::remove_wal_file_robust(&tombstone_wal)?;
+        super::persistence::durable_remove(&tombstone_wal)?;
+
         self.inner.tombstones.write().clear();
 
         self.load_sync()?;

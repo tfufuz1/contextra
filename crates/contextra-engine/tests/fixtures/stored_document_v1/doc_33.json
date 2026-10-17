@@ -1,0 +1,25 @@
+{
+  "id": "doc_33",
+  "embedding": [
+    0.33,
+    0.34,
+    0.35,
+    0.36,
+    0.37,
+    0.38,
+    0.39,
+    0.4,
+    0.41,
+    0.42,
+    0.43,
+    0.44,
+    0.45,
+    0.46,
+    0.47,
+    0.48
+  ],
+  "metadata": {
+    "index": 33,
+    "text": "Sample document 33 for v1 legacy stored_document migration test."
+  }
+}

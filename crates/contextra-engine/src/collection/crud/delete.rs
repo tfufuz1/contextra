@@ -6,6 +6,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
+        // Retain per-document lock across begin_transaction, delete_op, and commit/rollback (TOCTOU safety)
         let _guard = self.kv_locks.lock_for(id).await;
         let mut db_tx = self.begin_transaction()?;
 

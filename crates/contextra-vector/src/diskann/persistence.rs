@@ -1,11 +1,12 @@
 use std::sync::Arc;
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence; idempotenter WAL-Recovery-Deduplizierung.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
+// STAND: TS:2026-10-06T12:00:00Z (SESSION: fix/p03-d-diskann-pending-wal)
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
+pub(crate) use super::durable_fs::{atomic_replace, durable_remove};
 use super::format::{
     DiskAnnFooter, DiskAnnHeader, CHECKSUM_SEED, DISKANN_FOOTER_MAGIC, DISKANN_MAGIC,
     DISKANN_VERSION,
@@ -61,14 +62,32 @@ impl DiskAnnIndex {
     }
 
     pub fn persist_delta_sync(&self) -> Result<()> {
-        let pending = {
-            let guard = self.inner.pending_inserts.read();
-            guard.clone()
+        let raw_pending = {
+            let mut guard = self.inner.pending_inserts.write();
+            self.inner.pending_count.store(0, Ordering::Relaxed);
+            std::mem::take(&mut *guard)
         };
+
+        // Deduplizierung über doc_id (Vektoren, deren doc_id bereits im Index existiert,
+        // werden nicht erneut eingefügt).
+        let existing_doc_ids = self.inner.doc_ids.read();
+        let mut seen_pending = std::collections::HashSet::new();
+        let mut pending = Vec::with_capacity(raw_pending.len());
+        for (id, vec) in raw_pending {
+            if existing_doc_ids.contains(&id) || !seen_pending.insert(id) {
+                tracing::info!(
+                    doc_id = %id.inner(),
+                    "DiskANN persist_delta_sync: DocId existiert bereits im Index oder doppelt in pending; Vektor wird verworfen (Idempotenz)"
+                );
+            } else {
+                pending.push((id, vec));
+            }
+        }
+        drop(existing_doc_ids);
 
         if pending.is_empty() {
             let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-            Self::remove_wal_file_robust(&pending_wal)?;
+            durable_remove(&pending_wal)?;
             return Ok(());
         }
 
@@ -87,31 +106,8 @@ impl DiskAnnIndex {
         }
 
         // Inkrementeller Pfad
-        let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
-        self.write_incremental_to_file_sync(&tmp_path, &pending)?;
-
-        let tmp_file = std::fs::File::open(&tmp_path)?;
-        tmp_file
-            .sync_all()
-            .map_err(|e| ContextraError::Storage(format!("fsync tmp: {e}")))?;
-        drop(tmp_file);
-
-        #[cfg(test)]
-        self.maybe_failpoint("temp_written")?;
-
-        #[cfg(test)]
-        self.maybe_failpoint("before_rename")?;
-
-        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
         let index_path = self.inner.config.index_path.clone();
-        std::fs::rename(&tmp_path, &index_path)
-            .map_err(|e| ContextraError::Storage(format!("rename: {e}")))?;
-        if let Some(parent) = index_path.parent() {
-            if let Ok(dir) = std::fs::File::open(parent) {
-                dir.sync_all()
-                    .map_err(|e| ContextraError::Storage(format!("parent fsync: {e}")))?;
-            }
-        }
+        self.write_incremental_to_file_sync(&index_path, &pending)?;
 
         #[cfg(test)]
         self.maybe_failpoint("after_rename")?;
@@ -122,18 +118,7 @@ impl DiskAnnIndex {
         self.maybe_failpoint("before_wal_removal")?;
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        Self::remove_wal_file_robust(&pending_wal)?;
-
-        {
-            let mut guard = self.inner.pending_inserts.write();
-            if guard.len() >= pending.len() {
-                guard.drain(..pending.len());
-            } else {
-                guard.clear();
-            }
-            let remaining = guard.len() as u64;
-            self.inner.pending_count.store(remaining, Ordering::Relaxed);
-        }
+        durable_remove(&pending_wal)?;
 
         Ok(())
     }
@@ -177,18 +162,9 @@ impl DiskAnnIndex {
         vectors: &[Vec<f32>],
         ids: &[DocId],
     ) -> Result<()> {
-        use std::fs::OpenOptions;
-        use std::io::Write;
         use std::sync::atomic::Ordering;
 
         let n = vectors.len();
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .map_err(ContextraError::Io)?;
-
         let quantizer_opt = {
             let q_guard = self.inner.quantizer.read();
             q_guard.clone()
@@ -217,18 +193,20 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut buf = Vec::new();
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
-        file.write_all(&header_bytes).map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&header_bytes);
+
         let padding = vec![
             0u8;
             self.inner.config.sector_size
                 - (DiskAnnHeader::SIZE % self.inner.config.sector_size)
         ];
         hmac.update(&padding);
-        file.write_all(&padding).map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&padding);
 
         for i in 0..n {
             let mut node_buf = Vec::new();
@@ -258,7 +236,7 @@ impl DiskAnnIndex {
             }
 
             hmac.update(&node_buf);
-            file.write_all(&node_buf).map_err(ContextraError::Io)?;
+            buf.extend_from_slice(&node_buf);
         }
 
         let computed_hmac = hmac.finalize();
@@ -266,14 +244,12 @@ impl DiskAnnIndex {
             magic: *DISKANN_FOOTER_MAGIC,
             hmac: computed_hmac,
         };
-        file.write_all(&footer.to_bytes())
-            .map_err(ContextraError::Io)?;
+        buf.extend_from_slice(&footer.to_bytes());
 
-        file.sync_all().map_err(ContextraError::Io)?;
-        Ok(())
+        atomic_replace(path, &buf)
     }
 
-    pub(crate) fn init_hnsw_fallback(&self) -> Result<Arc<crate::hnsw::HnswIndex>> {
+    pub fn init_hnsw_fallback(&self) -> Result<Arc<crate::hnsw::HnswIndex>> {
         let hnsw_config = crate::hnsw::HnswConfig {
             dimension: self.inner.config.dimension,
             distance_metric: self.inner.config.distance_metric,
@@ -296,6 +272,9 @@ impl DiskAnnIndex {
         let wal_exists = pending_wal.exists();
 
         if !index_exists && !wal_exists {
+            if self.inner.config.create_if_missing {
+                return Ok(());
+            }
             return Err(ContextraError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!(
@@ -312,23 +291,10 @@ impl DiskAnnIndex {
 
                 // Clean up any orphaned temporary files from interrupted persist_delta or build calls
                 let delta_tmp = inner.config.index_path.with_extension("delta.tmp");
-                if delta_tmp.exists() {
-                    if let Err(e) = std::fs::remove_file(&delta_tmp) {
-                        tracing::warn!(
-                            "Failed to remove orphaned delta.tmp file {}: {e}",
-                            delta_tmp.display()
-                        );
-                    }
-                }
+                durable_remove(&delta_tmp)?;
+
                 let idx_tmp = inner.config.index_path.with_extension("idx.tmp");
-                if idx_tmp.exists() {
-                    if let Err(e) = std::fs::remove_file(&idx_tmp) {
-                        tracing::warn!(
-                            "Failed to remove orphaned idx.tmp file {}: {e}",
-                            idx_tmp.display()
-                        );
-                    }
-                }
+                durable_remove(&idx_tmp)?;
 
                 let file =
                     std::fs::File::open(&inner.config.index_path).map_err(ContextraError::Io)?;
@@ -454,6 +420,12 @@ impl DiskAnnIndex {
                     let doc_id_end = doc_id_offset
                         .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
+                    // TODO(Implementer): [P05 / F-03 & F-04 / MEDIUM]
+                    // F-03: Schutz gegen Dateitrunkierung während Mmap-Zugriff.
+                    // F-04: Fehlender Struct-Alignment-Guard bei Rohdaten-Casts in On-Disk-Slices:
+                    // Aktuell wird `from_le_bytes` verwendet (speichersicher), aber für direkte Direct-Structure-Pointers
+                    // müssen strikte Alignment-Invarianten (`bytemuck::Pod` oder explizite Offset-Ausrichtungsprüfungen)
+                    // garantiert werden, um Alignment-Faults auf strikt ausgerichteten CPUs zu verhindern.
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
                             ContextraError::Storage("DiskANN file truncated before doc_id".into())

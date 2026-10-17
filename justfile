@@ -31,6 +31,7 @@ check:
     $RUNNER cargo xtask check-toctou-defaults
     $RUNNER cargo xtask check-nan-hot-loop
     $RUNNER cargo xtask check-result-dropped-io
+    $RUNNER cargo xtask check-callers
     if [ -f coverage.json ]; then
         $RUNNER cargo xtask check-coverage-gate
     fi
@@ -112,6 +113,12 @@ check-nan-hot-loop:
 
 check-result-dropped-io:
     cargo xtask check-result-dropped-io
+
+check-callers *ARGS:
+    cargo xtask check-callers {{ARGS}}
+
+canary-after-delete *ARGS:
+    cargo test -p contextra-engine --test 'canary_*' {{ARGS}}
 
 coverage-gate:
     cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json

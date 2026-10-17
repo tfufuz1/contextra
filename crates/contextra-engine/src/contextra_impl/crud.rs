@@ -1,3 +1,4 @@
+use crate::contextra_impl::forget::ForgetReceipt;
 use crate::deletion::ForgetOptions;
 use crate::*;
 use contextra_store::LsmStorage;
@@ -290,8 +291,8 @@ impl Contextra {
             .await
     }
 
-    pub async fn delete(&self, id: &str) -> Result<ForgetReceipt> {
-        self.forget(id, ForgetOptions::default()).await
+    pub async fn delete(&self, id: &str) -> Result<()> {
+        self.default_col().await?.delete(id).await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]

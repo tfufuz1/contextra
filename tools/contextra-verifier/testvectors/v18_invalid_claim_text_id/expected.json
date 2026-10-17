@@ -1,0 +1,7 @@
+{
+  "origin": "python-selfsigned",
+  "result": "INVALID",
+  "exit_code": 2,
+  "category": "POLICY_VIOLATION",
+  "reason": "Unallowed claim_text_id: 99"
+}

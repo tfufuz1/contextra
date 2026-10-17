@@ -677,6 +677,7 @@ name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "contextra-adapt",
  "contextra-core",
  "contextra-db",
  "contextra-graph",
@@ -810,6 +811,7 @@ dependencies = [
  "contextra-rank",
  "contextra-store",
  "contextra-sys",
+ "contextra-testkit",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
@@ -871,6 +873,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
+ "toml 0.8.23",
  "tracing",
  "wat",
  "zeroize",
@@ -6134,8 +6137,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "chrono",
- "contextra-bench",
- "contextra-router",
  "contextra-types",
  "proc-macro2",
  "quote",

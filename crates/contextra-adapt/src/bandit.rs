@@ -557,6 +557,12 @@ pub struct BanditProfileState {
     /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
     #[serde(default)]
     pub sketch_theta: Vec<f32>,
+    /// Maximale erlaubte Spur von A⁻¹.
+    #[serde(default = "default_max_trace")]
+    pub max_trace: f64,
+    /// Schwelle für Drift-Erkennung via Probe-Residual.
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -628,12 +634,14 @@ impl BanditProfileState {
             seed: 0,
             sketch_matrix: None,
             sketch_theta: Vec::new(),
+            max_trace: default_max_trace(),
+            drift_threshold: default_drift_threshold(),
         }
     }
 
     /// Gibt die Anzahl der Rebuilds/Re-Faktorisierungen von A⁻¹ zurück.
     pub fn rebuild_count(&self) -> u64 {
-        self.rebuild_count
+        self.refactorizations
     }
 
     /// Führt eine explizite Re-Faktorisierung/Inversion von A⁻¹ aus der Schattenmatrix A mittels Cholesky-Zerlegung durch.
@@ -648,7 +656,7 @@ impl BanditProfileState {
                 self.inv_a[i] = inv_f64[i] as f32;
             }
             self.updates_since_reset = 0;
-            self.rebuild_count += 1;
+            self.refactorizations += 1;
             true
         } else {
             false
@@ -1114,8 +1122,8 @@ impl BanditProfileState {
                 }
 
                 let current_trace = compute_inv_a_trace(&self.inv_a, d);
-                if current_trace > self.max_trace {
-                    let scale = (self.max_trace / current_trace) as f32;
+                if current_trace > default_max_trace() {
+                    let scale = (default_max_trace() / current_trace) as f32;
                     for val in self.inv_a.iter_mut() {
                         *val *= scale;
                     }
@@ -1131,7 +1139,7 @@ impl BanditProfileState {
                 );
 
                 if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                    || probe_residual > self.drift_threshold
+                    || probe_residual > default_drift_threshold()
                 {
                     if !self.rebuild_inv_a_from_a() {
                         tracing::warn!("Rebuild of inv_a from shadow matrix A failed on probe residual drift");

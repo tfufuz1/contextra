@@ -129,12 +129,7 @@ pub fn reverse_sweep<S: FprSweepSource>(
         };
 
         // 2. Prüfen, ob der Schlüssel bereits durch den Footprint abgedeckt war
-        let covered_by_footprint = footprint.keys.explicit.iter().any(|e| e.as_slice() == key)
-            || footprint
-                .keys
-                .prefixes
-                .iter()
-                .any(|p| key.starts_with(p.as_slice()));
+        let covered_by_footprint = footprint.matches(key);
 
         if covered_by_footprint {
             return true;

@@ -7,6 +7,7 @@ use std::path::Path;
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
+use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::deletion_proof::types::{
     hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope,
 };
@@ -48,7 +49,7 @@ pub struct ForgetReceipt {
     /// Per-layer verification status.
     pub layers: Vec<LayerStatus>,
     /// Sealed v4 cryptographic deletion proof, present iff `assurance_reached >= assurance_requested`.
-    pub proof: Option<DeletionProof>,
+    pub proof: Option<ProofV4>,
     /// Wait policy applied during deletion.
     pub wait: Wait,
 }
@@ -59,7 +60,7 @@ pub enum LayerStatus {
     /// Layer verified with measured witness backing specified key families.
     Verified {
         layer: DeletionLayer,
-        families: Vec<&'static str>,
+        families: Vec<String>,
     },
     /// Physical purge or key destruction pending for layer.
     Pending {
@@ -247,7 +248,7 @@ impl Contextra {
         }) {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::HnswIndex,
-                families: vec!["CollectionIndex"],
+                families: vec!["CollectionIndex".to_string()],
             });
             witnesses.push(hnsw_witness);
         }
@@ -259,7 +260,7 @@ impl Contextra {
         {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::TextIndex,
-                families: vec!["TextIndex"],
+                families: vec!["TextIndex".to_string()],
             });
             witnesses.push(text_witness);
         }
@@ -271,7 +272,7 @@ impl Contextra {
         {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::Relations,
-                families: vec!["Relations"],
+                families: vec!["Relations".to_string()],
             });
             witnesses.push(rel_witness);
         }
@@ -298,7 +299,7 @@ impl Contextra {
         }) {
             layer_statuses.push(LayerStatus::Verified {
                 layer: DeletionLayer::ErasureLedger,
-                families: vec!["SystemMeta"],
+                families: vec!["SystemMeta".to_string()],
             });
             witnesses.push(ledger_witness);
         }

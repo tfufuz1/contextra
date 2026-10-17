@@ -9,6 +9,7 @@
 pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
+pub mod residue_scan;
 pub mod sq8_bias;
 
 mod acorn_filtered;
@@ -17,7 +18,8 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
-mod types;
+pub(crate) mod types;
+pub use types::VectorSeededRng;
 mod vector_index_impl;
 
 #[cfg(test)]
@@ -28,6 +30,7 @@ pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
+pub use residue_scan::HnswResidueReport;
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,

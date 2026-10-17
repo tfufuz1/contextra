@@ -304,6 +304,11 @@ pub struct FenFenceGuard<'a> {
 }
 
 impl<'a> FenFenceGuard<'a> {
+    /// Returns unique numeric ID of this fence registration.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     /// Returns current write sequence number for this guard scope.
     pub fn scope_write_seq(&self) -> u64 {
         self.write_seq.load(Ordering::Acquire)
@@ -475,7 +480,7 @@ impl ErasureFence {
     }
 
     /// Helper to release a registered prefix fence by ID.
-    fn release_prefix_fence(&self, id: u64) {
+    pub fn release_prefix_fence(&self, id: u64) {
         self.gate.release_fence(id);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }

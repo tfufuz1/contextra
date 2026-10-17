@@ -4,7 +4,8 @@
 // Spec v17 (Part 4.3, K-02; Part 6.5 "Pin-first").
 
 use contextra_core::{DocId, TxId, VectorIndex};
-use contextra_ports::{Rng, SeededRng};
+use contextra_ports::Rng;
+use contextra_vector::hnsw::VectorSeededRng as SeededRng;
 use contextra_vector::{HnswConfig, HnswIndex, RebuildStatus};
 use std::sync::Arc;
 
