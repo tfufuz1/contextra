@@ -2,6 +2,10 @@
 // ZWECK: AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen.
 // INVARIANTEN: Target-Features guaranteed by caller or feature-checks.
 
+#![allow(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
+#![allow(unused_unsafe)]
+
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
@@ -360,7 +364,7 @@ pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
-    // SAFETY: Target feature `avx512f` is guaranteed by caller contract. Operates on SIMD register values without memory access.
+    // SAFETY: AVX-512 intrinsic extraction and register lane reduction; target feature `avx512f` is verified by caller.
     unsafe {
         let v256 = _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1));
         let vlow = _mm256_castps256_ps128(v256);
@@ -550,7 +554,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSim
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
-    // SAFETY: Target feature `avx512f` is guaranteed by caller contract. Operates on SIMD register values without memory access.
+    // SAFETY: AVX-512 intrinsic extraction and register lane reduction; target feature `avx512f` is verified by caller.
     unsafe {
         let v256 = _mm256_add_epi32(_mm512_castsi512_si256(v), _mm512_extracti32x8_epi32(v, 1));
         let vlow = _mm256_castsi256_si128(v256);

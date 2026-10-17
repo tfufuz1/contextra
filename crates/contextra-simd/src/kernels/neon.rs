@@ -2,6 +2,10 @@
 // ZWECK: ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
 // INVARIANTEN: Target-Architektur aarch64 / neon.
 
+#![allow(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
+#![allow(unused_unsafe)]
+
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
