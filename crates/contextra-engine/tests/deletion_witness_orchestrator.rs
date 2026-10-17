@@ -9,24 +9,15 @@ use contextra_engine::deletion::{
     forget_document, ErasureFootprint, DpiDeletionRuntime, KeyFamilyRegistry, FprSweepSource, FprSweepReport, ForgetOptions,
 };
 use contextra_ports::{ContextChunk, DocId, ScoredDocument, StorageEngine, TxId, VectorIndex, VectorIndexStats, VectorResidue};
-use contextra_store::{LsmStorage, LsmStorageConfig};
+use contextra_store::{LsmConfig as LsmStorageConfig, LsmStorage};
 use contextra_types::{ContextraError, Result};
 use tempfile::TempDir;
 
 struct DummySweepSource;
 
 impl FprSweepSource for DummySweepSource {
-    fn sweep_range(
-        &self,
-        _start_key: &[u8],
-        _end_key: &[u8],
-        _footprint: &ErasureFootprint,
-    ) -> Result<FprSweepReport> {
-        Ok(FprSweepReport {
-            scanned_keys: 0,
-            residual_keys: Vec::new(),
-            clean: true,
-        })
+    fn for_each_key(&self, _f: &mut dyn for<'a> FnMut(&'a [u8]) -> bool) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -99,7 +90,7 @@ async fn hnsw_witness_measured_not_asserted() {
     let db_dir = temp_dir.path().join("db");
     std::fs::create_dir_all(&db_dir).unwrap();
 
-    let storage = LsmStorage::open(LsmStorageConfig::new(&db_dir)).await.unwrap();
+    let storage = LsmStorage::new(LsmStorageConfig { path: db_dir.clone(), ..Default::default() }).await.unwrap();
     let runtime = DpiDeletionRuntime::open(&db_dir, None, [1u8; 16]).unwrap();
     let registry = KeyFamilyRegistry::new();
     let sweep_source = DummySweepSource;
@@ -135,7 +126,7 @@ async fn witness_error_is_not_swallowed() {
     let db_dir = temp_dir.path().join("db");
     std::fs::create_dir_all(&db_dir).unwrap();
 
-    let storage = LsmStorage::open(LsmStorageConfig::new(&db_dir)).await.unwrap();
+    let storage = LsmStorage::new(LsmStorageConfig { path: db_dir.clone(), ..Default::default() }).await.unwrap();
     let runtime = DpiDeletionRuntime::open(&db_dir, None, [1u8; 16]).unwrap();
     let registry = KeyFamilyRegistry::new();
     let sweep_source = DummySweepSource;
@@ -196,7 +187,7 @@ async fn no_self_attested_fallback() {
     let db_dir = temp_dir.path().join("db");
     std::fs::create_dir_all(&db_dir).unwrap();
 
-    let storage = LsmStorage::open(LsmStorageConfig::new(&db_dir)).await.unwrap();
+    let storage = LsmStorage::new(LsmStorageConfig { path: db_dir.clone(), ..Default::default() }).await.unwrap();
     let runtime = DpiDeletionRuntime::open(&db_dir, None, [1u8; 16]).unwrap();
     let registry = KeyFamilyRegistry::new();
     let sweep_source = DummySweepSource;

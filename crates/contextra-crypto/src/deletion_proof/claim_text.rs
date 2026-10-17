@@ -3,14 +3,14 @@
 #![forbid(unsafe_code)]
 
 use crate::deletion_proof::types::DeletionLayer;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Standard-Disclaimer für Deletion Proof Audits (rechtlich vorsichtig).
 pub const AUDIT_SCOPE_DISCLAIMER: &str =
     "Audit gegen definierte Zeugen und Toleranzen, kein Beweis der Abwesenheit";
 
 /// Status-Klassifizierung für einzelne Layer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LayerVerificationStatus {
     /// Layer wurde durch einen realen Scan verifiziert.
     Verified,
@@ -30,7 +30,7 @@ impl LayerVerificationStatus {
 
 /// Assurance-Stufen S0 bis S4 für den Deletion Witness.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum WitAssurance {
     /// S0: Basic Tombstone Committal.
@@ -66,7 +66,7 @@ impl WitAssurance {
 
 /// Geschlossenes ClaimText-Enum mit repr(u16)-stabilen IDs gemäß Spezifikation C7.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u16)]
 pub enum WitClaimText {
     /// S0: Tombstones committed; Daten über die Contextra-API nicht mehr les-/findbar.
