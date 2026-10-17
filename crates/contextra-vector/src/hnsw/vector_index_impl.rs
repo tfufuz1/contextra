@@ -228,128 +228,12 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn residue(&self, id: DocId) -> Result<VectorResidue> {
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_node_count = mmap_guard
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-
-        let doc_map = self.inner.hot.doc_to_node.read();
-        let target_idx_opt = doc_map.get(&id.inner()).copied();
-        drop(doc_map);
-
-        let deleted_guard = self.inner.cold.deleted_nodes.read();
-
-        let (node_present, target_idx) = match target_idx_opt {
-            Some(idx) => {
-                let is_deleted = deleted_guard.contains(idx as u64);
-                (!is_deleted, Some(idx))
-            }
-            None => (false, None),
-        };
-
-        let m = self.inner.cold.config.m;
-        let nodes_read = self.inner.hot.nodes.read();
-        let total_nodes = mmap_node_count + nodes_read.len();
-
-        let mut outgoing_edges = 0u32;
-        let mut incoming_edges = 0u32;
-
-        if let Some(t_idx) = target_idx {
-            let target_max_layer = if t_idx < mmap_node_count {
-                if let Some(mmap) = mmap_guard.as_ref() {
-                    mmap.get_node_record(t_idx)
-                        .map(|r| r.max_layer as usize)
-                        .unwrap_or(0)
-                } else {
-                    0
-                }
-            } else {
-                let ram_idx = t_idx - mmap_node_count;
-                if ram_idx < nodes_read.len() {
-                    nodes_read[ram_idx].max_layer
-                } else {
-                    0
-                }
-            };
-
-            for layer in 0..=target_max_layer {
-                let conns = if t_idx < mmap_node_count {
-                    if let Some(mmap) = mmap_guard.as_ref() {
-                        if let Ok(rec) = mmap.get_node_record(t_idx) {
-                            mmap.get_connections(&rec, layer).unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        }
-                    } else {
-                        Vec::new()
-                    }
-                } else {
-                    let ram_idx = t_idx - mmap_node_count;
-                    self.inner
-                        .hot
-                        .arena
-                        .get_ram_node_connections(ram_idx, layer, m)
-                };
-                let count = u32::try_from(conns.len()).unwrap_or(u32::MAX);
-                outgoing_edges = outgoing_edges.saturating_add(count);
-            }
-
-            for node_idx in 0..total_nodes {
-                if node_idx == t_idx {
-                    continue;
-                }
-                let node_max_layer = if node_idx < mmap_node_count {
-                    if let Some(mmap) = mmap_guard.as_ref() {
-                        mmap.get_node_record(node_idx)
-                            .map(|r| r.max_layer as usize)
-                            .unwrap_or(0)
-                    } else {
-                        0
-                    }
-                } else {
-                    let ram_idx = node_idx - mmap_node_count;
-                    if ram_idx < nodes_read.len() {
-                        nodes_read[ram_idx].max_layer
-                    } else {
-                        0
-                    }
-                };
-
-                for layer in 0..=node_max_layer {
-                    let conns = if node_idx < mmap_node_count {
-                        if let Some(mmap) = mmap_guard.as_ref() {
-                            if let Ok(rec) = mmap.get_node_record(node_idx) {
-                                mmap.get_connections(&rec, layer).unwrap_or_default()
-                            } else {
-                                Vec::new()
-                            }
-                        } else {
-                            Vec::new()
-                        }
-                    } else {
-                        let ram_idx = node_idx - mmap_node_count;
-                        self.inner
-                            .hot
-                            .arena
-                            .get_ram_node_connections(ram_idx, layer, m)
-                    };
-                    if conns.contains(&(t_idx as u32)) {
-                        incoming_edges = incoming_edges.saturating_add(1);
-                    }
-                }
-            }
-        }
-
-        drop(nodes_read);
-        drop(deleted_guard);
-        drop(mmap_guard);
-
+        let scan = self.scan_residue(id);
         Ok(VectorResidue {
-            node_present,
-            incoming_edges,
-            outgoing_edges,
-            pinned: false,
+            node_present: scan.node_found,
+            incoming_edges: u32::try_from(scan.incoming_edges).unwrap_or(u32::MAX),
+            outgoing_edges: u32::try_from(scan.outgoing_edges).unwrap_or(u32::MAX),
+            pinned: scan.pinned_by_reader,
         })
     }
 
@@ -595,7 +479,7 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
-        Ok(TxId::new(self.inner.hot.last_tx_id.load(Ordering::SeqCst)))
+        Ok(TxId::try_new(self.inner.hot.last_tx_id.load(Ordering::SeqCst)).unwrap_or(TxId::INVALID))
     }
 
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {

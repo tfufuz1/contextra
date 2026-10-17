@@ -26,6 +26,22 @@ pub enum VectorData {
     U8(Vec<u8>),
 }
 
+impl VectorData {
+    /// Zeroizes in-memory vector storage bytes.
+    pub fn zeroize(&mut self) {
+        match self {
+            VectorData::F32(v) => {
+                for element in v.iter_mut() {
+                    *element = 0.0;
+                }
+            }
+            VectorData::U8(v) => {
+                v.fill(0);
+            }
+        }
+    }
+}
+
 /// A node in the HNSW graph.
 #[derive(Debug)]
 pub struct HnswNode {
@@ -33,6 +49,16 @@ pub struct HnswNode {
     pub(super) vector: VectorData,
     pub(super) max_layer: usize,
     pub(super) committed_tx: u64,
+}
+
+impl HnswNode {
+    /// Zeroizes vector data and node metadata upon document deletion.
+    pub fn zeroize(&mut self) {
+        self.vector.zeroize();
+        self.doc_id = DocId::new(0);
+        self.committed_tx = 0;
+        self.max_layer = 0;
+    }
 }
 
 /// Search candidate.
@@ -187,6 +213,7 @@ pub struct HnswColdCore {
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
+    pub fault_injection_skip_zeroize: AtomicBool,
     #[cfg(test)]
     pub fault_injection_insert_target: AtomicU64,
     #[cfg(test)]
@@ -259,6 +286,7 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    fault_injection_skip_zeroize: AtomicBool::new(false),
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -327,6 +355,7 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    fault_injection_skip_zeroize: AtomicBool::new(false),
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -334,6 +363,14 @@ impl HnswIndex {
                 },
             }),
         }
+    }
+
+    /// Controls test fault injection to simulate incomplete deletion (skipping zeroization).
+    pub fn set_fault_injection_skip_zeroize(&self, skip: bool) {
+        self.inner
+            .cold
+            .fault_injection_skip_zeroize
+            .store(skip, Ordering::SeqCst);
     }
 
     /// Sets the target insertion count for simulating compute_insert fault injection in tests.
