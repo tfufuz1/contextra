@@ -15,8 +15,11 @@ async fn test_forget_fails_closed_on_witness_error() -> contextra_types::Result<
 
     db.insert("doc_fail", &[0.5, 0.5, 0.0, 0.0], None).await?;
 
-    // Request S4 without keyring available
-    let opts = ForgetOptions::new().with_assurance(WitAssurance::S4);
+    // Request S4 with keyring available flag and purge mode set, but without initialized keyring record
+    let opts = ForgetOptions::new()
+        .with_assurance(WitAssurance::S4)
+        .with_purge(PurgeMode::Purge)
+        .with_keyring_available(true);
 
     let receipt = db.forget("doc_fail", opts).await?;
 

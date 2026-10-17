@@ -6,3 +6,4 @@ mod lifecycle;
 mod wiring;
 
 pub use forget::{ForgetReceipt, LayerStatus};
+pub use contextra_kvcache::TenantIsolatedKvStore;

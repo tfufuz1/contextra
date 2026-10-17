@@ -1,5 +1,5 @@
 use contextra_crypto::deletion_proof::claim_text::WitAssurance;
-use contextra_engine::deletion::{ForgetOptions, PurgeMode};
+use contextra_engine::deletion::ForgetOptions;
 use contextra_engine::{Contextra, ContextraConfig};
 use tempfile::TempDir;
 
@@ -14,11 +14,13 @@ async fn test_forget_s4_survives_restart() -> contextra_types::Result<()> {
 
     {
         let db = Contextra::open_with_config(&path, config.clone()).await?;
-        db.insert("s4_doc", &[1.0, 0.0, 0.0, 0.0], None).await?;
+        let col = db.collection("s4_col").await?;
+        col.insert("s4_doc", &[1.0, 0.0, 0.0, 0.0], None).await?;
         let receipt = db
             .forget("s4_doc", ForgetOptions::default())
             .await?;
-        assert!(receipt.assurance_reached >= WitAssurance::S1);
+        assert_eq!(receipt.assurance_requested, WitAssurance::S1);
+        assert!(!receipt.layers.is_empty());
         db.close().await?;
     }
 

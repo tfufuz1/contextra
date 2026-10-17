@@ -6,6 +6,8 @@ use contextra_types::{FilterExpr, Result};
 use serde_json::Value;
 use std::sync::Arc;
 
+use super::forget::ForgetReceipt;
+
 impl Contextra {
     pub(crate) async fn default_col(&self) -> Result<Arc<Collection<LsmStorage>>> {
         self.collection("default").await
