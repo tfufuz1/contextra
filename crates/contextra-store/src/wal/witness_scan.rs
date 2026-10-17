@@ -1,5 +1,4 @@
 #![cfg(not(loom))]
-#![allow(clippy::cast_possible_truncation)]
 
 //! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
 //! Stand: 2026-10-13
@@ -169,7 +168,7 @@ pub async fn scan_wal_directory_with_clock(
     clock: &dyn Clock,
 ) -> Result<WalScanEvidence> {
     let start_nanos = clock.monotonic_nanos();
-    let timeout_nanos = inputs.timeout.as_nanos() as u64;
+    let timeout_nanos = u64::try_from(inputs.timeout.as_nanos()).unwrap_or(u64::MAX);
 
     let mut entries = match tokio::fs::read_dir(&inputs.wal_dir).await {
         Ok(e) => e,
@@ -347,10 +346,13 @@ pub async fn scan_wal_directory_with_clock(
         }
     }
 
-    let segments_removed = initial_segment_names
-        .iter()
-        .filter(|name| !final_segment_names.contains(*name))
-        .count() as u64;
+    let segments_removed = u64::try_from(
+        initial_segment_names
+            .iter()
+            .filter(|name| !final_segment_names.contains(*name))
+            .count(),
+    )
+    .unwrap_or(u64::MAX);
 
     Ok(WalScanEvidence {
         segments_total,
