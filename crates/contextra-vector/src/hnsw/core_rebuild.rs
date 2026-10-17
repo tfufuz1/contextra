@@ -350,6 +350,25 @@ impl HnswIndexCore {
             self.cold.deleted_nodes.write().insert(idx as u64);
             self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
 
+            let mmap_node_count = self
+                .cold
+                .mmap_index
+                .read()
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+
+            let skip_zeroize = self.cold.fault_injection_skip_zeroize.load(Ordering::SeqCst);
+            if !skip_zeroize && idx >= mmap_node_count {
+                let ram_idx = idx - mmap_node_count;
+                let mut nodes_write = self.hot.nodes.write();
+                if let Some(node) = nodes_write.get_mut(ram_idx) {
+                    node.zeroize();
+                }
+                drop(nodes_write);
+                self.hot.arena.free_node(ram_idx);
+            }
+
             let ep_val = self.hot.get_entry_point();
             let ram_ep_val = self.hot.get_ram_entry_point();
 
