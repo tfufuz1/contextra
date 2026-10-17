@@ -11,10 +11,13 @@ pub mod drift;
 pub mod flow_thompson;
 pub mod homeostat;
 pub mod lyapunov;
+#[cfg(feature = "off-policy-eval")]
 pub mod off_policy;
+#[cfg(feature = "off-policy-eval")]
 pub mod offpolicy;
 pub mod pid;
 pub mod pid_latency_controller;
+pub mod pool_controller;
 #[cfg(feature = "rie-greedy-personalization")]
 pub mod rie_greedy;
 pub mod shadow_mode;
@@ -27,9 +30,11 @@ pub use drift::*;
 pub use flow_thompson::*;
 pub use homeostat::*;
 pub use lyapunov::*;
+#[cfg(feature = "off-policy-eval")]
 pub use off_policy::*;
 pub use pid::*;
 pub use pid_latency_controller::*;
+pub use pool_controller::*;
 #[cfg(feature = "rie-greedy-personalization")]
 pub use rie_greedy::{RieGreedyError, RieGreedyProfile};
 pub use shadow_mode::*;
