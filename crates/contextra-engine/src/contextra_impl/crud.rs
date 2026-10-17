@@ -1,3 +1,4 @@
+use crate::contextra_impl::forget::ForgetReceipt;
 use crate::deletion::ForgetOptions;
 use crate::*;
 use contextra_store::LsmStorage;

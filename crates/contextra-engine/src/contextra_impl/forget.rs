@@ -9,8 +9,9 @@ use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
 use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::deletion_proof::types::{
-    hash_deleted_keys_length_prefixed, DeletionLayer,  DeletionScope,
+    hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope,
 };
+use contextra_crypto::deletion_proof::ProofV4;
 use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_store::compaction::purge_filter::PurgeScope;
@@ -87,7 +88,7 @@ impl Contextra {
             vec![id.to_string()],
             as_of_tx,
             &opts,
-            Some((contextra_types::TenantId::SYSTEM, id, doc_id)),
+            Some((col.tenant_id(), id, doc_id)),
         )
         .await
     }
@@ -297,8 +298,8 @@ impl Contextra {
 
         // Handle Physical Purge when requested (opts.purge != PurgeMode::None)
         if opts.purge != PurgeMode::None {
-            let db_dir = std::env::temp_dir();
-            if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
+            let db_dir = self.storage.db_dir();
+            if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]) {
                 let driver = DpiPurgeDriver::new(&self.storage, &runtime, DpiPurgeDriverConfig::default());
                 let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
                 let logical_handle = FonLogicalHandle {
@@ -387,8 +388,8 @@ impl Contextra {
             let zeu_probe = self.storage.store_probe();
             let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
 
-            let db_dir = std::env::temp_dir();
-            if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
+            let db_dir = self.storage.db_dir();
+            if let Ok(runtime) = DpiDeletionRuntime::open(db_dir, None, [0u8; 16]) {
                 runtime
                     .finalize_logical(logical_input, opts, None, probes)
                     .ok()

@@ -557,6 +557,12 @@ pub struct BanditProfileState {
     /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
     #[serde(default)]
     pub sketch_theta: Vec<f32>,
+    /// Maximale erlaubte Spur von A⁻¹.
+    #[serde(default = "default_max_trace")]
+    pub max_trace: f64,
+    /// Schwelle für Drift-Erkennung via Probe-Residual.
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -628,6 +634,8 @@ impl BanditProfileState {
             seed: 0,
             sketch_matrix: None,
             sketch_theta: Vec::new(),
+            max_trace: default_max_trace(),
+            drift_threshold: default_drift_threshold(),
         }
     }
 

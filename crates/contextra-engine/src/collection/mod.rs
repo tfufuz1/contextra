@@ -930,6 +930,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.namespaced_key(b"", 0)
     }
 
+    /// Returns the bound TenantId for this collection.
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        contextra_types::TenantId::SYSTEM
+    }
+
     /// Returns the name of the collection.
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn name(&self) -> &str {
