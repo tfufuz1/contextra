@@ -70,6 +70,8 @@ pub struct ForgetOptions {
     pub wait: Wait,
     /// Verification depth (default: Footprint).
     pub verify_depth: VerifyDepth,
+    /// Whether cryptographic keyring is available for S4 cryptographic erasure.
+    pub keyring_available: bool,
 }
 
 impl Default for ForgetOptions {
@@ -80,6 +82,7 @@ impl Default for ForgetOptions {
             purge_path: None,
             wait: Wait::No,
             verify_depth: VerifyDepth::Footprint,
+            keyring_available: false,
         }
     }
 }
@@ -126,19 +129,26 @@ impl ForgetOptions {
         self
     }
 
+    /// Sets whether the keyring is available.
+    #[must_use]
+    pub fn with_keyring_available(mut self, keyring_available: bool) -> Self {
+        self.keyring_available = keyring_available;
+        self
+    }
+
     /// Validates options configuration consistency.
     ///
     /// # Errors
     ///
     /// Returns [`ContextraError::InvalidInput`] if:
-    /// - Assurance level S4 is requested (keyring integration pending).
+    /// - Assurance level S4 is requested without keyring availability.
     /// - `Wait::Until(0)` duration is requested.
     /// - Assurance level >= S2 is requested without physical purge mode.
     /// - `PurgeMode::PurgeWithScrub` is requested without a purge path.
     pub fn validate(&self) -> Result<()> {
-        if self.assurance == WitAssurance::S4 {
+        if self.assurance == WitAssurance::S4 && !self.keyring_available {
             return Err(ContextraError::invalid_input(
-                "S4 requires keyring, not available",
+                "S4 requires keyring (feature `encryption-at-rest`)",
             ));
         }
 

@@ -348,8 +348,10 @@ impl<'a> DpiPurgeDriver<'a> {
 
 /// Orchestrates complete document deletion with logical Phase-A proof issuance, physical purge driver execution,
 /// reverse index sweep, and returns a verified [`ForgetOutcome`].
-pub async fn forget_document<S: FprSweepSource>(
+#[allow(clippy::too_many_arguments)]
+pub async fn forget_document<S: FprSweepSource, V: contextra_ports::VectorIndex>(
     storage: &LsmStorage,
+    vector_index: &V,
     runtime: &DpiDeletionRuntime,
     doc_id_str: &str,
     as_of_tx: TxId,
@@ -380,13 +382,18 @@ pub async fn forget_document<S: FprSweepSource>(
     let mut witnesses = storage
         .issue_witnesses_v2(zeu_req)
         .await
-        .unwrap_or_default();
+        .map_err(|e| ContextraError::Internal(format!("WitnessFailed: store scan error: {e}")))?;
 
+    // HNSW witness from actual measurement
     if !witnesses
         .iter()
         .any(|w| *w.layer() == DeletionLayer::HnswIndex)
     {
-        if let Ok(hnsw_witness) = LayerWitness::issue(WitIssueArgs {
+        let residue = vector_index.residue(doc_id).await?;
+        let marked_zeroed =
+            !residue.node_present && residue.incoming_edges == 0 && residue.outgoing_edges == 0;
+
+        let hnsw_witness = LayerWitness::issue(WitIssueArgs {
             layer: DeletionLayer::HnswIndex,
             scope_hash,
             scanned_at_tx: as_of_tx,
@@ -400,69 +407,42 @@ pub async fn forget_document<S: FprSweepSource>(
             store_generation: WitStoreGeneration(0),
             layer_evidence: WitLayerEvidence::HnswIndex {
                 node_id: doc_id.inner(),
-                incoming_edges: 0,
-                outgoing_edges: 0,
-                pinned_by_reader: false,
-                marked_zeroed: true,
+                incoming_edges: residue.incoming_edges,
+                outgoing_edges: residue.outgoing_edges,
+                pinned_by_reader: residue.pinned,
+                marked_zeroed,
             },
             key_identifiers_claimed: false,
-        }) {
-            witnesses.push(hnsw_witness);
-        }
+        })
+        .map_err(|e| ContextraError::Internal(format!("WitnessFailed: HnswIndex creation failed: {e}")))?;
+
+        witnesses.push(hnsw_witness);
     }
 
     if !witnesses
         .iter()
         .any(|w| *w.layer() == DeletionLayer::TextIndex)
     {
-        if let Ok(text_witness) = issue_text_index_witness(
+        let text_witness = issue_text_index_witness(
             doc_id,
             &footprint.ram.term_bytes,
             scope_hash,
             as_of_tx,
-            None,
-        ) {
-            witnesses.push(text_witness);
-        }
+            Some(0),
+        )?;
+        witnesses.push(text_witness);
     }
 
     if !witnesses
         .iter()
         .any(|w| *w.layer() == DeletionLayer::Relations)
     {
-        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).unwrap_or(0);
-        if let Ok(rel_witness) =
-            issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, None)
-        {
-            witnesses.push(rel_witness);
-        }
-    }
-
-    if !witnesses
-        .iter()
-        .any(|w| *w.layer() == DeletionLayer::ErasureLedger)
-    {
-        if let Ok(ledger_witness) = LayerWitness::issue(WitIssueArgs {
-            layer: DeletionLayer::ErasureLedger,
-            scope_hash,
-            scanned_at_tx: as_of_tx,
-            as_of_tx,
-            assurance: opts.assurance,
-            claim: contextra_crypto::deletion_proof::claim_text::WitClaimText::S1,
-            footprint_hash,
-            scope_write_seq: 0,
-            scanner_name: "ledger_scanner",
-            scanner_version: 1,
-            store_generation: WitStoreGeneration(0),
-            layer_evidence: WitLayerEvidence::Memtable {
-                memtables_scanned: 1,
-                entries_found: 0,
-                tombstones_found: 0,
-            },
-            key_identifiers_claimed: false,
-        }) {
-            witnesses.push(ledger_witness);
-        }
+        let scanned_edges = u64::try_from(footprint.ram.relation_keys.len()).map_err(|e| {
+            ContextraError::InvalidInput(format!("Failed converting relation_keys len: {e}"))
+        })?;
+        let rel_witness =
+            issue_relations_witness(doc_id, scanned_edges, scope_hash, as_of_tx, Some(0))?;
+        witnesses.push(rel_witness);
     }
 
     let logical_input = DpiLogicalInput {
@@ -470,7 +450,7 @@ pub async fn forget_document<S: FprSweepSource>(
         storage_scope: "lsm".to_string(),
         deleted_keys_hash: scope_hash,
         footprint_hash,
-        observed_empty: true,
+        observed_empty: footprint.observed_empty,
         deleted_after_tx: as_of_tx,
         witnesses,
         scope_file_names: vec![doc_id_str.to_string()],
