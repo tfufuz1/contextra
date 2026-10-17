@@ -31,13 +31,13 @@ async fn test_hnsw_topology_and_search_determinism() {
         .build()
         .expect("valid config");
 
-    let rng1 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
-    let rng2 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+    let rng1 = std::sync::Arc::new(super::types::VectorSeededRng::new(seed));
+    let rng2 = std::sync::Arc::new(super::types::VectorSeededRng::new(seed));
 
     let idx1 = HnswIndex::try_new_with_rng(config.clone(), rng1).expect("idx1 creation");
     let idx2 = HnswIndex::try_new_with_rng(config, rng2).expect("idx2 creation");
 
-    let sm = contextra_ports::SeededRng::new(1001);
+    let sm = super::types::VectorSeededRng::new(1001);
     let mut vecs = Vec::with_capacity(n);
     for _ in 0..n {
         let v: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
