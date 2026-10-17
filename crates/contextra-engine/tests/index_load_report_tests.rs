@@ -1,4 +1,5 @@
 #![cfg(not(loom))]
+use contextra_ports::StorageEngine;
 
 use contextra_engine::collection::{IndexLoadReport, LoadPolicy};
 use contextra_engine::{Contextra, ContextraConfig};

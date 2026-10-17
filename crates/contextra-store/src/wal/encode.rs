@@ -1,5 +1,3 @@
-#![allow(clippy::cast_possible_truncation)]
-
 //! FILE-CONTEXT:
 //! STAND: 2026-10-06
 //! ZWECK: Format-Spezifikation (V1/V2/V3), `WalEntry`, `WalOp`, CRC32 & HMAC-Berechnung sowie Binär-Serialisierung.
@@ -11,6 +9,12 @@ use contextra_types::{ContextraError, Result, TxId};
 use contextra_crypto::wal_crypto::WalHmac;
 
 use super::MAX_WAL_ENTRY_SIZE;
+
+/// Maximum allowed key size in WAL entries (1 MiB).
+pub const MAX_KEY_SIZE: usize = 1024 * 1024;
+
+/// Maximum allowed value size in WAL entries (64 MiB).
+pub const MAX_VALUE_SIZE: usize = MAX_WAL_ENTRY_SIZE as usize;
 
 /// Typed parsing errors encountered when decoding WAL entries from raw bytes.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -68,13 +72,13 @@ pub const WAL_V3_HEADER: [u8; 4] = *b"MFW3";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WalVersion {
     V1, // Legacy: kein HMAC
-    V2, // Current: HMAC ohne tx_id
-    V3, // New: HMAC mit tx_id
+    V2, // Legacy: HMAC ohne tx_id
+    V3, // Current: HMAC mit tx_id
 }
 
 /// A batch of prepared WAL entries bound to a specific HMAC chain.
 ///
-/// `PreparedBatch` has a private inner field and cannot be constructed outside `wal.rs`.
+/// `PreparedBatch` has a private inner field and cannot be constructed outside the `wal` module.
 /// It can only be created by calling [`Wal::prepare_batch`].
 #[derive(Debug, Clone)]
 pub struct PreparedBatch(pub(crate) Vec<WalEntry>);
@@ -216,14 +220,25 @@ impl WalEntry {
             match op {
                 WalOp::Put { key, value, .. } => {
                     mac.update(&[0u8]); // op type
-                    mac.update(&(key.len() as u32).to_le_bytes());
+                    let key_len_u32 = u32::try_from(key.len()).map_err(|_| {
+                        ContextraError::Serialization(WalParseError::OversizedKey.to_string())
+                    })?;
+                    let val_len_u32 = u32::try_from(value.len()).map_err(|_| {
+                        ContextraError::Serialization(
+                            WalParseError::OversizedValue { limit: MAX_VALUE_SIZE }.to_string(),
+                        )
+                    })?;
+                    mac.update(&key_len_u32.to_le_bytes());
                     mac.update(key);
-                    mac.update(&(value.len() as u32).to_le_bytes());
+                    mac.update(&val_len_u32.to_le_bytes());
                     mac.update(value);
                 }
                 WalOp::Delete { key, .. } => {
                     mac.update(&[1u8]); // op type
-                    mac.update(&(key.len() as u32).to_le_bytes());
+                    let key_len_u32 = u32::try_from(key.len()).map_err(|_| {
+                        ContextraError::Serialization(WalParseError::OversizedKey.to_string())
+                    })?;
+                    mac.update(&key_len_u32.to_le_bytes());
                     mac.update(key);
                 }
                 WalOp::TxEnd { committed, .. } => {
@@ -242,6 +257,32 @@ impl WalEntry {
 
     /// Serializes the entry to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        match &self.op {
+            WalOp::Put { key, value, .. } => {
+                if key.len() > MAX_KEY_SIZE {
+                    return Err(ContextraError::Serialization(
+                        WalParseError::OversizedKey.to_string(),
+                    ));
+                }
+                if value.len() > MAX_VALUE_SIZE {
+                    return Err(ContextraError::Serialization(
+                        WalParseError::OversizedValue {
+                            limit: MAX_VALUE_SIZE,
+                        }
+                        .to_string(),
+                    ));
+                }
+            }
+            WalOp::Delete { key, .. } => {
+                if key.len() > MAX_KEY_SIZE {
+                    return Err(ContextraError::Serialization(
+                        WalParseError::OversizedKey.to_string(),
+                    ));
+                }
+            }
+            WalOp::TxEnd { .. } => {}
+        }
+
         let op_size = match &self.op {
             WalOp::Put { key, value, .. } => 1 + 8 + 4 + key.len() + 4 + value.len(),
             WalOp::Delete { key, .. } => 1 + 8 + 4 + key.len(),
@@ -255,16 +296,24 @@ impl WalEntry {
         // total_size = length_prefix(4) + total_payload
         let total_size = 4 + total_payload_size;
 
-        let mut buf = Vec::with_capacity(total_size);
-
-        // 1. Length Prefix
         if total_payload_size > MAX_WAL_ENTRY_SIZE as usize {
             return Err(ContextraError::Serialization(format!(
                 "WAL entry too large: {} bytes (max {})",
                 total_payload_size, MAX_WAL_ENTRY_SIZE
             )));
         }
-        buf.extend_from_slice(&(total_payload_size as u32).to_le_bytes());
+
+        let total_payload_u32 = u32::try_from(total_payload_size).map_err(|_| {
+            ContextraError::Serialization(format!(
+                "WAL total payload size {} exceeds u32::MAX",
+                total_payload_size
+            ))
+        })?;
+
+        let mut buf = Vec::with_capacity(total_size);
+
+        // 1. Length Prefix
+        buf.extend_from_slice(&total_payload_u32.to_le_bytes());
 
         // 2. CRC32 Placeholder (we'll fill this at the end)
         let crc_offset = buf.len();
@@ -278,17 +327,31 @@ impl WalEntry {
 
         match &self.op {
             WalOp::Put { tx_id, key, value } => {
+                let key_len_u32 = u32::try_from(key.len()).map_err(|_| {
+                    ContextraError::Serialization(WalParseError::OversizedKey.to_string())
+                })?;
+                let val_len_u32 = u32::try_from(value.len()).map_err(|_| {
+                    ContextraError::Serialization(
+                        WalParseError::OversizedValue {
+                            limit: MAX_VALUE_SIZE,
+                        }
+                        .to_string(),
+                    )
+                })?;
                 buf.push(0u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&key_len_u32.to_le_bytes());
                 buf.extend_from_slice(key);
-                buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&val_len_u32.to_le_bytes());
                 buf.extend_from_slice(value);
             }
             WalOp::Delete { tx_id, key } => {
+                let key_len_u32 = u32::try_from(key.len()).map_err(|_| {
+                    ContextraError::Serialization(WalParseError::OversizedKey.to_string())
+                })?;
                 buf.push(1u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&key_len_u32.to_le_bytes());
                 buf.extend_from_slice(key);
             }
             WalOp::TxEnd { tx_id, committed } => {
@@ -345,16 +408,18 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_id = TxId::new(u64::from_le_bytes(
+                let tx_raw = u64::from_le_bytes(
                     tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                ));
+                );
+                let tx_id = TxId::try_new(tx_raw)
+                    .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 let key_len = u32::from_le_bytes(
                     klen_bytes
                         .try_into()
                         .map_err(|_| WalParseError::Truncated)?,
                 ) as usize;
 
-                if key_len > 1024 * 1024 {
+                if key_len > MAX_KEY_SIZE {
                     return Err(WalParseError::OversizedKey);
                 }
 
@@ -382,9 +447,9 @@ impl WalEntry {
                         .map_err(|_| WalParseError::Truncated)?,
                 ) as usize;
 
-                if val_len > MAX_WAL_ENTRY_SIZE as usize {
+                if val_len > MAX_VALUE_SIZE {
                     return Err(WalParseError::OversizedValue {
-                        limit: MAX_WAL_ENTRY_SIZE as usize,
+                        limit: MAX_VALUE_SIZE,
                     });
                 }
 
@@ -405,16 +470,18 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_id = TxId::new(u64::from_le_bytes(
+                let tx_raw = u64::from_le_bytes(
                     tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                ));
+                );
+                let tx_id = TxId::try_new(tx_raw)
+                    .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 let key_len = u32::from_le_bytes(
                     klen_bytes
                         .try_into()
                         .map_err(|_| WalParseError::Truncated)?,
                 ) as usize;
 
-                if key_len > 1024 * 1024 {
+                if key_len > MAX_KEY_SIZE {
                     return Err(WalParseError::OversizedKey);
                 }
 
@@ -434,9 +501,11 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let committed_byte = *remaining.get(8).ok_or(WalParseError::Truncated)?;
 
-                let tx_id = TxId::new(u64::from_le_bytes(
+                let tx_raw = u64::from_le_bytes(
                     tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                ));
+                );
+                let tx_id = TxId::try_new(tx_raw)
+                    .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 if committed_byte > 1 {
                     return Err(WalParseError::InvalidCommittedByte(committed_byte));
                 }

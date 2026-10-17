@@ -14,12 +14,14 @@ use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
+#[allow(dead_code)]
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 #[cfg(feature = "fault-injection")]
 pub static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+#[allow(dead_code)]
 pub(crate) enum WalCommand {
     Append {
         payload: Vec<u8>,
@@ -46,6 +48,7 @@ pub(crate) enum WalCommand {
     },
 }
 
+#[allow(dead_code)]
 fn respond_poisoned_error(cmd: WalCommand) {
     let err = ContextraError::Storage(
         "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further operations".into(),
@@ -133,6 +136,7 @@ impl Default for WalFlusherConfig {
     }
 }
 
+#[allow(dead_code)]
 fn encode_encrypted_rewrite_chunks(
     v3_entries: &[WalEntry],
     km: &crate::wal::KeyManager,
@@ -183,6 +187,7 @@ fn encode_encrypted_rewrite_chunks(
 
 impl Wal {
     /// Enables background flusher actor for processing WAL I/O commands sequentially with default `NoFault` injector.
+    #[allow(dead_code)]
     pub(crate) fn enable_flusher_with_config(
         &self,
         file: crate::wal::fs::File,
@@ -192,6 +197,7 @@ impl Wal {
     }
 
     /// Enables background flusher actor for processing WAL I/O commands sequentially with a custom `FaultInjector`.
+    #[allow(dead_code)]
     pub(crate) fn enable_flusher_with_injector<F: FaultInjector + 'static>(
         &self,
         mut file: crate::wal::fs::File,

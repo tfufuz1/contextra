@@ -241,7 +241,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if let Some(val) = self.storage.get(&doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
-            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+            } else if let Ok(full) = StoredDocument::from_slice(&val) {
                 Some(full.id)
             } else {
                 None
@@ -268,7 +268,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
-            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+            } else if let Ok(full) = StoredDocument::from_slice(&val) {
                 Some(full.id)
             } else {
                 None
@@ -325,7 +325,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?;
 
-        let data = serde_json::to_vec(&stored)?;
+        let data = stored.encode_v2()?;
         self.storage.put(tx, &user_key, &data).await?;
 
         let meta_data = serde_json::to_vec(&meta_only)?;

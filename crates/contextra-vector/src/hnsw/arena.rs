@@ -161,6 +161,15 @@ impl HnswArena {
             }
         } else {
             let count_start = count_offsets[ram_idx];
+            let count_end = if ram_idx + 1 < count_offsets.len() {
+                count_offsets[ram_idx + 1]
+            } else {
+                counts.len()
+            };
+            if count_start < counts.len() {
+                let end_clamped = count_end.min(counts.len());
+                counts[count_start..end_clamped].fill(0);
+            }
             for (layer, layer_conns) in final_connections.iter().enumerate() {
                 let l_offset = Self::layer_offset(start_offset, layer, m);
                 let layer_cap = if layer == 0 { m * 2 } else { m };
@@ -293,12 +302,40 @@ impl HnswArena {
         false
     }
 
-    /// Marks a node's slot as free for future slot reuse.
+    /// Marks a node's slot as free for future slot reuse and zeroizes its connection storage and counts.
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();
+        let capacities = self.capacities.read();
+        let count_offsets = self.count_offsets.read();
+
         if ram_idx < offsets.len() {
-            self.free_list.write().push(ram_idx);
-            self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+            let start = offsets[ram_idx];
+            let cap = capacities.get(ram_idx).copied().unwrap_or(0);
+
+            let mut arena = self.arena.write();
+            if start + cap <= arena.len() {
+                arena[start..start + cap].fill(0);
+            }
+
+            let mut counts = self.counts.write();
+            if ram_idx < count_offsets.len() {
+                let count_start = count_offsets[ram_idx];
+                let count_end = if ram_idx + 1 < count_offsets.len() {
+                    count_offsets[ram_idx + 1]
+                } else {
+                    counts.len()
+                };
+                if count_start < counts.len() {
+                    let end_clamped = count_end.min(counts.len());
+                    counts[count_start..end_clamped].fill(0);
+                }
+            }
+
+            let mut free_list = self.free_list.write();
+            if !free_list.contains(&ram_idx) {
+                free_list.push(ram_idx);
+                self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+            }
         }
     }
 }

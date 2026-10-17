@@ -329,6 +329,18 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '5', '9', '13', '15', '20', 'B']
 test = "cargo test -p contextra-store --locked"
 
+[crates.contextra-store-redb]
+ring = 'Ring 1'
+maturity = 'experimental'
+description = 'redb StorageEngine Backend Adapter'
+capabilities = ['redb-storage', 'storage-engine']
+path = "crates/contextra-store-redb"
+unsafe_island = false
+may_depend_on = ['contextra-ports', 'contextra-types']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '5']
+test = "cargo test -p contextra-store-redb --features store-redb --locked"
+
 [crates.contextra-sys]
 ring = 'Ring 0'
 maturity = 'stable'

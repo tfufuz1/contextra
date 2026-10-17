@@ -13,6 +13,7 @@
 
 pub mod error;
 pub mod error_dto;
+pub mod panic_guard;
 pub mod model_fingerprint;
 pub mod retrieval_strategy;
 pub mod schema;
@@ -23,6 +24,9 @@ pub mod types;
 pub use types::math;
 
 pub use error::{ContextraError, Result};
+pub use panic_guard::{
+    guard_panic, guard_panic_with_hook, HealthState, PoisonHook, CONTEXTRA_PANICS_TOTAL,
+};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use retrieval_strategy::RetrievalStrategy;

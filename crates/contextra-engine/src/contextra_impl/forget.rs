@@ -7,6 +7,7 @@ use std::sync::Arc;
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
 use contextra_crypto::deletion_proof::probe::{WitStoreGeneration, WitStoreProbe};
+use contextra_crypto::deletion_proof::proof_v4::ProofV4;
 use contextra_crypto::deletion_proof::types::{
     hash_deleted_keys_length_prefixed, DeletionLayer, DeletionScope,
 };
@@ -19,7 +20,7 @@ use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxI
 use serde::{Deserialize, Serialize};
 
 use crate::deletion::{
-    issue_relations_witness, issue_text_index_witness, DpiDeletionRuntime, DpiLogicalInput,
+    relations_witness::issue_relations_witness, text_witness::issue_text_index_witness, DpiDeletionRuntime, DpiLogicalInput,
     DpiPurgeDriver, DpiPurgeDriverConfig, ErasureFootprint, FonLogicalHandle, ForgetOptions,
     KeyFamilyRegistry, PurgeMode, PurgeScopeTarget, Wait,
 };
@@ -73,7 +74,7 @@ impl Contextra {
         let footprint = col.erasure_footprint(doc_id).await?;
         let scope = DeletionScope::Document {
             doc_id,
-            tenant_id: col.tenant_id(),
+            tenant_id: contextra_types::TenantId::SYSTEM,
         };
 
         // Execute logical deletion in a transaction
@@ -100,8 +101,8 @@ impl Contextra {
     ) -> Result<ForgetReceipt> {
         opts.validate()?;
 
-        let col = self.collection(name).await?;
-        let tenant_id = col.tenant_id();
+        let _col = self.collection(name).await?;
+        let tenant_id = contextra_types::TenantId::SYSTEM;
 
         // 1. Footprint derivation
         let target = PurgeScopeTarget::Collection {

@@ -1122,8 +1122,8 @@ impl BanditProfileState {
                 }
 
                 let current_trace = compute_inv_a_trace(&self.inv_a, d);
-                if current_trace > self.max_trace {
-                    let scale = (self.max_trace / current_trace) as f32;
+                if current_trace > default_max_trace() {
+                    let scale = (default_max_trace() / current_trace) as f32;
                     for val in self.inv_a.iter_mut() {
                         *val *= scale;
                     }
@@ -1139,7 +1139,7 @@ impl BanditProfileState {
                 );
 
                 if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                    || probe_residual > self.drift_threshold
+                    || probe_residual > default_drift_threshold()
                 {
                     if !self.rebuild_inv_a_from_a() {
                         tracing::warn!("Rebuild of inv_a from shadow matrix A failed on probe residual drift");

@@ -198,10 +198,8 @@ impl PhysicalScope {
             Err(insertion_point) => insertion_point,
         };
 
-        if idx > 0 {
-            if key.starts_with(self.prefixes[idx - 1].as_slice()) {
-                return true;
-            }
+        if idx > 0 && key.starts_with(self.prefixes[idx - 1].as_slice()) {
+            return true;
         }
 
         false
@@ -273,10 +271,45 @@ pub struct EraseCtx<'a> {
 }
 
 /// Active write fence guard held during purge execution.
-#[derive(Debug)]
 pub struct FenceGuard {
     /// Identifier of purge holding the fence.
     pub purge_id: PurgeId,
+    on_release: Option<Box<dyn FnOnce() + Send>>,
+}
+
+impl FenceGuard {
+    /// Creates a new `FenceGuard` without a release callback.
+    pub const fn new(purge_id: PurgeId) -> Self {
+        Self {
+            purge_id,
+            on_release: None,
+        }
+    }
+
+    /// Creates a new `FenceGuard` with a custom release callback called on drop.
+    pub fn with_release(purge_id: PurgeId, on_release: impl FnOnce() + Send + 'static) -> Self {
+        Self {
+            purge_id,
+            on_release: Some(Box::new(on_release)),
+        }
+    }
+}
+
+impl std::fmt::Debug for FenceGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FenceGuard")
+            .field("purge_id", &self.purge_id)
+            .field("has_release_callback", &self.on_release.is_some())
+            .finish()
+    }
+}
+
+impl Drop for FenceGuard {
+    fn drop(&mut self) {
+        if let Some(cb) = self.on_release.take() {
+            cb();
+        }
+    }
 }
 
 /// Output report produced by an [`ErasureBackend::purge_physical`] operation (§5.5).

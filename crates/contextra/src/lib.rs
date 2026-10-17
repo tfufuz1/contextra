@@ -10,8 +10,13 @@ pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
 
+#[cfg(feature = "compliance")]
+pub mod compliance;
+
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
+#[cfg(feature = "compliance")]
+pub use compliance::*;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
@@ -44,7 +49,10 @@ pub fn builder(dimension: usize) -> ContextraBuilder {
 
 /// Opens or creates a `Contextra` instance at the given storage path using default configuration and `OpenFastGate`.
 pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, ContextraError> {
-    builder(768).with_storage_path(path.as_ref()).build().await
+    let path_buf = path.as_ref().to_path_buf();
+    contextra_types::public_api!("open", {
+        builder(768).with_storage_path(path_buf).build().await
+    })
 }
 
 /// Opens or creates a `Contextra` instance at the given storage path with an explicit configuration and `OpenFastGate`.
@@ -52,11 +60,14 @@ pub async fn open_with_config(
     path: impl AsRef<std::path::Path>,
     config: ContextraConfig,
 ) -> Result<Contextra, ContextraError> {
-    builder(config.dimension)
-        .with_storage_path(path.as_ref())
-        .with_config(config)
-        .build()
-        .await
+    let path_buf = path.as_ref().to_path_buf();
+    contextra_types::public_api!("open_with_config", {
+        builder(config.dimension)
+            .with_storage_path(path_buf)
+            .with_config(config)
+            .build()
+            .await
+    })
 }
 
 #[cfg(test)]

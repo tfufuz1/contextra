@@ -38,6 +38,7 @@ contextra-graph = { workspace = true }
 contextra-db = { workspace = true }
 contextra-infer-onnx = { workspace = true }
 contextra-infer-candle = { workspace = true }
+contextra-adapt = { workspace = true, features = ["bandit-routing", "egress-sherman-morrison", "flow-corrected-thompson", "off-policy-eval"] }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

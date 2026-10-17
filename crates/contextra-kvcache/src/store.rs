@@ -18,6 +18,7 @@ use super::attention_score::{
 use super::eviction_worker::EvictionWorker;
 use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use super::segment::KvSegment;
+use zeroize::Zeroize;
 
 /// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
 pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
@@ -88,13 +89,14 @@ impl TenantState {
             self.cache.resize(new_cap);
         }
 
-        if let Some((_, old)) = self.cache.push(id, segment) {
+        if let Some((_, mut old)) = self.cache.push(id, segment) {
             self.total_bytes = self.total_bytes.saturating_sub(old.len());
             if let Some(old_meta) = self.segment_meta.remove(&id) {
                 if matches!(old_meta.directive, CacheDirective::Pin { ttl: None }) {
                     self.pinned_bytes = self.pinned_bytes.saturating_sub(old.len() as u64);
                 }
             }
+            old.zeroize();
         }
 
         self.total_bytes = self.total_bytes.saturating_add(bytes);
@@ -160,7 +162,9 @@ impl TenantState {
             .collect();
 
         for id in ids_to_release {
-            self.remove(id);
+            if let Some(mut seg) = self.remove(id) {
+                seg.zeroize();
+            }
         }
     }
 
@@ -465,7 +469,7 @@ impl TenantIsolatedKvStore {
         }
         let idx = self.shard_idx(tenant);
         let scores = self.attention_source();
-        let _deferred: Vec<KvSegment> = {
+        let mut _deferred: Vec<KvSegment> = {
             let mut shard = self.shards[idx].lock.write();
             if let Some(state) = shard.get_mut(&tenant) {
                 let removed = segment_ids
@@ -486,6 +490,9 @@ impl TenantIsolatedKvStore {
                 vec![]
             }
         };
+        for seg in &mut _deferred {
+            seg.zeroize();
+        }
         tracing::debug!(
             tenant_id = ?tenant,
             removed_segment_ids = ?segment_ids,
@@ -692,6 +699,9 @@ impl TenantIsolatedKvStore {
                             handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
                         }
                     }
+                    for seg in &mut deferred_drop {
+                        seg.zeroize();
+                    }
                     deferred_drop.clear();
 
                     #[cfg(test)]
@@ -722,6 +732,9 @@ impl TenantIsolatedKvStore {
                     all_segments.push(seg);
                 }
             }
+        }
+        for seg in &mut all_segments {
+            seg.zeroize();
         }
         drop(all_segments);
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");
