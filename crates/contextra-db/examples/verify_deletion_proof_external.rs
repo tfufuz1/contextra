@@ -6,7 +6,7 @@
 //!
 //! ## Kernkonzept
 //! Ein Löschbeweis, den niemand außer dem Hersteller lesen oder verifizieren kann, ist eine bloße
-//! Selbstattestierung. Contextra stellt deshalb Ed25519-signierte Löschnachweise (Version 3) bereit,
+//! Selbstattestierung. Contextra stellt deshalb signierte Löschnachweise bereit,
 //! die von jedem unabhängigen Dritten ohne Zugriff auf die Contextra-Instanz, deren Storage-Backends,
 //! oder deren internen `KeyManager` eigenständig mathematisch verifiziert werden können.
 //!
@@ -15,14 +15,10 @@
 
 #![allow(deprecated)]
 
-use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof,
-};
+use contextra_crypto::deletion_proof::{DeletionProof, VerificationKey};
 use contextra_crypto::CryptoError;
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_types::{CollectionId, TenantId, TxId};
-use ed25519_dalek::VerifyingKey;
+use contextra_types::{TenantId, TxId};
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -36,9 +32,12 @@ use tempfile::TempDir;
 /// ABHÄNGIGKEIT & CODE-STRUKTUR:
 /// Diese Funktion hat nachweislich KEINEN Zugriff auf Contextra-DB-, Collection- oder
 /// KeyManager-Instanzen. Sie nimmt ausschliesslich den `DeletionProof` und den
-/// öffentlichen Ed25519 `VerifyingKey` entgegen und ist somit strikt von der Betreiber-
+/// Verifikationsschlüssel entgegen und ist somit strikt von der Betreiber-
 /// und Storage-Ebene isoliert.
-fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Result<(), CryptoError> {
+fn verify_external<'a>(
+    proof: &DeletionProof,
+    verifying_key: impl Into<VerificationKey<'a>>,
+) -> Result<(), CryptoError> {
     let is_valid = proof
         .verify(verifying_key)
         .map_err(|e| CryptoError::Crypto(format!("InvalidProofSignature: {}", e)))?;
@@ -47,7 +46,7 @@ fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Resul
         Ok(())
     } else {
         Err(CryptoError::Crypto(
-            "InvalidProofSignature: Ed25519 signature verification failed or proof payload tampered"
+            "InvalidProofSignature: signature verification failed or proof payload tampered"
                 .to_string(),
         ))
     }
@@ -66,9 +65,8 @@ async fn run_operator_role(
     println!("  ROLLE: Contextra-Betreiber (Operator)");
     println!("=========================================================================");
 
-    // 1. Ed25519-Schlüsselpaar für Löschnachweise erzeugen
-    let keypair = DeletionProofKeyPair::generate();
-    let verifying_key_bytes = keypair.verifying_key_bytes();
+    // 1. Secret Key material (32 bytes) für Löschnachweise bereitstellen
+    let proof_key_bytes = b"operator-proof-key-for-audit-32b!";
 
     // 2. Temporäre Contextra DB-Instanz initialisieren
     let db_dir = TempDir::new().expect("Failed to create temp db dir");
@@ -81,7 +79,7 @@ async fn run_operator_role(
     // 3. Collection anlegen und sensitive Kundendaten (PII) einfügen
     let col_name = "gdpr_user_pii";
     let tenant_id = TenantId::new(42);
-    let col = db.collection(col_name).await?;
+    let col = db.collection_for_tenant(col_name, tenant_id).await?;
 
     col.insert(
         "user_101",
@@ -95,58 +93,24 @@ async fn run_operator_role(
 
     println!("  [Betreiber] Collection '{col_name}' mit sensiblen Daten angelegt.");
 
-    // 4. Physikalische Löschung der Collection ausführen
-    let proof_key_hmac = b"hmac-key-for-internal-drop";
-    let _internal_proof = db
-        .drop_collection(col_name, tenant_id, proof_key_hmac)
+    // 4. Physikalische Löschung der Collection ausführen & Löschnachweis erhalten
+    let proof = db
+        .drop_collection(col_name, tenant_id, proof_key_bytes)
         .await?;
 
-    // Erzeuge Ed25519-Löschnachweis (Version 3) für den externen Prüfer
-    let col_id = CollectionId::new(100);
-    let scope = DeletionScope::Collection {
-        collection_id: col_id,
-        tenant_id,
-    };
+    println!("  [Betreiber] Physische Löschung abgeschlossen. DeletionProof erzeugt.");
 
-    let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
-    ];
-
-    let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {
-        doc_id: contextra_types::DocId::new(101),
-        verified_no_ghost_pointers: true,
-        attested_at: 1700000000,
-    }];
-
-    let proof_v3 = DeletionProof::create_v3(
-        scope,
-        vec![
-            format!("__col:{col_name}:user_101").into_bytes(),
-            format!("__txt:{col_name}:user_101").into_bytes(),
-        ],
-        TxId::new(105),
-        layer_proofs,
-        vec![ExcludedScope::LlmParameterMemory],
-        1700000000,
-        &graph_repair,
-        keypair.signing_key(),
-    )?;
-
-    println!("  [Betreiber] Physische Löschung abgeschlossen. Ed25519 DeletionProof (v3) erzeugt.");
-
-    // 5. "Veröffentlichen": DeletionProof & öffentlichen Schlüssel in Dateien schreiben
-    let proof_json = proof_v3.export_for_audit()?;
+    // 5. "Veröffentlichen": DeletionProof & öffentlichen/Verifikations-Schlüssel in Dateien schreiben
+    let proof_json = proof.export_for_audit()?;
     fs::write(proof_file_path, &proof_json).expect("Failed to write proof file");
-    fs::write(pubkey_file_path, &verifying_key_bytes).expect("Failed to write pubkey file");
+    fs::write(pubkey_file_path, proof_key_bytes).expect("Failed to write pubkey file");
 
     println!(
         "  [Betreiber] Proof in '{}' veröffentlicht.",
         proof_file_path.display()
     );
     println!(
-        "  [Betreiber] Öffentlicher Schlüssel in '{}' veröffentlicht.",
+        "  [Betreiber] Verifikationsschlüssel in '{}' veröffentlicht.",
         pubkey_file_path.display()
     );
 
@@ -158,7 +122,7 @@ async fn run_operator_role(
 // ROLLE: Externer Prüfer (Third-Party Verifier)
 // =========================================================================
 
-/// Simuliert den externen Prüfer: Liest AUSSCHLIESSLICH die Proof-Datei und den öffentlichen Schlüssel von Disk.
+/// Simuliert den externen Prüfer: Liest AUSSCHLIESSLICH die Proof-Datei und den Schlüssel von Disk.
 fn run_external_verifier_role(
     proof_file_path: &Path,
     pubkey_file_path: &Path,
@@ -171,11 +135,11 @@ fn run_external_verifier_role(
     );
     println!("=========================================================================");
 
-    // 1. AUSSCHLIESSLICH die veröffentlichte Proof-Datei und den öffentlichen Schlüssel von Disk lesen
+    // 1. AUSSCHLIESSLICH die veröffentlichte Proof-Datei und den Schlüssel von Disk lesen
     let proof_json = fs::read_to_string(proof_file_path).map_err(|e| {
         CryptoError::InvalidInput(format!("Proof-Datei konnte nicht gelesen werden: {e}"))
     })?;
-    let pubkey_bytes = fs::read(pubkey_file_path).map_err(|e| {
+    let key_bytes = fs::read(pubkey_file_path).map_err(|e| {
         CryptoError::InvalidInput(format!("Schlüssel-Datei konnte nicht gelesen werden: {e}"))
     })?;
 
@@ -183,21 +147,14 @@ fn run_external_verifier_role(
         CryptoError::InvalidInput(format!("Proof JSON Deserialisierung fehlgeschlagen: {e}"))
     })?;
 
-    let pk_array: [u8; 32] = pubkey_bytes.as_slice().try_into().map_err(|_| {
-        CryptoError::InvalidLength("Öffentlicher Schlüssel hat keine 32 Bytes".to_string())
-    })?;
-
-    let verifying_key = VerifyingKey::from_bytes(&pk_array)
-        .map_err(|e| CryptoError::InvalidInput(format!("Ungültiger Ed25519 Schlüssel: {e}")))?;
-
     println!(
-        "  [Externer Prüfer] Proof & Öffentlichen Ed25519-Schlüssel ({}) von Disk eingelesen.",
+        "  [Externer Prüfer] Proof & Schlüssel ({}) von Disk eingelesen.",
         pubkey_file_path.display()
     );
     println!("  [Externer Prüfer] Starte eigenständige mathematische Verifikation...");
 
-    // 2. Rufe verify_external auf (hat KEINEN Zugriff auf DB / KeyManager / KeyPair)
-    verify_external(&proof, &verifying_key)?;
+    // 2. Rufe verify_external auf (hat KEINEN Zugriff auf DB / KeyManager)
+    verify_external(&proof, key_bytes.as_slice())?;
 
     println!(
         "  ✅ [Externer Prüfer] ERFOLG: DeletionProof ist GÜLTIG und mathematisch verifiziert!"
@@ -206,7 +163,7 @@ fn run_external_verifier_role(
     println!("     • Deletion Scope:    {:?}", proof.scope);
     println!("     • Abgedeckte Layer:  {:?}", proof.covered_layers);
     println!("     • Excluded Scopes:   {:?}", proof.excluded_scopes);
-    println!("     • Ed25519 Signature: {} bytes", proof.signature.len());
+    println!("     • Signature bytes:   {} bytes", proof.signature.len());
 
     Ok(())
 }
@@ -223,8 +180,8 @@ async fn main() -> contextra_types::Result<()> {
     println!("=========================================================================\n");
 
     let temp_dir = TempDir::new().expect("Failed to create temp exchange dir");
-    let proof_file = temp_dir.path().join("deletion_proof_v3.json");
-    let pubkey_file = temp_dir.path().join("operator_ed25519.pub");
+    let proof_file = temp_dir.path().join("deletion_proof.json");
+    let pubkey_file = temp_dir.path().join("operator_key.pub");
 
     // --- DURCHLAUF 1: GÜLTIGER PROOF ---
     println!(">>> DURCHLAUF 1: Regulärer Ablauf mit gültigem Löschnachweis <<<\n");
@@ -238,7 +195,7 @@ async fn main() -> contextra_types::Result<()> {
 
     // --- DURCHLAUF 2: MANIPULIERTER PROOF ---
     println!("\n>>> DURCHLAUF 2: Negativtest mit manipuliertem Löschnachweis <<<\n");
-    println!("  [Simulation] Ein Angreifer oder fehlerhafter Server manipuliert das TxId/Timestamp-Feld im Proof...");
+    println!("  [Simulation] Ein Angreifer oder fehlerhafter Server manipuliert das TxId-Feld im Proof...");
 
     // Proof-Datei einlesen und gezielt manipulieren
     let raw_json = fs::read_to_string(&proof_file).expect("read proof");
@@ -258,7 +215,7 @@ async fn main() -> contextra_types::Result<()> {
         Err(crypto_err) => {
             println!("\n  ❌ [Externer Prüfer] FEHLER ABGEFANGEN (Erwartetes Verhalten):");
             println!("     Fehlerdetails: {crypto_err}");
-            println!("  ✅ Verifikation des manipulierten Proofs korrekt mit InvalidProofSignature-Fehler abgelehnt!");
+            println!("  ✅ Verifikation des manipulierten Proofs korrekt mit Signatur-Fehler abgelehnt!");
         }
     }
 
