@@ -1,14 +1,15 @@
 //! Testfall für Sherman-Morrison Langzeit-Stabilität und Präzisions-Matrix-Drift-Erkennung (§13.2).
 
 #![cfg(feature = "bandit-routing")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
 use contextra_adapt::{
-    BanditError, BanditImplementation, BanditProfileState,
+    BanditImplementation, BanditProfileState,
     SHERMAN_MORRISON_REFACTORIZATION_INTERVAL,
 };
 
 #[test]
-fn test_sherman_morrison_long_run_drift_detection() {
+fn test_sherman_morrison_long_run_auto_recovery() {
     let d = 4;
     let mut state = BanditProfileState::cold_start(d, 0.5);
     state.implementation = BanditImplementation::ShermanMorrison;
@@ -21,44 +22,24 @@ fn test_sherman_morrison_long_run_drift_detection() {
     let reward = 1.0;
 
     let max_updates = 1500;
-    let mut drift_detected = false;
 
     for i in 1..=max_updates {
-        match state.update(&x, reward, cost, is_cloud) {
-            Ok(()) => {
-                assert!(
-                    (i as u64) <= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL,
-                    "update() call {i} succeeded after exceeding refactorization interval without drift detection"
-                );
-            }
-            Err(BanditError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                denominator,
-            }) => {
-                drift_detected = true;
-                assert_eq!(updates_since_reset, i as u64);
-                // Entweder Intervall überschritten ODER denominator <= 0.0
-                assert!(
-                    updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                        || denominator <= 0.0,
-                    "PrecisionMatrixDriftDetected returned unexpectedly with updates={updates_since_reset}, denominator={denominator}"
-                );
-                break;
-            }
-            Err(e) => {
-                panic!("Unexpected error variant from update(): {e:?}");
-            }
-        }
+        let res = state.update(&x, reward, cost, is_cloud);
+        assert!(
+            res.is_ok(),
+            "update() call {i} failed unexpectedly: {res:?}"
+        );
     }
 
     assert!(
-        drift_detected,
-        "Expected PrecisionMatrixDriftDetected within {max_updates} updates, but none occurred"
+        state.refactorizations >= 1,
+        "Expected at least 1 auto-refactorization within {max_updates} updates, but got {}",
+        state.refactorizations
     );
 }
 
 #[test]
-fn test_sherman_morrison_well_conditioned_no_false_positives() {
+fn test_sherman_morrison_well_conditioned_auto_recovery_at_interval() {
     let d = 4;
     let mut state = BanditProfileState::cold_start(d, 0.5);
     state.implementation = BanditImplementation::ShermanMorrison;
@@ -81,27 +62,19 @@ fn test_sherman_morrison_well_conditioned_no_false_positives() {
         );
     }
 
-    // Update 1001 überschreitet das Re-Faktorisierungsintervall und MUSS den Fehler liefern
+    assert_eq!(state.refactorizations, 0);
+
+    // Update 1001 überschreitet das Re-Faktorisierungsintervall und führt eine automatische Refaktorisierung durch
     let x_1001 = vec![1.0f32, 0.0, 0.0, 0.0];
     let res_1001 = state.update(&x_1001, reward, cost, is_cloud);
-    match res_1001 {
-        Err(BanditError::PrecisionMatrixDriftDetected {
-            updates_since_reset,
-            denominator,
-        }) => {
-            assert_eq!(
-                updates_since_reset,
-                SHERMAN_MORRISON_REFACTORIZATION_INTERVAL + 1
-            );
-            assert!(
-                denominator > 0.0,
-                "Under well-conditioned updates, denominator should remain positive (got {denominator})"
-            );
-        }
-        other => {
-            panic!("Expected PrecisionMatrixDriftDetected on update 1001, got {other:?}");
-        }
-    }
+    assert!(
+        res_1001.is_ok(),
+        "Update 1001 must succeed via auto-recovery: {res_1001:?}"
+    );
+    assert_eq!(
+        state.refactorizations, 1,
+        "Refactorizations counter must increment on update 1001"
+    );
 }
 
 /// Gauss-Jordan Inversion in f64 für ein d x d Array (Row-Major).
@@ -201,26 +174,25 @@ fn test_sherman_morrison_100k_updates_frobenius_stability() {
             }
         }
 
+        let refac_before = state.refactorizations;
+
         // 2. Incremental Sherman-Morrison update in state.
-        // When interval 1000 is reached, refactorization re-inverts A from ground truth and resets counter.
-        match state.update(&x, 1.0, 0.0, false) {
-            Ok(()) => {}
-            Err(BanditError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                ..
-            }) => {
-                if updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL {
-                    // Perform refactorization / re-inversion from current A
-                    let fresh_inv = naive_matrix_inverse_f64(&a_matrix_f64, d)
-                        .expect("Refactorization reinversion must succeed");
-                    for i in 0..(d * d) {
-                        state.inv_a[i] = fresh_inv[i] as f32;
-                    }
-                    // Perform update again on fresh refactorized matrix
-                    let _ = state.update(&x, 1.0, 0.0, false);
+        // When interval 1000 is reached, auto-recovery refactorizes inv_a (soft restart to I).
+        let update_res = state.update(&x, 1.0, 0.0, false);
+        assert!(update_res.is_ok(), "Update {t} failed: {update_res:?}");
+
+        // Reset ground-truth accumulation on soft restart
+        if state.refactorizations > refac_before {
+            a_matrix_f64 = vec![0.0f64; d * d];
+            for i in 0..d {
+                a_matrix_f64[i * d + i] = 1.0;
+            }
+            for i in 0..d {
+                for j in 0..d {
+                    a_matrix_f64[i * d + j] =
+                        gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
                 }
             }
-            Err(e) => panic!("Unexpected error: {e:?}"),
         }
 
         if t % 10_000 == 0 {
