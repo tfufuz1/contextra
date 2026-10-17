@@ -50,26 +50,17 @@ default-members = [
     "crates/contextra-core",
     "crates/contextra-store",
     "crates/contextra-vector",
-    "crates/contextra-db",
     "crates/contextra-text",
+    "crates/contextra-graph",
     "crates/contextra-checkpoint",
     "crates/contextra-crypto",
-    "crates/contextra-privacy",
-    "crates/contextra-graph",
-    "crates/contextra-mcp",
-    "crates/contextra-agent",
-    "crates/contextra-router",
-    "crates/contextra-infer-candle",
-    "crates/contextra-testkit",
-    "crates/contextra",
+    "crates/contextra-db",
+    "crates/contextra-engine",
     "crates/contextra-types",
     "crates/contextra-ports",
     "crates/contextra-mvcc",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
-    "crates/contextra-engine",
-    "crates/contextra-cognition",
-    "crates/contextra-rank",
+    "crates/contextra-testkit",
+    "crates/contextra",
 ]
 
 [workspace.package]
@@ -185,6 +176,8 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
+indexing_slicing = "warn"
+arithmetic_side_effects = "warn"
 
 [profile.release]
 panic = "unwind"

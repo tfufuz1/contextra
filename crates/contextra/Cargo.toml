@@ -33,9 +33,10 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+contextra-license = { workspace = true, features = ["test-support"] }
 
 [features]
-default = ["fast", "candle"]
+default = ["fast"]
 fast = []
 docid-128 = ["contextra-types/docid-128"]
 sovereign = ["contextra-crypto", "contextra-privacy"]
