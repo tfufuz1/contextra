@@ -3,6 +3,7 @@
 // ORAKEL: Independent math/spec assertions and explicit boundary inputs (R4).
 
 #![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::kdf::{KDF_HEADER_MAGIC, KDF_HEADER_VERSION_1, KDF_ID_ARGON2ID};
 use contextra_crypto::kv_shredding::{GroupKek, RecordDek};
@@ -129,7 +130,7 @@ fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
     // Kills mutants in <impl KvCipher for KvSegmentCipher>::seal & open
     // Oracle: Decrypted payload MUST equal original plaintext
     let km = KeyManager::try_new("test-passphrase-kv-cipher", b"test-salt-kv-cipher").unwrap();
-    let cipher = KvSegmentCipher::new(km);
+    let cipher = KvSegmentCipher::ephemeral(km);
     let plaintext = b"exact plaintext payload for KvSegmentCipher seal open";
 
     let sealed = cipher
@@ -171,7 +172,7 @@ fn killer_test_key_registry_get_wrapped_kek_and_dek() {
     assert_eq!(dek_nonce, payload.dek_nonce);
 
     // After revoking record, get_wrapped_dek returns None, but get_wrapped_kek returns Some
-    assert!(registry.revoke_record(group_id, record_id));
+    assert!(registry.revoke_record(group_id, record_id).unwrap());
     assert!(
         registry.get_wrapped_dek(group_id, record_id).is_none(),
         "Revoked record wrapped DEK must be None"
@@ -182,7 +183,7 @@ fn killer_test_key_registry_get_wrapped_kek_and_dek() {
     );
 
     // After revoking group, get_wrapped_kek returns None
-    assert!(registry.revoke_group(group_id));
+    assert!(registry.revoke_group(group_id).unwrap());
     assert!(
         registry.get_wrapped_kek(group_id).is_none(),
         "Revoked group wrapped KEK must be None"
@@ -210,7 +211,7 @@ fn killer_test_key_registry_is_group_active_logic() {
     );
 
     // 3. Group revoked -> active must be FALSE
-    registry.revoke_group(group_id);
+    registry.revoke_group(group_id).unwrap();
     assert!(
         !registry.is_group_active(group_id),
         "Revoked group must not be active"

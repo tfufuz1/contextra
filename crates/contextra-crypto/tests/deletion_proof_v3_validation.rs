@@ -1,8 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    GraphRepairAttestation, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+    ExcludedScope, GraphRepairAttestation, LayerCleanupProof,
 };
 use contextra_types::{error::HnswDeletionError, ContextraError, DocId, TenantId, TxId};
 
@@ -20,6 +20,7 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
     ];
 
+    let durability = DurabilityProof::new(100);
     // Attempt to create v3 proof with empty graph_repair slice when HnswIndex is covered
     let res = DeletionProof::create_v3(
         scope,
@@ -29,6 +30,7 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[], // Empty graph_repair -> MUST FAIL
+        Some(&durability),
         keypair.signing_key(),
     );
 
@@ -68,6 +70,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         attested_at: 1700000000,
     }];
 
+    let durability = DurabilityProof::new(100);
     let res = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec()],
@@ -76,6 +79,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &graph_repair,
+        Some(&durability),
         keypair.signing_key(),
     );
 
@@ -85,6 +89,10 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
     );
 
     let proof = res.unwrap();
+    assert_eq!(
+        proof.deleted_after_tx,
+        TxId::new(durability.confirmed_seq_no)
+    );
     assert!(proof.verify(&keypair.verifying_key).unwrap());
 }
 
@@ -104,6 +112,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
     // 1. Create a valid Ed25519 Version 3 proof
+    let durability = DurabilityProof::new(100);
+
     let valid_v3_proof = DeletionProof::create_v3(
         scope.clone(),
         vec![b"key1".to_vec()],
@@ -112,12 +122,17 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();
 
     // Verify original v3 proof is valid
     assert_eq!(valid_v3_proof.signature_version, 3);
+    assert_eq!(
+        valid_v3_proof.deleted_after_tx,
+        TxId::new(durability.confirmed_seq_no)
+    );
     assert_eq!(
         valid_v3_proof.signature_version_typed(),
         Ok(SignatureVersion::V3)
@@ -155,8 +170,8 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
     }
 
     // 3. Test HMAC Version 2 proof with valid signature but unknown mutated version
-    let hmac_key = b"hmac_key_32_bytes_long_secret!!";
-    let valid_v2_proof = DeletionProof::create(
+    let hmac_key = b"hmac_key_32_bytes_long_secret!!1";
+    let valid_v2_proof = DeletionProof::create_v2(
         scope,
         vec![b"key1".to_vec()],
         TxId::new(100),
@@ -179,4 +194,52 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
             "verify() for HMAC proof MUST reject unknown version byte {unknown_byte} fail-closed"
         );
     }
+}
+
+#[test]
+fn test_create_v3_with_insufficient_or_missing_durability_fails() {
+    let keypair = DeletionProofKeyPair::generate();
+    let tenant_id = TenantId::try_new(1).unwrap();
+    let scope = DeletionScope::Document {
+        doc_id: DocId::new(42),
+        tenant_id,
+    };
+
+    let layer_proofs =
+        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+
+    // 1. Missing durability (None) MUST fail
+    let res_none = DeletionProof::create_v3(
+        scope.clone(),
+        vec![b"key1".to_vec()],
+        TxId::new(100),
+        layer_proofs.clone(),
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
+        None,
+        keypair.signing_key(),
+    );
+    assert!(
+        res_none.is_err(),
+        "create_v3 with None durability MUST return Err(NotDurable)"
+    );
+
+    // 2. Insufficient durability (confirmed_seq_no < deleted_after_tx.0) MUST fail
+    let insufficient_durability = DurabilityProof::new(50);
+    let res_insufficient = DeletionProof::create_v3(
+        scope,
+        vec![b"key1".to_vec()],
+        TxId::new(100),
+        layer_proofs,
+        vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
+        Some(&insufficient_durability),
+        keypair.signing_key(),
+    );
+    assert!(
+        res_insufficient.is_err(),
+        "create_v3 with durability.confirmed_seq_no < deleted_after_tx MUST return Err(NotDurable)"
+    );
 }

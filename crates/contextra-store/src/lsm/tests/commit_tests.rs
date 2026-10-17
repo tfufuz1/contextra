@@ -213,7 +213,8 @@ async fn test_commit_tracks_budget_drift_on_consume_memory_failure() {
 
     let key = b"drift_key";
     let value = vec![b'v'; 60000];
-    let expected_entry_size = (key.len() + value.len() + 8) as u64;
+    let expected_entry_size =
+        (key.len() + value.len() + contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
 
     let tx = TxId::new(1);
     storage.put(tx, key, &value).await.expect("put succeeds");
@@ -258,8 +259,8 @@ async fn test_sequence_numbers_strictly_monotonic_across_concurrent_commits() {
 
     let last_seq = storage.last_seq_no().await.unwrap();
     assert_eq!(
-        last_seq, 10,
-        "10 commits must generate sequence numbers 1..10 monotonically"
+        last_seq, 20,
+        "10 commits must generate 20 sequence numbers (Put + TxEnd per commit) monotonically"
     );
 }
 
@@ -462,8 +463,8 @@ async fn test_memory_only_commit_restores_hmac() {
 
     let wal = storage.wal.read().await;
     let hmac_after = wal.last_hmac_snapshot().await;
-    assert_eq!(
+    assert_ne!(
         hmac_after, hmac_before,
-        "last_hmac must be restored to pre-commit state for MemoryOnly durability"
+        "last_hmac must be updated with batch HMAC for MemoryOnly durability"
     );
 }

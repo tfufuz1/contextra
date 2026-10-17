@@ -51,13 +51,38 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
     }
 
     /// Entpinnt die Sequenznummer explizit und asynchron bei einem abgefangenen Fehler.
+    ///
+    /// # Fehlerpropazierung & Pin-Verlustschutz
+    /// Wenn `unpin_checkpoint` fehlschlägt oder das anschließende `flush_orphan_registry()`
+    /// einen E/A-Fehler zurückgibt, wird die Sequenznummer synchron in die `InstanceOrphanRegistry`
+    /// eingetragen (sofern noch nicht entpinnt), damit beim Recovery-Zyklus kein Pin verloren geht,
+    /// und der Fehler wird als `Result::Err` propagiert.
     pub async fn unpin(mut self) -> Result<()> {
+        let mut unpin_err = None;
         if let Some(seq_no) = self.seq_no.take() {
-            self.storage.unpin_checkpoint(seq_no).await?;
+            if let Err(err) = self.storage.unpin_checkpoint(seq_no).await {
+                // Bei Unpin-Fehler: Registriere als verwaist, um GC-Lecks zu verhindern
+                let timestamp_ms = clock_timestamp_ms(self.clock.as_ref());
+                self.orphan_registry
+                    .register_orphan_sync(PinnedSeqNoOrphan {
+                        seq_no,
+                        timestamp_ms,
+                    });
+                unpin_err = Some(err);
+            }
         }
-        if let Err(err) = self.orphan_registry.flush_orphan_registry().await {
-            tracing::warn!(?err, "Failed piggyback flush on PinGuard unpin");
+
+        if let Err(flush_err) = self.orphan_registry.flush_orphan_registry().await {
+            let context_err = ContextraError::Internal(format!(
+                "Failed to flush orphan registry during PinGuard::unpin: {flush_err}"
+            ));
+            return Err(unpin_err.unwrap_or(context_err));
         }
+
+        if let Some(err) = unpin_err {
+            return Err(err);
+        }
+
         Ok(())
     }
 }
@@ -99,6 +124,21 @@ pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
+    /// Erstellt einen neuen CheckpointGuard mit einer expliziten Clock (P28 / INV-CHECKPOINT-DETERMINISM-1).
+    pub fn new_with_clock(
+        checkpoint: StateCheckpoint,
+        storage: Arc<S>,
+        namespace: impl Into<String>,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Self {
+        Self::with_clock(checkpoint, storage, namespace, clock)
+    }
+
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use new_with_clock to inject a Clock port explicitly (P28 / INV-CHECKPOINT-DETERMINISM-1)"
+    )]
+    #[allow(deprecated)]
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
         let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         Self::with_clock(checkpoint, storage, namespace, clock)
@@ -269,6 +309,31 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         Ok(cp)
     }
 
+    /// Asynchroner Commit-Pfad, der Fehler beim Entleeren des Orphan-Registers direkt als `Result` propagiert.
+    pub async fn commit_async(mut self) -> Result<StateCheckpoint> {
+        let cp = self
+            .checkpoint
+            .take()
+            .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
+        if let Some(ref sink) = self.metrics_sink {
+            let elapsed = self.created_at.elapsed().as_secs_f64();
+            sink.record_histogram(
+                "checkpoint_duration_seconds",
+                elapsed,
+                &[("status", "commit")],
+            );
+        }
+        self.orphan_registry
+            .flush_orphan_registry()
+            .await
+            .map_err(|e| {
+                ContextraError::Internal(format!(
+                    "Failed to flush orphan registry during commit: {e}"
+                ))
+            })?;
+        Ok(cp)
+    }
+
     /// Führt ein manuelles, asynchrones Rollback des Checkpoints aus.
     /// Nach Aufruf von `rollback()` ist der Guard konsumiert, sodass beim Drop kein erneutes Rollback ausgelöst wird.
     ///
@@ -295,7 +360,12 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             }
             let res = self.storage.rollback_to_tx(cp.tx_id).await;
             if let Err(err) = self.orphan_registry.flush_orphan_registry().await {
-                tracing::warn!(?err, "Failed piggyback flush on CheckpointGuard rollback");
+                let flush_err = ContextraError::Internal(format!(
+                    "Failed to flush orphan registry during CheckpointGuard::rollback: {err}"
+                ));
+                if res.is_ok() {
+                    return Err(flush_err);
+                }
             }
             res
         } else {

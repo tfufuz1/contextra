@@ -7,7 +7,7 @@
 #![forbid(unsafe_code)]
 
 use crate::kv::delete_mode::KvDeleteMode;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use std::sync::Arc;
 
@@ -144,7 +144,7 @@ impl KvSegmentManager {
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
     pub fn delete_segment(&self, group_id: u64) -> bool {
         match self.config.delete_mode {
-            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id),
+            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id).unwrap_or(false),
             KvDeleteMode::TombstoneOnly => false,
         }
     }
@@ -160,7 +160,11 @@ impl KvSegmentManager {
                 "Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.",
             )),
             KvDeleteMode::CryptoShred => {
-                // Return true if key is revoked (no longer active)
+                if !self.registry.was_group_ever_registered(group_id) {
+                    return Err(ContextraError::KvDeleteModeConfig(
+                        "Löschbeweis unzulässig: Gruppe wurde nie registriert.",
+                    ));
+                }
                 let is_active = self.registry.is_key_active(group_id);
                 Ok(!is_active)
             }

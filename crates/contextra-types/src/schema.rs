@@ -30,6 +30,11 @@ impl DocIdWidth {
             Self::Bit128 => 16,
         }
     }
+
+    /// Returns the size in bytes of the active compile-time `DocIdWidth`.
+    pub fn current_bytes_len() -> usize {
+        Self::current().bytes_len()
+    }
 }
 
 /// SSTable and WAL Manifest schema version identifier.
@@ -70,9 +75,41 @@ impl ManifestSchemaVersion {
         }
     }
 
+    /// Parses and validates build compatibility of a schema version byte.
+    pub fn from_u8_checked(version_byte: u8) -> Result<Self> {
+        let version = Self::from_u8(version_byte)?;
+        if version.is_compatible_with_current_build() {
+            Ok(version)
+        } else {
+            version.validate_build_compatibility()
+        }
+    }
+
+    /// Returns the size in bytes of a single `DocId` value under this schema version's DocId width.
+    pub fn doc_id_bytes_len(self) -> usize {
+        self.doc_id_width().bytes_len()
+    }
+
     /// Returns `true` if this schema version is compatible with the compile-time DocId feature flags.
     pub fn is_compatible_with_current_build(self) -> bool {
         self.doc_id_width() == DocIdWidth::current()
+    }
+
+    /// Validates that this schema version is compatible with the current compile-time build flags.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::Serialization` if schema version's DocId width does not match the active build.
+    pub fn validate_build_compatibility(self) -> Result<Self> {
+        if self.is_compatible_with_current_build() {
+            Ok(self)
+        } else {
+            Err(ContextraError::Serialization(format!(
+                "Manifest schema version {:?} (DocId width {:?}) is incompatible with current build configuration (DocId width {:?})",
+                self,
+                self.doc_id_width(),
+                DocIdWidth::current()
+            )))
+        }
     }
 }
 

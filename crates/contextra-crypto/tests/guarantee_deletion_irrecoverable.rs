@@ -7,14 +7,15 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    deprecated
 )]
 
 use contextra_crypto::{
     crypto::KeyManager,
     deletion_proof::{
-        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-        GraphRepairAttestation, LayerCleanupProof,
+        DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
+        ExcludedScope, GraphRepairAttestation, LayerCleanupProof,
     },
     ed25519_proof::SignatureVersion,
     error::CryptoError,
@@ -136,7 +137,7 @@ fn test_scenario_1_tenant_shredding_and_isolation() {
     assert!(registry.is_group_active(tenant_b_group));
 
     // "Delete" Tenant A (Schlüsselvernichtung über die öffentliche API)
-    let revoked = registry.revoke_group(tenant_a_group);
+    let revoked = registry.revoke_group(tenant_a_group).unwrap();
     assert!(
         revoked,
         "Public API revoke_group(tenant_a) must return true for active group"
@@ -215,7 +216,7 @@ fn test_scenario_2_key_derivation_boundary_and_reconstruction_check() {
         .expect("Initial get_or_derive must succeed");
 
     // Löschung / Revocation
-    let revoked = registry.revoke_group(tenant_id);
+    let revoked = registry.revoke_group(tenant_id).unwrap();
     assert!(revoked, "Revocation of tenant_id 999 must succeed");
 
     // Versuche Schlüssel nach Löschung neu abzuleiten
@@ -255,6 +256,7 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
     ];
 
+    let durability = DurabilityProof::new(500);
     let proof = DeletionProof::create_full_v3(
         scope,
         deleted_keys,
@@ -265,6 +267,7 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
         Some(1024),
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("v3 DeletionProof creation must succeed");
@@ -352,6 +355,7 @@ fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
         attested_at: 1700000000,
     }];
 
+    let durability = DurabilityProof::new(100);
     let proof = DeletionProof::create_full_v3(
         scope,
         vec![b"k1".to_vec()],
@@ -362,6 +366,7 @@ fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
         None,
         1700000000,
         &graph_repair,
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();
@@ -399,6 +404,7 @@ fn test_scenario_4_independent_external_verification_and_tempfile() {
         .unwrap(),
     ];
 
+    let durability = DurabilityProof::new(12345);
     let proof = DeletionProof::create_full_v3(
         scope,
         deleted_keys,
@@ -412,6 +418,7 @@ fn test_scenario_4_independent_external_verification_and_tempfile() {
         Some(42),
         1700001000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .expect("v3 proof creation must succeed");
@@ -483,6 +490,7 @@ fn test_scenario_5_replay_cross_tenant_and_downgrade_attacks() {
         tenant_id: tenant_a,
     };
 
+    let durability = DurabilityProof::new(10);
     let proof_a = DeletionProof::create_v3(
         scope_a,
         vec![b"key_a".to_vec()],
@@ -491,6 +499,7 @@ fn test_scenario_5_replay_cross_tenant_and_downgrade_attacks() {
         vec![],
         1700000000,
         &[],
+        Some(&durability),
         keypair.signing_key(),
     )
     .unwrap();

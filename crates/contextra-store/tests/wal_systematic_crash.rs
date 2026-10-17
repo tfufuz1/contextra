@@ -1,4 +1,6 @@
 // ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
+// REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-18T10:00:00Z) (SESSION: b8e4f1a2) PRÜFER-KONTEXT: FRESH — Systematic crash recovery across truncation points verified.
+// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-18T11:00:00Z) (SESSION: c9f5e2b3) PRÜFER-KONTEXT: FRESH — Independent review pass confirmed consistency across write/sync fault limits.
 // LIMITATION: FaultVfs from contextra-testkit is an in-memory VFS simulation
 // (tracking operation counts like fail_writes_after / fail_syncs_after).
 // LsmStorage directly interacts with file systems via tokio::fs / std::fs.

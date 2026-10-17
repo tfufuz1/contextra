@@ -14,6 +14,9 @@
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
+/// Re-export KMS Provider Trait nach Spec §20.2 (INV-KMS-1).
+pub use crate::kms::KmsProvider;
+
 /// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
 ///
 /// # Invariants
@@ -55,6 +58,33 @@ impl EncryptedWal {
             )));
         }
         let sub_km = key_manager.derive_file_key(file_id)?;
+        Ok(Self {
+            key_manager: sub_km,
+        })
+    }
+
+    /// Constructs an `EncryptedWal` by deriving stream key material via a `KmsProvider`.
+    pub fn from_kms(kms: &dyn KmsProvider, file_id: &[u8]) -> Result<Self> {
+        if file_id.is_empty() {
+            return Err(CryptoError::InvalidInput(
+                "file_id cannot be empty".to_string(),
+            ));
+        }
+        if file_id.len() > 10_000 {
+            return Err(CryptoError::InvalidInput(format!(
+                "file_id length {} exceeds maximum allowed bound of 10000 bytes",
+                file_id.len()
+            )));
+        }
+        let raw_key = kms.derive_key("wal", file_id)?;
+        if raw_key.len() != 32 {
+            return Err(CryptoError::Crypto(
+                "KMS returned key of invalid length for WAL".to_string(),
+            ));
+        }
+        let mut key_arr = [0u8; 32];
+        key_arr.copy_from_slice(&raw_key);
+        let sub_km = KeyManager::from_raw_key(key_arr)?;
         Ok(Self {
             key_manager: sub_km,
         })
@@ -222,6 +252,13 @@ impl IntegrityVerifier {
         self.last_seq_no
     }
 
+    /// Transferiert sowohl `last_hmac` als auch `last_seq_no` von einer `source`-Instanz
+    /// für einen vollständigen Verifier-Handoff.
+    pub fn handoff_from(&mut self, source: &Self) {
+        self.set_last_hmac(source.last_hmac_snapshot());
+        self.set_last_seq_no(source.last_seq_no_snapshot());
+    }
+
     /// Verifies a V3 entry (with tx_id and length prefixes) and updates the chain state.
     pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
@@ -231,7 +268,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no {
+        if let Some(last_seq) = self.last_seq_no_snapshot() {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -260,17 +297,20 @@ impl IntegrityVerifier {
         let tx_id_bytes = entry.tx_id.to_le_bytes();
         mac.update(&tx_id_bytes);
 
+        let key_len_u32 = u32::try_from(entry.key.len()).unwrap_or(u32::MAX);
+        let val_len_u32 = u32::try_from(entry.value.len()).unwrap_or(u32::MAX);
+
         if entry.op_type == 0 {
             // Put
             mac.update(&[0u8]);
-            mac.update(&(entry.key.len() as u32).to_le_bytes());
+            mac.update(&key_len_u32.to_le_bytes());
             mac.update(&entry.key);
-            mac.update(&(entry.value.len() as u32).to_le_bytes());
+            mac.update(&val_len_u32.to_le_bytes());
             mac.update(&entry.value);
         } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
-            mac.update(&(entry.key.len() as u32).to_le_bytes());
+            mac.update(&key_len_u32.to_le_bytes());
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd
@@ -295,7 +335,7 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
         Ok(())
     }
 
@@ -319,7 +359,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no {
+        if let Some(last_seq) = self.last_seq_no_snapshot() {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -375,14 +415,14 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
         Ok(())
     }
 
     /// Updates the chain state for legacy V1 entries without HMAC verification.
     pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot) {
         self.last_hmac = entry.checksum;
-        self.last_seq_no = Some(entry.seq_no);
+        self.set_last_seq_no(Some(entry.seq_no));
     }
 
     /// Default verification delegating to V3 verification.
@@ -392,7 +432,14 @@ impl IntegrityVerifier {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    deprecated
+)]
 mod tests {
     use super::*;
 
@@ -439,6 +486,36 @@ mod tests {
         } else {
             panic!("Expected WalCorruption with offset");
         }
+    }
+
+    #[tokio::test]
+    async fn test_encrypted_wal_from_kms_roundtrip() -> Result<()> {
+        use crate::kms::LocalKmsProvider;
+        use crate::keystore::MfksKeystore;
+        use crate::kv_shredding::KeyRegistry;
+        use crate::revocation_log::RevocationLog;
+        use contextra_ports::SystemClock;
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+        use std::sync::Arc;
+
+        let (master_key, header) = KeyManager::try_new_argon2id("kms-wal-pass").unwrap();
+        let keystore = MfksKeystore::new(header, vec![], vec![]).unwrap();
+        let clock = Arc::new(SystemClock::new());
+        let sk = SigningKey::generate(&mut OsRng);
+        let vk = sk.verifying_key();
+        let log = Arc::new(RevocationLog::new_in_memory(clock.clone(), Some(sk), vk));
+        let registry = Arc::new(KeyRegistry::new());
+
+        let kms = LocalKmsProvider::new(master_key, keystore, registry, log, clock);
+
+        let wal = EncryptedWal::from_kms(&kms, b"segment_001.wal")?;
+        let data = b"payload via kms derived wal";
+        let encrypted = wal.encrypt_chunk(data)?;
+        let decrypted = wal.decrypt_chunk(&encrypted)?;
+        assert_eq!(decrypted, data);
+
+        Ok(())
     }
 
     #[tokio::test]

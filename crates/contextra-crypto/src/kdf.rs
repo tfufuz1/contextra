@@ -32,9 +32,14 @@ pub const KDF_ID_ARGON2ID: u8 = 1;
 /// Min. empfohlener Salt-Umfang (16 Bytes)
 pub const MIN_SALT_LEN: usize = 16;
 
-/// OWASP Mindestanforderungen für Argon2id
-pub const MIN_M_COST_KIB: u32 = 19456; // ~19 MiB
-pub const MIN_T_COST: u32 = 2;
+/// Legacies Minimum für bestehende Header
+pub const LEGACY_MIN_M_COST_KIB: u32 = 19456; // ~19 MiB
+pub const LEGACY_MIN_T_COST: u32 = 2;
+pub const LEGACY_MIN_P_COST: u32 = 1;
+
+/// INV-KDF-1 Mindestanforderungen für neu erzeugte Header (Spec §20.2 / INV-KDF-1)
+pub const MIN_M_COST_KIB: u32 = 65536; // 64 MiB
+pub const MIN_T_COST: u32 = 3;
 pub const MIN_P_COST: u32 = 1;
 
 /// OWASP Standardempfehlungen für Argon2id
@@ -61,21 +66,21 @@ impl Default for KdfParams {
 }
 
 impl KdfParams {
-    /// Erstellt neue `KdfParams` mit Validierung der Untergrenzen.
+    /// Erstellt neue `KdfParams` mit Validierung der zulässigen Untergrenzen (inklusive Altbestand).
     pub fn new(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Result<Self> {
-        if m_cost_kib < MIN_M_COST_KIB {
+        if m_cost_kib < LEGACY_MIN_M_COST_KIB {
             return Err(CryptoError::InvalidInput(format!(
-                "m_cost_kib ({m_cost_kib}) liegt unter dem Minimum von {MIN_M_COST_KIB} KiB"
+                "m_cost_kib ({m_cost_kib}) liegt unter dem absoluten Minimum von {LEGACY_MIN_M_COST_KIB} KiB"
             )));
         }
-        if t_cost < MIN_T_COST {
+        if t_cost < LEGACY_MIN_T_COST {
             return Err(CryptoError::InvalidInput(format!(
-                "t_cost ({t_cost}) liegt unter dem Minimum von {MIN_T_COST}"
+                "t_cost ({t_cost}) liegt unter dem absoluten Minimum von {LEGACY_MIN_T_COST}"
             )));
         }
-        if p_cost < MIN_P_COST {
+        if p_cost < LEGACY_MIN_P_COST {
             return Err(CryptoError::InvalidInput(format!(
-                "p_cost ({p_cost}) liegt unter dem Minimum von {MIN_P_COST}"
+                "p_cost ({p_cost}) liegt unter dem absoluten Minimum von {LEGACY_MIN_P_COST}"
             )));
         }
         Ok(Self {
@@ -93,6 +98,11 @@ impl KdfParams {
             t_cost,
             p_cost,
         }
+    }
+
+    /// Prüft, ob die Kostenparameter den aktuellen Richtlinien von INV-KDF-1 genügen.
+    pub fn meets_policy(&self) -> bool {
+        self.m_cost_kib >= MIN_M_COST_KIB && self.t_cost >= MIN_T_COST && self.p_cost >= MIN_P_COST
     }
 }
 
@@ -116,6 +126,45 @@ impl KdfHeader {
             params: KdfParams::default(),
             salt,
         })
+    }
+
+    /// Kalibriert die KDF-Kostenparameter dynamisch auf eine Mindestlaufzeit (z. B. >= 250 ms)
+    /// unter Einhaltung der INV-KDF-1 Untergrenzen (m >= 64 MiB, t >= 3).
+    pub fn new_calibrated(target_ms: u64, clock: &dyn contextra_ports::Clock) -> Result<Self> {
+        if target_ms < 250 {
+            return Err(CryptoError::InvalidInput(format!(
+                "target_ms ({target_ms}) muss mindestens 250 ms betragen"
+            )));
+        }
+
+        let dummy_passphrase = "calibration-sample-passphrase";
+        let mut params = KdfParams::default(); // m = 64 MiB, t = 3, p = 1
+        let mut salt = vec![0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut salt);
+
+        loop {
+            let header = Self {
+                version: KDF_HEADER_VERSION_1,
+                kdf_id: KDF_ID_ARGON2ID,
+                params: params.clone(),
+                salt: salt.clone(),
+            };
+
+            let start_nanos = clock.monotonic_nanos();
+            let _ = derive_key_argon2id(dummy_passphrase, &header)?;
+            let elapsed_ms = (clock.monotonic_nanos().saturating_sub(start_nanos)) / 1_000_000;
+
+            if elapsed_ms >= target_ms || params.t_cost >= 20 {
+                return Ok(header);
+            }
+
+            params.t_cost += 1;
+        }
+    }
+
+    /// Prüft, ob der KDF-Header den Sicherheitsanforderungen der aktuellen Policy genügt.
+    pub fn meets_policy(&self) -> bool {
+        self.params.meets_policy() && self.salt.len() >= MIN_SALT_LEN
     }
 
     /// Erstellt einen `KdfHeader` v1 mit vorgegebenen Parametern und Salt.
@@ -153,7 +202,8 @@ impl KdfHeader {
         buf.extend_from_slice(&self.params.m_cost_kib.to_be_bytes());
         buf.extend_from_slice(&self.params.t_cost.to_be_bytes());
         buf.extend_from_slice(&self.params.p_cost.to_be_bytes());
-        buf.extend_from_slice(&(self.salt.len() as u32).to_be_bytes());
+        let salt_len = u32::try_from(self.salt.len()).unwrap_or(u32::MAX);
+        buf.extend_from_slice(&salt_len.to_be_bytes());
         buf.extend_from_slice(&self.salt);
         buf
     }

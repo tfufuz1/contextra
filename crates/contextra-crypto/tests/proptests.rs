@@ -3,6 +3,14 @@
 // INVARIANTEN: Roundtrip invariant: decrypt(encrypt(pt)) == pt. Authenticity invariant: 1-bit ciphertext flip must fail decryption.
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    deprecated
+)]
+
 use contextra_crypto::wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
 use contextra_types::TenantId;
@@ -43,7 +51,7 @@ proptest! {
         plaintext in proptest::collection::vec(any::<u8>(), 0..5_000),
     ) {
         let km = CryptoKey::try_new("kv-proptest-passphrase", b"kv-proptest-salt").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
 
         let tenant_id = TenantId::try_new(tenant_val).unwrap();
         let fp = ModelFingerprint::new([0x33u8; 32], model_id, quant);
@@ -63,7 +71,7 @@ proptest! {
         plaintext in proptest::collection::vec(any::<u8>(), 0..1_000),
     ) {
         let km = CryptoKey::try_new("kv-mismatch-passphrase", b"kv-mismatch-salt").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
 
         let tenant_a = TenantId::try_new(tenant_a_val).unwrap();
         let tenant_b = TenantId::try_new(tenant_a_val + tenant_b_offset).unwrap();
@@ -82,7 +90,7 @@ proptest! {
         plaintext in proptest::collection::vec(any::<u8>(), 0..1_000),
     ) {
         let km = CryptoKey::try_new("kv-freshness-passphrase", b"kv-freshness-salt").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let cipher = KvSegmentCipher::ephemeral(km);
 
         let tenant_id = TenantId::try_new(tenant_val).unwrap();
         let fp = ModelFingerprint::new([0x77u8; 32], "model-freshness", "Q8_0");

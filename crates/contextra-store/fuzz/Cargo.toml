@@ -65,3 +65,9 @@ name = "fuzz_recovery_arbitrary_state"
 path = "fuzz_targets/fuzz_recovery_arbitrary_state.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "witness_reader_sstable"
+path = "fuzz_targets/witness_reader_sstable.rs"
+test = false
+doc = false
