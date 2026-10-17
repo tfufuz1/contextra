@@ -6,6 +6,7 @@ use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, SignedActivation, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
+use contextra_types::DeterministicTimestamp;
 use ed25519_dalek::SigningKey;
 
 struct TestClock {
@@ -13,11 +14,14 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
-    fn now_unix_nanos(&self) -> u64 {
-        (self.now_unix_secs * 1_000_000_000) as u64
+    fn now(&self) -> DeterministicTimestamp {
+        DeterministicTimestamp::new(
+            u64::try_from(self.now_unix_secs * 1000).unwrap_or(0),
+            0,
+        )
     }
 
-    fn monotonic_nanos(&self) -> u64 {
+    fn monotonic_ticks(&self) -> u64 {
         0
     }
 }
@@ -51,8 +55,13 @@ fn test_order_step_1_fast_ring_bypass() {
     assert_eq!(gate_no_act.check_ring(FeatureRing::Fast), Ok(()));
 
     // 1b. Corrupted signature -> Fast is Ok
-    let mut act_corrupt =
-        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 1000, &signing_key);
+    let mut act_corrupt = SignedActivation::create_signed(
+        FeatureRing::Sovereign,
+        expected_id,
+        1000,
+        &signing_key,
+    )
+    .expect("create_signed succeeds");
     act_corrupt.signature[0] ^= 0xFF;
     let gate_corrupt =
         SignedLicenseGate::from_activation_with_clock(act_corrupt, verifying_key, clock.clone())
@@ -65,7 +74,8 @@ fn test_order_step_1_fast_ring_bypass() {
         expected_id,
         3000,
         &foreign_signing_key,
-    );
+    )
+    .expect("create_signed succeeds");
     let gate_foreign =
         SignedLicenseGate::from_activation_with_clock(act_foreign, verifying_key, clock)
             .with_local_installation_id(wrong_id);
@@ -84,7 +94,8 @@ fn test_ring_semantics_compliance_does_not_unlock_sovereign_and_open_fast_gate()
 
     // Activation for Compliance ring only
     let activation =
-        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key)
+            .expect("create_signed succeeds");
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -130,8 +141,13 @@ fn test_order_step_3_hash_mismatch_before_signature_check() {
         now_unix_secs: 1000,
     });
 
-    let mut activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key);
+    let mut activation = SignedActivation::create_signed(
+        FeatureRing::Sovereign,
+        expected_id,
+        2000,
+        &signing_key,
+    )
+    .expect("create_signed succeeds");
     activation.signature[0] ^= 0xFF; // tampered signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
@@ -157,7 +173,8 @@ fn test_order_step_4_signature_check_before_expiration() {
         local_id,
         2000, // expires at 2000
         &signing_key,
-    );
+    )
+    .expect("create_signed succeeds");
     activation.signature[0] ^= 0xFF; // tampered signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
@@ -184,7 +201,8 @@ fn test_order_step_5_expiration_before_ring_level_check() {
         local_id,
         expires_at,
         &signing_key,
-    );
+    )
+    .expect("create_signed succeeds");
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -206,7 +224,8 @@ fn test_order_step_6_ring_mismatch() {
     });
 
     let activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key)
+            .expect("create_signed succeeds");
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -227,7 +246,8 @@ fn test_order_step_7_success() {
     });
 
     let activation =
-        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key);
+        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key)
+            .expect("create_signed succeeds");
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);

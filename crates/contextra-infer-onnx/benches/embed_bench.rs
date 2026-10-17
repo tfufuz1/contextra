@@ -11,11 +11,14 @@ use tokio::runtime::Runtime;
 fn bench_embed(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let mut model_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    model_dir.push("tests/data");
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut model_dir = manifest_dir.join("tests").join("data");
+    if !model_dir.join("model.onnx").exists() {
+        model_dir = manifest_dir.join("tests").join("fixtures");
+    }
 
     if !model_dir.join("model.onnx").exists() || !model_dir.join("tokenizer.json").exists() {
-        println!("Skipping benchmark because ONNX model or tokenizer is missing in tests/data");
+        println!("Skipping benchmark because ONNX model or tokenizer is missing in tests/data and tests/fixtures");
         return;
     }
 
@@ -30,6 +33,15 @@ fn bench_embed(c: &mut Criterion) {
                         .await
                         .unwrap();
                 }
+            })
+        })
+    });
+
+    c.bench_function("embed_batch_100_texts", |b| {
+        let texts = vec!["This is a benchmark test sentence for ONNX embeddings."; 100];
+        b.iter(|| {
+            rt.block_on(async {
+                let _ = embedder.embed_batch_async(&texts).await.unwrap();
             })
         })
     });

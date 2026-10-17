@@ -589,3 +589,39 @@ async fn test_pin_guard_drop_latency_sub_millisecond() {
         "Dropping PinGuard must not write to disk synchronously"
     );
 }
+
+#[test]
+fn test_rollback_blocking_outside_runtime() {
+    let _lock = TEST_LOCK.lock();
+    let storage = Arc::new(TrackingMockStorage::new());
+    let store = PersistentCheckpointStore::new(storage.clone(), "test_rb_sync").unwrap();
+
+    let guard = store.create_guard(TxId::new(9901)).unwrap();
+    let res = guard.rollback_blocking();
+    assert!(res.is_ok(), "rollback_blocking outside runtime must succeed");
+    assert_eq!(storage.rolled_back_txs.lock().clone(), vec![TxId::new(9901)]);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_rollback_blocking_inside_current_thread_runtime() {
+    let _lock = TEST_LOCK.lock();
+    let storage = Arc::new(TrackingMockStorage::new());
+    let store = PersistentCheckpointStore::new(storage.clone(), "test_rb_ct").unwrap();
+
+    let guard = store.create_guard(TxId::new(9902)).unwrap();
+    let res = guard.rollback_blocking();
+    assert!(res.is_ok(), "rollback_blocking inside current_thread runtime must succeed");
+    assert_eq!(storage.rolled_back_txs.lock().clone(), vec![TxId::new(9902)]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollback_blocking_inside_multi_thread_runtime() {
+    let _lock = TEST_LOCK.lock();
+    let storage = Arc::new(TrackingMockStorage::new());
+    let store = PersistentCheckpointStore::new(storage.clone(), "test_rb_mt").unwrap();
+
+    let guard = store.create_guard(TxId::new(9903)).unwrap();
+    let res = guard.rollback_blocking();
+    assert!(res.is_ok(), "rollback_blocking inside multi_thread runtime must succeed");
+    assert_eq!(storage.rolled_back_txs.lock().clone(), vec![TxId::new(9903)]);
+}
