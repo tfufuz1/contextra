@@ -38,7 +38,7 @@ impl Drop for TestDir {
 }
 
 #[test]
-fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
+fn test_scrub_and_remove_hardlink_safety() -> std::io::Result<()> {
     let dir = TestDir::new()?;
     let original = dir.path().join("original.txt");
     let hardlink = dir.path().join("hardlink.txt");
@@ -48,18 +48,15 @@ fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
     fs::hard_link(&original, &hardlink)?;
 
     let receipt: ScrubReceipt = scrub_and_remove(&original)?;
-    assert_eq!(receipt.bytes_scrubbed, secret_data.len() as u64);
+    assert_eq!(receipt.method, contextra_durable_fs::ScrubMethod::UnlinkOnly);
+    assert_eq!(receipt.bytes_scrubbed, 0);
 
-    // Original file must be removed
+    // Original file must be unlinked
     assert!(!original.exists());
 
-    // Hardlink file must exist and contain only zero bytes
+    // Hardlink file must exist and preserve original data
     let hardlink_data = fs::read(&hardlink)?;
-    assert_eq!(hardlink_data.len(), secret_data.len());
-    assert!(
-        hardlink_data.iter().all(|&b| b == 0),
-        "Hardlink data should contain only zeros"
-    );
+    assert_eq!(hardlink_data, secret_data);
 
     Ok(())
 }
