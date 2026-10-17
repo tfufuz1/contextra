@@ -899,9 +899,8 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
                         self.codec.tenant_id, tenant_id
                     )));
                 }
-                let prefix = self.codec.collection_prefix(collection_id);
                 let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
-                PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![prefix])
+                PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![])
             }
             LogicalScope::Collection {
                 collection_id,
@@ -953,8 +952,7 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
         if let Some(backend) = self.inner.erasure_capabilities_handle() {
             backend.purge_physical(scope, as_of, probe)
         } else {
-            Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::other(
                 "Underlying storage engine does not support ErasureBackend",
             )))
         }
@@ -993,9 +991,12 @@ mod tests {
             tenant_id: tenant_1,
         };
         let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-        assert_eq!(phys_scope.prefixes().len(), 1);
-        assert_eq!(phys_scope.prefixes()[0], b"t:101:10:");
-        assert_eq!(phys_scope.keys().len(), 0); // subsumed by prefix
+        assert!(phys_scope.prefixes().is_empty());
+        assert_eq!(phys_scope.keys().len(), 1);
+        assert_eq!(phys_scope.keys()[0], b"t:101:10:doc:1");
+
+        let sibling_key = b"t:101:10:doc:2";
+        assert!(!phys_scope.matches_key(sibling_key));
 
         // 3. Physical scope resolution with mismatched TenantId MUST fail closed
         let mismatched_scope = LogicalScope::Document {
