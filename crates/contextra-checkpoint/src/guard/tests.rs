@@ -161,35 +161,42 @@ fn test_rollback_blocking_in_sync_context() {
     assert_eq!(rolled_back, vec![TxId::new(909)]);
 }
 
-#[tokio::test]
-async fn test_rollback_blocking_in_async_context_returns_error() {
+#[tokio::test(flavor = "current_thread")]
+async fn test_rollback_blocking_in_current_thread_context() {
     let storage = Arc::new(MockStorage::new());
     let cp = StateCheckpoint {
         tx_id: TxId::new(1010),
         timestamp_ms: 1000,
         namespace: Some("test".to_string()),
     };
-    let guard = CheckpointGuard::new(cp, storage, "test");
+    let guard = CheckpointGuard::new(cp, storage.clone(), "test");
 
-    // Timeout safety net to guarantee no hanging/deadlock
-    let res = tokio::time::timeout(std::time::Duration::from_secs(2), async move {
-        guard.rollback_blocking()
-    })
-    .await
-    .expect("rollback_blocking in async context timed out - possible deadlock!");
-
+    let res = guard.rollback_blocking();
     assert!(
-        res.is_err(),
-        "rollback_blocking called from async context must return error immediately to prevent deadlock"
+        res.is_ok(),
+        "rollback_blocking called from current_thread runtime must succeed"
     );
-    if let Err(ContextraError::Internal(msg)) = res {
-        assert!(msg.contains("active async Tokio runtime context"));
-        assert!(msg.contains("rollback().await"));
-    } else {
-        panic!(
-            "Expected ContextraError::Internal error message instructing to use rollback().await"
-        );
-    }
+    let rolled_back = storage.rolled_back_tx.lock().clone();
+    assert_eq!(rolled_back, vec![TxId::new(1010)]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollback_blocking_in_multi_thread_context() {
+    let storage = Arc::new(MockStorage::new());
+    let cp = StateCheckpoint {
+        tx_id: TxId::new(2020),
+        timestamp_ms: 1000,
+        namespace: Some("test".to_string()),
+    };
+    let guard = CheckpointGuard::new(cp, storage.clone(), "test");
+
+    let res = guard.rollback_blocking();
+    assert!(
+        res.is_ok(),
+        "rollback_blocking called from multi_thread runtime must succeed"
+    );
+    let rolled_back = storage.rolled_back_tx.lock().clone();
+    assert_eq!(rolled_back, vec![TxId::new(2020)]);
 }
 
 #[tokio::test]
@@ -257,6 +264,8 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
         orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
         skipped_rollbacks: Arc::new(AtomicU64::new(0)),
         clock: Arc::new(SystemClock::new()),
+        metrics_sink: None,
+        created_at: std::time::Instant::now(),
     };
     assert!(matches!(
         consumed_guard.checkpoint(),
@@ -270,6 +279,8 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
         orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
         skipped_rollbacks: Arc::new(AtomicU64::new(0)),
         clock: Arc::new(SystemClock::new()),
+        metrics_sink: None,
+        created_at: std::time::Instant::now(),
     };
     assert!(matches!(
         consumed_guard2.commit(),
@@ -283,6 +294,8 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
         orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
         skipped_rollbacks: Arc::new(AtomicU64::new(0)),
         clock: Arc::new(SystemClock::new()),
+        metrics_sink: None,
+        created_at: std::time::Instant::now(),
     };
     let res = consumed_guard3.rollback().await;
     assert!(matches!(res, Err(ContextraError::Internal(_))));

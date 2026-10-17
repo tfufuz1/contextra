@@ -454,7 +454,6 @@ impl InstanceOrphanRegistry {
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::register_orphaned_checkpoint instead. Global functions are not safe in multi-instance environments."
 )]
-#[allow(deprecated)]
 pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
     tracing::warn!(
         tx_id = ?cp.tx_id,
@@ -467,7 +466,6 @@ pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::get_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
 )]
-#[allow(deprecated)]
 pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> {
     Vec::new()
 }
@@ -490,7 +488,6 @@ pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> 
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::clear_orphaned_checkpoint instead. Global functions are not safe in multi-instance environments."
 )]
-#[allow(deprecated)]
 pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
 
 /// Clears all registered orphaned checkpoints.
@@ -498,7 +495,6 @@ pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::clear_all_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
 )]
-#[allow(deprecated)]
 pub fn clear_all_orphaned_checkpoints() {}
 
 /// Retained for backward compatibility. No background tasks are spawned during drop.
