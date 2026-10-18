@@ -71,9 +71,25 @@ async fn test_prefix_crash_recovery_enumeration() {
             ..Default::default()
         };
 
-        if let Ok(storage) = LsmStorage::open(test_config).await {
-            verify_storage_against_reference_model(&storage, &ref_model).await;
-            let _ = storage.close().await;
+        match LsmStorage::open(test_config).await {
+            Ok(storage) => {
+                verify_storage_against_reference_model(&storage, &ref_model).await;
+                let _ = storage.close().await;
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("Storage")
+                        || err_msg.contains("WAL")
+                        || err_msg.contains("Corruption")
+                        || err_msg.contains("Invalid")
+                        || err_msg.contains("Header")
+                        || err_msg.contains("IO")
+                        || err_msg.contains("Format")
+                        || err_msg.contains("Manifest"),
+                    "Recovery error must be a defined error variant, got: {e:?}"
+                );
+            }
         }
     }
 }

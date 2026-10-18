@@ -5,8 +5,6 @@
 // I3 (raw sweep clean post-purge with positive control), I4 (fault injection error & byte-identical files),
 // I5 (idempotent double purge).
 
-#![allow(non_snake_case)]
-
 use contextra_ports::erasure::PurgeError;
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
@@ -113,7 +111,7 @@ fn compute_dir_hashes(dir: &Path) -> BTreeMap<String, String> {
 /// Snapshot mit seq >= as_of_tx denselben Wert wie das Modell.
 /// Prüft auch zwingend Tenant-Isolierung: Präfix `t:4:` darf `t:42:` nie treffen.
 #[tokio::test]
-async fn Invariante_I1_outside_scope_snap() -> contextra_types::Result<()> {
+async fn invariante_i1_outside_scope_snap() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -191,7 +189,7 @@ async fn Invariante_I1_outside_scope_snap() -> contextra_types::Result<()> {
 /// sowie eine SSTable, die beim Purge vollständig leer wird, um exakte Pfad-
 /// basierte Ersetzung ohne Zuordnungsverschiebung zu beweisen (P-2/B-07).
 #[tokio::test]
-async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Result<()> {
+async fn invariante_i2_version_ordering_and_l0_overlap() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -264,7 +262,7 @@ async fn Invariante_I2_version_ordering_and_l0_overlap() -> contextra_types::Res
 /// im Rohsweep nicht auffindbar.
 /// Positivkontrolle: Vor dem Purge muss der Canary in SSTables / purge_tmp gefunden werden.
 #[tokio::test]
-async fn Invariante_I3_raw_sweep_purged_in_scope() -> contextra_types::Result<()> {
+async fn invariante_i3_raw_sweep_purged_in_scope() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -315,7 +313,7 @@ async fn Invariante_I3_raw_sweep_purged_in_scope() -> contextra_types::Result<()
 /// Invariante I4: Ein injizierter Lesefehler an jedem Offset führt zu Err und
 /// byteidentischen Dateien (Dateihash vor und nach dem Lauf gleich).
 #[tokio::test]
-async fn Invariante_I4_fault_injection_error_and_byte_identical_files() -> contextra_types::Result<()> {
+async fn invariante_i4_fault_injection_error_and_byte_identical_files() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -390,7 +388,7 @@ async fn Invariante_I4_fault_injection_error_and_byte_identical_files() -> conte
 // ============================================================================
 /// Invariante I5: Zweifacher Purge desselben Scopes führt zum selben Zustand.
 #[tokio::test]
-async fn Invariante_I5_idempotent_double_purge() -> contextra_types::Result<()> {
+async fn invariante_i5_idempotent_double_purge() -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
