@@ -473,44 +473,13 @@ impl LsmStorage {
             let path = entry.path();
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if file_name.ends_with(".tmp")
-                || file_name.ends_with(".purge_tmp")
-                || path.extension().is_some_and(|ext| ext == "tmp" || ext == "purge_tmp")
+                || path.extension().is_some_and(|ext| ext == "tmp")
                 || file_name.starts_with("SALT.tmp.")
                 || file_name.starts_with("MANIFEST.new.")
             {
-                tracing::warn!("Scrubbing and removing leftover temp file: {:?}", path);
-                let p = path.clone();
-                let res = tokio::task::spawn_blocking(move || {
-                    match contextra_durable_fs::scrub_if_safe(
-                        &p,
-                        contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                        false,
-                        false,
-                    ) {
-                        Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                        | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                        Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                            contextra_durable_fs::durable_remove(&p)
-                        }
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                        Err(e) => Err(e),
-                    }
-                })
-                .await;
-                match res {
-                    Ok(Ok(_)) => {}
-                    Ok(Err(e)) => {
-                        return Err(ContextraError::Storage(format!(
-                            "Failed to scrub leftover temp file {:?}: {}",
-                            path, e
-                        )));
-                    }
-                    Err(join_err) => {
-                        return Err(ContextraError::Storage(format!(
-                            "Join error scrubbing leftover temp file {:?}: {}",
-                            path, join_err
-                        )));
-                    }
+                tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
+                if let Err(e) = tokio::fs::remove_file(&path).await {
+                    tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
                 }
             } else if path.extension().is_some_and(|ext| ext == "sst") {
                 if let Some(ref valid_set) = valid_manifest_sstables {
@@ -521,39 +490,9 @@ impl LsmStorage {
                         .as_ref()
                         .is_some_and(|dead_set| dead_set.contains(path_key))
                     {
-                        tracing::info!("Scrubbing and removing dead SSTable file proven by MANIFEST: {:?}", path);
-                        let p = path.clone();
-                        let res = tokio::task::spawn_blocking(move || {
-                            match contextra_durable_fs::scrub_if_safe(
-                                &p,
-                                contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                                false,
-                                false,
-                            ) {
-                                Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                                | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                                Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                                    contextra_durable_fs::durable_remove(&p)
-                                }
-                                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                                Err(e) => Err(e),
-                            }
-                        })
-                        .await;
-                        match res {
-                            Ok(Ok(_)) => {}
-                            Ok(Err(e)) => {
-                                return Err(ContextraError::Storage(format!(
-                                    "Failed to scrub dead SSTable {:?}: {}",
-                                    path, e
-                                )));
-                            }
-                            Err(join_err) => {
-                                return Err(ContextraError::Storage(format!(
-                                    "Join error scrubbing dead SSTable {:?}: {}",
-                                    path, join_err
-                                )));
-                            }
+                        tracing::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
+                        if let Err(e) = tokio::fs::remove_file(&path).await {
+                            tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
                         tracing::warn!(
@@ -1083,39 +1022,14 @@ impl LsmStorage {
 
         let mut manifest_batch = Vec::new();
         for path in sst_to_remove {
-            tracing::info!("Scrubbing and removing SSTable during rollback: {:?}", path);
+            tracing::info!("Removing SSTable during rollback: {:?}", path);
             manifest_batch.push(crate::manifest::ManifestEntry::Remove { path: path.clone() });
-            let p = path.clone();
-            let res = tokio::task::spawn_blocking(move || {
-                match contextra_durable_fs::scrub_if_safe(
-                    &p,
-                    contextra_durable_fs::ScrubPolicy::OverwriteZeros,
-                    false,
-                    false,
-                ) {
-                    Ok(contextra_durable_fs::ScrubOutcome::Scrubbed(_))
-                    | Ok(contextra_durable_fs::ScrubOutcome::RemovedUnscrubbed) => Ok(()),
-                    Ok(contextra_durable_fs::ScrubOutcome::Refused(_)) => {
-                        contextra_durable_fs::durable_remove(&p)
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                    Err(e) => Err(e),
-                }
-            })
-            .await;
-            match res {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => {
-                    return Err(ContextraError::Storage(format!(
-                        "Failed to scrub rolled back SSTable {:?}: {}",
-                        path, e
-                    )));
-                }
-                Err(join_err) => {
-                    return Err(ContextraError::Storage(format!(
-                        "Join error scrubbing rolled back SSTable {:?}: {}",
-                        path, join_err
-                    )));
+            if let Err(e) = tokio::fs::remove_file(&path).await {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    tracing::error!(
+                        path = ?path,
+                        "Orphaned SSTable konnte nicht entfernt werden: {e}. Manuelles Cleanup nötig."
+                    );
                 }
             }
         }

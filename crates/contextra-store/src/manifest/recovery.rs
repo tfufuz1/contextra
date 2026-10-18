@@ -115,36 +115,6 @@ pub(super) fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[
                     }
                 }
             }
-            4 => {
-                // WalCheckpoint: exact payload size (4 crc + 1 tag + 32 hmac = 37)
-                if claimed_len != 37 {
-                    return false;
-                }
-            }
-            5 => {
-                // FormatVersionRecord: exact payload size (4 crc + 1 tag + 1 file_kind + 2 max_ver + 2 mig_from = 10)
-                if claimed_len != 10 {
-                    return false;
-                }
-            }
-            6 => {
-                // ErasureWatermarkRecord: exact payload size (4 crc + 1 tag + 1 mode = 6)
-                if claimed_len != 6 {
-                    return false;
-                }
-            }
-            7 => {
-                // LedgerHeadRecord: exact payload size (4 crc + 1 tag + 8 seq + 32 mac = 45)
-                if claimed_len != 45 {
-                    return false;
-                }
-            }
-            8 => {
-                // BackendIdRecord: exact payload size (4 crc + 1 tag + 8 backend_id = 13)
-                if claimed_len != 13 {
-                    return false;
-                }
-            }
             _ => {
                 // Unknown op_tag is definitely corruption
                 return false;

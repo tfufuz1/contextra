@@ -15,8 +15,7 @@ arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 tempfile = "3"
 bytes = "1"
-contextra-ports = { path = "../../contextra-ports" }
-contextra-types = { path = "../../contextra-types" }
+contextra-core = { path = "../../contextra-core" }
 contextra-store = { path = ".." }
 
 [[bin]]

@@ -18,8 +18,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use contextra_ports::StorageEngine;
-use contextra_types::TxId;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;

@@ -802,14 +802,6 @@ impl Wal {
                                     ))
                                 })?;
 
-                                injector.on_fsync(Some(&path)).map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL migration fsync failed for {}: {}",
-                                        path.display(),
-                                        e
-                                    ))
-                                })?;
-
                                 #[cfg(feature = "fault-injection")]
                                 if FAIL_SYNC_ONCE
                                     .compare_exchange(

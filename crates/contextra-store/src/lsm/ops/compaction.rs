@@ -13,9 +13,6 @@ use std::sync::Arc;
 /// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
 /// concurrent sequence allocation races during rotation.
 pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
-    if storage.is_read_only() {
-        return Err(ContextraError::Storage("Store is in read-only mode".into()));
-    }
     let _flush_lock = storage.flush_mutex.lock().await;
 
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
