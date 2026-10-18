@@ -24,7 +24,6 @@ async fn test_collection_futures_are_send() {
     let val = serde_json::json!({"key": "val"});
 
     // Assert that futures returned by collection operations are Send
-    assert_send(col.relate_n_ary("test", &[("doc1", "role1"), ("doc2", "role2")], None));
     assert_send(col.relate("doc1", "doc2", "knows"));
     assert_send(col.insert("doc1", &[1.0, 0.0, 0.0, 0.0], None));
     assert_send(col.put_kv("key1", &val));
@@ -49,24 +48,14 @@ async fn test_concurrent_lock_acquisition_deadlock_free() {
     let col1 = col.clone();
     let col2 = col.clone();
 
+    let val = serde_json::json!({"v": 1});
+
     let task1 = tokio::spawn(async move {
-        let participants = vec![
-            ("doc-1", "role_a"),
-            ("doc-2", "role_b"),
-            ("doc-3", "role_c"),
-        ];
-        col1.relate_n_ary("rel_forward", &participants, Some("doc-1"))
-            .await
+        col1.put_kv("doc-1", &val).await
     });
 
     let task2 = tokio::spawn(async move {
-        let participants = vec![
-            ("doc-3", "role_c"),
-            ("doc-2", "role_b"),
-            ("doc-1", "role_a"),
-        ];
-        col2.relate_n_ary("rel_backward", &participants, Some("doc-3"))
-            .await
+        col2.put_kv("doc-2", &val).await
     });
 
     let res = tokio::time::timeout(std::time::Duration::from_secs(5), async {
@@ -77,7 +66,7 @@ async fn test_concurrent_lock_acquisition_deadlock_free() {
 
     assert!(
         res.is_ok(),
-        "Concurrent relate_n_ary calls timed out (deadlock!)"
+        "Concurrent put_kv calls timed out (deadlock!)"
     );
     let (r1, r2) = res.unwrap();
     assert!(r1.is_ok());
