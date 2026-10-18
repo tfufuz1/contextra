@@ -74,6 +74,8 @@ pub enum WitnessReadError {
     UnclassifiedFile(String),
     /// Encrypted file without available decryption key.
     NotWitnessable(String),
+    /// Key was destroyed (Crypto-Erase).
+    KeyDestroyed(String),
     /// I/O read failure.
     Io(String),
     /// Frame or payload decoding failure.
@@ -88,6 +90,7 @@ impl fmt::Display for WitnessReadError {
             WitnessReadError::CorruptFile(msg) => write!(f, "CorruptFile: {msg}"),
             WitnessReadError::UnclassifiedFile(msg) => write!(f, "UnclassifiedFile: {msg}"),
             WitnessReadError::NotWitnessable(msg) => write!(f, "NotWitnessable: {msg}"),
+            WitnessReadError::KeyDestroyed(msg) => write!(f, "KeyDestroyed: {msg}"),
             WitnessReadError::Io(msg) => write!(f, "Io: {msg}"),
             WitnessReadError::Decode(msg) => write!(f, "Decode: {msg}"),
             WitnessReadError::ScanTimeout(msg) => write!(f, "ScanTimeout: {msg}"),

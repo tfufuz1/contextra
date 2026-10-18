@@ -154,6 +154,7 @@ impl Wal {
             .collect())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -161,6 +162,7 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
+    #[allow(dead_code)]
     async fn replay_mmap_with_size_and_version(
         &self,
         _file_size: u64,

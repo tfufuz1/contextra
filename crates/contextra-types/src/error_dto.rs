@@ -369,6 +369,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "max_age_ticks": max_age_ticks,
                 })),
             },
+            ContextraError::KeyDestroyed(msg) => Self {
+                kind: "KeyDestroyed".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }
