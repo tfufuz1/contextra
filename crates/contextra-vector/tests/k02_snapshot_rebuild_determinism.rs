@@ -37,7 +37,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
         ef_construction: 64,
         ef_search: 64,
         rebuild_threshold: 0.50,
-        distance_metric: contextra_core::DistanceMetric::Euclidean,
+        distance_metric: contextra_types::DistanceMetric::Euclidean,
         ..Default::default()
     };
 

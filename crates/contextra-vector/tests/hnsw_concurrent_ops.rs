@@ -1,8 +1,8 @@
 use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_crypto::deletion_proof::claim_text::WitAssurance;
 use contextra_vector::hnsw::{
     witness::HnwIssueArgs, GhostFreeVectorIndex, HnswConfig, HnswIndex, ResDepth,
 };
-use contextra_crypto::deletion_proof::claim_text::WitAssurance;
 use std::sync::Arc;
 
 #[tokio::test]
