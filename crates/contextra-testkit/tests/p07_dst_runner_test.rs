@@ -3,7 +3,6 @@
 // ZWECK: DST runner test harness, regression file runner, and NaiveWalSut verification.
 // INVARIANTEN: Zero divergences for NaiveWalSut; regression seeds file MUST be parsed and tested.
 
-
 use contextra_testkit::dst::{NaiveWalSut, P07DstRunner};
 use std::fs;
 use std::path::{Path, PathBuf};

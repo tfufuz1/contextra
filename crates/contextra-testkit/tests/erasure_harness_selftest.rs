@@ -60,10 +60,7 @@ fn test_reference_store_handcheck() {
     // Hand-check step 2: Delete key
     ref_store.delete(b"user:100");
     assert_eq!(ref_store.get(b"user:100"), None);
-    assert_eq!(
-        ref_store.state_of(b"user:100"),
-        Some(&KeyState::Tombstone)
-    );
+    assert_eq!(ref_store.state_of(b"user:100"), Some(&KeyState::Tombstone));
     assert_eq!(ref_store.active_count(), 2);
     assert_eq!(ref_store.total_entries(), 3);
 
@@ -79,7 +76,10 @@ fn test_reference_store_handcheck() {
     let snapshot = ref_store.active_snapshot();
     assert_eq!(snapshot.len(), 2);
     assert_eq!(snapshot.get(&b"user:101"[..]), Some(&b"bob".to_vec()));
-    assert_eq!(snapshot.get(&b"doc:001"[..]), Some(&b"document_data".to_vec()));
+    assert_eq!(
+        snapshot.get(&b"doc:001"[..]),
+        Some(&b"document_data".to_vec())
+    );
 }
 
 #[tokio::test]
@@ -89,7 +89,10 @@ async fn test_tenant_matrix_runner_lsm_and_tenant_scoped() {
         let storage = ctx.storage;
         async move {
             let tx1 = TxId::try_new(100).unwrap();
-            storage.put(tx1, b"harness_key_1", b"harness_val_1").await.unwrap();
+            storage
+                .put(tx1, b"harness_key_1", b"harness_val_1")
+                .await
+                .unwrap();
             storage.commit(tx1).await.unwrap();
 
             let val = storage.get(b"harness_key_1").await.unwrap();

@@ -9,9 +9,7 @@ pub mod raw_sweep;
 pub mod reference_store;
 pub mod tenant_matrix;
 
-pub use canary::{
-    CanaryEncoding, CanaryFieldType, CanaryNeedleInfo, CanarySet,
-};
+pub use canary::{CanaryEncoding, CanaryFieldType, CanaryNeedleInfo, CanarySet};
 #[cfg(feature = "fault-injection")]
 pub use failpoints::FailpointHelper;
 

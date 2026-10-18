@@ -3,7 +3,6 @@
 // ZWECK: Unit and determinism tests for SimFs.
 // INVARIANTEN: Identical seeds MUST yield identical post-crash content hashes.
 
-
 use contextra_testkit::sim_fs::{SimFs, SimOpenOptions, SimVfs};
 use std::path::Path;
 

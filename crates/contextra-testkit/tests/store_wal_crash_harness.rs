@@ -3,7 +3,6 @@
 // ZWECK: Crash consistency harness driving ReferenceModel and FaultVfs against public Store/WAL API.
 // INVARIANTEN: Zero real data corruption, fixed deterministic seeds, reference model validation.
 
-
 use contextra_ports::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalOp};
 use contextra_testkit::{FaultConfig, FaultVfs, ReferenceModel};

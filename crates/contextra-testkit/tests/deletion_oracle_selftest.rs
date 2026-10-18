@@ -2,7 +2,6 @@
 // STAND: 2026-10-12
 // ZWECK: Selbsttest fuer Canary-Orakel, Rohsweep und Report (Spezifikation T1).
 
-
 use std::fs::{self, File};
 use std::io::Write;
 use tempfile::tempdir;

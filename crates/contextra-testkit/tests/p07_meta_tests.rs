@@ -3,7 +3,6 @@
 // ZWECK: Meta-tests proving that the DST runner detects intentionally buggy SUT implementations.
 // INVARIANTEN: Every faulty SUT MUST trigger a divergence error; NaiveWalSut MUST pass 2,000 seeds.
 
-
 use contextra_testkit::dst::op::DstOp;
 use contextra_testkit::dst::p07_runner::P07DstRunner;
 use contextra_testkit::dst::p07_sut::{NaiveWalSut, SystemUnderTest};

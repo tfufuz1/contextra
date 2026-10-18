@@ -1,4 +1,3 @@
-
 #[path = "support/canary.rs"]
 mod canary;
 

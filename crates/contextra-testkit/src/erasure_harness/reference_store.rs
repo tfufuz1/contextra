@@ -51,7 +51,11 @@ impl ReferenceStore {
         let k = key.as_ref().to_vec();
         let existed = self.entries.contains_key(&k);
         self.entries.insert(k, (Vec::new(), KeyState::Purged));
-        if existed { 1 } else { 0 }
+        if existed {
+            1
+        } else {
+            0
+        }
     }
 
     pub fn purge_prefix(&mut self, prefix: &[u8]) -> usize {

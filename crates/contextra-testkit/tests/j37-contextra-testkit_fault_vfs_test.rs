@@ -1,4 +1,3 @@
-
 use contextra_testkit::{FaultConfig, FaultVfs};
 use std::io::ErrorKind;
 use std::path::Path;
