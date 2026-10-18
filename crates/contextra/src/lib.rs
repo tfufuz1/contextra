@@ -23,7 +23,7 @@ pub use contextra_core::DistanceMetric;
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    SearchResult, TextEmbeddingEngine,
+    EncryptionConfig, KekSource, SearchResult, TextEmbeddingEngine,
 };
 pub use query_rewriter::LlmQueryRewriter;
 

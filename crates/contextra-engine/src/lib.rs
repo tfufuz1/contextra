@@ -17,6 +17,8 @@ use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
 #[cfg(not(loom))]
+pub use contextra_store::lsm::config::{EncryptionConfig, KekSource};
+#[cfg(not(loom))]
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
@@ -48,6 +50,7 @@ pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
 pub mod metrics_names;
+pub mod migration;
 #[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
@@ -203,7 +206,7 @@ pub struct ContextraConfig {
     pub dimension: usize,
     pub max_elements: usize,
     pub distance_metric: contextra_types::DistanceMetric,
-    pub encryption_passphrase: Option<String>,
+    pub encryption: EncryptionConfig,
     /// Maximum RAM the LSM storage engine may use (in MB). Passed directly to LsmConfig::max_ram_mb.
     /// Default: 2048 (matches LsmConfig default).
     pub max_ram_mb: u64,
@@ -244,6 +247,20 @@ pub struct ContextraConfig {
 
 #[cfg(not(loom))]
 impl ContextraConfig {
+    pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
+        self.encryption = EncryptionConfig::Passphrase(passphrase.into());
+        self
+    }
+
+    pub fn with_encryption_config(mut self, encryption: EncryptionConfig) -> Self {
+        self.encryption = encryption;
+        self
+    }
+
+    pub fn encryption_passphrase(&self) -> Option<String> {
+        self.encryption.passphrase()
+    }
+
     pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
         self.consolidation_launcher = Some(launcher);
         self
@@ -267,10 +284,7 @@ impl std::fmt::Debug for ContextraConfig {
             .field("dimension", &self.dimension)
             .field("max_elements", &self.max_elements)
             .field("distance_metric", &self.distance_metric)
-            .field(
-                "encryption_passphrase",
-                &self.encryption_passphrase.as_ref().map(|_| "***"),
-            )
+            .field("encryption", &self.encryption)
             .field("max_ram_mb", &self.max_ram_mb)
             .field(
                 "group_commit_window_micros",
@@ -307,7 +321,7 @@ impl Default for ContextraConfig {
             dimension: 768,
             max_elements: 1_000_000,
             distance_metric: contextra_types::DistanceMetric::Cosine,
-            encryption_passphrase: None,
+            encryption: EncryptionConfig::default(),
             max_ram_mb: 2048,
             group_commit_window_micros: 500,
             durability_mode: DurabilityMode::default(),

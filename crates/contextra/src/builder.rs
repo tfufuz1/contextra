@@ -96,7 +96,16 @@ impl ContextraBuilder {
 
     /// Sets the encryption passphrase for persistent storage.
     pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
-        self.config.encryption_passphrase = Some(passphrase.into());
+        self.config.encryption = contextra_db::EncryptionConfig::Passphrase(passphrase.into());
+        self
+    }
+
+    /// Sets the full encryption configuration for persistent storage.
+    pub fn with_encryption_config(
+        mut self,
+        encryption: contextra_db::EncryptionConfig,
+    ) -> Self {
+        self.config.encryption = encryption;
         self
     }
 
@@ -267,7 +276,7 @@ mod tests {
         assert_eq!(builder.config.max_elements, 50000);
         assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);
         assert_eq!(
-            builder.config.encryption_passphrase,
+            builder.config.encryption_passphrase(),
             Some("secret_pass".to_string())
         );
         assert!(!builder.config.consolidation_enabled);

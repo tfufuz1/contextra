@@ -12,7 +12,7 @@ use contextra_engine::deletion::text_witness::issue_text_index_witness;
 use contextra_engine::deletion::{
     forget_document, DpiDeletionRuntime, ErasureFootprint, FprSweepSource, KeyFamilyRegistry, ForgetOptions,
 };
-use contextra_ports::{DocId, TxId};
+use contextra_ports::{DocId, StorageEngine, TxId};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, Result};
 use tempfile::TempDir;
@@ -224,7 +224,7 @@ async fn store_with_residual_version_returns_err() {
 
     // Put a residual active record into storage for this document key
     if let Some(key) = footprint.keys.explicit.first() {
-        storage.put(key.clone(), b"RESIDUAL_RECORD_DATA".to_vec(), TxId(1)).await.unwrap();
+        storage.put(TxId(1), key, b"RESIDUAL_RECORD_DATA").await.unwrap();
     }
 
     let opts = ForgetOptions::default();
