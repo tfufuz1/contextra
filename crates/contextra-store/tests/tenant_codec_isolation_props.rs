@@ -9,7 +9,7 @@ use tempfile::TempDir;
 
 use proptest::prelude::*;
 
-use contextra_core::{CollectionId, DocId, TenantId, TxId};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::tenant_codec::{TenantKeyCodec, TenantScopedStorage};
