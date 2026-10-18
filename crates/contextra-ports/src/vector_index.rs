@@ -180,7 +180,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     fn trigger_rebuild_async(&self) {}
 }
 
-// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
 /// Contract for executing hybrid (vector + text) queries for profile routing.
 pub trait HybridSearchProvider: Send + Sync {
     /// Executes a hybrid query returning matched context chunks with relevance scores.

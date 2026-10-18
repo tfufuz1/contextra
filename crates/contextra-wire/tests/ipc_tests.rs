@@ -119,6 +119,7 @@ fn test_search_response_full_roundtrip() {
     let resp_offset = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
+            version: 1,
             results: Some(results_vec),
             total_hits: 1000,
             processing_time_ms: 12.34,
@@ -198,6 +199,7 @@ fn test_fault_injection_and_corruption_no_panic() {
     let resp = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
+            version: 1,
             results: Some(results),
             total_hits: 1,
             processing_time_ms: 1.0,
@@ -248,6 +250,7 @@ fn test_concurrency_parallel_serialization() {
                     let resp = SearchResponse::create(
                         &mut builder,
                         &SearchResponseArgs {
+                            version: 1,
                             results: Some(results),
                             total_hits: (i + 1) as u32,
                             processing_time_ms: 0.5,
@@ -288,6 +291,7 @@ fn test_shared_buffer_concurrency() {
     let resp = SearchResponse::create(
         &mut builder,
         &SearchResponseArgs {
+            version: 1,
             results: Some(results),
             total_hits: 42,
             processing_time_ms: 2.5,

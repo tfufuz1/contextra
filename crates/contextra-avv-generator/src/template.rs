@@ -19,6 +19,9 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
 
     let mut out = String::with_capacity(2048);
 
+    writeln!(out, "> **Hinweis:** Vorlage, keine Rechtsberatung\n")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+
     writeln!(
         out,
         "# Vereinbarung zur Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO"
@@ -145,6 +148,9 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
         ctx.tenant_id, ctx.deletion_sla_days
     )
     .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+
+    writeln!(out, "\n> **Hinweis:** Vorlage, keine Rechtsberatung")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
 
     Ok(out)
 }

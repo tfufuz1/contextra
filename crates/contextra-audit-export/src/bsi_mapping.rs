@@ -4,6 +4,10 @@
 //! This module serves as the Single Source of Truth (SSOT) for the BSI Grundschutz / TR-02102
 //! cryptographic mapping table included in the generated GDPR Art. 30 processing register export.
 //!
+//! **Normative References & Standards:**
+//! - **DIN EN ISO/IEC 27555:2025-09**: Leitfaden für das Löschen personenbezogener Daten (ersetzt die zurückgezogene DIN 66398).
+//! - **NIST SP 800-88 Rev. 2**: Guidelines for Media Sanitization (Verifikationsstufe: Purge / Cryptographic Erase).
+//!
 //! **IMPORTANT FOR MAINTAINERS:**
 //! Whenever a cryptographic primitive in `contextra-crypto` or related storage security modules
 //! is added, removed, or updated, this mapping table (`bsi_mapping_table()`) MUST be updated
@@ -11,7 +15,8 @@
 //! must also be updated accordingly.
 //!
 //! **COMPLIANCE & LEGAL NOTICE:**
-//! This mapping document provides reference alignment against BSI Technical Guidelines (TR-02102).
+//! This mapping document provides reference alignment against BSI Technical Guidelines (TR-02102),
+//! DIN EN ISO/IEC 27555:2025-09, and NIST SP 800-88 Rev. 2.
 //! It constitutes a technical mapping documentation and NOT a formal certification, audit approval,
 //! or warranty of BSI compliance.
 
@@ -38,8 +43,8 @@ pub fn bsi_mapping_table() -> Vec<BsiMappingEntry> {
         BsiMappingEntry {
             primitive_name: "Ed25519".to_string(),
             code_location: "crates/contextra-crypto/src/deletion_proof.rs".to_string(),
-            bsi_reference: "BSI TR-02102-1".to_string(),
-            note: "Digitale Signatur für Löschnachweise (DeletionProof v3, §14.1). BSI TR-02102-1 §1.5/§3.2 bewertet Ed25519 (Curve25519) als empfohlenes Asymmetrisches Signaturverfahren mit 128-Bit Sicherheit. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
+            bsi_reference: "BSI TR-02102-1 / DIN EN ISO/IEC 27555:2025-09".to_string(),
+            note: "Digitale Signatur für Löschnachweise (DeletionProof v3, §14.1; DIN EN ISO/IEC 27555:2025-09; NIST SP 800-88 Rev. 2 Verifikationsstufe: Purge/Crypto-Erase). BSI TR-02102-1 §1.5/§3.2 bewertet Ed25519 (Curve25519) als empfohlenes Asymmetrisches Signaturverfahren mit 128-Bit Sicherheit. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
         },
         BsiMappingEntry {
             primitive_name: "HMAC-SHA256".to_string(),
@@ -50,8 +55,8 @@ pub fn bsi_mapping_table() -> Vec<BsiMappingEntry> {
         BsiMappingEntry {
             primitive_name: "AES-256-GCM-SIV".to_string(),
             code_location: "crates/contextra-crypto/src/crypto.rs".to_string(),
-            bsi_reference: "BSI TR-02102-1".to_string(),
-            note: "Symmetrische Verschlüsselung (Envelope Encryption, KeyManager, §10). BSI TR-02102-1 §1.3 empfiehlt AES mit ≥128-Bit Schlüssellänge; AES-256-GCM-SIV stellt missbrauchsresistente authentifizierte Authenticated Encryption (AEAD) nach RFC 8452 bereit. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
+            bsi_reference: "BSI TR-02102-1 / NIST SP 800-88 Rev. 2".to_string(),
+            note: "Symmetrische Verschlüsselung (Envelope Encryption, KeyManager, §10; NIST SP 800-88 Rev. 2 Cryptographic Erase / Purge). BSI TR-02102-1 §1.3 empfiehlt AES mit ≥128-Bit Schlüssellänge; AES-256-GCM-SIV stellt missbrauchsresistente authentifizierte Authenticated Encryption (AEAD) nach RFC 8452 bereit. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
         },
         BsiMappingEntry {
             primitive_name: "Argon2id".to_string(),
@@ -75,8 +80,9 @@ fn sanitize_markdown_cell(input: &str) -> String {
 /// Consistent with the rendering style in [`crate::markdown_template::render_register_markdown`].
 pub fn render_bsi_mapping_markdown(entries: &[BsiMappingEntry]) -> String {
     let mut out = String::new();
+    out.push_str("> **Hinweis:** Vorlage, keine Rechtsberatung\n\n");
     out.push_str("# BSI Grundschutz / TR-02102 Kryptographische Zuordnung\n\n");
-    out.push_str("> **Hinweis:** Dieses Dokument / dieser Export dient der technischen Referenzzuordnung nach BSI TR-02102 und stellt KEINE Zertifizierungs- oder Konformitätsbehauptung dar. Die BSI-Empfehlungen sind regelmäßig gegen die neuesten Veröffentlichungen des BSI zu prüfen.\n\n");
+    out.push_str("> **Hinweis:** Dieses Dokument / dieser Export dient der technischen Referenzzuordnung nach BSI TR-02102, DIN EN ISO/IEC 27555:2025-09 und NIST SP 800-88 Rev. 2 und stellt KEINE Zertifizierungs- oder Konformitätsbehauptung dar. Die Empfehlungen sind regelmäßig gegen die neuesten Veröffentlichungen zu prüfen.\n\n");
     out.push_str("| Krypto-Primitive | Code-Fundstelle | BSI-Referenz | Anmerkung / Kontext |\n");
     out.push_str("| --- | --- | --- | --- |\n");
 
@@ -89,6 +95,12 @@ pub fn render_bsi_mapping_markdown(entries: &[BsiMappingEntry]) -> String {
         out.push_str(&format!("| {name} | `{location}` | {bsi_ref} | {note} |\n"));
     }
 
+    out.push_str("\n## Grenzen der Nachweisbarkeit\n\n");
+    out.push_str("- **Audit mit Toleranz:** Kein mathematischer oder physikalischer Beweis der Abwesenheit von Daten möglich (Garg et al.).\n");
+    out.push_str("- **Flash/SSD-Physik:** Überschreiben auf Flash-Speicher/SSDs ist aufgrund von Wear Leveling und Garbage Collection nicht garantiert (Wei et al.). Belastbarer Schutz erfolgt durch kryptographisches Löschen (Crypto-Erase / Key-Shredding nach NIST SP 800-88 Rev. 2 Verifikationsstufe Purge).\n");
+    out.push_str("- **Umgebungsparameter:** Umgebungswerte (z. B. Swap, Core-Dumps, Copy-on-Write-Dateisysteme) sind rein „beobachtet“ und keinesfalls „garantiert“.\n");
+
+    out.push_str("\n> **Hinweis:** Vorlage, keine Rechtsberatung\n");
     out
 }
 
@@ -139,5 +151,8 @@ mod tests {
         assert!(markdown.contains("AES-256-GCM-SIV"));
         assert!(markdown.contains("Argon2id"));
         assert!(markdown.contains("BSI TR-02102-1"));
+        assert!(markdown.contains("DIN EN ISO/IEC 27555:2025-09"));
+        assert!(markdown.contains("NIST SP 800-88 Rev. 2"));
+        assert!(markdown.contains("## Grenzen der Nachweisbarkeit"));
     }
 }
