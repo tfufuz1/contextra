@@ -2,6 +2,25 @@
 
 use thiserror::Error;
 
+/// Fehlertypen für Module Admission Control.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum AdmissionError {
+    #[error("Unsigned WASM module: missing signature header or metadata")]
+    UnsignedModule,
+
+    #[error("Invalid WASM module signature: {0}")]
+    InvalidSignature(String),
+
+    #[error("Module digest mismatch: expected {expected}, got {actual}")]
+    DigestMismatch { expected: String, actual: String },
+
+    #[error("Invalid module payload or format: {0}")]
+    InvalidModule(String),
+
+    #[error("Module verification failed: {0}")]
+    VerificationFailed(String),
+}
+
 /// Fehlertypen der WASM-Ausführungsgrenze.
 #[derive(Debug, Error)]
 pub enum SandboxError {
@@ -31,6 +50,9 @@ pub enum SandboxError {
 
     #[error("Process exited with code {code}")]
     ProcessExit { code: i32 },
+
+    #[error("Module admission error: {0}")]
+    Admission(#[from] AdmissionError),
 
     #[error("WASM runtime error: {0}")]
     Runtime(String),

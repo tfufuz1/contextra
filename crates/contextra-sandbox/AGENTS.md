@@ -49,9 +49,16 @@ impl WasmExecutor {
 
 ## 5. Anti-Patterns & LLM-Fallstricke
 
-- **Niemals unsafe code in contextra-sandbox verwenden**.
-- **Niemals Fuel-Setups oder Wall-Clock-Timeouts weglassen**.
-- **Niemals Stores über execute()-Aufrufe hinweg wiederverwenden**.
+```bash
+cargo test -p contextra-sandbox --locked
+cargo test -p contextra-sandbox --test wasm_boundary_tests
+cargo test -p contextra-sandbox --test pure_merge_operator_capabilities_test
+cargo test -p contextra-sandbox --test wasm_wasi_io
+cargo xtask check-agents-integrity
+cargo xtask doctrine-scan --crate contextra-sandbox
+cargo xtask check-unsafe-islands
+```
+
 
 ## 6. Relevante ADRs & Rules
 

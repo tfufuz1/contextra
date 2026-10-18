@@ -1,9 +1,13 @@
 //! Integration tests for WASI I/O, limits, clock, random, proc_exit, and capabilities (§4.18).
 
-use contextra_sandbox::{SandboxError, WasmCapabilities, WasmExecutor};
+use contextra_sandbox::{AdmittedModule, SandboxError, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+fn admit(bytes: Vec<u8>) -> AdmittedModule {
+    AdmittedModule::new(bytes, [0u8; 32])
+}
 
 /// (a) Guest reads input via `fd_read` and writes it via `fd_write` back (Echo), Output == Input.
 #[tokio::test]
@@ -31,12 +35,13 @@ async fn test_wasi_echo_stdin_to_stdout() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities::default();
     let input_data = b"hello wasi echo test";
 
     let output = executor
-        .execute(&wasm_bytes, input_data, &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, input_data, &caps, Duration::from_secs(1))
         .await?;
 
     assert_eq!(&output.stdout[..], input_data);
@@ -61,11 +66,12 @@ async fn test_wasi_empty_input_eof() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities::default();
 
     let output = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
         .await?;
 
     assert!(output.stdout.is_empty());
@@ -81,6 +87,7 @@ async fn test_wasi_input_too_large() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities {
         max_stdin_bytes: 10,
@@ -89,7 +96,7 @@ async fn test_wasi_input_too_large() -> TestResult {
     let input = b"0123456789_too_large";
 
     let result = executor
-        .execute(&wasm_bytes, input, &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, input, &caps, Duration::from_secs(1))
         .await;
 
     assert!(
@@ -124,6 +131,7 @@ async fn test_wasi_output_limit_exceeded() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities {
         max_output_bytes: 25,
@@ -131,7 +139,7 @@ async fn test_wasi_output_limit_exceeded() -> TestResult {
     };
 
     let result = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(2))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(2))
         .await;
 
     assert!(
@@ -170,11 +178,12 @@ async fn test_wasi_proc_exit_0_stops_execution() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities::default();
 
     let output = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
         .await?;
 
     assert!(
@@ -198,11 +207,12 @@ async fn test_wasi_proc_exit_nonzero_returns_error() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities::default();
 
     let result = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
         .await;
 
     assert!(
@@ -238,6 +248,7 @@ async fn test_wasi_clock_time_get() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
 
     // Case 1: allow_clock = true -> errno 0
@@ -246,7 +257,7 @@ async fn test_wasi_clock_time_get() -> TestResult {
         ..Default::default()
     };
     let output_allowed = executor
-        .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_allowed, Duration::from_secs(1))
         .await?;
     let errno_allowed = i32::from_le_bytes(output_allowed.stdout[0..4].try_into()?);
     assert_eq!(errno_allowed, 0, "Expected clock_time_get to succeed (0)");
@@ -257,7 +268,7 @@ async fn test_wasi_clock_time_get() -> TestResult {
         ..Default::default()
     };
     let output_denied = executor
-        .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_denied, Duration::from_secs(1))
         .await?;
     let errno_denied = i32::from_le_bytes(output_denied.stdout[0..4].try_into()?);
     assert_eq!(
@@ -296,6 +307,7 @@ async fn test_wasi_random_get() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
 
     // Case 1: Seed set -> deterministic identical bytes across calls
@@ -304,10 +316,10 @@ async fn test_wasi_random_get() -> TestResult {
         ..Default::default()
     };
     let out1 = executor
-        .execute(&wasm_bytes, b"", &caps_seeded, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_seeded, Duration::from_secs(1))
         .await?;
     let out2 = executor
-        .execute(&wasm_bytes, b"", &caps_seeded, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_seeded, Duration::from_secs(1))
         .await?;
 
     let errno1 = i32::from_le_bytes(out1.stdout[0..4].try_into()?);
@@ -326,7 +338,7 @@ async fn test_wasi_random_get() -> TestResult {
         ..Default::default()
     };
     let out_unseeded = executor
-        .execute(&wasm_bytes, b"", &caps_unseeded, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps_unseeded, Duration::from_secs(1))
         .await?;
     let errno_nosys = i32::from_le_bytes(out_unseeded.stdout[0..4].try_into()?);
     assert_eq!(
@@ -359,11 +371,12 @@ async fn test_wasi_args_sizes_get() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities::default();
 
     let output = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
         .await?;
 
     let argc = u32::from_le_bytes(output.stdout[0..4].try_into()?);
@@ -391,6 +404,7 @@ async fn test_wasi_allow_stdout_false_discards_output() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
+    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = WasmCapabilities {
         allow_stdout: false,
@@ -398,7 +412,7 @@ async fn test_wasi_allow_stdout_false_discards_output() -> TestResult {
     };
 
     let output = executor
-        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
         .await?;
 
     assert!(
