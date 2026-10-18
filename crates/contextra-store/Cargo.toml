@@ -43,6 +43,7 @@ arc-swap = "1.9.2"
 quick_cache = { version = "0.6", optional = true }
 contextra-crypto = { workspace = true }
 bytes = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
 parking_lot = { workspace = true }

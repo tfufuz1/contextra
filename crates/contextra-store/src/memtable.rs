@@ -32,12 +32,23 @@
 //! - **INVARIANT 4**: rollback(tx_id) removes ALL entries from that transaction atomically.
 
 use bytes::Bytes;
-use contextra_types::{TOMBSTONE_BIT, TxId};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use zeroize::Zeroize;
+
+/// Helper function to zeroize `Bytes` if unshared / uniquely owned.
+///
+/// Note: Best-effort zeroizing on deallocation. RAM-Rest nach Freigabe an den Allocator nicht kontrollierbar.
+#[inline]
+pub fn zeroize_bytes_if_unique(bytes: Bytes) {
+    if let Ok(mut mut_slice) = bytes.try_into_mut() {
+        mut_slice.zeroize();
+    }
+}
 
 const _: () = assert!(TOMBSTONE_BIT == 1u64 << 63);
 
@@ -282,11 +293,14 @@ impl MemTable {
     }
 
     /// Removes all entries associated with the specified transaction ID from the MemTable.
+    ///
+    /// Values and keys are zeroized upon drop where unshared. Note: RAM-Rest nach Freigabe an den Allocator nicht kontrollierbar.
     pub fn rollback(&self, tx_id: u64) {
         let mut total_freed_size = 0usize;
         let mut new_min_tx = u64::MAX;
         let mut new_max_tx = 0u64;
         let mut has_entries = false;
+        let mut rolled_back_entries = Vec::new();
 
         for shard in &self.shards {
             let mut entries = shard.entries.write();
@@ -294,6 +308,7 @@ impl MemTable {
                 versions.retain(|(_seq, val, tx)| {
                     if *tx == tx_id {
                         total_freed_size += key.len() + val.len() + STAGING_ENTRY_OVERHEAD_BYTES;
+                        rolled_back_entries.push((key.clone(), val.clone()));
                         false
                     } else {
                         new_min_tx = new_min_tx.min(*tx);
@@ -304,6 +319,11 @@ impl MemTable {
                 });
                 !versions.is_empty()
             });
+        }
+
+        for (k, v) in rolled_back_entries {
+            zeroize_bytes_if_unique(k);
+            zeroize_bytes_if_unique(v);
         }
 
         if total_freed_size > 0 {
@@ -343,7 +363,7 @@ impl MemTable {
         let entries = self.shards[shard_idx].entries.read();
         let versions = entries.get(key)?;
 
-        use contextra_types::{TOMBSTONE_BIT, TxId};
+        use contextra_types::{TxId, TOMBSTONE_BIT};
 
         let target_raw_seq = seq_no & !TOMBSTONE_BIT;
 

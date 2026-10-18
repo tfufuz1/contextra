@@ -1,6 +1,6 @@
 //! SSTable (Sorted String Table) implementation.
 
-mod block_cache;
+pub mod block_cache;
 mod block_search;
 mod bloom;
 mod builder;
