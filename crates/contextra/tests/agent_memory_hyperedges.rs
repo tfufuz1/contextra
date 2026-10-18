@@ -2,7 +2,8 @@
 
 use contextra::agent_memory::{MemoryId, RelationId};
 use contextra::{builder, AgentMemory, ContextraError, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, Result};
+use contextra_ports::BoxFuture;
+use contextra_types::error::Result;
 use std::sync::Arc;
 
 struct MockEmbedder;

@@ -1,4 +1,4 @@
-use contextra_db::Collection as ContextraCollection;
+use contextra_db::Contextra;
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -16,27 +16,88 @@ use crate::bindings::vector_index_stats::PyVectorIndexStats;
 
 #[pyclass(name = "Collection")]
 pub struct PyCollection {
-    pub(crate) inner: Arc<ContextraCollection>,
+    pub(crate) db: Arc<Contextra>,
+    pub(crate) name: String,
+    pub(crate) inner: Arc<
+        contextra_db::collection::Collection<
+            contextra_store::tenant_codec::TenantScopedStorage<Arc<contextra_store::LsmStorage>>,
+        >,
+    >,
     pub(crate) runtime: Arc<Runtime>,
     pub(crate) poisoned: Arc<AtomicBool>,
+    pub(crate) tenant_id: contextra_types::TenantId,
 }
 
 impl PyCollection {
     pub fn new(
-        inner: Arc<ContextraCollection>,
+        db: Arc<Contextra>,
+        name: String,
+        inner: Arc<
+            contextra_db::collection::Collection<
+                contextra_store::tenant_codec::TenantScopedStorage<
+                    Arc<contextra_store::LsmStorage>,
+                >,
+            >,
+        >,
         runtime: Arc<Runtime>,
         poisoned: Arc<AtomicBool>,
+        tenant_id: contextra_types::TenantId,
     ) -> Self {
         Self {
+            db,
+            name,
             inner,
             runtime,
             poisoned,
+            tenant_id,
         }
+    }
+
+    pub(crate) async fn get_target_collection(
+        &self,
+    ) -> Result<
+        Arc<
+            contextra_db::collection::Collection<
+                contextra_store::tenant_codec::TenantScopedStorage<
+                    Arc<contextra_store::LsmStorage>,
+                >,
+            >,
+        >,
+        contextra_core::ContextraError,
+    > {
+        Ok(self.inner.clone())
     }
 }
 
 #[pymethods]
 impl PyCollection {
+    /// Returns the tenant ID associated with this collection context.
+    #[getter]
+    pub fn tenant_id(&self) -> u64 {
+        self.tenant_id.inner()
+    }
+
+    /// Returns a new Collection instance bound to the specified tenant ID.
+    pub fn with_tenant(&self, tenant_id: u64, py: Python<'_>) -> PyResult<PyCollection> {
+        let new_tenant = contextra_types::TenantId::try_new(tenant_id)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let rt = &self.runtime;
+        let name_owned = self.name.clone();
+        let db = self.db.clone();
+        let col = run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(db.collection_for_tenant(&name_owned, new_tenant))
+                .map_err(contextra_err)
+        })?;
+        Ok(PyCollection::new(
+            self.db.clone(),
+            self.name.clone(),
+            col,
+            self.runtime.clone(),
+            self.poisoned.clone(),
+            new_tenant,
+        ))
+    }
+
     /// Returns true if the collection/database engine was poisoned by a previous caught Rust panic.
     #[getter]
     pub fn is_poisoned(&self) -> bool {

@@ -26,7 +26,12 @@ macro_rules! contextra_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.insert(&id_str, &v_owned, m)).map_err(contextra_err))
+                run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.insert(&id_str, &v_owned, m).await.map_err(contextra_err)
+                    })
+                })
             }
 
             /// Retrieves a document by its user-provided string or numeric ID.
@@ -37,7 +42,12 @@ macro_rules! contextra_crud_methods {
             ) -> PyResult<Option<PyDocument>> {
                 let id_str = validate_id_obj(id)?;
                 let rt = &self.runtime;
-                let doc = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.get(&id_str)).map_err(contextra_err))?;
+                let doc = run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.get(&id_str).await.map_err(contextra_err)
+                    })
+                })?;
                 match doc {
                     Some(d) => Ok(Some(doc_to_py(py, d)?)),
                     None => Ok(None),
@@ -61,7 +71,12 @@ macro_rules! contextra_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.update(&id_str, &v_owned, m)).map_err(contextra_err))
+                run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.update(&id_str, &v_owned, m).await.map_err(contextra_err)
+                    })
+                })
             }
 
             /// Upserts a document (inserts if missing, updates if exists).
@@ -81,7 +96,12 @@ macro_rules! contextra_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.upsert(&id_str, &v_owned, m)).map_err(contextra_err))
+                run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.upsert(&id_str, &v_owned, m).await.map_err(contextra_err)
+                    })
+                })
             }
 
             /// Deletes a document by its ID and returns a deletion receipt dict.
@@ -94,8 +114,7 @@ macro_rules! contextra_crud_methods {
                 let rt = &self.runtime;
                 let receipt = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.delete(&id_str)).map_err(contextra_err))?;
                 let val = serde_json::to_value(&receipt).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-                json_to_py(py, &val)
-            }
+                json_to_py(py, &val)            }
 
             /// Performs semantic k-NN search over the embeddings.
             #[pyo3(signature = (vector, k))]
@@ -117,7 +136,12 @@ macro_rules! contextra_crud_methods {
                 })?;
                 validate_vector(v)?;
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.search(&v_owned, k)).map_err(contextra_err))?;
+                let results = run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.search(&v_owned, k).await.map_err(contextra_err)
+                    })
+                })?;
                 results_to_py(py, results)
             }
 
@@ -143,7 +167,12 @@ macro_rules! contextra_crud_methods {
                 })?;
                 validate_vector(v)?;
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.search(&v_owned, k)).map_err(contextra_err))?;
+                let results = run_blocking_ffi(py, &self.poisoned, || {
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.search(&v_owned, k).await.map_err(contextra_err)
+                    })
+                })?;
 
                 let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
                 let mut res_offsets = Vec::with_capacity(results.len());
@@ -169,7 +198,7 @@ macro_rules! contextra_crud_methods {
                 let response = contextra_core::ipc::SearchResponse::create(
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
-                        results: Some(results_vec_off),
+                                                results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,
                     },
@@ -218,8 +247,12 @@ macro_rules! contextra_crud_methods {
                 let text_owned = text.to_string();
                 let v_owned = v.to_vec();
                 let results = run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref()))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref())
+                            .await
+                            .map_err(contextra_err)
+                    })
                 })?;
                 results_to_py(py, results)
             }
@@ -264,8 +297,12 @@ macro_rules! contextra_crud_methods {
                 let text_owned = text.to_string();
                 let v_owned = v.to_vec();
                 let results = run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref()))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref())
+                            .await
+                            .map_err(contextra_err)
+                    })
                 })?;
 
                 let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
@@ -292,7 +329,7 @@ macro_rules! contextra_crud_methods {
                 let response = contextra_core::ipc::SearchResponse::create(
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
-                        results: Some(results_vec_off),
+                                                results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,
                     },
@@ -317,8 +354,12 @@ macro_rules! contextra_crud_methods {
                 let rt = &self.runtime;
                 let label_owned = label.to_string();
                 run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.relate(&from_str, &to_str, &label_owned))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.relate(&from_str, &to_str, &label_owned)
+                            .await
+                            .map_err(contextra_err)
+                    })
                 })
             }
 
@@ -333,8 +374,12 @@ macro_rules! contextra_crud_methods {
                 let rt = &self.runtime;
                 let prefix_owned = prefix.to_string();
                 let results = run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.scan_prefix(&prefix_owned, limit))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.scan_prefix(&prefix_owned, limit)
+                            .await
+                            .map_err(contextra_err)
+                    })
                 })?;
                 let mut py_res = Vec::with_capacity(results.len());
                 for (k, v) in results {
@@ -369,8 +414,12 @@ macro_rules! contextra_crud_methods {
                         Some(b) => Bound::Included(b.as_slice()),
                         None => Bound::Unbounded,
                     };
-                    rt.block_on(self.inner.scan(start_bound, end_bound, limit))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.scan(start_bound, end_bound, limit)
+                            .await
+                            .map_err(contextra_err)
+                    })
                 })?;
                 let mut py_res = Vec::with_capacity(results.len());
                 for (k, v) in results {
@@ -415,8 +464,10 @@ macro_rules! contextra_batch_methods {
                     batch.push((id_str, v.to_vec(), m));
                 }
                 run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.insert_many(&batch))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.insert_many(&batch).await.map_err(contextra_err)
+                    })
                 })
             }
 
@@ -446,8 +497,10 @@ macro_rules! contextra_batch_methods {
                     batch.push((id_str, v.to_vec(), m));
                 }
                 run_blocking_ffi(py, &self.poisoned, || {
-                    rt.block_on(self.inner.upsert_many(&batch))
-                        .map_err(contextra_err)
+                    rt.block_on(async {
+                        let col = self.get_target_collection().await.map_err(contextra_err)?;
+                        col.upsert_many(&batch).await.map_err(contextra_err)
+                    })
                 })
             }
         }
