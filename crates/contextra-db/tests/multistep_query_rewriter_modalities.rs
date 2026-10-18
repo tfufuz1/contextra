@@ -3,7 +3,6 @@
 
 use contextra_db::multistep::{MultiStepConfig, MultiStepEngine};
 use contextra_db::Collection;
-use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, QueryRewriteOutput, QueryRewriter, TextEmbeddingEngine};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Result, ScoredEntry};
@@ -71,14 +70,13 @@ async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).expect("hnsw index"));
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
+        Arc::new(contextra_graph::CsrGraph::new()),
         next_tx,
         4,
         contextra_text::Language::English,

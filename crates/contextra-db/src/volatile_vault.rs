@@ -144,6 +144,43 @@ pub struct VolatileContextVault {
 }
 
 impl VolatileContextVault {
+    /// Entnimmt alle Chunks aus dem Vault für die Speicherung im Storage Engine.
+    ///
+    /// # INVARIANTE INV-VAULT-2
+    /// Dies ist der einzige Schreibpfad auf dauerhafte Ablage.
+    /// Gibt ein Tupel aus `(Vec<VaultChunkMetadata>, Vec<VaultChunk>)` zurück,
+    /// setzt den Byte-Zähler zurück und löst bestehende mlock-Fixierungen.
+    pub fn drain_for_commit(&mut self) -> (Vec<VaultChunkMetadata>, Vec<VaultChunk>) {
+        if self.consumed {
+            return (Vec::new(), Vec::new());
+        }
+        let metadata = self.preview_metadata();
+        self.mlock_regions.unlock_all();
+        self.current_bytes = 0;
+        let chunks = std::mem::take(&mut self.chunks);
+        (metadata, chunks)
+    }
+
+    /// Commits the vault contents, draining all chunks and returning a [`CommitReceipt`].
+    pub fn commit(&mut self) -> Result<CommitReceipt, VaultError> {
+        if self.consumed {
+            return Err(VaultError::AlreadyConsumed);
+        }
+        let (metadata, chunks) = self.drain_for_commit();
+        let chunks_committed = chunks.len();
+        let bytes_committed = metadata.iter().map(|m| m.size_bytes).sum();
+        self.consumed = true;
+        Ok(CommitReceipt {
+            chunks_committed,
+            bytes_committed,
+        })
+    }
+
+    /// Alias for `commit()` matching spec naming convention (`commit_to_storage`).
+    pub fn commit_to_storage(&mut self) -> Result<CommitReceipt, VaultError> {
+        self.commit()
+    }
+
     /// Neuen leeren Vault öffnen. Kein I/O.
     pub fn open(config: VaultConfig) -> Self {
         let initial_locked = config.attempt_mlock;
