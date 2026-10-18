@@ -11,6 +11,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_core::{StorageEngine, TxId};
+use contextra_store::lsm::config::EncryptionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -124,7 +125,7 @@ async fn child_writer() {
     let config = LsmConfig {
         path: db_path,
         group_commit_window_micros: group_commit_micros,
-        encryption_passphrase: passphrase,
+        encryption: passphrase.map(EncryptionConfig::Passphrase).unwrap_or_default(),
         ..Default::default()
     };
 
@@ -273,7 +274,7 @@ async fn test_crash_kill_durability() {
         let config = LsmConfig {
             path: tmp_dir.path().to_path_buf(),
             group_commit_window_micros: group_commit_micros,
-            encryption_passphrase: passphrase.clone(),
+            encryption: passphrase.clone().map(EncryptionConfig::Passphrase).unwrap_or_default(),
             ..Default::default()
         };
 
@@ -474,7 +475,7 @@ async fn test_crash_kill_durability() {
             let corrupt_config = LsmConfig {
                 path: corrupt_tmp.path().to_path_buf(),
                 group_commit_window_micros: group_commit_micros,
-                encryption_passphrase: passphrase.clone(),
+                encryption: passphrase.clone().map(EncryptionConfig::Passphrase).unwrap_or_default(),
                 ..Default::default()
             };
 

@@ -165,6 +165,21 @@ impl LsmStorage {
 
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
+        let hwm_path = config.path.join(".encrypted_hwm");
+        if hwm_path.exists() && !config.encryption.is_encrypted() {
+            return Err(ContextraError::Storage(
+                "Silent downgrade attempt detected: database was previously encrypted but opened without encryption".into(),
+            ));
+        }
+
+        if config.encryption.is_encrypted() {
+            if let Err(e) = tokio::fs::write(&hwm_path, b"ENCRYPTED_HWM_V1\n").await {
+                tracing::warn!("Failed to write .encrypted_hwm marker: {e}");
+            } else {
+                let _ = crate::util::fsync_parent_dir(&hwm_path).await;
+            }
+        }
+
         let salt_path = config.path.join("SALT");
         let salt = match tokio::fs::read(&salt_path).await {
             Ok(buf) => {
@@ -191,13 +206,13 @@ impl LsmStorage {
             }
         };
 
-        let key_manager = match &config.encryption_passphrase {
+        let key_manager = match config.encryption.passphrase() {
             Some(p) => {
                 let header = contextra_crypto::KdfHeader::new(
                     contextra_crypto::KdfParams::default(),
                     salt.clone(),
                 )?;
-                Some(Arc::new(KeyManager::try_new_strict(p, &header)?))
+                Some(Arc::new(KeyManager::try_new_strict(&p, &header)?))
             }
             None => None,
         };

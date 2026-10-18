@@ -1,4 +1,5 @@
 use contextra_core::{StorageEngine, TxId};
+use contextra_store::lsm::config::EncryptionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -11,7 +12,7 @@ async fn test_encrypted_db_roundtrip() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("super-secret".to_string()),
+        encryption: EncryptionConfig::Passphrase("super-secret".to_string()),
         ..Default::default()
     };
 
@@ -49,7 +50,7 @@ async fn test_wrong_passphrase_fails() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("correct-pass".to_string()),
+        encryption: EncryptionConfig::Passphrase("correct-pass".to_string()),
         ..Default::default()
     };
 
@@ -65,7 +66,7 @@ async fn test_wrong_passphrase_fails() {
     }
 
     // 2. Re-open with WRONG passphrase
-    config.encryption_passphrase = Some("wrong-pass".to_string());
+    config.encryption = EncryptionConfig::Passphrase("wrong-pass".to_string());
     let result = LsmStorage::new(config).await;
 
     // Replay or SSTable open should fail
@@ -80,7 +81,7 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("secret".to_string()),
+        encryption: EncryptionConfig::Passphrase("secret".to_string()),
         ..Default::default()
     };
 

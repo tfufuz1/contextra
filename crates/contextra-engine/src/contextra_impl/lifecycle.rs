@@ -49,6 +49,12 @@ impl Contextra {
             config.deletion_proof_active = false;
         }
 
+        if authorized_ring.ring() == FeatureRing::Sovereign && !config.encryption.is_encrypted() {
+            return Err(contextra_types::ContextraError::PolicyViolation(
+                "FeatureRing::Sovereign requires active encryption (EncryptionConfig cannot be None)".into(),
+            ));
+        }
+
         if config.dimension == 0 {
             return Err(contextra_types::ContextraError::invalid_input(
                 "dimension must be > 0",
@@ -62,7 +68,7 @@ impl Contextra {
 
         let lsm_config = contextra_store::LsmConfig {
             path: path.as_ref().to_path_buf(),
-            encryption_passphrase: config.encryption_passphrase.clone(),
+            encryption: config.encryption.clone(),
             max_ram_mb: config.max_ram_mb,
             group_commit_window_micros: config.group_commit_window_micros,
             durability_mode: config.durability_mode,
