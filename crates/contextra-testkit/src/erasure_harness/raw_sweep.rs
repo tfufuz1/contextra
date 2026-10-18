@@ -190,7 +190,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_raw_sweep_finds_known_needles() {
         let dir = tempdir().unwrap();
         let sub_dir = dir.path().join("sst");
@@ -211,7 +210,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_defective_erasure_detected() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("data.sst");

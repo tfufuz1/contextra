@@ -65,7 +65,6 @@ impl TenantMatrixRunner {
     /// Runs an async test function `f` twice:
     /// 1. Directly against `LsmStorage`
     /// 2. Against `TenantScopedStorage` wrapping `LsmStorage`
-    #[allow(clippy::expect_used)]
     pub async fn run_async<F, Fut>(test_fn: F)
     where
         F: Fn(TenantMatrixContext) -> Fut,
@@ -126,7 +125,6 @@ mod tests {
     use contextra_types::TxId;
 
     #[tokio::test]
-    #[allow(clippy::unwrap_used)]
     async fn test_tenant_matrix_runner_executes_both_modes() {
         TenantMatrixRunner::run_async(|ctx| {
             let mode = ctx.mode;

@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-15
+// STAND: 2026-10-17
 // ZWECK: Shared Test-Harness Modul fuer Loeschtests (Wave 2 & Welle 2+).
 // INVARIANTEN: #![forbid(unsafe_code)], Ring-konform, gemeinsame Basis fuer REG-15 & §11.2.
 

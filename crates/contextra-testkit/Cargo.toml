@@ -1,19 +1,15 @@
+[package]
+name = "contextra-testkit"
+version = "0.1.0"
+edition = "2021"
+authors = ["Contextra Team"]
+description = "Deterministic test utilities, ManualClock, FaultVfs, InMemoryStorageEngine, ReferenceModel, and Erasure Harness."
+
 [lints]
 workspace = true
 
-[package]
-name = "contextra-testkit"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra"
-
-[package.metadata.contextra]
-ring = "tooling"
-
 [features]
-default = ["fault-injection"]
+default = []
 fault-injection = []
 
 [dependencies]
@@ -26,4 +22,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
