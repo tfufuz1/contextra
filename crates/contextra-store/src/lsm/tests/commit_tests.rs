@@ -356,8 +356,9 @@ async fn test_system_pressure_wal_queue_backpressure_transition() {
     storage.shutdown();
 }
 
+#[cfg(feature = "fault-injection")]
 #[tokio::test]
-async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
+async fn test_group_commit_leader_holds_commit_mutex_during_disk_io() {
     use crate::wal::DELAY_APPEND_FOR_TX;
     use crate::wal::DELAY_APPEND_MS;
 
@@ -398,13 +399,12 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Attempt to acquire commit_mutex while leader is delayed inside wal.append_batch().
-    // If commit_mutex was correctly released before disk I/O, try_lock() MUST succeed!
+    // Per specification (B-01), leader holds commit_mutex over WAL Append and visibility advance!
     let try_lock_res = storage.commit_mutex.try_lock();
     assert!(
-        try_lock_res.is_ok(),
-        "commit_mutex must be released during group commit leader disk I/O (wal.append_batch)"
+        try_lock_res.is_err(),
+        "commit_mutex must be held by group commit leader during disk I/O (wal.append_batch)"
     );
-    drop(try_lock_res);
 
     // Clean up tasks and reset fault injection state
     leader_handle.await.expect("leader task").unwrap();
