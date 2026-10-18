@@ -59,9 +59,11 @@
 //    - Der WitnessReader & Scanner durchmustern ALLE Versionen (`seq <= as_of_tx`), um auch durch Tombstones
 //      oder neuere Werte überschattete historische Schlüssel/Werte (z. B. Injektionsmatrix Zeile 5) nachweislich zu finden.
 
+use super::builder::build_block_aad;
 use super::witness_types::{WitnessEntry, WitnessReadError, WitnessSstMetadata};
 use crate::wal::KeyManager;
 use bytes::Bytes;
+use contextra_crypto::{KeyId, ScopeKeyring};
 use std::fmt;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -83,6 +85,9 @@ pub struct WitnessReader {
     has_crc: bool,
     format_version: u16,
     key_manager: Option<Arc<KeyManager>>,
+    scope_keyring: Option<Arc<ScopeKeyring>>,
+    key_id: Option<KeyId>,
+    enc_version: u16,
     is_encrypted: bool,
 }
 
@@ -105,6 +110,14 @@ impl WitnessReader {
     pub fn open(
         path: impl AsRef<Path>,
         key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self, WitnessReadError> {
+        Self::open_with_keyring(path, key_manager, None)
+    }
+
+    pub fn open_with_keyring(
+        path: impl AsRef<Path>,
+        key_manager: Option<Arc<KeyManager>>,
+        scope_keyring: Option<Arc<ScopeKeyring>>,
     ) -> Result<Self, WitnessReadError> {
         let path_buf = path.as_ref().to_path_buf();
         let derived_km = if let Some(ref km) = key_manager {
@@ -138,8 +151,8 @@ impl WitnessReader {
             ));
         }
 
-        // Read trailer
-        let read_trailer_len = usize::try_from(54u64.min(file_size)).unwrap_or(54);
+        // Read trailer (up to 72 bytes)
+        let read_trailer_len = usize::try_from(72u64.min(file_size)).unwrap_or(72);
         let mut trailer_buf = vec![0u8; read_trailer_len];
         let trailer_seek_pos = file_size.saturating_sub(read_trailer_len as u64);
         file.seek(SeekFrom::Start(trailer_seek_pos))
@@ -154,37 +167,33 @@ impl WitnessReader {
 
         let mut format_version = 0u16;
         let mut is_mfsx = false;
+        let mut parsed_key_id: Option<KeyId> = None;
+        let mut parsed_enc_version = 0u16;
+        let mut trailer_size = 54u64;
 
-        if trailer_len >= 54 {
-            if let Some(slice) = trailer_buf.get(50..54) {
-                let magic = u32::from_le_bytes(slice.try_into().unwrap_or([0; 4]));
-                if magic == WITNESS_SSTABLE_MAGIC_MFSX {
-                    if let Some(ver_slice) = trailer_buf.get(48..50) {
-                        format_version = u16::from_le_bytes(ver_slice.try_into().unwrap_or([0; 2]));
-                        is_mfsx = true;
-                    }
-                }
-            }
-        }
-
-        if !is_mfsx && trailer_len >= 52 {
-            if let Some(slice) = trailer_buf.get(48..52) {
-                let magic = u32::from_le_bytes(slice.try_into().unwrap_or([0; 4]));
-                if magic == WITNESS_SSTABLE_MAGIC_MFSX {
+        if trailer_len >= 12 {
+            let magic_slice = &trailer_buf[trailer_len - 4..trailer_len];
+            let magic = u32::from_le_bytes(magic_slice.try_into().unwrap_or([0; 4]));
+            if magic == WITNESS_SSTABLE_MAGIC_MFSX {
+                let ver_slice = &trailer_buf[trailer_len - 6..trailer_len - 4];
+                let ver = u16::from_le_bytes(ver_slice.try_into().unwrap_or([0; 2]));
+                if ver >= 5 && trailer_len >= 72 {
+                    format_version = ver;
                     is_mfsx = true;
+                    trailer_size = 72;
+                } else if ver >= 1 && trailer_len >= 54 {
+                    format_version = ver;
+                    is_mfsx = true;
+                    trailer_size = 54;
+                } else if ver == 0 && trailer_len >= 52 {
                     format_version = 0;
+                    is_mfsx = true;
+                    trailer_size = 52;
                 }
-            }
-        }
-
-        if !is_mfsx && trailer_len >= 54 {
-            if let Some(slice) = trailer_buf.get(50..54) {
-                let magic = u32::from_le_bytes(slice.try_into().unwrap_or([0; 4]));
-                if magic == WITNESS_SSTABLE_MAGIC_LEGACY {
-                    return Err(WitnessReadError::CorruptFile(
-                        "Legacy SSTable format detected (not supported in witness mode)".into(),
-                    ));
-                }
+            } else if magic == WITNESS_SSTABLE_MAGIC_LEGACY {
+                return Err(WitnessReadError::CorruptFile(
+                    "Legacy SSTable format detected (not supported in witness mode)".into(),
+                ));
             }
         }
 
@@ -194,16 +203,19 @@ impl WitnessReader {
             ));
         }
 
-        if format_version > 4 {
+        if format_version > 5 {
             return Err(WitnessReadError::CorruptFile(format!(
                 "Unsupported SSTable format version {format_version}"
             )));
         }
 
-        let base = if format_version >= 1 { 0 } else { 2 };
+        let base = trailer_len.saturating_sub(usize::try_from(trailer_size).unwrap_or(54));
+        let offset_adjust = if format_version == 0 { 2 } else { 0 };
+        let b = base + offset_adjust;
+
         let min_tx_id = u64::from_le_bytes(
             trailer_buf
-                .get(base..base + 8)
+                .get(b..b + 8)
                 .ok_or_else(|| {
                     WitnessReadError::CorruptFile("Invalid min_tx_id in trailer".into())
                 })?
@@ -212,7 +224,7 @@ impl WitnessReader {
         );
         let max_tx_id = u64::from_le_bytes(
             trailer_buf
-                .get(base + 8..base + 16)
+                .get(b + 8..b + 16)
                 .ok_or_else(|| {
                     WitnessReadError::CorruptFile("Invalid max_tx_id in trailer".into())
                 })?
@@ -221,21 +233,21 @@ impl WitnessReader {
         );
         let min_seq = u64::from_le_bytes(
             trailer_buf
-                .get(base + 16..base + 24)
+                .get(b + 16..b + 24)
                 .ok_or_else(|| WitnessReadError::CorruptFile("Invalid min_seq in trailer".into()))?
                 .try_into()
                 .unwrap_or([0; 8]),
         );
         let max_seq = u64::from_le_bytes(
             trailer_buf
-                .get(base + 24..base + 32)
+                .get(b + 24..b + 32)
                 .ok_or_else(|| WitnessReadError::CorruptFile("Invalid max_seq in trailer".into()))?
                 .try_into()
                 .unwrap_or([0; 8]),
         );
         let bloom_offset = u64::from_le_bytes(
             trailer_buf
-                .get(base + 32..base + 40)
+                .get(b + 32..b + 40)
                 .ok_or_else(|| {
                     WitnessReadError::CorruptFile("Invalid bloom_offset in trailer".into())
                 })?
@@ -244,7 +256,7 @@ impl WitnessReader {
         );
         let index_offset = u64::from_le_bytes(
             trailer_buf
-                .get(base + 40..base + 48)
+                .get(b + 40..b + 48)
                 .ok_or_else(|| {
                     WitnessReadError::CorruptFile("Invalid index_offset in trailer".into())
                 })?
@@ -252,7 +264,28 @@ impl WitnessReader {
                 .unwrap_or([0; 8]),
         );
 
-        let trailer_offset = file_size.saturating_sub(if format_version >= 1 { 54 } else { 52 });
+        if format_version >= 5 {
+            let kid_bytes: [u8; 16] = trailer_buf
+                .get(b + 48..b + 64)
+                .ok_or_else(|| {
+                    WitnessReadError::CorruptFile("Invalid key_id in trailer".into())
+                })?
+                .try_into()
+                .unwrap_or([0; 16]);
+            parsed_key_id = Some(KeyId(kid_bytes));
+
+            parsed_enc_version = u16::from_le_bytes(
+                trailer_buf
+                    .get(b + 64..b + 66)
+                    .ok_or_else(|| {
+                        WitnessReadError::CorruptFile("Invalid enc_version in trailer".into())
+                    })?
+                    .try_into()
+                    .unwrap_or([0; 2]),
+            );
+        }
+
+        let trailer_offset = file_size.saturating_sub(trailer_size);
 
         if index_offset > trailer_offset
             || (bloom_offset > 0 && (bloom_offset < index_offset || bloom_offset > trailer_offset))
@@ -347,15 +380,20 @@ impl WitnessReader {
             has_crc: true,
             format_version,
             key_manager: derived_km,
-            is_encrypted: false,
+            scope_keyring,
+            key_id: parsed_key_id,
+            enc_version: parsed_enc_version,
+            is_encrypted: parsed_enc_version == 1,
         };
 
         // Try reading first key to determine encryption or complete metadata
         if let Err(err) = reader.read_first_key() {
             if matches!(err, WitnessReadError::NotWitnessable(_)) {
                 reader.is_encrypted = true;
-            } else if reader.key_manager.is_none() {
-                // If no key manager and first block failed CRC / parse, file is encrypted or corrupt.
+            } else if matches!(err, WitnessReadError::KeyDestroyed(_)) {
+                return Err(err);
+            } else if reader.key_manager.is_none() && reader.scope_keyring.is_none() {
+                // If no key manager/keyring and first block failed CRC / parse, file is encrypted or corrupt.
                 // Fail-closed to NotWitnessable if encrypted without key.
                 return Err(WitnessReadError::NotWitnessable(
                     "Encrypted SSTable cannot be witnessed without decryption key".into(),
@@ -423,7 +461,49 @@ impl WitnessReader {
             .read_exact(&mut buf)
             .map_err(|e| WitnessReadError::Io(e.to_string()))?;
 
-        let block_data = if let Some(km) = &self.key_manager {
+        let block_data = if self.enc_version == 1 && self.key_id.is_some() {
+            let kr = self.scope_keyring.as_ref().ok_or_else(|| {
+                WitnessReadError::NotWitnessable(
+                    "Encrypted SSTable (v5) cannot be witnessed without keyring".into(),
+                )
+            })?;
+            let kid = self.key_id.unwrap();
+            let dek_handle = match kr.dek(kid) {
+                Ok(h) => h,
+                Err(contextra_crypto::CryptoError::KeyRevoked(msg)) => {
+                    return Err(WitnessReadError::KeyDestroyed(format!(
+                        "unlesbar (Schlüssel vernichtet): {msg}"
+                    )));
+                }
+                Err(e) => {
+                    return Err(WitnessReadError::CorruptFile(format!(
+                        "Key retrieval failed: {e}"
+                    )));
+                }
+            };
+
+            if buf.len() < 12 {
+                return Err(WitnessReadError::CorruptFile(
+                    "Encrypted block missing nonce".into(),
+                ));
+            }
+            let mut nonce = [0u8; 12];
+            nonce.copy_from_slice(&buf[0..12]);
+            let file_id_str = self
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default();
+            let aad = build_block_aad(file_id_str.as_bytes(), offset, &kid);
+            match dek_handle.decrypt(&buf[12..], &nonce, &aad) {
+                Ok(dec) => dec,
+                Err(e) => {
+                    return Err(WitnessReadError::CorruptFile(format!(
+                        "Decryption failed: {e}"
+                    )));
+                }
+            }
+        } else if let Some(km) = &self.key_manager {
             if buf.len() < 12 {
                 return Err(WitnessReadError::CorruptFile(
                     "Encrypted block missing nonce".into(),
@@ -498,7 +578,7 @@ impl WitnessReader {
 
     /// Iterates over all KV entries across all blocks in sorted key order.
     pub fn read_all_entries(&mut self) -> Result<Vec<WitnessEntry>, WitnessReadError> {
-        if self.is_encrypted && self.key_manager.is_none() {
+        if self.is_encrypted && self.key_manager.is_none() && self.scope_keyring.is_none() {
             return Err(WitnessReadError::NotWitnessable(
                 "Cannot read entries from encrypted SSTable without decryption key".into(),
             ));

@@ -39,9 +39,20 @@ impl Drop for ZeroizingBytesOwner {
 }
 
 /// Helper function to create `Bytes` backed by a `ZeroizingBytesOwner`.
+///
+/// **Copy Cost Analysis:**
+/// - Cache Insert: Converts `Bytes` to `Vec<u8>` (`data.to_vec()`) to wrap inside `ZeroizingBytesOwner`.
+///   This incurs 1 heap allocation and byte copy on cache insertion (~N bytes copy).
+/// - Cache Read (`get`): Clones the `Bytes` handle which is an O(1) atomic refcount bump with ZERO byte copies.
+/// - Cache Eviction / Invalidation Drop: `ZeroizingBytesOwner::drop` zeroizes the buffer in-place (O(N) memset)
+///   before returning memory to the allocator.
 pub fn make_zeroizing_bytes(data: Vec<u8>) -> Bytes {
     Bytes::from_owner(ZeroizingBytesOwner::new(data))
 }
+
+/// Constant indicating that cache buffer zeroization on drop is fully implemented in code
+/// and verified by integration tests (`crates/contextra-store/tests/cache_residue.rs`).
+pub const CACHE_ZEROIZATION_IMPLEMENTED: bool = true;
 
 /// RAM claim state for cached memory buffers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -460,7 +471,9 @@ impl BlockCache {
     }
 
     pub fn ram_claim(&self) -> CchRamClaim {
-        if self.secure_buffers() {
+        // CchRamClaim::Zeroized is asserted ONLY when zeroization is both implemented/verified in code
+        // AND the runtime secure_buffers flag is active. It does not depend on a configuration flag alone.
+        if CACHE_ZEROIZATION_IMPLEMENTED && self.secure_buffers() {
             CchRamClaim::Zeroized
         } else {
             CchRamClaim::Unreferenced

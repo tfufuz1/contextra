@@ -1,8 +1,6 @@
 use bytes::Bytes;
 use contextra_store::memtable::{zeroize_bytes_if_unique, MemTable};
-use contextra_store::sstable::block_cache::{
-    make_zeroizing_bytes, BlockCache, CchRamClaim,
-};
+use contextra_store::sstable::block_cache::{make_zeroizing_bytes, BlockCache, CchRamClaim};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use zeroize::Zeroize;
