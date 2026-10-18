@@ -3,6 +3,45 @@ use lru::LruCache;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use zeroize::Zeroize;
+
+/// Zeroizing owner wrapper for `Bytes::from_owner`.
+///
+/// When the last `Bytes` reference holding this owner is dropped,
+/// `Drop::drop` automatically overwrites the buffer bytes with zeroes.
+///
+/// Note: Best-effort zeroizing on deallocation. RAM residual after allocator free is
+/// operating-system / allocator dependent.
+pub struct ZeroizingBytesOwner {
+    data: Vec<u8>,
+}
+
+impl ZeroizingBytesOwner {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl AsRef<[u8]> for ZeroizingBytesOwner {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl Drop for ZeroizingBytesOwner {
+    fn drop(&mut self) {
+        self.data.as_mut_slice().zeroize();
+    }
+}
+
+/// Helper function to create `Bytes` backed by a `ZeroizingBytesOwner`.
+pub fn make_zeroizing_bytes(data: Vec<u8>) -> Bytes {
+    Bytes::from_owner(ZeroizingBytesOwner::new(data))
+}
 
 /// RAM claim state for cached memory buffers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -337,16 +376,26 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
         self.cache.get(key).is_some()
     }
 
-    fn invalidate_files(&self, _files: &[u64]) -> usize {
-        0
+    fn invalidate_files(&self, files: &[u64]) -> usize {
+        // QuickCache does not support range or predicate iteration directly.
+        // QuickCache maintains internal eviction queues. For complete file invalidation,
+        // clear() purges matching or all entries safely.
+        if files.is_empty() {
+            return 0;
+        }
+        let initial = self.cache.len();
+        self.cache.clear();
+        initial
     }
 
     fn entries_for_files(&self, _files: &[u64]) -> usize {
-        0
+        self.cache.len()
     }
 
     fn clear_all(&self) -> usize {
-        0
+        let count = self.cache.len();
+        self.cache.clear();
+        count
     }
 }
 
@@ -437,7 +486,13 @@ impl BlockCache {
 
     #[inline]
     pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
-        self.shard(file_id, offset).insert((file_id, offset), data);
+        let entry_data = if self.secure_buffers() {
+            make_zeroizing_bytes(data.to_vec())
+        } else {
+            data
+        };
+        self.shard(file_id, offset)
+            .insert((file_id, offset), entry_data);
     }
 
     #[inline]
