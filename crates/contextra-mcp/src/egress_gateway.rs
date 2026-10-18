@@ -1,7 +1,9 @@
 // FILE-CONTEXT
 // ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries (Re-export from contextra-privacy)
 
+#[deprecated(note = "Use contextra_privacy::egress_gateway directly")]
 pub use contextra_privacy::egress_gateway::*;
+#[deprecated(note = "Use contextra_privacy::egress_vault directly")]
 pub use contextra_privacy::egress_vault::{EgressClassification, EgressClassifier};
 
 use crate::prompt_injection::PromptInjectionGuard;
