@@ -445,6 +445,10 @@ impl McpServer {
     /// Nachbedingung: Bei Angabe von `id` wird ein einzelnes Dokument gelöscht (ohne Löschnachweis, Scope `"collection_only"`).
     /// Ohne `id` wird die gesamte Collection inkl. Erzeugung eines `DeletionProof` aus dem Umgebungsschlüssel gelöscht.
     async fn handle_forget(&self, args: &Value) -> Result<Value, McpError> {
+        let session_tenant = crate::validation::resolve_session_tenant_from_env()
+            .map_err(McpError::from)?;
+        let _tenant_id = crate::validation::validate_request_tenant(session_tenant, Some(args))?;
+
         let col_name = match args.get("collection") {
             Some(col_val) => {
                 let s = col_val.as_str().ok_or_else(|| {
@@ -491,8 +495,57 @@ impl McpServer {
             _ => None,
         };
 
+        let assurance_requested = match args.get("assurance") {
+            Some(v) => {
+                let s = v.as_str().ok_or_else(|| {
+                    McpError::invalid_params("Invalid params: 'assurance' must be a string (S1, S2, S3, S4)")
+                })?;
+                match s.trim() {
+                    "S1" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S1,
+                    "S2" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S2,
+                    "S3" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S3,
+                    "S4" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S4,
+                    invalid => {
+                        return Err(McpError::invalid_params(format!(
+                            "Invalid assurance level '{invalid}'. Expected one of: S1, S2, S3, S4"
+                        )));
+                    }
+                }
+            }
+            None => contextra_crypto::deletion_proof::claim_text::WitAssurance::S1,
+        };
+
+        let purge_requested = match args.get("purge") {
+            Some(v) => {
+                let s = v.as_str().ok_or_else(|| {
+                    McpError::invalid_params("Invalid params: 'purge' must be a string (None, Purge, PurgeWithScrub)")
+                })?;
+                match s.trim() {
+                    "None" | "none" => contextra::ForgetOptions::default().purge,
+                    "Purge" | "purge" => contextra::ForgetOptions::default().with_purge(contextra::PurgeMode::Purge).purge,
+                    "PurgeWithScrub" | "purgewithscrub" => contextra::ForgetOptions::default().with_purge(contextra::PurgeMode::PurgeWithScrub).purge,
+                    invalid => {
+                        return Err(McpError::invalid_params(format!(
+                            "Invalid purge mode '{invalid}'. Expected one of: None, Purge, PurgeWithScrub"
+                        )));
+                    }
+                }
+            }
+            None => contextra::ForgetOptions::default().purge,
+        };
+
+        let opts = contextra::ForgetOptions::default()
+            .with_assurance(assurance_requested)
+            .with_purge(purge_requested);
+
+        let exclusions = json!([
+            "client_and_llm_context_not_covered",
+            "external_backups_not_covered",
+            "flash_remanence_not_covered_without_S4"
+        ]);
+
         if let Some(id) = id_opt {
-            let receipt = self.db.delete(id).await.map_err(McpError::from)?;
+            let receipt = self.db.forget(id, opts).await.map_err(McpError::from)?;
 
             let proof_present = receipt.proof.is_some();
             let proof_val = match &receipt.proof {
@@ -502,43 +555,99 @@ impl McpServer {
             let layers_val = serde_json::to_value(&receipt.layers)
                 .map_err(|e| McpError::internal_error(e.to_string()))?;
 
+            let claim_text = match receipt.assurance_reached {
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S0 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S0.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S1 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S1.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S2 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S2V.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S3 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S3.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S4 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S4.text()
+                }
+                _ => contextra_crypto::deletion_proof::claim_text::WitClaimText::S0.text(),
+            };
+
+            let ok = receipt.assurance_reached >= receipt.assurance_requested;
+            let reason = if !ok {
+                Some(format!(
+                    "Requested assurance {:?} was not reached (reached {:?})",
+                    receipt.assurance_requested, receipt.assurance_reached
+                ))
+            } else {
+                None
+            };
+
             Ok(json!({
-                "ok": true,
+                "ok": ok,
                 "collection": col_name,
                 "id": id,
-                "assurance_reached": receipt.assurance_reached,
-                "assurance_requested": receipt.assurance_requested,
+                "assurance_requested": format!("{:?}", receipt.assurance_requested),
+                "assurance_reached": format!("{:?}", receipt.assurance_reached),
+                "claim": claim_text,
                 "proof_present": proof_present,
                 "proof": proof_val,
                 "layers": layers_val,
+                "exclusions": exclusions,
+                "reason": reason,
             }))
         } else {
-            let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-                .key
-                .ok_or_else(|| {
-                    McpError::invalid_params("deletion proof key not configured")
-                })?;
+            let receipt = self.db.forget_collection(col_name, opts).await.map_err(McpError::from)?;
 
-            let tenant_id = contextra_types::TenantId::try_new(1)
-                .unwrap_or(contextra_types::TenantId::SYSTEM);
-
-            let proof = self
-                .db
-                .drop_collection(col_name, tenant_id, proof_key.as_bytes())
-                .await
-                .map_err(McpError::from)?;
-
-            let proof_json_str = proof
-                .export_for_audit()
+            let proof_present = receipt.proof.is_some();
+            let proof_val = match &receipt.proof {
+                Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
+                None => None,
+            };
+            let layers_val = serde_json::to_value(&receipt.layers)
                 .map_err(|e| McpError::internal_error(e.to_string()))?;
-            let proof_val: Value = serde_json::from_str(&proof_json_str)
-                .map_err(|e| McpError::internal_error(e.to_string()))?;
+
+            let claim_text = match receipt.assurance_reached {
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S0 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S0.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S1 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S1.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S2 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S2V.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S3 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S3.text()
+                }
+                contextra_crypto::deletion_proof::claim_text::WitAssurance::S4 => {
+                    contextra_crypto::deletion_proof::claim_text::WitClaimText::S4.text()
+                }
+                _ => contextra_crypto::deletion_proof::claim_text::WitClaimText::S0.text(),
+            };
+
+            let ok = receipt.assurance_reached >= receipt.assurance_requested;
+            let reason = if !ok {
+                Some(format!(
+                    "Requested assurance {:?} was not reached (reached {:?})",
+                    receipt.assurance_requested, receipt.assurance_reached
+                ))
+            } else {
+                None
+            };
 
             Ok(json!({
-                "ok": true,
+                "ok": ok,
                 "collection": col_name,
+                "assurance_requested": format!("{:?}", receipt.assurance_requested),
+                "assurance_reached": format!("{:?}", receipt.assurance_reached),
+                "claim": claim_text,
+                "proof_present": proof_present,
                 "proof": proof_val,
-                "proof_scope": "collection"
+                "layers": layers_val,
+                "exclusions": exclusions,
+                "reason": reason,
             }))
         }
     }
@@ -586,7 +695,11 @@ impl McpServer {
             if col_name == "default" && k.starts_with(b"__") {
                 continue;
             }
-            if let Ok(stored) = serde_json::from_slice::<serde_json::Value>(&v) {
+            if let Ok(stored) = contextra::engine::collection::StoredDocument::from_slice(&v) {
+                if let Ok(doc_id) = DocId::from_key(&stored.id) {
+                    turns.push((doc_id, stored.embedding));
+                }
+            } else if let Ok(stored) = serde_json::from_slice::<serde_json::Value>(&v) {
                 if let (Some(id_str), Some(arr)) = (
                     stored.get("id").and_then(|i| i.as_str()),
                     stored.get("embedding").and_then(|e| e.as_array()),

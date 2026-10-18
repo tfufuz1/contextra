@@ -13,8 +13,8 @@
 //! | `contextra_plugin_status` | `DatabaseRead` | Status of active plugins & rings |
 //! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
 //! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-//! | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
-//! | `contextra_forget` | `DatabaseWrite` | Delete document/collection with DeletionProof |
+//! | `contextra_delete` | `DatabaseWrite` | Logische Löschung (Tombstone), kein Nachweis |
+//! | `contextra_forget` | `DatabaseWrite` | High-assurance provable forget with V4 ForgetReceipt |
 //! | `contextra_relate` | `DatabaseWrite` | Create binary directed/bidirectional relationship |
 //! | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |

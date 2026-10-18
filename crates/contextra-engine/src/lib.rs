@@ -153,6 +153,8 @@ pub struct ContextraStats {
     pub storage_stats: contextra_ports::StorageStats,
 }
 
+pub use contextra_impl::{ForgetReceipt, LayerStatus};
+
 pub use contextra_ports::DriftStatusProvider;
 pub type DbStats = ContextraStats;
 

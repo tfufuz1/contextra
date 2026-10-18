@@ -25,6 +25,11 @@ pub use contextra_db::{
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
+pub use contextra_db::engine;
+pub use contextra_db::engine::{
+    deletion::{ForgetOptions, PurgeMode},
+    ForgetReceipt, LayerStatus,
+};
 pub use query_rewriter::LlmQueryRewriter;
 
 #[cfg(feature = "router")]

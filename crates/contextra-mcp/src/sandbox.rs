@@ -42,8 +42,8 @@ pub struct ToolDefinition {
 /// | `contextra_plugin_status` | `DatabaseRead` | Active plugin status & rings |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-/// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
-/// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
+/// | `contextra_delete` | `DatabaseWrite` | Logische Löschung (Tombstone), kein Nachweis |
+/// | `contextra_forget` | `DatabaseWrite` | High-assurance provable forget with V4 ForgetReceipt |
 /// | `contextra_relate` | `DatabaseWrite` | Create directed/bidirectional binary relationship |
 /// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
