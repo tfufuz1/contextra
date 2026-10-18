@@ -2,7 +2,9 @@
 // STAND: 2026-10-17T00:00:00Z
 // ZWECK: Unit, Integration, Plant-Model Step Response, Anti-Windup, and Proptest for PoolController.
 
-use contextra_adapt::{ManualControlClock, PoolController, PoolControllerConfig};
+use contextra_adapt::{
+    ManualControlClock, PoolController, PoolControllerConfig,
+};
 use proptest::prelude::*;
 
 #[test]
@@ -115,10 +117,7 @@ fn test_no_windup_after_60s_saturation() {
     for _ in 0..600 {
         clock.advance_nanos(100_000_000);
         let pool = controller.update_with_clock(&clock, 1000.0);
-        assert_eq!(
-            pool, 50,
-            "Actuator must be clamped to min_pool=50 during saturation"
-        );
+        assert_eq!(pool, 50, "Actuator must be clamped to min_pool=50 during saturation");
     }
 
     // Immediately drop latency to 90ms (error = +10ms, slightly under target)

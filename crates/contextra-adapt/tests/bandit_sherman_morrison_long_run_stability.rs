@@ -4,7 +4,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
 use contextra_adapt::{
-    BanditImplementation, BanditProfileState, SHERMAN_MORRISON_REFACTORIZATION_INTERVAL,
+    BanditImplementation, BanditProfileState,
+    SHERMAN_MORRISON_REFACTORIZATION_INTERVAL,
 };
 
 #[test]

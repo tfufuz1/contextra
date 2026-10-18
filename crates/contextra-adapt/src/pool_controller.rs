@@ -246,8 +246,7 @@ impl PoolController {
         let de = -dy_f;
 
         // Unclamped output signal: u_unclamped = Kp*e + Ki*I + Kd*de
-        let u_unclamped =
-            self.config.kp * error + self.config.ki * self.integral + self.config.kd * de;
+        let u_unclamped = self.config.kp * error + self.config.ki * self.integral + self.config.kd * de;
 
         // Candidate pool calculation in position form: pool_nominal + u
         let pool_nominal_f = self.config.pool_nominal as f32;
