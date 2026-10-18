@@ -36,6 +36,7 @@ graph-connectivity-health = ["contextra-graph/physio-percolation", "contextra-en
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "contextra-engine/edge-reinforcement-learning"]
 
 [dev-dependencies]
+contextra-ports = { workspace = true, features = ["test-utils"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 contextra-infer-candle = { workspace = true }

@@ -422,7 +422,8 @@ async fn test_consolidation_aborts_on_delete_failure(
 
 #[test]
 fn test_compactor_jitter_reproducible_and_in_bounds() {
-    use contextra_ports::{Rng, SeededRng};
+    use contextra_ports::Rng;
+    use contextra_vector::hnsw::VectorSeededRng as SeededRng;
 
     let rng1 = SeededRng::new(42);
     let rng2 = SeededRng::new(42);
@@ -455,7 +456,7 @@ fn test_compactor_jitter_reproducible_and_in_bounds() {
 
 #[test]
 fn test_compactor_with_rng_builder() {
-    use contextra_ports::SeededRng;
+    use contextra_vector::hnsw::VectorSeededRng as SeededRng;
 
     let budget = TokenBudget::new(100, 0);
     let rng = Arc::new(SeededRng::new(12345));
