@@ -1,7 +1,7 @@
 use contextra_engine::collection::Collection;
 use contextra_engine::ProvenanceRecord;
 use contextra_ports::{
-    ContextSegment, LlmTextGenerator, Rng, SeededRng, StorageEngine, VectorIndex,
+    ContextSegment, LlmTextGenerator, Rng, SystemRng, StorageEngine, VectorIndex,
 };
 use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use std::sync::Arc;
@@ -30,11 +30,11 @@ impl std::fmt::Debug for ContextCompactor {
 impl ContextCompactor {
     /// Creates a new `ContextCompactor` with given `TokenBudget` and `CompactionStrategy`.
     pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self {
-        // Default: SeededRng mit fester Konstante. Der Composition Root soll per with_rng einen Entropie-Seed setzen.
+        // Default: SystemRng. Der Composition Root soll per with_rng einen Entropie-Seed setzen.
         Self {
             budget,
             strategy,
-            rng: Arc::new(SeededRng::new(0x434F_4E54_5854_5241)),
+            rng: Arc::new(SystemRng::new()),
         }
     }
 
@@ -246,7 +246,7 @@ impl ContextCompactor {
         V: VectorIndex,
         G: LlmTextGenerator + ?Sized,
     {
-        let default_rng = SeededRng::new(0x434F_4E54_5854_5241);
+        let default_rng = SystemRng::new();
         Self::consolidate_with_retry_with_rng(
             collection,
             source_doc_ids,

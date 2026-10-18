@@ -1,7 +1,5 @@
-use contextra_core::error::ContextraError;
-use contextra_core::traits::{BoxFuture, StorageEngine, StorageStats};
-use contextra_core::types::*;
-use contextra_core::Result;
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use futures::future::join_all;
 use std::sync::Arc;
@@ -50,7 +48,7 @@ impl StorageEngine for DummyStorageEngine {
         Box::pin(async move { Ok(0) })
     }
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move { Ok(TxId(0)) })
+        Box::pin(async move { Ok(TxId::try_new(0).unwrap()) })
     }
     fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
@@ -209,8 +207,8 @@ async fn proof_put_if_absent_atomicity() {
     let storage = Arc::new(LsmStorage::new(config).await.unwrap());
 
     let key = b"atomic_key";
-    let tx_a = TxId(100);
-    let tx_b = TxId(101);
+    let tx_a = TxId::try_new(100).unwrap();
+    let tx_b = TxId::try_new(101).unwrap();
 
     let s1 = storage.clone();
     let s2 = storage.clone();

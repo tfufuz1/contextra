@@ -68,13 +68,14 @@ impl Contextra {
         opts.validate()?;
 
         let col = self.default_col().await?;
+        let tenant_id = col.tenant_id();
         let doc_id = DocId::from_key(id)
             .map_err(|e| ContextraError::InvalidInput(format!("Invalid doc id '{id}': {e}")))?;
 
         let footprint = col.erasure_footprint(doc_id).await?;
         let scope = DeletionScope::Document {
             doc_id,
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id,
         };
 
         // Execute logical deletion in a transaction
@@ -88,7 +89,7 @@ impl Contextra {
             vec![id.to_string()],
             as_of_tx,
             &opts,
-            Some((TenantId::try_new(1).unwrap(), id, doc_id)),
+            Some((tenant_id, id, doc_id)),
         )
         .await
     }
@@ -102,19 +103,20 @@ impl Contextra {
         opts.validate()?;
 
         let col = self.collection(name).await?;
-        let tenant_id = TenantId::try_new(1).unwrap();
+        let tenant_id = col.tenant_id();
+        let collection_id = CollectionId::from_key(name).unwrap_or(CollectionId::new(1));
 
         // 1. Footprint derivation
         let target = PurgeScopeTarget::Collection {
             tenant_id,
-            collection_id: CollectionId::new(1),
+            collection_id,
             collection_name: name.to_string(),
         };
         let legacy_footprint = KeyFamilyRegistry::enumerate_legacy(target);
         let footprint = legacy_footprint.to_erasure_footprint();
 
         let scope = DeletionScope::Collection {
-            collection_id: CollectionId::new(1),
+            collection_id,
             tenant_id,
         };
 
@@ -131,7 +133,7 @@ impl Contextra {
             footprint,
             vec![format!("col:{name}")],
             as_of_tx,
-            &&opts,
+            &opts,
             None,
         )
         .await
@@ -298,7 +300,7 @@ impl Contextra {
 
         // Handle Physical Purge when requested (opts.purge != PurgeMode::None)
         if opts.purge != PurgeMode::None {
-            let db_dir = std::path::PathBuf::from(".");
+            let db_dir = self.storage.path().to_path_buf();
             if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
                 let driver = DpiPurgeDriver::new(&self.storage, &runtime, DpiPurgeDriverConfig::default());
                 let purge_scope = PurgeScope::Keys(footprint.keys.explicit.clone());
@@ -388,7 +390,7 @@ impl Contextra {
             let zeu_probe = self.storage.store_probe();
             let probes: &[&dyn WitStoreProbe] = &[zeu_probe.as_ref()];
 
-            let db_dir = std::path::PathBuf::from(".");
+            let db_dir = self.storage.path().to_path_buf();
             if let Ok(runtime) = DpiDeletionRuntime::open(&db_dir, None, [0u8; 16]) {
                 runtime
                     .finalize_logical(logical_input, &opts, None, probes)
