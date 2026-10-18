@@ -420,6 +420,7 @@ pub struct BlockCache {
     shards: Vec<BlockCacheShard>,
     hash_builder: ahash::RandomState,
     secure_buffers: AtomicBool,
+    non_zeroized_count: std::sync::atomic::AtomicUsize,
 }
 
 impl BlockCache {
@@ -439,6 +440,7 @@ impl BlockCache {
             shards,
             hash_builder: ahash::RandomState::new(),
             secure_buffers: AtomicBool::new(false),
+            non_zeroized_count: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -447,11 +449,17 @@ impl BlockCache {
     }
 
     pub fn invalidate_files(&self, files: &[u64]) -> usize {
-        self.shards.iter().map(|s| s.invalidate_files(files)).sum()
+        let removed: usize = self.shards.iter().map(|s| s.invalidate_files(files)).sum();
+        if self.is_empty() {
+            self.non_zeroized_count.store(0, Ordering::Relaxed);
+        }
+        removed
     }
 
     pub fn clear_all(&self) -> usize {
-        self.shards.iter().map(|s| s.clear_all()).sum()
+        let count: usize = self.shards.iter().map(|s| s.clear_all()).sum();
+        self.non_zeroized_count.store(0, Ordering::Relaxed);
+        count
     }
 
     pub fn cache_report(&self, files: &[u64]) -> CchCacheReport {
@@ -471,9 +479,14 @@ impl BlockCache {
     }
 
     pub fn ram_claim(&self) -> CchRamClaim {
-        // CchRamClaim::Zeroized is asserted ONLY when zeroization is both implemented/verified in code
-        // AND the runtime secure_buffers flag is active. It does not depend on a configuration flag alone.
-        if CACHE_ZEROIZATION_IMPLEMENTED && self.secure_buffers() {
+        // CchRamClaim::Zeroized is returned ONLY when:
+        // 1. Zeroization implementation is present in code (CACHE_ZEROIZATION_IMPLEMENTED)
+        // 2. Runtime secure_buffers flag is active
+        // 3. Observed buffer state confirms no non-zeroized entries are present in the cache
+        if CACHE_ZEROIZATION_IMPLEMENTED
+            && self.secure_buffers()
+            && self.non_zeroized_count.load(Ordering::Relaxed) == 0
+        {
             CchRamClaim::Zeroized
         } else {
             CchRamClaim::Unreferenced
@@ -502,6 +515,7 @@ impl BlockCache {
         let entry_data = if self.secure_buffers() {
             make_zeroizing_bytes(data.to_vec())
         } else {
+            self.non_zeroized_count.fetch_add(1, Ordering::Relaxed);
             data
         };
         self.shard(file_id, offset)
