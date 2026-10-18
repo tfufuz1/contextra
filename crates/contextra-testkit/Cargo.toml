@@ -1,15 +1,19 @@
 [package]
 name = "contextra-testkit"
-version = "0.1.0"
-edition = "2021"
-authors = ["Contextra Team"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
 description = "Deterministic test utilities, ManualClock, FaultVfs, InMemoryStorageEngine, ReferenceModel, and Erasure Harness."
 
 [lints]
 workspace = true
 
+[package.metadata.contextra]
+ring = "tooling"
+
 [features]
-default = []
+default = ["fault-injection"]
 fault-injection = []
 
 [dependencies]
