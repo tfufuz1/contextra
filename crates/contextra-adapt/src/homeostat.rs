@@ -7,7 +7,10 @@
 //!
 //! NOTE: `RerankPidController` is deprecated in favor of `crate::PoolController`.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use contextra_ports::{Clock, SystemClock};
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
@@ -98,16 +101,39 @@ impl RerankPidController {
 /// Evaluated before or during candidate hydration and Cross-Encoder batch inference steps in `Collection::hybrid_search_reranked`.
 /// If `deadline_exceeded(started_at)` returns `true`, the search pipeline should immediately break out and return
 /// the partially hydrated/reranked candidate results accumulated up to that point rather than blocking indefinitely.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone)]
 pub struct RerankDeadline {
     /// Maximum time budget allowed for reranking operations.
     pub budget: Duration,
+    clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for RerankDeadline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RerankDeadline")
+            .field("budget", &self.budget)
+            .finish()
+    }
 }
 
 impl RerankDeadline {
+    /// Creates a new `RerankDeadline` with specified budget and injected [`Clock`] port.
+    pub fn new_with_clock(budget: Duration, clock: Arc<dyn Clock>) -> Self {
+        Self { budget, clock }
+    }
+
     /// Creates a new `RerankDeadline` with the specified duration budget.
+    ///
+    /// Delegates to [`Self::new_with_clock`] using a standard [`SystemClock`].
     pub fn new(budget: Duration) -> Self {
-        Self { budget }
+        Self::new_with_clock(budget, Arc::new(SystemClock::new()))
+    }
+
+    /// Checks if the elapsed time since `started_at_nanos` equals or exceeds the deadline budget.
+    pub fn deadline_exceeded_nanos(&self, started_at_nanos: u64) -> bool {
+        let now = self.clock.monotonic_nanos();
+        let elapsed_nanos = now.saturating_sub(started_at_nanos);
+        elapsed_nanos >= self.budget.as_nanos() as u64
     }
 
     /// Checks if the elapsed time since `started_at` equals or exceeds the deadline budget.

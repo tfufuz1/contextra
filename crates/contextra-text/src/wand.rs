@@ -242,7 +242,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         storage.last_seq_no().await?
     };
 
-    let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
+    let is_latest = max_seq.is_none();
     let total_docs_u32 = (total_docs as u32).max(1);
 
     let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
@@ -290,7 +290,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 let plist = match loaded_list {
                     Some(l) => l,
                     None => {
-                        let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
+                        let raw_entries = storage.scan_prefix_at(&prefix, seq).await?;
                         let mut postings = Vec::with_capacity(raw_entries.len());
                         for (key, val_bytes) in raw_entries {
                             let suffix_bytes = &key[prefix.len()..];
@@ -586,7 +586,10 @@ mod tests {
 
     impl StorageEngine for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
+            Box::pin(async move {
+                let seq = self.last_seq_no().await?;
+                self.get_at_seq(key, seq).await
+            })
         }
         fn put<'a>(
             &'a self,
@@ -726,7 +729,10 @@ mod tests {
             &'a self,
             prefix: &'a [u8],
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })
+            Box::pin(async move {
+                let seq = self.last_seq_no().await?;
+                self.scan_prefix_at(prefix, seq).await
+            })
         }
         fn scan_prefix_at<'a>(
             &'a self,

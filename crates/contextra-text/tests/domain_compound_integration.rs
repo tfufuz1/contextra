@@ -49,6 +49,35 @@ fn test_legal_compounds_decomposition_at_least_20_cases() {
 }
 
 #[test]
+fn test_german_morph_tokenizer_default_loads_domain_vocabularies() {
+    use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
+
+    let tokenizer = GermanMorphTokenizer::new();
+    let tokens = tokenizer.tokenize("Schadenersatzanspruch und Bandscheibenvorfall");
+
+    assert!(
+        tokens.contains(&"schadenersatzanspruch".to_string()),
+        "GermanMorphTokenizer must preserve full legal compound. Tokens: {:?}",
+        tokens
+    );
+    assert!(
+        tokens.contains(&"anspruch".to_string()) || tokens.contains(&"schadenersatz".to_string()),
+        "GermanMorphTokenizer must decompose legal compound 'Schadenersatzanspruch'. Tokens: {:?}",
+        tokens
+    );
+    assert!(
+        tokens.contains(&"bandscheibenvorfall".to_string()),
+        "GermanMorphTokenizer must preserve full medical compound. Tokens: {:?}",
+        tokens
+    );
+    assert!(
+        tokens.contains(&"bandscheiben".to_string()) || tokens.contains(&"vorfall".to_string()),
+        "GermanMorphTokenizer must decompose medical compound 'Bandscheibenvorfall'. Tokens: {:?}",
+        tokens
+    );
+}
+
+#[test]
 fn test_medical_compounds_decomposition_at_least_20_cases() {
     let splitter = GermanCompoundSplitter::new_with_all_domains();
 

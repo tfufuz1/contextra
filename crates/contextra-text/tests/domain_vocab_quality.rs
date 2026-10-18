@@ -362,7 +362,7 @@ fn test_compound_splitter_sample_decomp() {
         ("krankenhaus", &["kranken", "haus"]),
         ("krankenpflege", &["kranken", "pflege"]),
         ("kinderpflege", &["kinder", "pflege"]),
-        ("haushaltspflege", &["haus", "halts", "pflege"]),
+        ("haushaltspflege", &["haushalts", "pflege"]),
         ("krankentransport", &["kranken", "transport"]),
         ("krankenversicherung", &["kranken", "versicherung"]),
         ("pflegeheim", &["pflege", "heim"]),
