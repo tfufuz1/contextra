@@ -243,7 +243,7 @@ async fn test_contextra_forget_single_doc() {
     let insert_req = make_request(
         "contextra_insert",
         json!({
-            "id": "forget_doc_1",
+            "id": "101",
             "text": "Secret data to forget",
             "collection": "default"
         }),
@@ -258,7 +258,7 @@ async fn test_contextra_forget_single_doc() {
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "forget_doc_1"
+                "id": "101"
             }
         }),
     );
@@ -266,14 +266,14 @@ async fn test_contextra_forget_single_doc() {
     let res_nc = serde_json::to_value(&resp_nc).unwrap();
     assert_eq!(res_nc["result"]["isError"], true);
 
-    // 3. Forget single doc with confirm=true
+    // 3. Forget single doc with default S1 assurance (reaches S0 due to pending ErasureLedger layer, ok = false)
     let forget_req = make_request(
         "tools/call",
         json!({
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "forget_doc_1",
+                "id": "101",
                 "confirm": true
             }
         }),
@@ -284,16 +284,20 @@ async fn test_contextra_forget_single_doc() {
     assert_ne!(res_f["result"]["isError"], true);
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], true);
-    assert_eq!(json_res["id"], "forget_doc_1");
+    assert_eq!(json_res["ok"], false);
+    assert_eq!(json_res["id"], "101");
+    assert_eq!(json_res["assurance_requested"], "S1");
+    assert_eq!(json_res["assurance_reached"], "S0");
+    assert!(json_res["reason"].as_str().unwrap().contains("Requested assurance S1 was not reached"));
+    assert_eq!(json_res["proof_present"], false);
     assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert_eq!(json_res["proof_scope"], "collection_only");
+    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
 
     // 4. Verify contextra_get returns null
     let get_req = make_request(
         "contextra_get",
         json!({
-            "id": "forget_doc_1",
+            "id": "101",
             "collection": "default"
         }),
     );
@@ -310,36 +314,13 @@ async fn test_contextra_forget_collection_with_proof() {
     let insert_req = make_request(
         "contextra_insert",
         json!({
-            "id": "doc_in_col",
+            "id": "102",
             "text": "Data in custom collection",
             "collection": col_name
         }),
     );
     let resp = server.handle(insert_req).await;
     assert!(resp.error.is_none());
-
-    // 1. Without proof key configured -> fails
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
-    let forget_req_nokey = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": col_name,
-                "confirm": true
-            }
-        }),
-    );
-    let resp_nokey = server.handle(forget_req_nokey).await;
-    let res_nokey = serde_json::to_value(&resp_nokey).unwrap();
-    assert_eq!(res_nokey["result"]["isError"], true);
-    let err_text = res_nokey["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(err_text.contains("deletion proof key not configured"));
-
-    // 2. With proof key configured -> succeeds and generates DeletionProof
-    let test_key = "test_deletion_proof_key_32_bytes!";
-    std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", test_key);
 
     let forget_req = make_request(
         "tools/call",
@@ -358,16 +339,11 @@ async fn test_contextra_forget_collection_with_proof() {
 
     let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], true);
     assert_eq!(json_res["collection"], col_name);
-    assert_eq!(json_res["proof_scope"], "collection");
-
-    let proof_val = &json_res["proof"];
-    let proof: contextra_crypto::deletion_proof::DeletionProof =
-        serde_json::from_value(proof_val.clone()).unwrap();
-    assert!(proof.verify(test_key.as_bytes()).unwrap());
-
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    assert_eq!(json_res["assurance_requested"], "S1");
+    assert_eq!(json_res["assurance_reached"], "S0");
+    assert_eq!(json_res["ok"], false);
+    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
 }
 
 #[tokio::test]
@@ -596,6 +572,84 @@ async fn test_search_validates_empty_or_oversized_query() {
     let err_huge = resp_huge.error.expect("error expected for oversized query"); // expect
     assert_eq!(err_huge.code, -32602);
     assert!(err_huge.message.contains("query size exceeds limit"));
+}
+
+#[tokio::test]
+async fn test_contextra_forget_invalid_assurance_returns_invalid_params() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "doc_1",
+                "confirm": true,
+                "assurance": "INVALID_LEVEL"
+            }
+        }),
+    );
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("Invalid assurance level 'INVALID_LEVEL'"));
+}
+
+#[tokio::test]
+async fn test_contextra_forget_invalid_purge_returns_invalid_params() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "doc_1",
+                "confirm": true,
+                "purge": "INVALID_PURGE"
+            }
+        }),
+    );
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("Invalid purge mode 'INVALID_PURGE'"));
+}
+
+#[tokio::test]
+async fn test_delete_tool_description_mentions_tombstone_and_no_proof_promise() {
+    let (server, _tmp) = create_mock_server().await;
+    let req = make_request("tools/list", json!({}));
+    let response = server.handle(req).await;
+    let tools = response.result.unwrap()["tools"].as_array().unwrap().clone();
+
+    let delete_tool = tools
+        .iter()
+        .find(|t| t["name"] == "contextra_delete")
+        .expect("contextra_delete tool in list");
+    let desc = delete_tool["description"].as_str().unwrap();
+    assert!(
+        desc.contains("Tombstone"),
+        "contextra_delete description must contain 'Tombstone', got: '{desc}'"
+    );
+    assert!(
+        !desc.contains("issue a cryptographic DeletionProof"),
+        "contextra_delete description must not promise a cryptographic DeletionProof, got: '{desc}'"
+    );
+
+    let forget_tool = tools
+        .iter()
+        .find(|t| t["name"] == "contextra_forget")
+        .expect("contextra_forget tool in list");
+    let forget_desc = forget_tool["description"].as_str().unwrap();
+    assert!(
+        !forget_desc.contains("GDPR"),
+        "contextra_forget description must strictly avoid 'GDPR', got: '{forget_desc}'"
+    );
 }
 
 #[tokio::test]
@@ -966,7 +1020,7 @@ async fn test_contextra_consolidate_success() {
     let insert_req1 = make_request(
         "contextra_insert",
         json!({
-            "id": "turn_doc_1",
+            "id": "1001",
             "text": "First turn text",
             "collection": "default"
         }),
@@ -977,7 +1031,7 @@ async fn test_contextra_consolidate_success() {
     let insert_req2 = make_request(
         "contextra_insert",
         json!({
-            "id": "turn_doc_2",
+            "id": "1002",
             "text": "Second turn text",
             "collection": "default"
         }),

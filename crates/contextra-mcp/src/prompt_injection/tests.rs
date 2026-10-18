@@ -355,6 +355,14 @@ struct FixedTestClock {
 }
 
 impl contextra_ports::Clock for FixedTestClock {
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        contextra_types::DeterministicTimestamp::new(self.unix_nanos / 1_000_000, 0)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        0
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.unix_nanos
     }
