@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   flake-report:
@@ -48,19 +47,5 @@ jobs:
             }
             const data = JSON.parse(fs.readFileSync('.jules/local/flake-report.json', 'utf8'));
             if (data.flaky_detected) {
-              const title = '[flake] Automated Nightly Flake Report Detection';
-              const issues = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open',
-              });
-              const exists = issues.data.some(i => i.title === title);
-              if (!exists) {
-                await github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  title: title,
-                  body: `Nightly Flake Report hat Test-Flakiness erkannt.\nRuns: ${data.runs}\nSuccessful: ${data.successful_runs}\nRate: ${data.success_rate * 100}%`,
-                });
-              }
+              core.setFailed(`Nightly Flake Report hat Test-Flakiness erkannt.\nRuns: ${data.runs}\nSuccessful: ${data.successful_runs}\nRate: ${data.success_rate * 100}%`);
             }
