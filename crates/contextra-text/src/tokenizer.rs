@@ -508,7 +508,9 @@ mod tests {
 
         // German compound words and hyphenated terms in regular segments should be processed
         assert!(
-            tokens.iter().any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
+            tokens
+                .iter()
+                .any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
             "Regular German hyphenated compound terms should be tokenized. Tokens: {:?}",
             tokens
         );

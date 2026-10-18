@@ -167,7 +167,10 @@ fn test_state_atomicity_on_errors() {
     // 1. Dimension Mismatch Error
     let x_mismatch = vec![0.5f32, 0.5];
     let err_mismatch = state.update(&x_mismatch, 0.8, 0.1, false);
-    assert!(matches!(err_mismatch, Err(BanditError::DimensionMismatch { .. })));
+    assert!(matches!(
+        err_mismatch,
+        Err(BanditError::DimensionMismatch { .. })
+    ));
     assert_eq!(state, state_before, "State mutated on DimensionMismatch!");
 
     // 2. Non-finite input vector (NaN)
@@ -204,7 +207,10 @@ fn test_determinism_same_seed_inputs_identical_state() {
         state2.update(&x2, 0.7, 0.05, false).unwrap();
     }
 
-    assert_eq!(state1, state2, "States diverged despite identical seeds and inputs");
+    assert_eq!(
+        state1, state2,
+        "States diverged despite identical seeds and inputs"
+    );
 }
 
 #[test]
@@ -220,7 +226,10 @@ fn test_discounting_f32_overflow_check() {
         factor *= gamma_inv;
     }
     println!("Discounting growth factor after 1000 steps: {factor}");
-    assert!(factor < 10.0, "Discounting growth factor unexpectedly large: {factor}");
+    assert!(
+        factor < 10.0,
+        "Discounting growth factor unexpectedly large: {factor}"
+    );
     assert!(factor.is_finite());
 }
 
@@ -241,19 +250,24 @@ fn test_inconsistent_deserialized_lengths_no_panic() {
         "implementation": "DiagonalApproximation"
     }"#;
 
-    let state: BanditProfileState = serde_json::from_str(inconsistent_json)
-        .expect("Deserialization of state must succeed");
+    let state: BanditProfileState =
+        serde_json::from_str(inconsistent_json).expect("Deserialization of state must succeed");
 
     let x = vec![1.0f32, 0.5f32];
     // Attempting update / score should handle dimension checking safely without panic
-    let score_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        state.score(&x, 0.0, false)
-    }));
-    assert!(score_res.is_ok(), "score() panicked on inconsistent lengths!");
+    let score_res =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| state.score(&x, 0.0, false)));
+    assert!(
+        score_res.is_ok(),
+        "score() panicked on inconsistent lengths!"
+    );
 
     let update_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut st = state.clone();
         st.update(&x, 1.0, 0.0, false)
     }));
-    assert!(update_res.is_ok(), "update() panicked on inconsistent lengths!");
+    assert!(
+        update_res.is_ok(),
+        "update() panicked on inconsistent lengths!"
+    );
 }

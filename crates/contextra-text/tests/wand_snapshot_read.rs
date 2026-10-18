@@ -26,7 +26,10 @@ impl MockStorage {
 }
 
 impl StorageEngine for MockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> contextra_ports::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> contextra_ports::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
     }
     fn put<'a>(
@@ -137,7 +140,9 @@ impl StorageEngine for MockStorage {
     fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn stats<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<contextra_ports::StorageStats>> {
+    fn stats<'a>(
+        &'a self,
+    ) -> contextra_ports::BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
             Ok(contextra_ports::StorageStats {
                 num_segments: 0,
@@ -199,20 +204,26 @@ async fn test_wand_unbatched_posting_snapshot_isolation() -> Result<()> {
 
     // Transaction 1: Add document 1 with term "snapshot_test_term"
     let tx1 = TxId::try_new(1).unwrap();
-    index.upsert_document(tx1, DocId::new(1), "snapshot_test_term").await?;
+    index
+        .upsert_document(tx1, DocId::new(1), "snapshot_test_term")
+        .await?;
     storage.commit(tx1).await?;
 
     let snap1_seq = storage.last_seq_no().await?;
 
     // Transaction 2: Add document 2 with term "snapshot_test_term"
     let tx2 = TxId::try_new(2).unwrap();
-    index.upsert_document(tx2, DocId::new(2), "snapshot_test_term").await?;
+    index
+        .upsert_document(tx2, DocId::new(2), "snapshot_test_term")
+        .await?;
     storage.commit(tx2).await?;
 
     // Create a new InvertedIndex instance pointing to the same storage to bypass resident_index cache
     let fresh_index = InvertedIndex::new(storage.clone(), "wand_snap_test");
 
-    let results = fresh_index.search_bm25_at("snapshot_test_term", 10, Some(snap1_seq)).await?;
+    let results = fresh_index
+        .search_bm25_at("snapshot_test_term", 10, Some(snap1_seq))
+        .await?;
 
     // doc_id 2 was added in tx2 after snap1_seq.
     // It must NOT appear in search results for snap1_seq.

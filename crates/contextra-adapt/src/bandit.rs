@@ -802,9 +802,9 @@ impl BanditProfileState {
                 }
 
                 let mut denominator = 1.0 + xt_v_disc;
-                let needs_refactorization =
-                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                        || denominator <= 0.0;
+                let needs_refactorization = self.updates_since_reset
+                    >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0;
 
                 if needs_refactorization {
                     self.refactorize_inv_a(k);
@@ -863,9 +863,9 @@ impl BanditProfileState {
 
                 // 2. Denominator und Gain Vector k
                 let mut denominator = 1.0 + xt_v_disc;
-                let needs_refactorization =
-                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                        || denominator <= 0.0;
+                let needs_refactorization = self.updates_since_reset
+                    >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0;
 
                 if needs_refactorization {
                     self.refactorize_inv_a(d);

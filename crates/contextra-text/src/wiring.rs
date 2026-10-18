@@ -52,7 +52,10 @@ mod tests {
             value: &'a [u8],
         ) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
-                self.data.lock().unwrap().insert(key.to_vec(), value.to_vec());
+                self.data
+                    .lock()
+                    .unwrap()
+                    .insert(key.to_vec(), value.to_vec());
                 Ok(())
             })
         }

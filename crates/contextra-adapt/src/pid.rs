@@ -35,10 +35,7 @@ pub trait AntiWindupController: Send + Sync {
 /// PID controller wrapper.
 ///
 /// DEPRECATED: Use [`crate::PoolController`] instead.
-#[deprecated(
-    since = "0.1.0",
-    note = "use PoolController; removal 2027-01-31"
-)]
+#[deprecated(since = "0.1.0", note = "use PoolController; removal 2027-01-31")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PidController {
     /// Proportional gain.
@@ -84,7 +81,9 @@ impl PidController {
     ) -> Self {
         let min_pool_size = min_pool_size.max(PID_MIN_POOL_SIZE_DEFAULT);
         let max_pool_size = max_pool_size.max(min_pool_size);
-        let pool_nominal = initial_pool.unwrap_or(min_pool_size).clamp(min_pool_size, max_pool_size);
+        let pool_nominal = initial_pool
+            .unwrap_or(min_pool_size)
+            .clamp(min_pool_size, max_pool_size);
 
         let config = PoolControllerConfig {
             kp: 0.5,
