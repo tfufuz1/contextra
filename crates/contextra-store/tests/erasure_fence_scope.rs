@@ -1,19 +1,24 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Tests für präzise Scope-Fences (ErasureFence) und Invarianten.
+// STAND: 2026-10-16
+// ZWECK: Integrationstests für präzise Scope-Fences (ErasureFence) und Invarianten (F-1 bis F-8).
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::fence::{ErasureFence, FenceError};
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_scope_fence_inside_outside_prefix() {
+async fn test_async_runtime_blocking_attempt_rejected() {
     let fence = ErasureFence::new();
-    let guard = fence
-        .acquire_scope_fence_for(vec![b"coll_a:".to_vec()])
-        .unwrap();
+    let res = fence.acquire_scope_fence_for(vec![b"coll_a:".to_vec()]);
+    assert_eq!(res.unwrap_err(), FenceError::AsyncRuntimeBlockingAttempt);
+}
+
+#[test]
+fn test_scope_fence_inside_outside_prefix() {
+    let fence = ErasureFence::new();
+    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
 
     // Writing outside prefix works
     assert!(fence.check_write_allowed_scope(b"coll_b:doc1").is_ok());
@@ -24,16 +29,16 @@ async fn test_scope_fence_inside_outside_prefix() {
         Err(FenceError::CollectionDropping)
     );
 
-    drop(guard);
-    // After guard drop, writing inside prefix is allowed again
+    fence.release_scope_fence_for_locked(b"coll_a:");
+    // After release, writing inside prefix is allowed again
     assert!(fence.check_write_allowed_scope(b"coll_a:doc1").is_ok());
 }
 
-#[tokio::test]
-async fn test_scope_fence_prefix_edge_cases() {
+#[test]
+fn test_scope_fence_prefix_edge_cases() {
     let fence = ErasureFence::new();
     // "a:" vs "ab:"
-    let _guard = fence.acquire_scope_fence_for(vec![b"a:".to_vec()]).unwrap();
+    fence.acquire_scope_fence_for_locked(b"a:".to_vec());
 
     // "a:123" is in scope "a:"
     assert_eq!(
@@ -45,40 +50,44 @@ async fn test_scope_fence_prefix_edge_cases() {
     assert!(fence.check_write_allowed_scope(b"ab:123").is_ok());
 }
 
-#[tokio::test]
-async fn test_scope_fence_guard_drop_releases() {
+#[test]
+fn test_scope_fence_guard_drop_releases() {
     let fence = ErasureFence::new();
 
-    let res: Result<(), FenceError> = (|| {
-        let _guard = fence.acquire_scope_fence_for(vec![b"scope:".to_vec()])?;
-        assert!(fence.check_write_allowed_scope(b"scope:key").is_err());
-        // Simulate error path inside closure
-        Err(FenceError::Conflict)
-    })();
+    fence.acquire_scope_fence_for_locked(b"scope:".to_vec());
+    assert!(fence.check_write_allowed_scope(b"scope:key").is_err());
 
-    assert!(res.is_err());
-    // Guard should be dropped when closure returned, releasing fence
+    fence.release_scope_fence_for_locked(b"scope:");
     assert!(fence.check_write_allowed_scope(b"scope:key").is_ok());
 }
 
-#[tokio::test]
-async fn test_scope_fence_overlapping_scopes_conflict() {
+#[test]
+fn test_scope_fence_overlapping_scopes_union_ref_count() {
     let fence = ErasureFence::new();
-    let _guard1 = fence
-        .acquire_scope_fence_for(vec![b"coll_a:".to_vec()])
-        .unwrap();
+    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
 
-    // Overlapping scope "coll_a:sub:" -> Conflict
-    let res = fence.acquire_scope_fence_for(vec![b"coll_a:sub:".to_vec()]);
-    assert_eq!(res.unwrap_err(), FenceError::Conflict);
+    // Overlapping scope "coll_a:sub:" -> Union with ref_count (F-2/F-3, no Conflict)
+    fence.acquire_scope_fence_for_locked(b"coll_a:sub:".to_vec());
 
     // Disjoint scope "coll_b:" -> Success
-    let guard2 = fence.acquire_scope_fence_for(vec![b"coll_b:".to_vec()]);
-    assert!(guard2.is_ok());
+    fence.acquire_scope_fence_for_locked(b"coll_b:".to_vec());
+
+    fence.release_scope_fence_for_locked(b"coll_a:");
+    // Overlapping "coll_a:sub:" still active via second registration
+    assert_eq!(
+        fence.check_write_allowed_scope(b"coll_a:sub:doc1"),
+        Err(FenceError::CollectionDropping)
+    );
+
+    fence.release_scope_fence_for_locked(b"coll_a:sub:");
+    // Now coll_a:sub: is released
+    assert!(fence.check_write_allowed_scope(b"coll_a:sub:doc1").is_ok());
+
+    fence.release_scope_fence_for_locked(b"coll_b:");
 }
 
-#[tokio::test]
-async fn test_doc_lock_atomic_conflict_no_partial_leak() {
+#[test]
+fn test_doc_lock_atomic_conflict_no_partial_leak() {
     let fence = ErasureFence::new();
     // Pre-lock doc1
     let _guard1 = fence
@@ -93,23 +102,23 @@ async fn test_doc_lock_atomic_conflict_no_partial_leak() {
     assert!(fence.check_write_allowed_scope(b"doc2").is_ok());
 }
 
-#[tokio::test]
-async fn test_scope_write_seq_increments_only_in_scope() {
+#[test]
+fn test_scope_write_seq_increments_only_in_scope() {
     let fence = ErasureFence::new();
-    let guard = fence
-        .acquire_scope_fence_for(vec![b"coll_a:".to_vec()])
-        .unwrap();
+    let initial_seq = fence.scope_write_seq();
 
-    let initial_seq = fence.scope_write_seq_for(&guard);
+    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
+    let fenced_seq = fence.scope_write_seq();
+    assert!(fenced_seq > initial_seq);
 
     // Attempt write on foreign key -> sequence does not change
     let _ = fence.check_write_allowed_scope(b"coll_b:doc1");
-    assert_eq!(fence.scope_write_seq_for(&guard), initial_seq);
+    assert_eq!(fence.scope_write_seq(), fenced_seq);
 
     // Attempt write in scope -> sequence increments
     let _ = fence.check_write_allowed_scope(b"coll_a:doc1");
-    let new_seq = fence.scope_write_seq_for(&guard);
-    assert_ne!(new_seq, initial_seq);
+    let new_seq = fence.scope_write_seq();
+    assert!(new_seq > fenced_seq);
 
     let snap_seq = fence.snapshot_write_seq(&[b"coll_a:".to_vec()]);
     assert!(snap_seq >= new_seq);
@@ -126,11 +135,10 @@ async fn test_all_write_paths_respect_fence() {
 
     let tx_id = TxId::new(1);
 
-    // 1. Path 'put'
-    let _guard = storage
+    // 1. Install fence via locked helper / sync call
+    storage
         .erasure_fence
-        .acquire_scope_fence_for(vec![b"locked:".to_vec()])
-        .unwrap();
+        .acquire_scope_fence_for_locked(b"locked:".to_vec());
 
     let put_res = storage.put(tx_id, b"locked:key1", b"val1").await;
     assert!(put_res.is_err());
@@ -160,17 +168,16 @@ async fn test_all_write_paths_respect_fence() {
     assert!(del_prefix_res.is_err());
 
     // 6. Path 'commit' (when operation staged before fence)
-    drop(_guard);
+    storage.erasure_fence.release_scope_fence_for_locked(b"locked:");
     let tx_staged = TxId::new(2);
     storage
         .put(tx_staged, b"locked:key4", b"val4")
         .await
         .unwrap();
 
-    let _guard_again = storage
+    storage
         .erasure_fence
-        .acquire_scope_fence_for(vec![b"locked:".to_vec()])
-        .unwrap();
+        .acquire_scope_fence_for_locked(b"locked:".to_vec());
 
     let commit_res = storage.commit(tx_staged).await;
     assert!(commit_res.is_err());
