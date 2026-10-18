@@ -6,7 +6,7 @@ use tempfile::TempDir;
 
 use contextra_engine::collection::query_builder::ScopeConstraint;
 use contextra_engine::{Collection, DistanceMetric, Language};
-use contextra_graph::CsrGraph;
+use contextra_engine::no_graph_stubs::CsrGraph;
 use contextra_ports::{Result as PortResult, ScoredDocument, TxId, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId};
