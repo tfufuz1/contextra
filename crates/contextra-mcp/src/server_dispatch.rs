@@ -168,13 +168,15 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a document or an entire collection with GDPR DeletionProof export.",
+                            "description": "Provably forget a document or collection returning a v4 ForgetReceipt with layer verification statuses and explicit scope exclusions.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
                                     "collection": { "type": "string" },
                                     "id":         { "type": "string" },
-                                    "confirm":    { "type": "boolean" }
+                                    "confirm":    { "type": "boolean" },
+                                    "assurance":  { "type": "string", "enum": ["S1", "S2", "S3", "S4"], "default": "S1" },
+                                    "purge":      { "type": "string", "enum": ["None", "Purge", "PurgeWithScrub"], "default": "None" }
                                 },
                                 "required": ["collection", "confirm"]
                             }
@@ -288,7 +290,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_delete",
-                            "description": "Delete a document with HNSW neighborhood graph repair and issue a cryptographic DeletionProof.",
+                            "description": "Delete a document using logische Löschung (Tombstone), kein Nachweis, nicht für Art. 17 ausreichend.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {

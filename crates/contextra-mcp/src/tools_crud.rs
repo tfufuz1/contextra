@@ -116,39 +116,32 @@ impl McpServer {
             ));
         }
 
-        let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-            .key
-            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
-
-        let tenant_id = crate::validation::extract_tenant_from_args_or_env(Some(args));
-
-        let proof = self
+        let opts = contextra::ForgetOptions::default();
+        let receipt = self
             .db
-            .drop_collection(col_name, tenant_id, proof_key.as_bytes())
+            .forget_collection(col_name, opts)
             .await
             .map_err(McpError::from)?;
 
-        let proof_json_str = proof
-            .export_for_audit()
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-        let proof_val: Value = serde_json::from_str(&proof_json_str)
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-
-        let proof_status = proof_val
-            .get("proof_status")
-            .and_then(|v| v.as_str())
-            .unwrap_or("issued");
+        let proof_present = receipt.proof.is_some();
+        let proof_val = match &receipt.proof {
+            Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
+            None => None,
+        };
 
         Ok(json!({
-            "ok": true,
+            "ok": receipt.assurance_reached >= receipt.assurance_requested,
             "collection": col_name,
+            "assurance_requested": format!("{:?}", receipt.assurance_requested),
+            "assurance_reached": format!("{:?}", receipt.assurance_reached),
+            "proof_present": proof_present,
             "proof": proof_val,
-            "proof_status": proof_status,
+            "proof_status": if proof_present { "issued" } else { "pending" },
             "proof_scope": "collection"
         }))
     }
 
-    /// Handler für `contextra_delete` — Löscht ein Dokument (Tombstone). Single-Doc-Löschungen stellen keinen DeletionProof aus.
+    /// Handler für `contextra_delete` — Logische Löschung (Tombstone), kein Nachweis, nicht für Art. 17 ausreichend.
     pub(crate) async fn handle_delete(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = if let Some(col_val) = args.get("collection") {
             let s = col_val.as_str().ok_or_else(|| {
