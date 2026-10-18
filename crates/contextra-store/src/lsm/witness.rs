@@ -398,7 +398,7 @@ impl LsmStorage {
         let wal_inputs = WalScanInputs {
             wal_dir: self.config.path.clone(),
             as_of_tx: req.as_of_tx.inner(),
-            encrypted_mode: self.config.encryption_passphrase.is_some(),
+            encrypted_mode: self.config.encryption.is_encrypted(),
             timeout: Duration::from_secs(10),
             scope: WalScopeSpec {
                 key_prefixes: req.scope_prefixes.clone(),

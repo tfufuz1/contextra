@@ -15,9 +15,10 @@ pub use contextra_engine::{
 };
 pub use contextra_engine::{
     CommunityDetectionConfig, Contextra, ContextraConfig, ContextraStats, DbStats, Document,
-    EmbeddingBackend, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1,
-    HybridQueryBuilder, ImportSummary, Language, ProvenanceRecord, SearchResult, SearchStrategy,
-    SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
+    EmbeddingBackend, EncryptionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1,
+    ExportRelationV1, HybridQueryBuilder, ImportSummary, KekSource, Language, ProvenanceRecord,
+    SearchResult, SearchStrategy, SignalContribution, SignalWeights, MAX_SCAN_RESULTS,
+    SCHEMA_VERSION_V1,
 };
 
 #[cfg(feature = "graph-connectivity-health")]

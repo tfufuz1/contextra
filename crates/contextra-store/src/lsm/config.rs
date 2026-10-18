@@ -64,8 +64,74 @@ impl DurabilityMode {
     }
 }
 
+/// Source for Key Encryption Key (KEK).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum KekSource {
+    Passphrase(String),
+    Environment(String),
+    File(PathBuf),
+}
+
+impl std::fmt::Debug for KekSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Passphrase(_) => write!(f, "Passphrase(***)"),
+            Self::Environment(var) => f.debug_tuple("Environment").field(var).finish(),
+            Self::File(path) => f.debug_tuple("File").field(path).finish(),
+        }
+    }
+}
+
+/// Encryption configuration for LSM storage and WAL.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum EncryptionConfig {
+    #[default]
+    None,
+    Passphrase(String),
+    Keyring {
+        dir: PathBuf,
+        kek_source: KekSource,
+    },
+}
+
+impl std::fmt::Debug for EncryptionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "EncryptionConfig::None"),
+            Self::Passphrase(_) => write!(f, "EncryptionConfig::Passphrase(***)"),
+            Self::Keyring { dir, kek_source } => f
+                .debug_struct("EncryptionConfig::Keyring")
+                .field("dir", dir)
+                .field("kek_source", kek_source)
+                .finish(),
+        }
+    }
+}
+
+impl EncryptionConfig {
+    pub fn is_encrypted(&self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    pub fn passphrase(&self) -> Option<String> {
+        match self {
+            Self::None => None,
+            Self::Passphrase(p) => Some(p.clone()),
+            Self::Keyring { kek_source, .. } => match kek_source {
+                KekSource::Passphrase(p) => Some(p.clone()),
+                KekSource::Environment(var) => std::env::var(var).ok(),
+                KekSource::File(path) => {
+                    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+                }
+            },
+        }
+    }
+}
+
 /// LSM storage configuration.
-// SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
+// SEC-001 — Erweitere LsmConfig um `encryption` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -82,7 +148,7 @@ pub struct LsmConfig {
     pub tx_timeout: Duration,
     /// Configuration for background compaction.
     pub compaction: CompactionConfig,
-    pub encryption_passphrase: Option<String>,
+    pub encryption: EncryptionConfig,
     /// Time window in microseconds to batch concurrent WAL commits before issuing fsync.
     /// Set to 0 to disable group commit batching (immediate single commit).
     pub group_commit_window_micros: u64,
@@ -102,6 +168,12 @@ pub struct LsmConfig {
     pub max_internal_merge_factor: usize,
 }
 
+impl LsmConfig {
+    pub fn encryption_passphrase(&self) -> Option<String> {
+        self.encryption.passphrase()
+    }
+}
+
 impl Default for LsmConfig {
     fn default() -> Self {
         Self {
@@ -110,7 +182,7 @@ impl Default for LsmConfig {
             max_ram_mb: 2048,
             tx_timeout: Duration::from_secs(60),
             compaction: CompactionConfig::default(),
-            encryption_passphrase: None,
+            encryption: EncryptionConfig::default(),
             group_commit_window_micros: 500,
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
