@@ -1,7 +1,7 @@
 //! Injection Matrix Test Suite according to Specification T2, lines 1-16 (T-2026-9220).
 //! Verifies that witness issuance fails closed on any non-tombstone, residue, corruption, or unclassified files.
 
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::CompactionConfig;

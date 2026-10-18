@@ -33,7 +33,7 @@ async fn test_witness_reader_differential_against_production_reader() {
             let raw_seq = (i as u64) + 1;
             let is_tombstone = rng.gen_bool(0.15);
             let seq = if is_tombstone {
-                raw_seq | contextra_core::TOMBSTONE_BIT
+                raw_seq | contextra_types::TOMBSTONE_BIT
             } else {
                 raw_seq
             };
@@ -61,8 +61,8 @@ async fn test_witness_reader_differential_against_production_reader() {
         expected_entries.sort_by(|a, b| {
             let key_cmp = a.0.cmp(&b.0);
             if key_cmp == std::cmp::Ordering::Equal {
-                let seq_a = a.2 & !contextra_core::TOMBSTONE_BIT;
-                let seq_b = b.2 & !contextra_core::TOMBSTONE_BIT;
+                let seq_a = a.2 & !contextra_types::TOMBSTONE_BIT;
+                let seq_b = b.2 & !contextra_types::TOMBSTONE_BIT;
                 seq_b.cmp(&seq_a)
             } else {
                 key_cmp
@@ -116,7 +116,7 @@ async fn test_witness_reader_differential_against_production_reader() {
             assert_eq!(p_val, &w_entry.value, "Run {run} idx {idx}: Value mismatch");
             assert_eq!(*p_seq, w_entry.seq_no, "Run {run} idx {idx}: Seq mismatch");
             assert_eq!(
-                (*p_seq & contextra_core::TOMBSTONE_BIT) != 0,
+                (*p_seq & contextra_types::TOMBSTONE_BIT) != 0,
                 w_entry.is_tombstone,
                 "Run {run} idx {idx}: Tombstone mismatch"
             );

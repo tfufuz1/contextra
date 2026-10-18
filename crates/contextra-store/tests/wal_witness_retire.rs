@@ -3,7 +3,7 @@
 //! Verifies that `retire_segments_up_to` only removes segments with max_tx <= checkpoint_tx,
 //! verifies that rotation alone does not delete files, and tests crash consistency.
 
-use contextra_core::{ContextraError, TxId};
+use contextra_types::{ContextraError, TxId};
 use contextra_store::wal::{retire_segments_up_to, Wal, WalOp};
 use tempfile::tempdir;
 
