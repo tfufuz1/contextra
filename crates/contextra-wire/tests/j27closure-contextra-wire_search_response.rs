@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-10-05T00:00:00Z (TASK: J27-contextra-wire)
 // ZWECK: Integrationstests für SearchResponse FlatBuffers Puffer-Finish und Größenvorab-Optionen-Verifizierung.
