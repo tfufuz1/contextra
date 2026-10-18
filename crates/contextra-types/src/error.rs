@@ -365,6 +365,10 @@ pub enum ContextraError {
         /// Maximum allowed snapshot age in ticks.
         max_age_ticks: u64,
     },
+
+    /// Data encryption key has been destroyed / revoked (Crypto-Erase).
+    #[error("Key destroyed: {0}")]
+    KeyDestroyed(String),
 }
 
 impl ContextraError {
@@ -443,8 +447,8 @@ impl ContextraError {
             "DurabilityConfig" => Self::durability_config(msg),
             "OrphanedVectorReference" => {
                 let parts: Vec<&str> = msg.split("->").collect();
-                if parts.len() == 2 {
-                    Self::orphaned_vector_reference(parts[0].trim(), parts[1].trim())
+                if let (Some(&doc_id), Some(&index_id)) = (parts.first(), parts.get(1)) {
+                    Self::orphaned_vector_reference(doc_id.trim(), index_id.trim())
                 } else {
                     Self::orphaned_vector_reference("unknown", msg)
                 }

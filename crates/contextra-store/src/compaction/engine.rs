@@ -9,6 +9,7 @@ use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
+use contextra_crypto::{KeyId, ScopeKeyring};
 use contextra_types::{Result, TOMBSTONE_BIT};
 use contextra_ports::StorageStats;
 use contextra_mvcc::snapshot::SnapshotFloor;
@@ -25,6 +26,8 @@ pub struct CompactionEngine {
     pub floor: Arc<dyn SnapshotFloor>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
+    scope_keyring: Option<Arc<ScopeKeyring>>,
+    active_key_id: Option<KeyId>,
     budget: Arc<contextra_types::ResourceTracker>,
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
@@ -67,6 +70,8 @@ impl CompactionEngine {
             floor,
             block_cache,
             key_manager,
+            scope_keyring: None,
+            active_key_id: None,
             budget,
             manifest,
             compaction_counter: AtomicU64::new(0),
@@ -91,6 +96,13 @@ impl CompactionEngine {
     /// Clears the active purge scope.
     pub fn clear_purge_scope(&self) {
         *self.purge_scope.write() = None;
+    }
+
+    /// Configures `ScopeKeyring` and active `KeyId` for v5 scope-encrypted compactions.
+    pub fn with_scope_keyring(mut self, keyring: Arc<ScopeKeyring>, key_id: KeyId) -> Self {
+        self.scope_keyring = Some(keyring);
+        self.active_key_id = Some(key_id);
+        self
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -257,9 +269,10 @@ impl CompactionEngine {
 
         // Open the new SSTable reader
         let new_reader = Arc::new(
-            SstableReader::open_with_key_manager(
+            SstableReader::open_with_keyring(
                 &output_path,
                 Arc::clone(&self.block_cache),
+                self.scope_keyring.clone(),
                 self.key_manager.clone(),
             )
             .await?,
@@ -639,8 +652,32 @@ impl CompactionEngine {
             }
         }
 
-        let mut builder =
-            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
+        let mut input_key_ids = Vec::new();
+        for sst in inputs {
+            if let Some(kid) = sst.key_id() {
+                if !input_key_ids.contains(&kid) {
+                    input_key_ids.push(kid);
+                }
+            }
+        }
+
+        if input_key_ids.len() > 1 {
+            return Err(contextra_types::ContextraError::InvalidInput(
+                "Cannot merge SSTables with different key_ids into a single file".to_string(),
+            ));
+        }
+
+        let target_key_id = if let Some(kid) = self.active_key_id {
+            Some(kid)
+        } else {
+            input_key_ids.first().copied()
+        };
+
+        let mut builder = if let (Some(ref kr), Some(kid)) = (&self.scope_keyring, target_key_id) {
+            SstableBuilder::create_with_scope_keyring(output_path, Arc::clone(kr), kid).await?
+        } else {
+            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?
+        };
         let mut last_key: Option<bytes::Bytes> = None;
         let mut floor_emitted = false;
         let mut processed_count = 0;

@@ -7,6 +7,7 @@ use super::witness_inventory::SstInventory;
 use super::witness_reader::WitnessReader;
 use super::witness_types::{SstScanEvidence, SstScanInputs, SstScopeSpec, WitnessReadError};
 use crate::wal::KeyManager;
+use contextra_crypto::ScopeKeyring;
 use std::fs;
 use std::sync::Arc;
 
@@ -15,6 +16,20 @@ pub fn scan_sstables<F>(
     scope: &SstScopeSpec,
     inputs: &SstScanInputs,
     key_manager: Option<Arc<KeyManager>>,
+    generation_callback: F,
+) -> Result<SstScanEvidence, WitnessReadError>
+where
+    F: Fn() -> u64,
+{
+    scan_sstables_with_keyring(scope, inputs, key_manager, None, generation_callback)
+}
+
+/// Executes the 7-step witness scan pipeline with ScopeKeyring support for Format v5.
+pub fn scan_sstables_with_keyring<F>(
+    scope: &SstScopeSpec,
+    inputs: &SstScanInputs,
+    key_manager: Option<Arc<KeyManager>>,
+    scope_keyring: Option<Arc<ScopeKeyring>>,
     generation_callback: F,
 ) -> Result<SstScanEvidence, WitnessReadError>
 where
@@ -44,10 +59,17 @@ where
             continue;
         }
 
-        let mut reader = match WitnessReader::open(file_path, key_manager.clone()) {
+        let mut reader = match WitnessReader::open_with_keyring(
+            file_path,
+            key_manager.clone(),
+            scope_keyring.clone(),
+        ) {
             Ok(r) => r,
             Err(WitnessReadError::NotWitnessable(msg)) => {
                 return Err(WitnessReadError::NotWitnessable(msg));
+            }
+            Err(WitnessReadError::KeyDestroyed(msg)) => {
+                return Err(WitnessReadError::KeyDestroyed(msg));
             }
             Err(_) => {
                 // Unparseable SSTable candidate file -> unclassified
@@ -57,7 +79,9 @@ where
         };
 
         // Complete first_key read for metadata AP-08
-        let _ = reader.read_first_key();
+        if let Err(WitnessReadError::KeyDestroyed(msg)) = reader.read_first_key() {
+            return Err(WitnessReadError::KeyDestroyed(msg));
+        }
         let metadata = reader.metadata();
 
         // Step 3: Range Pruning
@@ -83,6 +107,9 @@ where
             Ok(e) => e,
             Err(WitnessReadError::NotWitnessable(msg)) => {
                 return Err(WitnessReadError::NotWitnessable(msg));
+            }
+            Err(WitnessReadError::KeyDestroyed(msg)) => {
+                return Err(WitnessReadError::KeyDestroyed(msg));
             }
             Err(_) => {
                 evidence.unclassified_files += 1;
