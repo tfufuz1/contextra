@@ -10,19 +10,76 @@
 use contextra_types::{ContextraError, Result};
 
 /// Default k1 parameter for BM25 term frequency saturation scaling.
+/// **Note**: Textbook default value (`1.5`), uncalibrated on project corpus.
 pub const BM25_K1: f32 = 1.5;
 /// Default b parameter for BM25 document length normalization penalty tuning.
+/// **Note**: Textbook default value (`0.75`), uncalibrated on project corpus.
 pub const BM25_B: f32 = 0.75;
 
 /// BM25 scoring model parameters.
 ///
-/// Recommendations (Robertson-Walker defaults):
-/// - `k1`: Term frequency saturation control parameter. Recommended default value is `1.5` (well-studied range `1.2..2.0`). Must be non-negative (`k1 >= 0.0`).
-/// - `b`: Document length normalization penalty parameter. Recommended default value is `0.75` (range `0.0..1.0`).
+/// Recommendations (Robertson-Walker defaults, uncalibrated on system corpus):
+/// - `k1`: Term frequency saturation control parameter. Textbook default value is `1.5` (well-studied range `1.2..2.0`). Must be non-negative (`k1 >= 0.0`).
+/// - `b`: Document length normalization penalty parameter. Textbook default value is `0.75` (range `0.0..1.0`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BM25 {
     pub k1: f32,
     pub b: f32,
+}
+
+/// Type alias for BM25 scoring model parameters.
+pub type Bm25Params = BM25;
+
+/// Calculates Normalized Discounted Cumulative Gain (nDCG@k) for a retrieved document list.
+///
+/// Evaluates retrieval quality against a ground-truth mapping of document IDs to relevance values.
+///
+/// # Returns
+/// A score in `[0.0, 1.0]`. Returns `0.0` if `k == 0` or if no relevant ground-truth documents exist.
+pub fn evaluate_ndcg_at_k<ID: std::hash::Hash + Eq>(
+    retrieved_ids: &[ID],
+    relevance_ground_truth: &std::collections::HashMap<ID, f32>,
+    k: usize,
+) -> f32 {
+    if k == 0 || retrieved_ids.is_empty() || relevance_ground_truth.is_empty() {
+        return 0.0;
+    }
+
+    let limit = k.min(retrieved_ids.len());
+
+    let mut dcg = 0.0f32;
+    for (idx, id) in retrieved_ids.iter().take(limit).enumerate() {
+        let rel = relevance_ground_truth.get(id).copied().unwrap_or(0.0);
+        if rel > 0.0 {
+            let gain = (2.0f32.powf(rel) - 1.0).max(0.0);
+            let discount = ((idx + 2) as f32).log2();
+            dcg += gain / discount;
+        }
+    }
+
+    let mut ideal_gains: Vec<f32> = relevance_ground_truth
+        .values()
+        .copied()
+        .filter(|&r| r > 0.0)
+        .collect();
+    ideal_gains.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+
+    if ideal_gains.is_empty() {
+        return 0.0;
+    }
+
+    let mut idcg = 0.0f32;
+    for (idx, &rel) in ideal_gains.iter().take(limit).enumerate() {
+        let gain = (2.0f32.powf(rel) - 1.0).max(0.0);
+        let discount = ((idx + 2) as f32).log2();
+        idcg += gain / discount;
+    }
+
+    if idcg <= 0.0 {
+        0.0
+    } else {
+        (dcg / idcg).clamp(0.0, 1.0)
+    }
 }
 
 impl BM25 {
@@ -344,6 +401,40 @@ mod tests {
         let default_bm25 = BM25::default();
         assert_eq!(default_bm25.k1, 1.5);
         assert_eq!(default_bm25.b, 0.75);
+
+        let params: Bm25Params = Bm25Params::default();
+        assert_eq!(params.k1, 1.5);
+        assert_eq!(params.b, 0.75);
+    }
+
+    #[test]
+    fn test_evaluate_ndcg_at_k() {
+        use std::collections::HashMap;
+
+        let mut ground_truth = HashMap::new();
+        ground_truth.insert("doc1", 3.0f32);
+        ground_truth.insert("doc2", 2.0f32);
+        ground_truth.insert("doc3", 1.0f32);
+
+        // Perfect ranking
+        let perfect = vec!["doc1", "doc2", "doc3"];
+        let ndcg_perfect = evaluate_ndcg_at_k(&perfect, &ground_truth, 3);
+        assert!((ndcg_perfect - 1.0).abs() < 1e-5, "Perfect ranking must yield nDCG 1.0, got {}", ndcg_perfect);
+
+        // Reversed ranking
+        let reversed = vec!["doc3", "doc2", "doc1"];
+        let ndcg_reversed = evaluate_ndcg_at_k(&reversed, &ground_truth, 3);
+        assert!(ndcg_reversed < 1.0 && ndcg_reversed > 0.0, "Reversed ranking must yield 0 < nDCG < 1, got {}", ndcg_reversed);
+
+        // Completely irrelevant ranking
+        let irrelevant = vec!["doc4", "doc5", "doc6"];
+        let ndcg_irrelevant = evaluate_ndcg_at_k(&irrelevant, &ground_truth, 3);
+        assert_eq!(ndcg_irrelevant, 0.0, "Irrelevant ranking must yield nDCG 0.0");
+
+        // Empty inputs
+        assert_eq!(evaluate_ndcg_at_k::<&str>(&[], &ground_truth, 3), 0.0);
+        assert_eq!(evaluate_ndcg_at_k(&perfect, &HashMap::new(), 3), 0.0);
+        assert_eq!(evaluate_ndcg_at_k(&perfect, &ground_truth, 0), 0.0);
     }
 
     use proptest::prelude::*;

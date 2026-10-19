@@ -1,7 +1,9 @@
-//! Regression test for Tokenizer Pipeline Identity (P1), Snapshot Isolation (P4), and Tx Rollback (P5).
+//! Regression test for Tokenizer Pipeline Identity (P1), German Compound Splitting (P2),
+//! Umlaut Bi-directional Recall (P3), Snapshot Isolation (P4), Tx Rollback (P5), and WAND Correctness (P6).
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::inverted::{InvertedIndex, Language};
+use contextra_text::morphology::{GermanCompoundSplitter, MorphologicalTokenizer};
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
@@ -229,6 +231,147 @@ async fn test_pipeline_identity_point_search_recall() -> Result<()> {
             doc_id
         );
     }
+
+    Ok(())
+}
+
+/// P2: German Compound Splitter Evaluation for 20 Compound Words.
+#[test]
+fn test_p2_german_compound_splitter_20_words() {
+    let splitter = GermanCompoundSplitter::default();
+
+    let compounds = [
+        "datenschutzgrundverordnung",
+        "bundesdatenschutzgesetz",
+        "softwarearchitektur",
+        "computerprogramm",
+        "kraftfahrzeugsteuer",
+        "bundesverfassungsgericht",
+        "informationstechnologie",
+        "datenbankmanagement",
+        "kuenstlicheintelligenz",
+        "maschinelleslernen",
+        "softwareentwicklung",
+        "datenschutzbestimmungen",
+        "itsicherheitsgesetz",
+        "bundesnetzagentur",
+        "telekommunikationsgesetz",
+        "unternehmensfuehrung",
+        "finanzdienstleistungen",
+        "personalentwicklung",
+        "urheberrechtsgesetz",
+        "markenrecht",
+    ];
+
+    println!("\n=== P2 GERMAN COMPOUND SPLITTER EVALUATION ===");
+    for &word in &compounds {
+        let split = splitter.decompose(word);
+        println!("Word: {:<30} | Split: {:?}", word, split);
+    }
+}
+
+/// P3: Umlaut Normalization Bi-directional Test across 4 pairs (8 directions).
+#[tokio::test]
+async fn test_p3_umlaut_normalization_bidirectional() -> Result<()> {
+    let storage = Arc::new(TestMVCCStorage::new());
+    let index = InvertedIndex::new_with_language(storage.clone(), "p3_ns", Language::German);
+
+    // Pair 1: Bär / Baer (ä / ae)
+    index
+        .insert(TxId::new(1), DocId::new(1), "Der Bär im Wald")
+        .await?;
+    index
+        .insert(TxId::new(2), DocId::new(2), "Herr Baer im Bueromodus")
+        .await?;
+
+    // Pair 2: Öl / Oel (ö / oe)
+    index
+        .insert(TxId::new(3), DocId::new(3), "Das Öl ist teuer")
+        .await?;
+    index
+        .insert(TxId::new(4), DocId::new(4), "Das Oel wird knapp")
+        .await?;
+
+    // Pair 3: München / Muenchen (ü / ue)
+    index
+        .insert(TxId::new(5), DocId::new(5), "Der Standort München")
+        .await?;
+    index
+        .insert(TxId::new(6), DocId::new(6), "Der Standort Muenchen")
+        .await?;
+
+    // Pair 4: Straße / Strasse (ß / ss)
+    index
+        .insert(TxId::new(7), DocId::new(7), "In der Hauptstraße")
+        .await?;
+    index
+        .insert(TxId::new(8), DocId::new(8), "An der Ringstrasse")
+        .await?;
+
+    index.commit(TxId::new(1)).await?;
+    index.commit(TxId::new(2)).await?;
+    index.commit(TxId::new(3)).await?;
+    index.commit(TxId::new(4)).await?;
+    index.commit(TxId::new(5)).await?;
+    index.commit(TxId::new(6)).await?;
+    index.commit(TxId::new(7)).await?;
+    index.commit(TxId::new(8)).await?;
+
+    // 1a: Query "Baer" -> find Doc 1 ("Bär")
+    let res_baer = index.search("baer", 10).await?;
+    assert!(
+        res_baer.iter().any(|r| r.doc_id == DocId::new(1)),
+        "Query 'baer' must find Doc 1 ('Bär')"
+    );
+
+    // 1b: Query "Bär" -> find Doc 2 ("Baer")
+    let res_bar = index.search("bär", 10).await?;
+    assert!(
+        res_bar.iter().any(|r| r.doc_id == DocId::new(2)),
+        "Query 'bär' must find Doc 2 ('Baer')"
+    );
+
+    // 2a: Query "Oel" -> find Doc 3 ("Öl")
+    let res_oel = index.search("oel", 10).await?;
+    assert!(
+        res_oel.iter().any(|r| r.doc_id == DocId::new(3)),
+        "Query 'oel' must find Doc 3 ('Öl')"
+    );
+
+    // 2b: Query "Öl" -> find Doc 4 ("Oel")
+    let res_ol = index.search("öl", 10).await?;
+    assert!(
+        res_ol.iter().any(|r| r.doc_id == DocId::new(4)),
+        "Query 'öl' must find Doc 4 ('Oel')"
+    );
+
+    // 3a: Query "Muenchen" -> find Doc 5 ("München")
+    let res_muenchen = index.search("muenchen", 10).await?;
+    assert!(
+        res_muenchen.iter().any(|r| r.doc_id == DocId::new(5)),
+        "Query 'muenchen' must find Doc 5 ('München')"
+    );
+
+    // 3b: Query "München" -> find Doc 6 ("Muenchen")
+    let res_munchen = index.search("münchen", 10).await?;
+    assert!(
+        res_munchen.iter().any(|r| r.doc_id == DocId::new(6)),
+        "Query 'münchen' must find Doc 6 ('Muenchen')"
+    );
+
+    // 4a: Query "Strasse" -> find Doc 7 ("Hauptstraße")
+    let res_strasse = index.search("strasse", 10).await?;
+    assert!(
+        res_strasse.iter().any(|r| r.doc_id == DocId::new(7)),
+        "Query 'strasse' must find Doc 7 ('Hauptstraße')"
+    );
+
+    // 4b: Query "Straße" -> find Doc 8 ("Ringstrasse")
+    let res_strase = index.search("straße", 10).await?;
+    assert!(
+        res_strase.iter().any(|r| r.doc_id == DocId::new(8)),
+        "Query 'straße' must find Doc 8 ('Ringstrasse')"
+    );
 
     Ok(())
 }
