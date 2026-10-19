@@ -2,9 +2,9 @@
 // STAND: 2026-10-13
 // ZWECK: Post-Fusion Cross-Encoder Reranking Stage (§20.2 / APM-22).
 
-use contextra_ports::Reranker;
-use contextra_types::Result;
 use std::sync::Arc;
+use contextra_ports::Reranker;
+use contextra_types::{Result};
 
 use super::topk::cmp_scores;
 use super::types::{ProvenanceRecord, SearchResult};

@@ -15,7 +15,10 @@ use contextra_ports::{Clock, SystemClock};
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
 /// DEPRECATED: Use [`crate::PoolController`] instead.
-#[deprecated(since = "0.1.0", note = "use PoolController; removal 2027-01-31")]
+#[deprecated(
+    since = "0.1.0",
+    note = "use PoolController; removal 2027-01-31"
+)]
 #[derive(Debug, Clone)]
 pub struct RerankPidController {
     #[allow(deprecated)]

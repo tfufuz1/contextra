@@ -28,10 +28,7 @@ fn german_tokenizer_normalizes_umlauts() {
 fn test_decompose_handles_uppercase_without_panic() {
     let splitter = GermanCompoundSplitter::new();
     let parts = splitter.decompose("Bundesverfassungsgericht");
-    assert!(
-        !parts.is_empty(),
-        "decompose must handle non-lowercase input safely without panic"
-    );
+    assert!(!parts.is_empty(), "decompose must handle non-lowercase input safely without panic");
 }
 
 #[test]

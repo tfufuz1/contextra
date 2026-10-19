@@ -73,10 +73,7 @@ fn test_drift_detector_zero_panic_edge_cases() {
 
     // Status check should be panic-free
     let status = detector.analyze();
-    assert!(matches!(
-        status,
-        DriftStatus::Stable { .. } | DriftStatus::DriftDetected { .. }
-    ));
+    assert!(matches!(status, DriftStatus::Stable { .. } | DriftStatus::DriftDetected { .. }));
     assert_ne!(detector.overall_drift_status(), "");
 
     detector.clear_observations();

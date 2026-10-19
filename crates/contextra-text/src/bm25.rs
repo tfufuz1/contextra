@@ -419,28 +419,17 @@ mod tests {
         // Perfect ranking
         let perfect = vec!["doc1", "doc2", "doc3"];
         let ndcg_perfect = evaluate_ndcg_at_k(&perfect, &ground_truth, 3);
-        assert!(
-            (ndcg_perfect - 1.0).abs() < 1e-5,
-            "Perfect ranking must yield nDCG 1.0, got {}",
-            ndcg_perfect
-        );
+        assert!((ndcg_perfect - 1.0).abs() < 1e-5, "Perfect ranking must yield nDCG 1.0, got {}", ndcg_perfect);
 
         // Reversed ranking
         let reversed = vec!["doc3", "doc2", "doc1"];
         let ndcg_reversed = evaluate_ndcg_at_k(&reversed, &ground_truth, 3);
-        assert!(
-            ndcg_reversed < 1.0 && ndcg_reversed > 0.0,
-            "Reversed ranking must yield 0 < nDCG < 1, got {}",
-            ndcg_reversed
-        );
+        assert!(ndcg_reversed < 1.0 && ndcg_reversed > 0.0, "Reversed ranking must yield 0 < nDCG < 1, got {}", ndcg_reversed);
 
         // Completely irrelevant ranking
         let irrelevant = vec!["doc4", "doc5", "doc6"];
         let ndcg_irrelevant = evaluate_ndcg_at_k(&irrelevant, &ground_truth, 3);
-        assert_eq!(
-            ndcg_irrelevant, 0.0,
-            "Irrelevant ranking must yield nDCG 0.0"
-        );
+        assert_eq!(ndcg_irrelevant, 0.0, "Irrelevant ranking must yield nDCG 0.0");
 
         // Empty inputs
         assert_eq!(evaluate_ndcg_at_k::<&str>(&[], &ground_truth, 3), 0.0);

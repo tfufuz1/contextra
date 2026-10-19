@@ -6,8 +6,8 @@
 
 //! PID Latency Controller & Latency Budget Guard.
 
-use contextra_ports::{Clock, SystemClock};
 use std::sync::Arc;
+use contextra_ports::{Clock, SystemClock};
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).
 pub const DEFAULT_TARGET_LATENCY_MS: f64 = 100.0;
@@ -24,7 +24,10 @@ pub const MAX_INTEGRAL: f64 = 10.0;
 /// Classical PID controller for dynamically scaling multi-step retrieval parameters (`k_pool`, `max_hops`).
 ///
 /// DEPRECATED: Use [`crate::PoolController`] instead.
-#[deprecated(since = "0.1.0", note = "use PoolController; removal 2027-01-31")]
+#[deprecated(
+    since = "0.1.0",
+    note = "use PoolController; removal 2027-01-31"
+)]
 #[derive(Debug, Clone)]
 pub struct PidLatencyController {
     /// Proportional gain coefficient.
