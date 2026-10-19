@@ -1,5 +1,5 @@
 use contextra_store::sstable::{
-    binary_search_entry_in_block, block_binary_search, BlockBuilder, BlockCache, SstableBuilder,
+    binary_search_entry_in_block, BlockBuilder, BlockCache, SstableBuilder,
     SstableReader,
 };
 use proptest::prelude::*;
@@ -84,9 +84,6 @@ proptest! {
             mutated_block = apply_mutation(mutated_block, m);
         }
 
-        // Test block_binary_search (must never panic regardless of mutated bytes)
-        let _ = block_binary_search(&mutated_block, offsets_start, num_offsets, &search_key, true);
-
         // Test binary_search_entry_in_block (must never panic)
         let _ = binary_search_entry_in_block(&mutated_block, offsets_start, num_offsets, &search_key, true);
 
@@ -97,7 +94,6 @@ proptest! {
             let offsets_len = derived_num_offsets.saturating_mul(4);
             if n >= 8 + offsets_len {
                 let derived_offsets_start = n - 8 - offsets_len;
-                let _ = block_binary_search(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key, true);
                 let _ = binary_search_entry_in_block(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key, true);
             }
         }

@@ -93,7 +93,7 @@ async fn test_merge_operator_counter_across_sstables() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -146,7 +146,7 @@ async fn test_merge_operator_fail_safe_retains_both() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
         .await
         .unwrap();
 
@@ -217,17 +217,17 @@ async fn test_merge_operator_deterministic_output() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(
+        .merge_sstables_with_cancel(
             &[reader1.clone(), reader2.clone()],
             &out_path1,
             min_seq,
             true,
-        )
+        , None)
         .await
         .unwrap();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path2, min_seq, true)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path2, min_seq, true, None)
         .await
         .unwrap();
 
@@ -289,7 +289,7 @@ async fn test_active_snapshot_prevents_merge() {
 
     // raw_seq of version 3 is >= min_seq (2), so it cannot be merged with version 1
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
         .await
         .unwrap();
 
@@ -365,7 +365,7 @@ async fn test_tombstone_keys_are_not_merged() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
         .await
         .unwrap();
 
@@ -444,7 +444,7 @@ async fn test_merge_operator_fuel_exhausted_fail_safe() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
         .await
         .unwrap();
 
@@ -525,7 +525,7 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
+        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
         .await
         .unwrap();
 
