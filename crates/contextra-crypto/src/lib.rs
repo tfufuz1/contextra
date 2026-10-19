@@ -30,7 +30,6 @@ pub mod kdf;
 pub mod keystore;
 pub mod kms;
 pub mod kv_cipher;
-pub mod kv_segment;
 pub mod kv_shredding;
 pub mod revocation_log;
 pub mod scope_keyring;
@@ -56,12 +55,6 @@ pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use keystore::MfksKeystore;
 pub use kms::{DestroyedKey, KmsProvider, LocalKmsProvider};
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
-pub use kv_segment::{
-    eviction_worker::{emergency_wipe, EvictionWorker},
-    segment::KvSegment,
-    store::TenantIsolatedKvStore,
-    CURRENT_KV_KEY_DERIVATION_VERSION,
-};
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use scope_keyring::{

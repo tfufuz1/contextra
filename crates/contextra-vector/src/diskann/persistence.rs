@@ -300,14 +300,21 @@ impl DiskAnnIndex {
                     std::fs::File::open(&inner.config.index_path).map_err(ContextraError::Io)?;
                 let mmap = contextra_sys::mmap_readonly(&file).map_err(ContextraError::Io)?;
 
-                if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE {
-                    return Err(ContextraError::Storage(
+                let disk_len = file
+                    .metadata()
+                    .map_err(ContextraError::Io)?
+                    .len() as usize;
+
+                if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE
+                    || disk_len < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE
+                {
+                    return Err(ContextraError::Index(
                         "DiskANN file too small for header and footer".into(),
                     ));
                 }
 
                 let header_slice = mmap.get(0..DiskAnnHeader::SIZE).ok_or_else(|| {
-                    ContextraError::Storage("DiskANN file too small for header".into())
+                    ContextraError::Index("DiskANN file too small for header".into())
                 })?;
                 let header = DiskAnnHeader::try_from_bytes(header_slice)?;
 
@@ -377,10 +384,16 @@ impl DiskAnnIndex {
                 let start_offset = DiskAnnHeader::SIZE.div_ceil(sector_size) * sector_size;
                 let expected_min_size = start_offset
                     .saturating_add((header.node_count as usize).saturating_mul(node_size_bytes));
-                if file_len < expected_min_size {
-                    return Err(ContextraError::Storage(format!(
+
+                let disk_len = file
+                    .metadata()
+                    .map_err(ContextraError::Io)?
+                    .len() as usize;
+
+                if file_len < expected_min_size || disk_len < expected_min_size {
+                    return Err(ContextraError::Index(format!(
                         "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
-                        file_len, expected_min_size
+                        disk_len.min(file_len), expected_min_size
                     )));
                 }
 
@@ -409,6 +422,10 @@ impl DiskAnnIndex {
                             "Read offset must be sector-aligned".into(),
                         ));
                     }
+                    let current_disk_len = std::fs::metadata(&inner.config.index_path)
+                        .map(|m| m.len() as usize)
+                        .unwrap_or(0);
+
                     let inner_mmap = inner.mmap.read();
                     let mmap_ref = inner_mmap
                         .as_ref()
@@ -420,15 +437,21 @@ impl DiskAnnIndex {
                     let doc_id_end = doc_id_offset
                         .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
-                    // TODO(Implementer): [P05 / F-03 & F-04 / MEDIUM]
-                    // F-03: Schutz gegen Dateitrunkierung während Mmap-Zugriff.
-                    // F-04: Fehlender Struct-Alignment-Guard bei Rohdaten-Casts in On-Disk-Slices:
-                    // Aktuell wird `from_le_bytes` verwendet (speichersicher), aber für direkte Direct-Structure-Pointers
-                    // müssen strikte Alignment-Invarianten (`bytemuck::Pod` oder explizite Offset-Ausrichtungsprüfungen)
-                    // garantiert werden, um Alignment-Faults auf strikt ausgerichteten CPUs zu verhindern.
+
+                    // F-03: Protection against runtime file truncation during Mmap access.
+                    // Check both mmap region length and physical disk file size before reading slice.
+                    if doc_id_end > mmap_ref.len() || doc_id_end > current_disk_len {
+                        return Err(ContextraError::Index(
+                            "DiskANN file truncated before doc_id".into(),
+                        ));
+                    }
+
+                    // F-04: Alignment Safety Notice:
+                    // All binary reading in DiskANN uses byte-slice `from_le_bytes` parsing.
+                    // `from_le_bytes` operates on unaligned `[u8; N]` arrays safely on all CPUs.
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
-                            ContextraError::Storage("DiskANN file truncated before doc_id".into())
+                            ContextraError::Index("DiskANN file truncated before doc_id".into())
                         })?;
                     #[cfg(not(feature = "docid-128"))]
                     let doc_id = u64::from_le_bytes(
@@ -520,8 +543,15 @@ impl DiskAnnIndex {
             .checked_add(node_size)
             .ok_or_else(|| ContextraError::Index("Node end offset addition overflow".into()))?;
 
-        if end_offset > mmap.len() {
-            return Err(ContextraError::Index("Node offset out of bounds".into()));
+        // F-03: Re-verify physical disk length before accessing node bytes to guard against concurrent file truncation
+        let current_disk_len = std::fs::metadata(&self.inner.config.index_path)
+            .map(|m| m.len() as usize)
+            .unwrap_or(0);
+
+        if end_offset > mmap.len() || end_offset > current_disk_len {
+            return Err(ContextraError::Index(
+                "Node offset out of bounds or file truncated".into(),
+            ));
         }
 
         let node_data = mmap

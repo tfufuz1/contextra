@@ -4,7 +4,8 @@
 //! P7-Nachweis: Messbarer Throughput-Unterschied muss dokumentiert sein.
 //! Erwartete Speedup-Größenordnung: Cache-Hit ist signifikant schneller (O(1) Reference Lookup vs. Speicherallokation & Voller Prefill).
 
-use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
 use contextra_types::{ModelFingerprint, TenantId};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};

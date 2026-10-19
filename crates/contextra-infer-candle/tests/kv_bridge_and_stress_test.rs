@@ -6,7 +6,8 @@
 #[cfg(feature = "kv-bridge")]
 mod tests {
     use candle_core::Device;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_kvcache::TenantIsolatedKvStore;
     use contextra_infer_candle::inference::CandleModelInner;
     use contextra_infer_candle::kv_bridge::KvCacheKey;
     use contextra_infer_candle::{CandleLlmClient, GaspValidator, KvBridgeAdapter};

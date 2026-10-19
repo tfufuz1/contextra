@@ -619,6 +619,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "contextra-ports",
+ "contextra-sys",
  "contextra-types",
  "criterion",
  "proptest",
@@ -655,7 +656,6 @@ dependencies = [
 name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
- "contextra-crypto",
  "contextra-ports",
  "contextra-types",
  "serde",
@@ -668,7 +668,6 @@ dependencies = [
 name = "contextra-avv-generator"
 version = "0.1.0"
 dependencies = [
- "contextra-ports",
  "contextra-types",
  "serde",
  "thiserror 2.0.20",
@@ -772,6 +771,7 @@ dependencies = [
  "blake3",
  "contextra-crypto",
  "contextra-durable-fs",
+ "contextra-kvcache",
  "contextra-ports",
  "contextra-types",
  "criterion",
@@ -1092,6 +1092,7 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-avv-generator",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
@@ -1177,7 +1178,6 @@ name = "contextra-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ed25519-dalek",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -1191,7 +1191,7 @@ name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-types",
+ "contextra-core",
  "criterion",
  "proptest",
  "thiserror 2.0.20",

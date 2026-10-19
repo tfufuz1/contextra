@@ -153,7 +153,8 @@ async fn test_generate_with_context_text_identical_and_kv_bridge_consultation() 
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_consultation() {
     use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_kvcache::TenantIsolatedKvStore;
 
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
@@ -209,7 +210,8 @@ async fn test_generate_with_context_kv_bridge_consultation() {
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
     use crate::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_kvcache::TenantIsolatedKvStore;
 
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
@@ -318,7 +320,8 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
 #[tokio::test]
 async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_hit() {
     use crate::kv_bridge::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_kvcache::TenantIsolatedKvStore;
 
     let fingerprint = ModelFingerprint {
         hash: [7u8; 32],
@@ -612,7 +615,8 @@ async fn test_inference_zero_concurrency_limit_clamped_to_one() {
 #[tokio::test]
 async fn test_candle_llm_client_with_kv_bridge() {
     use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_kvcache::TenantIsolatedKvStore;
 
     let mock_model = Box::new(MockCandleModel {
         response: "KV Response".to_string(),

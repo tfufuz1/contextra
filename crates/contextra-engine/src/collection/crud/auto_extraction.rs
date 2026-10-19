@@ -135,19 +135,13 @@ impl Default for AutoExtractionConfig {
     }
 }
 
-#[allow(clippy::type_complexity)]
-static AUTO_EXTRACTION_REGISTRY: std::sync::LazyLock<
-    parking_lot::RwLock<
-        ahash::AHashMap<
-            usize,
-            (
-                Arc<dyn LlmTextGenerator>,
-                AutoExtractionConfig,
-                ExtractorMode,
-            ),
-        >,
-    >,
-> = std::sync::LazyLock::new(|| parking_lot::RwLock::new(ahash::AHashMap::new()));
+/// Inner binding holding the auto extraction generator, config, and extractor mode.
+#[derive(Clone)]
+pub(crate) struct AutoExtractionBinding {
+    pub generator: Arc<dyn LlmTextGenerator>,
+    pub config: AutoExtractionConfig,
+    pub mode: ExtractorMode,
+}
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Configures auto extraction with an LLM generator and config (builder pattern).
@@ -176,10 +170,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         config: AutoExtractionConfig,
         extractor_mode: ExtractorMode,
     ) {
-        let key = Arc::as_ptr(&self.kv_locks) as usize;
-        AUTO_EXTRACTION_REGISTRY
-            .write()
-            .insert(key, (generator, config, extractor_mode));
+        *self.auto_extraction.write() = Some(AutoExtractionBinding {
+            generator,
+            config,
+            mode: extractor_mode,
+        });
     }
 
     /// Sets or updates auto extraction without an external LLM generator (suitable for RuleBased mode).
@@ -192,11 +187,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub fn auto_extraction_config(
         &self,
     ) -> Option<(Arc<dyn LlmTextGenerator>, AutoExtractionConfig)> {
-        let key = Arc::as_ptr(&self.kv_locks) as usize;
-        AUTO_EXTRACTION_REGISTRY
+        self.auto_extraction
             .read()
-            .get(&key)
-            .map(|(g, c, _)| (g.clone(), c.clone()))
+            .as_ref()
+            .map(|binding| (binding.generator.clone(), binding.config.clone()))
     }
 
     /// Returns the configured auto extraction generator, config, and extractor mode.
@@ -207,8 +201,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         AutoExtractionConfig,
         ExtractorMode,
     )> {
-        let key = Arc::as_ptr(&self.kv_locks) as usize;
-        AUTO_EXTRACTION_REGISTRY.read().get(&key).cloned()
+        self.auto_extraction
+            .read()
+            .as_ref()
+            .map(|binding| (binding.generator.clone(), binding.config.clone(), binding.mode))
     }
 }
 

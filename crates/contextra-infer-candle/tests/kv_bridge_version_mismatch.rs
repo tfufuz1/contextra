@@ -2,7 +2,8 @@
 
 //! Verification test for KV-Bridge mismatch and corruption scenarios: Model fingerprint mismatch, RoPE mismatch, truncated or corrupted bytes.
 
-use contextra_crypto::{CryptoKey, KvSegment, KvSegmentCipher, TenantIsolatedKvStore};
+use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
 use contextra_types::{ModelFingerprint, TenantId};
 use std::sync::Arc;

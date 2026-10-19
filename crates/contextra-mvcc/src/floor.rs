@@ -37,14 +37,19 @@ impl<T: Clone> GcFloor<T> {
     /// Creates a new `GcFloor` evaluator.
     pub fn new(
         registry: Arc<SnapshotRegistry>,
-        tx_buffer: Option<Arc<TxBuffer<T>>>,
+        tx_buffer: impl Into<Option<Arc<TxBuffer<T>>>>,
         last_applied: Arc<AtomicU64>,
     ) -> Self {
         Self {
             registry,
-            tx_buffer,
+            tx_buffer: tx_buffer.into(),
             last_applied,
         }
+    }
+
+    /// Returns the last applied sequence number watermark.
+    pub fn last_applied(&self) -> u64 {
+        self.last_applied.load(Ordering::Acquire)
     }
 
     /// Calculates the GC sequence floor under a unified evaluation contract.
@@ -63,5 +68,46 @@ impl<T: Clone> GcFloor<T> {
         let last_applied = self.last_applied.load(Ordering::Acquire);
 
         registry_min.min(tx_buffer_min).min(last_applied)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gc_floor_without_tx_buffer() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        let last_applied = Arc::new(AtomicU64::new(100));
+
+        let floor_calc = GcFloor::<Vec<u8>>::new(registry.clone(), None, last_applied.clone());
+
+        assert_eq!(floor_calc.last_applied(), 100);
+        assert_eq!(floor_calc.floor(), 100);
+
+        let lease = registry.acquire(|| 50);
+        assert_eq!(floor_calc.floor(), 50);
+
+        drop(lease);
+        assert_eq!(floor_calc.floor(), 100);
+    }
+
+    #[test]
+    fn test_gc_floor_with_tx_buffer_direct_arc() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        let last_applied = Arc::new(AtomicU64::new(200));
+        let tx_buffer = Arc::new(TxBuffer::<(Vec<u8>, Vec<u8>)>::new().with_snapshot_registry(registry.clone()));
+
+        // Test passing Arc<TxBuffer> directly without Some wrapper
+        let floor_calc = GcFloor::new(registry.clone(), tx_buffer.clone(), last_applied.clone());
+
+        assert_eq!(floor_calc.last_applied(), 200);
+        assert_eq!(floor_calc.floor(), 200);
+
+        let lease = registry.acquire(|| 150);
+        assert_eq!(floor_calc.floor(), 150);
+
+        drop(lease);
+        assert_eq!(floor_calc.floor(), 200);
     }
 }

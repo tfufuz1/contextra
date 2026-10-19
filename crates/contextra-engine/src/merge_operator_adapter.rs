@@ -10,7 +10,8 @@
 //! to background SSTable compaction threads.
 //!
 //! To prevent OS thread and runtime exhaustion (W1-17), [`WasmMergeOperator`] delegates execution
-//! to a shared Tokio runtime pool and leverages the LRU module cache in [`contextra_sandbox`].
+//! to an explicitly provided Tokio runtime handle (`tokio::runtime::Handle`) and leverages the LRU
+//! module cache in [`contextra_sandbox`].
 //! Operatoren can be registered into a [`MergeOperatorRegistry`] after passing the fail-closed CRDT gate.
 
 use contextra_sandbox::merge::MergeOperatorRegistry;
@@ -21,34 +22,14 @@ use contextra_store::MergeOperator;
 use contextra_types::{ContextraError, Result};
 use std::sync::mpsc;
 use std::sync::Arc;
-use std::sync::OnceLock;
 use std::time::Duration;
-
-static SHARED_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-
-fn get_shared_runtime() -> Result<&'static tokio::runtime::Runtime> {
-    if let Some(rt) = SHARED_RUNTIME.get() {
-        Ok(rt)
-    } else {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .thread_name("wasm-merge-runtime")
-            .enable_all()
-            .build()
-            .map_err(|e| {
-                ContextraError::Internal(format!("Failed to build WASM merge runtime: {e}"))
-            })?;
-        let _ = SHARED_RUNTIME.set(rt);
-        SHARED_RUNTIME
-            .get()
-            .ok_or_else(|| ContextraError::Internal("Runtime init failed".into()))
-    }
-}
 
 /// Synchronous wrapper around [`WasmMergeFunction`] implementing [`MergeOperator`].
 #[derive(Clone)]
 pub struct WasmMergeOperator {
     func: Arc<WasmMergeFunction>,
     recv_timeout: Duration,
+    handle: tokio::runtime::Handle,
 }
 
 impl std::fmt::Debug for WasmMergeOperator {
@@ -64,24 +45,49 @@ impl std::fmt::Debug for WasmMergeOperator {
 }
 
 impl WasmMergeOperator {
-    /// Creates a new `WasmMergeOperator` with default capability limits (10,000,000 fuel, 5s timeout).
+    /// Creates a new `WasmMergeOperator` using active Tokio context handle with default capability limits.
     pub fn new(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self> {
+        let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+            ContextraError::Internal(format!("No Tokio runtime context available: {e}"))
+        })?;
+        Self::new_with_handle(wasm_bytes, handle)
+    }
+
+    /// Creates a new `WasmMergeOperator` with an explicit [`tokio::runtime::Handle`] and default capability limits.
+    pub fn new_with_handle(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        handle: tokio::runtime::Handle,
+    ) -> Result<Self> {
         let caps = MergeOperatorCapabilities::pure_with_result_channel();
-        Self::new_with_config(
+        Self::new_with_config_and_handle(
             wasm_bytes,
             caps.max_fuel,
             Duration::from_millis(caps.max_wall_clock_ms),
+            handle,
         )
     }
 
-    /// Creates a new `WasmMergeOperator` with custom `max_fuel` and `wall_clock_timeout` configuration.
-    ///
-    /// # Errors
-    /// Returns `ContextraError::Sandbox` if WASM validation fails.
+    /// Creates a new `WasmMergeOperator` using active Tokio context handle with custom limits.
     pub fn new_with_config(
         wasm_bytes: impl Into<Arc<[u8]>>,
         max_fuel: u64,
         wall_clock_timeout: Duration,
+    ) -> Result<Self> {
+        let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+            ContextraError::Internal(format!("No Tokio runtime context available: {e}"))
+        })?;
+        Self::new_with_config_and_handle(wasm_bytes, max_fuel, wall_clock_timeout, handle)
+    }
+
+    /// Creates a new `WasmMergeOperator` with custom `max_fuel`, `wall_clock_timeout`, and an explicit [`tokio::runtime::Handle`].
+    ///
+    /// # Errors
+    /// Returns `ContextraError::Sandbox` if WASM validation fails.
+    pub fn new_with_config_and_handle(
+        wasm_bytes: impl Into<Arc<[u8]>>,
+        max_fuel: u64,
+        wall_clock_timeout: Duration,
+        handle: tokio::runtime::Handle,
     ) -> Result<Self> {
         let wasm_bytes = wasm_bytes.into();
         let mut caps = MergeOperatorCapabilities::pure_with_result_channel();
@@ -92,15 +98,18 @@ impl WasmMergeOperator {
         let recv_timeout = Duration::from_millis(caps.max_wall_clock_ms.saturating_add(2_000));
 
         // Note (W1-17): WasmMergeFunction internally encapsulates WasmExecutor which maintains
-        // an LRU ModuleCache for compiled WASM modules. Worker pool concurrency is bounded
-        // when execution tasks run on the shared runtime pool.
+        // an LRU ModuleCache for compiled WASM modules.
         let func = Arc::new(
             WasmMergeFunction::new_with_capabilities(wasm_bytes, caps).map_err(|e| {
                 ContextraError::Sandbox(format!("WASM validation failed: {}", map_sandbox_err(&e)))
             })?,
         );
 
-        Ok(Self { func, recv_timeout })
+        Ok(Self {
+            func,
+            recv_timeout,
+            handle,
+        })
     }
 
     /// Returns a reference to the underlying [`WasmMergeFunction`].
@@ -115,12 +124,14 @@ impl WasmMergeOperator {
     /// Returns `ContextraError::Sandbox` if CRDT property verification fails.
     pub fn admit_into_registry(&self, registry: Arc<MergeOperatorRegistry>) -> Result<[u8; 32]> {
         let func = self.func.clone();
-        let rt = get_shared_runtime()?;
+        let handle = self.handle.clone();
         let (tx, rx) = mpsc::channel();
 
-        rt.spawn(async move {
-            let res = registry.admit_function(func).await;
-            let _ = tx.send(res);
+        tokio::task::block_in_place(move || {
+            handle.spawn(async move {
+                let res = registry.admit_function(func).await;
+                let _ = tx.send(res);
+            });
         });
 
         match rx.recv_timeout(Duration::from_secs(30)) {
@@ -144,21 +155,15 @@ impl MergeOperator for WasmMergeOperator {
         let func = self.func.clone();
         let existing = existing_val.to_vec();
         let new = new_val.to_vec();
-        let rt = match get_shared_runtime() {
-            Ok(rt) => rt,
-            Err(e) => {
-                tracing::warn!("WasmMergeOperator shared runtime initialization failed: {e}");
-                return Err(ContextraError::Internal(format!(
-                    "Shared runtime initialization error: {e}"
-                )));
-            }
-        };
+        let handle = self.handle.clone();
 
         let (tx, rx) = mpsc::channel();
 
-        rt.spawn(async move {
-            let res = func.merge(&existing, &new).await;
-            let _ = tx.send(res);
+        tokio::task::block_in_place(move || {
+            handle.spawn(async move {
+                let res = func.merge(&existing, &new).await;
+                let _ = tx.send(res);
+            });
         });
 
         match rx.recv_timeout(self.recv_timeout) {

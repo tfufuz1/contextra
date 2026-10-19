@@ -19,6 +19,11 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod distance;
+/// DiskANN out-of-core vector index module.
+///
+/// STATUS: Frozen, opt-in behind the `experimental-diskann` feature flag.
+#[cfg(feature = "experimental-diskann")]
+pub mod diskann;
 pub mod hnsw;
 pub mod persistence;
 pub mod quantize;
