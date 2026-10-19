@@ -21,10 +21,8 @@ use contextra_store::lsm::witness::ZeuIssueRequest;
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 
-use contextra_crypto::deletion_proof::evidence::WitLayerEvidence;
-use contextra_crypto::deletion_proof::probe::WitStoreGeneration;
 use contextra_crypto::deletion_proof::types::DeletionLayer;
-use contextra_crypto::deletion_witness::{LayerWitness, WitIssueArgs};
+use contextra_crypto::deletion_witness::LayerWitness;
 
 use super::copy_observer::DpiCopyObserver;
 use super::footprint::ErasureFootprint;
@@ -33,9 +31,7 @@ use super::forget_options::{
 };
 use super::proof_issue::{DpiDeletionRuntime, DpiLogicalInput};
 use super::registry::KeyFamilyRegistry;
-use super::relations_witness::issue_relations_witness;
 use super::reverse_sweep::{reverse_sweep, FprNeedles, FprSweepReport, FprSweepSource, SweepDepth};
-use super::text_witness::issue_text_index_witness;
 
 /// Options controlling physical purge driver execution (§C5.3, C5.7).
 #[derive(Debug, Clone)]

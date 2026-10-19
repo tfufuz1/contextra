@@ -14,13 +14,6 @@ pub enum SearchStrategy {
     },
     /// Personalized PageRank power iteration graph traversal strategy.
     PersonalizedPageRank(contextra_types::PprConfig),
-    /// PathRAG bidirectional Dijkstra graph traversal strategy.
-    PathRag {
-        /// Maximum traversal hop depth.
-        max_hops: usize,
-        /// Sufficiency threshold for filtering low-confidence paths.
-        sufficiency_threshold: f64,
-    },
 }
 
 impl SearchStrategy {
@@ -36,13 +29,6 @@ impl SearchStrategy {
             SearchStrategy::PersonalizedPageRank(cfg) => {
                 GraphTraversalStrategy::PersonalizedPageRank(cfg.clone())
             }
-            SearchStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            } => GraphTraversalStrategy::PathRag {
-                max_hops: *max_hops,
-                sufficiency_threshold: *sufficiency_threshold,
-            },
         }
     }
 
@@ -51,7 +37,9 @@ impl SearchStrategy {
         match self {
             SearchStrategy::Rrf => FusionStrategy::Rrf,
             SearchStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
-            _ => FusionStrategy::Rrf,
+            SearchStrategy::Hops { .. } | SearchStrategy::PersonalizedPageRank(_) => {
+                FusionStrategy::Rrf
+            }
         }
     }
 
@@ -68,13 +56,9 @@ impl From<GraphTraversalStrategy> for SearchStrategy {
             GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
                 SearchStrategy::PersonalizedPageRank(cfg)
             }
-            GraphTraversalStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            } => SearchStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            },
+            GraphTraversalStrategy::PathRag { max_hops, .. } => {
+                SearchStrategy::Hops { max_hops }
+            }
         }
     }
 }

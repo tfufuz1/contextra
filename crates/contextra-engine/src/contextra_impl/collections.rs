@@ -1,9 +1,82 @@
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Status of physical purge attempt during collection drop.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PhysicalPurgeStatus {
+    /// Physical purge was successfully performed.
+    Performed {
+        /// Total number of records purged.
+        records_purged: u64,
+        /// Total bytes reclaimed during physical compaction.
+        bytes_reclaimed: u64,
+    },
+    /// Physical purge was not performed or was blocked.
+    NotPerformed {
+        /// Reason why physical purge was not executed or was blocked.
+        reason: String,
+    },
+}
+
+/// Report summarizing the result of dropping a collection, including deletion proof and physical purge status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DropCollectionReport {
+    /// Cryptographic deletion proof attesting to logical (and optionally physical) deletion.
+    pub proof: DeletionProof,
+    /// Physical purge execution status.
+    pub physical_purge: PhysicalPurgeStatus,
+}
+
+fn hex_encode_32_col(bytes: &[u8; 32]) -> String {
+    let mut s = String::with_capacity(64);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+/// Derives a [`CollectionId`] from a raw `u64` hash prefix value.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`](contextra_types::ContextraError::InvalidInput) if `prefix` is 0.
+pub fn collection_id_from_hash_prefix(prefix: u64) -> Result<CollectionId> {
+    CollectionId::try_new(prefix)
+}
+
+/// Derives a [`CollectionId`] deterministically from a collection name using the first 8 bytes of BLAKE3 hash.
+///
+/// # Errors
+/// Returns [`ContextraError::InvalidInput`](contextra_types::ContextraError::InvalidInput) if `name` is empty or if derived ID is 0.
+pub fn derive_collection_id(name: &str) -> Result<CollectionId> {
+    if name.is_empty() {
+        return Err(contextra_types::ContextraError::invalid_input(
+            "Collection name cannot be empty",
+        ));
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(name.as_bytes());
+    let hash_bytes = hasher.finalize();
+    let col_id_u64 =
+        u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().map_err(|_| {
+            contextra_types::ContextraError::invalid_input("Hash truncation failed")
+        })?);
+    collection_id_from_hash_prefix(col_id_u64)
+}
+
 impl Contextra {
+    /// Derives a [`CollectionId`] from a raw `u64` hash prefix value.
+    pub fn collection_id_from_hash_prefix(prefix: u64) -> Result<CollectionId> {
+        collection_id_from_hash_prefix(prefix)
+    }
+
+    /// Derives a [`CollectionId`] deterministically from a collection name using BLAKE3.
+    pub fn derive_collection_id(name: &str) -> Result<CollectionId> {
+        derive_collection_id(name)
+    }
+
     pub async fn collection_for_tenant(
         &self,
         name: &str,
@@ -273,18 +346,42 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    /// Drops a collection and returns a [`DropCollectionReport`] summarizing deletion proof and physical purge status.
+    ///
+    /// # Limitations / Non-Guarantees
+    /// - Physical purge execution depends on LSM compaction availability (`LsmStorage::purge_keys`).
+    /// - If physical purge is blocked or unimplemented, `physical_purge` is set to [`PhysicalPurgeStatus::NotPerformed`]
+    ///   and `covered_layers` in the deletion proof strictly claims only logical [`DeletionLayer::LsmMemtable`].
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
     #[tracing::instrument(level = "trace", skip(self, proof_key))]
-    pub async fn drop_collection(
+    pub async fn drop_collection_with_report(
         &self,
         name: &str,
         tenant_id: TenantId,
         proof_key: &[u8],
-    ) -> Result<DeletionProof> {
+    ) -> Result<DropCollectionReport> {
+        if proof_key.len() < 32 || proof_key.iter().all(|&b| b == 0) {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Proof key must be at least 32 bytes long and cannot be all zeroes",
+            ));
+        }
+
         if name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
         }
+
+        let collection_id = derive_collection_id(name)?;
+
+        // Schließe das Scan-Commit-Fenster: Lock-Reihenfolge collections -> kv_locks -> embedder (INV-DELETION-1).
+        // Entfernen aus der Registry vor dem Scannen verhindert, dass ein nebenläufiger Schreiber
+        // eine neue Referenz zur Collection holt und während des Löschens schreibt.
+        self.collections.write().await.remove(name);
+        self.tenant_collections
+            .write()
+            .await
+            .remove(&(tenant_id, name.to_string()));
 
         let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
             self.storage.clone(),
@@ -295,25 +392,25 @@ impl Contextra {
         let txt_data_prefix = format!("__txt:{}:", name);
         let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
+        let tx = self.allocate_tx()?;
 
+        // Scanne Schlüssel am konsistenten Snapshot-Stand tx.inner()
         let col_entries = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
+            .scan_prefix_at(col_data_prefix.as_bytes(), tx.inner())
             .await?;
+        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
         for (k, _) in col_entries {
             deleted_keys.push(k);
         }
 
         let txt_entries = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
+            .scan_prefix_at(txt_data_prefix.as_bytes(), tx.inner())
             .await?;
         for (k, _) in txt_entries {
             deleted_keys.push(k);
         }
 
         deleted_keys.push(col_idx_key.clone());
-
-        let tx = self.allocate_tx()?;
 
         tenant_storage
             .delete_prefix(tx, col_data_prefix.as_bytes())
@@ -369,7 +466,7 @@ impl Contextra {
 
         let proof = DeletionProof::create(
             scope,
-            deleted_keys,
+            deleted_keys.clone(),
             tx,
             layer_proofs,
             vec![],
@@ -377,17 +474,99 @@ impl Contextra {
         )
         .map_err(|e| {
             contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
+                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
                 tx.inner()
             ))
         })?;
 
-        self.collections.write().await.remove(name);
-        self.tenant_collections
-            .write()
-            .await
-            .remove(&(tenant_id, name.to_string()));
+        // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
+        let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
+        let registry = deletion::KeyFamilyRegistry::default();
+        let sweep_needles = deletion::FprNeedles {
+            doc_id_bytes: Vec::new(),
+            collection_id: Some(collection_id),
+            collection_name: name.to_string(),
+            tenant_prefix: tenant_id.inner().to_le_bytes().to_vec(),
+        };
 
-        Ok(proof)
+        let mut pid16 = [0u8; 16];
+        pid16.copy_from_slice(&proof.deleted_keys_hash[..16]);
+
+        let fon_handle = deletion::FonLogicalHandle {
+            proof_id: pid16,
+            proof_path: std::path::PathBuf::from(format!(
+                "proofs/{}.json",
+                hex_encode_32_col(&proof.deleted_keys_hash)
+            )),
+            full_proof_id: proof.deleted_keys_hash,
+        };
+
+        let forget_opts = deletion::ForgetOptions::default();
+
+        let tenant_prefix = format!("t:{}:", tenant_id.inner());
+        let purge_scope = contextra_store::compaction::purge_filter::PurgeScope::Prefixes(vec![
+            format!("{}{}", tenant_prefix, col_data_prefix).into_bytes(),
+            format!("{}{}", tenant_prefix, txt_data_prefix).into_bytes(),
+        ]);
+
+        let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
+        let deps = deletion::DeletionWiringDeps {
+            storage: self.storage.clone(),
+            db_dir: proof_dir,
+            signer_cfg_path: None,
+            db_instance_id: [0x33; 16],
+            ring_mode: deletion::wiring::RingMode::Sovereign,
+        };
+
+        if let Ok(deletion_wiring) = deletion::DeletionWiring::build(deps) {
+            let driver = deletion_wiring.purge_driver();
+            let zeu_probe = self.storage.store_probe();
+            let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
+                &[zeu_probe.as_ref()];
+
+            let _ = driver
+                .run_purge(
+                    purge_scope,
+                    &[name.to_string()],
+                    tx,
+                    &fon_handle,
+                    &forget_opts,
+                    &deleted_keys,
+                    &sweep_needles,
+                    &footprint,
+                    &registry,
+                    deletion::SweepDepth::Standard,
+                    None,
+                    probes,
+                    None,
+                )
+                .await;
+        }
+
+        Ok(DropCollectionReport {
+            proof,
+            physical_purge: PhysicalPurgeStatus::NotPerformed {
+                reason: "Purge managed by background ErasureSupervisor".to_string(),
+            },
+        })
+    }
+
+    /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.
+    ///
+    /// # Limitations / Non-Guarantees
+    /// - Claims ONLY layers verified by an explicit scan (strictly [`DeletionLayer::LsmMemtable`] unless physical purge succeeded).
+    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
+    /// - Attests strictly to logical deletion (tombstones committed and verified empty in active MemTable/LSM key space scans).
+    #[tracing::instrument(level = "trace", skip(self, proof_key))]
+    pub async fn drop_collection(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+        proof_key: &[u8],
+    ) -> Result<DeletionProof> {
+        let report = self
+            .drop_collection_with_report(name, tenant_id, proof_key)
+            .await?;
+        Ok(report.proof)
     }
 }
