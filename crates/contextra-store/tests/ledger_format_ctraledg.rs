@@ -4,6 +4,7 @@
 // TEST-ABDECKUNG: Torn Tail, Mittel-Beschädigung, Rollback, ELDG-Migration, Gruppen-Append, Plaintext-Präfix Isolation.
 
 #![forbid(unsafe_code)]
+#![cfg(feature = "erasure")]
 
 use contextra_ports::SystemClock;
 use contextra_store::erasure_ledger::*;

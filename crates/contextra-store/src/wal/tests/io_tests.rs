@@ -450,7 +450,7 @@ async fn test_disk_full_mid_append_batch_rollback() -> Result<()> {
         .prepare_batch(vec![(op_fail1, 2), (op_fail2, 3)])
         .await?;
 
-    FAIL_APPEND_FOR_TX.store(fail_tx.inner(), Ordering::SeqCst);
+    wal.fault_plan().fail_append_for_tx.store(fail_tx.inner(), Ordering::SeqCst);
 
     let append_res = wal.append_batch(batch).await;
     assert!(
