@@ -2,7 +2,8 @@
 
 //! Verification test for KV-Bridge tenant key separation: Data encrypted under Tenant A key cannot be read under Tenant B.
 
-use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
 use contextra_types::{ModelFingerprint, TenantId};
 use std::sync::Arc;
