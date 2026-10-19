@@ -1,11 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern).
-// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PoolController-reguliert in [50, 200].
-// STAND: TS:2026-10-17T00:00:00Z
+// INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts.
+// STAND: TS:2026-10-15T00:00:00Z
 
-use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
-use contextra_adapt::{PoolController, PoolControllerConfig};
 pub use contextra_ports::QueryRewriter;
 use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
 use contextra_types::{EntityId, Result, ScoredEntry};
@@ -16,6 +14,37 @@ pub const DEFAULT_MAX_SUB_QUERIES: usize = 3;
 
 /// Default candidate pool expansion multiplier for pre-reranking retrieval.
 pub const DEFAULT_RERANK_POOL_MULTIPLIER: usize = 2;
+
+/// Default target latency in ms.
+pub const DEFAULT_TARGET_LATENCY_MS: f64 = 100.0;
+
+/// Latency budget guard to bound multi-step retrieval rounds.
+#[derive(Debug, Clone, Copy)]
+pub struct LatencyBudgetGuard {
+    start: std::time::Instant,
+    budget_ms: f64,
+}
+
+impl LatencyBudgetGuard {
+    pub fn new(budget_ms: f64) -> Self {
+        Self {
+            start: std::time::Instant::now(),
+            budget_ms,
+        }
+    }
+
+    pub fn elapsed_ms(&self) -> f64 {
+        self.start.elapsed().as_secs_f64() * 1000.0
+    }
+
+    pub fn budget_ms(&self) -> f64 {
+        self.budget_ms
+    }
+
+    pub fn is_exceeded(&self) -> bool {
+        self.elapsed_ms() >= self.budget_ms
+    }
+}
 
 /// Konfiguration für Multi-Step Retrieval.
 #[derive(Debug, Clone)]
@@ -65,24 +94,14 @@ pub struct MultiStepResult {
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
-    pid_controller: parking_lot::Mutex<PoolController>,
     clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
-        let pool_cfg = PoolControllerConfig {
-            target_latency_ms: config.latency_budget_ms as f32,
-            min_pool: 50,
-            max_pool: 200,
-            pool_nominal: 100,
-            ..Default::default()
-        };
-        let pid = PoolController::new(pool_cfg).unwrap_or_default();
         Self {
             collection,
             config,
-            pid_controller: parking_lot::Mutex::new(pid),
             clock: Arc::new(SystemClock::new()),
         }
     }
@@ -146,12 +165,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         let mut rounds_executed = 0;
         let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
 
-        // Runde 1: Standard-Suche mit PoolController-reguliertem Kandidatenpool
-        let start_nanos = self.clock.monotonic_nanos();
-        let current_pid_val = self.pid_controller.lock().current_pool();
-        let candidate_k = (self.config.rerank_pool_multiplier * k)
-            .clamp(50, current_pid_val)
-            .clamp(50, 200);
+        // Runde 1: Standard-Suche mit Kandidatenpool
+        let candidate_k = (self.config.rerank_pool_multiplier * k).clamp(50, 200);
 
         let round1 = self
             .collection
@@ -161,14 +176,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .k(candidate_k)
             .execute()
             .await?;
-
-        let round1_elapsed_nanos = self.clock.monotonic_nanos().saturating_sub(start_nanos);
-        let round1_dt = std::time::Duration::from_nanos(round1_elapsed_nanos);
-        let round1_elapsed_ms = round1_dt.as_secs_f32() * 1000.0;
-        // Update PoolController state for subsequent rounds and queries.
-        self.pid_controller
-            .lock()
-            .update_step(round1_dt.as_secs_f32(), round1_elapsed_ms);
 
         all_result_sets.push(round1);
         rounds_executed += 1;
@@ -209,11 +216,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 break;
             }
 
-            let round_start_nanos = self.clock.monotonic_nanos();
-            let pid_val = self.pid_controller.lock().current_pool();
-            let scaled_k = (self.config.rerank_pool_multiplier * k)
-                .clamp(50, pid_val)
-                .clamp(50, 200);
+            let scaled_k = (self.config.rerank_pool_multiplier * k).clamp(50, 200);
 
             let current_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
             let scored_entries: Vec<ScoredEntry> = current_results
@@ -333,17 +336,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 }
             }
 
-            let round_elapsed_nanos = self
-                .clock
-                .monotonic_nanos()
-                .saturating_sub(round_start_nanos);
-            let round_dt = std::time::Duration::from_nanos(round_elapsed_nanos);
-            let round_elapsed_ms = round_dt.as_secs_f32() * 1000.0;
-            // Update PoolController state for subsequent rounds and queries.
-            self.pid_controller
-                .lock()
-                .update_step(round_dt.as_secs_f32(), round_elapsed_ms);
-
             let deduped_round = deduplicate_search_results(round_results);
             all_result_sets.push(deduped_round);
             rounds_executed += 1;
@@ -387,7 +379,6 @@ fn deduplicate_search_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
@@ -428,14 +419,12 @@ mod tests {
             ..Default::default()
         };
         let index = Arc::new(HnswIndex::try_new(hnsw_config).expect("hnsw index")); // expect
-        let graph = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(AtomicU64::new(1));
 
         let col = Collection::new(
             "default".to_string(),
             storage,
             index,
-            graph,
             next_tx,
             4,
             contextra_text::Language::English,

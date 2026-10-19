@@ -1,25 +1,5 @@
 use contextra_db::memory_consolidation::compute_community_hash;
-#[cfg(feature = "volatile-vault")]
-use contextra_db::volatile_vault::{SignalModality, VaultChunk};
 use contextra_types::DocId;
-#[cfg(feature = "volatile-vault")]
-use contextra_types::TxId;
-
-#[cfg(feature = "volatile-vault")]
-#[test]
-fn test_vault_chunk_docid_type() {
-    if let Ok(doc_id) = DocId::from_key("vault_test_doc_key") {
-        let chunk = VaultChunk::new(
-            doc_id,
-            b"sensitive payload".to_vec(),
-            SignalModality::TextInput,
-            TxId::new(1),
-        );
-
-        assert_eq!(chunk.id, doc_id);
-        assert_eq!(chunk.content, b"sensitive payload");
-    }
-}
 
 #[test]
 fn test_compute_community_hash_deterministic() {

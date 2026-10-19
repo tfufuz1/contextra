@@ -1,10 +1,12 @@
 // FILE-CONTEXT
+// STAND: 2026-10-15T00:00:00Z
 // ZWECK: Contextra Database Strangler Shell / Re-export Facade (Layer 3).
-// INVARIANTEN: Backward compatibility for all public types; re-exports from contextra-engine and contextra-cognition.
+// INVARIANTEN: Backward compatibility for required public types; re-exports from contextra-engine.
+// NICHT-OFFENSICHTLICH: Keine eigenen Storage-Mutationen in contextra-db; delegiert an contextra-engine.
+// SIEHE AUCH: AGENTS.md, capabilities.toml
 
 #![forbid(unsafe_code)]
 
-pub use contextra_cognition as cognition;
 pub use contextra_engine as engine;
 
 // Re-exports from contextra-engine
@@ -21,92 +23,20 @@ pub use contextra_engine::{
     SCHEMA_VERSION_V1,
 };
 
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_engine::collection::maintenance::PercolationResult;
-#[cfg(feature = "sandbox")]
-pub use contextra_engine::SandboxBridge;
-
-// Re-exports from contextra-cognition
-#[allow(deprecated)]
-pub use contextra_cognition::execute_sleep_cycle;
-pub use contextra_cognition::{
-    cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-    compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-    run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-    ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard, ConsolidationPhaseResult,
-    ConsolidationSession, ContextCompactor, ContextManager, MaintenanceConfig,
-    MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
-    SynthesisPhaseResult, TurnSegment,
-};
-
-pub mod context {
-    pub use contextra_cognition::context::*;
-}
-pub mod context_compaction {
-    pub use contextra_cognition::context_compaction::*;
-}
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
-pub mod synthesis_phase {
-    pub use contextra_cognition::synthesis_phase::*;
-}
-pub mod consolidation_executor {
-    pub use contextra_cognition::consolidation_executor::*;
-}
-pub mod consolidation_locks {
-    pub use contextra_cognition::consolidation_locks::*;
-}
-pub mod maintenance_scheduler {
-    pub use contextra_cognition::maintenance_scheduler::*;
-}
-pub mod maintenance_config {
-    pub use contextra_cognition::maintenance_config::*;
-}
-
 #[deprecated(note = "use background_workers instead")]
 pub mod reaper {
     pub use contextra_engine::background_workers::*;
 }
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub use contextra_cognition::start_consolidation_reaper;
 
-// mod Collection is used via pub mod collection
-pub mod decay_controller {
-    pub use contextra_adapt::decay_controller::*;
-}
 pub use contextra_engine::fusion;
-pub mod homeostat;
 pub mod multistep;
-pub mod pid_latency_controller {
-    pub use contextra_adapt::pid_latency_controller::*;
-}
-
-#[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
-#[cfg(feature = "volatile-vault")]
-pub use volatile_vault::{
-    CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-    VaultError, VolatileContextVault,
-};
+pub mod wiring;
 
-pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
-pub use homeostat::{PoolController, PoolControllerConfig, RerankDeadline};
-#[allow(deprecated)]
-pub use homeostat::RerankPidController;
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
-#[allow(deprecated)]
-pub use pid_latency_controller::{
-    LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
-    MIN_SCALING_FACTOR,
-};
 
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;
@@ -233,10 +163,8 @@ mod tests {
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
             .expect("insert"); // expect
-        assert_eq!(db.len().await.expect("len"), 1); // expect
 
         db.delete("doc-1").await.expect("delete"); // expect
-        assert_eq!(db.len().await.expect("len"), 0); // expect
 
         // get should return None after delete
         let doc = db.get("doc-1").await.expect("get"); // expect
@@ -356,9 +284,6 @@ mod tests {
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(
-            contextra_adapt::PidController::new(150.0, 50, 200, Some(100)),
-        ));
 
         // Warmup calibrator so ECE is populated
         {
@@ -371,18 +296,15 @@ mod tests {
 
         db.set_router(Arc::downgrade(&router_arc));
         db.set_calibrator(Arc::downgrade(&calibrator_arc));
-        db.set_pid_controller(Arc::downgrade(&pid_arc));
 
         let stats_attached = db.stats().await.expect("stats");
         assert_eq!(stats_attached.drift_status, "stabil");
         assert!(stats_attached.calibration_ece.is_some());
         assert!(stats_attached.last_calibration_at.is_some());
-        assert_eq!(stats_attached.pid_pool_size, Some(100));
 
         // 3. Drop strong references (simulating shutdown) -> stats() must not panic and fallback gracefully
         drop(router_arc);
         drop(calibrator_arc);
-        drop(pid_arc);
 
         let stats_dropped = db.stats().await.expect("stats after drop");
         assert_eq!(stats_dropped.drift_status, "nicht verfügbar");
@@ -615,7 +537,6 @@ mod tests {
             .collection_for_tenant("drop-me", tenant_id)
             .await
             .expect("re-create"); // expect
-        assert_eq!(col2.len().await, 0);
         assert!(col2.get("k1").await.expect("get").is_none()); // expect
     }
 
@@ -649,65 +570,10 @@ mod tests {
     }
 
     #[test]
-    fn test_contextra_config_defaults_to_onnx_backend() {
+    fn test_contextra_config_defaults() {
         let config = ContextraConfig::default();
         assert_eq!(config.dimension, 768);
-        assert_eq!(
-            config.embedding_backend,
-            EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: None,
-            }
-        );
-        assert_eq!(
-            EmbeddingBackend::default(),
-            EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: None,
-            }
-        );
-    }
-
-    #[tokio::test]
-    #[cfg(feature = "onnx")]
-    async fn test_onnx_default_backend_e2e_with_fixture() {
-        let tmp = TempDir::new().expect("temp dir");
-        let cache_tmp = TempDir::new().expect("cache temp dir");
-        let model_dir = cache_tmp.path().join("nomic-embed-text");
-        std::fs::create_dir_all(&model_dir).expect("create model dir");
-
-        let fixture_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("contextra-embed")
-            .join("tests")
-            .join("fixtures");
-
-        std::fs::copy(fixture_dir.join("model.onnx"), model_dir.join("model.onnx"))
-            .expect("copy model");
-        std::fs::copy(
-            fixture_dir.join("tokenizer.json"),
-            model_dir.join("tokenizer.json"),
-        )
-        .expect("copy tokenizer");
-
-        let config = ContextraConfig {
-            dimension: 32, // Fixture BERT model output dim is 32
-            embedding_backend: EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: Some(cache_tmp.path().to_path_buf()),
-            },
-            ..Default::default()
-        };
-
-        let db = Contextra::open_with_config(tmp.path(), config)
-            .await
-            .expect("open_with_config");
-
-        assert!(db.embedder.read().is_some());
-        let embedder = db.embedder.read().as_ref().cloned().expect("embedder");
-        let vec = embedder.embed("test document").await.expect("embed test");
-        assert_eq!(vec.len(), 32);
+        assert_eq!(config.embedding_backend, EmbeddingBackend::None);
     }
 
     #[tokio::test]

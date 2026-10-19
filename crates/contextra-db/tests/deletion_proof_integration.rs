@@ -2,6 +2,7 @@
 
 //! Integration tests for GDPR Art. 17 DeletionProof generation during collection drop.
 
+use contextra_crypto::deletion_proof::VerificationKey;
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_engine::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
 use contextra_ports::StorageEngine;
@@ -75,8 +76,10 @@ async fn test_drop_collection_generates_verifiable_deletion_proof() {
     );
 
     // 4. Verify signature with correct proof key
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+    let verifying_key = signing_key.verifying_key();
     let is_valid = proof
-        .verify(proof_key)
+        .verify(VerificationKey::Ed25519(&verifying_key))
         .expect("verify() should execute without error");
     assert!(
         is_valid,
@@ -85,8 +88,11 @@ async fn test_drop_collection_generates_verifiable_deletion_proof() {
 
     // 5. Verify signature fails with wrong proof key
     let wrong_key = b"invalid-wrong-deletion-proof-key";
+    let wrong_signing_key =
+        ed25519_dalek::SigningKey::from_bytes(wrong_key[..32].try_into().unwrap());
+    let wrong_verifying_key = wrong_signing_key.verifying_key();
     let is_valid_wrong = proof
-        .verify(wrong_key)
+        .verify(VerificationKey::Ed25519(&wrong_verifying_key))
         .expect("verify() should execute without error");
     assert!(
         !is_valid_wrong,
@@ -145,8 +151,12 @@ async fn test_negative_reconstruction_no_data_discoverable_after_drop() {
         .await
         .expect("drop_collection");
 
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+    let verifying_key = signing_key.verifying_key();
     assert!(
-        proof.verify(proof_key).expect("verify"),
+        proof
+            .verify(VerificationKey::Ed25519(&verifying_key))
+            .expect("verify"),
         "Proof must be cryptographically valid"
     );
 
@@ -281,8 +291,14 @@ async fn test_deleted_keys_hash_is_deterministic() {
         "HMAC signatures must match when key hashes and parameters are identical"
     );
 
-    assert!(proof_1.verify(proof_key).unwrap());
-    assert!(proof_2.verify(proof_key).unwrap());
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+    let verifying_key = signing_key.verifying_key();
+    assert!(proof_1
+        .verify(VerificationKey::Ed25519(&verifying_key))
+        .unwrap());
+    assert!(proof_2
+        .verify(VerificationKey::Ed25519(&verifying_key))
+        .unwrap());
 }
 
 /// Test 4d: Explicit integration test for drop_collection verifying physical emptiness before proof generation.
@@ -309,7 +325,11 @@ async fn test_drop_collection_verifies_physical_emptiness_before_proof() {
         .await
         .expect("drop_collection should succeed when storage is verifiably empty");
 
-    assert!(proof.verify(proof_key).expect("verify signature"));
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(proof_key[..32].try_into().unwrap());
+    let verifying_key = signing_key.verifying_key();
+    assert!(proof
+        .verify(VerificationKey::Ed25519(&verifying_key))
+        .expect("verify signature"));
 }
 
 /// Test 4e: Refutation tests — Tampered proof payload, tampered signature, or missing/invalid layer witness must fail verification.

@@ -40,7 +40,7 @@ async fn test_atomic_final_state_checkpoint() -> contextra_types::Result<()> {
 
     engine.run(&mut ctx, &graph).await?;
 
-    assert_eq!(ctx.status, AgentStatus::Completed);
+    assert_eq!(ctx.status(), AgentStatus::Completed);
 
     // Verify that a checkpoint exists for the 'end' node
     let checkpoints = engine.checkpoint_store.list_checkpoints().await?;
