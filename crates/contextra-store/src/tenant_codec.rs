@@ -1046,32 +1046,58 @@ mod tests {
         let codec = TenantKeyCodec::new(tenant);
         let col = CollectionId(42);
         let doc = DocId(99);
-        let key = codec.encode_chunk_key(&col, doc);
-        assert_eq!(TenantKeyCodec::decode_tenant_id(&key), Some(tenant));
+        let chunk_key = codec.encode_chunk_key(&col, doc);
+        assert_eq!(TenantKeyCodec::decode_tenant_id(&chunk_key), Some(tenant));
+
+        let graph_key = codec.encode_graph_key(&col, 1001);
+        assert_eq!(TenantKeyCodec::decode_tenant_id(&graph_key), Some(tenant));
     }
 
     #[test]
     fn test_cross_tenant_isolation() {
-        let codec_a = TenantKeyCodec::new(TenantId::try_new(1).unwrap());
-        let codec_b = TenantKeyCodec::new(TenantId::try_new(2).unwrap());
+        let tenant_a = TenantId::try_new(1).unwrap();
+        let tenant_b = TenantId::try_new(2).unwrap();
+        let codec_a = TenantKeyCodec::new(tenant_a);
+        let codec_b = TenantKeyCodec::new(tenant_b);
         let col = CollectionId(1);
         let doc = DocId(1);
+
         let key_a = codec_a.encode_chunk_key(&col, doc);
-        // Key von Tenant A darf NICHT mit Präfix von Tenant B matchen
+        // Key von Tenant A darf NICHT mit Präfix von Tenant B matchen (VETO-F10)
         assert!(!key_a.starts_with(codec_b.scan_prefix()));
+        assert_ne!(
+            TenantKeyCodec::decode_tenant_id(&key_a),
+            Some(tenant_b)
+        );
+        assert_eq!(
+            TenantKeyCodec::decode_tenant_id(&key_a),
+            Some(tenant_a)
+        );
     }
 
     #[test]
     fn test_scan_prefix_cached_no_alloc() {
         let codec = TenantKeyCodec::new(TenantId::try_new(42).unwrap());
-        assert!(codec.scan_prefix().starts_with(b"t:42:"));
+        assert_eq!(codec.scan_prefix(), b"t:42:");
     }
 
     #[test]
-    fn test_decode_invalid_key_returns_none() {
+    fn test_decode_invalid_and_manipulated_keys_return_none() {
+        // Completely invalid format or empty
+        assert!(TenantKeyCodec::decode_tenant_id(b"").is_none());
         assert!(TenantKeyCodec::decode_tenant_id(b"invalid").is_none());
+        assert!(TenantKeyCodec::decode_tenant_id(b"x:100:10:chunk:1").is_none());
+
+        // Zero tenant_id is forbidden (must return None)
         assert!(TenantKeyCodec::decode_tenant_id(b"t:0:col:chunk:1").is_none());
-        // SYSTEM
+
+        // Non-numeric tenant_id
+        assert!(TenantKeyCodec::decode_tenant_id(b"t:abc:10:chunk:1").is_none());
+        assert!(TenantKeyCodec::decode_tenant_id(b"t:-5:10:chunk:1").is_none());
+
+        // Missing trailing delimiter or colon
+        assert!(TenantKeyCodec::decode_tenant_id(b"t:100").is_none());
+        assert!(TenantKeyCodec::decode_tenant_id(b"t:").is_none());
     }
 
     #[test]

@@ -334,7 +334,7 @@ async fn test_compaction_isolation_across_scopes() {
 
     let output_a_path = tmp.path().join("scope_a_compact.sst");
     engine_a
-        .merge_sstables(&[reader_a.clone()], &output_a_path, 0, false)
+        .merge_sstables_with_cancel(&[reader_a.clone()], &output_a_path, 0, false, None)
         .await
         .unwrap();
 
@@ -355,14 +355,14 @@ async fn test_compaction_isolation_across_scopes() {
 
     let output_b_path = tmp.path().join("scope_b_compact.sst");
     engine_b
-        .merge_sstables(&[reader_b.clone()], &output_b_path, 0, false)
+        .merge_sstables_with_cancel(&[reader_b.clone()], &output_b_path, 0, false, None)
         .await
         .unwrap();
 
     // Verify attempting to merge reader_a and reader_b together in a single call fails
     let mixed_output_path = tmp.path().join("mixed_output.sst");
     let mixed_res = engine_a
-        .merge_sstables(&[reader_a, reader_b], &mixed_output_path, 0, false)
+        .merge_sstables_with_cancel(&[reader_a, reader_b], &mixed_output_path, 0, false, None)
         .await;
     assert!(
         matches!(mixed_res, Err(ContextraError::InvalidInput(_))),

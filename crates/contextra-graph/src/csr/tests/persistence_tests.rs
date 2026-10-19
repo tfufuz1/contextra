@@ -291,6 +291,59 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
 }
 
 #[tokio::test]
+async fn hyperedge_survives_storage_roundtrip() {
+    use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_PREFIX};
+    use contextra_store::{LsmConfig, LsmStorage};
+
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
+    let graph = CsrGraph::with_config_and_storage(CsrGraphConfig::default(), storage.clone());
+    let tx = TxId::new(1);
+    let he_id = HyperEdgeId::new(501);
+    let e1 = EntityId::new(100);
+    let e2 = EntityId::new(101);
+
+    let edge = HyperEdge::new(
+        he_id,
+        crate::csr::EdgeType::Default,
+        vec![
+            RoleBinding::new(RoleId::new(1), e1),
+            RoleBinding::new(RoleId::new(2), e2),
+        ],
+        0.9,
+    );
+
+    graph.insert_hyperedge(edge.clone());
+    graph.persist_hyperedge(tx, &edge).await.unwrap();
+    storage.commit(tx).await.unwrap();
+    storage.flush().await.unwrap();
+    drop(graph);
+
+    let reopened_graph = CsrGraph::load_from_storage(storage.as_ref()).await.unwrap();
+    let (entries, _) = storage
+        .scan_prefix_bounded(HYPEREDGE_PREFIX.as_bytes(), 100, None)
+        .await
+        .unwrap();
+
+    for (_key, value) in entries {
+        let recovered_he = HyperEdge::deserialize(&value).unwrap();
+        reopened_graph.insert_hyperedge(recovered_he);
+    }
+
+    let retrieved = reopened_graph.get_hyperedge(he_id);
+    assert!(retrieved.is_some(), "Hyperedge must survive storage roundtrip");
+    assert_eq!(*retrieved.unwrap(), edge);
+    assert_eq!(reopened_graph.hyperedges_for_entity(e1), vec![he_id]);
+}
+
+#[tokio::test]
 async fn graph_edges_survive_storage_roundtrip() {
     use contextra_store::{LsmConfig, LsmStorage};
 

@@ -111,7 +111,7 @@ async fn test_compaction_retention_exact_min_snapshot_seq() {
     // Therefore, seq 100 is the floor version for min_snapshot_seq = 100.
     // Seq 50 is strictly older than min_snapshot_seq and older than the floor version, so it MUST be discarded.
     engine
-        .merge_sstables(&[r1], &output_path, 100, true)
+        .merge_sstables_with_cancel(&[r1], &output_path, 100, true, None)
         .await
         .unwrap();
 

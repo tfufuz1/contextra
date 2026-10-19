@@ -172,18 +172,3 @@ pub fn binary_search_entry_in_block(
     }
 }
 
-pub fn block_binary_search(
-    block_data: &[u8],
-    offsets_start: usize,
-    num_offsets: usize,
-    key: &[u8],
-    is_v3: bool,
-) -> Result<Option<usize>> {
-    match binary_search_first_index_in_block(block_data, offsets_start, num_offsets, key, is_v3)? {
-        Some(idx) => {
-            let (entry_off, _) = get_entry_at_index(block_data, offsets_start, idx, is_v3)?;
-            Ok(Some(entry_off))
-        }
-        None => Ok(None),
-    }
-}

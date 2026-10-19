@@ -146,6 +146,15 @@ impl WasmExecutor {
         capabilities: &WasmCapabilities,
         timeout: Duration,
     ) -> Result<WasmOutput, SandboxError> {
+        #[cfg(not(feature = "unverified-execute"))]
+        {
+            if crate::approval::classify_risk(capabilities).requires_approval() {
+                return Err(SandboxError::CapabilityViolation {
+                    capability: "unverified execution of elevated/high risk WASM module requires feature 'unverified-execute'".to_string(),
+                });
+            }
+        }
+
         // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
         // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
         // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
@@ -382,7 +391,7 @@ mod tests {
             res_denied
         );
 
-        // Test case 2: allow_cloud_egress = true -> Execution succeeds
+        // Test case 2: allow_cloud_egress = true -> Execution succeeds if unverified-execute enabled, else denied
         let caps_allowed = WasmCapabilities {
             allow_cloud_egress: true,
             ..Default::default()
@@ -390,9 +399,16 @@ mod tests {
         let res_allowed = executor
             .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
             .await;
+        #[cfg(feature = "unverified-execute")]
         assert!(
             res_allowed.is_ok(),
-            "Expected execution to succeed when allow_cloud_egress is true, got: {:?}",
+            "Expected execution to succeed when allow_cloud_egress is true with feature unverified-execute, got: {:?}",
+            res_allowed
+        );
+        #[cfg(not(feature = "unverified-execute"))]
+        assert!(
+            matches!(res_allowed, Err(SandboxError::CapabilityViolation { .. })),
+            "Expected execution to be denied when allow_cloud_egress is true without feature unverified-execute, got: {:?}",
             res_allowed
         );
         Ok(())

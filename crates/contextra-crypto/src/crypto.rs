@@ -64,6 +64,7 @@ impl Clone for KeyManager {
         }
 
         let mut nonce_prefix = [0u8; 4];
+        // CSPRNG EXCEPTION (P28): Nonce prefix generation requires cryptographically secure OS entropy via OsRng.
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Self {
@@ -122,6 +123,7 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
+        // CSPRNG EXCEPTION (P28): Nonce prefix generation requires cryptographically secure OS entropy via OsRng.
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
@@ -777,6 +779,41 @@ mod tests {
             let (_, nonce) = km.encrypt_auto_nonce(data).expect("encrypt"); // expect
             assert!(nonces.insert(nonce), "Nonce reuse detected!");
         }
+    }
+
+    #[test]
+    fn test_cipher_for_tenant_isolation_roundtrip_mismatch_fails() {
+        use contextra_types::TenantId;
+
+        let km = KeyManager::try_new("master-passphrase-tenant-isolation", b"salt-tenant-1234").expect("km");
+        let tenant_a = TenantId::try_new(101).expect("tenant_a");
+        let tenant_b = TenantId::try_new(202).expect("tenant_b");
+
+        let cipher_a = km.cipher_for(tenant_a).expect("cipher_a");
+        let cipher_b = km.cipher_for(tenant_b).expect("cipher_b");
+
+        // Verify keys derived for different tenants are distinct
+        assert_ne!(
+            cipher_a.inspect_key_bytes_for_test(),
+            cipher_b.inspect_key_bytes_for_test(),
+            "Cipher keys derived for different tenants MUST be distinct"
+        );
+
+        let data = b"confidential tenant A data block";
+        let (encrypted_a, nonce_a) = cipher_a.encrypt_auto_nonce(data).expect("encrypt_a");
+
+        // Decryption with tenant A cipher must succeed
+        let decrypted_a = cipher_a
+            .decrypt_auto_nonce(&encrypted_a, &nonce_a)
+            .expect("decrypt_a");
+        assert_eq!(decrypted_a.as_slice(), data);
+
+        // Decryption of tenant A's ciphertext using tenant B's cipher MUST fail
+        let result_b = cipher_b.decrypt_auto_nonce(&encrypted_a, &nonce_a);
+        assert!(
+            result_b.is_err(),
+            "Tenant B cipher MUST NOT be able to decrypt Tenant A ciphertext (VETO-F10)"
+        );
     }
 
     #[test]

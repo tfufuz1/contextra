@@ -1,6 +1,6 @@
 use contextra_audit_export::{
     render_register_json, render_register_markdown, testkit::InMemoryProcessingRegisterSource,
-    ProcessingRegisterEntry, ProcessingRegisterSource,
+    AuditRegisterExporter, ProcessingRegisterEntry, ProcessingRegisterSource,
 };
 use contextra_types::TenantId;
 
@@ -17,6 +17,43 @@ fn test_json_rendering_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
     let deserialized: Vec<ProcessingRegisterEntry> = serde_json::from_str(&json_output)?;
     assert_eq!(deserialized, entries);
+
+    Ok(())
+}
+
+#[test]
+fn test_audit_register_exporter_api() -> Result<(), Box<dyn std::error::Error>> {
+    let tenant_id = TenantId::try_new(300)?;
+    let mut exporter = AuditRegisterExporter::with_sample_data_for(tenant_id);
+
+    // Test source() and source_mut()
+    let initial_entries = exporter.source().collect_entries(tenant_id)?;
+    assert_eq!(initial_entries.len(), 2);
+
+    let new_entry = ProcessingRegisterEntry {
+        tenant_id,
+        processing_purpose: "Test purpose added via source_mut".to_string(),
+        data_categories: vec!["Audit Logs".to_string()],
+        legal_basis: "Art. 6 Abs. 1 lit. c DSGVO".to_string(),
+        egress_events: vec![],
+        deletion_proofs: vec![],
+        generated_at: 1_700_000_200_000_000_000,
+    };
+
+    exporter.source_mut().add_entry(new_entry.clone());
+
+    let updated_entries = exporter.source().collect_entries(tenant_id)?;
+    assert_eq!(updated_entries.len(), 3);
+
+    // Test export_json()
+    let json_export = exporter.export_json(tenant_id)?;
+    let parsed: Vec<ProcessingRegisterEntry> = serde_json::from_str(&json_export)?;
+    assert_eq!(parsed.len(), 3);
+    assert_eq!(parsed[2], new_entry);
+
+    // Test export_markdown()
+    let markdown_export = exporter.export_markdown(tenant_id)?;
+    assert!(markdown_export.contains("Test purpose added via source_mut"));
 
     Ok(())
 }

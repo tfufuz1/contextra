@@ -22,6 +22,13 @@ pub enum ApprovalRisk {
     High,
 }
 
+impl ApprovalRisk {
+    /// Determines whether this risk level requires explicit human approval or verified gating.
+    pub fn requires_approval(&self) -> bool {
+        matches!(self, Self::Elevated | Self::High)
+    }
+}
+
 /// Derives the execution risk level deterministically from `WasmCapabilities`.
 ///
 /// # Rule Matrix

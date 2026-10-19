@@ -13,6 +13,7 @@ pub mod erasure_requests;
 pub mod error;
 pub mod markdown_template;
 pub mod retention_classes;
+#[cfg(any(test, feature = "testkit"))]
 pub mod testkit;
 
 pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
@@ -142,6 +143,7 @@ impl<S> AuditRegisterExporter<S> {
     }
 }
 
+#[cfg(any(test, feature = "testkit"))]
 impl AuditRegisterExporter<testkit::InMemoryProcessingRegisterSource> {
     /// Creates an exporter pre-populated with synthetic sample processing register entries for `tenant_id`.
     pub fn with_sample_data_for(tenant_id: TenantId) -> Self {

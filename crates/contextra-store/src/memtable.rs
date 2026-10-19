@@ -1159,4 +1159,39 @@ mod tests {
         assert_eq!(seq, 100);
         assert_eq!(tx, 10);
     }
+
+    #[test]
+    fn test_scan_range_into_unbounded_equivalence_with_iter_latest() {
+        let mt = MemTable::new();
+
+        // Populate multiple versions across different keys
+        mt.put(Bytes::from("key1"), Bytes::from("k1_v1"), 10, 1);
+        mt.put(Bytes::from("key1"), Bytes::from("k1_v2"), 20, 2);
+        mt.put(Bytes::from("key2"), Bytes::from("k2_v1"), 15, 1);
+        mt.put(Bytes::from("key3"), Bytes::from("k3_v1"), 30, 3);
+        mt.put(Bytes::from("key3"), Bytes::from("k3_v2"), 40, 4);
+
+        // 1. Collect latest via iter_latest()
+        let iter_latest_map: BTreeMap<Bytes, (Bytes, u64)> = mt
+            .iter_latest()
+            .into_iter()
+            .map(|(k, v, seq, _tx)| (k, (v, seq)))
+            .collect();
+
+        // 2. Collect latest via scan_range_into(Unbounded, Unbounded, u64::MAX, TxId::MAX)
+        let mut scan_range_map = BTreeMap::new();
+        mt.scan_range_into(
+            Bound::Unbounded,
+            Bound::Unbounded,
+            u64::MAX,
+            TxId(u64::MAX),
+            &mut scan_range_map,
+        );
+
+        // Prove bitwise equivalence of keys and latest visible values/seqs
+        assert_eq!(
+            scan_range_map, iter_latest_map,
+            "scan_range_into over Unbounded range at u64::MAX must produce identical results to iter_latest"
+        );
+    }
 }

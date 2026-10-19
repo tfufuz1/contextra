@@ -159,25 +159,13 @@ impl Wal {
         &self,
         file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        self.replay_mmap_with_size_and_version(file_size).await
-    }
-
-    #[allow(dead_code)]
-    async fn replay_mmap_with_size_and_version(
-        &self,
-        _file_size: u64,
-    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        match self.replay_mmap().await {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                tracing::warn!(
-                    "WAL mmap replay failed for {:?} ({}), falling back to stream reader",
-                    self.path,
-                    e
-                );
-                self.replay_stream_with_version().await
-            }
-        }
+        let (entries, version) = self.replay_mmap().await?;
+        let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
+        let valid_entries = entries
+            .into_iter()
+            .take_while(|(_, _, pos)| *pos <= file_size_usize as u64)
+            .collect();
+        Ok((valid_entries, version))
     }
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`).
