@@ -1,3 +1,14 @@
+# Jules API Configuration & Verification Status
+#
+# VERIFIKATIONS-STATUS (geprüft gegen xtask/src/harness/jules_dispatch.rs):
+# - "AUTO_CREATE_PR": In dispatch.rs wird explizit geprüft, dass "AUTO_CREATE_PR" NICHT in dieser Datei enthalten ist.
+# - "requirePlanApproval" / "automationMode": In dispatch.rs werden diese Werte im JSON-Payload hardcodiert an die REST-API übermittelt:
+#     "requirePlanApproval": true, "automationMode": "MANUAL"
+# - Alle anderen Felder in dieser Datei (endpoints, actions, headers) sind zur Dokumentation der Endpunkte angelegt,
+#   werden jedoch vom Dispatcher-Code nicht dynamisch eingelesen oder verifiziert.
+#
+# Daher bleibt verified = false.
+
 verified = false
 
 [endpoints]
@@ -14,6 +25,8 @@ send_message = "/sessions/{session_id}:sendMessage"
 authorization = "X-Goog-Api-Key"
 content_type = "application/json"
 
+# Die operative Steuerung der Autonomie- und Freigabestufen (Plan-Freigabe, Auto-Merge)
+# ist Owner-Konfiguration und wird in .jules/AUTONOMY.md geregelt.
 [defaults]
 require_plan_approval = true
 automation_mode = "MANUAL"
