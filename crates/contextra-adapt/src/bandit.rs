@@ -3,53 +3,9 @@
 
 #![allow(clippy::needless_range_loop)]
 
+pub use contextra_sys::SeededRng;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
-
-/// Deterministischer SplitMix64 PRNG für Seed-basierte Zufallszahlen.
-#[derive(Debug)]
-pub struct SeededRng {
-    state: AtomicU64,
-}
-
-impl SeededRng {
-    /// Erstellt eine neue [`SeededRng`]-Instanz mit dem gegebenen Seed.
-    pub fn new(seed: u64) -> Self {
-        Self {
-            state: AtomicU64::new(seed),
-        }
-    }
-}
-
-impl contextra_ports::SeededRng for SeededRng {
-    fn next_u64(&self) -> u64 {
-        const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
-        let z = self
-            .state
-            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
-            .wrapping_add(GOLDEN_RATIO_64);
-        let mut z = z;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        z ^ (z >> 31)
-    }
-
-    fn fill_bytes(&self, mut dest: &mut [u8]) {
-        while !dest.is_empty() {
-            let val = self.next_u64();
-            let bytes = val.to_le_bytes();
-            let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
-        }
-    }
-
-    fn next_unit_f64(&self) -> f64 {
-        let mantissa = self.next_u64() >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
-    }
-}
 
 /// Intervall für die periodische Re-Faktorisierung/Drift-Prüfung der Sherman-Morrison Inversen.
 // Wert ist ein konservativer Startwert, siehe PR-Diskussion für Tuning
@@ -222,7 +178,7 @@ impl SketchMatrix {
         let mut data = Vec::with_capacity(total_elements);
 
         for _ in 0..total_elements {
-            let bit = (contextra_ports::Rng::next_u64(&rng) & 1) == 0;
+            let bit = (rng.next_u64() & 1) == 0;
             data.push(if bit { scale } else { -scale });
         }
 
