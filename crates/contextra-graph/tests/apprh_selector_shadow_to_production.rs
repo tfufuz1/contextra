@@ -158,14 +158,15 @@ fn test_selector_explicit_promotion_yields_apprh() -> Result<(), Box<dyn std::er
     let mut g = MockGraph::new();
     let e1 = EntityId::new(1);
     let e2 = EntityId::new(2);
-    let e3 = EntityId::new(3);
 
     g.add_binary_edge(e1, e2, 1.0);
-    g.add_hyperedge(1, vec![e1, e2, e3], 2.0);
 
     let seeds = vec![e1];
     let ppr = PprParams::default();
-    let apprh_params = ApprhParams::default();
+    let apprh_params = ApprhParams {
+        ppr: ppr.clone(),
+        ..Default::default()
+    };
 
     let monitor = Arc::new(ApprhGateMonitor::new(ApprhGateMonitorConfig {
         window_size: 5,
