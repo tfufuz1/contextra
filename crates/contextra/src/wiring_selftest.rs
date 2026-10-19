@@ -21,8 +21,11 @@ pub struct WiringReport {
 
 impl WiringReport {
     pub fn is_valid(&self) -> bool {
-        self.missing_ports.iter().all(|m| m.contains("(disabled)"))
-            && self.invalid_security_ports.is_empty()
+        self.missing_ports.iter().all(|m| {
+            m.contains("(disabled)")
+                || m.contains("(optional)")
+                || m.contains("(nicht prüfbar")
+        }) && self.invalid_security_ports.is_empty()
     }
 }
 
@@ -30,12 +33,31 @@ impl WiringReport {
 pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
     let mut report = WiringReport::default();
 
-    let _nanos = builder.clock().now_unix_nanos();
-    report.wired_ports.push("Clock".to_string());
+    if !builder.storage_path().as_os_str().is_empty() {
+        report.wired_ports.push("StoragePath".to_string());
+    } else {
+        report.missing_ports.push("StoragePath".to_string());
+    }
 
-    report.wired_ports.push("Rng".to_string());
-    report.wired_ports.push("IdGen".to_string());
-    report.wired_ports.push("LicenseGate".to_string());
+    if builder.config().dimension > 0 {
+        report.wired_ports.push("Dimension".to_string());
+    } else {
+        report.missing_ports.push("Dimension".to_string());
+    }
+
+    if let Some(err) = builder.signed_license_error() {
+        report
+            .invalid_security_ports
+            .push(format!("LicenseGate ({err})"));
+    } else {
+        report.wired_ports.push("LicenseGate".to_string());
+    }
+
+    if builder.embedder().is_some() {
+        report.wired_ports.push("Embedder".to_string());
+    } else {
+        report.missing_ports.push("Embedder (optional)".to_string());
+    }
 
     if builder.kms_enabled() {
         report.wired_ports.push("Kms".to_string());
@@ -51,7 +73,19 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
 
     if builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
         report.wired_ports.push("Erasure".to_string());
+    } else {
+        report.missing_ports.push("Erasure (disabled)".to_string());
     }
+
+    report.missing_ports.push(
+        "Clock (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
+    );
+    report.missing_ports.push(
+        "Rng (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
+    );
+    report.missing_ports.push(
+        "IdGen (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
+    );
 
     report
 }
@@ -70,13 +104,21 @@ pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport,
     }
 
     if !report.is_valid() {
-        let missing = report
-            .missing_ports
-            .iter()
-            .filter(|m| !m.contains("(disabled)"))
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ");
+        let missing = if !report.invalid_security_ports.is_empty() {
+            report.invalid_security_ports.join(", ")
+        } else {
+            report
+                .missing_ports
+                .iter()
+                .filter(|m| {
+                    !m.contains("(disabled)")
+                        && !m.contains("(optional)")
+                        && !m.contains("(nicht prüfbar")
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
         return Err(BuildError::IncompleteWiring {
             flag: "security_ports".to_string(),
             missing,
@@ -87,13 +129,58 @@ pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport,
 }
 
 /// Generiert einen Verdrahtungsbericht für eine `Contextra`-Instanz.
-pub fn generate_report_for_instance(_instance: &Contextra) -> WiringReport {
+pub fn generate_report_for_instance(instance: &Contextra) -> WiringReport {
     let mut report = WiringReport::default();
-    report.wired_ports.push("Clock".to_string());
-    report.wired_ports.push("Rng".to_string());
-    report.wired_ports.push("IdGen".to_string());
-    report.wired_ports.push("LicenseGate".to_string());
-    report.wired_ports.push("EngineWiring".to_string());
+    let config = instance.config();
+
+    if config.dimension > 0 {
+        report.wired_ports.push("Dimension".to_string());
+    } else {
+        report.missing_ports.push("Dimension".to_string());
+    }
+
+    if config.metrics_sink.is_some() {
+        report.wired_ports.push("MetricsSink".to_string());
+    } else {
+        report.missing_ports.push("MetricsSink (optional)".to_string());
+    }
+
+    if config.merge_operator.is_some() {
+        report.wired_ports.push("MergeOperator".to_string());
+    } else {
+        report.missing_ports.push("MergeOperator (optional)".to_string());
+    }
+
+    if config.consolidation_launcher.is_some() {
+        report.wired_ports.push("ConsolidationLauncher".to_string());
+    } else {
+        report
+            .missing_ports
+            .push("ConsolidationLauncher (optional)".to_string());
+    }
+
+    if config.erasure_mode != contextra_ports::erasure::ErasureMode::Off {
+        report.wired_ports.push("Erasure".to_string());
+    } else {
+        report.missing_ports.push("Erasure (disabled)".to_string());
+    }
+
+    report.missing_ports.push(
+        "Clock (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
+    );
+    report.missing_ports.push(
+        "Rng (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
+    );
+    report.missing_ports.push(
+        "IdGen (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
+    );
+    report.missing_ports.push(
+        "LicenseGate (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
+    );
+    report.missing_ports.push(
+        "EngineWiring (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
+    );
+
     report
 }
 
