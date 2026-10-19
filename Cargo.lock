@@ -656,6 +656,8 @@ dependencies = [
 name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
+ "contextra-audit-export",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-types",
  "serde",
@@ -668,6 +670,7 @@ dependencies = [
 name = "contextra-avv-generator"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-types",
  "serde",
  "thiserror 2.0.20",
@@ -1177,6 +1180,7 @@ name = "contextra-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -1190,7 +1194,7 @@ name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-core",
+ "contextra-types",
  "criterion",
  "proptest",
  "thiserror 2.0.20",
