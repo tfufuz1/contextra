@@ -23,6 +23,29 @@ thiserror.workspace = true
 
 [features]
 dibud = []
+conformal = []
+isotonic_rebuild = []
+platt_closure = []
+
+[[test]]
+name = "dibud_equivalence"
+required-features = ["dibud"]
+
+[[test]]
+name = "dibud_requires_streaming_channels"
+required-features = ["dibud"]
+
+[[test]]
+name = "conformal_tests"
+required-features = ["conformal"]
+
+[[test]]
+name = "isotonic_ece_rebuild"
+required-features = ["isotonic_rebuild"]
+
+[[test]]
+name = "j12closure-contextra-rank_platt_fitted"
+required-features = ["platt_closure"]
 
 [dev-dependencies]
 contextra-adapt.workspace = true
