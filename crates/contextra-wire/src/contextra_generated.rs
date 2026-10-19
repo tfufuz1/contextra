@@ -401,9 +401,24 @@ pub mod contextra {
         }
 
         impl<'a> SearchResponse<'a> {
-            pub const VT_RESULTS: flatbuffers::VOffsetT = 4;
-            pub const VT_TOTAL_HITS: flatbuffers::VOffsetT = 6;
-            pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 8;
+
+        pub const VT_VERSION: flatbuffers::VOffsetT = 4;
+        pub const VT_RESULTS: flatbuffers::VOffsetT = 6;
+        pub const VT_TOTAL_HITS: flatbuffers::VOffsetT = 8;
+        pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 10;
+
+        /// Returns the schema protocol version.
+        ///
+        /// # Safety
+        /// Callers must ensure this table handle references a valid FlatBuffer buffer.
+        #[inline]
+        pub unsafe fn version(&self) -> u32 {
+            // SAFETY: Valid table slot for VT_VERSION.
+            self._tab.get::<u32>(SearchResponse::VT_VERSION, Some(1)).unwrap_or(1)
+        }
+
+
+
 
             #[inline]
             pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -479,6 +494,7 @@ pub mod contextra {
             }
         }
         pub struct SearchResponseArgs<'a> {
+            pub version: u32,
             pub results: Option<
                 flatbuffers::WIPOffset<
                     flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ScoredDocument<'a>>>,
@@ -491,6 +507,7 @@ pub mod contextra {
             #[inline]
             fn default() -> Self {
                 SearchResponseArgs {
+            version: 1,
                     results: None,
                     total_hits: 0,
                     processing_time_ms: 0.0,
@@ -503,6 +520,11 @@ pub mod contextra {
             start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
         }
         impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b> {
+
+        #[inline]
+        pub fn add_version(&mut self, version: u32) {
+            self.fbb_.push_slot::<u32>(SearchResponse::VT_VERSION, version, 1);
+        }
             #[inline]
             pub fn add_results(
                 &mut self,
@@ -1444,7 +1466,7 @@ pub mod contextra {
             fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
             root: flatbuffers::WIPOffset<SearchResponse<'a>>,
         ) {
-            fbb.finish(root, None);
+            fbb.finish(root, Some(SEARCH_RESPONSE_IDENTIFIER));
         }
 
         #[inline]
@@ -1452,7 +1474,19 @@ pub mod contextra {
             fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
             root: flatbuffers::WIPOffset<SearchResponse<'a>>,
         ) {
-            fbb.finish_size_prefixed(root, None);
+            fbb.finish_size_prefixed(root, Some(SEARCH_RESPONSE_IDENTIFIER));
+        }
+
+        pub const SEARCH_RESPONSE_IDENTIFIER: &str = "CTRA";
+
+        #[inline]
+        pub fn search_response_buffer_has_identifier(buf: &[u8]) -> bool {
+            flatbuffers::buffer_has_identifier(buf, SEARCH_RESPONSE_IDENTIFIER, false)
+        }
+
+        #[inline]
+        pub fn search_response_size_prefixed_buffer_has_identifier(buf: &[u8]) -> bool {
+            flatbuffers::buffer_has_identifier(buf, SEARCH_RESPONSE_IDENTIFIER, true)
         }
     } // pub mod IPC
 } // pub mod Contextra

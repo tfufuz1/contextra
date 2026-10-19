@@ -23,6 +23,7 @@ pub mod contextra_generated;
 
 pub mod adapter;
 pub mod jsonrpc;
+pub mod wiring;
 
 pub use contextra_generated::contextra::ipc::*;
 pub use jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};

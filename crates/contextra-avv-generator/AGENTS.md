@@ -7,6 +7,12 @@ Generierung rechtlicher Auftragsverarbeitungsverträge (AVV) und Datenschutzvere
 - Ring: 3
 - Async erlaubt: ja
 - Unsafe erlaubt: nein
+- **INV-AVV-TOM-DEFAULTS**: `default_technical_measures()` muss zwingend alle produktinternen Sicherheitsgarantien (Deletion Proofs, Access Control, Isolation) enthalten.
+  *Prüfung*: `cargo test -p contextra-avv-generator --lib`
+- **INV-AVV-TEMPLATE-UTF8**: Erzeugte AVV-Vorlagen sind strikt UTF-8-konform und frei von unmaskierten Platzhaltern.
+  *Prüfung*: `cargo test -p contextra-avv-generator --lib`
+- **INV-FORBID-UNSAFE**: Strikte Einhaltung von `#![forbid(unsafe_code)]`.
+  *Prüfung*: `cargo check -p contextra-avv-generator`
 
 ## Abhängigkeiten (`may_depend_on`, siehe `capabilities.toml`)
 - `contextra-types`
