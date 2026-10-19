@@ -22,6 +22,7 @@ pub struct GgufMetadata {
 /// Inspects a GGUF model file and extracts its architecture and metadata header keys.
 ///
 /// Uses `candle_core::quantized::gguf_file` to parse container headers without reading tensor payloads into memory.
+// TODO(contextra-plan): Plan for GGUF loader path: Verify zero-payload metadata extraction, tensor shape validation, and model fingerprint computation [ref:eigenbau-candle-tensor]
 pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, ContextraError> {
     // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     let mut file = File::open(model_path).map_err(|e| {

@@ -1,6 +1,6 @@
 #![deny(dead_code)]
 // FILE-CONTEXT
-// STAND: 2026-09-16T16:13:00Z (SESSION: afafdd44)
+// STAND: 2026-10-11T16:00:00Z (SESSION: 5984fc0d)
 // ZWECK: Crate root for contextra-infer-candle native GGUF inference backend.
 // INVARIANTEN: Zero unsafe code in crate; re-exports core inference types and gasp validator.
 
@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
+// REVIEW-PASS[2/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-10-11T16:00:00Z) (SESSION: 5984fc0d) PRÜFER-KONTEXT: FRESH
 
 pub mod attention_exporter;
 pub mod embedding;
