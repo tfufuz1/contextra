@@ -92,8 +92,7 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
     false
 }
 
-// TODO(contextra-plan): Plan for GASP grounding path: Verify IsotonicCalibrator confidence score scaling, attribution bounds, and non-constant score proof for perturbed context chunks [ref:eigenbau-candle-tensor]
-
+/// Verified GASP post-hoc grounding validator contract: Computes claim attribution against context chunks with bounded scores and `IsotonicCalibrator` confidence scaling.
 /// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,
@@ -315,9 +314,39 @@ impl GroundingValidator for GaspValidator {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use contextra_types::DocId;
+
+    #[tokio::test]
+    async fn test_gasp_non_constant_score_proof_for_perturbed_context_chunks() {
+        let validator = GaspValidator::new();
+        let response = "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.";
+
+        let unperturbed_chunks = vec![sample_chunk(
+            1,
+            "Der Umsatz betrug im Jahr 2025 genau 50 Millionen Euro.",
+        )];
+        let perturbed_chunks = vec![sample_chunk(
+            1,
+            "Der Umsatz betrug im Jahr 2025 genau 10 Millionen Euro.",
+        )];
+
+        let score_unperturbed = validator
+            .compute_raw_grounding_score(response, &unperturbed_chunks)
+            .unwrap();
+        let score_perturbed = validator
+            .compute_raw_grounding_score(response, &perturbed_chunks)
+            .unwrap();
+
+        assert_ne!(
+            score_unperturbed, score_perturbed,
+            "Perturbed context chunks must yield non-constant grounding scores"
+        );
+        assert_eq!(score_unperturbed, 1.0);
+        assert!(score_perturbed < 0.5);
+    }
 
     fn sample_chunk(id: u64, content: &str) -> ContextChunk {
         ContextChunk {

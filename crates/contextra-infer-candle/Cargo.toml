@@ -44,6 +44,7 @@ required-features = ["kv-bridge"]
 
 [features]
 default = []
+# Feature forwarding gate target re-exported by downstream workspace crates (e.g. contextra, contextra-mcp)
 candle = []
 kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]

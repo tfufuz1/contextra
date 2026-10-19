@@ -1,3 +1,5 @@
+#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
 // FILE-CONTEXT
 // STAND: 2026-09-13T01:42:00Z (SESSION: 50c8c755)
 // ZWECK: Integration tests for KV-Bridge fail-open behavior, fingerprint mismatches, GASP grounding, and backpressure saturation.
