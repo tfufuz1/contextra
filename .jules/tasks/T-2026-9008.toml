@@ -1,0 +1,38 @@
+id        = "T-2026-9008"
+title     = "ci(jules): jules-state-Branch und Kontext-Injektion (ADR-N30)"
+crate     = "contextra-core"
+tier      = 2
+risk      = "none"
+protected_change = "ADR-N30"
+goal      = "Erstellung des jules-state Workflows zur frequenzschonenden Bereitstellung von GitHub-Zustand (Milestones, Issues, PRs, Commits) via Git-Branch 'jules-state' und Einbindung in refresh-context.sh"
+non_goals = [
+  "Keine Änderungen an anderen Workflows oder xtask-Code",
+  "Keine Änderungen an environment_script.sh"
+]
+scope     = [
+  ".github/workflows/jules-state.yml",
+  ".github/workflows/prune-branches.yml",
+  ".jules/setup/refresh-context.sh",
+  ".jules/tasks/T-2026-9008.toml"
+]
+forbidden = [
+  "crates/**",
+  "xtask/**",
+  "capabilities.toml",
+  "AGENTS.md",
+  "rust-toolchain.toml",
+  "deny.toml"
+]
+invariants = ["Zero-Panic", "Rate-limit-frei", "Idempotenz"]
+acceptance = [
+  "cargo run --manifest-path xtask/Cargo.toml -- check-workflow-commands",
+  "cargo run --manifest-path xtask/Cargo.toml -- check-action-pinning",
+  "cargo run --manifest-path xtask/Cargo.toml -- protected-paths",
+  "cargo run --manifest-path xtask/Cargo.toml -- gate-weakening"
+]
+evidence_required = []
+
+[budget]
+files = 4
+lines = 500
+iterations = 5

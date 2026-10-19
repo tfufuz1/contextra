@@ -1,0 +1,126 @@
+name: Jules State Sync
+
+on:
+  issues:
+  milestone:
+  pull_request:
+    types: [opened, closed, reopened, synchronize, labeled, unlabeled]
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: jules-state
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  sync-state:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate STATE.md and publish to jules-state branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # (a) Header & Milestones
+          {
+            echo "# GitHub Repository State"
+            echo "Generated at $(date -u '+%Y-%m-%d %H:%M:%S UTC') from commit $SHA"
+            echo ""
+            echo "## Milestones"
+          } > STATE.md
+
+          MILESTONES_JSON=$(gh api "repos/$REPO/milestones?state=all&per_page=100" 2>/dev/null || echo "[]")
+          if echo "$MILESTONES_JSON" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+            echo "$MILESTONES_JSON" | jq -r '.[] | "- **\(.title)** [#\(.number)] (\(.state)): \(.open_issues) open, \(.closed_issues) closed"' >> STATE.md
+          else
+            echo "_No milestones found._" >> STATE.md
+          fi
+          echo "" >> STATE.md
+
+          # (b) Open issues with label "jules:ready" grouped by milestone
+          echo "## Open Issues (jules:ready)" >> STATE.md
+          ISSUES_JSON=$(gh api "repos/$REPO/issues?state=open&labels=jules:ready&per_page=100" 2>/dev/null || echo "[]")
+          if echo "$ISSUES_JSON" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+            echo "$ISSUES_JSON" | jq -r '
+              group_by(.milestone.number // 0) | .[] |
+              ( (.[0].milestone.title // "No Milestone") as $m | "### Milestone: \($m)\n" ) +
+              ( .[] |
+                ( [.labels[].name | select(startswith("crate:") or startswith("tier:") or startswith("risk:"))] | join(", ") ) as $lbls |
+                "- #\(.number): \(.title) [\($lbls)]"
+              )
+            ' >> STATE.md
+          else
+            echo "_No open jules:ready issues._" >> STATE.md
+          fi
+          echo "" >> STATE.md
+
+          # (c) Open PRs with changed files
+          echo "## Open Pull Requests" >> STATE.md
+          PRS_JSON=$(gh api "repos/$REPO/pulls?state=open&per_page=50" 2>/dev/null || echo "[]")
+          if echo "$PRS_JSON" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+            PR_COUNT=$(echo "$PRS_JSON" | jq 'length')
+            for ((i=0; i<PR_COUNT; i++)); do
+              PR_NUM=$(echo "$PRS_JSON" | jq -r ".[$i].number")
+              PR_TITLE=$(echo "$PRS_JSON" | jq -r ".[$i].title")
+              PR_BRANCH=$(echo "$PRS_JSON" | jq -r ".[$i].head.ref")
+              PR_DRAFT=$(echo "$PRS_JSON" | jq -r ".[$i].draft")
+
+              {
+                echo "### PR #$PR_NUM: $PR_TITLE"
+                echo "- **Branch:** \`$PR_BRANCH\` | **Draft:** $PR_DRAFT"
+                echo "- **Changed Files:**"
+              } >> STATE.md
+
+              FILES_JSON=$(gh api "repos/$REPO/pulls/$PR_NUM/files?per_page=100" 2>/dev/null || echo "[]")
+              if echo "$FILES_JSON" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+                echo "$FILES_JSON" | jq -r '.[] | "  - \(.filename)"' >> STATE.md
+              else
+                echo "  - _No files retrieved_" >> STATE.md
+              fi
+              echo "" >> STATE.md
+            done
+          else
+            echo "_No open pull requests._" >> STATE.md
+            echo "" >> STATE.md
+          fi
+
+          # (d) Last 20 commits on main
+          echo "## Recent Commits on main" >> STATE.md
+          (git log origin/main -20 --format='- %h %s' 2>/dev/null || git log -20 --format='- %h %s') >> STATE.md
+          echo "" >> STATE.md
+
+          # (e) Metadata footer
+          {
+            echo "---"
+            echo "Source SHA: $SHA"
+          } >> STATE.md
+
+          # Publish orphan commit to jules-state branch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BLOB_SHA=$(git hash-object -w STATE.md)
+          TREE_SHA=$(printf "100644 blob %s\tSTATE.md\n" "$BLOB_SHA" | git mktree)
+          COMMIT_MSG="chore(jules): update jules-state STATE.md [skip ci]
+
+          Protected-Change: ADR-N30"
+          COMMIT_SHA=$(git commit-tree "$TREE_SHA" -m "$COMMIT_MSG")
+          git push origin "$COMMIT_SHA:refs/heads/jules-state" --force
