@@ -1,7 +1,8 @@
 //! Regressionstest für AGT-INDEX-006: Snapshot-Isolation bei Soft-Delete.
 //! Sichert: search_at(seq) gibt Nodes zurück die NACH seq gelöscht wurden.
 
-use contextra_core::{DocId, TxId, VectorIndex};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::{HnswConfig, HnswIndex};
 
 #[tokio::test]
