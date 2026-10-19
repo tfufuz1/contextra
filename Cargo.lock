@@ -656,6 +656,7 @@ dependencies = [
 name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
+ "contextra-audit-export",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
