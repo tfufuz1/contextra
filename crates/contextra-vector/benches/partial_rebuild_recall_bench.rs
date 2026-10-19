@@ -1,6 +1,7 @@
 // FILE-CONTEXT: Criterion benchmark suite for F-02 Partial HNSW Rebuild recall regression curve across growing tombstone ratios.
 
-use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rand::rngs::StdRng;

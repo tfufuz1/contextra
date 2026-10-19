@@ -3,7 +3,7 @@
 // INVARIANTEN: Zero-Panic bei Deserialisierung.
 
 use crate::hnsw::Sq8Bias;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// Magic number for HNSW files (0x484E5357 = "HNSW").
 pub const HNSW_MAGIC: u32 = 0x484E5357;

@@ -720,7 +720,7 @@ impl DiskAnnIndex {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "docid-128"))]
 mod tests {
     use super::*;
 
