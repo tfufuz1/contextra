@@ -24,10 +24,4 @@ fuzz_target!(|input: FuzzInput| {
         input.num_offsets,
         &input.key,
     );
-    let _ = contextra_store::sstable::block_binary_search(
-        &input.block_data,
-        input.offsets_start,
-        input.num_offsets,
-        &input.key,
-    );
 });

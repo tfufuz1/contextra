@@ -940,6 +940,89 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_encrypted_wal_roundtrip_crash_replay_tamper_detection() -> Result<()> {
+        let km = KeyManager::try_new("master-passphrase-wal-crypto", b"salt-wal-1234")?;
+        let file_id = b"segment_crash_replay.wal";
+        let wal_crypto = EncryptedWal::new(km.clone(), file_id)?;
+
+        let payload_1 = b"transaction_1_payload_data";
+        let payload_2 = b"transaction_2_payload_data";
+
+        // 1. Encrypt chunks
+        let encrypted_chunk_1 = wal_crypto.encrypt_chunk(payload_1)?;
+        let encrypted_chunk_2 = wal_crypto.encrypt_chunk(payload_2)?;
+
+        // 2. Decrypt roundtrip check
+        let decrypted_1 = wal_crypto.decrypt_chunk(&encrypted_chunk_1)?;
+        let decrypted_2 = wal_crypto.decrypt_chunk(&encrypted_chunk_2)?;
+        assert_eq!(decrypted_1, payload_1);
+        assert_eq!(decrypted_2, payload_2);
+
+        // 3. Bit-flip manipulation on ciphertext byte
+        let mut tampered_chunk = encrypted_chunk_1.clone();
+        tampered_chunk[15] ^= 0x01;
+        assert!(
+            wal_crypto.decrypt_chunk(&tampered_chunk).is_err(),
+            "Decryption of tampered ciphertext MUST fail with CryptoError"
+        );
+
+        // 4. Bit-flip manipulation on nonce byte
+        let mut tampered_nonce_chunk = encrypted_chunk_1.clone();
+        tampered_nonce_chunk[2] ^= 0x01;
+        assert!(
+            wal_crypto.decrypt_chunk(&tampered_nonce_chunk).is_err(),
+            "Decryption of ciphertext with modified nonce MUST fail with CryptoError"
+        );
+
+        // 5. IntegrityVerifier HMAC verification over replayed snapshots
+        let integrity_key = km.integrity_key()?;
+        let mut verifier = IntegrityVerifier::new(&integrity_key);
+
+        let snapshot_1 = WalEntrySnapshot {
+            tx_id: 1,
+            seq_no: 1,
+            op_type: 0,
+            key: b"key1".to_vec(),
+            value: payload_1.to_vec(),
+            checksum: [0u8; 32],
+            prev_hmac: [0u8; 32],
+        };
+        let mut mac_1 = WalHmac::new(&integrity_key)?;
+        mac_1.update(&[0u8; 32]);
+        mac_1.update(&1u64.to_le_bytes());
+        mac_1.update(&1u64.to_le_bytes());
+        mac_1.update(&[0u8]);
+        mac_1.update(&len_prefix(snapshot_1.key.len())?);
+        mac_1.update(&snapshot_1.key);
+        mac_1.update(&len_prefix(snapshot_1.value.len())?);
+        mac_1.update(&snapshot_1.value);
+        let checksum_1 = mac_1.finalize();
+
+        let valid_snapshot_1 = WalEntrySnapshot {
+            tx_id: snapshot_1.tx_id,
+            seq_no: snapshot_1.seq_no,
+            op_type: snapshot_1.op_type,
+            key: snapshot_1.key.clone(),
+            value: snapshot_1.value.clone(),
+            checksum: checksum_1,
+            prev_hmac: snapshot_1.prev_hmac,
+        };
+
+        // Verify valid snapshot succeeds
+        verifier.verify_and_update(&valid_snapshot_1, 100)?;
+
+        // Verify tampered snapshot (manipulated value) fails
+        let mut tampered_snapshot_1 = valid_snapshot_1.clone();
+        tampered_snapshot_1.value = b"manipulated_value".to_vec();
+        assert!(
+            verifier.verify_and_update(&tampered_snapshot_1, 200).is_err(),
+            "IntegrityVerifier MUST reject tampered snapshot value"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn test_integrity_verifier_handoff_via_snapshot() {
         let key = b"integrity-key-32-bytes-handoff-";

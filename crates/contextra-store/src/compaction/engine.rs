@@ -459,28 +459,6 @@ impl CompactionEngine {
         raw_overhead + min_stream_buffer
     }
 
-    /// Performs a multi-way merge of input SSTables into a single output SSTable.
-    ///
-    /// During merge:
-    /// - Duplicate keys: newest sequence number wins
-    /// - Tombstones: removed if `seq_no < min_snapshot_seq` (no snapshot references them)
-    pub async fn merge_sstables(
-        &self,
-        inputs: &[Arc<SstableReader>],
-        output_path: &std::path::Path,
-        min_snapshot_seq: u64,
-        is_full_compaction: bool,
-    ) -> Result<()> {
-        self.merge_sstables_with_cancel(
-            inputs,
-            output_path,
-            min_snapshot_seq,
-            is_full_compaction,
-            None,
-        )
-        .await
-    }
-
     /// Helper to fetch next item from source stream and push to heap.
     async fn fetch_next_entry<T: Send>(
         source_idx: usize,
@@ -1112,7 +1090,9 @@ mod tests {
         }
 
         let output_path = tmp.path().join("rate-output.sst");
-        engine.merge_sstables(&old_ssts, &output_path, 0, false).await?;
+        engine
+            .merge_sstables_with_cancel(&old_ssts, &output_path, 0, false, None)
+            .await?;
 
         assert!(output_path.exists());
         Ok(())

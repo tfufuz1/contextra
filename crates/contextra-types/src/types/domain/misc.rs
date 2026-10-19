@@ -348,6 +348,55 @@ impl MemoryType {
     }
 }
 
+impl TlHfdParams {
+    /// Validates configuration parameters against spec constraints.
+    ///
+    /// # Errors
+    /// Returns [`ContextraError::InvalidInput`] if any parameter violates its domain boundary or is non-finite.
+    ///
+    /// # Complexity
+    /// Time complexity $O(1)$.
+    pub fn validate(&self) -> Result<()> {
+        if !self.sigma.is_finite() || self.sigma <= 0.0 {
+            return Err(ContextraError::InvalidInput(format!(
+                "sigma must be positive and finite, got {}",
+                self.sigma
+            )));
+        }
+        if !self.delta.is_finite() || self.delta < 2.0 {
+            return Err(ContextraError::InvalidInput(format!(
+                "delta must be >= 2.0 and finite, got {}",
+                self.delta
+            )));
+        }
+        if !self.gamma.is_finite() || self.gamma < 0.0 {
+            return Err(ContextraError::InvalidInput(format!(
+                "gamma must be >= 0.0 and finite, got {}",
+                self.gamma
+            )));
+        }
+        if self.max_iterations < 1 {
+            return Err(ContextraError::InvalidInput(format!(
+                "max_iterations must be >= 1, got {}",
+                self.max_iterations
+            )));
+        }
+        if self.max_top_k_expansion < 1 {
+            return Err(ContextraError::InvalidInput(format!(
+                "max_top_k_expansion must be >= 1, got {}",
+                self.max_top_k_expansion
+            )));
+        }
+        if self.max_hyperedge_sort_size < 2 {
+            return Err(ContextraError::InvalidInput(format!(
+                "max_hyperedge_sort_size must be >= 2, got {}",
+                self.max_hyperedge_sort_size
+            )));
+        }
+        Ok(())
+    }
+}
+
 impl std::fmt::Display for MemoryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_metadata_key())

@@ -10,6 +10,7 @@ use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeq
 use crate::restore_filter::CpyRestoreFilter;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
+use contextra_store::copy_registry::{CopyRegEntry, CopyRegistry};
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -936,20 +937,17 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Returns registered copies from `registry` for observability and exclusion set creation.
-    pub fn registered_copies<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
-        &self,
-        registry: &R,
-    ) -> Vec<crate::copy_registry::CopyRegEntry> {
-        registry.list()
+    pub fn registered_copies(&self, registry: &CopyRegistry) -> Vec<CopyRegEntry> {
+        registry.registered_copies()
     }
 
     /// Purges a registered copy checkpoint idempotently and crash-consistently.
     /// Unlinks hardlink files via `durable_remove` without modifying underlying contents,
     /// marks metadata as removed, and removes registry entry.
-    pub async fn purge_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
+    pub async fn purge_checkpoint(
         &self,
         copy_id: [u8; 16],
-        registry: &mut R,
+        registry: &mut CopyRegistry,
         clone_dir: &Path,
     ) -> Result<()> {
         purge_registered_checkpoint(copy_id, registry, clone_dir).await
@@ -957,13 +955,13 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 }
 
 /// Purges a registered copy checkpoint idempotently and crash-consistently.
-pub async fn purge_registered_checkpoint<R: crate::copy_registry::CpyCopyRegistry + ?Sized>(
+pub async fn purge_registered_checkpoint(
     copy_id: [u8; 16],
-    registry: &mut R,
+    registry: &mut CopyRegistry,
     clone_dir: &Path,
 ) -> Result<()> {
     let entries = registry.list();
-    let target_entry = entries.into_iter().find(|e| e.copy_id == copy_id);
+    let target_entry = entries.iter().find(|e| e.copy_id == copy_id).cloned();
 
     if let Some(entry) = target_entry {
         // 1. Unlink target hardlink files safely using durable_remove
@@ -973,7 +971,7 @@ pub async fn purge_registered_checkpoint<R: crate::copy_registry::CpyCopyRegistr
                     let path = dir_entry.path();
                     if path.is_file() {
                         if let Some(fname) = path.file_name().and_then(|f| f.to_str()) {
-                            let fid = crate::copy_registry::file_id_for_name(fname);
+                            let fid = contextra_store::copy_registry::file_id_for_name(fname);
                             if entry.file_ids.contains(&fid) {
                                 if let Err(e) = tokio::fs::remove_file(&path).await {
                                     if e.kind() != std::io::ErrorKind::NotFound {

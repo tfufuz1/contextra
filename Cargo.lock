@@ -619,6 +619,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "contextra-ports",
+ "contextra-sys",
  "contextra-types",
  "criterion",
  "proptest",
@@ -655,6 +656,7 @@ dependencies = [
 name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
+ "contextra-audit-export",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
@@ -772,6 +774,7 @@ dependencies = [
  "blake3",
  "contextra-crypto",
  "contextra-durable-fs",
+ "contextra-kvcache",
  "contextra-ports",
  "contextra-types",
  "criterion",
@@ -1092,6 +1095,7 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-avv-generator",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",

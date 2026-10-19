@@ -16,6 +16,7 @@ ring = "1"
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 contextra-mvcc = { version = "0.1.0", path = "../contextra-mvcc" }
+contextra-store = { version = "0.1.0", path = "../contextra-store" }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -32,7 +33,6 @@ tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
 contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
-contextra-store = { version = "0.1.0", path = "../contextra-store" }
 
 [target.'cfg(loom)'.dependencies]
 

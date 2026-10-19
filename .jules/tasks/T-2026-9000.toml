@@ -1,0 +1,42 @@
+# Task-Karte Säuberungsprogramm agentische Entwicklung
+id        = "T-2026-9000"
+title     = "ADRs N30-N34 Säuberungsprogramm agentische Entwicklung"
+crate     = "governance"
+tier      = 1            # Tier 1
+risk      = "none"       # none
+goal      = "Verfassen der normativen Entscheidungs-ADRs N30-N34 zur Konsolidierung und Säuberung der agentischen Entwicklung"
+non_goals = [
+  "Keine Änderungen an Quellcode, Workflows oder bestehender xtask-Logik",
+  "Keine Abschwächung von Gates oder Lints"
+]
+scope     = [
+  "docs/decisions/ADR-N30-*.md",
+  "docs/decisions/ADR-N31-*.md",
+  "docs/decisions/ADR-N32-*.md",
+  "docs/decisions/ADR-N33-*.md",
+  "docs/decisions/ADR-N34-*.md",
+  "docs/decisions/README.md",
+  ".jules/tasks/T-2026-9000.toml"
+]
+forbidden = [
+  "crates/**",
+  "xtask/**",
+  ".github/**",
+  "governance/**",
+  "capabilities.toml",
+  "AGENTS.md",
+  "rust-toolchain.toml",
+  "deny.toml"
+]
+invariants = ["Zero-Panic", "Gate Integrity"]
+acceptance = [
+  "cargo run --manifest-path xtask/Cargo.toml -- check-doc-references",
+  "cargo run --manifest-path xtask/Cargo.toml -- check-adr-deadlines",
+  "just sync-docs-check"
+]
+evidence_required = ["Fünf vollständig verfasste ADR-Dateien N30-N34 und aktualisierter Index in README.md"]
+
+[budget]
+files = 7
+lines = 1500
+iterations = 5

@@ -206,12 +206,12 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
     let min_snapshot_seq = u64::MAX;
     let output_path = tmp.path().join("sst_merged_m.sst");
     engine
-        .merge_sstables(
+        .merge_sstables_with_cancel(
             &[sst_a.clone(), sst_b.clone()],
             &output_path,
             min_snapshot_seq,
             false,
-        )
+        , None)
         .await
         .expect("merge A and B into M");
 
@@ -331,7 +331,7 @@ async fn test_phantom_data_after_partial_compaction() {
     // Manually trigger merger for {sst1, sst2} -> partial compaction
     let output_path = tmp.path().join("merged.sst");
     engine
-        .merge_sstables(&[sst1, sst2], &output_path, 100, false) // is_full = false
+        .merge_sstables_with_cancel(&[sst1, sst2], &output_path, 100, false, None) // is_full = false
         .await
         .expect("merge"); // expect
 
@@ -366,7 +366,7 @@ async fn test_phantom_data_after_partial_compaction() {
     .await;
 
     engine
-        .merge_sstables(&[sst1, sst2], &output_path_full, 100, true) // is_full = true
+        .merge_sstables_with_cancel(&[sst1, sst2], &output_path_full, 100, true, None) // is_full = true
         .await
         .expect("merge"); // expect
 
@@ -457,12 +457,12 @@ async fn test_compaction_pressure_awareness() {
     let normal_out = tmp.path().join("normal_merged.sst");
     let start_normal = tokio::time::Instant::now();
     engine
-        .merge_sstables(
+        .merge_sstables_with_cancel(
             &[Arc::clone(&sst1), Arc::clone(&sst2)],
             &normal_out,
             u64::MAX,
             true,
-        )
+        , None)
         .await
         .expect("merge under normal pressure");
     let duration_normal = start_normal.elapsed();
@@ -482,7 +482,7 @@ async fn test_compaction_pressure_awareness() {
     let critical_out = tmp.path().join("critical_merged.sst");
     let start_critical = tokio::time::Instant::now();
     engine
-        .merge_sstables(&[sst1, sst2], &critical_out, u64::MAX, true)
+        .merge_sstables_with_cancel(&[sst1, sst2], &critical_out, u64::MAX, true, None)
         .await
         .expect("merge under critical pressure");
     let duration_critical = start_critical.elapsed();
@@ -723,7 +723,7 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
     // in sstables list and can be safely merged without out-of-bounds panics.
     let output = tmp.path().join("merged_decoupled.sst");
     let merge_res = engine
-        .merge_sstables(&candidates, &output, u64::MAX, true)
+        .merge_sstables_with_cancel(&candidates, &output, u64::MAX, true, None)
         .await;
     assert!(
         merge_res.is_ok(),
@@ -790,7 +790,7 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
     // Versions > 15: seq 30, seq 20 (MUST both be retained).
     // Floor version (newest <= 15): seq 10 ("v10") (MUST be retained).
     engine
-        .merge_sstables(&[sst1, sst2, sst3], &output, 15, true)
+        .merge_sstables_with_cancel(&[sst1, sst2, sst3], &output, 15, true, None)
         .await
         .expect("merge");
 
@@ -1013,7 +1013,7 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
 
     let output_path = tmp.path().join("sst-compacted.sst");
     engine
-        .merge_sstables(&[sst1], &output_path, 15, true)
+        .merge_sstables_with_cancel(&[sst1], &output_path, 15, true, None)
         .await
         .expect("compaction succeeds");
 

@@ -104,6 +104,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Inserts a document with a Sequence-based Time-To-Live (TTL in committed ops).
+    ///
+    /// Sequence-based TTL sets `_expiry_seq` (`EXPIRY_METADATA_KEY`), which is scanned
+    /// and reaped by `Collection::reap_expired_documents` during background worker runs (`expiry_workers.rs`).
     #[tracing::instrument(level = "trace", skip(self, embedding, metadata))]
     pub async fn insert_with_ttl(
         &self,

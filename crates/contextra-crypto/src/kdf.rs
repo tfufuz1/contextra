@@ -130,6 +130,9 @@ impl KdfHeader {
 
     /// Kalibriert die KDF-Kostenparameter dynamisch auf eine Mindestlaufzeit (z. B. >= 250 ms)
     /// unter Einhaltung der INV-KDF-1 Untergrenzen (m >= 64 MiB, t >= 3).
+    ///
+    /// # Errors
+    /// Returns [`CryptoError::InvalidInput`] falls `target_ms < 250` ist.
     pub fn new_calibrated(target_ms: u64, clock: &dyn contextra_ports::Clock) -> Result<Self> {
         if target_ms < 250 {
             return Err(CryptoError::InvalidInput(format!(
@@ -294,6 +297,27 @@ impl KdfHeader {
             },
             salt,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_ports::SystemClock;
+
+    #[test]
+    fn test_kdf_header_new_calibrated() {
+        let clock = SystemClock::new();
+
+        // Positive path with target_ms >= 250
+        let header = KdfHeader::new_calibrated(250, &clock);
+        assert!(header.is_ok());
+        let header = header.unwrap();
+        assert!(header.meets_policy());
+
+        // Negative path: target_ms < 250 MUST fail
+        let invalid = KdfHeader::new_calibrated(100, &clock);
+        assert!(matches!(invalid, Err(CryptoError::InvalidInput(_))));
     }
 }
 

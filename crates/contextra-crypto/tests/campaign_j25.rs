@@ -16,7 +16,6 @@ use contextra_crypto::{
     anti_tamper::VolatileEncryptionKey,
     kdf::{KdfHeader, KdfParams},
     kv_cipher::ModelFingerprint,
-    kv_segment::{segment::KvSegment, store::TenantIsolatedKvStore},
     wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot},
     KeyManager,
 };
@@ -487,6 +486,8 @@ fn test_h8_wal_integrity_verifier_chain_reordering_and_tamper_detection() {
 
 #[test]
 fn test_h9_tenant_isolated_kv_store_cross_tenant_isolation_and_rollback() {
+    use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
+
     let store = TenantIsolatedKvStore::new();
 
     let tenant_a = TenantId::try_new(10).unwrap();

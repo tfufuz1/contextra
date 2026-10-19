@@ -53,6 +53,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// Process-static monotonic counter providing local sequence numbers for temporary file creation.
+// Uniqueness across processes and targets is guaranteed because temporary filenames incorporate the
+// target directory path, target file stem, OS Process ID (`pid`), and this atomic sequence `count`.
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Marker type representing a handle poisoned by an fsync error.

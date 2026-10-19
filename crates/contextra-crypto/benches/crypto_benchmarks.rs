@@ -61,7 +61,7 @@ fn bench_hmac_integrity(c: &mut Criterion) {
 
 // ADR-082 Performance-Nachweis Benchmarks
 
-use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
+use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
 use contextra_types::TenantId;
 
 fn bench_kv_insert_n_segments(c: &mut Criterion) {

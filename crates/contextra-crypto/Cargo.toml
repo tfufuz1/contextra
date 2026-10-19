@@ -43,6 +43,7 @@ kv-encryption = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils", "test-support"] }
+contextra-kvcache = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"

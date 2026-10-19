@@ -193,8 +193,9 @@ fn extract_mod_declarations(file_path: &Path) -> Vec<ModDecl> {
         Err(_) => return decls,
     };
 
+    let lines_raw: Vec<&str> = content.lines().collect();
     let stripped = strip_comments_and_strings(&content);
-    let lines: Vec<&str> = stripped.lines().collect();
+    let lines_stripped: Vec<&str> = stripped.lines().collect();
 
     let mod_re = match regex::Regex::new(r"^\s*(pub(\([^)]+\))?\s+)?mod\s+([a-zA-Z0-9_]+)\s*;") {
         Ok(r) => r,
@@ -208,13 +209,15 @@ fn extract_mod_declarations(file_path: &Path) -> Vec<ModDecl> {
 
     let mut pending_path: Option<String> = None;
 
-    for (line_idx, line) in lines.iter().enumerate() {
-        if let Some(caps) = path_re.captures(line) {
+    for (line_idx, line_stripped) in lines_stripped.iter().enumerate() {
+        let line_raw = lines_raw.get(line_idx).copied().unwrap_or(line_stripped);
+
+        if let Some(caps) = path_re.captures(line_raw) {
             pending_path = Some(caps[1].to_string());
             continue;
         }
 
-        if let Some(caps) = mod_re.captures(line) {
+        if let Some(caps) = mod_re.captures(line_stripped) {
             decls.push(ModDecl {
                 declaring_file: file_path.to_path_buf(),
                 line_num: line_idx + 1,
@@ -222,7 +225,7 @@ fn extract_mod_declarations(file_path: &Path) -> Vec<ModDecl> {
                 custom_path: pending_path.take(),
             });
         } else {
-            let line_trimmed = line.trim();
+            let line_trimmed = line_stripped.trim();
             if !line_trimmed.is_empty() && !line_trimmed.starts_with('#') {
                 pending_path = None;
             }
@@ -318,7 +321,65 @@ pub struct ModuleReachabilityResult {
     pub warnings: Vec<String>,
 }
 
-/// Scannt ein Crate auf Erreichbarkeit aller `.rs`-Dateien unter `src/`.
+/// Prüft, ob ein Unterverzeichnis im übergeordneten Modul dekariert ist.
+fn is_dir_declared(dir: &Path, src_dir: &Path, all_declarations: &[ModDecl]) -> bool {
+    let dir_name = match dir.file_name().and_then(|s| s.to_str()) {
+        Some(n) => n,
+        None => return true,
+    };
+
+    let parent_dir = match dir.parent() {
+        Some(p) => p,
+        None => return true,
+    };
+
+    let parent_files = if parent_dir == src_dir {
+        vec![
+            src_dir.join("lib.rs"),
+            src_dir.join("main.rs"),
+            src_dir.join("mod.rs"),
+        ]
+    } else {
+        let mut files = vec![parent_dir.join("mod.rs")];
+        if let Some(parent_stem) = parent_dir.file_stem().and_then(|s| s.to_str()) {
+            if let Some(grandparent) = parent_dir.parent() {
+                files.push(grandparent.join(format!("{}.rs", parent_stem)));
+            }
+        }
+        files
+    };
+
+    let canonical_dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+
+    for decl in all_declarations {
+        let declaring_file_canon = decl
+            .declaring_file
+            .canonicalize()
+            .unwrap_or_else(|_| decl.declaring_file.clone());
+
+        let is_parent_file = parent_files.iter().any(|pf| {
+            pf.canonicalize()
+                .map(|pfc| pfc == declaring_file_canon)
+                .unwrap_or_else(|_| pf == &decl.declaring_file)
+        });
+
+        if is_parent_file {
+            if decl.mod_name == dir_name {
+                return true;
+            }
+            if let Some(target) = resolve_mod_file(decl, src_dir) {
+                let target_canon = target.canonicalize().unwrap_or(target);
+                if target_canon == canonical_dir || target_canon.starts_with(&canonical_dir) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Scannt ein Crate auf Erreichbarkeit aller `.rs`-Dateien und -Unterverzeichnisse unter `src/`.
 pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleReachabilityResult {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -330,11 +391,15 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
     let src_dir = raw_src_dir.canonicalize().unwrap_or(raw_src_dir);
 
     let mut all_rs_files = Vec::new();
+    let mut all_dirs = Vec::new();
     for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
         let p = entry.path();
         if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("rs") {
             let canon = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
             all_rs_files.push(canon);
+        } else if p.is_dir() && p != src_dir {
+            let canon = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+            all_dirs.push(canon);
         }
     }
 
@@ -342,6 +407,54 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
     for file in &all_rs_files {
         let decls = extract_mod_declarations(file);
         all_declarations.extend(decls);
+    }
+
+    let repo_root_canon = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.to_path_buf());
+
+    let mut orphan_dirs = std::collections::HashSet::new();
+
+    for dir in &all_dirs {
+        let rel_to_src = match dir.strip_prefix(&src_dir) {
+            Ok(rel) => rel,
+            Err(_) => continue,
+        };
+
+        if rel_to_src.starts_with("bin") {
+            continue;
+        }
+
+        let contains_rs = WalkDir::new(dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .any(|e| e.path().is_file() && e.path().extension().and_then(|s| s.to_str()) == Some("rs"));
+
+        if !contains_rs {
+            continue;
+        }
+
+        if !is_dir_declared(dir, &src_dir, &all_declarations) {
+            orphan_dirs.insert(dir.clone());
+
+            let rel_to_repo = dir
+                .strip_prefix(&repo_root_canon)
+                .or_else(|_| dir.strip_prefix(repo_root))
+                .unwrap_or(dir)
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            let is_known_transition = KNOWN_TRANSITION_UNREACHABLE
+                .iter()
+                .any(|&t| t == rel_to_repo);
+
+            let msg = format!("{} (Unerreichbar: 0 mod-Deklarationen)", rel_to_repo);
+            if is_known_transition {
+                warnings.push(format!("TRANSITION: {}", msg));
+            } else {
+                errors.push(msg);
+            }
+        }
     }
 
     let mut target_decl_map: HashMap<PathBuf, Vec<ModDecl>> = HashMap::new();
@@ -409,11 +522,14 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
         let decl_count = decls_vec.len();
 
         if decl_count == 0 {
-            let msg = format!("{} (Unerreichbar: 0 mod-Deklarationen)", rel_to_repo);
-            if is_known_transition {
-                warnings.push(format!("TRANSITION: {}", msg));
-            } else {
-                errors.push(msg);
+            let inside_orphan_dir = orphan_dirs.iter().any(|od| file.starts_with(od));
+            if !inside_orphan_dir {
+                let msg = format!("{} (Unerreichbar: 0 mod-Deklarationen)", rel_to_repo);
+                if is_known_transition {
+                    warnings.push(format!("TRANSITION: {}", msg));
+                } else {
+                    errors.push(msg);
+                }
             }
         } else if decl_count > 1 {
             // Check if all declaring files are distinct root entry points (e.g. lib.rs vs main.rs)
@@ -572,5 +688,100 @@ mod tests {
         assert_eq!(res.errors.len(), 1);
         assert!(res.errors[0].contains("child.rs"));
         assert!(res.errors[0].contains("Mehrfachdeklaration"));
+    }
+
+    #[test]
+    fn test_orphan_directory_detected() {
+        let dir = tempdir().unwrap();
+        let repo_root = dir.path();
+        let crate_dir = repo_root.join("crates/my_crate");
+        let src_dir = crate_dir.join("src");
+        let orphan_dir = src_dir.join("orphan_dir");
+        fs::create_dir_all(&orphan_dir).unwrap();
+
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            "[package]\nname = \"my_crate\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+
+        fs::write(src_dir.join("lib.rs"), "// no mod orphan_dir declaration\n").unwrap();
+        fs::write(orphan_dir.join("mod.rs"), "pub mod helper;\n").unwrap();
+        fs::write(orphan_dir.join("helper.rs"), "// helper\n").unwrap();
+
+        let res = check_crate_reachability(&crate_dir, repo_root);
+        assert!(!res.errors.is_empty());
+        assert!(res.errors.iter().any(|e| e.contains("orphan_dir")));
+    }
+
+    #[test]
+    fn test_valid_directory_detected() {
+        let dir = tempdir().unwrap();
+        let repo_root = dir.path();
+        let crate_dir = repo_root.join("crates/my_crate");
+        let src_dir = crate_dir.join("src");
+        let valid_dir = src_dir.join("valid_dir");
+        fs::create_dir_all(&valid_dir).unwrap();
+
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            "[package]\nname = \"my_crate\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+
+        fs::write(src_dir.join("lib.rs"), "pub mod valid_dir;\n").unwrap();
+        fs::write(valid_dir.join("mod.rs"), "pub mod child;\n").unwrap();
+        fs::write(valid_dir.join("child.rs"), "// child\n").unwrap();
+
+        let res = check_crate_reachability(&crate_dir, repo_root);
+        assert!(res.errors.is_empty());
+    }
+
+    #[test]
+    fn test_cfg_gated_directory_module() {
+        let dir = tempdir().unwrap();
+        let repo_root = dir.path();
+        let crate_dir = repo_root.join("crates/my_crate");
+        let src_dir = crate_dir.join("src");
+        let cfg_dir = src_dir.join("cfg_dir");
+        fs::create_dir_all(&cfg_dir).unwrap();
+
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            "[package]\nname = \"my_crate\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+
+        fs::write(src_dir.join("lib.rs"), "#[cfg(feature = \"my_feat\")]\npub mod cfg_dir;\n").unwrap();
+        fs::write(cfg_dir.join("mod.rs"), "// cfg mod\n").unwrap();
+
+        let res = check_crate_reachability(&crate_dir, repo_root);
+        assert!(res.errors.is_empty());
+    }
+
+    #[test]
+    fn test_path_attribute_directory_module() {
+        let dir = tempdir().unwrap();
+        let repo_root = dir.path();
+        let crate_dir = repo_root.join("crates/my_crate");
+        let src_dir = crate_dir.join("src");
+        let custom_dir = src_dir.join("custom_path_dir");
+        fs::create_dir_all(&custom_dir).unwrap();
+
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            "[package]\nname = \"my_crate\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+
+        fs::write(
+            src_dir.join("lib.rs"),
+            "#[path = \"custom_path_dir/custom_mod.rs\"]\npub mod custom;\n",
+        )
+        .unwrap();
+        fs::write(custom_dir.join("custom_mod.rs"), "// custom mod\n").unwrap();
+
+        let res = check_crate_reachability(&crate_dir, repo_root);
+        assert!(res.errors.is_empty(), "Errors found: {:?}", res.errors);
     }
 }

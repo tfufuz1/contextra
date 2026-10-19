@@ -125,6 +125,18 @@ ci_class = 'pr'
 spec = ['A2', 'A3', '0', '2', '3', '4', '13', '15', '20']
 test = "cargo test -p contextra-db --locked"
 
+[crates.contextra-durable-fs]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Durable Filesystem operations and synchronous disk flushing'
+capabilities = ['durable-fs', 'fsync-flush']
+path = "crates/contextra-durable-fs"
+unsafe_island = false
+may_depend_on = ['contextra-sys']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '20']
+test = "cargo test -p contextra-durable-fs --locked"
+
 [crates.contextra-engine]
 ring = 'Ring 3'
 maturity = 'stable'

@@ -69,68 +69,22 @@ fn test_j25_deletion_proof_v3_audit_pos_and_wal_receipt_wiring() {
         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
 
     let durability = DurabilityProof::new(123);
-    let proof_v3 = DeletionProof::create_v3(
-        scope.clone(),
+    // V3 creation is forbidden per §20 and ADR-13, returning PolicyViolation
+    let res_v3 = DeletionProof::create_v3(
+        scope,
         vec![b"key_a".to_vec()],
         TxId(123),
-        cleanup_proofs.clone(),
-        vec![ExcludedScope::LlmParameterMemory],
-        1700000000,
-        &[],
-        Some(&durability),
-        keypair.signing_key(),
-    )
-    .expect("create_v3 must succeed");
-
-    assert_eq!(proof_v3.signature_version, 3);
-    assert!(proof_v3.verify(&keypair.verifying_key).unwrap());
-
-    let proof_with_pos = DeletionProof::create_v3_with_audit_position(
-        scope,
-        vec![b"key_b".to_vec()],
-        TxId(124),
         cleanup_proofs,
         vec![ExcludedScope::LlmParameterMemory],
-        Some(42),
         1700000000,
         &[],
         Some(&durability),
         keypair.signing_key(),
-    )
-    .expect("create_v3_with_audit_position must succeed");
-
-    assert_eq!(proof_with_pos.audit_chain_position, Some(42));
-    assert!(proof_with_pos.verify(&keypair.verifying_key).unwrap());
-
-    // Test verify_wal_receipt wiring
-    let integrity_key = b"integrity_key_32_bytes_test_wal!";
-    let prev_hmac = [0xAAu8; 32];
-    let payload = b"delete_event_payload_doc_42";
-
-    let receipt =
-        compute_wal_delete_receipt(&prev_hmac, payload, integrity_key).expect("compute receipt");
-
-    let proof_with_receipt = DeletionProof::create_with_wal_receipt_v3(
-        DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(7).unwrap(),
-        },
-        vec![b"k1".to_vec()],
-        TxId(125),
-        vec![],
-        vec![],
-        Some(receipt),
-        1700000000,
-        &[],
-        Some(&durability),
-        keypair.signing_key(),
-    )
-    .expect("create_with_wal_receipt_v3");
-
-    let receipt_valid = proof_with_receipt
-        .verify_wal_receipt(&prev_hmac, payload, integrity_key)
-        .expect("verify_wal_receipt");
-
-    assert!(receipt_valid, "WAL receipt must verify as valid");
+    );
+    assert!(matches!(
+        res_v3,
+        Err(contextra_types::ContextraError::PolicyViolation(_))
+    ));
 }
 
 #[test]

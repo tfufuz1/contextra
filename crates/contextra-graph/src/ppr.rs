@@ -11,7 +11,7 @@ pub mod cost;
 pub mod shadow_hook;
 pub(crate) mod snapshot;
 
-use self::cost::{estimate_ppr_cost, GraphStats};
+use self::cost::{estimate_ppr_cost, estimate_ppr_cost_with_multiplier, GraphStats, PprCostCalibrator};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 use std::collections::{BTreeMap, HashSet};
@@ -160,6 +160,16 @@ pub(crate) fn select_auto_ppr_algorithm(
     seed_count: usize,
     config: &PprConfig,
 ) -> PprAlgorithm {
+    select_auto_ppr_algorithm_with_calibrator(inner, seed_count, config, None)
+}
+
+/// Evaluates the cost model using optional calibrator recommended multiplier feedback.
+pub(crate) fn select_auto_ppr_algorithm_with_calibrator(
+    inner: &GraphInner,
+    seed_count: usize,
+    config: &PprConfig,
+    calibrator: Option<&PprCostCalibrator>,
+) -> PprAlgorithm {
     if seed_count == 0 {
         return PprAlgorithm::ForwardPush;
     }
@@ -168,7 +178,8 @@ pub(crate) fn select_auto_ppr_algorithm(
     let edge_count = inner.targets.len() + inner.pending_edge_count;
     let stats = GraphStats::new(node_count, edge_count);
 
-    let (_estimate, choice) = estimate_ppr_cost(Some(&stats), seed_count, config);
+    let mult = calibrator.and_then(|c| c.recommended_multiplier());
+    let (_estimate, choice) = estimate_ppr_cost_with_multiplier(Some(&stats), seed_count, config, mult);
     choice
 }
 
@@ -179,12 +190,37 @@ pub(crate) fn compute_ppr_with_context(
     deleted_nodes: &DeletedView,
     ctx: &mut PprContext,
 ) -> Vec<(EntityId, f32)> {
+    compute_ppr_with_shadow(
+        inner,
+        seed_nodes,
+        config,
+        deleted_nodes,
+        ctx,
+        None,
+        None,
+        false,
+    )
+}
+
+/// Calculates Personalized PageRank while optionally executing shadow mode comparisons in parallel.
+///
+/// Shadow computations never modify the productive result set.
+pub(crate) fn compute_ppr_with_shadow(
+    inner: &GraphInner,
+    seed_nodes: &[EntityId],
+    config: &PprConfig,
+    deleted_nodes: &DeletedView,
+    ctx: &mut PprContext,
+    shadow_params: Option<&shadow_hook::ShadowParams>,
+    sink: Option<&dyn contextra_adapt::ShadowSink<f64>>,
+    sampled: bool,
+) -> Vec<(EntityId, f32)> {
     let chosen_algorithm = match config.algorithm {
         PprAlgorithm::Auto => select_auto_ppr_algorithm(inner, seed_nodes.len(), config),
         other => other,
     };
 
-    match chosen_algorithm {
+    let results = match chosen_algorithm {
         PprAlgorithm::ForwardPush => {
             forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx)
         }
@@ -327,7 +363,40 @@ pub(crate) fn compute_ppr_with_context(
             }
             _ => compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx),
         },
+    };
+
+    if sampled {
+        if let Some(params) = shadow_params {
+            let ppr_params = crate::path_rag::PprParams {
+                alpha: if config.damping_factor.is_nan()
+                    || config.damping_factor <= 0.0
+                    || config.damping_factor >= 1.0
+                {
+                    0.15
+                } else {
+                    1.0 - config.damping_factor
+                },
+                epsilon: if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0
+                {
+                    1e-6
+                } else {
+                    config.convergence_epsilon
+                },
+                hyperedge_decay: 0.85,
+            };
+
+            shadow_hook::run_shadow_comparison(
+                inner,
+                seed_nodes,
+                &ppr_params,
+                params,
+                sink,
+                sampled,
+            );
+        }
     }
+
+    results
 }
 
 impl crate::path_rag::PathGraph for GraphInner {
@@ -1071,6 +1140,69 @@ pub(crate) fn compute_ppr_dense(
     });
 
     results
+}
+
+#[cfg(test)]
+mod ppr_shadow_invariance_tests {
+    use super::*;
+    use crate::csr::CsrGraph;
+    use contextra_ports::GraphIndex;
+    use contextra_types::{Edge, Entity, TxId};
+
+    #[tokio::test]
+    async fn test_ppr_shadow_execution_bit_identical_output() {
+        let graph = CsrGraph::new();
+        let tx = TxId::internal();
+        graph
+            .add_entity(tx, Entity::new(EntityId(1), "E1", "Node"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(tx, Entity::new(EntityId(2), "E2", "Node"))
+            .await
+            .unwrap();
+        graph
+            .add_edge(tx, Edge::new(EntityId(1), EntityId(2), "rel"))
+            .await
+            .unwrap();
+
+        let inner = graph.inner_read();
+        let deleted = DeletedView::from_nodes(HashSet::new());
+        let mut ctx1 = PprContext::new();
+        let mut ctx2 = PprContext::new();
+        let config = PprConfig::default();
+
+        let mut shadow_params = shadow_hook::ShadowParams::default();
+        shadow_params.tl_hfd = Some(crate::tl_hfd::TlHfdParams::default());
+
+        let res_no_shadow = compute_ppr_with_shadow(
+            &inner,
+            &[EntityId(1)],
+            &config,
+            &deleted,
+            &mut ctx1,
+            None,
+            None,
+            false,
+        );
+
+        let res_with_shadow = compute_ppr_with_shadow(
+            &inner,
+            &[EntityId(1)],
+            &config,
+            &deleted,
+            &mut ctx2,
+            Some(&shadow_params),
+            None,
+            true,
+        );
+
+        assert_eq!(res_no_shadow.len(), res_with_shadow.len());
+        for ((e1, r1), (e2, r2)) in res_no_shadow.iter().zip(res_with_shadow.iter()) {
+            assert_eq!(e1, e2);
+            assert_eq!(r1.to_bits(), r2.to_bits());
+        }
+    }
 }
 
 #[cfg(test)]

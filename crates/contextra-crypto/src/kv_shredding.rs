@@ -545,7 +545,10 @@ impl KeyRegistry {
         self.finalize_revoke(group_id)
     }
 
-    /// Queries the current [`KeyLifecycleState`] for a group.
+    /// Queries the current [`KeyLifecycleState`] for a group under the two-stage crypto-erase model.
+    ///
+    /// Returns [`KeyLifecycleState::KeyDestroyed`] if the group has been finalized/revoked,
+    /// or [`KeyLifecycleState::Active`] if active.
     pub fn key_lifecycle_state(&self, group_id: u64, _current_time_nanos: u64) -> KeyLifecycleState {
         if self.is_group_revoked(group_id) {
             KeyLifecycleState::KeyDestroyed
@@ -1039,6 +1042,27 @@ mod tests {
             listener.call_count.load(Ordering::SeqCst),
             1,
             "Listener is not called again on second revocation of unknown group_id"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_key_registry_key_lifecycle_state() -> Result<()> {
+        let registry = KeyRegistry::new();
+        let group_id = 333;
+
+        // Active key lifecycle state
+        assert_eq!(
+            registry.key_lifecycle_state(group_id, 1_000_000),
+            KeyLifecycleState::Active
+        );
+
+        // After revocation, state transitions to KeyDestroyed
+        registry.revoke_group(group_id)?;
+        assert_eq!(
+            registry.key_lifecycle_state(group_id, 1_000_000),
+            KeyLifecycleState::KeyDestroyed
         );
 
         Ok(())

@@ -52,6 +52,7 @@ proptest! {
             expires_at: Some(2000),
             feature_flags: BTreeMap::new(),
             installation_id_hash: Some(local_id),
+            key_id: None,
         };
 
         let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");

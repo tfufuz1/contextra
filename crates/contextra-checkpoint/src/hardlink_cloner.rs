@@ -18,8 +18,9 @@
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
 // INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen, Registrierung vor Disk-Link.
 
-use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
+use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry};
 use contextra_mvcc::SnapshotRegistry;
+use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -119,18 +120,15 @@ impl DefaultHardlinkCloner {
     }
 
     /// Clones SSTable hardlinks, enforcing registration and fsync persistence BEFORE creating links on disk.
-    pub async fn clone_sstable_hardlinks_registered<R>(
+    pub async fn clone_sstable_hardlinks_registered(
         &self,
         seq_no: u64,
         source_dir: &Path,
         target_dir: &Path,
         snapshot_registry: &Arc<SnapshotRegistry>,
-        registry: &mut R,
+        registry: &mut CopyRegistry,
         created_tx: u64,
-    ) -> Result<HardlinkCloneResult>
-    where
-        R: CpyCopyRegistry + ?Sized,
-    {
+    ) -> Result<HardlinkCloneResult> {
         // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
         let _guard = snapshot_registry.acquire(|| seq_no);
 
@@ -178,7 +176,6 @@ impl DefaultHardlinkCloner {
         // 3. Register and persist (fsync) in CopyRegistry BEFORE creating any physical link files on disk.
         // If registration or sync fails, abort immediately without modifying disk files.
         registry.register(entry).await?;
-        registry.sync_registry().await?;
 
         // 4. Create target directory and physical hardlink files
         fs::create_dir_all(target_dir)

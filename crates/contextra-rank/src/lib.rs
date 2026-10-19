@@ -4,6 +4,12 @@
 #![warn(missing_docs)]
 
 pub mod calibration;
+
+/// DiBud (Dynamic Budgeted RRF) fusion state machine, drivers, and types.
+/// Spec §6.1, §12 / AK-17.
+#[cfg(feature = "dibud")]
+pub mod dibud;
+
 pub mod drift;
 pub mod explain;
 pub mod fusion;

@@ -1407,4 +1407,117 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_f04_unaligned_slice_decoding_alignment_guard() {
+        // F-04: Alignment Guard. Test that parsing headers, footers, integers and floats
+        // starting at unaligned (odd byte address) slice offsets succeeds without alignment faults.
+        let header = DiskAnnHeader {
+            magic: *crate::diskann::format::DISKANN_MAGIC,
+            version: DISKANN_VERSION,
+            node_count: 42,
+            dimension: 128,
+            max_degree: 32,
+            sector_size: 4096,
+            entry_point: 0,
+            metric: 1,
+            quantized: 0,
+            q_min: -1.0,
+            q_max: 1.0,
+        };
+        let header_bytes = header.to_bytes();
+
+        let footer = DiskAnnFooter {
+            magic: *DISKANN_FOOTER_MAGIC,
+            hmac: [0xAB; 32],
+        };
+        let footer_bytes = footer.to_bytes();
+
+        // Test unaligned slice parsing across odd byte offsets 1, 3, 5, 7
+        for unaligned_offset in [1, 3, 5, 7] {
+            let mut padded_header = vec![0xFFu8; unaligned_offset];
+            padded_header.extend_from_slice(&header_bytes);
+
+            let header_slice = &padded_header[unaligned_offset..unaligned_offset + DiskAnnHeader::SIZE];
+            let parsed_header = DiskAnnHeader::try_from_bytes(header_slice)
+                .expect("unaligned header parsing must succeed");
+            assert_eq!(parsed_header.node_count, 42);
+            assert_eq!(parsed_header.dimension, 128);
+
+            let mut padded_footer = vec![0xEEu8; unaligned_offset];
+            padded_footer.extend_from_slice(&footer_bytes);
+
+            let footer_slice = &padded_footer[unaligned_offset..unaligned_offset + DiskAnnFooter::SIZE];
+            let parsed_footer = DiskAnnFooter::try_from_bytes(footer_slice)
+                .expect("unaligned footer parsing must succeed");
+            assert_eq!(parsed_footer.magic, *DISKANN_FOOTER_MAGIC);
+            assert_eq!(parsed_footer.hmac, [0xAB; 32]);
+
+            // Test unaligned primitive integer & float decoding via from_le_bytes
+            let val_f32 = 3.14159f32;
+            let val_u64 = 0xDEAD_BEEF_CAFE_BABE_u64;
+
+            let mut padded_prim = vec![0xDDu8; unaligned_offset];
+            padded_prim.extend_from_slice(&val_f32.to_le_bytes());
+            padded_prim.extend_from_slice(&val_u64.to_le_bytes());
+
+            let f32_bytes: [u8; 4] = padded_prim[unaligned_offset..unaligned_offset + 4]
+                .try_into()
+                .unwrap();
+            let parsed_f32 = f32::from_le_bytes(f32_bytes);
+            assert_eq!(parsed_f32, val_f32);
+
+            let u64_bytes: [u8; 8] = padded_prim[unaligned_offset + 4..unaligned_offset + 12]
+                .try_into()
+                .unwrap();
+            let parsed_u64 = u64::from_le_bytes(u64_bytes);
+            assert_eq!(parsed_u64, val_u64);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_f03_file_truncation_during_mmap_access_returns_error() -> Result<()> {
+        // F-03: Protection against file truncation during mmap access.
+        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let index_path = temp_dir.path().join("mmap_truncation.idx");
+
+        let config = DiskAnnConfig {
+            index_path: index_path.clone(),
+            dimension: 4,
+            max_degree: 4,
+            sector_size: 4096,
+            distance_metric: DistanceMetric::Euclidean,
+            fallback_policy: DiskAnnFallbackPolicy::FailFast,
+            ..DiskAnnConfig::default()
+        };
+
+        let index = DiskAnnIndex::try_new(config.clone())?;
+        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 2.0, 0.0, 0.0]];
+        let ids = vec![DocId::from(10u64), DocId::from(20u64)];
+        index.build(&vectors, &ids).await?;
+
+        // Verify load_node works when index file is intact
+        assert!(index.load_node(0).is_ok());
+
+        // Truncate the file on disk while Mmap handle is still open
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&index_path)
+            .map_err(ContextraError::Io)?;
+        file.set_len(10).map_err(ContextraError::Io)?;
+
+        // load_node must catch physical disk truncation via metadata check and return Err
+        let res = index.load_node(0);
+        assert!(
+            res.is_err(),
+            "load_node on truncated index file must return Err instead of panicking"
+        );
+        let err_msg = res.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("out of bounds or file truncated") || err_msg.contains("truncated"),
+            "Unexpected error message: {err_msg}"
+        );
+
+        Ok(())
+    }
 }

@@ -205,10 +205,10 @@ impl PhysicalScope {
         false
     }
 
-    /// Returns false since a valid `PhysicalScope` is guaranteed to be non-empty.
+    /// Returns true if this physical scope contains no explicit keys and no prefixes.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        false
+        self.keys.is_empty() && self.prefixes.is_empty()
     }
 
     /// Computes the canonical BLAKE3 scope digest using domain tag `contextra/physical-scope/v1` (§5.4).
@@ -229,6 +229,32 @@ impl PhysicalScope {
         }
 
         *hasher.finalize().as_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_physical_scope_is_empty() {
+        let empty_scope = PhysicalScope {
+            keys: vec![],
+            prefixes: vec![],
+        };
+        assert!(empty_scope.is_empty());
+
+        let scope_with_key = PhysicalScope {
+            keys: vec![b"t:1:k1".to_vec()],
+            prefixes: vec![],
+        };
+        assert!(!scope_with_key.is_empty());
+
+        let scope_with_prefix = PhysicalScope {
+            keys: vec![],
+            prefixes: vec![b"t:1:p1".to_vec()],
+        };
+        assert!(!scope_with_prefix.is_empty());
     }
 }
 
@@ -383,12 +409,6 @@ pub trait ErasureBackend: Send + Sync {
         as_of: TxId,
         probe: &dyn FreeSpaceProbe,
     ) -> std::result::Result<PurgeOutput, PurgeError>;
-}
-
-/// Extension trait providing erasure capabilities on storage engines.
-pub trait StorageErasureExt {
-    /// Returns reference to [`ErasureBackend`] if supported.
-    fn as_erasure_backend(&self) -> Option<&dyn ErasureBackend>;
 }
 
 /// Finish artifact generated upon erasure completion.
