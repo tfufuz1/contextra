@@ -4,7 +4,6 @@
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
 use contextra_types::ContextraError;
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::fs::File;
@@ -13,7 +12,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 /// Supported Candle quantization formats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandleQuantization {
     /// 4-bit medium K-quantization
     Q4KM,

@@ -27,6 +27,7 @@ async fn test_insert_emits_commit_latency_metric() -> contextra_types::Result<()
 
     let config = ContextraConfig {
         dimension: 4,
+        consolidation_enabled: false,
         metrics_sink: Some(test_sink.clone() as Arc<dyn MetricsSink>),
         ..Default::default()
     };
@@ -70,6 +71,7 @@ async fn test_repair_emits_rebuild_duration_metric() -> contextra_types::Result<
 
     let config = ContextraConfig {
         dimension: 4,
+        consolidation_enabled: false,
         metrics_sink: Some(test_sink.clone() as Arc<dyn MetricsSink>),
         ..Default::default()
     };
@@ -110,6 +112,7 @@ async fn test_default_noop_metrics_sink_runs_without_errors() -> contextra_types
     let dir = tempdir().unwrap();
     let config = ContextraConfig {
         dimension: 4,
+        consolidation_enabled: false,
         ..Default::default() // metrics_sink = None (Noop)
     };
 
@@ -131,6 +134,7 @@ async fn test_panicking_metrics_sink_does_not_fail_commit() -> contextra_types::
 
     let config = ContextraConfig {
         dimension: 4,
+        consolidation_enabled: false,
         metrics_sink: Some(panicking_sink as Arc<dyn MetricsSink>),
         ..Default::default()
     };

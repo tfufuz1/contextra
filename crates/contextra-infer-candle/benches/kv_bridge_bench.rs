@@ -15,7 +15,7 @@ const KV_SEGMENT_BYTES: usize = 256 * 1024;
 
 fn create_bench_adapter() -> (KvBridgeAdapter, TenantId, KvCacheKey) {
     let master_km = CryptoKey::try_new("bench-passphrase-kv", b"bench-salt-12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 

@@ -92,8 +92,6 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
     false
 }
 
-// TODO(contextra-plan): Plan for GASP grounding path: Verify IsotonicCalibrator confidence score scaling, attribution bounds, and non-constant score proof for perturbed context chunks [ref:eigenbau-candle-tensor]
-
 /// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,

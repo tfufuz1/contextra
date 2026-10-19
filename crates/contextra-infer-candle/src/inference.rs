@@ -10,8 +10,6 @@
 //! Backpressure contract: `max_concurrent_inferences` limits `spawn_blocking` calls.
 //! Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
 
-// TODO(contextra-plan): Plan for Candle ML inference path: Verify real GGUF forward-passes, backpressure semaphore limits, and non-constant output proofs across variable prompts [ref:eigenbau-candle-tensor]
-
 mod core;
 
 #[cfg(feature = "kv-stage-b")]
