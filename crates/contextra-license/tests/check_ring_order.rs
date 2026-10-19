@@ -15,10 +15,7 @@ struct TestClock {
 
 impl Clock for TestClock {
     fn now(&self) -> DeterministicTimestamp {
-        DeterministicTimestamp::new(
-            u64::try_from(self.now_unix_secs * 1000).unwrap_or(0),
-            0,
-        )
+        DeterministicTimestamp::new(u64::try_from(self.now_unix_secs * 1000).unwrap_or(0), 0)
     }
 
     fn monotonic_ticks(&self) -> u64 {
@@ -55,13 +52,9 @@ fn test_order_step_1_fast_ring_bypass() {
     assert_eq!(gate_no_act.check_ring(FeatureRing::Fast), Ok(()));
 
     // 1b. Corrupted signature -> Fast is Ok
-    let mut act_corrupt = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        expected_id,
-        1000,
-        &signing_key,
-    )
-    .expect("create_signed succeeds");
+    let mut act_corrupt =
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 1000, &signing_key)
+            .expect("create_signed succeeds");
     act_corrupt.signature[0] ^= 0xFF;
     let gate_corrupt =
         SignedLicenseGate::from_activation_with_clock(act_corrupt, verifying_key, clock.clone())
@@ -141,13 +134,9 @@ fn test_order_step_3_hash_mismatch_before_signature_check() {
         now_unix_secs: 1000,
     });
 
-    let mut activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        expected_id,
-        2000,
-        &signing_key,
-    )
-    .expect("create_signed succeeds");
+    let mut activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key)
+            .expect("create_signed succeeds");
     activation.signature[0] ^= 0xFF; // tampered signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)

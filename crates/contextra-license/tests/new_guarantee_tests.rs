@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use contextra_license::{
-    derive_local_installation_id_hash, FeatureRing, LicensePayload,
-    SignedActivation, SignedLicenseGate,
+    derive_local_installation_id_hash, FeatureRing, LicensePayload, SignedActivation,
+    SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
 use contextra_types::{DeterministicTimestamp, TenantId};
@@ -52,6 +52,7 @@ proptest! {
             expires_at: Some(2000),
             feature_flags: BTreeMap::new(),
             installation_id_hash: Some(local_id),
+            key_id: None,
         };
 
         let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -94,13 +95,8 @@ fn test_signed_activation_bit_flip_verification() {
     let verifying_key = signing_key.verifying_key();
     let local_id = [0x42u8; 32];
 
-    let act = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        local_id,
-        2000,
-        &signing_key,
-    )
-    .expect("create_signed succeeds");
+    let act = SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key)
+        .expect("create_signed succeeds");
 
     assert!(act.verify_signature(&verifying_key));
 
@@ -134,7 +130,10 @@ impl Serialize for FailingPayload {
 fn test_serialization_failure_returns_err() {
     let failing = FailingPayload;
     let res = bincode::serialize(&failing);
-    assert!(res.is_err(), "Failing payload serialization MUST return Err");
+    assert!(
+        res.is_err(),
+        "Failing payload serialization MUST return Err"
+    );
 }
 
 #[test]

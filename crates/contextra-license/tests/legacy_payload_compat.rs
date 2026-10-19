@@ -18,10 +18,7 @@ struct TestClock {
 
 impl Clock for TestClock {
     fn now(&self) -> DeterministicTimestamp {
-        DeterministicTimestamp::new(
-            u64::try_from(self.now_unix_secs * 1000).unwrap_or(0),
-            0,
-        )
+        DeterministicTimestamp::new(u64::try_from(self.now_unix_secs * 1000).unwrap_or(0), 0)
     }
 
     fn monotonic_ticks(&self) -> u64 {

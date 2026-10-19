@@ -65,13 +65,9 @@ fn test_step_3_mismatched_installation_id_returns_not_activated_before_signature
     });
 
     // Create an activation for expected_id with tampered signature to verify Step 3 runs BEFORE Step 4
-    let mut activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        expected_id,
-        2000,
-        &signing_key,
-    )
-    .expect("create_signed succeeds");
+    let mut activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key)
+            .expect("create_signed succeeds");
     activation.signature[0] ^= 0xFF; // Tamper signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
