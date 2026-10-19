@@ -12,8 +12,8 @@
 use bytes::Bytes;
 use contextra_crypto::EncryptedKvLayer;
 #[cfg(test)]
-use contextra_crypto::KvSegment;
-use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
+use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
+use contextra_crypto::KvSegmentCipher;
 use contextra_ports::{ContextSegment, KvBridgeStorage};
 use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
@@ -301,7 +301,8 @@ impl std::fmt::Debug for KvBridgeAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_crypto::{CryptoKey, EvictionWorker};
+    use contextra_crypto::CryptoKey;
+    use contextra_kvcache::EvictionWorker;
     use contextra_ports::BoxFuture;
     use contextra_types::Result;
     use std::collections::HashMap;

@@ -2,7 +2,8 @@
 
 //! Verification test for KV-Bridge roundtrip: Export, serialization, encryption, decryption, and bit-identical restoration.
 
-use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
 use contextra_types::{ModelFingerprint, TenantId};
 use std::sync::Arc;
