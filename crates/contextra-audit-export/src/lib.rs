@@ -53,6 +53,37 @@ pub struct DeletionProofSummary {
     pub verified: bool,
 }
 
+/// Complete processing register record according to GDPR Article 30 (Art. 30 Abs. 1 lit. a–g DSGVO).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Art30ProcessingRegisterEntry {
+    /// Associated tenant identifier (`contextra_types::TenantId`).
+    pub tenant_id: TenantId,
+    /// Name and contact details of controller/representative/DPO (Art. 30 Abs. 1 lit. a DSGVO).
+    pub controller_details: String,
+    /// Purposes of the processing (Art. 30 Abs. 1 lit. b DSGVO).
+    pub processing_purpose: String,
+    /// Categories of data subjects (Art. 30 Abs. 1 lit. c DSGVO).
+    pub data_subject_categories: Vec<String>,
+    /// Categories of personal data (Art. 30 Abs. 1 lit. c DSGVO).
+    pub data_categories: Vec<String>,
+    /// Categories of recipients to whom personal data have been/will be disclosed (Art. 30 Abs. 1 lit. d DSGVO).
+    pub recipient_categories: Vec<String>,
+    /// Transfers of personal data to a third country or international organization, if applicable (Art. 30 Abs. 1 lit. e DSGVO).
+    pub third_country_transfers: Option<String>,
+    /// Envisaged time limits for erasure of data categories (Art. 30 Abs. 1 lit. f DSGVO).
+    pub erasure_deadlines: String,
+    /// Technical and organizational security measures (Art. 30 Abs. 1 lit. g / Art. 32 Abs. 1 DSGVO).
+    pub technical_organizational_measures: Vec<String>,
+    /// Statutory legal basis for processing (e.g. Art. 6 Abs. 1 lit. b DSGVO).
+    pub legal_basis: String,
+    /// Linked egress gateway event summaries.
+    pub egress_events: Vec<EgressEventSummary>,
+    /// Linked cryptographic deletion proof summaries.
+    pub deletion_proofs: Vec<DeletionProofSummary>,
+    /// Generation timestamp in Unix nanoseconds (`Clock`-compatible).
+    pub generated_at: u64,
+}
+
 /// A record entry in the GDPR Article 30 processing register.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegisterEntry {
