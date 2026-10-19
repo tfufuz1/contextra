@@ -11,8 +11,11 @@ pub mod hmac;
 pub mod io;
 pub mod replay;
 pub mod replay_filter;
+#[cfg(not(loom))]
 pub mod retire;
+#[cfg(not(loom))]
 pub mod scope_purge;
+#[cfg(not(loom))]
 pub mod witness_scan;
 
 #[cfg(test)]
@@ -152,6 +155,9 @@ pub(crate) mod fs {
             self
         }
         pub fn append(&mut self, _append: bool) -> &mut Self {
+            self
+        }
+        pub fn truncate(&mut self, _truncate: bool) -> &mut Self {
             self
         }
         pub fn mode(&mut self, _mode: u32) -> &mut Self {
