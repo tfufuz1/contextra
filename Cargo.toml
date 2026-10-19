@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
+    "crates/contextra-durable-fs",
     "crates/contextra-simd",
     "crates/contextra-core",
     "crates/contextra-store",
@@ -110,6 +111,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Workspace crates
 contextra-wire = { path = "crates/contextra-wire" }
 contextra-sys = { path = "crates/contextra-sys" }
+contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
@@ -171,6 +173,7 @@ unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
 
 [workspace.lints.clippy]
+await_holding_lock = "deny"
 undocumented_unsafe_blocks = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
