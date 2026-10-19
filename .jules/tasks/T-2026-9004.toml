@@ -1,0 +1,20 @@
+id        = "T-2026-9004"
+title     = "docs(jules): Task-Karten v2, Issue-kompatibel"
+crate     = "contextra-core"
+tier      = 1
+risk      = "none"
+issue     = 9004
+goal      = "Aktualisiere .jules/tasks/README.md und _TEMPLATE.toml für Issue-Form-Kompatibilität (ADR-N30) und erstelle Task-Karte T-2026-9004."
+non_goals = ["Keine Änderungen an xtask/**", "Keine Änderungen an .github/**"]
+scope     = [".jules/tasks/README.md", ".jules/tasks/_TEMPLATE.toml", ".jules/tasks/T-2026-9004.toml"]
+forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+invariants = ["Zero-Panic"]
+acceptance = [
+  "cargo test -p contextra-core"
+]
+evidence_required = []
+
+[budget]
+files = 3
+lines = 300
+iterations = 5

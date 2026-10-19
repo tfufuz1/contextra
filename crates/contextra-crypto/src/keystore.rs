@@ -142,7 +142,12 @@ impl MfksKeystore {
         })
     }
 
-    /// Entschlüsselt den Keystore und verifiziert den Zustand der verknüpften `KeyRegistry`.
+    /// Entschlüsselt den Keystore mit der Passphrase und verifiziert gleichzeitig die Integrität des
+    /// an das `KeyRegistry` angebundenen `RevocationLog`s.
+    ///
+    /// # Errors
+    /// Returns [`CryptoError`] falls die Passphrase falsch ist, die KDF-Parameter nicht der Policy
+    /// entsprechen oder das RevocationLog Manipulationen aufweist.
     pub fn open_and_verify(&self, passphrase: &str, registry: &KeyRegistry) -> Result<KeyManager> {
         let km = KeyManager::try_new_strict(passphrase, &self.kdf_header)?;
         if let Some(ref log) = registry.revocation_log {
@@ -180,5 +185,29 @@ mod tests {
         for len in 0..bytes.len() - 1 {
             assert!(MfksKeystore::from_bytes(&bytes[..len]).is_err());
         }
+    }
+
+    #[test]
+    fn test_mfks_keystore_open_and_verify() {
+        let passphrase = "correct-passphrase-mfks";
+        let (_, header) = KeyManager::try_new_argon2id(passphrase).unwrap();
+        let keystore = MfksKeystore::new(header.clone(), vec![1, 2, 3], vec![4, 5, 6]).unwrap();
+        let registry = KeyRegistry::new();
+
+        // Positive path
+        let open_res = keystore.open_and_verify(passphrase, &registry);
+        assert!(open_res.is_ok());
+
+        // Negative path: Corrupted KdfHeader policy failure MUST fail open_and_verify
+        let mut weak_header = header;
+        weak_header.params.m_cost_kib = 100; // violates MIN_M_COST_KIB (65536)
+        let invalid_keystore = MfksKeystore {
+            version: MFKS_VERSION_1,
+            kdf_header: weak_header,
+            wrapped_deks: vec![1, 2, 3],
+            registry_log: vec![4, 5, 6],
+        };
+        let policy_err = invalid_keystore.open_and_verify(passphrase, &registry);
+        assert!(policy_err.is_err());
     }
 }

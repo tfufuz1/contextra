@@ -5,6 +5,17 @@ use crate::error::Result;
 use rand::RngCore;
 use zeroize::Zeroizing;
 
+/// Source of resolved deletion proof key (environment variables or key files).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProofKeyEnvSource {
+    PrimaryFile,
+    LegacyFile,
+    PrimaryEnv,
+    LegacyEnv,
+    BothSame,
+    BothDifferentConflict,
+}
+
 /// Trait defining a secure source for deletion proof signing keys (CSPRNG or KMS/HSM handles).
 pub trait ProofKeySource: Send + Sync {
     /// Generates or provisions a new signing keypair via this key source.
@@ -41,7 +52,7 @@ impl InMemoryCsprngKeySource {
         }
     }
 
-    /// Creates a key source from an explicit keypair.
+    /// Creates an [`InMemoryCsprngKeySource`] from an explicitly pre-generated or provisioned [`DeletionProofKeyPair`].
     pub fn from_keypair(keypair: DeletionProofKeyPair) -> Self {
         Self { keypair }
     }
@@ -192,5 +203,26 @@ impl<'a> From<&'a Vec<u8>> for VerificationKey<'a> {
 impl<'a> From<&'a ed25519_dalek::VerifyingKey> for VerificationKey<'a> {
     fn from(key: &'a ed25519_dalek::VerifyingKey) -> Self {
         VerificationKey::Ed25519(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_in_memory_csprng_key_source_from_keypair() -> Result<()> {
+        let keypair = DeletionProofKeyPair::generate();
+        let expected_pub = keypair.verifying_key_bytes();
+        let expected_id = *blake3::hash(&expected_pub).as_bytes();
+
+        let key_source = InMemoryCsprngKeySource::from_keypair(keypair);
+
+        let loaded = key_source.load_keypair()?;
+        assert_eq!(loaded.verifying_key_bytes(), expected_pub);
+        assert_eq!(key_source.public_key()?, expected_pub);
+        assert_eq!(key_source.key_id()?, expected_id);
+
+        Ok(())
     }
 }
