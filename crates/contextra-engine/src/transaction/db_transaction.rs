@@ -62,7 +62,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    /// Records keys and IDs that have been operated on for potential compensating rollback.
+    /// Ergonomie-Wrapper für Schlüssel-Staging ohne Vorwerte.
+    /// Registriert Vorwärts- und Rückwärtsschlüssel sowie die zugehörige `DocId` für ein potenzielles
+    /// kompensierendes Rollback, wenn keine vorherigen Schlüsselwerte (old_values) vorliegen.
     pub fn record_keys(&self, forward: Vec<u8>, reverse: Vec<u8>, doc_id: DocId) {
         self.record_keys_with_old_values(forward, None, reverse, None, doc_id);
     }
@@ -147,6 +149,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push(entity_id);
     }
 
+    /// Bedient den Staging-Pfad für Kanten-Tombstones im Graph-Index.
+    /// Staget die Löschung einer gerichteten Kante zwischen `from` und `to` Entity-IDs,
+    /// um die notwendige Transaktions-Symmetrie für Kantenlöschungen sicherzustellen.
     pub fn stage_graph_edge_delete(&self, from: EntityId, to: EntityId) {
         let mut guard = match self.staged_graph_edge_deletes.lock() {
             Ok(g) => g,
