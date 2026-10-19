@@ -139,6 +139,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_arc_slice_as_arc() {
+        let vec = vec![1, 2, 3];
+        let slice = ArcSlice::from_vec(vec);
+        assert_eq!(slice.as_arc().as_ref(), &[1, 2, 3]);
+        assert_eq!(slice.offset(), 0);
+        assert!(!slice.is_empty());
+    }
+
+    #[test]
     fn test_arc_slice_basic() {
         let vec = vec![10, 20, 30, 40, 50];
         let slice = ArcSlice::from_vec(vec);

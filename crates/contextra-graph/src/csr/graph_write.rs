@@ -783,7 +783,12 @@ impl CsrGraph {
         }; // Write-Lock freigegeben
 
         if let Some(doc_id) = source_doc_id {
-            self.doc_edge_index.record(doc_id, (from, to));
+            let prov = crate::provenance::EdgeProvenance::new(
+                (from, to),
+                vec![doc_id],
+                tx_valid_from.unwrap_or_else(TxId::internal),
+            );
+            self.doc_edge_index.record_provenance(&prov);
         }
 
         // Phase 2: Compact außerhalb des Write-Locks (falls nötig)
@@ -802,8 +807,10 @@ impl CsrGraph {
         to: EntityId,
         weight: f32,
     ) -> Result<()> {
-        self.add_edge(from, to, weight, None, None, None, None, None, None, None)
-            .await
+        self.insert_edge_direct_with_bitemporal_validity(
+            from, to, weight, None, None, None, None, None,
+        )
+        .await
     }
 
     /// Directly inserts an edge with validity into the CSR graph without staging.
@@ -820,14 +827,12 @@ impl CsrGraph {
         tx_valid_from: Option<TxId>,
         tx_valid_to: Option<TxId>,
     ) -> Result<()> {
-        self.add_edge(
+        self.insert_edge_direct_with_bitemporal_validity(
             from,
             to,
             weight,
             tx_valid_from,
             tx_valid_to,
-            None,
-            None,
             None,
             None,
             None,
