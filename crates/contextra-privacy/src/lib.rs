@@ -13,6 +13,7 @@ pub mod guarded_payload;
 pub mod processing_registry;
 
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+#[allow(deprecated)]
 pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -23,8 +24,9 @@ pub use context_edit_audit::{
 };
 pub use egress_gateway::{
     handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,
-    process_cloud_response, CloudQueryRequest, CloudQueryResponse, CloudResponseRehydrator,
-    DefaultEgressClassifier, EgressGuardCheck, InjectionDetector, MAX_SEARCH_QUERY_BYTES,
+    process_cloud_response, CloudEgressPipeline, CloudEgressPipelineBuilder, CloudQueryRequest,
+    CloudQueryResponse, CloudResponseRehydrator, DefaultEgressClassifier, EgressGuardCheck,
+    InjectionDetector, MAX_SEARCH_QUERY_BYTES,
 };
 pub use egress_guard::{
     EgressGuard, TextSearchEngine, TextSearchResult, DEFAULT_EGRESS_GUARD_MIN_BYTES,

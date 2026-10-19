@@ -276,13 +276,14 @@ pub async fn classify_layer1_arc(
         let matches = set_cloned.matches(text);
         if matches.matched_any() {
             if let Some(first_idx) = matches.iter().next() {
-                let cp = &patterns_cloned[first_idx];
-                tracing::warn!(
-                    rule_id = %cp.name,
-                    pattern = %cp.regex.as_str(),
-                    "Egress DLP sensitive pattern match detected"
-                );
-                return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
+                if let Some(cp) = patterns_cloned.get(first_idx) {
+                    tracing::warn!(
+                        rule_id = %cp.name,
+                        pattern = %cp.regex.as_str(),
+                        "Egress DLP sensitive pattern match detected"
+                    );
+                    return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
+                }
             }
         }
         EgressClassification::Allow
@@ -332,7 +333,7 @@ impl EgressVault {
         let compiled = patterns
             .into_iter()
             .enumerate()
-            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx + 1), &pat))
+            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx.saturating_add(1)), &pat))
             .collect::<Result<Vec<_>, _>>()?;
 
         let set_patterns: Vec<&str> = compiled.iter().map(|p| p.regex.as_str()).collect();
@@ -428,7 +429,7 @@ impl EgressVault {
         }
 
         let mut current_text = Zeroizing::new(payload.to_string());
-        let mut replacement_count = 0;
+        let mut replacement_count: usize = 0;
 
         // Phase 1: Regex-Muster im Ersetzungsmodus anwenden
         for cp in self.patterns.iter() {
@@ -440,7 +441,7 @@ impl EgressVault {
                 let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                 new_text.push_str(&surrogate);
                 last_end = m.end();
-                replacement_count += 1;
+                replacement_count = replacement_count.saturating_add(1);
             }
             if last_end > 0 {
                 new_text.push_str(&current_text[last_end..]);
@@ -471,7 +472,7 @@ impl EgressVault {
                     let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                     current_text.replace_range(range.clone(), &surrogate);
                     last_processed_start = range.start;
-                    replacement_count += 1;
+                    replacement_count = replacement_count.saturating_add(1);
                 }
             }
         }
@@ -516,7 +517,7 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects, deprecated)]
 mod tests {
     use super::*;
     use std::time::Instant;
