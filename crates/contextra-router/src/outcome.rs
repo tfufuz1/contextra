@@ -26,6 +26,24 @@ impl DecisionId {
     }
 }
 
+/// An in-flight routing ticket representing a pending decision awaiting an outcome.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RoutingTicket {
+    decision_id: DecisionId,
+}
+
+impl RoutingTicket {
+    /// Creates a new `RoutingTicket` for the given `DecisionId`.
+    pub const fn new(decision_id: DecisionId) -> Self {
+        Self { decision_id }
+    }
+
+    /// Returns the associated `DecisionId`.
+    pub const fn decision_id(&self) -> DecisionId {
+        self.decision_id
+    }
+}
+
 /// Instanzgebundener Generator für monoton steigende `DecisionId`s (Spec §3 P29).
 #[derive(Debug)]
 pub struct DecisionIdGenerator {

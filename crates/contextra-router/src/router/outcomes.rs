@@ -99,6 +99,11 @@ impl RouterEngine {
         }
     }
 
+    /// Completes a tracked routing decision using its `RoutingTicket` and records the ground-truth outcome.
+    pub fn complete(&self, ticket: RoutingTicket, outcome: RoutingOutcome) -> bool {
+        self.record_outcome(ticket.decision_id(), outcome)
+    }
+
     /// Muss vom Aufrufer (Agent-Loop) nach Abschluss des SLM-Aufrufs aufgerufen werden.
     /// Liefert das tatsächliche Ergebnis zurück und trainiert die Kalibrierung
     /// mit einem echten Ground-Truth-Signal.

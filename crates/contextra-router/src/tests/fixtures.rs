@@ -1,5 +1,5 @@
 use crate::{RouterEngine, SlmProfile};
-use contextra_db::{Collection, ContextManager};
+use contextra_db::Collection;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget, TxId};
 use std::sync::Arc;
@@ -123,9 +123,22 @@ impl crate::ports_local::ContextPreparer for TestContextPreparer {
         budget: &TokenBudget,
         relevance_threshold: f32,
     ) -> Result<ContextWindow> {
-        let mut manager = ContextManager::new(budget.clone());
-        manager.set_relevance_threshold(relevance_threshold);
-        manager.prepare_context(chunks)
+        let mut total_tokens = 0;
+        let mut selected_chunks = Vec::new();
+        for chunk in chunks {
+            if chunk.relevance >= relevance_threshold {
+                let chunk_tokens = chunk.token_count;
+                if total_tokens + chunk_tokens <= budget.limit {
+                    total_tokens += chunk_tokens;
+                    selected_chunks.push(chunk);
+                }
+            }
+        }
+        Ok(ContextWindow {
+            chunks: selected_chunks,
+            total_tokens,
+            truncated: false,
+        })
     }
 }
 

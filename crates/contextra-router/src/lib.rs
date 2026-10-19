@@ -47,9 +47,9 @@ pub use arm_registry::{ArmRegistry, ArmRegistryError};
 pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 pub use dispatch::dispatch_to_slm;
-pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
+pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome, RoutingTicket};
 pub use profile::SlmProfile;
-pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
+pub use router::{DefaultRouterEngine, RouterAdminView, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
 pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};

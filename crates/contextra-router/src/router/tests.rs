@@ -178,3 +178,118 @@ fn test_pending_bandit_eviction_unit() {
         assert_eq!(router.pending_bandit.read().len(), 0);
     });
 }
+
+#[tokio::test]
+async fn test_route_tracked_and_complete_workflow(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let config = contextra_db::ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let collection = db.collection("default").await?;
+
+    let vec_data = vec![0.1f32, 0.2, 0.3, 0.4];
+    collection
+        .insert("doc1", &vec_data, Some(serde_json::json!({"text": "test query content"})))
+        .await?;
+
+    let profile = SlmProfile::new(
+        "p1",
+        "http://localhost:1111",
+        vec![],
+        TokenBudget::new(1000, 100),
+        0.0,
+    );
+
+    let router = crate::tests::tests::create_test_router(collection, vec![profile], None);
+    assert_eq!(router.pending_decision_count(), 0);
+
+    let (decision, ticket) = router.route_tracked(&vec_data, "test query").await?;
+    assert_eq!(decision.decision_id, ticket.decision_id());
+    assert_eq!(router.pending_decision_count(), 1);
+
+    let completed = router.complete(ticket, RoutingOutcome::Success);
+    assert!(completed);
+    assert_eq!(router.pending_decision_count(), 0);
+
+    let stats = router.calibration_stats();
+    assert_eq!(stats["p1"].times_selected, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_router_admin_view() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let config = contextra_db::ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let collection = db.collection("default").await?;
+
+    let profile = SlmProfile::new(
+        "p1",
+        "http://localhost:1111",
+        vec![],
+        TokenBudget::new(1000, 100),
+        0.1,
+    );
+
+    let router = crate::tests::tests::create_test_router(collection, vec![profile], None);
+    let admin = router.admin();
+
+    assert_eq!(admin.pending_decision_count(), 0);
+    assert_eq!(admin.overall_drift_status(), "unbekannt");
+
+    let stats = admin.calibration_stats();
+    assert!(stats.contains_key("p1"));
+
+    let baseline_set = admin.set_lyapunov_baseline("p1", &[0.1, 0.2, 0.3]);
+    assert!(baseline_set);
+
+    admin.reset_calibration("p1");
+    admin.reset_all_calibration();
+    admin.evict_stale_decisions();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_update_profiles_deprecated_delegation(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let config = contextra_db::ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let collection = db.collection("default").await?;
+
+    let p1 = SlmProfile::new(
+        "p1",
+        "http://localhost:1111",
+        vec![],
+        TokenBudget::new(1000, 100),
+        0.1,
+    );
+
+    let router = crate::tests::tests::create_test_router(collection, vec![p1], None);
+    assert_eq!(router.profiles().len(), 1);
+
+    let p2 = SlmProfile::new(
+        "p2",
+        "http://localhost:2222",
+        vec![],
+        TokenBudget::new(1000, 100),
+        0.2,
+    );
+
+    #[allow(deprecated)]
+    router.update_profiles(vec![p2]);
+    assert_eq!(router.profiles().len(), 1);
+    assert_eq!(router.profiles()[0].name, "p2");
+
+    Ok(())
+}
