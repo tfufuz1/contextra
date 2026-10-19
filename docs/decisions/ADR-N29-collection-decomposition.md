@@ -13,9 +13,9 @@
 Eine detaillierte Codebase-Analyse am HEAD zeigt, dass `Collection` in `crates/contextra-engine/src/collection/mod.rs` ein klassisches God-Object darstellt.
 
 ### 1.1 Metriken & Umfang
-* **Hauptdatei:** `crates/contextra-engine/src/collection/mod.rs` (1272 LOC gesamt).
-* **Struct-Definition:** `crates/contextra-engine/src/collection/mod.rs:603–633` (20 Felder).
-* **Submodule / `impl`-Blöcke unter `collection/`:**
+* **Hauptdatei:** `crates/contextra-engine/src/collection/mod.rs` (1277 LOC gesamt).
+* **Struct-Definition:** `crates/contextra-engine/src/collection/mod.rs:603–638` (21 Felder inkl. `auto_extraction`).
+* **Submodule / `impl`-Blöcke unter `collection/`:** 38 `impl`-Blöcke verteilt über 20 Quellcodedateien:
   - `crud/` (`insert.rs`, `read.rs`, `delete.rs`, `update.rs`, `links.rs`, `auto_extraction.rs`) — Document-CRUD & Auto-Extraction.
   - `search/` (`hybrid.rs`, `vector.rs`, `bm25.rs`, `checkpoint.rs`) — Multi-Signal-Retrieval Pipeline & RRF.
   - `relate/` — Graph-Relationen & Zettelkasten-Memory-Links.
@@ -24,7 +24,7 @@ Eine detaillierte Codebase-Analyse am HEAD zeigt, dass `Collection` in `crates/c
   - `query_builder/` — `HybridQueryBuilder` Konstruktion & Signal-Gewichtung.
   - `kv_lock.rs` — Key-granulares Lock-Sharding (`KvKeyLocks`).
 
-### 1.2 Vollständige Feldtabelle von `Collection` (20 Felder)
+### 1.2 Vollständige Feldtabelle von `Collection` (21 Felder)
 
 | Nr. | Feldname | Typ | Verwender-Dateien | Lebenszyklus / Zweck |
 | :--- | :--- | :--- | :--- | :--- |
@@ -43,11 +43,12 @@ Eine detaillierte Codebase-Analyse am HEAD zeigt, dass `Collection` in `crates/c
 | 13 | `mutations_since_community_detection` | `Arc<AtomicU64>` | `mod.rs`, `relate/`, `maintenance/` | Atomic Counter; Zählt Graph-Mutationen für auto-getriggerte Community Detection. |
 | 14 | `community_detection_trigger_threshold` | `Arc<AtomicU64>` | `mod.rs`, `maintenance/` | Atomic Threshold; Schwelle für automatische Community-Erkennung. |
 | 15 | `consolidation_in_progress` | `Arc<AtomicBool>` | `mod.rs`, `maintenance/` | Atomic Flag; verhindert parallele Doppel-Trigger der Konsolidierung. |
-| 16 | `config` | `parking_lot::RwLock<CollectionConfig>` | `mod.rs`, `crud/insert.rs` | Konfiguration; Backpressure-Delay und Sammlungs-Parameter. |
-| 17 | `pressure_rx` | `parking_lot::RwLock<Option<watch::Receiver<SystemPressure>>>` | `mod.rs`, `crud/insert.rs` | Watch-Channel; Empfang von System-Pressure-Signalen aus dem LSM-Store. |
-| 18 | `clock` | `parking_lot::RwLock<Arc<dyn Clock>>` | `mod.rs`, `crud/`, `tx.rs` | Injizierter Port (P28); Deterministische Zeitquelle für Inserte/Deletes. |
-| 19 | `metrics` | `parking_lot::RwLock<Arc<dyn MetricsSink>>` | `mod.rs`, `crud/`, `search/` | Injizierter Port; Erfassung operationaler Performanz-Metriken. |
-| 20 | `last_load_report` | `parking_lot::Mutex<Option<IndexLoadReport>>` | `mod.rs` | Mutex; speichert den Ergebnis-Bericht des letzten `load_index`-Scans. |
+| 16 | `auto_extraction` | `Arc<RwLock<Option<AutoExtractionBinding>>>` | `mod.rs`, `crud/auto_extraction.rs` | Shared RwLock; Bindung für automatische Triple- & Entity-Extraktion (P08). |
+| 17 | `config` | `parking_lot::RwLock<CollectionConfig>` | `mod.rs`, `crud/insert.rs` | Konfiguration; Backpressure-Delay und Sammlungs-Parameter. |
+| 18 | `pressure_rx` | `parking_lot::RwLock<Option<watch::Receiver<SystemPressure>>>` | `mod.rs`, `crud/insert.rs` | Watch-Channel; Empfang von System-Pressure-Signalen aus dem LSM-Store. |
+| 19 | `clock` | `parking_lot::RwLock<Arc<dyn Clock>>` | `mod.rs`, `crud/`, `tx.rs` | Injizierter Port (P28); Deterministische Zeitquelle für Inserte/Deletes. |
+| 20 | `metrics` | `parking_lot::RwLock<Arc<dyn MetricsSink>>` | `mod.rs`, `crud/`, `search/` | Injizierter Port; Erfassung operationaler Performanz-Metriken. |
+| 21 | `last_load_report` | `parking_lot::Mutex<Option<IndexLoadReport>>` | `mod.rs` | Mutex; speichert den Ergebnis-Bericht des letzten `load_index`-Scans. |
 
 ---
 
@@ -68,15 +69,15 @@ Um Prinzip P30 (Crate-/Modul-Schnittkriterien) und P26 (Sync-Kern, async-Schale)
 
 3. **`AutoExtractionController`:**
    - **Aufgabe:** Automatische Triple-Extraktion (P08) und LLM-Einbindung.
-   - **Felder:** `embedder` (#9). Registrierung verbleibt getrennt vom Kern im Inferenz-Port.
+   - **Felder:** `embedder` (#9), `auto_extraction` (#16). Registrierung verbleibt getrennt vom Kern im Inferenz-Port.
 
 4. **`MaintenanceCoordinator`:**
    - **Aufgabe:** Hintergrund-Tasks, Memory-Decay, Community Detection & Task-Drosselung.
-   - **Felder:** `consolidation_guard` (#10), `mutations_since_community_detection` (#13), `community_detection_trigger_threshold` (#14), `consolidation_in_progress` (#15), `last_load_report` (#20).
+   - **Felder:** `consolidation_guard` (#10), `mutations_since_community_detection` (#13), `community_detection_trigger_threshold` (#14), `consolidation_in_progress` (#15), `last_load_report` (#21).
 
 5. **`OperationalContext` / Environment Ports:**
    - **Aufgabe:** Injizierte Ports für Zeit, Metriken und Backpressure.
-   - **Felder:** `config` (#16), `pressure_rx` (#17), `clock` (#18), `metrics` (#19).
+   - **Felder:** `config` (#17), `pressure_rx` (#18), `clock` (#19), `metrics` (#20).
 
 ---
 
