@@ -1,0 +1,38 @@
+id        = "T-2026-9006"
+title     = "ci: schwere Gates auf Nightly und Pfadfilter (ADR-N31)"
+crate     = "workspace"
+tier      = 2
+risk      = "none"
+issue     = 9006
+goal      = "Verschiebe teure CI-Prüfungen auf Nightly/Schedule und Pfadfilter (ADR-N31), erstelle Job-Summaries für Diagnosen und wahre Prüfschärfe."
+non_goals = ["Keine Änderungen an Quellcode oder xtask", "Keine Lockerung oder Entfernung von Required Checks oder Prüfschwellen"]
+scope     = [
+  ".github/workflows/deep-gates.yml",
+  ".github/workflows/mutation-testing.yml",
+  ".github/workflows/loom-gate.yml",
+  ".github/workflows/tsan.yml",
+  ".github/workflows/fuzz-extended.yml",
+  ".github/workflows/chaos.yml",
+  ".github/workflows/coverage.yml",
+  ".github/workflows/bench.yml",
+  ".github/workflows/bench-regression.yml",
+  ".github/workflows/simd-cross-validation.yml",
+  ".github/workflows/nucleation-recall-history.yml",
+  ".github/workflows/flake-report.yml",
+  ".github/workflows/scheduled-audit.yml",
+  ".github/workflows/post-merge-verification.yml",
+  ".jules/tasks/T-2026-9006.toml"
+]
+forbidden = ["crates/**", "xtask/**", "docs/**", "governance/**", ".github/rulesets/**", "capabilities.toml", "AGENTS.md"]
+invariants = ["P19 Quality Gates", "ADR-N31 Tiered Testing"]
+acceptance = [
+  "cargo xtask check-workflow-commands",
+  "cargo xtask check-action-pinning",
+  "cargo xtask gate-weakening --base origin/main"
+]
+evidence_required = []
+
+[budget]
+files = 15
+lines = 500
+iterations = 10

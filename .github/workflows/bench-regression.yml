@@ -1,7 +1,25 @@
+# Takt: Nightly (03:00 UTC) / workflow_dispatch / pull_request (Pfadfilter) / push on main
+# Zweck: Prüft Performance-Regressionen via Criterion Benchmarks und Bandit Latency Budget.
+# Lokaler Befehl: cargo bench -p contextra-vector && cargo xtask bench-gate --tolerance 0.05
+
 name: Benchmark Regression Gate
+
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - 'crates/contextra-vector/**'
+      - 'crates/contextra-db/**'
+      - 'crates/contextra-store/**'
+      - 'crates/contextra-router/**'
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   bench-regression:
@@ -21,11 +39,20 @@ jobs:
           cargo bench -p contextra-store --bench wal_throughput_bench -- --save-baseline current
       - name: Assert No Regression (±5%)
         run: cargo xtask bench-gate --tolerance 0.05
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Criterion Benchmarks Regression Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo bench -p contextra-vector --bench distance_nan_impact_bench -- --save-baseline current && cargo xtask bench-gate --tolerance 0.05" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - name: Upload Benchmark Results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: criterion-results-${{ github.sha }}
           path: target/criterion/
+          retention-days: 7
 
   bandit-latency-budget:
     name: Bandit Latency Budget Gate
@@ -42,3 +69,11 @@ jobs:
             xtask
       - name: Bandit Latency Budget Gate
         run: cargo run -p xtask --features contextra-router/bandit-routing -- check-bandit-latency-budget
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Bandit Latency Budget Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run -p xtask --features contextra-router/bandit-routing -- check-bandit-latency-budget" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

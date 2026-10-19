@@ -1,9 +1,17 @@
+# Takt: Täglich (03:00 UTC) / workflow_dispatch
+# Zweck: Erkennt Test-Flakiness durch mehrfache Testwiederholungen.
+# Lokaler Befehl: cargo run --manifest-path xtask/Cargo.toml -- flake-report --runs 10 --json
+
 name: Flake Report Nightly
 
 on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -36,6 +44,7 @@ jobs:
         with:
           name: flake-report-results
           path: .jules/local/flake-report.json
+          retention-days: 7
 
       - name: Process Flake Issues
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
@@ -49,3 +58,12 @@ jobs:
             if (data.flaky_detected) {
               core.setFailed(`Nightly Flake Report hat Test-Flakiness erkannt.\nRuns: ${data.runs}\nSuccessful: ${data.successful_runs}\nRate: ${data.success_rate * 100}%`);
             }
+
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Nightly Flake Report Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Test-Flakiness erkannt. Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- flake-report --runs 10" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
