@@ -16,6 +16,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Deterministischer SplitMix64 PRNG für retry jitter.
+///
+/// RING-LAYER-EXCEPTION: Local implementation retained in Ring 2 (`contextra-infer-ollama`)
+/// because Ring layering rules prohibition prevents Ring 2 crates from depending on Ring 0
+/// `contextra-sys` (Order 0).
 #[derive(Debug)]
 pub struct SeededRng {
     state: AtomicU64,

@@ -12,6 +12,7 @@ ring = "0"
 [dependencies]
 blake3 = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-sys = { workspace = true }
 contextra-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
