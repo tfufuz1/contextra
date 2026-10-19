@@ -5,27 +5,7 @@
 
 use contextra_engine::decay_controller::DecayControllerConfig;
 
-#[cfg(feature = "graph-connectivity-health")]
-use contextra_graph::percolation::PercolationConfig;
-
-#[cfg(not(feature = "graph-connectivity-health"))]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PercolationConfig {
-    pub critical_threshold: f32,
-    pub rebonding_similarity: f32,
-    pub max_new_edges_per_pass: usize,
-}
-
-#[cfg(not(feature = "graph-connectivity-health"))]
-impl Default for PercolationConfig {
-    fn default() -> Self {
-        Self {
-            critical_threshold: 0.7,
-            rebonding_similarity: 0.85,
-            max_new_edges_per_pass: 100,
-        }
-    }
-}
+pub use contextra_graph::percolation::PercolationConfig;
 
 /// Zentrale Konfiguration für den `MaintenanceScheduler` (§10.2).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
