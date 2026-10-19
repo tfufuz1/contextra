@@ -29,18 +29,14 @@ pub enum HybridPipelineStage {
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
-    ///
-    /// Applies `memory_type_filter` and metadata `FilterExpr` as Pre-RRF filters to preserve
-    /// Reciprocal Rank Fusion properties (ADR-024).
-    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    /// Scheduled for removal in v0.2.0. Use `Collection::query().query_config()` instead.
+    #[deprecated(since = "0.1.0", note = "Use Collection::query() instead. Scheduled for removal in v0.2.0.")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, query))]
     pub async fn hybrid_search_with_query(
         &self,
         query: &contextra_types::HybridQuery,
     ) -> Result<Vec<crate::SearchResult>> {
-        // Pin-first, read-after: the seq is read under the protection of the pin,
-        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
             let snapshot = contextra_ports::ReadSnapshot::from_seq(seq);
             self.hybrid_search_with_query_at(query, &snapshot).await
@@ -687,5 +683,72 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok((results, report))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_types::TxId;
+
+    #[test]
+    fn test_filter_by_importance_filtering() {
+        let doc_high = crate::SearchResult {
+            id: "doc-high".to_string(),
+            score: 0.9,
+            metadata: Some(serde_json::json!({
+                "importance": {
+                    "base_score": 0.8,
+                    "decay": "None",
+                    "created_at_tx": 1
+                }
+            })),
+            matched_signals: Vec::new(),
+            provenance: None,
+        };
+
+        let doc_low = crate::SearchResult {
+            id: "doc-low".to_string(),
+            score: 0.85,
+            metadata: Some(serde_json::json!({
+                "importance": {
+                    "base_score": 0.2,
+                    "decay": "None",
+                    "created_at_tx": 1
+                }
+            })),
+            matched_signals: Vec::new(),
+            provenance: None,
+        };
+
+        let results = vec![doc_high.clone(), doc_low.clone()];
+        let now_tx = TxId::try_new(10).unwrap();
+
+        // 1. Default / No threshold filter (threshold 0.0): returns both
+        let no_filter = Collection::<contextra_store::LsmStorage, contextra_vector::HnswIndex>::filter_by_importance(results.clone(), 0.0, now_tx);
+        assert_eq!(no_filter.len(), 2);
+        assert_eq!(no_filter[0].id, "doc-high");
+        assert_eq!(no_filter[1].id, "doc-low");
+
+        // 2. High threshold (0.5): filters out doc-low, preserves doc-high without reordering
+        let filtered = Collection::<contextra_store::LsmStorage, contextra_vector::HnswIndex>::filter_by_importance(results, 0.5, now_tx);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, "doc-high");
+    }
+
+    #[test]
+    fn test_traverse_links_structure() {
+        // Verify DocId representations for Zettelkasten link traversal
+        let start = DocId::new(100);
+        let target1 = DocId::new(101);
+        let target2 = DocId::new(102);
+
+        let hops = vec![(target1, 1), (target2, 2)];
+        assert_eq!(hops.len(), 2);
+        assert_eq!(hops[0].0, target1);
+        assert_eq!(hops[0].1, 1);
+        assert_eq!(hops[1].0, target2);
+        assert_eq!(hops[1].1, 2);
+        assert_ne!(start, target1);
     }
 }

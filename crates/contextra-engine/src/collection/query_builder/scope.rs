@@ -56,3 +56,22 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_allowed_ids_sets_default_gamma_two() {
+        let mut set = BTreeSet::new();
+        set.insert(DocId::new(10));
+        set.insert(DocId::new(20));
+
+        let scope = ScopeConstraint::from_allowed_ids(set.clone());
+        assert_eq!(scope.allowed_doc_ids, set);
+        assert_eq!(scope.gamma, 2);
+
+        let custom = ScopeConstraint::new(set.clone(), 5);
+        assert_eq!(custom.gamma, 5);
+    }
+}
