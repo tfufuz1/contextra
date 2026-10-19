@@ -1,7 +1,10 @@
+# Takt: Wöchentlich (Mo 03:00 UTC) / workflow_dispatch / pull_request (Pfadfilter)
+# Zweck: Führt rotierendes/zielgerichtetes Mutation Testing aus.
+# Lokaler Befehl: cargo mutants -p contextra-crypto -- --lib
+
 name: Mutation Testing
+
 on:
-  # Wöchentlicher automatischer Lauf jeden Montag um 03:00 UTC
-  # (Frequenz abgestimmt auf die 45-Minuten-Timeout-Begrenzung für Mutation Testing)
   schedule:
     - cron: '0 3 * * 1'
   workflow_dispatch:
@@ -22,6 +25,10 @@ on:
       - 'crates/contextra-text/**'
       - 'crates/contextra-graph/**'
       - 'crates/contextra-rank/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -142,6 +149,7 @@ jobs:
         with:
           name: mutation-score-history
           path: docs/mutation_score_history.jsonl
+          retention-days: 7
 
       - name: Enforce Mutation Score Gate
         run: |
@@ -150,9 +158,13 @@ jobs:
             cargo run -p xtask -- check-mutation-score-gate --crate "$crate"
           done
 
-      - name: Report Failure
+      - name: Report Failure Summary
         if: failure()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
-        with:
-          script: |
-            core.setFailed("Mutation testing failed.");
+        run: |
+          echo "### ❌ Mutation Testing Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Target Crates: \`${{ steps.target.outputs.crates }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo mutants -p <crate> --timeout 120" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run -p xtask -- check-mutation-score-gate --crate <crate>" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,3 +1,7 @@
+# Takt: Nightly (04:00 UTC) / workflow_dispatch / pull_request (Pfadfilter)
+# Zweck: Prüft Nebenläufigkeit und Data Races mit Loom.
+# Lokaler Befehl: RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit --release
+
 name: Loom Concurrency Gate
 on:
   schedule:
@@ -13,6 +17,10 @@ on:
       - "crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"
       - "crates/contextra-vector/src/**"
       - "crates/contextra-vector/tests/loom_quantizer_race_test.rs"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,6 +42,14 @@ jobs:
         run: |
           which just || cargo install just --cheap-only || true
           just loom-store
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Loom Concurrency Check — contextra-store Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "RUSTFLAGS=\"--cfg loom\" cargo test -p contextra-store --test loom_group_commit --release" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   loom-crypto:
     name: Loom Concurrency Check — contextra-crypto
@@ -46,6 +62,14 @@ jobs:
       - name: Run Loom Test — contextra-crypto (loom_kv_deferred_zeroize)
         run: |
           RUSTFLAGS="--cfg loom" cargo test -p contextra-crypto --test loom_kv_deferred_zeroize --release
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Loom Concurrency Check — contextra-crypto Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "RUSTFLAGS=\"--cfg loom\" cargo test -p contextra-crypto --test loom_kv_deferred_zeroize --release" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   loom-index:
     name: Loom Concurrency Check — contextra-vector
@@ -58,3 +82,11 @@ jobs:
       - name: Run Loom Test — contextra-vector (loom_quantizer_race_test)
         run: |
           RUSTFLAGS="--cfg loom" cargo test -p contextra-vector --test loom_quantizer_race_test --release
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Loom Concurrency Check — contextra-vector Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "RUSTFLAGS=\"--cfg loom\" cargo test -p contextra-vector --test loom_quantizer_race_test --release" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
