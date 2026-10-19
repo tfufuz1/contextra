@@ -19,3 +19,9 @@ impl From<TlHfdError> for contextra_types::ContextraError {
         contextra_types::ContextraError::InvalidInput(err.to_string())
     }
 }
+
+impl From<contextra_types::ContextraError> for TlHfdError {
+    fn from(err: contextra_types::ContextraError) -> Self {
+        TlHfdError::InvalidParameter(err.to_string())
+    }
+}
