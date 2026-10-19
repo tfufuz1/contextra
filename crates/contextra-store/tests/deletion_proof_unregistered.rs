@@ -2,7 +2,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_store::kv::{
     delete_mode::KvDeleteMode,

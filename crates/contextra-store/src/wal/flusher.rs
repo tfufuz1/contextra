@@ -17,9 +17,6 @@ use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 #[allow(dead_code)]
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-#[cfg(feature = "fault-injection")]
-pub static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
 
 #[allow(dead_code)]
 pub(crate) enum WalCommand {
@@ -230,6 +227,8 @@ impl Wal {
             Arc::clone(&self.allow_legacy_integrity_key_fallback);
         let min_wal_version = self.min_wal_version;
         let legacy_key_used = Arc::clone(&self.legacy_key_used);
+        #[cfg(feature = "fault-injection")]
+        let fault_plan = self.fault_plan.clone();
 
         let handle = tokio::spawn(async move {
             let mut pending_cmd: Option<WalCommand> = None;
@@ -348,7 +347,8 @@ impl Wal {
                             }
 
                             #[cfg(feature = "fault-injection")]
-                            if crate::wal::FAIL_APPEND_PARTIAL_ONCE
+                            if fault_plan
+                                .fail_append_partial_once
                                 .compare_exchange(
                                     true,
                                     false,
@@ -357,7 +357,8 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                let partial_bytes = crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
+                                let partial_bytes = fault_plan
+                                    .fail_append_after_partial_bytes
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
                                 if cut > 0 {
@@ -374,9 +375,11 @@ impl Wal {
                                         );
                                     }
                                 }
-                                crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
+                                fault_plan
+                                    .fail_append_after_partial_bytes
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
-                                crate::wal::FAIL_APPEND_PARTIAL_ONCE
+                                fault_plan
+                                    .fail_append_partial_once
                                     .store(false, std::sync::atomic::Ordering::SeqCst);
                                 return Err(ContextraError::Storage(
                                     "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
@@ -442,7 +445,8 @@ impl Wal {
                             })?;
 
                             #[cfg(feature = "fault-injection")]
-                            if FAIL_SYNC_ONCE
+                            if fault_plan
+                                .fail_sync_once
                                 .compare_exchange(
                                     true,
                                     false,
@@ -526,7 +530,8 @@ impl Wal {
                     } => {
                         let res: Result<()> = async {
                             #[cfg(feature = "fault-injection")]
-                            if crate::wal::FAIL_TRUNCATE_ONCE
+                            if fault_plan
+                                .fail_truncate_once
                                 .compare_exchange(
                                     true,
                                     false,
@@ -597,7 +602,8 @@ impl Wal {
                     WalCommand::Seal { ack } => {
                         let res: Result<PathBuf> = async {
                             #[cfg(feature = "fault-injection")]
-                            if FAIL_SYNC_ONCE
+                            if fault_plan
+                                .fail_sync_once
                                 .compare_exchange(
                                     true,
                                     false,
@@ -803,7 +809,8 @@ impl Wal {
                                 })?;
 
                                 #[cfg(feature = "fault-injection")]
-                                if FAIL_SYNC_ONCE
+                                if fault_plan
+                                    .fail_sync_once
                                     .compare_exchange(
                                         true,
                                         false,

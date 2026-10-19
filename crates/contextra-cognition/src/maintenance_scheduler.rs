@@ -461,6 +461,21 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "edge-reinforcement-learning")]
+    #[tokio::test]
+    async fn test_maintenance_scheduler_edge_reinforcement_buffer() {
+        let col = create_test_collection().await;
+        let buffer = Arc::new(contextra_graph::EdgeReinforcementBuffer::new());
+        let scheduler = MaintenanceScheduler::new(
+            MaintenanceConfig::default(),
+            col,
+            ConsolidationConfig::default(),
+        )
+        .with_edge_reinforcement_buffer(buffer.clone());
+
+        assert!(scheduler.edge_reinforcement_buffer.is_some());
+    }
+
     #[tokio::test]
     async fn test_active_sessions_tracking() {
         let col = create_test_collection().await;

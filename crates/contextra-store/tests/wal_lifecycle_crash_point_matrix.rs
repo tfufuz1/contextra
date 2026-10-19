@@ -6,7 +6,7 @@
 
 use contextra_types::{ContextraError, TxId};
 use contextra_store::wal::{
-    Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
+    Wal, WalConfig, WalOp, WalVersion,
 };
 use contextra_testkit::{FaultConfig, FaultVfs};
 use tempfile::TempDir;
@@ -56,16 +56,16 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     let last_hmac_before_cmd = wal.last_hmac_snapshot().await;
 
     // Reset static fault injection handles
-    FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
-    FAIL_TRUNCATE_ONCE.store(false, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan().fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan().fail_truncate_once.store(false, std::sync::atomic::Ordering::SeqCst);
 
     // 2. Trigger target WalCommand under injected fault at `time_point`
     let mut cmd_attempt_ok = false;
     match cmd_type {
         "Append" => {
-            // Use FAIL_APPEND_FOR_TX static when time_point maps to target TxId (11..=25)
+            // Use fault_plan when time_point maps to target TxId (11..=25)
             let fail_tx = 10 + (time_point as u64 % 15) + 1;
-            FAIL_APPEND_FOR_TX.store(fail_tx, std::sync::atomic::Ordering::SeqCst);
+            wal.fault_plan().fail_append_for_tx.store(fail_tx, std::sync::atomic::Ordering::SeqCst);
 
             vfs.set_config(FaultConfig {
                 fail_writes_after: Some(time_point),
@@ -83,7 +83,7 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
         }
         "Truncate" => {
             if time_point % 2 == 0 {
-                FAIL_TRUNCATE_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
+                wal.fault_plan().fail_truncate_once.store(true, std::sync::atomic::Ordering::SeqCst);
             }
             vfs.set_config(FaultConfig {
                 fail_writes_after: Some(time_point),
@@ -141,8 +141,8 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     // Reset VFS fault config and static indicators before process restart simulation
     vfs.reset_counters();
     vfs.set_config(FaultConfig::default());
-    FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
-    FAIL_TRUNCATE_ONCE.store(false, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan().fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan().fail_truncate_once.store(false, std::sync::atomic::Ordering::SeqCst);
 
     drop(wal);
 

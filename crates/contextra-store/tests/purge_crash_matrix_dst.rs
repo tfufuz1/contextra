@@ -7,8 +7,8 @@
 // 3. Gelöschte Schlüssel kehren nicht zurück (Anti-Resurrection).
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
-use contextra_ports::{Rng, SeededRng, StorageEngine};
-use contextra_testkit::ManualClock;
+use contextra_ports::{Rng, StorageEngine};
+use contextra_testkit::{ManualClock, SeededRng};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;

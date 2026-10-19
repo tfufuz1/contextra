@@ -1,8 +1,12 @@
+#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
 use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
 use candle_core::Device;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
+#[cfg(feature = "kv-bridge")]
+use contextra_ports::ContextSegment;
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
 use contextra_types::{ConfigFingerprint, Result};
@@ -21,6 +25,42 @@ impl CandleModelInner for MockCandleModel {
     ) -> Result<String> {
         Ok(format!("{prompt} -> {}", self.response))
     }
+}
+
+#[tokio::test]
+async fn test_inference_non_constant_output_proof_across_variable_prompts() {
+    let mock_model = Box::new(MockCandleModel {
+        response: "Response Tail".to_string(),
+    });
+    let fp = ModelFingerprint {
+        hash: [12u8; 32],
+        model_id: "test_prompt_model.gguf".to_string(),
+        quantization: "Q4_K_M".to_string(),
+    };
+    let tokenizer_bytes = r#"{
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+    }"#;
+    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
+
+    let client = CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer);
+
+    let output_a = client.generate("Prompt Alpha").await.unwrap();
+    let output_b = client.generate("Prompt Beta").await.unwrap();
+
+    assert_ne!(
+        output_a, output_b,
+        "Variable prompts must yield non-constant generation outputs"
+    );
+    assert!(output_a.contains("Prompt Alpha"));
+    assert!(output_b.contains("Prompt Beta"));
 }
 
 #[tokio::test]

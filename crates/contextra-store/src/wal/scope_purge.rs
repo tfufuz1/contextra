@@ -11,7 +11,8 @@
 use contextra_durable_fs::atomic_replace;
 use contextra_types::{ContextraError, Result};
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
+#[cfg(feature = "fault-injection")]
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 
@@ -20,8 +21,6 @@ use crate::util::fsync_parent_dir;
 use crate::wal::{
     classify_wal_filename, KeyManager, Wal, WalEntry, WalFileType, WalOp, WAL_V3_HEADER,
 };
-
-pub static WAL_PURGE_FAILPOINT: AtomicU32 = AtomicU32::new(0);
 
 pub const FAILPOINT_BEFORE_REWRITE: u32 = 1;
 pub const FAILPOINT_AFTER_REWRITE: u32 = 2;
@@ -181,6 +180,7 @@ pub async fn purge_wal_scope(
     scope: &PurgeScope,
     as_of_tx: u64,
     key_manager: Option<Arc<KeyManager>>,
+    #[cfg(feature = "fault-injection")] fault_plan: Option<Arc<crate::wal::WalFaultPlan>>,
 ) -> Result<WalPurgeReport> {
     resume_wal_scope_purge(wal_dir).await?;
 
@@ -195,7 +195,11 @@ pub async fn purge_wal_scope(
 
     let mut report = WalPurgeReport::default();
 
-    if check_and_clear_failpoint(FAILPOINT_BEFORE_REWRITE) {
+    if check_and_clear_failpoint(
+        #[cfg(feature = "fault-injection")]
+        fault_plan.as_deref(),
+        FAILPOINT_BEFORE_REWRITE,
+    ) {
         return Err(ContextraError::Storage(
             "Simulated failpoint: FAILPOINT_BEFORE_REWRITE".into(),
         ));
@@ -362,7 +366,11 @@ pub async fn purge_wal_scope(
         })?;
         drop(tmp_file);
 
-        if check_and_clear_failpoint(FAILPOINT_AFTER_REWRITE) {
+        if check_and_clear_failpoint(
+            #[cfg(feature = "fault-injection")]
+            fault_plan.as_deref(),
+            FAILPOINT_AFTER_REWRITE,
+        ) {
             return Err(ContextraError::Storage(
                 "Simulated failpoint: FAILPOINT_AFTER_REWRITE".into(),
             ));
@@ -380,7 +388,11 @@ pub async fn purge_wal_scope(
 
         fsync_parent_dir(&path).await?;
 
-        if check_and_clear_failpoint(FAILPOINT_AFTER_RENAME) {
+        if check_and_clear_failpoint(
+            #[cfg(feature = "fault-injection")]
+            fault_plan.as_deref(),
+            FAILPOINT_AFTER_RENAME,
+        ) {
             return Err(ContextraError::Storage(
                 "Simulated failpoint: FAILPOINT_AFTER_RENAME".into(),
             ));
@@ -391,7 +403,11 @@ pub async fn purge_wal_scope(
         report.tail_bytes_cleaned += tail_bytes;
     }
 
-    if check_and_clear_failpoint(FAILPOINT_AFTER_OLD_REMOVAL) {
+    if check_and_clear_failpoint(
+        #[cfg(feature = "fault-injection")]
+        fault_plan.as_deref(),
+        FAILPOINT_AFTER_OLD_REMOVAL,
+    ) {
         return Err(ContextraError::Storage(
             "Simulated failpoint: FAILPOINT_AFTER_OLD_REMOVAL".into(),
         ));
@@ -428,8 +444,17 @@ pub async fn resume_wal_scope_purge(wal_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn check_and_clear_failpoint(fp: u32) -> bool {
-    WAL_PURGE_FAILPOINT
-        .compare_exchange(fp, 0, Ordering::SeqCst, Ordering::SeqCst)
-        .is_ok()
+fn check_and_clear_failpoint(
+    #[cfg(feature = "fault-injection")] fault_plan: Option<&crate::wal::WalFaultPlan>,
+    fp: u32,
+) -> bool {
+    #[cfg(feature = "fault-injection")]
+    if let Some(plan) = fault_plan {
+        return plan
+            .wal_purge_failpoint
+            .compare_exchange(fp, 0, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok();
+    }
+    let _ = fp;
+    false
 }

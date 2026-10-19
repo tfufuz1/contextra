@@ -410,7 +410,13 @@ impl LsmStorage {
         } else {
             config.path.join("wal.log")
         };
-        let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
+        let wal_config = crate::wal::WalConfig {
+            key_manager: key_manager.clone(),
+            #[cfg(feature = "fault-injection")]
+            fault_plan: config.fault_plan.clone(),
+            ..Default::default()
+        };
+        let wal = Wal::open_with_config(&active_wal_path, wal_config).await?;
 
         let budget_config = ResourceBudget {
             memory_limit: config.max_ram_mb * 1024 * 1024,

@@ -1,12 +1,14 @@
 //! FILE-CONTEXT:
 //! ZWECK: Integrationstests fuer WAL Scope Purge (`purge_wal_scope`) und WAL-Witness Scanner.
 
+#![cfg(feature = "fault-injection")]
+
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::wal::{
     purge_wal_scope, scan_wal_directory, Wal, WalOp, WalScanInputs, WalScopeSpec,
-    FAILPOINT_AFTER_RENAME, FAILPOINT_AFTER_REWRITE, FAILPOINT_BEFORE_REWRITE,
-    WAL_PURGE_FAILPOINT,
+    WalFaultPlan, FAILPOINT_AFTER_RENAME, FAILPOINT_AFTER_REWRITE, FAILPOINT_BEFORE_REWRITE,
 };
+use std::sync::Arc;
 use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -55,7 +57,7 @@ async fn test_purge_canary_key_removed_and_witness_clean() -> Result<()> {
     assert!(!evidence_before.is_valid());
 
     let scope = PurgeScope::Prefixes(vec![b"canary_".to_vec()]);
-    let report = purge_wal_scope(dir.path(), &scope, 100, None).await?;
+    let report = purge_wal_scope(dir.path(), &scope, 100, None, None).await?;
     assert_eq!(report.segments_rewritten, 1);
     assert_eq!(report.frames_purged, 1);
 
@@ -100,14 +102,15 @@ async fn test_purge_crash_failpoints_and_resume() -> Result<()> {
         wal.append_batch(batch).await?;
         wal.close().await?;
 
-        WAL_PURGE_FAILPOINT.store(fp, Ordering::SeqCst);
+        let fault_plan = Arc::new(WalFaultPlan::new());
+        fault_plan.wal_purge_failpoint.store(fp, Ordering::SeqCst);
         let scope = PurgeScope::Keys(vec![b"canary_key".to_vec()]);
 
-        let res = purge_wal_scope(dir.path(), &scope, 10, None).await;
+        let res = purge_wal_scope(dir.path(), &scope, 10, None, Some(fault_plan)).await;
         assert!(res.is_err(), "Failpoint {} should trigger error", fp);
 
         // Resume after crash
-        let report = purge_wal_scope(dir.path(), &scope, 10, None).await?;
+        let report = purge_wal_scope(dir.path(), &scope, 10, None, None).await?;
         assert!(report.segments_evaluated >= 1);
 
         let inputs = WalScanInputs {
@@ -171,7 +174,7 @@ async fn test_recycled_segment_with_tail_data_cleared() -> Result<()> {
     assert_eq!(evidence_before.frames_matching_scope, 1);
 
     let scope = PurgeScope::Keys(vec![b"non_existent".to_vec()]);
-    let report = purge_wal_scope(dir.path(), &scope, 100, None).await?;
+    let report = purge_wal_scope(dir.path(), &scope, 100, None, None).await?;
     assert!(report.tail_bytes_cleaned > 0);
 
     let evidence_after = scan_wal_directory(&inputs).await?;
@@ -207,7 +210,7 @@ async fn test_replay_after_purge_does_not_resurrect_deleted_key() -> Result<()> 
     wal.close().await?;
 
     let scope = PurgeScope::Keys(vec![b"resurrect_candidate".to_vec()]);
-    purge_wal_scope(dir.path(), &scope, 15, None).await?;
+    purge_wal_scope(dir.path(), &scope, 15, None, None).await?;
 
     let wal_replayed = Wal::open_read_only(&wal_path, None).await?;
     let replayed = wal_replayed.replay().await?;

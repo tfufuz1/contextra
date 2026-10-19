@@ -10,7 +10,6 @@
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_store::wal::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,8 +38,8 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
     storage.put(tx2, b"k_tx2", b"v_tx2").await.expect("put tx2");
 
     // 2. Configure Fault Injection: delay WAL append batch containing tx1 by 1000ms
-    DELAY_APPEND_FOR_TX.store(tx1.inner(), Ordering::SeqCst);
-    DELAY_APPEND_MS.store(1000, Ordering::SeqCst);
+    storage.fault_plan().delay_append_for_tx.store(tx1.inner(), Ordering::SeqCst);
+    storage.fault_plan().delay_append_ms.store(1000, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
 
@@ -64,8 +63,8 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
     let res_b = res_b.expect("task b join");
 
     // Reset Fault-Injection Flags
-    DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
-    DELAY_APPEND_MS.store(0, Ordering::SeqCst);
+    storage.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
+    storage.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
 
     // 3. Verifiziere: Mindestens eine Transaktion schlägt fehl mit CommitTimeout (der Follower)
     let follower_res = if res_a.is_err() {
@@ -133,8 +132,8 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
         .expect("put f1");
 
     // Configure Fault Injection: delay WAL append batch containing tx_leader by 1000ms
-    DELAY_APPEND_FOR_TX.store(tx_leader.inner(), Ordering::SeqCst);
-    DELAY_APPEND_MS.store(1000, Ordering::SeqCst);
+    storage.fault_plan().delay_append_for_tx.store(tx_leader.inner(), Ordering::SeqCst);
+    storage.fault_plan().delay_append_ms.store(1000, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
 
@@ -157,8 +156,8 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
     let res_leader = res_leader.expect("leader join");
     let res_f1 = res_f1.expect("f1 join");
 
-    DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
-    DELAY_APPEND_MS.store(0, Ordering::SeqCst);
+    storage.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
+    storage.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
 
     let (follower_res, leader_res) = if res_leader.is_err() {
         (&res_leader, &res_f1)

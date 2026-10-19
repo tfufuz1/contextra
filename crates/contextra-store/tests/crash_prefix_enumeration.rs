@@ -42,7 +42,7 @@ async fn test_prefix_crash_recovery_enumeration() {
                 .await
                 .expect("put initial record");
             storage.commit(tx).await.expect("commit initial record");
-            ref_model.put(key, val);
+            ref_model.put(&key, &val);
         }
 
         storage.close().await.expect("close initial storage");
@@ -64,7 +64,7 @@ async fn test_prefix_crash_recovery_enumeration() {
         copy_dir_recursive(seed_path, test_path);
 
         let test_wal = test_path.join("wal.log");
-        truncate_wal_file(&test_wal, cutoff);
+        truncate_wal_file(&test_wal, cutoff as usize);
 
         let test_config = LsmConfig {
             path: test_path.to_path_buf(),
@@ -73,7 +73,7 @@ async fn test_prefix_crash_recovery_enumeration() {
 
         match LsmStorage::open(test_config).await {
             Ok(storage) => {
-                verify_storage_against_reference_model(&storage, &ref_model).await;
+                verify_storage_against_reference_model(&storage, &ref_model, u64::MAX).await;
                 let _ = storage.close().await;
             }
             Err(e) => {
