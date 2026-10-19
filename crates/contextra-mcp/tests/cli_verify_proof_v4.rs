@@ -21,14 +21,17 @@ fn create_valid_v4_proof(
         .finish(signer)
         .expect("builder finish");
 
-    proof.claims = vec![ProofClaimV4 {
-        layer_id: 1,
-        assurance: 2,
-        claim_text_id: 3,
-        witness_digest: [0x22; 32],
-        scanned_at_tx: 10,
-        evidence_tlv: vec![],
-    }];
+    proof.claims = vec![1, 3, 20, 21, 26]
+        .into_iter()
+        .map(|layer_id| ProofClaimV4 {
+            layer_id,
+            assurance: 2,
+            claim_text_id: 3,
+            witness_digest: [0x22; 32],
+            scanned_at_tx: 10,
+            evidence_tlv: vec![],
+        })
+        .collect();
     proof.excluded_scopes = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     proof.sign_with_signer(signer).expect("sign failed");
     proof

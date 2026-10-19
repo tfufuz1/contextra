@@ -37,10 +37,10 @@ async fn test_j18_llm_config_build_generator_integration() {
 fn test_j18_deletion_proof_key_from_env_integration() {
     std::env::set_var(
         "CONTEXTRA_DELETION_PROOF_KEY",
-        "integration_test_key_32bytes!!",
+        "primary_deletion_proof_key_32bytes_valid!",
     );
     let resolved = deletion_proof_key_from_env().expect("deletion proof key resolved");
-    assert_eq!(resolved.as_str(), "integration_test_key_32bytes!!");
+    assert_eq!(resolved.as_str(), "primary_deletion_proof_key_32bytes_valid!");
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
 }
 

@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let db = Arc::new(Contextra::open(&db_path).await?);
     let embedder = config.build_provider()?;
-    let server = Arc::new(McpServer::from_env(db, embedder)?);
+    let server = Arc::new(McpServer::with_write_permission(db, embedder, allow_write)?);
 
     tracing::info!(
         db_path,
