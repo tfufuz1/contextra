@@ -98,7 +98,7 @@ async fn test_nway_merge_n4_and_n5_counter() {
     let min_seq = snapshot_reg.min_active_seqno(); // u64::MAX
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -135,7 +135,7 @@ async fn test_nway_merge_n4_and_n5_counter() {
 
     let out_path_5 = dir.path().join("compacted_n5.sst");
     engine
-        .merge_sstables(&readers_5, &out_path_5, min_seq, true)
+        .merge_sstables_with_cancel(&readers_5, &out_path_5, min_seq, true, None)
         .await
         .unwrap();
 
@@ -196,7 +196,7 @@ async fn test_nway_merge_non_commutative_order() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -268,7 +268,7 @@ async fn test_nway_merge_tombstone_in_middle() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -329,7 +329,7 @@ async fn test_nway_merge_exact_min_snapshot_seq() {
     let min_seq = 3;
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -388,7 +388,7 @@ async fn test_nway_merge_with_active_snapshot_floor() {
     let min_seq = 2;
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -452,7 +452,7 @@ async fn test_nway_merge_error_mid_chain_failsafe() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 
@@ -520,7 +520,7 @@ async fn test_nway_merge_key_manager_bypasses_merge_op() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&readers, &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&readers, &out_path, min_seq, true, None)
         .await
         .unwrap();
 

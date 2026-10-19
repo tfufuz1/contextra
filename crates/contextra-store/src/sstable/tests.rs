@@ -84,7 +84,7 @@ async fn test_block_bloom_filter_v4() {
 }
 
 #[test]
-fn test_block_binary_search_duplicate_keys_returns_first_index() {
+fn test_binary_search_first_index_duplicate_keys_returns_first_index() {
     let mut builder = BlockBuilder::new(4096);
     // Add 3 versions for key "dup_key" in descending sequence order
     builder.add(b"dup_key", b"v3", 30, 1);
@@ -170,15 +170,6 @@ fn test_block_search_functions_all_return_first_index_for_multi_version_keys() {
     .expect("search entry should succeed");
     assert!(entry_res.is_some());
 
-    let block_bin_res = block_search::block_binary_search(
-        &block,
-        offsets_start,
-        num_offsets,
-        b"key_a",
-        true,
-    )
-    .expect("block binary search should succeed");
-    assert!(block_bin_res.is_some());
 }
 
 use proptest::prelude::*;
@@ -242,14 +233,6 @@ proptest! {
         ).unwrap();
         prop_assert!(entry_res.is_some());
 
-        let block_bin_res = block_search::block_binary_search(
-            &block,
-            offsets_start,
-            num_offsets,
-            target_key,
-            true,
-        ).unwrap();
-        prop_assert!(block_bin_res.is_some());
     }
 }
 

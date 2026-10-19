@@ -86,7 +86,7 @@ fn prop_compaction_tombstone_masking_latest_operation_wins() {
 
             let output_path = tmp.path().join("merged.sst");
             engine
-                .merge_sstables(&input_ssts, &output_path, u64::MAX, true)
+                .merge_sstables_with_cancel(&input_ssts, &output_path, u64::MAX, true, None)
                 .await
                 .unwrap();
 
@@ -196,7 +196,7 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     // Perform merge
     let output = tmp.path().join("merged_chronological.sst");
     engine
-        .merge_sstables(&candidate_ssts, &output, u64::MAX, true)
+        .merge_sstables_with_cancel(&candidate_ssts, &output, u64::MAX, true, None)
         .await
         .expect("merge");
 
@@ -251,7 +251,7 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
 
     let output = tmp.path().join("merged_mvcc2.sst");
     engine
-        .merge_sstables(&[sst1, sst2], &output, 95, true)
+        .merge_sstables_with_cancel(&[sst1, sst2], &output, 95, true, None)
         .await
         .expect("merge");
 
@@ -319,7 +319,7 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
 
     let output = tmp.path().join("merged_mvcc3.sst");
     engine
-        .merge_sstables(&[sst1, sst2, sst3], &output, 95, true)
+        .merge_sstables_with_cancel(&[sst1, sst2, sst3], &output, 95, true, None)
         .await
         .expect("merge");
 
@@ -378,7 +378,7 @@ async fn test_merge_deduplication() {
 
     let output = tmp.path().join("merged.sst");
     engine
-        .merge_sstables(&[sst1, sst2], &output, u64::MAX, true)
+        .merge_sstables_with_cancel(&[sst1, sst2], &output, u64::MAX, true, None)
         .await
         .expect("merge"); // expect
 
@@ -431,7 +431,7 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
 
     // min_snapshot_seq=100 -> key-a tombstone is GC'd during full compaction
     engine
-        .merge_sstables(&[sst1], &output, 100, true)
+        .merge_sstables_with_cancel(&[sst1], &output, 100, true, None)
         .await
         .expect("merge"); // expect
 
@@ -485,7 +485,7 @@ async fn test_tombstone_gc() {
 
     // min_snapshot_seq=100 → tombstone at seq=5 is safe to GC
     engine
-        .merge_sstables(&[sst1], &output, 100, true)
+        .merge_sstables_with_cancel(&[sst1], &output, 100, true, None)
         .await
         .expect("merge"); // expect
 
@@ -529,7 +529,7 @@ async fn test_tombstone_preserved_with_active_snapshot() {
 
     // min_snapshot_seq=2 → tombstone at seq=5 is NOT safe to GC
     engine
-        .merge_sstables(&[sst1], &output, 2, true)
+        .merge_sstables_with_cancel(&[sst1], &output, 2, true, None)
         .await
         .expect("merge"); // expect
 
@@ -1067,7 +1067,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
 
     let output_path = tmp.path().join("merged_timeout.sst");
     let result = engine
-        .merge_sstables(&[sst1, sst2], &output_path, u64::MAX, true)
+        .merge_sstables_with_cancel(&[sst1, sst2], &output_path, u64::MAX, true, None)
         .await;
 
     assert!(

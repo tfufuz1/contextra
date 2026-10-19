@@ -103,7 +103,7 @@ async fn test_campaign_deepresearch_three_way_merge_full_consumption() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables(&[reader1, reader2, reader3], &out_path, min_seq, true)
+        .merge_sstables_with_cancel(&[reader1, reader2, reader3], &out_path, min_seq, true, None)
         .await
         .unwrap();
 
