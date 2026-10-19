@@ -11,6 +11,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use contextra_ports::{Clock, SystemClock};
+#[cfg(test)]
+use contextra_types::DeterministicTimestamp;
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
@@ -221,15 +223,35 @@ mod tests {
         }
     }
 
+    struct TestClock(std::sync::atomic::AtomicU64);
+
+    impl Clock for TestClock {
+        fn now(&self) -> DeterministicTimestamp {
+            DeterministicTimestamp::new(self.0.load(std::sync::atomic::Ordering::Relaxed) / 1_000_000, 0)
+        }
+
+        fn monotonic_ticks(&self) -> u64 {
+            0
+        }
+
+        fn now_unix_nanos(&self) -> u64 {
+            self.0.load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.0.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+
     #[test]
     fn test_rerank_deadline_exceeded() {
-        let deadline = RerankDeadline::new(Duration::from_millis(50));
-        let start = Instant::now();
+        let clock = Arc::new(TestClock(std::sync::atomic::AtomicU64::new(1_000_000_000)));
+        let deadline = RerankDeadline::new_with_clock(Duration::from_millis(50), clock.clone());
+        let start_nanos = 1_000_000_000u64;
 
-        assert!(!deadline.deadline_exceeded(start));
+        assert!(!deadline.deadline_exceeded_nanos(start_nanos));
 
-        std::thread::sleep(Duration::from_millis(60));
-
-        assert!(deadline.deadline_exceeded(start));
+        clock.0.store(1_050_000_000, std::sync::atomic::Ordering::Relaxed);
+        assert!(deadline.deadline_exceeded_nanos(start_nanos));
     }
 }
