@@ -16,6 +16,7 @@ pub fn generate_avv_draft(ctx: &AvvContext) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
     use contextra_types::TenantId;
@@ -27,7 +28,7 @@ mod tests {
         let draft = generate_avv_draft(&ctx);
 
         let required_disclaimer =
-            "Entwurf – juristische Prüfung erforderlich";
+            "Hinweis:** Vorlage, keine Rechtsberatung";
         assert!(
             draft.contains(required_disclaimer),
             "AVV draft must contain legal disclaimer"

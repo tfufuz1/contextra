@@ -12,16 +12,8 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-/// Quelle des aufgelösten Schlüssels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProofKeySource {
-    PrimaryFile,
-    LegacyFile,
-    PrimaryEnv,
-    LegacyEnv,
-    BothSame,
-    BothDifferentConflict,
-}
+/// Quelle des aufgelösten Schlüssels (aus `contextra-crypto`).
+pub use contextra_crypto::deletion_proof::keys::ProofKeyEnvSource as ProofKeySource;
 
 /// Ergebnis der Schlüssel-Auflösung.
 #[derive(Clone, PartialEq, Eq)]

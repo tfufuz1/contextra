@@ -210,8 +210,8 @@ mod tests {
         let rec = create_sample_record();
         let json = serde_json::to_value(&rec)?;
         assert_eq!(
-            json["tenant_id"],
-            serde_json::Value::String("tenant-123".to_string())
+            json.get("tenant_id"),
+            Some(&serde_json::Value::String("tenant-123".to_string()))
         );
         Ok(())
     }
