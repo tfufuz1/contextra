@@ -6,8 +6,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 use contextra_crypto::{
-    compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,
-    DeletionProofKeyPair, DeletionScope, DurabilityProof, EncryptedCommitmentSalt, ExcludedScope,
+    compute_record_commitment, AuditChain, DataClass, DeletionLayer,
+    DeletionProofKeyPair, DeletionScope, EncryptedCommitmentSalt,
     KeyManager, KeyRegistry, LayerCleanupProof,
 };
 use contextra_types::{DocId, TenantId, TxId};
@@ -165,7 +165,6 @@ fn test_commitment_shredding_and_dictionary_attack_resilience() {
 
 #[test]
 fn test_deletion_proof_linked_to_audit_chain_position() {
-    let keypair = DeletionProofKeyPair::generate();
     let mut chain = AuditChain::new();
 
     let entry = chain
@@ -186,33 +185,23 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
         tenant_id: TenantId::try_new(1).unwrap(),
     };
 
-    let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
-    ];
+    use contextra_crypto::deletion_proof::builder::ProofBuilder;
+    use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 
-    let durability = DurabilityProof::new(100);
-    let proof = DeletionProof::create_v3_with_audit_position(
-        scope,
-        vec![b"doc_500_key".to_vec()],
-        TxId(100),
-        cleanup_proofs,
-        vec![ExcludedScope::LlmParameterMemory],
-        Some(audit_pos),
-        1700000000,
-        &[],
-        Some(&durability),
-        keypair.signing_key(),
-    )
-    .unwrap();
+    let signer = ProofKeyPairSigner::from_secret_bytes([0x77u8; 32]);
+    let proof_v4 = ProofBuilder::new(scope, "db-audit-chain-test")
+        .with_deleted_after_tx(100)
+        .with_chain_link(audit_pos + 1, [0xAA; 32])
+        .finish(&signer)
+        .unwrap();
 
-    assert_eq!(proof.audit_chain_position, Some(audit_pos));
-    assert!(proof.verify_external(&keypair.verifying_key).is_ok());
+    assert_eq!(proof_v4.chain.seq, audit_pos + 1);
+    assert!(proof_v4.verify_signature(&signer.public_key()).unwrap());
 
-    // Tampering with audit_chain_position invalidates signature
-    let mut tampered = proof;
-    tampered.audit_chain_position = Some(999);
-    assert!(tampered.verify_external(&keypair.verifying_key).is_err());
+    // Tampering with chain.seq invalidates signature
+    let mut tampered = proof_v4;
+    tampered.chain.seq = 999;
+    assert!(!tampered.verify_signature(&signer.public_key()).unwrap());
 }
 
 #[test]

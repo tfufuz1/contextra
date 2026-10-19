@@ -15,10 +15,13 @@ pub enum StorageScope {
 
 /// Schlüsselbereich mit expliziten Einzel-Keys und Präfixen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct KeyScope {
+pub struct FootprintKeyScope {
     pub explicit: Vec<Vec<u8>>,
     pub prefixes: Vec<Vec<u8>>,
 }
+
+/// Disambiguated alias for engine footprint key scope.
+pub type KeyScope = FootprintKeyScope;
 
 /// RAM-Footprint für In-Memory-Strukturen und flüchtige Indizes.
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,7 +104,7 @@ impl FprRamFootprint {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ErasureFootprint {
     pub storage: StorageScope,
-    pub keys: KeyScope,
+    pub keys: FootprintKeyScope,
     pub hash: [u8; 32],
     pub ram: FprRamFootprint,
     pub ram_hash: [u8; 32],
@@ -110,7 +113,7 @@ pub struct ErasureFootprint {
 
 impl ErasureFootprint {
     /// Erstellt einen neuen `ErasureFootprint` und berechnet automatisch dessen Hash.
-    pub fn new(storage: StorageScope, keys: KeyScope) -> Self {
+    pub fn new(storage: StorageScope, keys: FootprintKeyScope) -> Self {
         let ram = FprRamFootprint::default();
         let ram_hash = ram.compute_hash();
         let mut footprint = Self {
@@ -170,7 +173,7 @@ impl ErasureFootprint {
             )
         };
 
-        let keys = KeyScope { explicit, prefixes };
+        let keys = FootprintKeyScope { explicit, prefixes };
 
         let mut ram = FprRamFootprint::default();
         ram.doc_ids.push(doc_id);
@@ -200,7 +203,7 @@ impl ErasureFootprint {
         let txt_data = format!("__txt:{}:", collection_name).into_bytes();
         let col_idx = [b"__col_idx:\x00", collection_name.as_bytes()].concat();
 
-        let keys = KeyScope {
+        let keys = FootprintKeyScope {
             explicit: vec![col_idx],
             prefixes: vec![col_data, txt_data],
         };
@@ -242,7 +245,7 @@ impl ErasureFootprint {
             b"__meta:".to_vec(),
         ];
 
-        let keys = KeyScope {
+        let keys = FootprintKeyScope {
             explicit: Vec::new(),
             prefixes,
         };

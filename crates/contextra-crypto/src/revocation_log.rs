@@ -328,8 +328,11 @@ impl RevocationLog {
         Self::open_or_create_with_mode(path, clock, signing_key, verifying_key, InitMode::CreateNew)
     }
 
-    /// Öffnet einen bestehenden Widerrufslog unter `path`.
-    /// Fails mit `CryptoError::IntegrityViolation`, falls die Log-Datei oder die Marker-Datei fehlt oder gekürzt ist.
+    /// Öffnet einen bestehenden, bereits auf der Festplatte existierenden Widerrufslog unter `path`.
+    ///
+    /// # Errors
+    /// Returns [`CryptoError::IntegrityViolation`] falls die Log-Datei oder die Marker-Datei fehlt,
+    /// gekürzt, beschädigt oder unvollständig ist.
     pub fn open_existing(
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
@@ -1039,6 +1042,31 @@ mod tests {
             matches!(open_res, Err(CryptoError::IntegrityViolation)),
             "Opening tampered log file MUST return CryptoError::IntegrityViolation"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_revocation_log_open_existing_valid_and_missing() -> Result<()> {
+        let tmp_file = NamedTempFile::new().map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let log_path = tmp_file.path().to_path_buf();
+        let non_existent_path = tmp_file.path().parent().unwrap().join("missing_log_file.log");
+        let (sk, vk) = test_keypair();
+        let clock = Arc::new(SystemClock::new());
+
+        // Create log initially
+        {
+            let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk.clone()), vk)?;
+            log.append(RevocationTarget::Group(123))?;
+        }
+
+        // Positive path: open_existing on valid log path succeeds
+        let reopened = RevocationLog::open_existing(&log_path, clock.clone(), Some(sk.clone()), vk);
+        assert!(reopened.is_ok());
+
+        // Negative path: open_existing on non-existent path MUST fail with IntegrityViolation
+        let missing_res = RevocationLog::open_existing(&non_existent_path, clock, Some(sk), vk);
+        assert!(matches!(missing_res, Err(CryptoError::IntegrityViolation)));
 
         Ok(())
     }
