@@ -198,7 +198,8 @@ macro_rules! contextra_crud_methods {
                 let response = contextra_core::ipc::SearchResponse::create(
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
-                                                results: Some(results_vec_off),
+                        version: 1,
+                        results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,
                     },
@@ -329,7 +330,8 @@ macro_rules! contextra_crud_methods {
                 let response = contextra_core::ipc::SearchResponse::create(
                     &mut builder,
                     &contextra_core::ipc::SearchResponseArgs {
-                                                results: Some(results_vec_off),
+                        version: 1,
+                        results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,
                     },
