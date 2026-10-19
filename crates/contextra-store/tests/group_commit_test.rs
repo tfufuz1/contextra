@@ -83,7 +83,6 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
 #[cfg(feature = "fault-injection")]
 async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
     use contextra_types::ContextraError;
-    use contextra_store::wal::FAIL_APPEND_FOR_TX;
 
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
@@ -103,7 +102,7 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
     storage.commit(tx_base).await.expect("commit base");
 
     // Configure fault injection to fail append_batch for tx 10
-    FAIL_APPEND_FOR_TX.store(10, Ordering::SeqCst);
+    storage.fault_plan().fail_append_for_tx.store(10, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(10));
     let mut set = tokio::task::JoinSet::new();
@@ -137,7 +136,7 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
     }
 
     // Reset fault injection flag
-    FAIL_APPEND_FOR_TX.store(0, Ordering::SeqCst);
+    storage.fault_plan().fail_append_for_tx.store(0, Ordering::SeqCst);
 
     // All 10 tasks in the batch must receive an Err (no partial success)
     assert_eq!(

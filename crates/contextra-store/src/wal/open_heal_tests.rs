@@ -348,8 +348,8 @@ async fn test_fault_injection_recover_from_poison() -> Result<()> {
     wal.append_batch(batch1).await?;
 
     // Arm fault injection
-    FAIL_APPEND_PARTIAL_ONCE.store(true, Ordering::SeqCst);
-    FAIL_APPEND_AFTER_PARTIAL_BYTES.store(10, Ordering::SeqCst);
+    wal.fault_plan().fail_append_partial_once.store(true, Ordering::SeqCst);
+    wal.fault_plan().fail_append_after_partial_bytes.store(10, Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),

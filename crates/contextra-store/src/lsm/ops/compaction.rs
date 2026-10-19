@@ -31,7 +31,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .config
             .path
             .join(format!("wal-{:020}.log", flush_id));
-        let new_wal = Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?;
+        let wal_config = crate::wal::WalConfig {
+            key_manager: storage.key_manager.clone(),
+            #[cfg(feature = "fault-injection")]
+            fault_plan: storage.config.fault_plan.clone(),
+            ..Default::default()
+        };
+        let new_wal = Wal::open_with_config(wal_path, wal_config).await?;
         Some(new_wal)
     } else {
         None
@@ -55,7 +61,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         .config
                         .path
                         .join(format!("wal-{:020}.log", flush_id));
-                    Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?
+                    let wal_config = crate::wal::WalConfig {
+                        key_manager: storage.key_manager.clone(),
+                        #[cfg(feature = "fault-injection")]
+                        fault_plan: storage.config.fault_plan.clone(),
+                        ..Default::default()
+                    };
+                    Wal::open_with_config(wal_path, wal_config).await?
                 }
             };
 
