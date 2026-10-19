@@ -116,15 +116,17 @@ fn collect_fs_info(path: &Path) -> (String, String) {
 }
 
 pub fn get_peak_rss_bytes() -> u64 {
-    unsafe {
-        let mut rusage: libc::rusage = std::mem::zeroed();
-        if libc::getrusage(libc::RUSAGE_SELF, &mut rusage) == 0 {
-            // Linux returns maxrss in KiB
-            #[cfg(target_os = "linux")]
-            return (rusage.ru_maxrss as u64) * 1024;
-
-            #[cfg(not(target_os = "linux"))]
-            return rusage.ru_maxrss as u64;
+    if cfg!(target_os = "linux") {
+        if let Ok(status) = fs::read_to_string("/proc/self/status") {
+            for line in status.lines() {
+                if line.starts_with("VmHWM:") {
+                    if let Some(parts) = line.split_whitespace().nth(1) {
+                        if let Ok(kib) = parts.parse::<u64>() {
+                            return kib.saturating_mul(1024);
+                        }
+                    }
+                }
+            }
         }
     }
     0
