@@ -627,7 +627,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             if self.collection.name() == "default" && k.starts_with(b"__") {
                 continue;
             }
-            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
+            // Use StoredDocument::from_slice to support both JSON v1 and CXSD v2 binary stored documents
+            if let Ok(stored) = StoredDocument::from_slice(&v) {
                 if let Ok(doc_id) = DocId::from_key(&stored.id) {
                     turns.push((doc_id, stored.embedding));
                 }
