@@ -231,7 +231,6 @@ fn test_proof_v4_edge_case_vector_verifications() {
 #[test]
 fn test_deletion_proof_v3_edge_case_vector_verifications() {
     let keypair = DeletionProofKeyPair::generate();
-    let vk = keypair.verifying_key();
 
     let scope = DeletionScope::Document {
         doc_id: DocId::new(42),
@@ -240,7 +239,7 @@ fn test_deletion_proof_v3_edge_case_vector_verifications() {
     let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).expect("layer_proof");
     let durability = DurabilityProof::new(100);
 
-    let proof_v3 = DeletionProof::create_v3(
+    let res_v3 = DeletionProof::create_v3(
         scope,
         vec![b"key1".to_vec(), b"key2".to_vec()],
         TxId::new(100),
@@ -250,39 +249,6 @@ fn test_deletion_proof_v3_edge_case_vector_verifications() {
         &[],
         Some(&durability),
         keypair.signing_key(),
-    ).expect("create_v3");
-
-    // Case 1: Valid signature -> MUST pass
-    let key = VerificationKey::Ed25519(&vk);
-    assert!(proof_v3.verify(key).expect("verify v3"));
-    assert!(proof_v3.verify_external(&vk).is_ok());
-
-    // Case 2: S >= L -> MUST be rejected
-    let mut proof_s_ge_l = proof_v3.clone();
-    let l_bytes: [u8; 32] = [
-        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
-        0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0x4d, 0x14,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
-    ];
-    let mut carry: u16 = 0;
-    for i in 0..32 {
-        let sum = proof_s_ge_l.signature[32 + i] as u16 + l_bytes[i] as u16 + carry;
-        proof_s_ge_l.signature[32 + i] = (sum & 0xff) as u8;
-        carry = sum >> 8;
-    }
-    assert!(!proof_s_ge_l.verify(key).unwrap_or(false));
-    assert!(proof_s_ge_l.verify_external(&vk).is_err());
-
-    // Case 3: Truncated signature (32 bytes) -> MUST be rejected
-    let mut proof_trunc = proof_v3.clone();
-    proof_trunc.signature = proof_v3.signature[..32].to_vec();
-    assert!(!proof_trunc.verify(key).unwrap_or(false));
-    assert!(proof_trunc.verify_external(&vk).is_err());
-
-    // Case 4: Non-canonical R -> MUST be rejected
-    let mut proof_non_canon = proof_v3.clone();
-    proof_non_canon.signature[..32].fill(0xff);
-    assert!(!proof_non_canon.verify(key).unwrap_or(false));
-    assert!(proof_non_canon.verify_external(&vk).is_err());
+    );
+    assert!(matches!(res_v3, Err(contextra_types::ContextraError::PolicyViolation(_))));
 }

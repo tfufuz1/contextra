@@ -255,6 +255,14 @@ impl StateGraph {
     pub fn get_node(&self, id: &str) -> Option<&AgentNode> {
         self.nodes.get(id)
     }
+
+    /// Returns the node ID of the start node if present in the graph.
+    pub fn start_node_id(&self) -> Option<String> {
+        self.nodes
+            .values()
+            .find(|n| n.node_type == NodeType::Start)
+            .map(|n| n.id.clone())
+    }
 }
 
 #[cfg(test)]

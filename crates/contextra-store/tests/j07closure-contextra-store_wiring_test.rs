@@ -1,6 +1,5 @@
 //! Integration test suite verifying production wiring of all 16 target symbols.
 
-use contextra_core::{CollectionId, TenantId};
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_ports::{Clock, SystemClock};
 use contextra_store::{
@@ -10,6 +9,7 @@ use contextra_store::{
     memtable::MemTable,
     tenant_codec::TenantKeyCodec,
 };
+use contextra_types::{CollectionId, ResourceBudget, ResourceTracker, TenantId};
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -19,20 +19,20 @@ impl WalObserver for TestObserver {
         &self,
         _batch: &contextra_store::lsm::observer::CommittedBatch<'_>,
         _seq_no: u64,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
     ) {
     }
 }
 
 struct TestMergeOp;
 impl MergeOperator for TestMergeOp {
-    fn merge(&self, existing_value: &[u8], _new_value: &[u8]) -> contextra_core::Result<Vec<u8>> {
+    fn merge(&self, existing_value: &[u8], _new_value: &[u8]) -> contextra_types::Result<Vec<u8>> {
         Ok(existing_value.to_vec())
     }
 }
 
 #[tokio::test]
-async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
+async fn test_j07closure_all_16_symbols_wiring() -> contextra_types::Result<()> {
     // 1–4. KV Segment symbols: delete_segment, generate_deletion_proof, read_segment, write_segment
     let registry = Arc::new(KeyRegistry::new());
     let master_km = Arc::new(KeyManager::try_new(
@@ -75,14 +75,12 @@ async fn test_j07closure_all_16_symbols_wiring() -> contextra_core::Result<()> {
 
     let _engine = contextra_store::compaction::CompactionEngine::new(
         lsm_config.compaction.clone(),
-        Arc::new(contextra_core::SnapshotRegistry::new()),
+        Arc::new(contextra_mvcc::SnapshotRegistry::new()),
         Arc::new(contextra_store::sstable::BlockCache::new(16)),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
-                memory_limit: 1024 * 1024,
-            },
-        )),
+        Arc::new(ResourceTracker::new(ResourceBudget {
+            memory_limit: 1024 * 1024,
+        })),
         None,
     )
     .with_adaptive_planner(planner);

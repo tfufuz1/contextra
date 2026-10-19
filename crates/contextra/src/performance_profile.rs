@@ -1,22 +1,21 @@
 // FILE-CONTEXT
-// ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05)
-// INVARIANTEN: INV-PERF-PROFILE-1, INV-PERF-PROFILE-2
+// ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, EP1)
+// INVARIANTEN: PerformanceProfile::default() == PerformanceProfile::Balanced
 
 pub use contextra_ports::license::VectorDeleteMode;
+use contextra_ports::erasure::ErasureMode;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PerformanceProfile {
-    Compliance,
     Balanced,
-    BareMetal,
 }
 
 impl Default for PerformanceProfile {
     fn default() -> Self {
-        Self::Compliance
+        Self::Balanced
     }
 }
 
@@ -24,7 +23,7 @@ impl Default for PerformanceProfile {
 pub struct ResolvedProfileConfig {
     pub durability_mode: DurabilityMode,
     pub vector_delete_mode: VectorDeleteMode,
-    pub deletion_proof_active: bool,
+    pub erasure_mode: ErasureMode,
     pub feature_ring: FeatureRing,
 }
 
@@ -32,7 +31,7 @@ pub struct ResolvedProfileConfig {
 pub enum PerformanceProfileError {
     #[error("durability configuration invalid: {0}")]
     Durability(#[from] DurabilityConfigError),
-    #[error("DurabilityMode::Full combined with VectorDeleteMode::BackgroundRepair while deletion-proof is active breaks the deletion-proof guarantee for the vector index")]
+    #[error("DurabilityMode::Full combined with VectorDeleteMode::BackgroundRepair while erasure_mode is active breaks deletion guarantees for vector index")]
     DurabilityVectorMismatch,
     #[error("feature ring {0:?} requires a valid license: {1}")]
     LicenseRequired(FeatureRing, LicenseError),
@@ -41,22 +40,10 @@ pub enum PerformanceProfileError {
 impl PerformanceProfile {
     pub fn resolve(self) -> ResolvedProfileConfig {
         match self {
-            Self::Compliance => ResolvedProfileConfig {
-                durability_mode: DurabilityMode::Full,
-                vector_delete_mode: VectorDeleteMode::SynchronousRepair,
-                deletion_proof_active: true,
-                feature_ring: FeatureRing::Sovereign,
-            },
             Self::Balanced => ResolvedProfileConfig {
                 durability_mode: DurabilityMode::WalNoHmac,
                 vector_delete_mode: VectorDeleteMode::BackgroundRepair,
-                deletion_proof_active: false,
-                feature_ring: FeatureRing::Fast,
-            },
-            Self::BareMetal => ResolvedProfileConfig {
-                durability_mode: DurabilityMode::MemoryOnly,
-                vector_delete_mode: VectorDeleteMode::BackgroundRepair,
-                deletion_proof_active: false,
+                erasure_mode: ErasureMode::Off,
                 feature_ring: FeatureRing::Fast,
             },
         }
@@ -74,15 +61,25 @@ impl ResolvedProfileConfig {
 
     pub fn validate(&self) -> Result<(), PerformanceProfileError> {
         self.durability_mode
-            .validate_against_features(self.deletion_proof_active, self.feature_ring)?;
+            .validate_against_features(self.erasure_mode != ErasureMode::Off, self.feature_ring)?;
 
         if self.durability_mode == DurabilityMode::Full
             && self.vector_delete_mode == VectorDeleteMode::BackgroundRepair
-            && self.deletion_proof_active
+            && self.erasure_mode != ErasureMode::Off
         {
             return Err(PerformanceProfileError::DurabilityVectorMismatch);
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_performance_profile_default_is_balanced() {
+        assert_eq!(PerformanceProfile::default(), PerformanceProfile::Balanced);
     }
 }

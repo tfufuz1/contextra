@@ -266,7 +266,7 @@ async fn test_goal_condition_triggers_scratchpad_checkpoint_and_reset() {
 
     let res = orchestrator.run(&mut ctx, &graph).await;
     assert!(res.is_ok());
-    assert_eq!(ctx.status, crate::context::AgentStatus::Completed);
+    assert_eq!(ctx.status(), crate::context::AgentStatus::Completed);
 
     let scratchpad_after = ctx.clm_scratchpad.as_ref().expect("scratchpad exists");
     assert_eq!(scratchpad_after.current_subgoal_index(), 1);

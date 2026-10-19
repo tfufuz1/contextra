@@ -36,7 +36,6 @@ pub use contextra_privacy::guarded_payload;
 pub mod fc_ts_dispatch;
 #[cfg(any(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
 pub mod routing_strategy;
-#[cfg(feature = "cloud-egress-guard")]
 pub mod transport;
 
 #[cfg(all(test, feature = "bandit-routing"))]

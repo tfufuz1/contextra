@@ -11,6 +11,9 @@ description = "WASM Execution Boundary for Contextra MCP CodeExecution Permissio
 [package.metadata.contextra]
 ring = "2"
 
+[features]
+unverified-execute = []
+
 [dependencies]
 wasmtime = { version = "25", default-features = false, features = ["async", "cranelift"] }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
@@ -18,6 +21,7 @@ anyhow = "1"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

@@ -10,9 +10,6 @@ pub use contextra_crypto::deletion_proof::{
 };
 
 pub mod deletion;
-use contextra_ports::license::LicenseGate;
-#[cfg(feature = "sandbox")]
-use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
@@ -22,7 +19,7 @@ pub use contextra_store::lsm::config::{EncryptionConfig, KekSource};
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
-use contextra_types::{CollectionId, DocId, TenantId};
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -38,9 +35,6 @@ pub mod collection;
 pub mod decay_controller;
 #[cfg(not(loom))]
 pub mod export;
-#[cfg(feature = "entity-extraction")]
-#[cfg(not(loom))]
-pub mod extraction;
 #[cfg(not(loom))]
 pub mod filter;
 #[cfg(not(loom))]
@@ -48,7 +42,8 @@ pub mod fusion;
 #[cfg(not(loom))]
 pub mod import;
 #[cfg(not(loom))]
-pub mod kv_cache_integration;
+pub mod lifecycle;
+pub mod limits;
 pub mod metrics_names;
 pub mod migration;
 #[cfg(not(loom))]
@@ -56,16 +51,7 @@ pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(not(loom))]
-pub use kv_cache_integration::build_eviction_worker;
-
-#[cfg(feature = "sandbox")]
-pub mod merge_operator_adapter;
-#[cfg(feature = "sandbox")]
-pub use merge_operator_adapter::WasmMergeOperator;
-
-#[cfg(not(loom))]
-pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+pub use limits::EngineLimits;
 
 #[cfg(not(loom))]
 pub use export::{
@@ -79,20 +65,23 @@ pub use import::ImportSummary;
 pub use background_workers::start_decay_cleanup_worker;
 #[cfg(not(loom))]
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
+#[cfg(not(loom))]
+pub use lifecycle::{EngineLifecycle, ErasureSupervisor};
 
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(not(loom))]
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationResult;
-#[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
+pub use collection::search::hybrid::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
 pub use contextra_text::Language;
+pub use deletion::{
+    forget_document, reverse_sweep, DeletionWiring, DeletionWiringDeps, DpiDeletionRuntime,
+    DpiPurgeDriver, DpiPurgeDriverConfig, FonLogicalHandle, ForgetOptions, ForgetOutcome,
+    PurgeHandle, VerifyDepth, Wait,
+};
 #[cfg(not(loom))]
 #[allow(deprecated)]
 pub use filter::MetadataFilter;
@@ -158,7 +147,7 @@ pub struct ContextraStats {
 
 pub use contextra_impl::{ForgetReceipt, LayerStatus};
 
-pub use contextra_ports::DriftStatusProvider;
+pub use contextra_ports::{DriftStatusProvider, ReadSnapshot};
 pub type DbStats = ContextraStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,14 +169,36 @@ pub enum EmbeddingBackend {
         model_name: String,
         cache_dir: Option<std::path::PathBuf>,
     },
+    Candle {
+        model_dir: std::path::PathBuf,
+    },
+    Ollama {
+        endpoint: String,
+        model: String,
+    },
     None,
 }
 
-impl Default for EmbeddingBackend {
-    fn default() -> Self {
-        Self::Onnx {
-            model_name: "nomic-embed-text".to_string(),
-            cache_dir: None,
+impl std::str::FromStr for EmbeddingBackend {
+    type Err = ContextraError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().trim() {
+            "candle" => Ok(Self::Candle {
+                model_dir: std::path::PathBuf::new(),
+            }),
+            "onnx" => Ok(Self::Onnx {
+                model_name: "nomic-embed-text".to_string(),
+                cache_dir: None,
+            }),
+            "ollama" => Ok(Self::Ollama {
+                endpoint: "http://localhost:11434".to_string(),
+                model: "nomic-embed-text".to_string(),
+            }),
+            "none" => Ok(Self::None),
+            other => Err(ContextraError::InvalidInput(format!(
+                "Unknown embedding backend '{other}'. Expected 'candle', 'onnx', 'ollama', or 'none'."
+            ))),
         }
     }
 }
@@ -222,9 +233,9 @@ pub struct ContextraConfig {
     /// Default: DurabilityMode::Full.
     pub durability_mode: DurabilityMode,
 
-    /// Controls whether deletion proof generation and HMAC integrity guarantees are active.
-    /// Default: false.
-    pub deletion_proof_active: bool,
+    /// Controls operational erasure mode (§4.6).
+    /// Default: ErasureMode::Off.
+    pub erasure_mode: contextra_ports::erasure::ErasureMode,
 
     /// Controls vector index deletion repair behavior.
     /// Default: VectorDeleteMode::BackgroundRepair.
@@ -245,6 +256,8 @@ pub struct ContextraConfig {
     pub tenant_policy: TenantPolicy,
     /// Configured metrics sink for recording engine operational metrics.
     pub metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    /// Custom merge operator for compaction / flush.
+    pub merge_operator: Option<Arc<dyn contextra_store::MergeOperator>>,
 }
 
 #[cfg(not(loom))]
@@ -277,6 +290,11 @@ impl ContextraConfig {
         self.metrics_sink = Some(sink);
         self
     }
+
+    pub fn with_merge_operator(mut self, op: Arc<dyn contextra_store::MergeOperator>) -> Self {
+        self.merge_operator = Some(op);
+        self
+    }
 }
 
 #[cfg(not(loom))]
@@ -293,7 +311,7 @@ impl std::fmt::Debug for ContextraConfig {
                 &self.group_commit_window_micros,
             )
             .field("durability_mode", &self.durability_mode)
-            .field("deletion_proof_active", &self.deletion_proof_active)
+            .field("erasure_mode", &self.erasure_mode)
             .field("vector_delete_mode", &self.vector_delete_mode)
             .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
@@ -312,6 +330,10 @@ impl std::fmt::Debug for ContextraConfig {
                 "metrics_sink",
                 &self.metrics_sink.as_ref().map(|_| "dyn MetricsSink"),
             )
+            .field(
+                "merge_operator",
+                &self.merge_operator.as_ref().map(|_| "dyn MergeOperator"),
+            )
             .finish()
     }
 }
@@ -327,19 +349,20 @@ impl Default for ContextraConfig {
             max_ram_mb: 2048,
             group_commit_window_micros: 500,
             durability_mode: DurabilityMode::default(),
-            deletion_proof_active: false,
+            erasure_mode: contextra_ports::erasure::ErasureMode::Off,
             vector_delete_mode: VectorDeleteMode::BackgroundRepair,
             memtable_size_limit: 64 * 1024 * 1024,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
             community_detection: CommunityDetectionConfig::default(),
-            embedding_backend: EmbeddingBackend::default(),
-            consolidation_enabled: true,
+            embedding_backend: EmbeddingBackend::None,
+            consolidation_enabled: false,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
             consolidation_launcher: None,
             tenant_policy: TenantPolicy::Optional,
             metrics_sink: None,
+            merge_operator: None,
         }
     }
 }
@@ -356,7 +379,6 @@ pub struct Contextra {
     next_tx: Arc<AtomicU64>,
     dimension: usize,
     config: ContextraConfig,
-    license_gate: Arc<dyn LicenseGate>,
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
@@ -369,15 +391,13 @@ pub struct Contextra {
     calibrator: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
-    pid_controller: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
-    >,
-    kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
 #[cfg(not(loom))]
-mod contextra_impl;
+pub mod contextra_impl;
+#[cfg(not(loom))]
+pub use contextra_impl::wiring::{EngineWiring, EngineWiringExt};
 
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
@@ -393,100 +413,48 @@ impl Contextra {
     pub fn config(&self) -> &ContextraConfig {
         &self.config
     }
-
-    /// Returns a reference to the attached [`LicenseGate`].
-    pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
-        Arc::clone(&self.license_gate)
-    }
-
-    /// Returns the active KV eviction worker's attention score source if initialized.
-    pub fn kv_eviction_attention_source(
-        &self,
-    ) -> Option<Arc<dyn contextra_kvcache::AttentionScoreSource>> {
-        self.kv_eviction_worker
-            .read()
-            .as_ref()
-            .map(|w| w.attention_source())
-    }
 }
 
-#[cfg(feature = "sandbox")]
-pub trait SandboxBridge: Send + Sync {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>>;
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
-}
+#[cfg(test)]
+mod embedding_backend_tests {
+    use super::*;
+    use std::str::FromStr;
 
-#[cfg(feature = "sandbox")]
-impl SandboxBridge for Contextra {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
-        Box::pin(async move {
-            let f32_count = query.len() / 4;
-            let mut vector = Vec::with_capacity(f32_count);
-            for i in 0..f32_count {
-                let start = i * 4;
-                let bits = u32::from_le_bytes(
-                    query
-                        .get(start..start + 4)
-                        .ok_or_else(|| {
-                            contextra_types::ContextraError::Serialization("Query too short".into())
-                        })?
-                        .try_into()
-                        .map_err(|_| {
-                            contextra_types::ContextraError::Serialization("Invalid slice".into())
-                        })?,
-                );
-                vector.push(f32::from_bits(bits));
+    #[test]
+    fn test_embedding_backend_from_str_table() {
+        let cases = vec![
+            ("Candle", true),
+            ("CANDLE", true),
+            ("candle", true),
+            ("onnx", true),
+            ("ONNX", true),
+            ("ollama", true),
+            ("Ollama", true),
+            ("none", true),
+            ("NONE", true),
+            ("mock", false),
+            ("MOCK", false),
+            ("unknown_backend", false),
+            ("", false),
+        ];
+
+        for (input, expected_ok) in cases {
+            let res = EmbeddingBackend::from_str(input);
+            if expected_ok {
+                assert!(res.is_ok(), "Expected '{input}' to parse successfully");
+                let backend = res.unwrap();
+                match input.to_ascii_lowercase().trim() {
+                    "candle" => assert!(matches!(backend, EmbeddingBackend::Candle { .. })),
+                    "onnx" => assert!(matches!(backend, EmbeddingBackend::Onnx { .. })),
+                    "ollama" => assert!(matches!(backend, EmbeddingBackend::Ollama { .. })),
+                    "none" => assert!(matches!(backend, EmbeddingBackend::None)),
+                    _ => unreachable!(),
+                }
+            } else {
+                assert!(res.is_err(), "Expected '{input}' to return an error");
+                let err = res.unwrap_err();
+                assert!(matches!(err, ContextraError::InvalidInput(_)));
             }
-
-            let results: Vec<SearchResult> = self.search(&vector, k).await?;
-            serde_json::to_vec(&results)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
-        })
-    }
-
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let val_json: Value = serde_json::from_slice(value)
-                .unwrap_or(serde_json::json!({ "raw_data": String::from_utf8_lossy(value) }));
-
-            self.insert(&id, &[], Some(val_json)).await
-        })
-    }
-
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let doc = self.get(&id).await?;
-            match doc {
-                Some(d) => Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                    contextra_types::ContextraError::Internal(e.to_string())
-                })?)),
-                None => Ok(None),
-            }
-        })
+        }
     }
 }

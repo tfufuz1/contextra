@@ -208,6 +208,24 @@ impl ApprovalRequest {
         Ok(self)
     }
 
+    /// Automatically approves the request if it is low-risk (`!self.requires_approval()`).
+    ///
+    /// If human approval is required (`self.requires_approval()` is true), the request remains in `Pending` state.
+    ///
+    /// # Errors
+    /// Returns `ApprovalTransitionError` if the transition fails (e.g., if already expired or not in `Pending` state).
+    pub fn auto_approve_if_low_risk(
+        self,
+        system_identity: String,
+        now_unix_ms: u64,
+    ) -> Result<Self, ApprovalTransitionError> {
+        if !self.requires_approval() {
+            self.approve(system_identity, now_unix_ms)
+        } else {
+            Ok(self)
+        }
+    }
+
     /// Determines whether this execution requires human approval before proceeding.
     ///
     /// # Product Rationale

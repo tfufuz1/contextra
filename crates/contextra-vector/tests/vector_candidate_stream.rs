@@ -1,7 +1,5 @@
-use contextra_core::{
-    ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId, VectorIndex,
-    VectorIndexStats,
-};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
+use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 use rand::Rng;

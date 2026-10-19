@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
 use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
-use contextra_vector::hnsw::VectorSeededRng as SeededRng;
 use contextra_vector::acorn::FilteredIndex;
+use contextra_vector::hnsw::VectorSeededRng as SeededRng;
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use std::sync::Arc;
 

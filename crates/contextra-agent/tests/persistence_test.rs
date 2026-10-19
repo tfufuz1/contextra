@@ -79,7 +79,7 @@ async fn test_agent_persistence_and_recovery() {
     // Initial run
     engine.run(&mut ctx, &graph).await.expect("Run failed");
 
-    assert_eq!(ctx.status, AgentStatus::Completed);
+    assert_eq!(ctx.status(), AgentStatus::Completed);
     assert_eq!(ctx.memory.get("last_output").unwrap().as_u64().unwrap(), 1);
 
     // Verify persistence in DB
@@ -135,7 +135,7 @@ async fn test_agent_persistence_and_recovery() {
         .await
         .expect("Resume run failed");
 
-    assert_eq!(ctx2.status, AgentStatus::Completed);
+    assert_eq!(ctx2.status(), AgentStatus::Completed);
     assert_eq!(ctx2.current_node, "end");
     assert_eq!(ctx2.memory.get("last_output").unwrap().as_u64().unwrap(), 1);
 

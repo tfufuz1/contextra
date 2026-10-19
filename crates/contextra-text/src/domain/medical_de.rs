@@ -31,12 +31,12 @@ impl DomainVocabulary for MedicalDomainVocabulary {
     }
 }
 
-/// Exportierte Hilfsfunktionen für direkten Slice-Zugriff.
-pub fn get_medical_compound_stems() -> &'static [&'static str] {
+/// Intern exportierte Hilfsfunktionen für direkten Slice-Zugriff.
+pub(crate) fn get_medical_compound_stems() -> &'static [&'static str] {
     get_parsed_medical().compound_stems
 }
 
-pub fn get_medical_protected_terms() -> &'static [&'static str] {
+pub(crate) fn get_medical_protected_terms() -> &'static [&'static str] {
     get_parsed_medical().protected_terms
 }
 

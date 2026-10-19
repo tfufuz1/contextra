@@ -2,6 +2,7 @@
 mod tests {
     use super::super::*;
     use contextra_core::ContextraError;
+    use numpy::PyArrayMethods;
     use pyo3::exceptions::*;
     use pyo3::prelude::*;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -305,14 +306,14 @@ mod tests {
 
     #[test]
     fn test_gil_not_held_during_blocking_ops() {
-        use numpy::PyArrayMethods;
         pyo3::prepare_freethreaded_python();
         let temp_dir =
             std::env::temp_dir().join(format!("contextra_gil_test_{}", std::process::id()));
         let db_path = temp_dir.to_str().unwrap();
 
         Python::with_gil(|py| {
-            let db = open(py, db_path, 128, None, None, None).expect("failed to open test db");
+            register_contextra_module(py);
+            let db = open(py, db_path, 128, None, None, None, None).expect("failed to open test db");
 
             // Insert sample documents with prefixes
             let dummy_v = vec![0.1f32; 128];
@@ -345,23 +346,17 @@ mod tests {
                     pyo3::types::PyCFunction::new_closure(py, None, None, move |_args, _kwargs| {
                         Python::with_gil(|py| {
                             let prefix = if i % 2 == 0 { "pref_a_" } else { "pref_b_" };
+                            let bound_db = db_ref.bind(py);
+                            let db_borrow = bound_db.borrow();
                             for _ in 0..10 {
-                                let res: PyResult<PyObject> =
-                                    db_ref.call_method1(py, "scan_prefix", (prefix,));
+                                let res = db_borrow.scan_prefix(py, prefix, None);
                                 match res {
-                                    Ok(res_obj) => {
-                                        let list = res_obj.extract::<Vec<(String, PyObject)>>(py);
-                                        if let Ok(l) = list {
-                                            if l.len() != 10 {
-                                                errors_clone.lock().unwrap().push(format!(
-                                                    "Expected 10 docs, got {}",
-                                                    l.len()
-                                                ));
-                                            }
-                                        } else {
-                                            errors_clone.lock().unwrap().push(
-                                                "Failed to extract scan_prefix result".into(),
-                                            );
+                                    Ok(l) => {
+                                        if l.len() != 10 {
+                                            errors_clone.lock().unwrap().push(format!(
+                                                "Expected 10 docs, got {}",
+                                                l.len()
+                                            ));
                                         }
                                     }
                                     Err(e) => {
@@ -377,7 +372,9 @@ mod tests {
                     })
                     .unwrap();
 
-                let t = threading.call_method1("Thread", (worker_code,)).unwrap();
+                let kwargs = pyo3::types::PyDict::new(py);
+                kwargs.set_item("target", worker_code).unwrap();
+                let t = threading.call_method("Thread", (), Some(&kwargs)).unwrap();
                 t.call_method0("start").unwrap();
                 threads.push(t);
             }
@@ -406,5 +403,70 @@ mod tests {
         });
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    fn register_contextra_module(py: Python<'_>) {
+        if let Ok(sys) = py.import("sys") {
+            if let Ok(modules) = sys.getattr("modules") {
+                if modules.get_item("_contextra").is_err() {
+                    let m = pyo3::wrap_pymodule!(crate::_contextra)(py);
+                    let _ = modules.set_item("_contextra", m);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_tenant_isolation_two_tenants() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            register_contextra_module(py);
+            let temp_dir = std::env::temp_dir().join(format!("contextra_tenant_iso_{}", std::process::id()));
+            let db_path = temp_dir.to_str().unwrap();
+
+            // 1. Open database with tenant 1001
+            let db_t1 = open(py, db_path, 128, None, None, None, Some(1001)).expect("open db_t1");
+            assert_eq!(db_t1.tenant_id(), 1001);
+
+            // 2. Derive tenant 2002 via with_tenant
+            let db_t2 = db_t1.with_tenant(2002).expect("with_tenant 2002");
+            assert_eq!(db_t2.tenant_id(), 2002);
+
+            // 3. Verify invalid tenant ID (0) fails
+            assert!(db_t1.with_tenant(0).is_err());
+
+            // 4. Tenant 1001 inserts a document in default collection
+            let dummy_v = vec![0.1f32; 128];
+            let py_v1 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            let doc_id = "shared_doc_id";
+            db_t1.insert(py, &doc_id.into_pyobject(py).unwrap(), py_v1, None).expect("t1 insert");
+
+            // Tenant 1001 sees the document
+            let doc_t1 = db_t1.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t1 get");
+            assert!(doc_t1.is_some());
+
+            // Tenant 2002 does NOT see tenant 1001's document
+            let doc_t2 = db_t2.get(py, &doc_id.into_pyobject(py).unwrap()).expect("t2 get");
+            assert!(doc_t2.is_none(), "Tenant 2002 must not see Tenant 1001's document");
+
+            let py_v_search = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            let search_t2 = db_t2.search(py, py_v_search, 10).expect("t2 search");
+            assert!(search_t2.is_empty(), "Tenant 2002 search must be empty");
+
+            // 5. Test named collections
+            let col_t1 = db_t1.collection("shared_catalog", py).expect("col_t1");
+            assert_eq!(col_t1.tenant_id(), 1001);
+
+            let col_t2 = col_t1.with_tenant(2002, py).expect("col_t1 with_tenant 2002");
+            assert_eq!(col_t2.tenant_id(), 2002);
+
+            let py_v2 = numpy::PyArray1::from_vec(py, dummy_v.clone()).readonly();
+            col_t1.insert(py, &"col_doc_id".into_pyobject(py).unwrap(), py_v2, None).expect("col_t1 insert");
+
+            assert!(col_t1.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_some());
+            assert!(col_t2.get(py, &"col_doc_id".into_pyobject(py).unwrap()).unwrap().is_none(), "Tenant 2002 collection must not see Tenant 1001's collection document");
+
+            let _ = std::fs::remove_dir_all(temp_dir);
+        });
     }
 }

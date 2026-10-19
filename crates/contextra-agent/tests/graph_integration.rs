@@ -106,5 +106,5 @@ async fn test_decision_node_condition_branching() {
     // The decision node must follow low_prio_path because flag == true is satisfied,
     // whereas high_prio_path (priority 10) had flag == false (unsatisfied).
     assert_eq!(ctx.current_node, "low_prio_path");
-    assert_eq!(ctx.status, contextra_agent::AgentStatus::Completed);
+    assert_eq!(ctx.status(), contextra_agent::AgentStatus::Completed);
 }

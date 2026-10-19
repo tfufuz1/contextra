@@ -190,7 +190,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_raw_sweep_finds_known_needles() {
         let dir = tempdir().unwrap();
         let sub_dir = dir.path().join("sst");
@@ -198,7 +197,8 @@ mod tests {
 
         let file1 = sub_dir.join("000001.sst");
         let mut f1 = File::create(&file1).unwrap();
-        f1.write_all(b"HEADER_DATA_SECRET_KEY_12345_FOOTER").unwrap();
+        f1.write_all(b"HEADER_DATA_SECRET_KEY_12345_FOOTER")
+            .unwrap();
 
         let needles = vec![b"SECRET_KEY_12345".to_vec(), b"MISSING_KEY".to_vec()];
         let report = raw_sweep(dir.path(), &needles).unwrap();
@@ -207,21 +207,27 @@ mod tests {
         assert_eq!(report.hit_count(), 1);
         assert_eq!(report.hits[0].needle_index, 0);
         assert_eq!(report.hits[0].offset, 12);
-        assert_eq!(report.hits[0].relative_path, PathBuf::from("sst/000001.sst"));
+        assert_eq!(
+            report.hits[0].relative_path,
+            PathBuf::from("sst/000001.sst")
+        );
     }
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_defective_erasure_detected() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("data.sst");
         let mut f = File::create(&file_path).unwrap();
-        f.write_all(b"DOCUMENT_DATA_KEY_TO_BE_PURGED_RESIDUAL").unwrap();
+        f.write_all(b"DOCUMENT_DATA_KEY_TO_BE_PURGED_RESIDUAL")
+            .unwrap();
 
         let needles = vec![b"KEY_TO_BE_PURGED".to_vec()];
         let report = raw_sweep(dir.path(), &needles).unwrap();
 
-        assert!(!report.is_clean(), "Raw sweep must detect defective erasure / residual data");
+        assert!(
+            !report.is_clean(),
+            "Raw sweep must detect defective erasure / residual data"
+        );
         assert_eq!(report.hit_count(), 1);
     }
 }

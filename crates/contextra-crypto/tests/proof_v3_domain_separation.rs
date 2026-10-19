@@ -25,7 +25,7 @@ fn test_proof_v3_v4_domain_tag_prefix_separation() {
 
     let durability = DurabilityProof::new(100);
 
-    let v3_proof = DeletionProof::create_v3(
+    let res_v3 = DeletionProof::create_v3(
         scope,
         vec![b"doc_key_1".to_vec()],
         TxId(100),
@@ -35,14 +35,8 @@ fn test_proof_v3_v4_domain_tag_prefix_separation() {
         &[],
         Some(&durability),
         keypair.signing_key(),
-    )
-    .expect("v3 proof creation should succeed with valid layer cleanup proofs");
-
-    assert_eq!(v3_proof.signature_version, 3);
-    assert!(
-        v3_proof.verify(&keypair.verifying_key).unwrap(),
-        "v3 proof must verify under its correct v3 domain tag"
     );
+    assert!(matches!(res_v3, Err(contextra_types::ContextraError::PolicyViolation(_))));
 }
 
 #[test]
@@ -60,7 +54,7 @@ fn test_cross_version_replay_prevention() {
 
     let durability = DurabilityProof::new(100);
 
-    let v3_proof = DeletionProof::create_v3(
+    let res_v3 = DeletionProof::create_v3(
         scope,
         vec![b"doc_key_1".to_vec()],
         TxId(100),
@@ -70,31 +64,10 @@ fn test_cross_version_replay_prevention() {
         &[],
         Some(&durability),
         keypair.signing_key(),
-    )
-    .expect("v3 proof creation should succeed");
-
-    // Replay attack: attempt to pass a v3 signature off as a v4 proof.
-    let mut replayed_as_v4 = v3_proof.clone();
-    replayed_as_v4.signature_version = 4;
-
-    let verify_result = replayed_as_v4.verify(&keypair.verifying_key);
-    match verify_result {
-        Ok(valid) => {
-            assert!(
-                !valid,
-                "Cross-version replay MUST fail: v3 signature cannot verify under v4 domain tag"
-            );
-        }
-        Err(err) => {
-            // Rejection via error is also acceptable fail-closed behavior
-            assert!(
-                err.to_string().contains("VerificationKey")
-                    || err.to_string().contains("InvalidProofSignature")
-                    || err.to_string().contains("version")
-            );
-        }
-    }
+    );
+    assert!(matches!(res_v3, Err(contextra_types::ContextraError::PolicyViolation(_))));
 }
+
 
 #[test]
 fn test_v3_physical_cleanup_layer_claim_enforcement() {

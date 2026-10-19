@@ -27,7 +27,6 @@ pub mod wiring;
 
 pub use contextra_generated::contextra::ipc::*;
 pub use jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
-pub use wiring::WireWiring;
 
 impl<'a> SearchResponse<'a> {
     /// Finishes building the standard FlatBuffer with `SearchResponse` as the root table.

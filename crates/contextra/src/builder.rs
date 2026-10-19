@@ -201,7 +201,7 @@ impl ContextraBuilder {
                 let resolved = profile.resolve();
                 if self.explicit_user_config {
                     if self.config.durability_mode != resolved.durability_mode
-                        || self.config.deletion_proof_active != resolved.deletion_proof_active
+
                         || self.config.vector_delete_mode != resolved.vector_delete_mode
                     {
                         return Err(ContextraError::PolicyViolation(
@@ -211,7 +211,7 @@ impl ContextraBuilder {
                     }
                 } else {
                     self.config.durability_mode = resolved.durability_mode;
-                    self.config.deletion_proof_active = resolved.deletion_proof_active;
+
                     self.config.vector_delete_mode = resolved.vector_delete_mode;
                 }
                 resolved.feature_ring

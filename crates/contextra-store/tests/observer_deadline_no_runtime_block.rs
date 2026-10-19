@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_store::{CommittedBatch, ObserverRegistry, WalObserver, WriteOrigin};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

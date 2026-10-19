@@ -10,6 +10,23 @@ use crate::fusion::{SearchReport, Signal, SignalFailurePolicy};
 use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result};
 
+/// Fixed pipeline stages for hybrid search processing (§W1-15).
+pub const HYBRID_PIPELINE_STAGES: &[&str] = &[
+    "signal_retrieval",
+    "fusion",
+    "rerank",
+    "egress_filter",
+];
+
+/// Typed pipeline stage identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HybridPipelineStage {
+    SignalRetrieval,
+    Fusion,
+    Rerank,
+    EgressFilter,
+}
+
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
     ///
@@ -25,7 +42,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            self.hybrid_search_with_query_at(query, seq).await
+            let snapshot = contextra_ports::ReadSnapshot::from_seq(seq);
+            self.hybrid_search_with_query_at(query, &snapshot).await
         })
         .await
     }
@@ -35,10 +53,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
     ) -> Result<Vec<crate::SearchResult>> {
         let (results, _) = self
-            .hybrid_search_with_query_and_report_at(query, seq, SignalFailurePolicy::Fail, None)
+            .hybrid_search_with_query_and_report_at(query, snapshot, SignalFailurePolicy::Fail, None)
             .await?;
         Ok(results)
     }
@@ -48,10 +66,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn hybrid_search_with_query_and_report_at(
         &self,
         query: &contextra_types::HybridQuery,
-        seq: u64,
+        snapshot: &contextra_ports::ReadSnapshot,
         on_signal_failure: SignalFailurePolicy,
         metrics: Option<&dyn MetricsSink>,
     ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
+        let seq = snapshot.max_seq();
         if query.k == 0 {
             return Ok((Vec::new(), SearchReport::default()));
         }
@@ -601,11 +620,72 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         fused_results.truncate(k);
 
-        self.apply_community_boost_post_fusion(
-            fused_results,
-            target_community_id,
-            Self::DEFAULT_COMMUNITY_BOOST,
-        )
-        .await
+        let mut boosted = self
+            .apply_community_boost_post_fusion(
+                fused_results,
+                target_community_id,
+                Self::DEFAULT_COMMUNITY_BOOST,
+            )
+            .await?;
+
+        // Deterministic secondary tie-breaking on document ID (§W1-15)
+        boosted.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        Ok(boosted)
+    }
+
+    /// Additive extension for hybrid search supporting optional Cross-Encoder reranking and egress filtering.
+    pub async fn hybrid_search_with_query_and_report_at_reranked(
+        &self,
+        query: &contextra_types::HybridQuery,
+        snapshot: &contextra_ports::ReadSnapshot,
+        on_signal_failure: SignalFailurePolicy,
+        metrics: Option<&dyn MetricsSink>,
+        reranker: Option<&dyn contextra_ports::Reranker>,
+    ) -> Result<(Vec<crate::SearchResult>, SearchReport)> {
+        let (mut results, report) = self
+            .hybrid_search_with_query_and_report_at(query, snapshot, on_signal_failure, metrics)
+            .await?;
+
+        if let Some(r) = reranker {
+            let text_str = query.text_query.as_deref().unwrap_or("");
+            if !results.is_empty() && !text_str.is_empty() {
+                let candidate_texts: Vec<String> = results
+                    .iter()
+                    .map(|res| {
+                        res.metadata
+                            .as_ref()
+                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(&res.id)
+                            .to_string()
+                    })
+                    .collect();
+
+                if let Ok(ranked) = r.rerank(text_str, &candidate_texts).await {
+                    let mut reranked = Vec::with_capacity(query.k);
+                    for item in ranked.into_iter().take(query.k) {
+                        if let Some(mut orig) = results.get(item.original_index).cloned() {
+                            orig.score = item.score;
+                            reranked.push(orig);
+                        }
+                    }
+                    reranked.sort_by(|a, b| {
+                        b.score
+                            .partial_cmp(&a.score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| a.id.cmp(&b.id))
+                    });
+                    results = reranked;
+                }
+            }
+        }
+
+        Ok((results, report))
     }
 }
