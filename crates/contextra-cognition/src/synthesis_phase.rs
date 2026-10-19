@@ -17,8 +17,14 @@ pub struct SegmentSynthesisResult {
     pub skipped_segments: usize,
 }
 
-#[deprecated(note = "use SegmentSynthesisResult")]
-pub type SynthesisPhaseResult = SegmentSynthesisResult;
+/// Ergebnis des Generative Synthesis Pass.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SynthesisPhaseResult {
+    /// Neu generierte MetaChunks.
+    pub synthesized: Vec<crate::memory_consolidation::MetaChunk>,
+    /// Hashes von qualifizierten Communities, deren Synthese wegen `max_llm_calls_per_cycle` verschoben wurde.
+    pub deferred_community_hashes: Vec<u64>,
+}
 
 /// Ein generativ synthetisierter Wissens-Chunk mit Provenienz.
 #[derive(Debug, Clone, PartialEq, Eq)]
