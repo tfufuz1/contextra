@@ -15,6 +15,23 @@ use contextra_types::TenantId;
 
 use crate::prefix_store::TenantPrefixKvStore;
 
+/// RAM-Claim Status von gefundener Scratchpad-Substanz.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CchRamClaim {
+    /// Keine aktiven Pointer/Referenzen.
+    Unreferenced,
+    /// Aktive Referenzen auf Blöcke vorhanden.
+    ActiveReferences(usize),
+}
+
+/// Cache-Report für einen gescannten Scratchpad-Scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CacheReport {
+    pub caches_checked: usize,
+    pub entries_found: usize,
+    pub ram_claim: CchRamClaim,
+}
+
 /// Definiert den Bereich (Scope) eines Agenten-Scratchpads für die Cache-Invalidierung.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScratchpadCacheScope {
@@ -64,6 +81,31 @@ impl<'a> PrefixStoreScratchpadInvalidator<'a> {
     pub fn with_keys(mut self, keys: Vec<PrefixKey>) -> Self {
         self.keys = keys;
         self
+    }
+
+    /// Zählt die tatsächlich vorhandenen Einträge im unterliegenden Store für den angegebenen Scope.
+    pub fn count_entries_in_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize> {
+        if scope.scratchpad_key_prefix.is_empty() {
+            return Ok(0);
+        }
+
+        self.store.count_prefix_scope_keys(
+            scope.tenant_id,
+            &scope.scratchpad_key_prefix,
+            &self.keys,
+        )
+    }
+
+    /// Erzeugt einen detaillierten `CacheReport` für den gescannten Scope.
+    pub fn cache_report(&self, scope: &ScratchpadCacheScope) -> Result<CacheReport> {
+        let entries_found = self.count_entries_in_scope(scope)?;
+        let caches_checked = if self.keys.is_empty() { 1 } else { self.keys.len() };
+
+        Ok(CacheReport {
+            caches_checked,
+            entries_found,
+            ram_claim: CchRamClaim::Unreferenced,
+        })
     }
 }
 

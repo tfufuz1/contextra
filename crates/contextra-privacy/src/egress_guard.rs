@@ -322,11 +322,11 @@ mod tests {
     }
 
     impl contextra_ports::Clock for MockClock {
-        fn now_unix_nanos(&self) -> u64 {
-            self.nanos
+        fn now(&self) -> contextra_types::DeterministicTimestamp {
+            contextra_types::DeterministicTimestamp::new(self.nanos / 1_000_000, 0)
         }
 
-        fn monotonic_nanos(&self) -> u64 {
+        fn monotonic_ticks(&self) -> u64 {
             self.nanos
         }
     }

@@ -90,6 +90,7 @@ fn test_new_payload_roundtrip_deserialization() {
         expires_at: Some(2000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(hash),
+        key_id: None,
     };
 
     let bincode_opts = bincode::options().with_fixint_encoding();
@@ -128,6 +129,7 @@ fn test_corrupted_new_payload_not_accepted_as_legacy() {
         expires_at: Some(2000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(hash),
+        key_id: None,
     };
 
     let bincode_opts = bincode::options().with_fixint_encoding();

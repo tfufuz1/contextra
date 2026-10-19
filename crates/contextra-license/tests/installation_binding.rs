@@ -51,6 +51,7 @@ fn test_fast_ring_always_allowed_across_all_states() {
         expires_at: Some(expired_at),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(local_id),
+        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -104,6 +105,7 @@ fn test_expired_after_expiration_time() {
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
         installation_id_hash: None,
+        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -138,6 +140,7 @@ fn test_flipped_bit_in_payload_fails_construction() {
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some([7u8; 32]),
+        key_id: None,
     };
 
     let mut payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -175,6 +178,7 @@ fn test_mismatched_installation_id_returns_not_activated() {
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(expected_id),
+        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -250,6 +254,7 @@ fn test_payload_with_hash_gate_without_local_id_returns_not_activated() {
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(expected_id),
+        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
