@@ -40,7 +40,7 @@ pub mod restore_filter;
 mod store;
 pub mod wiring;
 
-pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CpyCopyRegistry};
+pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CopyStatus};
 pub use guard::{CheckpointGuard, PinGuard};
 pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
 pub use manifest::CheckpointManifest;
