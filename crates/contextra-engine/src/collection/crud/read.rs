@@ -18,6 +18,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // AI-TAG[CONVENTION-DRIFT][MAJOR] RESOLVED: AGT-DB-001 — snapshot_seq() now propagates storage errors (TS:2026-08-25T00:00:00Z)
     // instead of silently mapping them to u64::MAX (ID: AGT-DB-001).
     // Consistent with every other error-propagation path in this file.
+    /// Returns the current snapshot sequence number from storage without falling back to u64::MAX.
     pub async fn snapshot_seq(&self) -> Result<u64> {
         self.storage.last_seq_no().await
     }
@@ -25,7 +26,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Retrieves a document by its user-provided string ID.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn get(&self, id: &str) -> Result<Option<crate::Document>> {
-        self.get_at_snapshot(id, u64::MAX).await
+        let seq = self.snapshot_seq().await?;
+        self.get_at_snapshot(id, seq).await
     }
 
     /// Retrieves a document at a specific snapshot point.

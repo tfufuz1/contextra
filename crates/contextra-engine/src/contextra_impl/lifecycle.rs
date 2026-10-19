@@ -1,57 +1,35 @@
 use crate::*;
-use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
 impl Contextra {
-    /// Opens or creates a `Contextra` instance at `path` enforcing `deletion_proof_active = false`
-    /// and using default [`contextra_ports::license::LicenseGate`].
+    /// Opens or creates a `Contextra` instance at `path`.
     #[tracing::instrument(level = "trace", skip(path))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let config = ContextraConfig {
-            deletion_proof_active: false,
-            ..Default::default()
-        };
-        let fast_gate = Arc::new(OpenFastGate);
-        let token = fast_gate
-            .authorize(FeatureRing::Fast)
-            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
-        Self::open_authorized(path, config, &token, fast_gate).await
+        Self::open_with_config(path, ContextraConfig::default()).await
     }
 
-    /// Opens or creates a `Contextra` instance at `path` with explicit `config`, forcing
-    /// `deletion_proof_active = false` (as no authorized token was provided) and using default [`LicenseGate`].
+    /// Opens or creates a `Contextra` instance at `path` with explicit `config`.
     #[tracing::instrument(level = "trace", skip(path, config))]
-    pub async fn open_with_config(
-        path: impl AsRef<Path>,
-        mut config: ContextraConfig,
-    ) -> Result<Self> {
-        config.deletion_proof_active = false;
-        let fast_gate = Arc::new(OpenFastGate);
-        let token = fast_gate
-            .authorize(FeatureRing::Fast)
-            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
-        Self::open_authorized(path, config, &token, fast_gate).await
+    pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {
+        Self::open_with_config_and_wiring(path, config, EngineWiring::default()).await
     }
 
-    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token
-    /// and attached [`LicenseGate`].
-    #[tracing::instrument(level = "trace", skip(path, config, authorized_ring, gate))]
-    pub async fn open_authorized(
+    /// Opens or creates a `Contextra` instance with explicit config and wiring.
+    #[tracing::instrument(level = "trace", skip(path, config, wiring))]
+    pub async fn open_with_config_and_wiring(
         path: impl AsRef<Path>,
-        mut config: ContextraConfig,
-        authorized_ring: &AuthorizedRing,
-        gate: Arc<dyn LicenseGate>,
+        config: ContextraConfig,
+        wiring: EngineWiring,
     ) -> Result<Self> {
-        if authorized_ring.ring() == FeatureRing::Fast {
-            config.deletion_proof_active = false;
-        }
-
-        if authorized_ring.ring() == FeatureRing::Sovereign && !config.encryption.is_encrypted() {
-            return Err(contextra_types::ContextraError::PolicyViolation(
-                "FeatureRing::Sovereign requires active encryption (EncryptionConfig cannot be None)".into(),
+        if config.erasure_mode != contextra_ports::erasure::ErasureMode::Off
+            && !cfg!(feature = "erasure")
+        {
+            return Err(contextra_types::ContextraError::capability_unsupported(
+                "erasure",
+                "Erasure backend not configured",
             ));
         }
 
@@ -76,7 +54,18 @@ impl Contextra {
             ..Default::default()
         };
 
-        let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        if LsmStorage::has_pending_legacy_wal_migration_path(&lsm_config.path).await? {
+            LsmStorage::migrate_legacy_wal_keys(&lsm_config, clock).await?;
+        }
+
+        let storage = if let Some(op) = config.merge_operator.clone() {
+            Arc::new(LsmStorage::open_with_merge_operator(lsm_config, op).await?)
+        } else {
+            Arc::new(LsmStorage::open(lsm_config).await?)
+        };
+        let _ = storage.has_pending_legacy_wal_migration().await;
+
         if !storage.supports_ssi_tracking() {
             tracing::warn!(
                 "Storage engine does not support SSI tracking; serializable isolation may be degraded"
@@ -119,20 +108,24 @@ impl Contextra {
             &orphan_path,
         ));
 
-        let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
-        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store);
-
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
             .clone()
             .unwrap_or_else(|| Arc::new(contextra_ports::NoopMetricsSink));
+
+        // Record initial normal operational backpressure level (0.0 = Normal)
+        crate::metrics_names::record_gauge_safe(
+            metrics_sink.as_ref(),
+            crate::metrics_names::BACKPRESSURE_LEVEL,
+            0.0,
+            &[("status", "normal")],
+        );
 
         let db = Self {
             storage,
             next_tx,
             dimension: config.dimension,
             config: config.clone(),
-            license_gate: gate,
             expiry_reaper_interval: config.expiry_reaper_interval,
             community_detection_threshold: config.community_detection.auto_trigger_threshold,
             collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
@@ -140,13 +133,18 @@ impl Contextra {
             cancel_token: cancel_token.clone(),
             task_tracker: task_tracker.clone(),
             embedder: parking_lot::RwLock::new(None),
-            orphan_registry,
+            orphan_registry: orphan_registry.clone(),
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
-            pid_controller: parking_lot::RwLock::new(None),
-            kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
         };
+
+        db.apply(wiring);
+
+        let storage_ref = db.storage.as_ref();
+        if let Err(err) = db.orphan_registry.recover_and_clean(storage_ref).await {
+            tracing::warn!(error = %err, "Startup checkpoint/pin orphan recovery failed");
+        }
 
         db.initialize_collections().await?;
 
@@ -175,6 +173,8 @@ impl Contextra {
                             tracing::warn!(error = %e, "ConsolidationEngine task failed or was cancelled");
                         }
                     });
+                } else {
+                    tracing::warn!("consolidation_enabled is true but no consolidation_launcher is configured on ContextraConfig");
                 }
             }
         }
@@ -182,34 +182,7 @@ impl Contextra {
         Ok(db)
     }
 
-    async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
-        match backend {
-            EmbeddingBackend::Onnx {
-                model_name,
-                cache_dir,
-            } => {
-                #[cfg(feature = "onnx")]
-                {
-                    let model_dir = contextra_infer_onnx::ensure_onnx_model_download(
-                        model_name,
-                        cache_dir.as_deref(),
-                    )
-                    .await?;
-                    let embedder = contextra_infer_onnx::OnnxEmbedder::load(model_dir)?;
-                    let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
-                    self.set_embedder(embedder_arc).await?;
-                }
-                #[cfg(not(feature = "onnx"))]
-                {
-                    let _ = (model_name, cache_dir);
-                    tracing::debug!(
-                        "EmbeddingBackend::Onnx requested, but 'onnx' feature is disabled in this build. \
-                         Recompile with feature 'onnx' to enable local ONNX embeddings."
-                    );
-                }
-            }
-            EmbeddingBackend::None => {}
-        }
+    async fn init_embedding_backend(&self, _backend: &EmbeddingBackend) -> Result<()> {
         Ok(())
     }
 
@@ -246,6 +219,7 @@ impl Contextra {
 
     async fn repair_on_open_internal(&self) -> Result<()> {
         let start_time = std::time::Instant::now();
+        let sink = self.metrics_sink.read().clone();
 
         let collection_name_from_key = |key: &[u8]| -> String {
             if key.starts_with(b"__tx_intent:") {
@@ -384,6 +358,12 @@ impl Contextra {
         }
 
         let elapsed = start_time.elapsed();
+        crate::metrics_names::record_counter_safe(
+            sink.as_ref(),
+            crate::metrics_names::CHECKPOINT_DURATION,
+            elapsed.as_millis() as u64,
+            &[("phase", "repair_on_open")],
+        );
         tracing::info!(
             "repair_on_open: completed in {:?} — collections verified: {}",
             elapsed,
@@ -556,7 +536,7 @@ mod consolidation_launcher_tests {
     async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()>
     {
         let dir = tempdir().unwrap();
-        let config = ContextraConfig::default(); // no launcher set
+        let config = ContextraConfig::default();
 
         let db = Contextra::open_with_config(dir.path(), config).await?;
         db.close().await?;

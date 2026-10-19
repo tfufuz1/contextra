@@ -29,6 +29,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // For Associates/DerivedFrom/Elaborates, cycles cause unbounded BFS queue growth
         // in traverse_links (P0 audit fix).
         {
+            let bfs_seq = self.snapshot_seq().await?;
             let mut visited = std::collections::HashSet::new();
             let mut queue = std::collections::VecDeque::new();
             visited.insert(to);
@@ -47,7 +48,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         relation, to, from
                     )));
                 }
-                let links = self.get_links(curr).await?;
+                let links = self.get_links_at_snapshot(curr, bfs_seq).await?;
                 for link in links {
                     // Only follow edges of the same relation type to detect typed cycles
                     if link.relation == relation && visited.insert(link.target) {
@@ -62,7 +63,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         if let Some(bytes) = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .get_at_seq_tracked(tx, &doc_key, tx.inner())
             .await?
         {
             let mut doc_id_str = None;
@@ -136,7 +137,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     let user_key = self.namespaced_key(id_str.as_bytes(), 0);
                     if let Some(user_bytes) = self
                         .storage
-                        .get_at_seq_tracked(tx, &user_key, u64::MAX)
+                        .get_at_seq_tracked(tx, &user_key, tx.inner())
                         .await?
                     {
                         if let Ok(mut full_doc) =
@@ -173,19 +174,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
 
-                // INVARIANT INV-GRAPH-PROV-1: Graph tombstone MUST precede LSM commit
-                // for Supersedes links. CSR is rebuilt from LSM on startup — tombstone state is recovered
-                // transitively.
-                if relation == contextra_types::domain::LinkRelation::Supersedes {
-                    contextra_graph::cascade_invalidate_edges_for_superseded_doc(
-                        &self.graph_index,
-                        to,
-                        tx.inner(),
-                    )
-                    .await?;
-                }
-
-                // Commit transaction to persist the link updates and edge tombstones atomically
+                // Commit transaction to persist the link updates atomically
                 self.storage.commit(tx).await?;
             }
         }
@@ -193,14 +182,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    /// Retrieves all links for a given document.
-    pub async fn get_links(
+    /// Retrieves all links for a given document at a specific snapshot point (K1.13).
+    pub async fn get_links_at_snapshot(
         &self,
         doc_id: DocId,
+        seq: u64,
     ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        // SSI: nicht tx-gebunden — reiner Lesezugriff für Link-Abfrage
-        if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
+        if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                 if let Some(obj) = meta.metadata.as_ref().and_then(|m| m.as_object()) {
                     return Ok(obj
@@ -218,5 +207,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
         Ok(Vec::new())
+    }
+
+    /// Retrieves all links for a given document at the current snapshot point.
+    pub async fn get_links(
+        &self,
+        doc_id: DocId,
+    ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
+        let seq = self.snapshot_seq().await?;
+        self.get_links_at_snapshot(doc_id, seq).await
     }
 }

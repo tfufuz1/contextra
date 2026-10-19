@@ -1,122 +1,125 @@
 use super::compensating_actions::{
-    CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
-    CompensateTextAction, RollbackStagedAction,
+    CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
+    RollbackStagedAction,
 };
-use super::db_transaction::DbTransaction;
+use super::db_transaction::{DbTransaction, StagedTextOp};
 use super::intent::CommitIntent;
 use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TenantId, TxId};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    pub(super) fn validate_ssi_gate(&self) -> Result<()> {
+        let read_set = {
+            let guard = match self.read_set.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            guard.clone()
+        };
+
+        if read_set.is_empty() {
+            return Ok(());
+        }
+
+        if let Some(ref validator) = self.ssi_validator {
+            return validator.validate(self.tx_id, &read_set);
+        }
+
+        let storage_ref = self.collection.storage.as_ref();
+        if storage_ref.supports_ssi_tracking() {
+            Err(ContextraError::Conflict(format!(
+                "Serializable isolation validation failed for TxId({}): SSI validator unavailable (fail-closed)",
+                self.tx_id.inner()
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
-        let text_deletes = {
-            let mut guard = match self.staged_text_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-        let text_ops = {
-            let mut guard = match self.staged_text_ops.lock() {
+        let seq_ops = {
+            let mut guard = match self.staged_text_sequence.lock() {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
             std::mem::take(&mut *guard)
         };
 
-        for doc_id in text_deletes {
-            self.collection
-                .text_index
-                .delete_document(self.tx_id, doc_id)
-                .await?;
-        }
+        if !seq_ops.is_empty() {
+            let mut doc_order = Vec::new();
+            let mut last_op_map = ahash::AHashMap::new();
 
-        for (doc_id, text) in text_ops {
-            self.collection
-                .text_index
-                .upsert_document(self.tx_id, doc_id, &text)
-                .await?;
-        }
+            for op in seq_ops {
+                let doc_id = match &op {
+                    StagedTextOp::Upsert(id, _) => *id,
+                    StagedTextOp::Delete(id) => *id,
+                };
+                if !last_op_map.contains_key(&doc_id) {
+                    doc_order.push(doc_id);
+                }
+                last_op_map.insert(doc_id, op);
+            }
 
-        Ok(())
-    }
-
-    pub(super) async fn commit_graph_staged(&self) -> Result<()> {
-        let entities = {
-            let mut guard = match self.staged_graph_entities.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
+            for doc_id in doc_order {
+                if let Some(op) = last_op_map.get(&doc_id) {
+                    match op {
+                        StagedTextOp::Delete(id) => {
+                            self.collection
+                                .text_index
+                                .delete_document(self.tx_id, *id)
+                                .await?;
+                        }
+                        StagedTextOp::Upsert(id, text) => {
+                            self.collection
+                                .text_index
+                                .delete_document(self.tx_id, *id)
+                                .await?;
+                            self.collection
+                                .text_index
+                                .upsert_document(self.tx_id, *id, text)
+                                .await?;
+                        }
+                    }
+                }
+            }
+        } else {
+            let text_deletes = {
+                let mut guard = match self.staged_text_deletes.lock() {
+                    Ok(g) => g,
+                    Err(p) => p.into_inner(),
+                };
+                std::mem::take(&mut *guard)
             };
-            std::mem::take(&mut *guard)
-        };
-        let edges = {
-            let mut guard = match self.staged_graph_edges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
+            let text_ops = {
+                let mut guard = match self.staged_text_ops.lock() {
+                    Ok(g) => g,
+                    Err(p) => p.into_inner(),
+                };
+                std::mem::take(&mut *guard)
             };
-            std::mem::take(&mut *guard)
-        };
 
-        for entity in entities {
-            self.collection
-                .graph_index
-                .add_entity(self.tx_id, entity)
-                .await?;
-        }
+            for doc_id in text_deletes {
+                self.collection
+                    .text_index
+                    .delete_document(self.tx_id, doc_id)
+                    .await?;
+            }
 
-        for edge in edges {
-            GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge).await?;
-        }
-
-        let hyperedges = {
-            let mut guard = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for hyperedge in hyperedges {
-            self.collection.graph_index.insert_hyperedge(hyperedge);
-        }
-
-        let edge_deletes = {
-            let mut guard = match self.staged_graph_edge_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for (from, to) in edge_deletes {
-            self.collection
-                .graph_index
-                .remove_edge(self.tx_id, from, to)
-                .await?;
-        }
-
-        let entity_deletes = {
-            let mut guard = match self.staged_graph_entity_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for entity_id in entity_deletes {
-            self.collection
-                .graph_index
-                .remove_entity(self.tx_id, entity_id)
-                .await?;
+            for (doc_id, text) in text_ops {
+                self.collection
+                    .text_index
+                    .upsert_document(self.tx_id, doc_id, &text)
+                    .await?;
+            }
         }
 
         Ok(())
     }
 
-    /// Commits the transaction atomically across all 4 indices (LSM, HNSW, BM25, CSR).
+    /// Commits the transaction atomically across all indices (LSM, HNSW, BM25).
     pub async fn commit(self) -> Result<()> {
         let start_nanos = self.collection.clock().monotonic_nanos();
         let res = self.commit_internal().await;
@@ -136,6 +139,11 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     async fn commit_internal(&self) -> Result<()> {
+        if let Err(e) = self.validate_ssi_gate() {
+            self.rollback_internal().await;
+            return Err(e);
+        }
+
         let intent_key = self
             .collection
             .namespaced_key(&self.tx_id.inner().to_le_bytes(), 3);
@@ -157,35 +165,11 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            !ops.is_empty() || !dels.is_empty()
-        };
-
-        let has_graph = {
-            let ents = match self.staged_graph_entities.lock() {
+            let seq = match self.staged_text_sequence.lock() {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            let edgs = match self.staged_graph_edges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let e_dels = match self.staged_graph_edge_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let ent_dels = match self.staged_graph_entity_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let hyperedgs = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            !ents.is_empty()
-                || !edgs.is_empty()
-                || !e_dels.is_empty()
-                || !ent_dels.is_empty()
-                || !hyperedgs.is_empty()
+            !ops.is_empty() || !dels.is_empty() || !seq.is_empty()
         };
 
         let mut ledger = CommitLedger::new();
@@ -219,7 +203,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
-            has_graph,
+            has_graph: false,
             stages_completed: 0,
         };
         let intent_bytes = serde_json::to_vec(&intent).map_err(|e| {
@@ -232,7 +216,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .put(intent_tx, &intent_key, &intent_bytes)
             .await
         {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to write commit intent: {}",
                 e
@@ -240,7 +224,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         if let Err(e) = self.collection.storage.commit(intent_tx).await {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to commit intent transaction: {}",
                 e
@@ -249,7 +233,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Phase (b): Commit LSM storage first so document payload and metadata are durable before index staging/commit
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Storage commit failed: {}",
                 storage_err
@@ -268,7 +252,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let stage1_intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
-            has_graph,
+            has_graph: false,
             stages_completed: 1,
         };
         if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {
@@ -287,33 +271,27 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         }
 
-        // Phase (c): Execute staged index steps and commit vector, text, graph indices
+        // Phase (c): Execute staged index steps and commit vector and text indices
         if let Err(e) = self.commit_text_staged().await {
-            ledger.execute_rollback().await;
-            return Err(e);
-        }
-
-        if let Err(e) = self.commit_graph_staged().await {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(e);
         }
 
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "HNSW index commit failed: {}",
                 index_err
             )));
         }
-        let tenant_id = TenantId::try_new(1).unwrap_or_default();
         ledger.push(CompensateHnswAction::new(
             self.collection.clone(),
-            tenant_id,
+            self.tenant_id,
             Arc::clone(&doc_ids),
         ));
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Text index commit failed: {}",
                 text_err
@@ -323,18 +301,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             self.collection.clone(),
             Arc::clone(&doc_ids),
         ));
-
-        if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
-            return Err(ContextraError::Transaction(format!(
-                "Graph index commit failed: {}",
-                graph_err
-            )));
-        }
-        ledger.push(CompensateGraphAction {
-            collection: self.collection.clone(),
-            doc_ids: Arc::clone(&doc_ids),
-        });
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
@@ -365,7 +331,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 }
             }
             if attempt < max_retries {
-                tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    50 * u64::try_from(attempt).unwrap_or(1),
+                ))
+                .await;
             }
         }
 

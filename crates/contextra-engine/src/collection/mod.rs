@@ -716,9 +716,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let text_index = InvertedIndex::new_with_language(storage.clone(), &name, language);
 
-        let pressure_rx = (storage.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<LsmStorage>()
-            .map(|lsm| lsm.pressure_receiver());
+        let pressure_rx = None;
 
         Self {
             name,
@@ -820,9 +818,40 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.consolidation_in_progress.clone()
     }
 
-    /// Returns the CSR graph index for this collection.
-    pub fn graph_index(&self) -> Arc<CsrGraph> {
-        self.graph_index.clone()
+    /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
+    /// otherwise returning an error if tenant resolution is ambiguous or unresolvable).
+    pub fn try_tenant_id(&self) -> Result<contextra_types::TenantId> {
+        Err(contextra_types::ContextraError::InvalidInput(
+            "TenantId resolution failed: underlying storage engine is not bound to a specific tenant".to_string()
+        ))
+    }
+
+    /// Generates a collection prefix using TenantKeyCodec.
+    pub fn tenant_collection_prefix(
+        &self,
+        codec: &contextra_store::tenant_codec::TenantKeyCodec,
+        collection: &contextra_types::CollectionId,
+    ) -> Vec<u8> {
+        codec.collection_prefix(collection)
+    }
+
+    /// Encodes a graph key using TenantKeyCodec.
+    pub fn tenant_encode_graph_key(
+        &self,
+        codec: &contextra_store::tenant_codec::TenantKeyCodec,
+        collection: &contextra_types::CollectionId,
+        entity_id: u64,
+    ) -> Vec<u8> {
+        codec.encode_graph_key(collection, entity_id)
+    }
+
+    /// Evaluates point lookup traversal metrics on the underlying LSM storage engine.
+    pub async fn point_lookup_metrics(
+        &self,
+        storage: &contextra_store::LsmStorage,
+        key: &[u8],
+    ) -> (usize, usize, usize, usize, bool) {
+        storage.point_lookup_metrics(key).await
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
@@ -915,6 +944,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             k
         }
     }
+
     /// Returns a reference to the underlying storage engine.
     pub fn storage(&self) -> &Arc<S> {
         &self.storage

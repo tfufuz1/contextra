@@ -31,7 +31,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// - Gibt `observed_empty = true` zurück, wenn kein Eintrag für das Dokument existiert.
     /// - Führt `check_nonempty_or_observed_empty` durch.
     pub async fn erasure_footprint(&self, doc_id: DocId) -> Result<ErasureFootprint> {
-        let tenant_id = contextra_types::TenantId::SYSTEM;
+        let tenant_id = self.tenant_id();
         let storage_scope = StorageScope::Tenant(tenant_id);
 
         let id_str = doc_id.inner().to_string();
@@ -50,7 +50,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             {
                 actual_user_id = meta.id;
             } else if let Ok(full) =
-                serde_json::from_slice::<crate::collection::StoredDocument>(&doc_val)
+                crate::collection::StoredDocument::from_slice(&doc_val)
             {
                 actual_user_id = full.id;
             }
@@ -59,7 +59,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             if let Ok(entries) = self.storage.scan_prefix(&user_prefix).await {
                 for (k, v) in entries {
                     if let Ok(full) =
-                        serde_json::from_slice::<crate::collection::StoredDocument>(&v)
+                        crate::collection::StoredDocument::from_slice(&v)
                     {
                         if DocId::from_key(&full.id).ok() == Some(doc_id) {
                             actual_user_id = full.id;
@@ -106,7 +106,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         {
             scanned_count += 1;
             if let Ok(stored) =
-                serde_json::from_slice::<crate::collection::StoredDocument>(&user_val)
+                crate::collection::StoredDocument::from_slice(&user_val)
             {
                 if let Some(text) = crate::collection::extract_text(&stored.metadata) {
                     for term in text.split_whitespace() {

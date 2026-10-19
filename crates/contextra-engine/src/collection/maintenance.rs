@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup, Community detection).
+// ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup).
 // INVARIANTEN: repair() stellt LSM<->Index Synchronität nach Crash sicher; Reaping stützt sich auf Snapshot-Sequenzen.
 // NICHT-OFFENSICHTLICH: Pending TxIntents werden beim Start via Forward-Commit repariert und markiert.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
@@ -7,13 +7,29 @@
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
-use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use crate::CommunityDetectionConfig;
+use contextra_graph::community::{detect_communities, CommunityAssignment};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Returns a reference to the inverted text index.
+    pub fn text_index_ref(&self) -> &contextra_text::inverted::InvertedIndex<S> {
+        &self.text_index
+    }
+
+    /// Returns a reference to the graph index.
+    pub fn graph_index(&self) -> &contextra_graph::CsrGraph {
+        &self.graph_index
+    }
+
+    /// Returns a shared Arc reference to the graph index.
+    pub fn graph_index_arc(&self) -> Arc<contextra_graph::CsrGraph> {
+        self.graph_index.clone()
+    }
+
     /// Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch.
     /// Evictet Chunks deren effective_score unter eviction_threshold liegt.
     /// Gibt Anzahl der evictierten Dokumente zurück.
@@ -172,26 +188,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let _guard = self.consolidation_guard.lock().await;
         let mut repair_count = 0;
         let docs = self.storage.scan_prefix(&self.prefix).await?;
-        // FIND-DB-004: Use doc_to_node map directly for O(1) lookup per DocId,
-        // instead of iterating all nodes via all_doc_ids() which is O(N).
         let indexed_ids: std::collections::HashSet<DocId> =
             self.index.all_doc_ids().await?.into_iter().collect();
 
         tracing::info!("Starting integrity repair for collection '{}'", self.name);
         let start_time = std::time::Instant::now();
 
-        // 1. Scan for pending transaction intents (2-Phase Commit Recovery — FIND-DB-005)
+        // 1. Scan for pending transaction intents (2-Phase Commit Recovery)
         let intent_prefix = self.namespaced_key(&[], 3);
         let intents = self.storage.scan_prefix(&intent_prefix).await?;
         let recovery_tx = self.allocate_tx()?;
         let mut recovered_any = false;
         let mut recovered_text = false;
-        let mut recovered_graph = false;
 
         for (intent_key, intent_val) in intents {
             use crate::transaction::CommitIntent;
             if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
-                let (doc_ids, has_text, has_graph) = match intent_variant {
+                let (doc_ids, has_text, _has_graph) = match intent_variant {
                     CommitIntent::Pending {
                         doc_ids,
                         has_text,
@@ -203,12 +216,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         target_id,
                         base_tx: _,
                     } => {
-                        // Crash Recovery during Consolidation Pass (INV-CONSOLIDATE-2)
-                        // If target_id was committed to storage, ensure it is re-synced to index.
-                        // If target_id was not yet committed, consolidation aborted; delete the intent.
                         let target_doc_key =
                             self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
-                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                         if self.storage.get(&target_doc_key).await?.is_some() {
                             (Arc::new(vec![target_id]), true, false)
                         } else {
@@ -222,10 +231,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 };
 
                 tracing::info!(
-                    "Found pending transaction intent, recovering {} documents (has_text={}, has_graph={})",
+                    "Found pending transaction intent, recovering {} documents (has_text={})",
                     doc_ids.len(),
-                    has_text,
-                    has_graph
+                    has_text
                 );
 
                 let mut any_doc_in_storage = false;
@@ -240,7 +248,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if any_doc_in_storage {
                     for &doc_id in doc_ids.iter() {
                         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                         if let Some(val) = self.storage.get(&doc_key).await? {
                             let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
                                 .map(|m| m.id)
@@ -249,7 +256,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             let mut stored_doc = None;
                             if let Some(ref id_str) = meta_id {
                                 let user_key = self.namespaced_key(id_str.as_bytes(), 0);
-                                // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                                 if let Some(user_val) = self.storage.get(&user_key).await? {
                                     if let Ok(stored) =
                                         StoredDocument::from_slice(&user_val)
@@ -292,30 +298,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                         }
                                     }
                                 }
-
-                                if has_graph {
-                                    if let Ok(eid) = EntityId::from_key(&stored.id) {
-                                        let entity = contextra_types::Entity::new(
-                                            eid, &stored.id, "Document",
-                                        );
-                                        if let Err(e) =
-                                            self.graph_index.add_entity(recovery_tx, entity).await
-                                        {
-                                            tracing::warn!(
-                                                doc_id = %stored.id,
-                                                error = %e,
-                                                "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
-                                            );
-                                        } else {
-                                            recovered_graph = true;
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
                 } else {
-                    // Storage commit NEVER completed! Compensate index entries.
                     for &doc_id in doc_ids.iter() {
                         if let Err(e) = self.index.delete(recovery_tx, doc_id).await {
                             tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Vektor-Index-Eintrag bei Recovery nicht löschen");
@@ -332,44 +318,31 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 recovered_text = true;
                             }
                         }
-
-                        if has_graph {
-                            let eid = EntityId::from_doc_id(doc_id);
-                            if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {
-                                tracing::warn!(?eid, error = %e, "Konnte verwaisten Graph-Index-Eintrag bei Recovery nicht löschen");
-                            } else {
-                                recovered_graph = true;
-                            }
-                        }
                     }
                 }
 
-                // Cleanup recovered intent
                 if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
                     tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
                 }
             }
         }
+
         if recovered_any {
             self.index.commit(recovery_tx).await?;
         }
         if recovered_text {
             self.text_index.commit(recovery_tx).await?;
         }
-        if recovered_graph {
-            self.graph_index.commit(recovery_tx).await?;
-        }
-        if recovered_any || recovered_text || recovered_graph {
+        if recovered_any || recovered_text {
             self.storage.commit(recovery_tx).await?;
         }
 
-        // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
+        // 2. Fallback: Full scan for documents missing from index
         let fallback_tx = self.allocate_tx()?;
         let fallback_any = false;
         let mut fallback_text = false;
 
         for (namespaced_key, value) in docs {
-            // Only process user data (key_type 0)
             if self.name != "default" {
                 if namespaced_key.get(self.prefix.len()) != Some(&0) {
                     continue;
@@ -384,7 +357,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     tracing::debug!(
                         key = ?namespaced_key,
                         error = %e,
-                        "Überspringe nicht-deserialisierbare Einträge bei repair (erwartet für Metadaten-Keys)"
+                        "Überspringe nicht-deserialisierbare Einträge bei repair"
                     );
                     continue;
                 }
@@ -392,7 +365,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let doc_id = DocId::from_key(&stored.id)?;
 
-            // Ensure text index coverage
             if let Some(text) = extract_text(&stored.metadata) {
                 if let Ok(bm25_res) = self.text_index.search_bm25(&text, 1, None).await {
                     if !bm25_res.iter().any(|(id, _)| *id == doc_id) {
@@ -437,11 +409,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Rebuilds the HNSW index from storage.
-    /// Scans the collection for documents with expired sequence-based TTLs and deletes them in batches.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn reap_expired_documents(&self, max_expired: usize) -> Result<usize> {
         let current_seq = self.snapshot_seq().await?;
-        // AI-TAG[SMELL][MAJOR] RESOLVED: AGT-DB-f18d79a2 — reap_expired_documents uses cursor-based batch pagination to avoid 10k silent truncation limit (TS: 2026-09-12T18:43:13Z)
         let user_prefix = self.namespaced_key(b"", 0);
         let mut expired_ids = Vec::new();
         let mut cursor: Option<Vec<u8>> = None;
@@ -529,9 +499,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Scans the collection for documents with expired TTLs or decayed importance scores and deletes them.
-    ///
-    /// Reads `created_at_ms` (or `timestamp_ms`) and `ttl_ms` from document metadata for wall-clock TTL,
-    /// and `importance` metadata for TxId-based decay sweep (`effective_score < DECAY_DELETION_THRESHOLD`).
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {
         let now_ms = self.clock.read().now_unix_nanos() / 1_000_000;
@@ -581,7 +548,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 let mut marked_for_deletion = false;
 
                 if let Some(obj) = meta_obj {
-                    // 1. Working-Memory wall-clock TTL check ZUERST
                     if let Some(ttl_val) = obj.get("ttl_ms").and_then(|v| v.as_u64()) {
                         if ttl_val > 0 {
                             if let Some(created_at) = obj
@@ -599,7 +565,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         }
                     }
 
-                    // 2. TxId-basierter Decay-Sweep (nur wenn decay != None)
                     if !marked_for_deletion {
                         if let Some(imp_val) = obj.get("importance") {
                             if let Ok(imp) = serde_json::from_value::<
@@ -656,10 +621,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.trigger_expiry_cleanup().await
     }
 
-    /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
-    ///
-    /// Diese Funktion entkoppelt die LLM-Bewertung (die z.B. über Ollama geschieht)
-    /// von der reinen Datenbank-Operation.
+    /// Updates document importance score.
     pub async fn update_document_importance(
         &self,
         doc_id: &str,
@@ -742,12 +704,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Runs Leiden Community Detection with custom configuration
     /// and persists the resulting assignments in storage using TxId allocation.
-    #[tracing::instrument(level = "trace", skip(self, config))]
+    #[tracing::instrument(level = "trace", skip(self, _config))]
     pub async fn run_community_detection_with_config(
         &self,
-        config: &CommunityDetectionConfig,
+        _config: &CommunityDetectionConfig,
     ) -> Result<Vec<CommunityAssignment>> {
-        let assignments = detect_communities(&self.graph_index, config).await?;
+        let graph_config = contextra_graph::CommunityDetectionConfig::default();
+        let assignments = detect_communities(&self.graph_index, &graph_config).await?;
         if assignments.is_empty() {
             return Ok(assignments);
         }
@@ -775,7 +738,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             format!("__graph:community:{}", entity_id.inner()).as_bytes(),
             4,
         );
-        // SSI: nicht tx-gebunden — reiner Lesezugriff für Community-Abfrage
         if let Some(bytes) = self.storage.get(&key).await? {
             let comm_id: u64 = serde_json::from_slice(&bytes).map_err(|e| {
                 contextra_types::ContextraError::Internal(format!("community deserialize: {e}"))
@@ -796,13 +758,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             return Ok(std::collections::HashMap::new());
         }
 
-        // 1. First try graph_index in-memory batch lookup
         let graph_map = self.graph_index.get_communities_batch(entity_ids).await?;
         if !graph_map.is_empty() {
             return Ok(graph_map);
         }
 
-        // 2. Fallback: single batch scan over collection's community prefix in storage
         let prefix = self.namespaced_key(b"__graph:community:", 4);
         let entries = self.storage.scan_prefix(&prefix).await?;
         let target_set: std::collections::HashSet<&EntityId> = entity_ids.iter().collect();
@@ -825,121 +785,43 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(map)
     }
 
-    /// Removes all data belonging to this collection from storage.
+    /// Removes all data belonging to this collection from storage and resets RAM state.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
-        let prefix = if self.name == "default" {
+        if self.name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
-        } else {
-            self.prefix.clone()
-        };
+        }
 
+        self.consolidation_in_progress.store(true, Ordering::SeqCst);
+
+        let res = self.drop_collection_internal().await;
+
+        self.consolidation_in_progress
+            .store(false, Ordering::SeqCst);
+        res
+    }
+
+    async fn drop_collection_internal(&self) -> Result<()> {
         let tx = self.allocate_tx()?;
 
-        // 1. Clean collection data (user keys, docs, rels, intents)
-        self.storage.delete_prefix(tx, &prefix).await?;
+        self.storage.delete_prefix(tx, &self.prefix).await?;
 
-        // 2. Clean text index namespace (FIND-DB-002)
         let txt_prefix = format!("__txt:{}:", self.name).into_bytes();
         self.storage.delete_prefix(tx, &txt_prefix).await?;
 
-        self.storage.commit(tx).await?;
-        Ok(())
-    }
-}
+        self.text_index.resident_index().clear();
 
-#[cfg(feature = "graph-connectivity-health")]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PercolationResult {
-    pub health: Option<f32>,
-    pub rebonding_triggered: bool,
-    pub new_edges_added: usize,
-}
-
-#[cfg(feature = "graph-connectivity-health")]
-impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Überprüft die Perkolations-Gesundheit des Wissensgraphen und löst bei Unterschreitung
-    /// des Schwellenwerts automatisch einen Re-Bonding-Pass aus.
-    #[tracing::instrument(level = "trace", skip(self, config))]
-    pub async fn run_percolation_check(
-        &self,
-        config: &contextra_graph::percolation::PercolationConfig,
-    ) -> Result<PercolationResult> {
-        let stats = self.graph_index.stats().await?;
-        let health = contextra_graph::percolation::compute_percolation_health(
-            stats.num_entities,
-            stats.num_edges,
-        );
-
-        let rebonding_triggered = if let Some(phi) = health {
-            contextra_graph::percolation::should_trigger_rebonding(phi, config)
-        } else {
-            false
-        };
-
-        let mut new_edges_added = 0;
-
-        if rebonding_triggered {
-            let user_prefix = self.namespaced_key(b"", 0);
-            let mut embeddings = std::collections::HashMap::new();
-            let mut id_map = std::collections::HashMap::new();
-            let mut cursor: Option<Vec<u8>> = None;
-            const BATCH_SIZE: usize = 1000;
-
-            loop {
-                let (batch, next_cursor) = self
-                    .storage
-                    .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
-                    .await?;
-
-                if batch.is_empty() {
-                    break;
-                }
-
-                for (_k, v) in batch {
-                    if let Ok(stored) = StoredDocument::from_slice(&v) {
-                        if let Ok(eid) = EntityId::from_key(&stored.id) {
-                            id_map.insert(eid, stored.id.clone());
-                            embeddings.insert(eid, stored.embedding);
-                        }
-                    }
-                }
-
-                if let Some(next) = next_cursor {
-                    cursor = Some(next);
-                    tokio::task::yield_now().await;
-                } else {
-                    break;
-                }
+        if let Ok(active_doc_ids) = self.index.all_doc_ids().await {
+            for doc_id in active_doc_ids {
+                let _ = self.index.delete(tx, doc_id).await;
             }
-
-            let candidate_pairs = contextra_graph::percolation::find_rebonding_candidates(
-                self.graph_index.as_ref(),
-                &embeddings,
-                config,
-            )
-            .await;
-
-            for (from_id, to_id, _sim) in candidate_pairs {
-                if let (Some(from_str), Some(to_str)) = (id_map.get(&from_id), id_map.get(&to_id)) {
-                    if self
-                        .relate_bidirectional(from_str, to_str, "rebonded")
-                        .await
-                        .is_ok()
-                    {
-                        new_edges_added += 2;
-                    }
-                }
-            }
+            let _ = self.index.commit(tx).await;
         }
 
-        Ok(PercolationResult {
-            health,
-            rebonding_triggered,
-            new_edges_added,
-        })
+        self.storage.commit(tx).await?;
+        Ok(())
     }
 }
