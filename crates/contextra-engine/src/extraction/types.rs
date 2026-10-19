@@ -22,6 +22,16 @@ pub struct ExtractedTriple {
     pub source_span: Option<(usize, usize)>,
 }
 
+/// Modus für Entitätsextraktion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ExtractorMode {
+    /// LLM-basierte OpenIE Extraktion
+    #[default]
+    OpenIe,
+    /// Regelbasierte Extraktion
+    RuleBased,
+}
+
 /// Konfiguration für die automatische Entitätsextraktion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityExtractionConfig {

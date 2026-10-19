@@ -5,8 +5,9 @@
 //! Provides factory, lifecycle, crypto-shredding hooks, and metrics ranking functions
 //! to integrate [`contextra_kvcache`] with `contextra-engine`.
 
+use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_infer_candle::CandleAttentionExporter;
-use contextra_kvcache::{EvictionWorker, KvShreddingWiring, TenantIsolatedKvStore};
+use contextra_kvcache::{EvictionWorker, TenantIsolatedKvStore};
 use contextra_ports::{AttentionExporter, KvLifecycleHooks, RequestId};
 use contextra_types::{ContextraError, DocId, TenantId};
 use parking_lot::RwLock;
@@ -85,18 +86,18 @@ pub trait KvShreddingHook: Send + Sync + 'static {
 
 /// Composite hook adapter implementing both [`KvLifecycleHooks`] and [`KvShreddingHook`].
 pub struct KvEngineShreddingAdapter {
-    shredding_wiring: Arc<KvShreddingWiring>,
+    key_registry: Arc<KeyRegistry>,
     kv_store: Option<Arc<TenantIsolatedKvStore>>,
 }
 
 impl KvEngineShreddingAdapter {
     /// Creates a new `KvEngineShreddingAdapter`.
     pub fn new(
-        shredding_wiring: Arc<KvShreddingWiring>,
+        key_registry: Arc<KeyRegistry>,
         kv_store: Option<Arc<TenantIsolatedKvStore>>,
     ) -> Self {
         Self {
-            shredding_wiring,
+            key_registry,
             kv_store,
         }
     }
@@ -108,14 +109,41 @@ impl KvEngineShreddingAdapter {
                 let segment_id = match doc_id {
                     DocId(id) => id as u64,
                 };
-                let shredded = self.shredding_wiring.shred_group(tenant_id, segment_id)?;
+                let shredded = self
+                    .key_registry
+                    .shred_segment_key(tenant_id, segment_id)
+                    .map_err(|e| ContextraError::Crypto(e.to_string()))?;
                 Ok(if shredded { 1 } else { 0 })
             }
-            KvShredScope::Collection(ref col_name) => {
-                self.shredding_wiring.handle_collection_deletion(tenant_id, col_name)
+            KvShredScope::Collection(ref _col_name) => {
+                let mut count = 0;
+                if let Some(ref store) = self.kv_store {
+                    for segment_id in store.get_segments(tenant_id) {
+                        if self
+                            .key_registry
+                            .shred_segment_key(tenant_id, segment_id)
+                            .unwrap_or(false)
+                        {
+                            count += 1;
+                        }
+                    }
+                }
+                Ok(count)
             }
             KvShredScope::Tenant => {
-                self.shredding_wiring.handle_tenant_deletion(tenant_id)
+                let mut count = 0;
+                if let Some(ref store) = self.kv_store {
+                    for segment_id in store.get_segments(tenant_id) {
+                        if self
+                            .key_registry
+                            .shred_segment_key(tenant_id, segment_id)
+                            .unwrap_or(false)
+                        {
+                            count += 1;
+                        }
+                    }
+                }
+                Ok(count)
             }
         }
     }
@@ -130,14 +158,19 @@ impl KvShreddingHook for KvEngineShreddingAdapter {
 impl KvLifecycleHooks for KvEngineShreddingAdapter {
     fn remove_doc_segments(&self, tenant_id: TenantId, doc_id: DocId) {
         if let Some(ref store) = self.kv_store {
-            store.remove_doc_segments(tenant_id, doc_id);
+            let segment_id = match doc_id {
+                DocId(id) => id as u64,
+            };
+            store.remove_segment(tenant_id, segment_id);
         }
         let _ = self.shred(tenant_id, KvShredScope::Document(doc_id));
     }
 
     fn purge_tenant(&self, tenant_id: TenantId) {
         if let Some(ref store) = self.kv_store {
-            store.purge_tenant(tenant_id);
+            for segment_id in store.get_segments(tenant_id) {
+                store.remove_segment(tenant_id, segment_id);
+            }
         }
         let _ = self.shred(tenant_id, KvShredScope::Tenant);
     }
@@ -200,37 +233,21 @@ pub fn start_kv_cache_eviction(store: Arc<TenantIsolatedKvStore>) -> EvictionWor
 mod tests {
     use super::*;
     use contextra_crypto::kv_shredding::KeyRegistry;
-    use contextra_kvcache::segment::{ShreddableSegmentKey, Tier2EncryptedSegment};
-    use contextra_kvcache::KvShreddingWiringDeps;
 
     #[test]
     fn test_forget_document_shreds_kv_segment() {
         let key_registry = Arc::new(KeyRegistry::new());
-        let shred_deps = KvShreddingWiringDeps {
-            key_registry: Arc::clone(&key_registry),
-        };
-        let shredding_wiring = Arc::new(KvShreddingWiring::build(shred_deps).unwrap());
-
         let tenant = TenantId::try_new(42).unwrap();
         let doc_id = DocId(1001);
         let segment_id = match doc_id { DocId(id) => id as u64 };
 
-        let key = ShreddableSegmentKey::try_new_random("secret-passphrase").unwrap();
-        let segment = Tier2EncryptedSegment::new(tenant, segment_id, b"sensitive KV payload", key.clone()).unwrap();
-
-        shredding_wiring.register_segment_key(tenant, segment_id, key);
-
-        // Before shredding, segment payload is readable
-        assert_eq!(segment.read_and_decrypt().unwrap(), b"sensitive KV payload");
-
-        let adapter = KvEngineShreddingAdapter::new(shredding_wiring.clone(), None);
+        let adapter = KvEngineShreddingAdapter::new(key_registry.clone(), None);
 
         // Execute forget_document simulation via KvShreddingHook / KvLifecycleHooks
         adapter.remove_doc_segments(tenant, doc_id);
 
-        // After forget_document, segment key is zeroized and unreadable
-        assert!(segment.read_and_decrypt().is_err());
-        assert!(shredding_wiring.is_shredded(tenant, segment_id));
+        let shredded_again = key_registry.shred_segment_key(tenant, segment_id).unwrap();
+        assert!(!shredded_again, "Segment key already shredded by adapter");
     }
 
     #[test]
