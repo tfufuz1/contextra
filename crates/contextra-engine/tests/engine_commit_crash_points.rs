@@ -1,9 +1,10 @@
 #![cfg(not(loom))]
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
+use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -148,12 +149,14 @@ async fn create_faulty_collection() -> (
         })
         .unwrap(),
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = Collection::new_without_graph(
+    let col = Collection::new(
         "default".to_string(),
         storage.clone(),
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -170,6 +173,16 @@ async fn test_f19_intent_put_failure_triggers_rollback() -> Result<()> {
     let doc_id = DocId::new(999);
     tx.stage_text_insert(doc_id, "test text for F19 failure".to_string());
 
+    let e1 = Entity::new(EntityId::from_key("node_f19_1")?, "Node1", "Concept");
+    let e2 = Entity::new(EntityId::from_key("node_f19_2")?, "Node2", "Concept");
+    tx.stage_graph_entity(e1);
+    tx.stage_graph_entity(e2);
+    tx.stage_graph_edge(Edge::new(
+        EntityId::from_key("node_f19_1")?,
+        EntityId::from_key("node_f19_2")?,
+        "CONNECTS",
+    ));
+
     // Inject failure on intent put
     storage.fail_intent_put.store(true, Ordering::SeqCst);
 
@@ -177,6 +190,16 @@ async fn test_f19_intent_put_failure_triggers_rollback() -> Result<()> {
     assert!(
         commit_res.is_err(),
         "Commit should fail when intent put fails"
+    );
+
+    // Verify graph index was rolled back
+    let neighbors = col
+        .graph_index()
+        .neighbors(EntityId::from_key("node_f19_1")?)
+        .await?;
+    assert!(
+        neighbors.is_empty(),
+        "Graph index must be rolled back after intent put failure (F-19)"
     );
 
     Ok(())
