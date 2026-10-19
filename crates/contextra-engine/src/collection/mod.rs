@@ -621,6 +621,9 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) community_detection_trigger_threshold: Arc<AtomicU64>,
     /// Koordination des Konsolidierungslaufs zur Vermeidung von Double-Triggern (Engine + Scheduler).
     pub(super) consolidation_in_progress: Arc<AtomicBool>,
+    /// Auto extraction generator, config, and mode binding for document ingestion hooks.
+    pub(super) auto_extraction:
+        Arc<parking_lot::RwLock<Option<crud::auto_extraction::AutoExtractionBinding>>>,
     /// Collection configuration (e.g. backpressure settings).
     pub(super) config: parking_lot::RwLock<CollectionConfig>,
     /// Watch receiver for monitoring system pressure levels.
@@ -656,6 +659,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
                 .community_detection_trigger_threshold
                 .clone(),
             consolidation_in_progress: self.consolidation_in_progress.clone(),
+            auto_extraction: self.auto_extraction.clone(),
             config: parking_lot::RwLock::new(self.config.read().clone()),
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
@@ -735,6 +739,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
+            auto_extraction: Arc::new(parking_lot::RwLock::new(None)),
             config: parking_lot::RwLock::new(CollectionConfig::default()),
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
