@@ -297,3 +297,70 @@ fn test_retention_matrix_snapshot_output() {
     assert!(json.contains("RK-102"));
     assert!(json.contains("ContractTermination"));
 }
+
+#[test]
+fn test_is_overdue_and_is_completed_within_deadline_exact_boundaries() {
+    // Received on 2026-02-01 -> Base deadline is 2026-03-01
+    let received = CivilDate::new(2026, 2, 1).unwrap();
+    let expected_deadline = CivilDate::new(2026, 3, 1).unwrap();
+
+    // Pending request
+    let pending_req = ErasureRequest::try_new(
+        "REQ-BOUND-1",
+        received,
+        "scope_hash_bound_1",
+        false,
+        None,
+        0,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(pending_req.effective_deadline(), expected_deadline);
+    assert_eq!(pending_req.is_completed_within_deadline(), None);
+
+    // Day before deadline: 2026-02-28 -> not overdue
+    let day_before = CivilDate::new(2026, 2, 28).unwrap();
+    assert!(!pending_req.is_overdue(day_before));
+
+    // On exact deadline: 2026-03-01 -> not overdue
+    let exact_deadline_date = CivilDate::new(2026, 3, 1).unwrap();
+    assert!(!pending_req.is_overdue(exact_deadline_date));
+
+    // Day after deadline: 2026-03-02 -> overdue
+    let day_after = CivilDate::new(2026, 3, 2).unwrap();
+    assert!(pending_req.is_overdue(day_after));
+
+    // Completed exactly on deadline
+    let completed_on_time_req = ErasureRequest::try_new(
+        "REQ-BOUND-2",
+        received,
+        "scope_hash_bound_2",
+        false,
+        None,
+        0,
+        Some(ErasureDecision::Granted),
+        Some(exact_deadline_date),
+    )
+    .unwrap();
+
+    assert_eq!(completed_on_time_req.is_completed_within_deadline(), Some(true));
+    assert!(!completed_on_time_req.is_overdue(day_after)); // Completed on time, so even if current date is day_after, it's not overdue
+
+    // Completed 1 day after deadline
+    let completed_late_req = ErasureRequest::try_new(
+        "REQ-BOUND-3",
+        received,
+        "scope_hash_bound_3",
+        false,
+        None,
+        0,
+        Some(ErasureDecision::Granted),
+        Some(day_after),
+    )
+    .unwrap();
+
+    assert_eq!(completed_late_req.is_completed_within_deadline(), Some(false));
+    assert!(completed_late_req.is_overdue(exact_deadline_date)); // Completed late, so is_overdue is true regardless of current_date
+}
