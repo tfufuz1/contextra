@@ -1,0 +1,42 @@
+# Task-Karte T-2026-9001
+id        = "T-2026-9001"
+title     = "PLAYBOOK.md komprimiert Jules Prozessdokumente"
+crate     = "xtask"
+tier      = 1
+risk      = "none"
+goal      = "Prozessdokumente komprimieren und PLAYBOOK.md als zentrale Handlungsanweisung etablieren"
+non_goals = ["AGENTS.md bearbeiten", "xtask Code ändern", "Gates schwächen"]
+scope     = [
+  ".jules/PLAYBOOK.md",
+  ".jules/PREAMBLE.md",
+  ".jules/SESSION_BOOTSTRAP.md",
+  ".jules/JULES_CONTEXT.md",
+  ".jules/HARNESS_QUICKSTART.md",
+  ".jules/routines/*.md",
+  ".jules/tasks/T-2026-9001.toml"
+]
+forbidden = [
+  "AGENTS.md",
+  ".jules/setup/**",
+  ".jules/tasks/README.md",
+  ".jules/ISSUE_AUTOMATION_POLICY.md",
+  ".jules/jules-api.toml",
+  ".jules/*LOG*.md",
+  "xtask/**",
+  ".github/**"
+]
+invariants = ["Zero Gate Weakening", "Doc Reference Integrity"]
+acceptance = [
+  "cargo xtask check-jules-context-freshness",
+  "cargo xtask check-agents-integrity",
+  "cargo xtask check-doc-references",
+  "cargo xtask check-agents-freshness",
+  "cargo xtask doc-truth",
+  "cargo xtask jules submit"
+]
+evidence_required = ["Grüne Gate-Outputs"]
+
+[budget]
+files = 15
+lines = 300
+iterations = 5
