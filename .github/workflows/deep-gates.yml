@@ -1,8 +1,18 @@
+# Takt: Nightly (02:00 UTC) / workflow_dispatch / workflow_call
+# Zweck: Führt erweiterte Deep Gates (Determinismus, Unsafe Audit, Lock Audit, WAL Replay, Mutants Diff, Fuzz Smoke) aus.
+# Lokaler Befehl: cargo xtask determinism-check && cargo xtask unsafe-audit && cargo xtask lock-audit && cargo xtask wal-replay-verify && cargo xtask mutants-diff && cargo xtask fuzz-smoke
+
 name: Deep Gates Orchestrator
 
 on:
+  schedule:
+    - cron: '0 2 * * *'
   workflow_call:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -23,16 +33,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run determinism-check
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- determinism-check --json --base "$BASE_SHA" --head "$HEAD_SHA" > determinism-check.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Determinism Check Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- determinism-check --base HEAD~1 --head HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-determinism-check
           path: determinism-check.json
+          retention-days: 7
 
   gate-unsafe-audit:
     name: Unsafe Audit Gate
@@ -47,16 +67,26 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run unsafe-audit
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- unsafe-audit --json --miri > unsafe-audit.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Unsafe Audit Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- unsafe-audit --miri" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-unsafe-audit
           path: unsafe-audit.json
+          retention-days: 7
 
   gate-lock-audit:
     name: Lock Audit Gate
@@ -69,16 +99,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run lock-audit
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- lock-audit --json --base "$BASE_SHA" --head "$HEAD_SHA" > lock-audit.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Lock Audit Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- lock-audit --base HEAD~1 --head HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-lock-audit
           path: lock-audit.json
+          retention-days: 7
 
   gate-wal-replay-verify:
     name: WAL Replay Verify Gate
@@ -91,16 +131,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run wal-replay-verify
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- wal-replay-verify --json --base "$BASE_SHA" --head "$HEAD_SHA" > wal-replay-verify.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ WAL Replay Verify Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- wal-replay-verify --base HEAD~1 --head HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-wal-replay-verify
           path: wal-replay-verify.json
+          retention-days: 7
 
   gate-mutants-diff:
     name: Mutants Diff Gate
@@ -114,16 +164,26 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-mutants
       - name: Run mutants-diff
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- mutants-diff --json --base "$BASE_SHA" --head "$HEAD_SHA" > mutants-diff.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Mutants Diff Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- mutants-diff --base HEAD~1 --head HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-mutants-diff
           path: mutants-diff.json
+          retention-days: 7
 
   gate-fuzz-smoke:
     name: Fuzz Smoke Gate
@@ -138,13 +198,23 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --quiet
       - name: Run fuzz-smoke
+        id: run-gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
         run: |
           cargo run --manifest-path xtask/Cargo.toml -- fuzz-smoke --json --base "$BASE_SHA" --head "$HEAD_SHA" > fuzz-smoke.json
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Fuzz Smoke Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --manifest-path xtask/Cargo.toml -- fuzz-smoke --base HEAD~1 --head HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gate-fuzz-smoke
           path: fuzz-smoke.json
+          retention-days: 7

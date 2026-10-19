@@ -1,11 +1,23 @@
+# Takt: Wöchentlich (Sa 23:00 UTC) / workflow_dispatch / pull_request (Pfadfilter) / push on main
+# Zweck: misst Testabdeckung mit cargo-llvm-cov.
+# Lokaler Befehl: cargo llvm-cov --workspace --json --output-path coverage.json && cargo xtask check-coverage-gate
+
 name: Coverage Gate
 on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - 'crates/**'
+      - 'xtask/**'
   schedule:
     # Wöchentlich Samstag 23:00 UTC (Coverage-Trend-Tracking)
     - cron: "0 23 * * 6"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,8 +47,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Run Coverage Gate
-        run: cargo xtask check-coverage-gate
-        # Gate-Schwellwerte: siehe xtask/src/check_coverage_gate.rs::get_threshold_for_crate (einzige maßgebliche Quelle, nicht hier duplizieren)
+        run: cargo run -p xtask -- check-coverage-gate
 
       - name: Upload Coverage to Codecov
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -61,7 +72,7 @@ jobs:
         with:
           name: coverage-report-${{ github.sha }}
           path: target/coverage/
-          retention-days: 14
+          retention-days: 7
 
       - name: Coverage Trend (wöchentlich)
         if: github.event_name == 'schedule'
@@ -70,3 +81,13 @@ jobs:
           TOTAL=$(jq '.data[0].totals.lines.percent' coverage.json)
           echo "{\"date\": \"$DATE\", \"total_line_coverage\": $TOTAL}" >> benchmarks/results/coverage_history.jsonl
           echo "Coverage $DATE: $TOTAL%"
+
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Coverage Gate Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run -p xtask -- check-coverage-gate" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

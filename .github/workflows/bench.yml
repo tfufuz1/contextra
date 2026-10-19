@@ -1,10 +1,19 @@
+# Takt: Wöchentlich (So 02:00 UTC) / workflow_dispatch / pull_request (Pfadfilter) / push on main
+# Zweck: Führt Fixture-Smoke-Tests und Retrieval-Benchmarks aus.
+# Lokaler Befehl: cargo test --locked -p contextra-bench
+
 name: Benchmark Suite & Regression Baseline
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
+    paths:
+      - 'benchmarks/**'
+      - 'crates/contextra-bench/**'
+      - 'crates/contextra-vector/**'
+  schedule:
+    - cron: '0 2 * * 0'
   workflow_dispatch:
     inputs:
       update_baseline:
@@ -12,6 +21,10 @@ on:
         required: false
         type: boolean
         default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,150 +37,68 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@1.89.0
+      - name: Run Full Crate Unit & Integration Test Suite
+        run: cargo test --locked -p contextra-bench
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Dry-Run Benchmark Harness
+        run: cargo bench --locked -p contextra-db -- --test
 
-      - name: Fixture Evaluation & Benchmark Unit Tests
+      - name: Report Failure Summary
+        if: failure()
         run: |
-          # Execute fixture-based evaluation tests and harness verification
-          cargo test --locked -p contextra-bench
-
-      - name: Benchmark Harness Dry-Run Test
-        run: |
-          # Verify benchmark compilation and harness functionality without long running timings
-          CONTEXTRA_SCALE_TIERS=10,50 cargo bench --locked -p contextra-db -- --test
-
-      - name: Run Benchmark Group Baseline (Informative)
-        run: |
-          # Criterion baseline generation for PR artifacts
-          # Note: A future session will add comparison gates against main branch baseline with tolerance bands
-          CONTEXTRA_SCALE_TIERS=100,500 cargo bench --locked -p contextra-db --bench scale_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
-
-      - name: Upload Benchmark Results Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: benchmark-criterion-data
-          path: |
-            target/criterion
-            benches/results/scale_rss.csv
+          echo "### ❌ Fixture-Smoke-Test Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo test --locked -p contextra-bench" >> $GITHUB_STEP_SUMMARY
+          echo "cargo bench --locked -p contextra-db -- --test" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   retrieval-accuracy-bench:
-    name: Retrieval Accuracy Benchmark (contextra-bench)
+    name: Synthetic Retrieval Accuracy & Performance Suite
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: fixture-smoke-test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@1.89.0
+      - name: Execute Synthetic Accuracy & Latency Benchmarks
+        run: cargo run --locked -p contextra-bench --release -- synthetic --output benchmarks/results/synthetic_results.json
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-
-      - name: Cache LongMemEval Dataset
-        id: cache-longmemeval
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: benchmarks/contextra-bench/tests/data/
-          key: longmemeval-dataset-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs') }}
-          restore-keys: |
-            longmemeval-dataset-v1-
-
-      - name: Download LongMemEval & LoCoMo Datasets (if cache miss)
-        if: steps.cache-longmemeval.outputs.cache-hit != 'true'
+      - name: Report Failure Summary
+        if: failure()
         run: |
-          mkdir -p benchmarks/contextra-bench/tests/data/
-          pip install huggingface_hub --quiet
-          python3 -c "
-          from huggingface_hub import hf_hub_download
-          import shutil, os
-          path = hf_hub_download(
-              repo_id='xiaowu0162/longmemeval',
-              filename='longmemeval_s',
-              repo_type='dataset'
-          )
-          shutil.copy(path, 'benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl')
-          print(f'LongMemEval-S downloaded successfully: {os.path.getsize(path)} Bytes')
-          " || echo "⚠️ HuggingFace download failed — fixture fallback active"
+          echo "### ❌ Synthetic Retrieval Accuracy Benchmarks Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run --locked -p contextra-bench --release -- synthetic --output benchmarks/results/synthetic_results.json" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-          python3 -c "
-          from huggingface_hub import hf_hub_download
-          import shutil, os
-          path = hf_hub_download(
-              repo_id='KimmoZZZ/locomo',
-              filename='locomo10.json',
-              repo_type='dataset'
-          )
-          shutil.copy(path, 'benchmarks/contextra-bench/tests/data/locomo_test.json')
-          print(f'LoCoMo downloaded successfully: {os.path.getsize(path)} Bytes')
-          " || echo "⚠️ LoCoMo download failed — fixture fallback active"
-
-      - name: Run LongMemEval Benchmark Execution
-        run: |
-          DATASET="benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl"
-          FIXTURE="benchmarks/contextra-bench/tests/fixtures/long_mem_eval_fixture.json"
-          [ -f "$DATASET" ] && ACTUAL="$DATASET" || ACTUAL="$FIXTURE"
-          echo "Using Dataset: $ACTUAL ($(wc -c < $ACTUAL) Bytes)"
-          cargo run --locked -p contextra-bench --release -- long-mem-eval \
-            --dataset "$ACTUAL" \
-            --output benchmarks/results/long_mem_eval_results.json
-
-      - name: Run LoCoMo Benchmark Execution
-        run: |
-          DATASET="benchmarks/contextra-bench/tests/data/locomo_test.json"
-          FIXTURE="benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json"
-          [ -f "$DATASET" ] && ACTUAL="$DATASET" || ACTUAL="$FIXTURE"
-          echo "Using Dataset: $ACTUAL ($(wc -c < $ACTUAL) Bytes)"
-          cargo run --locked -p contextra-bench --release -- locomo \
-            --dataset "$ACTUAL" \
-            --output benchmarks/results/locomo_results.json
-
-      - name: Run Synthetic Retrieval Accuracy Benchmark Harness
-        run: cargo run --locked -p contextra-bench --release
-
-      - name: Evaluate Benchmark Regression Gate (xtask)
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "Updating baseline on main branch..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json --update
-          else
-            echo "Evaluating regression gate against main baseline..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json
-          fi
-
-      - name: Upload Retrieval Accuracy Benchmark Results
+      - name: Upload Synthetic Benchmark Metrics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: retrieval-accuracy-benchmark-results
-          path: |
-            benchmarks/results/
-            benchmarks/contextra-bench/baseline_metrics.json
-            benchmarks/contextra-bench/baseline_recall.json
+          name: synthetic-benchmark-metrics
+          path: benchmarks/results/synthetic_results.json
+          retention-days: 7
 
   benchmark-regression:
     name: Retrieval Quality Regression Gate (LongMemEval & LoCoMo)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    needs: fixture-smoke-test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@1.89.0
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-
-      - name: Build Benchmark Harness and Comparison Tooling
-        run: cargo build --locked -p contextra-bench --release
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Cache Benchmark Datasets
         id: cache-datasets
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d7715d53d42c # v4
         with:
           path: benchmarks/contextra-bench/tests/data/
           key: benchmark-datasets-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs', 'benchmarks/contextra-bench/src/locomo.rs') }}
@@ -283,6 +214,15 @@ jobs:
           print('baseline_metrics.json erfolgreich aktualisiert.')
           "
 
+      - name: Report Failure Summary
+        if: failure()
+        run: |
+          echo "### ❌ Retrieval Quality Benchmarks Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json --threshold 0.05" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Retrieval Quality Regression Artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -291,3 +231,4 @@ jobs:
           path: |
             benchmarks/results/
             benchmarks/contextra-bench/baseline_metrics.json
+          retention-days: 7
