@@ -3,6 +3,8 @@
 // ZWECK: Property-based tests for contextra-infer-candle components (fingerprinting, GaspValidator, and clients).
 // INVARIANTEN: Property tests must cover arbitrary inputs without panicking or producing illegal confidence/grounding scores.
 
+#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
 use contextra_infer_candle::model_registry::{compute_fingerprint, CandleQuantization};
 use contextra_types::ContextChunk;

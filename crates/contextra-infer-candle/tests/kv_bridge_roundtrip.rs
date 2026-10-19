@@ -1,4 +1,5 @@
 #![cfg(feature = "kv-bridge")]
+#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 //! Verification test for KV-Bridge roundtrip: Export, serialization, encryption, decryption, and bit-identical restoration.
 

@@ -1,3 +1,5 @@
+#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
 //! Benchmark: KV-Cache-Bridge Prefill Savings (§8, §10 Krit. #15, P7).
 //!
 //! Misst: Cache-Miss (voller Prefill) vs. Cache-Hit (entfällt Prefill).
