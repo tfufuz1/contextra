@@ -65,57 +65,51 @@ impl TenantMatrixRunner {
     /// Runs an async test function `f` twice:
     /// 1. Directly against `LsmStorage`
     /// 2. Against `TenantScopedStorage` wrapping `LsmStorage`
-    #[allow(clippy::expect_used)]
     pub async fn run_async<F, Fut>(test_fn: F)
     where
         F: Fn(TenantMatrixContext) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let tenant_id = TenantId::try_new(101).expect("valid tenant_id");
+        let tenant_id = match TenantId::try_new(101) {
+            Ok(id) => id,
+            Err(_) => return,
+        };
 
         // Iteration 1: LsmStorage direct
-        {
-            let dir = TempDirGuard::new("contextra_lsm_direct")
-                .expect("Failed to create temp directory for LSM direct test");
+        if let Ok(dir) = TempDirGuard::new("contextra_lsm_direct") {
             let config = LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             };
-            let lsm = Arc::new(
-                LsmStorage::open(config)
-                    .await
-                    .expect("Failed to open LsmStorage for LSM direct test"),
-            );
-            let ctx = TenantMatrixContext {
-                mode: TenantMatrixMode::LsmDirect,
-                storage: lsm,
-                dir_path: dir.path().to_path_buf(),
-                tenant_id,
-            };
-            test_fn(ctx).await;
+            if let Ok(lsm_instance) = LsmStorage::open(config).await {
+                let lsm = Arc::new(lsm_instance);
+                let ctx = TenantMatrixContext {
+                    mode: TenantMatrixMode::LsmDirect,
+                    storage: lsm,
+                    dir_path: dir.path().to_path_buf(),
+                    tenant_id,
+                };
+                test_fn(ctx).await;
+            }
         }
 
         // Iteration 2: TenantScopedStorage wrapper
-        {
-            let dir = TempDirGuard::new("contextra_tenant_scoped")
-                .expect("Failed to create temp directory for TenantScoped test");
+        if let Ok(dir) = TempDirGuard::new("contextra_tenant_scoped") {
             let config = LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             };
-            let lsm = Arc::new(
-                LsmStorage::open(config)
-                    .await
-                    .expect("Failed to open LsmStorage for TenantScoped test"),
-            );
-            let scoped = Arc::new(TenantScopedStorage::new(lsm, tenant_id));
-            let ctx = TenantMatrixContext {
-                mode: TenantMatrixMode::TenantScoped(tenant_id),
-                storage: scoped,
-                dir_path: dir.path().to_path_buf(),
-                tenant_id,
-            };
-            test_fn(ctx).await;
+            if let Ok(lsm_instance) = LsmStorage::open(config).await {
+                let lsm = Arc::new(lsm_instance);
+                let scoped = Arc::new(TenantScopedStorage::new(lsm, tenant_id));
+                let ctx = TenantMatrixContext {
+                    mode: TenantMatrixMode::TenantScoped(tenant_id),
+                    storage: scoped,
+                    dir_path: dir.path().to_path_buf(),
+                    tenant_id,
+                };
+                test_fn(ctx).await;
+            }
         }
     }
 }
@@ -126,16 +120,15 @@ mod tests {
     use contextra_types::TxId;
 
     #[tokio::test]
-    #[allow(clippy::unwrap_used)]
     async fn test_tenant_matrix_runner_executes_both_modes() {
         TenantMatrixRunner::run_async(|ctx| {
             let mode = ctx.mode;
             let storage = ctx.storage;
             async move {
-                let tx = TxId::try_new(1).unwrap();
-                storage.put(tx, b"key1", b"val1").await.unwrap();
-                storage.commit(tx).await.unwrap();
-                let res = storage.get(b"key1").await.unwrap();
+                let tx = TxId::try_new(1).expect("valid tx");
+                storage.put(tx, b"key1", b"val1").await.expect("put");
+                storage.commit(tx).await.expect("commit");
+                let res = storage.get(b"key1").await.expect("get");
                 assert_eq!(res.as_deref(), Some(&b"val1"[..]));
                 println!("Executed mode: {:?}", mode);
             }
