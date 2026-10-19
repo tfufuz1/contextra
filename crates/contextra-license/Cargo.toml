@@ -14,6 +14,7 @@ ring = "4"
 
 [features]
 default = []
+dev-open-gate = []
 test-support = []
 
 [dependencies]

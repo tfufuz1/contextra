@@ -2,7 +2,7 @@
 // ZWECK: KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding.
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_crypto::CryptoKey;
+use contextra_crypto::{KdfHeader, KdfParams, KeyManager};
 use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -76,14 +76,30 @@ pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
 /// Ausgelagerte Segmentdateien auf Disk werden dadurch mathematisch dauerhaft unlesbar.
 #[derive(Clone)]
 pub struct ShreddableSegmentKey {
-    key_manager: Arc<RwLock<Option<CryptoKey>>>,
+    key_manager: Arc<RwLock<Option<KeyManager>>>,
 }
 
 impl ShreddableSegmentKey {
     /// Erstellt einen neuen shred-fähigen Schlüssel aus Passphrase und Salt.
     #[allow(deprecated)]
     pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self, ContextraError> {
-        let km = CryptoKey::try_new(passphrase, salt)
+        let header = KdfHeader::new(KdfParams::default(), salt.to_vec())
+            .map_err(|e| ContextraError::Crypto(e.to_string()))?;
+        Self::try_new_strict(passphrase, &header)
+    }
+
+    /// Erstellt einen neuen shred-fähigen Schlüssel mit explizitem [`KdfHeader`] (INV-KDF-1 Policy Check).
+    pub fn try_new_strict(passphrase: &str, header: &KdfHeader) -> Result<Self, ContextraError> {
+        let km = KeyManager::try_new_strict(passphrase, header)
+            .map_err(|e| ContextraError::Crypto(e.to_string()))?;
+        Ok(Self {
+            key_manager: Arc::new(RwLock::new(Some(km))),
+        })
+    }
+
+    /// Erstellt einen neuen shred-fähigen Schlüssel mit [`KdfHeader`].
+    pub fn try_new_with_kdf(passphrase: &str, header: &KdfHeader) -> Result<Self, ContextraError> {
+        let km = KeyManager::try_new_with_kdf(passphrase, header)
             .map_err(|e| ContextraError::Crypto(e.to_string()))?;
         Ok(Self {
             key_manager: Arc::new(RwLock::new(Some(km))),
@@ -92,7 +108,7 @@ impl ShreddableSegmentKey {
 
     /// Erstellt einen neuen shred-fähigen Schlüssel mit zufälligem Salt.
     pub fn try_new_random(passphrase: &str) -> Result<Self, ContextraError> {
-        let (km, _) = CryptoKey::try_new_random_salt(passphrase)
+        let (km, _) = KeyManager::try_new_random_salt(passphrase)
             .map_err(|e| ContextraError::Crypto(e.to_string()))?;
         Ok(Self {
             key_manager: Arc::new(RwLock::new(Some(km))),
@@ -241,6 +257,44 @@ impl Drop for KvSegment {
 }
 
 impl KvSegment {
+    /// Validiert eingehende Segment-Bytes vor der Interpretation (Länge, Bounds, Bytecheck).
+    pub fn validate_incoming_bytes(data: &[u8]) -> Result<(), ContextraError> {
+        if data.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "KvSegment data cannot be empty".to_string(),
+            ));
+        }
+        if data.len() > 1024 * 1024 * 1024 {
+            return Err(ContextraError::InvalidInput(
+                "KvSegment data length exceeds maximum 1 GiB bound".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Validiert dieses Segment vor der Speicherung oder Verarbeitung.
+    pub fn validate(&self) -> Result<(), ContextraError> {
+        Self::validate_incoming_bytes(&self.data)?;
+        match &self.content {
+            KvSegmentContent::Raw(_) => Ok(()),
+            #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+            KvSegmentContent::KiviQuantized(block) => {
+                if block.meta.bits_per_value != 2 {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Invalid KIVI bits_per_value: expected 2, got {}",
+                        block.meta.bits_per_value
+                    )));
+                }
+                if !block.meta.scale.is_finite() || !block.meta.zero_point.is_finite() {
+                    return Err(ContextraError::InvalidInput(
+                        "KIVI quantization meta contains non-finite scale or zero_point".to_string(),
+                    ));
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// Erstellt ein neues Klartext-KV-Cache-Segment (Default / Zero-Config, P12-konform).
     pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self {
         let content_bytes = bytes::Bytes::copy_from_slice(&data);

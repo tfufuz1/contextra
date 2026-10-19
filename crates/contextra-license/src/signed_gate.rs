@@ -60,6 +60,83 @@ impl InstallationId {
     }
 }
 
+
+/// Individual verifying key entry in a [`LicenseKeyring`] with key identifier and validity window.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LicenseKeyEntry {
+    /// Unique identifier for this key (e.g. `"key-2026-v1"`).
+    pub key_id: String,
+    /// Ed25519 public verifying key.
+    pub verifying_key: VerifyingKey,
+    /// Optional Unix timestamp (seconds) starting from which this key is valid.
+    pub valid_from_unix: Option<i64>,
+    /// Optional Unix timestamp (seconds) until which this key is valid.
+    pub valid_until_unix: Option<i64>,
+    /// Flag indicating whether this key has been explicitly revoked.
+    pub is_revoked: bool,
+}
+
+/// Managed collection of Ed25519 verifying keys supporting key rotation and revocation.
+#[derive(Debug, Clone, Default)]
+pub struct LicenseKeyring {
+    keys: std::collections::BTreeMap<String, LicenseKeyEntry>,
+}
+
+impl LicenseKeyring {
+    /// Constructs an empty [`LicenseKeyring`].
+    pub fn new() -> Self {
+        Self {
+            keys: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// Adds or updates a key entry in the keyring.
+    pub fn add_key(&mut self, entry: LicenseKeyEntry) {
+        self.keys.insert(entry.key_id.clone(), entry);
+    }
+
+    /// Revokes a key in the keyring by its `key_id`.
+    pub fn revoke_key(&mut self, key_id: &str) {
+        if let Some(entry) = self.keys.get_mut(key_id) {
+            entry.is_revoked = true;
+        }
+    }
+
+    /// Looks up an active verifying key by `key_id` at the given timestamp.
+    ///
+    /// # Errors
+    /// Returns [`LicenseError::InvalidSignature`] if the key is unknown, revoked, or outside its validity window.
+    pub fn resolve_key(&self, key_id: &str, now_unix: i64) -> Result<&VerifyingKey, LicenseError> {
+        let entry = self
+            .keys
+            .get(key_id)
+            .ok_or(LicenseError::InvalidSignature)?;
+
+        if entry.is_revoked {
+            return Err(LicenseError::InvalidSignature);
+        }
+
+        if let Some(from) = entry.valid_from_unix {
+            if now_unix < from {
+                return Err(LicenseError::InvalidSignature);
+            }
+        }
+
+        if let Some(until) = entry.valid_until_unix {
+            if now_unix >= until {
+                return Err(LicenseError::InvalidSignature);
+            }
+        }
+
+        Ok(&entry.verifying_key)
+    }
+
+    /// Returns an iterator over all key entries in the keyring.
+    pub fn keys(&self) -> impl Iterator<Item = &LicenseKeyEntry> {
+        self.keys.values()
+    }
+}
+
 /// Signed activation record binding a feature ring activation to a specific machine/deployment installation hash (§10.2, §15).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedActivation {
@@ -72,6 +149,9 @@ pub struct SignedActivation {
     /// Ed25519 signature over `(ring, installation_id_hash, expires_at_unix)`.
     #[serde(with = "bytes_64")]
     pub signature: [u8; 64],
+    /// Optional key ID identifying the signing key in a [`LicenseKeyring`].
+    #[serde(default)]
+    pub key_id: Option<String>,
 }
 
 impl SignedActivation {
@@ -105,6 +185,7 @@ impl SignedActivation {
             installation_id_hash,
             expires_at_unix,
             signature,
+            key_id: None,
         })
     }
 
@@ -172,6 +253,9 @@ pub struct LicensePayload {
     pub feature_flags: BTreeMap<String, bool>,
     /// Optional 32-byte hash of a local machine or instance installation ID.
     pub installation_id_hash: Option<[u8; 32]>,
+    /// Optional key ID identifying the signing key in a [`LicenseKeyring`].
+    #[serde(default)]
+    pub key_id: Option<String>,
 }
 
 /// Legacy payload schema without `installation_id_hash` for backwards compatibility with bincode 1.x.
@@ -191,6 +275,7 @@ impl From<LegacyLicensePayload> for LicensePayload {
             expires_at: legacy.expires_at,
             feature_flags: legacy.feature_flags,
             installation_id_hash: None,
+            key_id: None,
         }
     }
 }
@@ -207,10 +292,12 @@ pub type IntegrityGate = SignedLicenseGate;
 #[derive(Clone)]
 pub struct SignedLicenseGate {
     verifying_key: Option<VerifyingKey>,
+    keyring: Option<LicenseKeyring>,
     activation: Option<SignedActivation>,
     license_payload: Option<LicensePayload>,
     local_installation_id: Option<[u8; 32]>,
     clock: Arc<dyn Clock>,
+    mode: crate::LicenseGateMode,
 }
 
 impl std::fmt::Debug for SignedLicenseGate {
@@ -227,12 +314,19 @@ impl std::fmt::Debug for SignedLicenseGate {
 impl SignedLicenseGate {
     /// Constructs a [`SignedLicenseGate`] without any active activation record.
     pub fn no_activation() -> Self {
+        Self::no_activation_with_clock(Arc::new(SystemClock::new()))
+    }
+
+    /// Constructs an unactivated [`SignedLicenseGate`] with a custom [`Clock`] port.
+    pub fn no_activation_with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             verifying_key: None,
+            keyring: None,
             activation: None,
             license_payload: None,
             local_installation_id: None,
-            clock: Arc::new(SystemClock::new()),
+            clock,
+            mode: crate::LicenseGateMode::Enforced,
         }
     }
 
@@ -249,11 +343,54 @@ impl SignedLicenseGate {
     ) -> Self {
         Self {
             verifying_key: Some(verifying_key),
+            keyring: None,
             activation: Some(activation),
             license_payload: None,
             local_installation_id: None,
             clock,
+            mode: crate::LicenseGateMode::Enforced,
         }
+    }
+
+    /// Attaches a [`LicenseKeyring`] to this gate for key rotation and revocation lookup.
+    pub fn with_keyring(mut self, keyring: LicenseKeyring) -> Self {
+        self.keyring = Some(keyring);
+        self
+    }
+
+    /// Configures the [`LicenseGateMode`] for this gate instance.
+    pub fn with_mode(mut self, mode: crate::LicenseGateMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// Attaches a custom [`Clock`] port to this gate.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Returns the configured [`LicenseGateMode`].
+    pub fn mode(&self) -> crate::LicenseGateMode {
+        self.mode
+    }
+
+    /// Sets the [`SignedActivation`] for this gate.
+    pub fn with_activation(mut self, activation: SignedActivation) -> Self {
+        self.activation = Some(activation);
+        self
+    }
+
+    /// Sets the [`LicensePayload`] for this gate.
+    pub fn with_payload(mut self, payload: LicensePayload) -> Self {
+        self.license_payload = Some(payload);
+        self
+    }
+
+    /// Sets the public Ed25519 [`VerifyingKey`] for this gate.
+    pub fn with_verifying_key(mut self, verifying_key: VerifyingKey) -> Self {
+        self.verifying_key = Some(verifying_key);
+        self
     }
 
     /// Constructs a [`SignedLicenseGate`] by verifying an Ed25519 signature over `payload_bytes`
@@ -296,20 +433,24 @@ impl SignedLicenseGate {
         if let Ok(license_payload) = bincode_opts.deserialize::<LicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
+                keyring: None,
                 activation: None,
                 license_payload: Some(license_payload),
                 local_installation_id: None,
                 clock,
+                mode: crate::LicenseGateMode::Enforced,
             });
         }
 
         if let Ok(legacy) = bincode_opts.deserialize::<LegacyLicensePayload>(payload_bytes) {
             return Ok(Self {
                 verifying_key: Some(verifying_key),
+                keyring: None,
                 activation: None,
                 license_payload: Some(legacy.into()),
                 local_installation_id: None,
                 clock,
+                mode: crate::LicenseGateMode::Enforced,
             });
         }
 
@@ -357,6 +498,7 @@ impl SignedLicenseGate {
             expires_at,
             feature_flags: BTreeMap::new(),
             installation_id_hash: None,
+            key_id: None,
         };
 
         let payload_bytes = bincode::serialize(&payload)?;
@@ -405,19 +547,49 @@ impl LicenseGate for SignedLicenseGate {
             }
         }
 
-        // (4) Step 4: Invalid signature check
+        // (4) Step 4: Keyring / Key Resolution and Signature Verification
+        let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
+
+        let active_key_id = self
+            .activation
+            .as_ref()
+            .and_then(|a| a.key_id.as_deref())
+            .or_else(|| self.license_payload.as_ref().and_then(|p| p.key_id.as_deref()));
+
+        let resolved_key: Option<&VerifyingKey> = if let Some(key_id) = active_key_id {
+            if let Some(ref keyring) = self.keyring {
+                Some(keyring.resolve_key(key_id, now_secs)?)
+            } else if let Some(ref vk) = self.verifying_key {
+                Some(vk)
+            } else {
+                return Err(LicenseError::InvalidSignature);
+            }
+        } else if let Some(ref vk) = self.verifying_key {
+            Some(vk)
+        } else if let Some(ref keyring) = self.keyring {
+            keyring
+                .resolve_key("default", now_secs)
+                .ok()
+                .or_else(|| {
+                    keyring
+                        .keys()
+                        .find_map(|k| keyring.resolve_key(&k.key_id, now_secs).ok())
+                })
+        } else {
+            None
+        };
+
         if let Some(ref act) = self.activation {
-            let sig_valid = match &self.verifying_key {
+            let sig_valid = match resolved_key {
                 Some(vk) => act.verify_signature(vk),
                 None => false,
             };
             if !sig_valid {
                 return Err(LicenseError::InvalidSignature);
             }
-        } else if self.license_payload.is_some() && self.verifying_key.is_none() {
+        } else if self.license_payload.is_some() && resolved_key.is_none() {
             return Err(LicenseError::InvalidSignature);
         }
-        // Note: For license_payload, signature verification was performed during `from_signed_payload_with_clock`.
 
         // (5) Step 5: Expiration check using clock port (P28)
         let expires_at = if let Some(ref act) = self.activation {
@@ -428,7 +600,6 @@ impl LicenseGate for SignedLicenseGate {
             i64::MAX
         };
 
-        let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
         if now_secs >= expires_at {
             return Err(LicenseError::Expired(expires_at));
         }

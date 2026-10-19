@@ -56,14 +56,14 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
         "verify_head_signature MUST reject signature with wrong verifying key"
     );
 
-    // 3. create_v3_with_audit_position in DeletionProof
+    // 3. create_v3_with_audit_position in DeletionProof (symbol check & ADR-13 policy violation check)
     let tenant_id = TenantId::try_new(1).expect("valid tenant_id");
     let scope = DeletionScope::Document { doc_id, tenant_id };
     let cleanup_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
         .expect("valid cleanup proof");
     let audit_position = Some(head_sig.chain_index);
     let durability = DurabilityProof::new(tx_id.0);
-    let proof = DeletionProof::create_v3_with_audit_position(
+    let proof_res = DeletionProof::create_v3_with_audit_position(
         scope,
         vec![b"key_1".to_vec(), b"key_2".to_vec()],
         tx_id,
@@ -74,12 +74,8 @@ fn test_j25_closure_all_9_symbols_verification() -> Result<(), Box<dyn std::erro
         &[],
         Some(&durability),
         keypair.signing_key(),
-    )?;
-
-    assert_eq!(proof.signature_version, 3);
-    assert_eq!(proof.deleted_after_tx, TxId(durability.confirmed_seq_no));
-    assert_eq!(proof.audit_chain_position, audit_position);
-    assert!(proof.verify(&keypair.verifying_key)?);
+    );
+    assert!(matches!(proof_res, Err(contextra_types::ContextraError::PolicyViolation(_))));
 
     // 4. verify_wal_delete_receipt in DeletionProof
     let integrity_key = b"integrity_key_32_bytes_long_!!";
