@@ -1,0 +1,42 @@
+# Task-Karte: PR-Gate-Konsolidierung (ADR-N31)
+id        = "T-2026-9005"
+title     = "PR-Gate-Konsolidierung (ADR-N31)"
+crate     = "workspace"
+tier      = 2
+risk      = "none"
+goal      = "Konsolidierung aller PR-Workflows in genau ein pr-gate.yml mit parallelen Jobs und Gate-Aggregator, Reduzierung der Required Checks auf maximal 6 ohne Gate-Schwächung."
+non_goals = ["Schwächung von Qualitäts-Gates", "Änderung von Quellcode ausserhalb des CI-Scopes", "Aufhebung von Review-Regeln"]
+scope     = [
+  ".github/workflows/merge-gate.yml",
+  ".github/workflows/context-gates.yml",
+  ".github/workflows/rust-ci.yml",
+  ".github/workflows/verdict.yml",
+  ".github/workflows/deny.yml",
+  ".github/workflows/unwrap-gate.yml",
+  ".github/workflows/unwrap-baseline-check.yml",
+  ".github/workflows/veto-deadline-gate.yml",
+  ".github/workflows/commit-integrity-guard.yml",
+  ".github/workflows/shell-commit-gate.yml",
+  ".github/workflows/audit-integrity.yml",
+  ".github/workflows/proof-correctness.yml",
+  ".github/workflows/pr-gate.yml",
+  ".github/rulesets/protect-main.json",
+  ".github/rulesets/protect-main.solo.json",
+  ".jules/tasks/T-2026-9005.toml"
+]
+forbidden = ["crates/**", "xtask/**", "governance/**", "capabilities.toml", "AGENTS.md"]
+invariants = ["ADR-N31", "Zero Gate Weakening", "Exact Job-Context Alignment"]
+acceptance = [
+  "cargo xtask check-workflow-commands",
+  "cargo xtask check-action-pinning",
+  "cargo xtask gates-catalog-sync",
+  "cargo xtask registry-check",
+  "cargo xtask gate-weakening --base origin/main",
+  "cargo xtask protected-paths"
+]
+evidence_required = ["Mapping-Tabelle im PR-Body", "YAML-Validierung aller geaenderten Workflows"]
+
+[budget]
+files = 16
+lines = 1500
+iterations = 10

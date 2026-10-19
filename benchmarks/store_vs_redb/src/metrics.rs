@@ -50,7 +50,7 @@ impl BenchmarkRecorder {
     pub fn new() -> Self {
         // Record latency in nanoseconds up to 10 minutes (600_000_000_000 ns) with 3 sig figs
         let histogram = Histogram::<u64>::new_with_bounds(1, 600_000_000_000, 3)
-            .unwrap_or_else(|_| Histogram::<u64>::new(3).unwrap());
+            .unwrap_or_else(|_| Histogram::<u64>::new(3).unwrap_or_default());
         Self { histogram }
     }
 

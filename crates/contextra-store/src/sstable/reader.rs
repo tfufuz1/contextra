@@ -751,11 +751,15 @@ impl SstableReader {
         .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
         .map_err(|e| ContextraError::Storage(format!("Block read failed: {}", e)))?;
 
-        let block_data = if enc_version == 1 && key_id.is_some() {
-            let kr = scope_keyring.as_ref().ok_or_else(|| {
-                ContextraError::Crypto("ScopeKeyring required for v5 encrypted SSTable".into())
-            })?;
-            let kid = key_id.unwrap();
+        let block_data = if enc_version == 1 {
+            let (kr, kid) = match (scope_keyring.as_ref(), key_id) {
+                (Some(kr), Some(kid)) => (kr, kid),
+                _ => {
+                    return Err(ContextraError::Crypto(
+                        "ScopeKeyring required for v5 encrypted SSTable".into(),
+                    ));
+                }
+            };
             let dek_handle = kr.dek(kid).map_err(|e| match e {
                 contextra_crypto::CryptoError::KeyRevoked(msg) => ContextraError::KeyDestroyed(msg),
                 other => ContextraError::Crypto(other.to_string()),
@@ -1151,5 +1155,36 @@ impl SstableReader {
         }
 
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_read_block_enc_version_without_keyring_errors() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), b"01234567890123456789").unwrap();
+        let file = Arc::new(std::fs::File::open(temp_file.path()).unwrap());
+
+        let res = SstableReader::read_block_static(
+            file,
+            0,
+            20,
+            &None,
+            &None,
+            None,
+            1,
+            true,
+            temp_file.path(),
+        )
+        .await;
+
+        let err = res.unwrap_err();
+        assert!(
+            err.to_string().contains("ScopeKeyring required for v5 encrypted SSTable"),
+            "Expected ScopeKeyring error, got: {err}"
+        );
     }
 }

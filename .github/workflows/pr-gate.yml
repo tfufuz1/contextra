@@ -1,0 +1,400 @@
+name: PR Gate (Consolidated)
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt-clippy-check:
+    name: Format, Clippy & Compile Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Check Duplicate Symbols (Fast Pre-Build)
+        run: cargo run -p xtask -- check-duplicate-symbols
+
+      - name: Lint Unsafe Slice Bounds (SIMD OOB)
+        run: cargo run -p xtask -- lint-unsafe-slices
+
+      - name: Security Check — No sh -c in dispatch.rs
+        run: |
+          if grep -rn 'Command::new("sh")' crates/contextra-router/src/dispatch.rs; then
+            echo "❌ SECURITY VIOLATION: sh -c in dispatch.rs gefunden!"
+            exit 1
+          fi
+          echo "✅ check-dispatch-no-sh-c: Kein sh -c in dispatch.rs"
+
+      - name: Workspace Compile Check
+        run: cargo xtask check-compile
+
+      - name: Format Check (rustfmt)
+        run: |
+          cargo fmt --all -- --check || (echo "❌ Format Check fehlgeschlagen! Lokal beheben mit: cargo fmt --all" && exit 1)
+
+      - name: Workspace Clippy (-D warnings)
+        run: cargo clippy --locked --all-targets --workspace -- -D warnings
+
+      - name: Clippy Check (contextra-py)
+        run: cargo clippy --manifest-path crates/contextra-py/Cargo.toml --all-targets -- -D warnings
+
+      - name: Clippy Check (xtask)
+        run: cargo clippy --manifest-path xtask/Cargo.toml --all-targets --locked -- -D warnings
+
+  nextest:
+    name: Test Suite (cargo-nextest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@45fceba0fc176f41d2aee1ca9d6598ba628eea62 # nextest
+
+      - name: Run Nextest Workspace Suite
+        run: cargo nextest run --locked --workspace --retries 0 --no-fail-fast
+
+      - name: Run contextra-durable-fs Tests
+        run: cargo test --manifest-path crates/contextra-durable-fs/Cargo.toml
+
+      - name: Run contextra-py Tests
+        run: cargo test --manifest-path crates/contextra-py/Cargo.toml --quiet
+
+      - name: Run xtask Unit Tests
+        run: cargo test --manifest-path xtask/Cargo.toml --locked
+
+      - name: Run Erasure & Deletion Test Suites
+        run: |
+          cargo test -p contextra-store --test 'erasure*' --test 'purge*' --test wal_scope_purge
+          cargo test -p contextra-engine --test 'deletion*' --test keyspace_conformance --test delete_concurrency
+          cargo test -p contextra-crypto --test 'deletion*' --test 'proof_binding*'
+
+      - name: Run HyperEdge Schema Merge Test
+        run: cargo test -p contextra-graph -- hyperedge
+
+      - name: Run Workspace Doc Tests
+        run: cargo test --doc --locked --workspace
+
+  proof-tests:
+    name: Correctness Proof Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@4314395b773db6ec53370cf7e57cc6bfefb6ae8f # cargo-llvm-cov
+
+      - name: L1 — TOCTOU put_if_absent (S1-01)
+        run: cargo test -p contextra-store --test toctou_put_if_absent -- --nocapture
+
+      - name: L1 — NaN Validation Policy (S1-11)
+        run: cargo test -p contextra-vector --test nan_validation_policy -- --nocapture
+
+      - name: L1 — Search Result Bound (S1-02)
+        run: cargo test -p contextra-db --test search_result_bound -- --nocapture
+
+      - name: L1 — Manifest Corruption (S1-03)
+        run: cargo test -p contextra-store --test manifest_corruption -- --nocapture
+
+      - name: L1 — BM25 Tombstone Read-Your-Writes (S1-04)
+        run: cargo test -p contextra-text --test tombstone_read_your_writes -- --nocapture
+
+      - name: L1 — source_doc_ids Populated (S1-10)
+        run: cargo test -p contextra-graph --test source_doc_ids_populated -- --nocapture
+
+      - name: L1 — WAL Truncate Ordering (S1-05)
+        run: cargo test -p contextra-store --test wal_truncate_ordering -- --nocapture
+
+      - name: L1 — HNSW deleted_nodes Lock Contention (S1-11)
+        run: cargo test -p contextra-vector --test deleted_nodes_lock_contention -- --nocapture
+
+      - name: L0 — Static Audit Lints (S3-01)
+        run: |
+          cargo xtask check-max-results-unbound
+          cargo xtask check-toctou-defaults
+          cargo xtask check-nan-hot-loop
+          cargo xtask check-result-dropped-io
+
+      - name: Coverage Gate Check
+        run: |
+          cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
+          cargo xtask check-coverage-gate coverage.json
+
+  deny:
+    name: Dependency Policy Gate (cargo deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check dependency policy (deny.toml)
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          command: check advisories bans licenses sources
+
+  governance-gates:
+    name: Governance & Integrity Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Execute Required JSON Gates
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || 'HEAD' }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask protected-paths --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/protected-paths.json || true
+          cargo xtask gate-weakening --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/gate-weakening.json || true
+          cargo xtask ratchet --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/ratchet.json || true
+          cargo xtask doc-truth --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/doc-truth.json || true
+          cargo xtask registry-check --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/registry-check.json || true
+          cargo xtask scope-guard --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/scope-guard.json || true
+          cargo xtask diff-budget --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/diff-budget.json || true
+          cargo xtask claims-in-pr --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/claims-in-pr.json || true
+          cargo xtask test-integrity --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/test-integrity.json || true
+          cargo xtask task-card --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/task-card.json || true
+          cargo xtask ledger --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/ledger.json || true
+          cargo xtask can-merge --json --base "$BASE_SHA" --head "$HEAD_SHA" > gate-results/can-merge.json || true
+
+      - name: Upload Gate Results Artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-results
+          path: gate-results/*.json
+
+      - name: Execute Integrity & Governance Checks
+        env:
+          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+        run: |
+          cargo xtask check-workflow-commands
+          cargo xtask check-fbs-drift
+          cargo xtask check-marker-drift
+          cargo xtask check-duplicate-symbols-cross-file
+          cargo xtask check-commit-messages
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            cargo run -p xtask -- check-commit-diff-integrity --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+          fi
+          cargo xtask check-ring-layering --strict
+          cargo xtask check-unsafe-islands
+          cargo xtask check-ffi-panic-boundary
+          cargo xtask check-audit-verdict-independence
+          cargo xtask check-dag
+          cargo xtask check-agents-integrity
+          cargo xtask check-module-reachability
+          cargo xtask check-phantom-files
+          cargo xtask validate-tags
+          cargo xtask check-review-coverage
+          cargo xtask check-consistency
+          cargo xtask check-placeholder-refs
+          cargo xtask check-adr-deadlines
+          cargo xtask check-doc-references
+          cargo xtask shell-commit-audit --fail-on-count=0
+
+      - name: Production Unwrap Baseline Counter Check
+        run: |
+          OUTPUT=$(cargo run -p xtask -- panic-inventory --exclude-tests)
+          echo "$OUTPUT"
+          COUNT=$(echo "$OUTPUT" | grep -oP '\d+(?= panic entries found)')
+          echo "Production unwrap/expect count: $COUNT"
+          BASELINE=$(cat .github/unwrap_baseline.txt 2>/dev/null || echo 99999)
+          echo "Current baseline: $BASELINE"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Production unwrap count increased from $BASELINE to $COUNT"
+            exit 1
+          fi
+
+  verdict-check:
+    name: Verdict Verdict Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [governance-gates]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Download Gate Results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: gate-results
+          path: gate-results
+
+      - name: Evaluate Verdict (Must Return 0)
+        run: cargo xtask verdict --results-dir gate-results --required governance/verdict-required.toml
+
+  verdict-comment:
+    name: Verdict Sticky Comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [governance-gates, verdict-check]
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Download Gate Results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: gate-results
+          path: gate-results
+
+      - name: Run Verdict Engine & Update PR Comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERDICT_OUT=$(cargo xtask verdict --results-dir gate-results --required governance/verdict-required.toml 2>&1 || true)
+          echo "$VERDICT_OUT"
+
+          COMMENT_BODY="<!-- contextra-verdict -->
+          ## 🛡️ Contextra Merge Verdict Summary
+
+          \`\`\`text
+          $VERDICT_OUT
+          \`\`\`
+          "
+
+          EXISTING_COMMENT_ID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --jq '.[] | select(.body | contains("<!-- contextra-verdict -->")) | .id' | head -n 1 || true)
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            echo "Updating existing verdict comment ID: $EXISTING_COMMENT_ID"
+            gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING_COMMENT_ID" -f body="$COMMENT_BODY" >/dev/null
+          else
+            echo "Creating new verdict comment on PR #$PR_NUMBER"
+            gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY" >/dev/null
+          fi
+
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - fmt-clippy-check
+      - nextest
+      - proof-tests
+      - deny
+      - governance-gates
+      - verdict-check
+      - verdict-comment
+    if: always()
+    steps:
+      - name: Evaluate Aggregated Status
+        env:
+          FMT_STATUS: ${{ needs.fmt-clippy-check.result }}
+          TEST_STATUS: ${{ needs.nextest.result }}
+          PROOF_STATUS: ${{ needs.proof-tests.result }}
+          DENY_STATUS: ${{ needs.deny.result }}
+          GOV_STATUS: ${{ needs.governance-gates.result }}
+          VERDICT_STATUS: ${{ needs.verdict-check.result }}
+        run: |
+          echo "=== Aggregator Gate Status Evaluation ==="
+          echo "fmt-clippy-check : $FMT_STATUS"
+          echo "nextest          : $TEST_STATUS"
+          echo "proof-tests      : $PROOF_STATUS"
+          echo "deny             : $DENY_STATUS"
+          echo "governance-gates : $GOV_STATUS"
+          echo "verdict-check    : $VERDICT_STATUS"
+
+          if [ "$FMT_STATUS" != "success" ] || \
+             [ "$TEST_STATUS" != "success" ] || \
+             [ "$PROOF_STATUS" != "success" ] || \
+             [ "$DENY_STATUS" != "success" ] || \
+             [ "$GOV_STATUS" != "success" ] || \
+             [ "$VERDICT_STATUS" != "success" ]; then
+            echo "❌ AGGREGATOR GATE FAILED: Mindestens ein erforderlicher PR-Gate-Job ist fehlgeschlagen."
+            exit 1
+          fi
+
+          echo "🟢 AGGREGATOR GATE PASSED: Alle erforderlichen PR-Gate-Jobs erfolgreich bestanden."

@@ -36,22 +36,7 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "Compile Check (cargo check)" },
-          { "context": "Format Check" },
-          { "context": "Clippy (-D warnings)" },
-          { "context": "Test Suite (cargo-nextest)" },
-          { "context": "verdict" },
-          { "context": "context-gates" },
-          { "context": "Compile & Security Check Gate" },
-          { "context": "Clippy Check (contextra-py & xtask)" },
-          { "context": "Fast Unit Tests (contextra-py & xtask)" },
-          { "context": "Ring & Safety Checks" },
-          { "context": "Check Duplicate Symbols Cross File Gate" },
-          { "context": "FlatBuffers Schema Drift Gate" },
-          { "context": "Capability Marker Drift Gate" },
-          { "context": "Dependency Policy Gate (cargo deny)" },
-          { "context": "Phantom Commit Protection Gate" },
-          { "context": "HyperEdge Schema Merge Gate" }
+          { "context": "gate" }
         ]
       }
     }
