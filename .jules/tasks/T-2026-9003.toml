@@ -1,0 +1,44 @@
+# Task-Karte T-2026-9003
+id        = "T-2026-9003"
+title     = "Docs-Inventur und Milestone-Vorschlag 2026-10"
+crate     = "docs"
+tier      = 1
+risk      = "none"
+goal      = "Dokumentationsinventur erstellen, Spezifikationsfassungen bewerten, Archivierungs-Reihenfolge und Milestone-Vorschlag ableiten"
+non_goals = [
+  "Keine bestehenden Dateien in docs/ ausser docs/reports/docs-inventory-2026-10.md veraendern",
+  "Keine Gates, Baselines oder Quellcode-Dateien modifizieren"
+]
+scope     = [
+  "docs/reports/docs-inventory-2026-10.md",
+  ".jules/tasks/T-2026-9003.toml"
+]
+forbidden = [
+  "crates/**",
+  "xtask/**",
+  ".github/**",
+  "capabilities.toml",
+  "AGENTS.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "docs/spec/**",
+  "docs/decisions/**"
+]
+invariants = [
+  "Dokumentationsinventur und Milestone-Analyse ohne Code-Eingriffe",
+  "Strict Scope Control (genau 2 erlaubte Dateien in git diff)"
+]
+acceptance = [
+  "git diff --name-only origin/main...HEAD listet genau die zwei erlaubten Dateien",
+  "cargo xtask jules submit schliesst erfolgreich ab"
+]
+evidence_required = [
+  "docs/reports/docs-inventory-2026-10.md",
+  ".jules/tasks/T-2026-9003.toml"
+]
+
+[budget]
+files = 2
+lines = 1200
+iterations = 5
