@@ -106,7 +106,24 @@ impl RouterEngine {
     }
 
     /// Dynamically updates configured SLM profiles at runtime (Hot-Reload).
+    #[deprecated(
+        since = "0.1.0",
+        note = "Nutze try_update_profiles() für kaskadierende Validierung vor dem Hot-Reload"
+    )]
     pub fn update_profiles(&self, new_profiles: Vec<SlmProfile>) {
+        let _ = self.try_update_profiles(new_profiles);
+    }
+
+    /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
+    pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
+        for p in &new_profiles {
+            p.validate()?;
+        }
+        self.update_profiles_internal(new_profiles);
+        Ok(())
+    }
+
+    pub(crate) fn update_profiles_internal(&self, new_profiles: Vec<SlmProfile>) {
         let current = self.state.load_full();
         let mut old_cal = current.calibration.clone();
         let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
@@ -136,15 +153,6 @@ impl RouterEngine {
         };
 
         self.state.store(Arc::new(new_state));
-    }
-
-    /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
-    pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
-        for p in &new_profiles {
-            p.validate()?;
-        }
-        self.update_profiles(new_profiles);
-        Ok(())
     }
 
     /// Returns a copy of the active SLM profiles.

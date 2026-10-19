@@ -8,7 +8,7 @@
 //! Core routing engine for matching hybrid search context to SLM profiles.
 
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
-use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
+use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome, RoutingTicket};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
 use contextra_ports::{
@@ -153,6 +153,60 @@ pub struct RouterState {
 ///
 /// Type-Alias for Backward-Compatibility.
 pub type DefaultRouterEngine = RouterEngine;
+
+/// Diagnostic and administrative view for `RouterEngine`.
+/// Bundles read-only status methods and reset operations.
+#[derive(Clone, Copy)]
+pub struct RouterAdminView<'a> {
+    engine: &'a RouterEngine,
+}
+
+impl<'a> RouterAdminView<'a> {
+    /// Creates a new administrative view for the given `RouterEngine`.
+    pub fn new(engine: &'a RouterEngine) -> Self {
+        Self { engine }
+    }
+
+    /// Returns calibration statistics for all configured profiles.
+    pub fn calibration_stats(&self) -> HashMap<String, ProfileCalibrationState> {
+        self.engine.calibration_stats()
+    }
+
+    /// Resets calibration statistics for a specific profile.
+    pub fn reset_calibration(&self, profile_name: &str) {
+        self.engine.reset_calibration(profile_name);
+    }
+
+    /// Resets calibration statistics for all profiles.
+    pub fn reset_all_calibration(&self) {
+        self.engine.reset_all_calibration();
+    }
+
+    /// Sets the baseline for a profile's Lyapunov drift watcher.
+    pub fn set_lyapunov_baseline(&self, profile_name: &str, baseline: &[f32]) -> bool {
+        self.engine.set_lyapunov_baseline(profile_name, baseline)
+    }
+
+    /// Returns the current Lyapunov drift status for a profile.
+    pub fn drift_status(&self, profile_name: &str) -> Option<LyapunovResult> {
+        self.engine.drift_status(profile_name)
+    }
+
+    /// Returns the overall Lyapunov drift status summary across active profiles.
+    pub fn overall_drift_status(&self) -> String {
+        self.engine.overall_drift_status()
+    }
+
+    /// Returns the number of in-flight (pending) decisions.
+    pub fn pending_decision_count(&self) -> usize {
+        self.engine.pending_decision_count()
+    }
+
+    /// Evicts stale pending decisions exceeding `PENDING_DECISION_TTL`.
+    pub fn evict_stale_decisions(&self) {
+        self.engine.evict_stale_decisions();
+    }
+}
 
 pub struct RouterEngine {
     pub(crate) search_provider: Arc<dyn HybridSearchProvider>,
@@ -322,5 +376,12 @@ pub(crate) fn select_profile_from_chunks(
 impl LocalDriftStatusProvider for RouterEngine {
     fn overall_drift_status(&self) -> String {
         self.overall_drift_status()
+    }
+}
+
+impl RouterEngine {
+    /// Returns an administrative view providing diagnostic and management access.
+    pub fn admin(&self) -> RouterAdminView<'_> {
+        RouterAdminView::new(self)
     }
 }
