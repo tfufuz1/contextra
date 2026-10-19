@@ -8,6 +8,7 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
+autotests = false
 
 [package.metadata.contextra]
 ring = "0"
@@ -23,6 +24,41 @@ thiserror.workspace = true
 
 [features]
 dibud = []
+
+[[test]]
+name = "calibration_deep_tests"
+
+[[test]]
+name = "calibration_migration_snapshot_test"
+
+[[test]]
+name = "calibration_stress_and_fault_tests"
+
+[[test]]
+name = "dibud_equivalence"
+required-features = ["dibud"]
+
+[[test]]
+name = "dibud_requires_streaming_channels"
+required-features = ["dibud"]
+
+[[test]]
+name = "global_fusion_community_aware"
+
+[[test]]
+name = "global_shadow_mode_discrepancy"
+
+[[test]]
+name = "isotonic_mutation_hardening_test"
+
+[[test]]
+name = "rank_tests"
+
+[[test]]
+name = "rrf_reference"
+
+[[test]]
+name = "score_normalized_fallback"
 
 [dev-dependencies]
 contextra-adapt.workspace = true
