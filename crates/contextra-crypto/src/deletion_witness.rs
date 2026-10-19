@@ -157,8 +157,12 @@ pub struct LayerWitness {
 impl LayerWitness {
     /// Erzeugt einen neuen `LayerWitness` unter Verwendung eines autorisierten [`WitnessIssuerToken`].
     ///
+    /// Erfordert ein gültiges Issuer-Token, das nur innerhalb des Crates konstruierbar ist,
+    /// um unbefugtes Ausstellen von Löschbelegen zu verhindern.
+    ///
     /// # Errors
-    /// Returns [`ContextraError::InvalidInput`] if invariants fail.
+    /// Returns [`ContextraError::InvalidInput`] if invariants fail (z. B. `scanned_at_tx < as_of_tx`
+    /// oder Assurance-Unstimmigkeiten).
     pub fn issue_sealed(_token: &WitnessIssuerToken, args: WitIssueArgs) -> Result<Self> {
         Self::issue(args)
     }
@@ -712,5 +716,40 @@ mod tests {
     fn test_witness_issuer_token_new() {
         let token = WitnessIssuerToken::new();
         assert_eq!(token, WitnessIssuerToken::new());
+    }
+
+    #[test]
+    fn test_layer_witness_issue_sealed_validation() {
+        let token = WitnessIssuerToken::new();
+        let valid_args = WitIssueArgs {
+            layer: DeletionLayer::LsmMemtable,
+            scope_hash: [1u8; 32],
+            scanned_at_tx: TxId(10),
+            as_of_tx: TxId(5),
+            assurance: WitAssurance::S1,
+            claim: WitClaimText::S1,
+            footprint_hash: [2u8; 32],
+            scope_write_seq: 1,
+            scanner_name: "test_scanner",
+            scanner_version: 1,
+            store_generation: WitStoreGeneration(1),
+            layer_evidence: WitLayerEvidence::Memtable {
+                memtables_scanned: 1,
+                entries_found: 1,
+                tombstones_found: 1,
+            },
+            key_identifiers_claimed: false,
+        };
+
+        // Positive path
+        let witness = LayerWitness::issue_sealed(&token, valid_args.clone());
+        assert!(witness.is_ok());
+
+        // Negative path: scanned_at_tx < as_of_tx MUST fail
+        let mut invalid_args = valid_args;
+        invalid_args.scanned_at_tx = TxId(2);
+        invalid_args.as_of_tx = TxId(5);
+        let res_invalid = LayerWitness::issue_sealed(&token, invalid_args);
+        assert!(matches!(res_invalid, Err(ContextraError::InvalidInput(_))));
     }
 }

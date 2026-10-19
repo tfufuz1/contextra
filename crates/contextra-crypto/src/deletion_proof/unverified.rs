@@ -22,10 +22,10 @@ impl UnverifiedProof {
     /// Returns a reference to the inner raw `DeletionProof` structure without verifying its signature.
     ///
     /// # Security Warning
-    /// Using fields from an unverified proof can lead to false claims or spoofing attacks.
-    /// Always verify the proof signature via [`.verify()`][UnverifiedProof::verify] before trusting
-    /// its contents.
-    pub fn raw_unverified(&self) -> &DeletionProof {
+    /// Restricted to `pub(crate)` to prevent external production code from bypassing cryptographic
+    /// verification and using unverified proofs as valid deletion assertions. Always verify the
+    /// proof signature via [`.verify()`][UnverifiedProof::verify] before trusting its contents.
+    pub(crate) fn raw_unverified(&self) -> &DeletionProof {
         &self.0
     }
 
@@ -64,5 +64,44 @@ impl UnverifiedProof {
 impl From<DeletionProof> for UnverifiedProof {
     fn from(proof: DeletionProof) -> Self {
         UnverifiedProof::new(proof)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deletion_proof::keys::DeletionProofKeyPair;
+    use contextra_types::{DocId, TenantId, TxId};
+
+    #[test]
+    fn test_unverified_proof_raw_unverified_access() {
+        let keypair = DeletionProofKeyPair::generate();
+        let wrong_keypair = DeletionProofKeyPair::generate();
+
+        let raw_proof = DeletionProof {
+            signature_version: 3,
+            scope: crate::DeletionScope::Document {
+                doc_id: DocId(100),
+                tenant_id: TenantId::SYSTEM,
+            },
+            deleted_keys_hash: [0xAA; 32],
+            deleted_after_tx: TxId(1),
+            timestamp: 1700000000,
+            signature: vec![],
+            covered_layers: vec![],
+            uncovered_layers: vec![],
+            excluded_scopes: vec![],
+            graph_repair: vec![],
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+
+        let unverified = UnverifiedProof::new(raw_proof.clone());
+        assert_eq!(unverified.raw_unverified(), &raw_proof);
+
+        // Verification with wrong key fails (negative path)
+        let failed = unverified.verify_external(wrong_keypair.verifying_key());
+        assert!(matches!(failed, Err(CryptoError::InvalidProofSignature)));
     }
 }
