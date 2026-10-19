@@ -1,0 +1,33 @@
+name: Labels Sync
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Sync labels from labels.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -c '
+          import yaml, subprocess
+
+          with open(".github/labels.yml") as f:
+              labels = yaml.safe_load(f)
+
+          for item in labels:
+              name = item["name"]
+              color = item.get("color", "FFFFFF")
+              desc = item.get("description", "")
+              cmd = ["gh", "label", "create", name, "--color", color, "--description", desc, "--force"]
+              print(f"Syncing label: {name}")
+              subprocess.run(cmd, check=True)
+          '

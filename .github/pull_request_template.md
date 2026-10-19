@@ -1,57 +1,23 @@
 Task-Card: <id>
-
-## Pull Request Checkliste
-
-### Code-Dimension (CI, Pflicht)
-- [ ] `cargo test --workspace` grün
-- [ ] `just dag-check` / `cargo xtask check-dag` grün (P1)
-- [ ] `cargo clippy --workspace -- -D warnings` grün
-- [ ] Kein neues `unsafe` ohne `// SAFETY:` (P2)
-- [ ] Kein neues `let _ =` auf I/O (P3)
-
-### Architektur-Dimension
-- [ ] **Reuse-Check (P10):** Wurde geprüft ob bestehende Funktionen (`score_batch()`, `tombstoned_edges`, `persist_calibration_state`) wiederverwendet werden können?
-  - Befund: _______________
-- [ ] **ADR eingetragen (P6):** Falls architektonisch relevant — ADR-Nummer: ___
-
-### Kalibrierungs-Dimension (P8, wenn Konfiguration geändert)
-- [ ] Änderung an SlmProfile/Prompt-Template/Modell-Config → Kalibrierungs-Reset-Test vorhanden
-- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `contextra-rank` verwendet
-
-### Provenienz-Dimension (wenn Graph-Code geändert)
-- [ ] Neue CSR-Kante hat `EdgeProvenance`-Eintrag (INV-GRAPH-PROV-1)
-- [ ] RRF-Fusion mit Kohärenz-Bonus: INV-PROV-2 eingehalten
-
-### Quantitative Aussagen (P7)
-- [ ] Keine neuen quantitativen Claims ohne Nachweis in `contextra-bench` oder ArXiv-Kennzeichnung
-
-### Chaos-Dimension (nur bei Storage-Änderungen)
-- [ ] Power-Cut-Simulation für WAL/Compaction
-- [ ] Zeroize-Nachweis wenn KV-Cache-Code berührt (P9)
-
-### Nicht-Implementieren-Prüfung
-- [ ] Kein partieller HNSW-Rebuild (VETO-01 / ADR-071)
-- [ ] Keine Cross-Tenant-Datenbewegung (VETO-02 / ADR-082)
-
----
+Claim-Crate: <!-- Pflicht: Crate-Name, den dieser PR primär ändert, z.B. contextra-router -->
+Claim-Issue: <!-- Aufgaben-ID oder ADR-Nummer, z.B. T-2026-9007 oder ADR-N30 -->
+Closes #<nr>
 
 ## Ziel
-### Claim-Deklaration (Pflicht für alle Code-PRs)
-Claim-Crate: <!-- Pflicht: Crate-Name, den dieser PR primär ändert, z.B. contextra-router -->
-Claim-Issue: <!-- Aufgaben-ID oder ADR-Nummer, z.B. P8/ADR-063 -->
-
-### Warum?
 
 
 ## Änderungen
-### Was wurde geändert?
-
+- `<datei/pfad>`: ...
 
 ## Invarianten berührt
-(aus AGENTS.md Invarianten-Katalog)
 
 
 ## Verifikation
+- Architektur (nur wenn Modulstruktur/Schnittstellen berührt): ...
+- Kalibrierung (nur wenn SlmProfile/Prompt/Model-Config berührt): ...
+- Provenienz (nur wenn Graph/CSR-Code berührt): ...
+- Chaos & Zeroize (nur wenn Storage/KV-Cache berührt): ...
+- Nicht-Implementieren (nur wenn HNSW/Tenant-Limits berührt): ...
 
 
 ## Out-of-scope Findings
@@ -62,5 +28,3 @@ Claim-Issue: <!-- Aufgaben-ID oder ADR-Nummer, z.B. P8/ADR-063 -->
 
 ## ADR/Spec-Sync
 
-
-### Bekannte Einschränkungen / offene Folgepunkte
