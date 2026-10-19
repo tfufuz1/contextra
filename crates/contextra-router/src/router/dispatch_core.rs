@@ -6,7 +6,6 @@ use super::*;
 
 impl RouterEngine {
     /// Routes a query with embedding and text to the best matching SLM profile.
-    #[allow(deprecated)]
     pub async fn route(
         &self,
         query_embedding: &[f32],
@@ -120,7 +119,7 @@ impl RouterEngine {
             };
 
             if let Some(state) = cal.get_mut(&selected_profile.name) {
-                state.times_selected += 1;
+                state.times_selected = state.times_selected.saturating_add(1);
                 state.cumulative_confidence += confidence_ratio;
             }
 
@@ -244,6 +243,18 @@ impl RouterEngine {
             decision_id,
             drift_status,
         })
+    }
+
+    /// Routes a query with embedding and text to the best matching SLM profile,
+    /// returning both the `RoutingDecision` and a tracking `RoutingTicket`.
+    pub async fn route_tracked(
+        &self,
+        query_embedding: &[f32],
+        query_text: &str,
+    ) -> Result<(RoutingDecision, RoutingTicket)> {
+        let decision = self.route(query_embedding, query_text).await?;
+        let ticket = RoutingTicket::new(decision.decision_id);
+        Ok((decision, ticket))
     }
 
     /// Kalibriertes Kaskaden-Routing.
@@ -540,8 +551,9 @@ impl RouterEngine {
         let (selected_action_idx, propensity) =
             logging_policy.select_action(greedy_action_idx, sample);
 
-        let selected_action_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
-        let (orig_idx, selected_profile, _score) = profile_scores[selected_action_usize];
+        let selected_action_usize =
+            (selected_action_idx as usize).min(profile_scores.len().saturating_sub(1));
+        let &(orig_idx, selected_profile, _score) = profile_scores.get(selected_action_usize)?;
 
         Some((
             orig_idx,
