@@ -10,17 +10,21 @@
 | `.github/workflows/chaos.yml` | Fehler-Eskalation | Schedule (`0 2 * * *`) / PR (`event_name === 'schedule'`) | Keiner | Deaktiviert |
 | `.github/workflows/tsan.yml` | Fehler-Eskalation | Schedule / PR / Dispatch | Keiner | Deaktiviert |
 
-## 2. Abgrenzungsregel für automatisierte Issues
+## 2. Abgrenzungsregel für automatisierte und manuelle Issues (ADR-N30)
 
-> **Grundsatz:** Automatisierte Issue-Erstellung durch Workflows/Gates/PRs ist vollständig **DEAKTIVIERT**, um Spam im Repository-Issue-Tracker zu verhindern. Workflows schlagen im Fehlerfall in den GitHub Actions Statuses fehl, ohne automatisch neue Issues anzulegen.
+> **Manuelle Issues:** Vom Menschen angelegte Issues über die vordefinierten Issue-Formulare (`.github/ISSUE_TEMPLATE/*.yml`) sind ausdrücklich erwünscht und dienen als primäre Eingabe für LLM-Agenten (Jules).
+>
+> **Automatisierte Issues:** Automatisierte Issue-Erstellung durch Workflows/Gates/PRs ist grundsätzlich **DEAKTIVIERT**, um Spam im Repository-Issue-Tracker zu verhindern.
+> **Ausnahme:** Die einzige zulässige automatische Issue-Erzeugung durch Workflows ist eine deduplizierte Meldung bei einem fehlerhaften `main`-Branch ("main rot"). Die Deduplizierung MUSS über einen festen Titel-Präfix (z. B. `[MAIN ROT]`) und einen eindeutigen HTML-Kommentar-Marker im Body erfolgen.
 
 ### Begründung
-* **Fehler-Eskalationen:** Sind zeitkritisch, indizieren akute Störungen im Hauptzweig oder in Integrationsläufen und benötigen sofortige menschliche und agentische Sichtbarkeit im Issue-Tracker.
-* **Proaktive Routineaufträge:** Erzeugen ohne echtes Fehlersignal unnötigen Noise im Issue-Tracker. Turnusmäßige Aufträge müssen stattdessen über Datei- und PR-basierte Handoffs (z. B. `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> via Pull Request) abgewickelt werden.
+* **Manuell erstellte Tasks:** Bieten volle Kontrolle und Transparenz über geplante Aufgaben im GitHub-UI.
+* **Fehler-Eskalationen ("main rot"):** Indizieren akute Störungen im Hauptzweig und benötigen sofortige Sichtbarkeit.
+* **Proaktive Routineaufträge ohne Fehlersignal:** Erzeugen unnötigen Noise im Issue-Tracker und müssen stattdessen Datei- oder PR-basiert abgewickelt werden.
 
 ## 3. Governance für neue Workflows
 
 Jeder **NEUE** GitHub Actions Workflow, der vorhat, `github.rest.issues.create` oder vergleichbare Mechanismen zur automatisierten Issue-Erstellung einzusetzen, MUSS diese Policy vorab lesen.
 
-* Die Einordnung (Fehler-Eskalation vs. proaktiver Routineauftrag) MUSS im PR-Body des einreichenden Pull Requests explizit begründet werden.
-* PRs, die Routineaufträge ohne Fehlersignal über GitHub-Issues automatisieren wollen, sind abzulehnen und auf PR-/Datei-basierte Mechanismen umzustellen.
+* Automatische Issues sind ausnahmslos auf deduplizierte "main rot"-Meldungen beschränkt.
+* PRs, die proaktive Routineaufträge ohne Fehlersignal über GitHub-Issues automatisieren wollen, sind abzulehnen.

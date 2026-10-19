@@ -1,0 +1,166 @@
+name: Jules Task
+description: Task-Eingabeformular für autonome LLM-Agenten (Jules) gemäß Vertrag mit Task-Karten
+title: "[TASK] "
+labels: ["type:chore"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Task Title / ID
+      description: 'Titel der Aufgabe (z. B. "Doku: Sync von Domain-Type Invarianten")'
+    validations:
+      required: true
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Betroffenes Crate
+      description: Wählen Sie das primär betroffene Crate aus
+      options:
+        - contextra
+        - contextra-adapt
+        - contextra-agent
+        - contextra-audit-export
+        - contextra-avv-generator
+        - contextra-checkpoint
+        - contextra-cognition
+        - contextra-core
+        - contextra-crypto
+        - contextra-db
+        - contextra-durable-fs
+        - contextra-engine
+        - contextra-graph
+        - contextra-infer-candle
+        - contextra-infer-ollama
+        - contextra-infer-onnx
+        - contextra-kvcache
+        - contextra-license
+        - contextra-mcp
+        - contextra-mvcc
+        - contextra-ports
+        - contextra-privacy
+        - contextra-py
+        - contextra-rank
+        - contextra-router
+        - contextra-sandbox
+        - contextra-simd
+        - contextra-store
+        - contextra-store-redb
+        - contextra-sys
+        - contextra-testkit
+        - contextra-text
+        - contextra-types
+        - contextra-vector
+        - contextra-wire
+        - benchmarks/contextra-bench
+    validations:
+      required: true
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Prompter Tier
+      description: Komplexitätsstufe des Prompts
+      options:
+        - "1"
+        - "2"
+        - "3"
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risiko-Klasse
+      description: Risiko-Klassifizierung des PRs
+      options:
+        - none
+        - sec
+        - crash
+        - simd
+        - utf8
+        - fusion
+        - concurrency
+        - calib
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Ziel
+      description: Präzise Beschreibung des konkreten Ziels
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Nicht-Ziele
+      description: Explizite Scope-Ausschlüsse (ein Eintrag pro Zeile)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Erlaubter Scope (Globs)
+      description: Welchen Pfaden darf der Agent Änderungen vornehmen?
+    validations:
+      required: true
+  - type: textarea
+    id: forbidden
+    attributes:
+      label: Verbotene Pfade (Globs)
+      description: Pfade, die nicht verändert werden dürfen (Standardmäßig alle geschützten Pfade)
+      value: |
+        .github/**
+        xtask/**
+        capabilities.toml
+        AGENTS.md
+        rust-toolchain.toml
+        deny.toml
+        .jules/setup/**
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Invarianten
+      description: 'Einzuhaltende System-Invarianten (z. B. Zero-Panic)'
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien (Befehle)
+      description: Auszuführende Befehle (müssen mit cargo oder just beginnen)
+      value: |
+        cargo test --workspace
+    validations:
+      required: true
+  - type: textarea
+    id: evidence_required
+    attributes:
+      label: Erforderliche Belege
+      description: 'Pflicht bei Risiko-Klasse != none'
+    validations:
+      required: false
+  - type: input
+    id: budget_files
+    attributes:
+      label: Datei-Budget
+      description: Maximale Anzahl geänderter Dateien (max. 25)
+      value: "15"
+    validations:
+      required: true
+  - type: input
+    id: budget_lines
+    attributes:
+      label: Zeilen-Budget
+      description: Maximale Anzahl geänderter Zeilen (max. 1000)
+      value: "500"
+    validations:
+      required: true
+  - type: input
+    id: budget_iterations
+    attributes:
+      label: Iterations-Budget
+      description: Maximale Anzahl Agenten-Iterationen (max. 12)
+      value: "5"
+    validations:
+      required: true
