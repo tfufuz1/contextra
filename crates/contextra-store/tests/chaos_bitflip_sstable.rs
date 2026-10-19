@@ -7,7 +7,9 @@
 //! b. Bloom-Filter-Korruption -> Darf NIEMALS zu False Negatives (`Ok(None)`) für existierende Keys führen (Datenverlust).
 //! c. Index-Korruption -> MUSS deterministisch mit Fehler behandeln (z.B. ChecksumMismatch oder ParseError), NIEMALS Panik.
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::storage::StorageEngine;
+use contextra_types::error::ContextraError;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use proptest::prelude::*;
 use std::fs::{self, OpenOptions};

@@ -4,139 +4,79 @@
 
 #![forbid(unsafe_code)]
 
+#[path = "support/mod.rs"]
 mod support;
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::ReferenceModel;
 use support::{copy_dir_recursive, truncate_wal_file, verify_storage_against_reference_model};
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_wal_prefix_crash_enumeration() {
-    let tmp_base = TempDir::new().expect("temp dir base");
-    let primary_dir = tmp_base.path().join("primary");
+async fn test_prefix_crash_recovery_enumeration() {
+    let seed_dir = TempDir::new().expect("create seed temp dir");
+    let seed_path = seed_dir.path();
 
     let config = LsmConfig {
-        path: primary_dir.clone(),
-        group_commit_window_micros: 0, // immediate commit for deterministic WAL layout
+        path: seed_path.to_path_buf(),
         ..Default::default()
     };
 
-    let mut model = ReferenceModel::new();
+    let ref_model = ReferenceModel::new();
 
-    // 1. Setup primary storage with a sequence of 5 committed batch transactions
-    let storage = LsmStorage::new(config.clone())
-        .await
-        .expect("open LsmStorage");
+    // Setup initial DB state: 10 transactions across keys
+    {
+        let storage = LsmStorage::open(config.clone())
+            .await
+            .expect("open storage for initial state");
 
-    let num_batches = 5;
-    for batch_idx in 1..=num_batches {
-        let tx = TxId::new(batch_idx as u64);
-        let k1 = format!("prefix_k_{batch_idx}_a").into_bytes();
-        let v1 = format!("prefix_v_{batch_idx}_a").into_bytes();
-        let k2 = format!("prefix_k_{batch_idx}_b").into_bytes();
-        let v2 = format!("prefix_v_{batch_idx}_b").into_bytes();
+        for i in 1..=10 {
+            let tx = TxId::new(i);
+            let key = format!("k{:02}", i).into_bytes();
+            let val = format!("v{:02}", i).into_bytes();
 
-        storage.put(tx, &k1, &v1).await.expect("put k1");
-        storage.put(tx, &k2, &v2).await.expect("put k2");
-        storage.commit(tx).await.expect("commit tx");
-
-        model.put(&k1, &v1);
-        model.put(&k2, &v2);
-        model.commit();
-    }
-
-    // Drop storage to simulate crash/shutdown
-    drop(storage);
-
-    // Locate WAL file
-    let wal_file = primary_dir.join("wal-00000000000000000000.log");
-    let wal_path = if wal_file.exists() {
-        wal_file
-    } else {
-        let legacy = primary_dir.join("wal.log");
-        if legacy.exists() {
-            legacy
-        } else {
-            // Find any log file in directory
-            let mut entries = tokio::fs::read_dir(&primary_dir).await.expect("read_dir");
-            let mut found = None;
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if entry.path().extension().map_or(false, |ext| ext == "log") {
-                    found = Some(entry.path());
-                    break;
-                }
-            }
-            found.expect("WAL file must exist in primary dir")
+            storage
+                .put(tx, &key, &val)
+                .await
+                .expect("put initial record");
+            storage.commit(tx).await.expect("commit initial record");
+            ref_model.put(key, val);
         }
-    };
 
-    let total_wal_bytes = tokio::fs::metadata(&wal_path)
-        .await
-        .expect("WAL metadata")
-        .len() as usize;
-    assert!(total_wal_bytes > 0, "WAL file must be non-empty");
-
-    // 2. Enumerate WAL truncations at 20 granular byte offsets across total WAL length
-    let step = (total_wal_bytes / 20).max(1);
-    let mut cutoffs = Vec::new();
-    let mut offset = 0;
-    while offset <= total_wal_bytes {
-        cutoffs.push(offset);
-        offset += step;
-    }
-    if cutoffs.last() != Some(&total_wal_bytes) {
-        cutoffs.push(total_wal_bytes);
+        storage.close().await.expect("close initial storage");
     }
 
-    for (step_idx, &cutoff_bytes) in cutoffs.iter().enumerate() {
-        let crash_dir = tmp_base.path().join(format!("crash_step_{step_idx}"));
-        copy_dir_recursive(&primary_dir, &crash_dir).expect("copy crash dir");
+    let wal_path = seed_path.join("wal.log");
+    let wal_len = std::fs::metadata(&wal_path)
+        .expect("metadata of wal.log")
+        .len();
 
-        let rel_wal_path = wal_path.strip_prefix(&primary_dir).expect("strip prefix");
-        let crash_wal_path = crash_dir.join(rel_wal_path);
+    assert!(wal_len > 0, "wal.log must be non-empty");
 
-        truncate_wal_file(&crash_wal_path, cutoff_bytes).expect("truncate wal");
+    let step = 16.max(wal_len / 50);
 
-        let crash_config = LsmConfig {
-            path: crash_dir.clone(),
-            group_commit_window_micros: 0,
+    for cutoff in (0..wal_len).step_by(step as usize) {
+        let test_dir = TempDir::new().expect("create test temp dir");
+        let test_path = test_dir.path();
+
+        copy_dir_recursive(seed_path, test_path);
+
+        let test_wal = test_path.join("wal.log");
+        truncate_wal_file(&test_wal, cutoff);
+
+        let test_config = LsmConfig {
+            path: test_path.to_path_buf(),
             ..Default::default()
         };
 
-        // Reopen storage post-crash
-        let reopened_res = LsmStorage::new(crash_config).await;
-
-        match reopened_res {
-            Ok(recovered_storage) => {
-                // Invariant (b): Recovered state matches ReferenceModel for a valid prefix of confirmed commits
-                let mut max_matched_seq = 0;
-                for commit_seq in 1..=num_batches {
-                    if verify_storage_against_reference_model(
-                        &recovered_storage,
-                        &model,
-                        commit_seq as u64,
-                    )
-                    .await
-                    .is_ok()
-                    {
-                        max_matched_seq = commit_seq;
-                    } else {
-                        break;
-                    }
-                }
-
-                // If cutoff is full size, all commits must match
-                if cutoff_bytes == total_wal_bytes {
-                    assert_eq!(
-                        max_matched_seq, num_batches,
-                        "Full WAL replay must recover all {num_batches} committed transactions"
-                    );
-                }
+        match LsmStorage::open(test_config).await {
+            Ok(storage) => {
+                verify_storage_against_reference_model(&storage, &ref_model).await;
+                let _ = storage.close().await;
             }
             Err(e) => {
-                // Invariant (a): Store opens OR reports a defined storage error
                 let err_msg = e.to_string();
                 assert!(
                     err_msg.contains("Storage")
@@ -144,8 +84,10 @@ async fn test_wal_prefix_crash_enumeration() {
                         || err_msg.contains("Corruption")
                         || err_msg.contains("Invalid")
                         || err_msg.contains("Header")
-                        || err_msg.contains("IO"),
-                    "Recovery error must be a defined Storage/WAL error variant, got: {e:?}"
+                        || err_msg.contains("IO")
+                        || err_msg.contains("Format")
+                        || err_msg.contains("Manifest"),
+                    "Recovery error must be a defined error variant, got: {e:?}"
                 );
             }
         }

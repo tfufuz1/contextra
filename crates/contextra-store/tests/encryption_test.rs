@@ -1,6 +1,7 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::config::EncryptionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::time::Duration;
 use tempfile::TempDir;
 

@@ -2,10 +2,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::TempDir;
 

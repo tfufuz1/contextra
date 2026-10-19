@@ -1,8 +1,9 @@
 // ANCHOR[TEST:STO-002] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 // REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:STO-002) (TS: 2026-09-18T10:00:00Z) (SESSION: b8e4f1a2) PRÜFER-KONTEXT: FRESH — Fault injection WAL tail truncation recovery verified.
 // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:STO-002) (TS: 2026-09-18T11:00:00Z) (SESSION: c9f5e2b3) PRÜFER-KONTEXT: FRESH — Independent review pass confirmed truncated records discard without corruption.
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::TempDir;
 use tokio::fs;
 
