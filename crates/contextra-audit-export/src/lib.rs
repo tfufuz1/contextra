@@ -53,6 +53,23 @@ pub struct DeletionProofSummary {
     pub verified: bool,
 }
 
+impl DeletionProofSummary {
+    /// Creates a new [`DeletionProofSummary`] with the specified attributes.
+    pub fn new(
+        proof_id: impl Into<String>,
+        scope: impl Into<String>,
+        timestamp_nanos: u64,
+        verified: bool,
+    ) -> Self {
+        Self {
+            proof_id: proof_id.into(),
+            scope: scope.into(),
+            timestamp_nanos,
+            verified,
+        }
+    }
+}
+
 /// A record entry in the GDPR Article 30 processing register.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegisterEntry {
