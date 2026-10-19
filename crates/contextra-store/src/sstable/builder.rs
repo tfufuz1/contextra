@@ -427,9 +427,15 @@ impl SstableBuilder {
 
         let mut block = Bytes::from(block_with_crc);
 
-        if self.format_version >= 5 && self.scope_keyring.is_some() && self.key_id.is_some() {
-            let keyring = self.scope_keyring.as_ref().unwrap();
-            let key_id = self.key_id.unwrap();
+        if self.format_version >= 5 {
+            let (keyring, key_id) = match (&self.scope_keyring, self.key_id) {
+                (Some(kr), Some(kid)) => (kr, kid),
+                _ => {
+                    return Err(ContextraError::Crypto(
+                        "ScopeKeyring required for v5 encrypted SSTable".into(),
+                    ));
+                }
+            };
             let dek_handle = keyring.dek(key_id).map_err(|e| match e {
                 contextra_crypto::CryptoError::KeyRevoked(msg) => ContextraError::KeyDestroyed(msg),
                 other => ContextraError::Crypto(other.to_string()),
@@ -637,5 +643,31 @@ impl SstableBuilder {
             min_seq: self.min_seq,
             max_seq: self.max_seq,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_v5_sstable_builder_without_keyring_errors() {
+        let dir = tempdir().unwrap();
+        let sst_path = dir.path().join("test_v5_no_keyring.sst");
+
+        let mut builder = SstableBuilder::create_with_version(&sst_path, 5)
+            .await
+            .unwrap();
+
+        let key = Bytes::from("test_key");
+        let val = Bytes::from("test_val");
+        builder.add(key, val, 100, 10, false).await.unwrap();
+
+        let err = builder.finish().await.unwrap_err();
+        assert!(
+            err.to_string().contains("ScopeKeyring required for v5 encrypted SSTable"),
+            "Expected ScopeKeyring error, got: {err}"
+        );
     }
 }

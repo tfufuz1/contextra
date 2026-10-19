@@ -33,7 +33,11 @@ impl KvKeyLocks {
     }
 
     pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
-        let guard = self.shards[idx].lock().await;
+        let shard = match self.shards.get(idx) {
+            Some(s) => s,
+            None => &self.shards[idx % KV_LOCK_SHARDS],
+        };
+        let guard = shard.lock().await;
         KeyGuard { _guard: guard }
     }
 
@@ -44,9 +48,9 @@ impl KvKeyLocks {
 
     #[cfg(test)]
     pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>> {
-        self.shards[idx]
-            .try_lock()
-            .ok()
+        self.shards
+            .get(idx)
+            .and_then(|s| s.try_lock().ok())
             .map(|guard| KeyGuard { _guard: guard })
     }
 
@@ -133,7 +137,7 @@ mod tests {
 }
 
 #[allow(unexpected_cfgs)]
-#[cfg(loom)]
+#[cfg(all(test, loom))]
 mod loom_tests {
     use super::*;
     use loom::sync::Arc;
@@ -162,7 +166,12 @@ mod loom_tests {
                 sorted_unique_shards(keys.iter().copied(), self.shard_count, &self.hasher);
             let mut guards = Vec::with_capacity(shard_indices.len());
             for idx in shard_indices {
-                guards.push(self.shards[idx].lock().unwrap());
+                if let Some(shard) = self.shards.get(idx) {
+                    match shard.lock() {
+                        Ok(guard) => guards.push(guard),
+                        Err(poisoned) => guards.push(poisoned.into_inner()),
+                    }
+                }
             }
             guards
         }
@@ -229,6 +238,29 @@ mod non_loom_tests {
 
             t1.await.unwrap();
             t2.await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_poisoned_mutex_recovery_and_shard_bounds() {
+        use std::sync::Mutex;
+        let mutex = Mutex::new(());
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = mutex.lock().map_err(|_| ()).unwrap();
+            panic!("trigger poison");
+        });
+        assert!(mutex.is_poisoned());
+        let guard = match mutex.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        drop(guard);
+
+        let kv = KvKeyLocks::new();
+        let rt = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let _guard_oob = kv.lock_shard(9999).await;
+            assert!(kv.try_lock_shard(9999).is_none());
         });
     }
 }
