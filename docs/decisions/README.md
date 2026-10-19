@@ -36,6 +36,8 @@ Das Verzeichnis `docs/decisions/` ist die einzige kanonische Quelle (Single Sour
 | **ADR-N24** | F9 AVV-Generator und Audit-Export als Entwurfs- und Berichtswerkzeuge | Accepted |
 | **ADR-N25** | F10 Panic-Isolation an der öffentlichen API (`guard_panic` und `Poisoned`-Zustand) | Accepted |
 | **ADR-N26** | Auflösung der Unsafe-Policy-Inkonsistency (ADR-004 vs. ADR-N03) | Accepted |
+| **ADR-N28** | Konsolidierung der Composition Root in der Fassade `contextra` und Entkopplung von `contextra-db` | Proposed |
+| **ADR-N29** | Dekomposition des God-Objects `Collection` in modulare Sub-Komponenten und Port-Traits | Proposed |
 
 ## Index Schlüssel-ADRs (Refactored / Superseded / Core)
 
