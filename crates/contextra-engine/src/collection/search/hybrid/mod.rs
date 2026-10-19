@@ -26,13 +26,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .await
     }
 
-    /// Performs hybrid search combining BM25, vector search, and graph traversal, followed by optional Cross-Encoder reranking.
     /// Mindest-Kandidatenpool für Cross-Encoder-Reranking.
     /// Wissenschaftliche Basis: arXiv:2604.01733 (T2-RAGBench).
     /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
     pub const DEFAULT_MIN_RERANK_CANDIDATES: usize = 100;
 
-    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    /// Legacy wrapper for hybrid search with reranking.
+    /// Scheduled for removal in v0.2.0. Use `Collection::query().reranker()` instead.
+    #[deprecated(since = "0.1.0", note = "Use Collection::query().reranker() instead. Scheduled for removal in v0.2.0.")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
     pub async fn hybrid_search_reranked(
@@ -94,6 +95,36 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         strategy: Option<&contextra_types::GraphTraversalStrategy>,
         same_community_as: Option<EntityId>,
         fusion_strategy: Option<contextra_types::SignalFusionStrategies>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        self.hybrid_search_with_strategy_and_importance(
+            text,
+            vector,
+            k,
+            anchor_entities,
+            weights,
+            strategy,
+            same_community_as,
+            fusion_strategy,
+            None,
+        )
+        .await
+    }
+
+    /// Extended hybrid search with optional importance threshold post-filtering.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn hybrid_search_with_strategy_and_importance(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+        weights: Option<&contextra_types::FusionWeights>,
+        strategy: Option<&contextra_types::GraphTraversalStrategy>,
+        same_community_as: Option<EntityId>,
+        fusion_strategy: Option<contextra_types::SignalFusionStrategies>,
+        min_importance_threshold: Option<f32>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
             return Ok(Vec::new());
@@ -186,7 +217,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     Self::DEFAULT_COMMUNITY_BOOST,
                 )
                 .await?;
-            Ok(boosted)
+
+            let final_results = if let Some(min_thresh) = min_importance_threshold {
+                let now_tx = contextra_types::TxId::try_new(seq)
+                    .unwrap_or_else(|_| contextra_types::TxId::new_unchecked(seq));
+                Self::filter_by_importance(boosted, min_thresh, now_tx)
+            } else {
+                boosted
+            };
+
+            Ok(final_results)
         })
         .await
     }
