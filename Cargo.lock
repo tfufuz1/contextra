@@ -772,6 +772,7 @@ dependencies = [
  "blake3",
  "contextra-crypto",
  "contextra-durable-fs",
+ "contextra-kvcache",
  "contextra-ports",
  "contextra-types",
  "criterion",

@@ -1148,7 +1148,7 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let dim = collection.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
 
-    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
+    let store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
     let master_km =
         contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
     let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
