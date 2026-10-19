@@ -4,6 +4,7 @@
 //              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -31,6 +32,11 @@ pub trait InjectionDetector: Send + Sync {
     fn detect(&self, text: &str) -> Option<String>;
 }
 
+/// Helper function to construct a policy violation error for egress security blocks.
+fn block_policy_violation(msg: impl Into<String>) -> EgressError {
+    EgressError::policy_violation(msg)
+}
+
 /// Inbound Layer 5 Re-Hydrator replacing surrogate tokens with original vault entities.
 #[derive(Debug, Clone, Default)]
 pub struct CloudResponseRehydrator {
@@ -53,7 +59,7 @@ impl CloudResponseRehydrator {
         let prefix = "[USER_ENTITY_";
 
         while let Some(start_idx) = cloud_response_text[cursor..].find(prefix) {
-            let absolute_start = cursor + start_idx;
+            let absolute_start = cursor.saturating_add(start_idx);
             result.push_str(&cloud_response_text[cursor..absolute_start]);
 
             let remainder = &cloud_response_text[absolute_start..];
@@ -67,14 +73,15 @@ impl CloudResponseRehydrator {
             if remainder.starts_with(prefix) {
                 // Collect character boundary offsets up to 18 characters
                 let indices: Vec<(usize, char)> = char_indices.by_ref().take(19).collect();
-                if indices.len() >= 18 && (indices.len() == 18 || indices[18].0 >= 18) {
-                    let hex_chars_valid =
-                        indices[13..17].iter().all(|(_, c)| c.is_ascii_hexdigit());
-                    let closing_bracket_valid = indices[17].1 == ']';
+                if indices.len() >= 18 && indices.get(18).is_none_or(|p| p.0 >= 18) {
+                    let hex_chars_valid = indices
+                        .get(13..17)
+                        .is_some_and(|slice| slice.iter().all(|(_, c)| c.is_ascii_hexdigit()));
+                    let closing_bracket_valid = indices.get(17).is_some_and(|p| p.1 == ']');
 
                     if hex_chars_valid && closing_bracket_valid {
                         token_len = if indices.len() > 18 {
-                            Some(indices[18].0)
+                            indices.get(18).map(|p| p.0)
                         } else {
                             Some(remainder.len())
                         };
@@ -92,14 +99,14 @@ impl CloudResponseRehydrator {
                         } else {
                             result.push_str(surrogate);
                         }
-                        cursor = absolute_start + end_bound;
+                        cursor = absolute_start.saturating_add(end_bound);
                         continue;
                     }
                 }
             }
 
             result.push_str(prefix);
-            cursor = absolute_start + prefix.len();
+            cursor = absolute_start.saturating_add(prefix.len());
         }
 
         result.push_str(&cloud_response_text[cursor..]);
@@ -164,7 +171,7 @@ pub async fn handle_cloud_query_scoped(
 ) -> Result<CloudQueryResponse, EgressError> {
     let req = request
         .into_inner_checked(expected_tenant_id)
-        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+        .map_err(|e| block_policy_violation(e.to_string()))?;
     handle_cloud_query(req, classifier).await
 }
 
@@ -177,7 +184,7 @@ pub async fn handle_cloud_query_scoped_with_guard(
 ) -> Result<CloudQueryResponse, EgressError> {
     let req = request
         .into_inner_checked(expected_tenant_id)
-        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+        .map_err(|e| block_policy_violation(e.to_string()))?;
     handle_cloud_query_with_guard(req, classifier, egress_guard).await
 }
 
@@ -191,7 +198,7 @@ pub async fn handle_cloud_query_scoped_with_bulk_detector(
 ) -> Result<CloudQueryResponse, EgressError> {
     let req = request
         .into_inner_checked(expected_tenant_id)
-        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+        .map_err(|e| block_policy_violation(e.to_string()))?;
     handle_cloud_query_with_bulk_detector(req, classifier, egress_guard, bulk_detector).await
 }
 
@@ -241,7 +248,7 @@ pub fn check_bulk_exfiltration(
         BulkExfiltrationOutcome::Block {
             window_bytes,
             limit,
-        } => Err(EgressError::invalid_params(format!(
+        } => Err(block_policy_violation(format!(
             "Egress volume rate limit exceeded: {window_bytes} bytes in window > {limit} limit"
         ))),
     }
@@ -273,7 +280,7 @@ pub async fn process_cloud_response(
             pattern = %matched_pattern,
             "Inbound cloud response contains prompt injection pattern"
         );
-        return Err(EgressError::invalid_params(format!(
+        return Err(block_policy_violation(format!(
             "Inbound security policy violation: prompt injection detected in cloud response ({matched_pattern})"
         )));
     }
@@ -285,24 +292,146 @@ fn evaluate_classification_result(classification: EgressClassification) -> Resul
     match classification {
         EgressClassification::Allow => Ok(()),
         EgressClassification::Block(BlockReason::SensitivePattern(rule_id)) => {
-            Err(EgressError::invalid_params(format!(
+            Err(block_policy_violation(format!(
                 "Egress policy violation: query blocked by rule {rule_id}"
             )))
         }
-        EgressClassification::Block(BlockReason::PolicyDenied(reason)) => Err(
-            EgressError::invalid_params(format!("Egress policy violation: {reason}")),
-        ),
+        EgressClassification::Block(BlockReason::PolicyDenied(reason))
+        | EgressClassification::Block(BlockReason::EgressPolicyDenied(reason)) => {
+            Err(block_policy_violation(format!(
+                "Egress policy violation: {reason}"
+            )))
+        }
         EgressClassification::Block(BlockReason::ClassificationTimeout) => {
-            Err(EgressError::invalid_params(
+            Err(block_policy_violation(
                 "Egress policy violation: classification evaluation timeout",
             ))
         }
         EgressClassification::Block(BlockReason::InternalError(err)) => Err(
-            EgressError::invalid_params(format!("Egress policy violation: {err}")),
+            EgressError::internal_error(format!("Egress policy violation: {err}")),
         ),
-        _ => Err(EgressError::invalid_params(
-            "Egress policy violation: query blocked due to unknown classification",
-        )),
+    }
+}
+
+/// Single public egress pipeline enforcing tenant verification, volume limits, DLP classification, L4 guard, and gateway.
+#[derive(Clone)]
+pub struct CloudEgressPipeline {
+    classifier: Arc<dyn EgressClassifier>,
+    expected_tenant_id: contextra_types::TenantId,
+    egress_guard: Option<Arc<dyn EgressGuardCheck>>,
+    bulk_detector: Option<(Arc<BulkExfiltrationDetector>, SessionId)>,
+}
+
+impl CloudEgressPipeline {
+    /// Creates a builder for `CloudEgressPipeline` with required classifier and tenant scope.
+    pub fn builder(
+        classifier: Arc<dyn EgressClassifier>,
+        expected_tenant_id: contextra_types::TenantId,
+    ) -> CloudEgressPipelineBuilder {
+        CloudEgressPipelineBuilder::new(classifier, expected_tenant_id)
+    }
+
+    /// Single public entrypoint executing egress checks in strict order:
+    /// 1. Tenant verification
+    /// 2. Session volume rate limiting
+    /// 3. L1 DLP classification
+    /// 4. Optional L4 Guard check
+    /// 5. Gateway response processing
+    pub async fn handle(
+        &self,
+        request: contextra_types::TenantScoped<CloudQueryRequest>,
+    ) -> Result<CloudQueryResponse, EgressError> {
+        let guard_ref = self.egress_guard.as_deref();
+        let bulk_ref = self
+            .bulk_detector
+            .as_ref()
+            .map(|(det, sess)| (det.as_ref(), sess.clone()));
+
+        handle_cloud_query_scoped_with_bulk_detector(
+            request,
+            &self.expected_tenant_id,
+            self.classifier.as_ref(),
+            guard_ref,
+            bulk_ref,
+        )
+        .await
+    }
+}
+
+/// Builder for constructing a configured [`CloudEgressPipeline`].
+pub struct CloudEgressPipelineBuilder {
+    classifier: Arc<dyn EgressClassifier>,
+    expected_tenant_id: contextra_types::TenantId,
+    egress_guard: Option<Arc<dyn EgressGuardCheck>>,
+    bulk_detector: Option<(Arc<BulkExfiltrationDetector>, SessionId)>,
+    egress_vault: Option<EgressVault>,
+}
+
+impl CloudEgressPipelineBuilder {
+    /// Creates a new `CloudEgressPipelineBuilder` with required `classifier` and `expected_tenant_id`.
+    pub fn new(
+        classifier: Arc<dyn EgressClassifier>,
+        expected_tenant_id: contextra_types::TenantId,
+    ) -> Self {
+        Self {
+            classifier,
+            expected_tenant_id,
+            egress_guard: None,
+            bulk_detector: None,
+            egress_vault: None,
+        }
+    }
+
+    /// Creates a new `CloudEgressPipelineBuilder` using an [`EgressVault`] instance as classifier.
+    pub fn new_with_vault(
+        vault: EgressVault,
+        expected_tenant_id: contextra_types::TenantId,
+    ) -> Self {
+        Self {
+            classifier: Arc::new(vault.clone()),
+            expected_tenant_id,
+            egress_guard: None,
+            bulk_detector: None,
+            egress_vault: Some(vault),
+        }
+    }
+
+    /// Configures an optional Layer 4 similarity / vector guard check.
+    pub fn with_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self {
+        self.egress_guard = Some(guard);
+        self
+    }
+
+    /// Configures an optional Layer 4 session volume rate limiter (`BulkExfiltrationDetector`).
+    pub fn with_bulk_detector(
+        mut self,
+        detector: Arc<BulkExfiltrationDetector>,
+        session_id: SessionId,
+    ) -> Self {
+        self.bulk_detector = Some((detector, session_id));
+        self
+    }
+
+    /// Attaches a custom [`SurrogateVault`] to the pipeline's [`EgressVault`].
+    pub fn with_surrogate_vault(
+        mut self,
+        surrogate_vault: Arc<crate::egress_vault::SurrogateVault>,
+    ) -> Self {
+        if let Some(vault) = self.egress_vault.take() {
+            let updated = vault.with_surrogate_vault(surrogate_vault);
+            self.classifier = Arc::new(updated);
+        }
+        self
+    }
+
+    /// Builds the final [`CloudEgressPipeline`].
+    pub fn build(self) -> CloudEgressPipeline {
+        CloudEgressPipeline {
+            classifier: self.classifier,
+            expected_tenant_id: self.expected_tenant_id,
+            egress_guard: self.egress_guard,
+            bulk_detector: self.bulk_detector,
+        }
     }
 }
 

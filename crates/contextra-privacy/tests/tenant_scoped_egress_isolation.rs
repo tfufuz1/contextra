@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic, deprecated)]
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::kv_cipher::ModelFingerprint;
