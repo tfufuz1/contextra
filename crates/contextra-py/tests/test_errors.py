@@ -37,7 +37,7 @@ def test_get_nonexistent_returns_none(db):
 
 def test_drop_default_collection_fails(db):
     with pytest.raises(contextra.ContextraValueError) as excinfo:
-        db.drop_collection("default")
+        db.drop_collection("default", proof_key=b"k" * 32)
     assert "Cannot drop default collection" in str(excinfo.value)
     assert excinfo.value.kind == "InvalidInput"
 

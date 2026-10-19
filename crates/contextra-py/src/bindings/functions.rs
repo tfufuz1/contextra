@@ -1,4 +1,5 @@
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_db::Contextra;
+use contextra_db::ContextraConfig;
 use pyo3::prelude::*;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use crate::bindings::runtime_state::get_runtime;
 ///     db.insert("doc1", vector, {"key": "value"})
 /// ```
 #[pyfunction]
-#[pyo3(signature = (path, dimension=768, max_elements=None, encryption_passphrase=None, distance_metric=None))]
+#[pyo3(signature = (path, dimension=768, max_elements=None, encryption_passphrase=None, distance_metric=None, tenant_id=None))]
 pub fn open(
     py: Python<'_>,
     path: &str,
@@ -26,6 +27,7 @@ pub fn open(
     max_elements: Option<usize>,
     encryption_passphrase: Option<String>,
     distance_metric: Option<String>,
+    tenant_id: Option<u64>,
 ) -> PyResult<PyContextra> {
     validate_db_path(path)?;
     if dimension == 0 || dimension > 10_000 {
@@ -38,7 +40,10 @@ pub fn open(
     let worker_threads = rt.metrics().num_workers();
     let mut config = ContextraConfig {
         dimension,
-        encryption_passphrase,
+        encryption: match encryption_passphrase {
+            Some(pass) => contextra_db::EncryptionConfig::Passphrase(pass),
+            None => contextra_db::EncryptionConfig::None,
+        },
         ..Default::default()
     };
 
@@ -65,6 +70,12 @@ pub fn open(
         };
     }
 
+    let resolved_tenant = match tenant_id {
+        Some(id) => contextra_types::TenantId::try_new(id)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+        None => contextra_types::TenantId::SYSTEM,
+    };
+
     let poisoned = Arc::new(AtomicBool::new(false));
     let path_string = path.to_string();
     let db = run_blocking_ffi(py, &poisoned, || {
@@ -72,7 +83,7 @@ pub fn open(
             .map_err(contextra_err)
     })?;
 
-    Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned))
+    Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned, resolved_tenant))
 }
 
 /// Internal helper function to trigger an unwinding panic inside `run_blocking_ffi` for testing FFI panic isolation.
