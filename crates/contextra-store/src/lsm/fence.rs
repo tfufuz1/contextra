@@ -6,6 +6,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
+use contextra_ports::erasure::{WriteFenced, WriteGate};
+
 #[cfg(loom)]
 use loom::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 #[cfg(loom)]
@@ -273,6 +275,60 @@ impl ErasureGate {
 impl Default for ErasureGate {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl WriteGate for ErasureGate {
+    fn is_active(&self) -> bool {
+        self.is_active()
+    }
+
+    fn check_batch(&self, keys: &mut dyn Iterator<Item = &[u8]>) -> Result<(), WriteFenced> {
+        if !self.is_active() {
+            return Ok(());
+        }
+
+        for key in keys {
+            if self.check_write_allowed(key).is_err() {
+                return Err(WriteFenced);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_erasure_gate_write_gate_trait() {
+        let gate = ErasureGate::new();
+        let write_gate: &dyn WriteGate = &gate;
+
+        assert!(!write_gate.is_active());
+        let batch = [b"key1".as_slice(), b"key2".as_slice()];
+        assert!(write_gate.check_batch(&mut batch.into_iter()).is_ok());
+
+        gate.acquire_fence(101, vec![b"key1".to_vec()], Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert!(write_gate.is_active());
+
+        let batch_allowed = [b"key2".as_slice(), b"key3".as_slice()];
+        assert!(write_gate.check_batch(&mut batch_allowed.into_iter()).is_ok());
+
+        let batch_blocked = [b"key2".as_slice(), b"key1_sub".as_slice()];
+        assert_eq!(
+            write_gate.check_batch(&mut batch_blocked.into_iter()),
+            Err(WriteFenced)
+        );
+
+        gate.release_fence(101);
+        assert!(!write_gate.is_active());
+        assert!(write_gate.check_batch(&mut batch_blocked.into_iter()).is_ok());
     }
 }
 
