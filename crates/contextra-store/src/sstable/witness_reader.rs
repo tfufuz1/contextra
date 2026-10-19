@@ -461,13 +461,15 @@ impl WitnessReader {
             .read_exact(&mut buf)
             .map_err(|e| WitnessReadError::Io(e.to_string()))?;
 
-        let block_data = if self.enc_version == 1 && self.key_id.is_some() {
-            let kr = self.scope_keyring.as_ref().ok_or_else(|| {
-                WitnessReadError::NotWitnessable(
-                    "Encrypted SSTable (v5) cannot be witnessed without keyring".into(),
-                )
-            })?;
-            let kid = self.key_id.unwrap();
+        let block_data = if self.enc_version == 1 {
+            let (kr, kid) = match (self.scope_keyring.as_ref(), self.key_id) {
+                (Some(kr), Some(kid)) => (kr, kid),
+                _ => {
+                    return Err(WitnessReadError::NotWitnessable(
+                        "Encrypted SSTable (v5) cannot be witnessed without keyring".into(),
+                    ));
+                }
+            };
             let dek_handle = match kr.dek(kid) {
                 Ok(h) => h,
                 Err(contextra_crypto::CryptoError::KeyRevoked(msg)) => {
@@ -764,4 +766,49 @@ fn parse_block_entries(
     }
 
     Ok(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_witness_reader_enc_version_without_keyring_errors() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), b"01234567890123456789").unwrap();
+
+        let mut reader = WitnessReader {
+            path: temp_file.path().to_path_buf(),
+            file_size: 20,
+            file: File::open(temp_file.path()).unwrap(),
+            metadata: WitnessSstMetadata {
+                first_key: Bytes::new(),
+                last_key: Bytes::new(),
+                min_tx_id: 0,
+                max_tx_id: 0,
+                min_seq: 0,
+                max_seq: 0,
+                key_count: 0,
+            },
+            index: Vec::new(),
+            index_offset: 20,
+            bloom_offset: 20,
+            has_crc: true,
+            format_version: 5,
+            key_manager: None,
+            scope_keyring: None,
+            key_id: None,
+            enc_version: 1,
+            is_encrypted: true,
+        };
+
+        let res = reader.read_block(0, 20);
+        let err = res.unwrap_err();
+        match err {
+            WitnessReadError::NotWitnessable(msg) => {
+                assert!(msg.contains("cannot be witnessed without keyring"));
+            }
+            other => panic!("Expected NotWitnessable, got: {other:?}"),
+        }
+    }
 }
