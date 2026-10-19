@@ -1092,6 +1092,7 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-avv-generator",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
