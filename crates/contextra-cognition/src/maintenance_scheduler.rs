@@ -65,16 +65,20 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
 
     /// Liefert die Anzahl aktuell aktiver Agenten-Sessions.
     pub fn active_agent_sessions(&self) -> usize {
+        // SeqCst guarantees a total global order across all agent session increments/decrements
+        // so maintenance ticks see consistent session counts.
         self.active_sessions.load(Ordering::SeqCst)
     }
 
     /// Erhöht die Anzahl aktiver Agenten-Sessions.
     pub fn increment_active_sessions(&self) -> usize {
+        // SeqCst guarantees immediate global visibility before session activity starts.
         self.active_sessions.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     /// Verringert die Anzahl aktiver Agenten-Sessions.
     pub fn decrement_active_sessions(&self) -> usize {
+        // SeqCst guarantees immediate global visibility when session activity ends.
         self.active_sessions
             .fetch_sub(1, Ordering::SeqCst)
             .saturating_sub(1)
@@ -98,15 +102,16 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
 
             loop {
                 tokio::select! {
-                    _ = ticker.tick() => {
-                        self.run_tick().await;
-                    }
+                    biased;
                     _ = cancel_token.cancelled() => {
                         tracing::info!(
                             collection = %self.collection.name(),
                             "MaintenanceScheduler shutting down via cancellation token"
                         );
                         break;
+                    }
+                    _ = ticker.tick() => {
+                        self.run_tick().await;
                     }
                 }
             }

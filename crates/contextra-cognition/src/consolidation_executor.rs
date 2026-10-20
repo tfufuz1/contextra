@@ -40,6 +40,9 @@ impl ConsolidationLockGuard {
     /// Gibt `Some(ConsolidationLockGuard)` zurück, wenn das Lock erfolgreich reserviert wurde.
     /// Gibt `None` zurück, falls bereits ein Konsolidierungslauf aktiv ist.
     pub fn try_acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
+        // AcqRel on success ensures writes from previous consolidation passes are acquired,
+        // and setting true is released to other threads. Relaxed on failure is sufficient
+        // because no state is accessed when acquisition fails.
         if flag
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
             .is_ok()
@@ -53,6 +56,8 @@ impl ConsolidationLockGuard {
 
 impl Drop for ConsolidationLockGuard {
     fn drop(&mut self) {
+        // Release ordering ensures all memory writes performed during consolidation are visible
+        // to subsequent threads that acquire the guard via compare_exchange AcqRel.
         self.flag.store(false, Ordering::Release);
     }
 }
@@ -555,6 +560,14 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
 
         loop {
             tokio::select! {
+                biased;
+                _ = self.cancel_token.cancelled() => {
+                    tracing::info!(
+                        collection = %self.collection.name(),
+                        "ConsolidationEngine shutting down via cancellation token"
+                    );
+                    break;
+                }
                 _ = ticker.tick() => {
                     if let Err(err) = self.run_cycle().await {
                         tracing::error!(
@@ -563,13 +576,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                             "ConsolidationEngine: cycle execution failed"
                         );
                     }
-                }
-                _ = self.cancel_token.cancelled() => {
-                    tracing::info!(
-                        collection = %self.collection.name(),
-                        "ConsolidationEngine shutting down via cancellation token"
-                    );
-                    break;
                 }
             }
         }
@@ -1067,7 +1073,11 @@ mod tests {
     }
 
     impl ResponseGroundingValidator for TestValidator {
-        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_types::Result<f32> {
+        fn score_grounding(
+            &self,
+            _response: &str,
+            _sources: &[&str],
+        ) -> contextra_types::Result<f32> {
             Ok(self.score)
         }
     }
@@ -1081,7 +1091,10 @@ mod tests {
             &'a self,
             _response: &'a str,
             _chunks: &'a [contextra_types::ContextChunk],
-        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::GroundingAssessment>> {
+        ) -> contextra_ports::BoxFuture<
+            'a,
+            contextra_types::Result<contextra_ports::GroundingAssessment>,
+        > {
             let score = self.score;
             Box::pin(async move {
                 Ok(contextra_ports::GroundingAssessment {
