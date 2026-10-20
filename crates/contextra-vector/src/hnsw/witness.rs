@@ -122,7 +122,7 @@ impl HnswIndex {
             )));
         }
 
-        let store_gen = WitStoreGeneration(self.index_epoch());
+        let store_gen = WitStoreGeneration(self.inner.hot.last_tx_id.load(std::sync::atomic::Ordering::Acquire));
 
         let node_id = args
             .doc_ids

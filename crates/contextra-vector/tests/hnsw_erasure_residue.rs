@@ -34,7 +34,7 @@ async fn test_erasure_canary_pattern_zero_residue() {
         .remove_with_graph_repair(canary_doc)
         .expect("remove_with_graph_repair");
 
-    let report: HnswResidueReport = index_mut.scan_residue(canary_doc);
+    let report: HnswResidueReport = index_mut.scan_residue_report(canary_doc);
     assert!(!report.node_found, "Node should not be found");
     assert_eq!(report.non_zero_vector_bytes, 0, "Vector bytes must be zeroized");
     assert_eq!(report.incoming_edges, 0, "No incoming edges allowed");
@@ -60,7 +60,7 @@ async fn test_fault_injection_incomplete_deletion_detected() {
     let mut index_mut = index;
     let _ = index_mut.remove_with_graph_repair(doc);
 
-    let report = index_mut.scan_residue(doc);
+    let report = index_mut.scan_residue_report(doc);
     // Fault injection skipped zeroize, so report should detect non-zero vector bytes or node residual
     assert!(
         report.non_zero_vector_bytes > 0 || report.node_found,
@@ -90,12 +90,12 @@ async fn test_slot_reuse_no_ghost_edges() {
     index_mut.insert(tx2, doc2, &vec2).await.expect("insert 2");
     index_mut.commit(tx2).await.expect("commit 2");
 
-    let report_doc1 = index_mut.scan_residue(doc1);
+    let report_doc1 = index_mut.scan_residue_report(doc1);
     assert_eq!(report_doc1.incoming_edges, 0, "No edges to old doc1");
     assert_eq!(report_doc1.outgoing_edges, 0, "No outgoing edges from doc1 slot");
     assert_eq!(report_doc1.non_zero_vector_bytes, 0, "No vector bytes for doc1");
 
-    let report_doc2 = index_mut.scan_residue(doc2);
+    let report_doc2 = index_mut.scan_residue_report(doc2);
     assert!(report_doc2.node_found, "Doc2 must be present");
     assert!(report_doc2.non_zero_vector_bytes > 0, "Doc2 has vector bytes");
 }
@@ -117,7 +117,7 @@ async fn test_entry_point_deletion_keeps_index_searchable() {
     let mut index_mut = index;
     index_mut.remove_with_graph_repair(doc_ep).expect("remove entry point doc");
 
-    let report_ep = index_mut.scan_residue(doc_ep);
+    let report_ep = index_mut.scan_residue_report(doc_ep);
     assert!(!report_ep.entry_point_is_doc, "Entry point must no longer point to deleted doc");
 
     // Search should still succeed and find remaining doc
@@ -140,10 +140,10 @@ async fn test_concurrency_pinned_reader_reported() {
     // Pin snapshot at seq 1
     index.pin_snapshot(1);
 
-    let report = index.scan_residue(doc);
+    let report = index.scan_residue_report(doc);
     assert!(report.pinned_by_reader, "Active snapshot pin must be reported as pinned_by_reader");
 
     index.unpin_snapshot(1);
-    let report_unpinned = index.scan_residue(doc);
+    let report_unpinned = index.scan_residue_report(doc);
     assert!(!report_unpinned.pinned_by_reader, "After unpinning, pinned_by_reader should be false");
 }

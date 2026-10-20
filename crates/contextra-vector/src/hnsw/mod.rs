@@ -11,6 +11,7 @@ pub mod arena;
 pub mod deletion;
 pub mod residue_scan;
 pub mod sq8_bias;
+pub mod witness;
 
 mod acorn_filtered;
 mod batch;
@@ -30,8 +31,9 @@ pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
-pub use residue_scan::HnswResidueReport;
+pub use residue_scan::{HnswResidueReport, ResDepth, ResHnswEvidence};
 pub use sq8_bias::Sq8Bias;
+pub use witness::{HnwIssueArgs, HnwNoClaim};
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,

@@ -80,8 +80,8 @@ impl LsmStorage {
             let mut matches = false;
             loop {
                 match stream.next_entry().await {
-                    Ok(Some((key, _val, _seq, _tx))) => {
-                        if scope.matches_key(&key) {
+                    Ok(Some((key, _val, _seq, tx))) => {
+                        if scope.matches_key(&key) && tx <= as_of_tx {
                             matches = true;
                             break;
                         }
@@ -136,7 +136,7 @@ impl LsmStorage {
             loop {
                 match stream.next_entry().await {
                     Ok(Some((key, val, seq, tx))) => {
-                        if scope.matches_key(&key) {
+                        if scope.matches_key(&key) && tx <= as_of_tx {
                             records_purged += 1;
                             bytes_reclaimed += (key.len() + val.len()) as u64;
                         } else {

@@ -32,8 +32,7 @@ async fn test_concurrent_delete_scan_insert() -> Result<(), Box<dyn std::error::
     handles.push(tokio::spawn(async move {
         for i in 1..=10 {
             let doc_id = DocId::new(i as u64);
-            let mut mut_idx = (*index_del).clone();
-            let _ = mut_idx.remove_with_graph_repair(doc_id);
+            let _ = index_del.remove_with_graph_repair(doc_id);
         }
     }));
 
