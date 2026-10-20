@@ -16,7 +16,7 @@ async fn test_erasure_fence_blocking() -> Result<()> {
     let tx1 = TxId::try_new(1).unwrap();
 
     // 1. Initial write permitted
-    storage.put(tx1, b"key1", b"val1").await?;
+    storage.put(TxId(1), b"key1", b"val1").await?;
     assert!(storage.erasure_fence().check_write_allowed(b"key1"));
 
     // 2. Acquire scope fence

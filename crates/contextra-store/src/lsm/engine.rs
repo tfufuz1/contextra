@@ -70,7 +70,7 @@ pub struct LsmStorage {
     pub(super) observer_registry: ObserverRegistry,
     pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
-    pub(super) erasure_fence: Arc<super::fence::ErasureFence>,
+    pub(crate) erasure_fence: Arc<super::fence::ErasureFence>,
     pub erasure_ledger_handle: Option<Arc<crate::erasure_ledger::ErasureLedgerHandle>>,
     pub(super) read_only: bool,
     pub(super) ledger_status: crate::erasure_ledger::LedgerOpenStatus,
@@ -110,6 +110,11 @@ impl LsmStorage {
 
     pub fn is_read_only(&self) -> bool {
         self.read_only
+    }
+
+    /// Returns a reference to the erasure fence protecting this storage instance.
+    pub fn erasure_fence(&self) -> &Arc<super::fence::ErasureFence> {
+        &self.erasure_fence
     }
 
     pub fn ledger_state(&self) -> crate::erasure_ledger::LedgerOpenStatus {

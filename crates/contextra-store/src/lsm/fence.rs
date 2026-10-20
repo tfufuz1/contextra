@@ -339,6 +339,50 @@ mod tests {
         assert!(!write_gate.is_active());
         assert!(write_gate.check_batch(&mut batch_blocked.into_iter()).is_ok());
     }
+
+    #[tokio::test]
+    async fn test_erasure_fence_blocking_and_isolation() {
+        let fence = ErasureFence::new();
+        assert!(!fence.is_active());
+
+        // Fast path: writes allowed
+        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
+        assert!(fence
+            .check_write_allowed_batch([b"scope1:key1".as_slice(), b"scope2:key2".as_slice()])
+            .is_ok());
+
+        // 1. Acquire prefix fence for scope1
+        fence
+            .gate
+            .acquire_fence(101, vec![b"scope1:".to_vec()], Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(fence.is_active());
+
+        // Writing inside locked scope is rejected (single & batch)
+        assert_eq!(
+            fence.check_write_allowed_scope(b"scope1:key1"),
+            Err(FenceError::CollectionDropping)
+        );
+        assert_eq!(
+            fence.check_write_allowed_batch([
+                b"scope2:key2".as_slice(),
+                b"scope1:key1".as_slice()
+            ]),
+            Err(FenceError::CollectionDropping)
+        );
+
+        // Writing outside locked scope during purge succeeds
+        assert!(fence.check_write_allowed_scope(b"scope2:key2").is_ok());
+        assert!(fence
+            .check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope3:key3".as_slice()])
+            .is_ok());
+
+        // Release fence
+        fence.gate.release_fence(101);
+        assert!(!fence.is_active());
+        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
+    }
 }
 
 /// RAII Guard that increments inflight counter on creation and decrements on drop.
@@ -408,6 +452,7 @@ impl<'a> Drop for FenDocLockGuard<'a> {
 #[derive(Debug)]
 pub struct ErasureFence {
     pub gate: ErasureGate,
+    active_fences: AtomicU32,
     scope_state: parking_lot::RwLock<FenceScopeState>,
     locked_doc_ids: parking_lot::RwLock<HashSet<Vec<u8>>>,
     scope_write_seq: AtomicU64,
@@ -420,6 +465,7 @@ impl ErasureFence {
     pub fn new() -> Self {
         Self {
             gate: ErasureGate::new(),
+            active_fences: AtomicU32::new(0),
             scope_state: parking_lot::RwLock::new(FenceScopeState::Active),
             locked_doc_ids: parking_lot::RwLock::new(HashSet::new()),
             scope_write_seq: AtomicU64::new(0),
@@ -428,28 +474,28 @@ impl ErasureFence {
         }
     }
 
-    /// Returns whether any scope fence, prefix fence, or document lock is currently active.
+    /// Returns `true` if any scope block, prefix fence, or document lock is currently active.
+    /// Fast-path zero-lock check for normal operation.
     #[inline]
     pub fn is_active(&self) -> bool {
-        self.active_fence_count.load(Ordering::Acquire) > 0
+        self.active_fences.load(Ordering::Acquire) > 0 || self.gate.is_active()
     }
 
     /// Checks if a scope-wide, prefix-based, or document-level write block is currently active for `key`.
     /// Returns `true` if write access is allowed, `false` if blocked by fence.
+    #[inline]
     pub fn check_write_allowed(&self, key: &[u8]) -> bool {
         self.check_write_allowed_scope(key).is_ok()
     }
 
     /// Checks if write access is allowed for `key`. Returns `Err(FenceError)` if blocked.
+    /// Fast path: Returns `Ok(())` immediately if `!self.is_active()`.
     #[inline]
     pub fn check_write_allowed_scope(&self, key: &[u8]) -> Result<(), FenceError> {
         if !self.is_active() {
             return Ok(());
         }
-        self.check_write_allowed_scope_slow(key)
-    }
 
-    fn check_write_allowed_scope_slow(&self, key: &[u8]) -> Result<(), FenceError> {
         let state = *self.scope_state.read();
         if state == FenceScopeState::CollectionDropping {
             self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
@@ -471,7 +517,9 @@ impl ErasureFence {
     }
 
     /// Checks if write access is allowed for a batch of keys.
-    pub fn check_write_batch_allowed_scope<'a, I>(&self, keys: I) -> Result<(), FenceError>
+    /// Fast path: Returns `Ok(())` immediately if `!self.is_active()`.
+    #[inline]
+    pub fn check_write_allowed_batch<'a, I>(&self, keys: I) -> Result<(), FenceError>
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
@@ -479,31 +527,8 @@ impl ErasureFence {
             return Ok(());
         }
 
-        let state = *self.scope_state.read();
-        if state == FenceScopeState::CollectionDropping {
-            self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
-            return Err(FenceError::CollectionDropping);
-        }
-
-        let keys_vec: Vec<&'a [u8]> = keys.into_iter().collect();
-
-        if self.gate.is_active() {
-            for key in &keys_vec {
-                if let Err(e) = self.gate.check_write_allowed(key) {
-                    self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
-                    return Err(e);
-                }
-            }
-        }
-
-        let locked_docs = self.locked_doc_ids.read();
-        if !locked_docs.is_empty() {
-            for key in &keys_vec {
-                if locked_docs.contains(*key) {
-                    self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
-                    return Err(FenceError::Conflict);
-                }
-            }
+        for key in keys {
+            self.check_write_allowed_scope(key)?;
         }
 
         Ok(())
@@ -514,7 +539,7 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state != FenceScopeState::CollectionDropping {
             *state = FenceScopeState::CollectionDropping;
-            self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+            self.active_fences.fetch_add(1, Ordering::Release);
         }
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
@@ -524,7 +549,7 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state == FenceScopeState::CollectionDropping {
             *state = FenceScopeState::Active;
-            self.active_fence_count.fetch_sub(1, Ordering::SeqCst);
+            self.active_fences.fetch_sub(1, Ordering::Release);
         }
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
@@ -571,7 +596,7 @@ impl ErasureFence {
             rt.block_on(run_acquire())?;
         }
 
-        self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+        self.active_fences.fetch_add(1, Ordering::Release);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -603,7 +628,7 @@ impl ErasureFence {
             return Err(e);
         }
 
-        self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+        self.active_fences.fetch_add(1, Ordering::Release);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -616,19 +641,22 @@ impl ErasureFence {
 
     /// Helper to release a registered prefix fence by ID.
     pub fn release_prefix_fence(&self, id: u64) {
-        if self.gate.release_fence(id) {
-            self.active_fence_count.fetch_sub(1, Ordering::SeqCst);
-        }
+        self.gate.release_fence(id);
+        self.active_fences.fetch_sub(1, Ordering::Release);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Locks specific document IDs against writes.
     pub fn lock_documents(&self, doc_ids: &[Vec<u8>]) {
         let mut locked = self.locked_doc_ids.write();
+        let mut added = 0u32;
         for id in doc_ids {
             if locked.insert(id.clone()) {
-                self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+                added += 1;
             }
+        }
+        if added > 0 {
+            self.active_fences.fetch_add(added, Ordering::Release);
         }
     }
 
@@ -672,6 +700,7 @@ impl ErasureFence {
                 self.active_fence_count.fetch_add(1, Ordering::SeqCst);
             }
         }
+        self.active_fences.fetch_add(doc_ids.len() as u32, Ordering::Release);
 
         Ok(FenDocLockGuard {
             fence: self,
@@ -682,10 +711,14 @@ impl ErasureFence {
     /// Unlocks specific document IDs.
     pub fn unlock_documents(&self, doc_ids: &[Vec<u8>]) {
         let mut locked = self.locked_doc_ids.write();
+        let mut removed = 0u32;
         for id in doc_ids {
             if locked.remove(id) {
-                self.active_fence_count.fetch_sub(1, Ordering::SeqCst);
+                removed += 1;
             }
+        }
+        if removed > 0 {
+            self.active_fences.fetch_sub(removed, Ordering::Release);
         }
     }
 

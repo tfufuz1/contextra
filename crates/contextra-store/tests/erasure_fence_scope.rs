@@ -126,8 +126,8 @@ async fn test_all_write_paths_respect_fence() {
 
     let tx_id = TxId::try_new(1).unwrap();
 
-    // 1. Path 'put'
-    let _guard = storage
+    // 1. Install fence via locked helper / sync call
+    let guard = storage
         .erasure_fence()
         .acquire_scope_fence_for(vec![b"locked:".to_vec()])
         .unwrap();
@@ -167,7 +167,7 @@ async fn test_all_write_paths_respect_fence() {
         .await
         .unwrap();
 
-    let _guard_again = storage
+    let _guard2 = storage
         .erasure_fence()
         .acquire_scope_fence_for(vec![b"locked:".to_vec()])
         .unwrap();
