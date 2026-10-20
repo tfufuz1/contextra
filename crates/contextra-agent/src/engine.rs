@@ -462,7 +462,10 @@ impl OrchestratorEngine {
 
                     // 3. Audit log (AC-3) - Audit trail is source of truth for "what was attempted".
                     // Executed before commit_step so a failure here leaves state uncommitted for clean retry.
-                    self.audit_log(ctx, &result).await?;
+                    if let Err(ContextraError::Conflict(_)) = self.audit_log(ctx, &result).await {
+                        ctx.step_count = ctx.next_retry_step_count();
+                        self.audit_log(ctx, &result).await?;
+                    }
 
                     // 4. Atomic commit to LSM - Source of truth for "what was accepted".
                     self.commit_step(ctx, &result).await?;
@@ -681,6 +684,8 @@ impl OrchestratorEngine {
                     match event_res? {
                         Some(event) => {
                             ctx.attach_event(event);
+                            let start_node = graph.start_node_id().unwrap_or_else(|| ctx.current_node.clone());
+                            ctx.reset_for_new_event(&start_node)?;
                             self.run(ctx, graph).await?;
                             self.checkpoint(ctx).await?;
                         }

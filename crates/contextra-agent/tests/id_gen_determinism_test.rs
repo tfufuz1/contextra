@@ -1,5 +1,24 @@
-use contextra_ports::{IdGen, SequentialIdGen};
+use contextra_ports::IdGen;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+struct SequentialIdGen {
+    next: AtomicU64,
+}
+
+impl SequentialIdGen {
+    fn new(start: u64) -> Self {
+        Self {
+            next: AtomicU64::new(start),
+        }
+    }
+}
+
+impl IdGen for SequentialIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, Ordering::SeqCst)
+    }
+}
 
 #[test]
 fn test_agent_id_gen_determinism() {

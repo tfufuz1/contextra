@@ -10,6 +10,14 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        contextra_types::DeterministicTimestamp::new(self.nanos / 1_000_000, self.nanos)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.nanos
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.nanos
     }

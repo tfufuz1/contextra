@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 /// Audit-Datensatz für Scratchpad-Kontextänderungen und Resets.
 #[derive(Debug, Clone)]
-pub struct ContextEditAuditRecord {
+pub struct ScratchpadEditRecord {
     pub tenant_id: TenantId,
     pub task_id: String,
     pub operation: String,
@@ -38,7 +38,7 @@ pub struct ContextEditAuditRecord {
 
 /// Lokaler Trait für Audit-Benachrichtigungen bei Scratchpad-Änderungen.
 pub trait ContextEditAuditSink: Send + Sync {
-    fn record_edit(&self, record: ContextEditAuditRecord);
+    fn record_edit(&self, record: ScratchpadEditRecord);
 }
 
 /// No-op-Implementierung von [`ContextEditAuditSink`].
@@ -46,7 +46,7 @@ pub trait ContextEditAuditSink: Send + Sync {
 pub struct NoopContextEditAuditSink;
 
 impl ContextEditAuditSink for NoopContextEditAuditSink {
-    fn record_edit(&self, _record: ContextEditAuditRecord) {}
+    fn record_edit(&self, _record: ScratchpadEditRecord) {}
 }
 
 /// Test-Implementierung von [`ContextEditAuditSink`], die Aufrufe zählt.
@@ -68,7 +68,7 @@ impl CountingContextEditAuditSink {
 }
 
 impl ContextEditAuditSink for CountingContextEditAuditSink {
-    fn record_edit(&self, _record: ContextEditAuditRecord) {
+    fn record_edit(&self, _record: ScratchpadEditRecord) {
         self.count.fetch_add(1, Ordering::Relaxed);
     }
 }
@@ -426,7 +426,7 @@ impl ClmScratchpad {
         }
 
         // Audit-Meldung für die Bearbeitung
-        self.audit_sink.record_edit(ContextEditAuditRecord {
+        self.audit_sink.record_edit(ScratchpadEditRecord {
             tenant_id: self.tenant_id,
             task_id: self.task_id.clone(),
             operation: "apply_edit".to_string(),
@@ -451,7 +451,7 @@ impl ClmScratchpad {
         let completed_subgoal = self.current_subgoal_index;
 
         // INV-CLM-SCRATCHPAD-1: Audit-Meldung für den Reset
-        self.audit_sink.record_edit(ContextEditAuditRecord {
+        self.audit_sink.record_edit(ScratchpadEditRecord {
             tenant_id: self.tenant_id,
             task_id: self.task_id.clone(),
             operation: "checkpoint_and_reset".to_string(),
