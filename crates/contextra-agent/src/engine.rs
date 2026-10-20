@@ -17,7 +17,7 @@ use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
 use contextra_ports::{Clock, StorageEngine, SystemClock};
-use contextra_store::LsmStorage;
+use contextra_store::{LsmStorage, StreamingRestoreGuard};
 use contextra_types::{ContextraError, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -43,7 +43,11 @@ pub struct OrchestratorEngine {
 impl OrchestratorEngine {
     /// Attempts to construct a new [`OrchestratorEngine`], returning an error if checkpoint store initialization fails.
     pub fn try_new(storage: Arc<LsmStorage>) -> Result<Self> {
-        let checkpoint_store = PersistentCheckpointStore::new(storage.clone(), "agent")?;
+        let mut checkpoint_store = PersistentCheckpointStore::new(storage.clone(), "agent")?;
+        if let Some(ref ledger_handle) = storage.erasure_ledger_handle {
+            let filter = StreamingRestoreGuard::for_lsm_handle(Arc::clone(ledger_handle));
+            checkpoint_store.set_restore_filter(Arc::new(filter));
+        }
         Ok(Self {
             tools: HashMap::new(),
             checkpoint_store: Arc::new(checkpoint_store),

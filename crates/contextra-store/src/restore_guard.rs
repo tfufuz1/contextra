@@ -9,16 +9,17 @@ use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_ports::{RestoreGuard, RestoreVerdict};
 use contextra_types::TxId;
-use crate::erasure_ledger::{ErasureLedger, LedgerDecision};
+use crate::erasure_ledger::{ErasureLedger, ErasureLedgerHandle, LedgerDecision};
 use std::sync::Arc;
 
 /// Streamender Anti-Resurrection Guard zur Verhinderung der Wiederbelebung gelöschter Schlüssel
 /// bei Checkpoint-Restores.
 ///
-/// Evaluiert Schlüssel einzeln ("on-demand" / streaming) gegen den [`ErasureLedger`],
-/// den [`RevocationLog`] und die [`KeyRegistry`].
+/// Evaluiert Schlüssel einzeln ("on-demand" / streaming) gegen den [`ErasureLedger`]
+/// oder [`ErasureLedgerHandle`], den [`RevocationLog`] und die [`KeyRegistry`].
 pub struct StreamingRestoreGuard {
-    ledger: Arc<ErasureLedger>,
+    ledger: Option<Arc<ErasureLedger>>,
+    ledger_handle: Option<Arc<ErasureLedgerHandle>>,
     revocation_log: Option<Arc<RevocationLog>>,
     key_registry: Option<Arc<KeyRegistry>>,
     storage_scope: Vec<u8>,
@@ -28,6 +29,8 @@ impl std::fmt::Debug for StreamingRestoreGuard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamingRestoreGuard")
             .field("storage_scope", &self.storage_scope)
+            .field("has_ledger", &self.ledger.is_some())
+            .field("has_ledger_handle", &self.ledger_handle.is_some())
             .field("has_revocation_log", &self.revocation_log.is_some())
             .field("has_key_registry", &self.key_registry.is_some())
             .finish()
@@ -44,7 +47,25 @@ impl StreamingRestoreGuard {
         storage_scope: impl Into<Vec<u8>>,
     ) -> Self {
         Self {
-            ledger,
+            ledger: Some(ledger),
+            ledger_handle: None,
+            revocation_log,
+            key_registry,
+            storage_scope: storage_scope.into(),
+        }
+    }
+
+    /// Erzeugt einen neuen `StreamingRestoreGuard` mit `ErasureLedgerHandle` und optionalen Revocation-Quellen.
+    #[must_use]
+    pub fn new_with_handle(
+        ledger_handle: Arc<ErasureLedgerHandle>,
+        revocation_log: Option<Arc<RevocationLog>>,
+        key_registry: Option<Arc<KeyRegistry>>,
+        storage_scope: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            ledger: None,
+            ledger_handle: Some(ledger_handle),
             revocation_log,
             key_registry,
             storage_scope: storage_scope.into(),
@@ -55,6 +76,12 @@ impl StreamingRestoreGuard {
     #[must_use]
     pub fn for_lsm(ledger: Arc<ErasureLedger>) -> Self {
         Self::new(ledger, None, None, b"lsm".to_vec())
+    }
+
+    /// Erzeugt einen Guard mit `ErasureLedgerHandle` für den LSM Storage Scope `b"lsm"`.
+    #[must_use]
+    pub fn for_lsm_handle(ledger_handle: Arc<ErasureLedgerHandle>) -> Self {
+        Self::new_with_handle(ledger_handle, None, None, b"lsm".to_vec())
     }
 
     /// Fügt einen optionalen `RevocationLog` hinzu.
@@ -119,8 +146,14 @@ impl RestoreGuard for StreamingRestoreGuard {
 
         // 3. ErasureLedger Entscheidung
         // Abgewiesen, wenn ein Ledger-Eintrag den Key oder ein Präfix deckt und erased_at_tx >= cp_tx
-        if self.ledger.decide(&self.storage_scope, key, cp_tx) == LedgerDecision::Drop {
-            return RestoreVerdict::Reject;
+        if let Some(ref ledger) = self.ledger {
+            if ledger.decide(&self.storage_scope, key, cp_tx) == LedgerDecision::Drop {
+                return RestoreVerdict::Reject;
+            }
+        } else if let Some(ref handle) = self.ledger_handle {
+            if handle.decide(&self.storage_scope, key, cp_tx) == LedgerDecision::Drop {
+                return RestoreVerdict::Reject;
+            }
         }
 
         RestoreVerdict::Allow
