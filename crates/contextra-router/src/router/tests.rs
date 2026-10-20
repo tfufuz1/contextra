@@ -192,7 +192,11 @@ async fn test_route_tracked_and_complete_workflow(
 
     let vec_data = vec![0.1f32, 0.2, 0.3, 0.4];
     collection
-        .insert("doc1", &vec_data, Some(serde_json::json!({"text": "test query content"})))
+        .insert(
+            "doc1",
+            &vec_data,
+            Some(serde_json::json!({"text": "test query content"})),
+        )
         .await?;
 
     let profile = SlmProfile::new(

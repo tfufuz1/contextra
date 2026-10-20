@@ -59,6 +59,17 @@ impl DecisionIdGenerator {
     }
 
     /// Erzeugt die nächste monotone `DecisionId`.
+    ///
+    /// # Atomic Ordering Justification
+    /// **Classification**: Unique ID / Sequence Generator (Non-synchronizing).
+    /// **Ordering**: `Ordering::Relaxed`.
+    /// **Rationale**: `fetch_add(1, Ordering::Relaxed)` operates on a single isolated atomic counter
+    /// (`self.next`). The hardware guarantees total modification order for operations on this single
+    /// location, ensuring every thread observes a strictly unique, monotonically increasing `u64` value.
+    /// Because `DecisionId` generation does not publish or synchronize access to other shared memory locations
+    /// (synchronization for decision tracking is handled independently via `pending_decisions` lock or `ArcSwap`),
+    /// acquire/release memory barriers are unnecessary. Using `Ordering::Relaxed` avoids memory fence overhead
+    /// on weak-memory architectures (ARM/RISC-V) without violating monotonicity or uniqueness invariants.
     pub fn next(&self) -> DecisionId {
         DecisionId::from_raw(self.next.fetch_add(1, Ordering::Relaxed))
     }
