@@ -22,7 +22,7 @@ test-utils = []
 [dependencies]
 contextra = { workspace = true, features = ["router"] }
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true, features = ["test-utils"] }
+contextra-ports = { workspace = true }
 contextra-license = { workspace = true }
 contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }

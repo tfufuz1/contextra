@@ -136,3 +136,7 @@ harness = false
 [[bench]]
 name = "redb_comparative_bench"
 harness = false
+
+[[bench]]
+name = "fence_hot_path"
+harness = false
