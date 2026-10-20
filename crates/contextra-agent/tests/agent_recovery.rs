@@ -366,7 +366,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
 
     // Simulate an abrupt step drop (uncommitted guard)
     let orphan_cp = contextra_checkpoint::StateCheckpoint {
-        tx_id: contextra_types::TxId::new(505),
+        tx_id: contextra_types::TxId::try_new(505).unwrap(),
         timestamp_ms: 1000,
         namespace: Some("agent".to_string()),
     };
@@ -382,7 +382,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     assert!(
         initial_orphans
             .iter()
-            .any(|cp| cp.tx_id == contextra_types::TxId::new(505)),
+            .any(|cp| cp.tx_id == contextra_types::TxId::try_new(505).unwrap()),
         "Orphaned checkpoint 505 must be registered in engine_a"
     );
 
@@ -418,7 +418,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     if let Some(registry) = engine_b.checkpoint_store.orphan_registry() {
         let remaining = registry.get_orphaned_checkpoints();
         assert!(
-            !remaining.iter().any(|cp| cp.tx_id == contextra_types::TxId::new(505)),
+            !remaining.iter().any(|cp| cp.tx_id == contextra_types::TxId::try_new(505).unwrap()),
             "Orphaned checkpoint 505 must be recovered and cleared after OrchestratorEngine startup recovery"
         );
     }

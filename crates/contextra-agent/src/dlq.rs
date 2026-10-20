@@ -222,14 +222,36 @@ impl DeadLetterQueue {
         let counter = self
             .next_tx
             .get_or_try_init(|| async {
-                let last_tx = self.storage.last_tx_id().await?.0;
-                Ok::<AtomicU64, ContextraError>(AtomicU64::new(last_tx + 1))
+                let last_tx = self.storage.last_tx_id().await?.inner();
+                let initial = last_tx.checked_add(1).ok_or_else(|| {
+                    ContextraError::Transaction("Initial TxId overflow beyond u64::MAX".to_string())
+                })?;
+                Ok::<AtomicU64, ContextraError>(AtomicU64::new(initial))
             })
             .await?;
 
-        // AI-TAG[SMELL][MINOR] RESOLVED: AGT-AGENT-49bfd02e — Replaced non-atomic last_tx_id + 1 read with OnceCell initialized AtomicU64 fetch_add. (TS: 2026-09-11T14:30:00Z)
-        let tx_val = counter.fetch_add(1, Ordering::SeqCst);
-        Ok(TxId::new(tx_val))
+        // ORDERING-BEGRÜNDUNG:
+        // Ordering::SeqCst in `fetch_update` gewährleistet eine strikt globale Sequenzordnung aller
+        // allozierten Transaktions-IDs über sämtliche nebenläufigen Threads hinweg.
+        // Der CAS-Loop stellt sicher, dass Werte an der Bereichsgrenze (MAX_COLLECTION_SEQUENCE
+        // bzw. u64::MAX) mit Err abgelehnt werden, statt im Unmanaged-Gap zu landen oder umzubrechen (wrap-around).
+        let tx_val = counter
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
+                if val == u64::MAX {
+                    None // Overflow - reject wrap-around at upper boundary
+                } else if val > TxId::MAX_COLLECTION_SEQUENCE && val < TxId::INTERNAL_BASE {
+                    None // In the invalid origin gap (AGT-GRAPH-001) - reject
+                } else {
+                    Some(val + 1)
+                }
+            })
+            .map_err(|_| {
+                ContextraError::Transaction(
+                    "TxId sequence overflow or invalid range boundary reached".to_string(),
+                )
+            })?;
+
+        TxId::try_new(tx_val)
     }
 }
 
@@ -310,7 +332,9 @@ mod tests {
 
         let events = metrics.events();
         assert!(!events.is_empty());
-        let last_event = events.last().cloned().unwrap();
+        let last_event = events.last().cloned().ok_or_else(|| {
+            ContextraError::Internal("Expected at least one metric event".to_string())
+        })?;
         assert_eq!(
             last_event,
             MetricEvent::Gauge {
@@ -323,14 +347,239 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_allocate_tx_concurrent_n_threads_m_calls() -> Result<()> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let dlq = Arc::new(DeadLetterQueue::new(storage));
+
+        const THREADS: usize = 8;
+        const CALLS_PER_THREAD: usize = 50;
+
+        let mut handles = Vec::new();
+
+        for _ in 0..THREADS {
+            let dlq_clone = Arc::clone(&dlq);
+            handles.push(tokio::spawn(async move {
+                let mut local_txs = Vec::with_capacity(CALLS_PER_THREAD);
+                for _ in 0..CALLS_PER_THREAD {
+                    let tx = dlq_clone.allocate_tx().await?;
+                    assert!(
+                        tx.is_valid_origin(),
+                        "Allocated TxId must have valid origin range"
+                    );
+                    local_txs.push(tx);
+                }
+                Ok::<Vec<TxId>, ContextraError>(local_txs)
+            }));
+        }
+
+        let mut all_txs = Vec::with_capacity(THREADS * CALLS_PER_THREAD);
+        for handle in handles {
+            let thread_txs = handle
+                .await
+                .map_err(|e| ContextraError::Internal(e.to_string()))??;
+
+            // Strictly monotonic per thread
+            for window in thread_txs.windows(2) {
+                if let (Some(w0), Some(w1)) = (window.first(), window.get(1)) {
+                    assert!(
+                        w0 < w1,
+                        "Per-thread TxId sequence must be strictly monotonic"
+                    );
+                }
+            }
+
+            all_txs.extend(thread_txs);
+        }
+
+        // Global uniqueness across all threads
+        let total_count = all_txs.len();
+        let unique_count = all_txs
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        assert_eq!(
+            unique_count, total_count,
+            "All allocated TxIds across threads must be distinct"
+        );
+
+        Ok(())
+    }
+
+    #[derive(Debug)]
+    struct BoundaryStorageEngine {
+        last_tx: TxId,
+    }
+
+    impl BoundaryStorageEngine {
+        fn new(last_tx: TxId) -> Self {
+            Self { last_tx }
+        }
+    }
+
+    impl Default for BoundaryStorageEngine {
+        fn default() -> Self {
+            Self {
+                last_tx: TxId::INVALID,
+            }
+        }
+    }
+
+    impl StorageEngine for BoundaryStorageEngine {
+        fn get<'a>(
+            &'a self,
+            _key: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _key: &'a [u8],
+            _seq: u64,
+        ) -> contextra_ports::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(
+            &'a self,
+            _tx: TxId,
+            _k: &'a [u8],
+            _v: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn put_if_absent<'a>(
+            &'a self,
+            _tx: TxId,
+            _k: &'a [u8],
+            _v: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, Result<bool>> {
+            Box::pin(async move { Ok(true) })
+        }
+        fn delete<'a>(
+            &'a self,
+            _tx: TxId,
+            _k: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, Result<contextra_ports::StorageStats>> {
+            Box::pin(async move {
+                Ok(contextra_ports::StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<TxId>> {
+            let tx = self.last_tx;
+            Box::pin(async move { Ok(tx) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _seq: u64) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _seq: u64) -> contextra_ports::BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _p: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _s: std::ops::Bound<&'a [u8]>,
+            _e: std::ops::Bound<&'a [u8]>,
+            _l: Option<usize>,
+        ) -> contextra_ports::BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+    }
+
     #[tokio::test]
-    async fn test_dlq_allocate_tx_uniqueness() -> Result<()> {
+    async fn test_allocate_tx_collection_sequence_boundary_returns_err() -> Result<()> {
+        let storage = Arc::new(BoundaryStorageEngine::new(TxId::try_new(
+            TxId::MAX_COLLECTION_SEQUENCE,
+        )?));
+        let dlq = DeadLetterQueue::new(storage);
+
+        // First allocation sees counter initialized at MAX_COLLECTION_SEQUENCE + 1 (in the gap)
+        let res = dlq.allocate_tx().await;
+        assert!(
+            res.is_err(),
+            "Allocation exceeding MAX_COLLECTION_SEQUENCE must return Err instead of emitting gap TxId"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_allocate_tx_u64_max_overflow_returns_err() -> Result<()> {
+        let storage = Arc::new(BoundaryStorageEngine::new(TxId::try_new(u64::MAX)?));
+        let dlq = DeadLetterQueue::new(storage);
+
+        let res = dlq.allocate_tx().await;
+        assert!(
+            res.is_err(),
+            "Allocation wrapping u64::MAX must return Err rather than wrapping around to 0"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dlq_poison_messages_returns_serialization_error() -> Result<()> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let dlq = DeadLetterQueue::new(storage.clone());
+
+        // Insert corrupt non-JSON payload into DLQ key
+        let tx = TxId::try_new(1)?;
+        storage
+            .put(tx, b"dlq:sess-poison:node:0", b"not-valid-json-content")
+            .await?;
+
+        let list_res = dlq.list().await;
+        assert!(
+            matches!(list_res, Err(ContextraError::Serialization(_))),
+            "Corrupt JSON payload in DLQ must return ContextraError::Serialization"
+        );
+
+        let drain_res = dlq.drain().await;
+        assert!(
+            matches!(drain_res, Err(ContextraError::Serialization(_))),
+            "Drain on poison message in DLQ must return ContextraError::Serialization"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dlq_empty_queue_ops() -> Result<()> {
         let storage = Arc::new(InMemoryStorageEngine::new());
         let dlq = DeadLetterQueue::new(storage);
 
-        let tx1 = dlq.allocate_tx().await?;
-        let tx2 = dlq.allocate_tx().await?;
-        assert_ne!(tx1, tx2);
+        let listed = dlq.list().await?;
+        assert!(listed.is_empty());
+
+        let drained = dlq.drain().await?;
+        assert!(drained.is_empty());
+
         Ok(())
     }
 
@@ -371,9 +620,12 @@ mod tests {
         dlq.push(&letter1).await?;
         let events = metrics.events();
         assert!(!events.is_empty());
-        let last_event = events.last().cloned().unwrap();
+        let last_event1 = events
+            .last()
+            .cloned()
+            .ok_or_else(|| ContextraError::Internal("Expected metric event".to_string()))?;
         assert_eq!(
-            last_event,
+            last_event1,
             MetricEvent::Gauge {
                 name: "dlq_depth".to_string(),
                 value: 1.0,
@@ -385,9 +637,12 @@ mod tests {
         metrics.clear();
         dlq.push(&letter2).await?;
         let events = metrics.events();
-        let last_event = events.last().cloned().unwrap();
+        let last_event2 = events
+            .last()
+            .cloned()
+            .ok_or_else(|| ContextraError::Internal("Expected metric event".to_string()))?;
         assert_eq!(
-            last_event,
+            last_event2,
             MetricEvent::Gauge {
                 name: "dlq_depth".to_string(),
                 value: 2.0,
@@ -400,9 +655,12 @@ mod tests {
         let removed = dlq.remove(&letter1).await?;
         assert!(removed);
         let events = metrics.events();
-        let last_event = events.last().cloned().unwrap();
+        let last_event3 = events
+            .last()
+            .cloned()
+            .ok_or_else(|| ContextraError::Internal("Expected metric event".to_string()))?;
         assert_eq!(
-            last_event,
+            last_event3,
             MetricEvent::Gauge {
                 name: "dlq_depth".to_string(),
                 value: 1.0,
@@ -415,9 +673,12 @@ mod tests {
         let drained = dlq.drain().await?;
         assert_eq!(drained.len(), 1);
         let events = metrics.events();
-        let last_event = events.last().cloned().unwrap();
+        let last_event4 = events
+            .last()
+            .cloned()
+            .ok_or_else(|| ContextraError::Internal("Expected metric event".to_string()))?;
         assert_eq!(
-            last_event,
+            last_event4,
             MetricEvent::Gauge {
                 name: "dlq_depth".to_string(),
                 value: 0.0,
