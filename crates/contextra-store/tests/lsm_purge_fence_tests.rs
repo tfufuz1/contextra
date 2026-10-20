@@ -14,23 +14,23 @@ async fn test_erasure_fence_blocking() -> contextra_core::Result<()> {
 
     // 1. Initial write permitted
     storage.put(TxId(1), b"key1", b"val1").await?;
-    assert!(storage.erasure_fence.check_write_allowed(b"key1"));
+    assert!(storage.erasure_fence().check_write_allowed(b"key1"));
 
     // 2. Acquire scope fence
-    storage.erasure_fence.acquire_scope_fence();
-    assert!(!storage.erasure_fence.check_write_allowed(b"key1"));
+    storage.erasure_fence().acquire_scope_fence();
+    assert!(!storage.erasure_fence().check_write_allowed(b"key1"));
 
     // 3. Release scope fence
-    storage.erasure_fence.release_scope_fence();
-    assert!(storage.erasure_fence.check_write_allowed(b"key1"));
+    storage.erasure_fence().release_scope_fence();
+    assert!(storage.erasure_fence().check_write_allowed(b"key1"));
 
     // 4. Lock document
-    storage.erasure_fence.lock_documents(&[b"key1".to_vec()]);
-    assert!(!storage.erasure_fence.check_write_allowed(b"key1"));
-    assert!(storage.erasure_fence.check_write_allowed(b"key2"));
+    storage.erasure_fence().lock_documents(&[b"key1".to_vec()]);
+    assert!(!storage.erasure_fence().check_write_allowed(b"key1"));
+    assert!(storage.erasure_fence().check_write_allowed(b"key2"));
 
-    storage.erasure_fence.unlock_documents(&[b"key1".to_vec()]);
-    assert!(storage.erasure_fence.check_write_allowed(b"key1"));
+    storage.erasure_fence().unlock_documents(&[b"key1".to_vec()]);
+    assert!(storage.erasure_fence().check_write_allowed(b"key1"));
 
     Ok(())
 }

@@ -137,7 +137,7 @@ async fn test_all_write_paths_respect_fence() {
 
     // 1. Install fence via locked helper / sync call
     let guard = storage
-        .erasure_fence
+        .erasure_fence()
         .acquire_scope_fence_for(vec![b"locked:".to_vec()])
         .unwrap();
 
@@ -177,7 +177,7 @@ async fn test_all_write_paths_respect_fence() {
         .unwrap();
 
     let _guard2 = storage
-        .erasure_fence
+        .erasure_fence()
         .acquire_scope_fence_for(vec![b"locked:".to_vec()])
         .unwrap();
 
