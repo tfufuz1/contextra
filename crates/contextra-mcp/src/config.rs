@@ -74,13 +74,13 @@ impl EmbeddingConfig {
         }
 
         if trimmed_provider.eq_ignore_ascii_case("mock") {
-            #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+            #[cfg(any(test, feature = "test-utils"))]
             {
                 tracing::warn!("Embedding-Provider 'mock' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
                 let embedder = contextra_ports::MockEmbedder::new(768);
                 return Ok(Arc::new(embedder));
             }
-            #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+            #[cfg(not(any(test, feature = "test-utils")))]
             {
                 return Err(ContextraError::InvalidInput(
                     "Embedding-Provider 'mock' ist in Release-Builds deaktiviert".to_string(),
@@ -99,13 +99,13 @@ pub fn create_embedding_provider(
     backend: &EmbeddingBackend,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match backend {
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+        #[cfg(any(test, feature = "test-utils"))]
         EmbeddingBackend::None => {
             tracing::warn!("Embedding-Provider 'mock' / 'none' ist explizit gesetzt. Es findet keine echte semantische Suche statt!");
             let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+        #[cfg(not(any(test, feature = "test-utils")))]
         EmbeddingBackend::None => Err(ContextraError::InvalidInput(
             "Kein Embedding-Backend konfiguriert".to_string(),
         )),
@@ -169,12 +169,12 @@ pub fn create_llm_text_generator(
     provider_type: &str,
 ) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
     match provider_type.to_lowercase().trim() {
-        #[cfg(any(test, debug_assertions, feature = "test-utils"))]
+        #[cfg(any(test, feature = "test-utils"))]
         "mock" => {
             let generator = MockLlmGenerator;
             Ok(Arc::new(generator))
         }
-        #[cfg(not(any(test, debug_assertions, feature = "test-utils")))]
+        #[cfg(not(any(test, feature = "test-utils")))]
         "mock" => Err(ContextraError::InvalidInput(
             "LLM-Provider 'mock' ist in Release-Builds deaktiviert".to_string(),
         )),
@@ -289,9 +289,11 @@ impl IpcConfig {
 }
 
 /// Fallback Mock LLM Text Generator.
+#[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Clone, Default)]
 pub struct MockLlmGenerator;
 
+#[cfg(any(test, feature = "test-utils"))]
 impl LlmTextGenerator for MockLlmGenerator {
     fn generate<'a>(
         &'a self,
