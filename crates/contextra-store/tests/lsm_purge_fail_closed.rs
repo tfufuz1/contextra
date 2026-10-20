@@ -60,7 +60,7 @@ async fn test_purge_keys_returns_insufficient_free_space_fail_closed() -> Result
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    match res.unwrap_err() {
+    match PurgeBlocked::from(res.unwrap_err()) {
         PurgeBlocked::InsufficientDiskSpace { needed, free } => {
             assert!(needed > 0);
             assert_eq!(free, 0);
@@ -91,7 +91,7 @@ async fn test_purge_keys_active_snapshot_precedence() -> Result<()> {
     // Call purge_keys as_of_tx = 100 (min_active_seq 50 <= as_of_tx 100)
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
     assert_eq!(
-        res.unwrap_err(),
+        PurgeBlocked::from(res.unwrap_err()),
         PurgeBlocked::ActiveSnapshot { min_seq: 50 }
     );
 
@@ -126,7 +126,7 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> Result<()> {
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert!(matches!(res.unwrap_err(), PurgeBlocked::InsufficientDiskSpace { .. }));
+    assert!(matches!(PurgeBlocked::from(res.unwrap_err()), PurgeBlocked::InsufficientDiskSpace { .. }));
 
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(

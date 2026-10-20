@@ -39,7 +39,7 @@ async fn test_purge_keys_insufficient_disk_space() -> Result<()> {
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    match res.unwrap_err() {
+    match PurgeBlocked::from(res.unwrap_err()) {
         PurgeBlocked::InsufficientDiskSpace { needed, free } => {
             assert!(needed > 0);
             assert_eq!(free, 0);
