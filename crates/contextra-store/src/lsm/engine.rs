@@ -112,6 +112,11 @@ impl LsmStorage {
         self.read_only
     }
 
+    /// Returns a reference to the erasure fence protecting this storage instance.
+    pub fn erasure_fence(&self) -> &Arc<super::fence::ErasureFence> {
+        &self.erasure_fence
+    }
+
     pub fn ledger_state(&self) -> crate::erasure_ledger::LedgerOpenStatus {
         self.ledger_status.clone()
     }
