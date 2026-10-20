@@ -413,21 +413,25 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            if let Err(e) = file.set_len(size_before).await {
+                            let set_len_res = file.set_len(size_before).await;
+                            if let Err(ref e) = set_len_res {
                                 tracing::warn!(
                                     wal_path = %path.display(),
                                     error = %e,
                                     "Failed to truncate file length to size_before during append write error recovery"
                                 );
                             }
-                            if let Err(e) = file.seek(std::io::SeekFrom::Start(size_before)).await {
+                            let seek_res = file.seek(std::io::SeekFrom::Start(size_before)).await;
+                            if let Err(ref e) = seek_res {
                                 tracing::warn!(
                                     wal_path = %path.display(),
                                     error = %e,
                                     "Failed to seek to size_before during append write error recovery"
                                 );
                             }
-                            poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                            if set_len_res.is_err() || seek_res.is_err() {
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                            }
 
                             for ack in acks {
                                 let _ =
