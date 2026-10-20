@@ -200,7 +200,11 @@ mod support_canary {
             }
 
             /// Generates search needles for a vector canary.
-            pub fn build_vector_needles(&self, vec_canary: &[f32], label: &str) -> Vec<SearchNeedle> {
+            pub fn build_vector_needles(
+                &self,
+                vec_canary: &[f32],
+                label: &str,
+            ) -> Vec<SearchNeedle> {
                 let canary_id = format!("{}_{}_vec", self.owner_person, label);
                 let mut bytes = Vec::with_capacity(vec_canary.len() * 4);
                 for &val in vec_canary {
@@ -238,7 +242,8 @@ mod support_canary {
         }
 
         fn base64_encode(data: &[u8]) -> String {
-            const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            const B64_CHARS: &[u8] =
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
 
             for chunk in data.chunks(3) {
