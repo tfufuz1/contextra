@@ -71,11 +71,63 @@ impl ErasureGate {
         }
     }
 
-    // TODO(WP-6 / PR-9 Schritt 1): `enter_write` mit RAII `WriteTicket` implementieren:
-    // Um Check-then-Act Races (Befund N8) im Schreiber zu verhindern, muss `enter_write` atomar:
-    // 1. `self.inc_inflight()` unter `SeqCst` ausführen.
-    // 2. Prüfen, ob `self.active` gesetzt ist (unter `SeqCst`). Falls ja, Keys gegen Präfix-Tabelle prüfen.
-    // 3. Ein RAII `WriteTicket` zurückgeben, das bei Drop automatisch `dec_inflight()` aufruft.
+    /// Enters write scope by incrementing inflight counter atomically (`SeqCst`),
+    /// checking active fence status (`SeqCst`), and validating keys against prefix fences.
+    ///
+    /// If fence is active and any key violates active prefixes, `dec_inflight()` is called
+    /// and `FenceError::CollectionDropping` is returned.
+    ///
+    /// Returns a RAII `WriteTicket` that automatically decrements the inflight counter on drop.
+    pub fn enter_write<'a, 'k, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
+    where
+        I: IntoIterator<Item = &'k [u8]>,
+    {
+        self.inc_inflight();
+
+        if self.active.load(Ordering::SeqCst) {
+            let key_vec: Vec<&'k [u8]> = keys.into_iter().collect();
+            let mut blocked = false;
+
+            #[cfg(not(loom))]
+            {
+                let table = self.table.load();
+                'outer: for pf in table.iter() {
+                    for prefix in &pf.prefixes {
+                        for key in &key_vec {
+                            if prefix.is_empty() || key.starts_with(prefix) {
+                                blocked = true;
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+
+            #[cfg(loom)]
+            {
+                if let Ok(table) = self.table.read() {
+                    'outer: for pf in table.iter() {
+                        for prefix in &pf.prefixes {
+                            for key in &key_vec {
+                                if prefix.is_empty() || key.starts_with(prefix) {
+                                    blocked = true;
+                                    break 'outer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if blocked {
+                self.dec_inflight();
+                return Err(FenceError::CollectionDropping);
+            }
+        }
+
+        Ok(WriteTicket { gate: self })
+    }
+
     /// Fast-path check: returns whether any scope fence is active.
     #[inline]
     pub fn is_active(&self) -> bool {
@@ -220,12 +272,9 @@ impl ErasureGate {
             }
         }
 
-        // TODO(WP-6 / PR-9 Schritt 3 / N9): `Ordering::Release` -> `Ordering::SeqCst` im Dekker-Muster:
-        // Befund N9: `self.active.store(true, Ordering::Release)` reicht nicht aus, um CPU-Store-Buffer-Reordering
-        // gegen den anschließenden Load von `self.inflight` zu verhindern (klassisches Dekker-Muster).
-        // Beide Operationen müssen mit `Ordering::SeqCst` ausgeführt werden, damit Schreiber und
+        // N9: Ordering::SeqCst im Dekker-Muster, damit Schreiber und
         // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
-        self.active.store(true, Ordering::Release);
+        self.active.store(true, Ordering::SeqCst);
 
         // Drain phase: wait until inflight == 0
         let start = std::time::Instant::now();
@@ -269,7 +318,7 @@ impl ErasureGate {
             let is_empty = new_table.is_empty();
             self.table.store(Arc::new(new_table));
             if is_empty {
-                self.active.store(false, Ordering::Release);
+                self.active.store(false, Ordering::SeqCst);
             }
             removed
         }
@@ -281,7 +330,7 @@ impl ErasureGate {
                 table.retain(|f| f.purge_id != purge_id);
                 let removed = table.len() < len_before;
                 if table.is_empty() {
-                    self.active.store(false, Ordering::Release);
+                    self.active.store(false, Ordering::SeqCst);
                 }
                 removed
             } else {
@@ -337,7 +386,9 @@ mod tests {
         assert!(write_gate.is_active());
 
         let batch_allowed = [b"key2".as_slice(), b"key3".as_slice()];
-        assert!(write_gate.check_batch(&mut batch_allowed.into_iter()).is_ok());
+        assert!(write_gate
+            .check_batch(&mut batch_allowed.into_iter())
+            .is_ok());
 
         let batch_blocked = [b"key2".as_slice(), b"key1_sub".as_slice()];
         assert_eq!(
@@ -347,7 +398,9 @@ mod tests {
 
         gate.release_fence(101);
         assert!(!write_gate.is_active());
-        assert!(write_gate.check_batch(&mut batch_blocked.into_iter()).is_ok());
+        assert!(write_gate
+            .check_batch(&mut batch_blocked.into_iter())
+            .is_ok());
     }
 
     #[tokio::test]
@@ -375,10 +428,7 @@ mod tests {
             Err(FenceError::CollectionDropping)
         );
         assert_eq!(
-            fence.check_write_allowed_batch([
-                b"scope2:key2".as_slice(),
-                b"scope1:key1".as_slice()
-            ]),
+            fence.check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope1:key1".as_slice()]),
             Err(FenceError::CollectionDropping)
         );
 
@@ -392,6 +442,18 @@ mod tests {
         fence.gate.release_fence(101);
         assert!(!fence.is_active());
         assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
+    }
+}
+
+/// RAII Guard that decrements inflight counter when dropped.
+#[derive(Debug)]
+pub struct WriteTicket<'a> {
+    gate: &'a ErasureGate,
+}
+
+impl<'a> Drop for WriteTicket<'a> {
+    fn drop(&mut self) {
+        self.gate.dec_inflight();
     }
 }
 
@@ -489,6 +551,31 @@ impl ErasureFence {
     #[inline]
     pub fn is_active(&self) -> bool {
         self.active_fences.load(Ordering::Acquire) > 0 || self.gate.is_active()
+    }
+
+    /// Atomically enters write scope for a batch of keys, returning a RAII `WriteTicket`.
+    pub fn enter_write<'a, 'k, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
+    where
+        I: IntoIterator<Item = &'k [u8]>,
+    {
+        let key_vec: Vec<&'k [u8]> = keys.into_iter().collect();
+        if self.is_active() {
+            let state = *self.scope_state.read();
+            if state == FenceScopeState::CollectionDropping {
+                self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+                return Err(FenceError::CollectionDropping);
+            }
+
+            let locked_docs = self.locked_doc_ids.read();
+            for key in &key_vec {
+                if locked_docs.contains(*key) {
+                    self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+                    return Err(FenceError::Conflict);
+                }
+            }
+        }
+
+        self.gate.enter_write(key_vec)
     }
 
     /// Checks if a scope-wide, prefix-based, or document-level write block is currently active for `key`.
@@ -710,7 +797,8 @@ impl ErasureFence {
                 self.active_fence_count.fetch_add(1, Ordering::SeqCst);
             }
         }
-        self.active_fences.fetch_add(doc_ids.len() as u32, Ordering::Release);
+        self.active_fences
+            .fetch_add(doc_ids.len() as u32, Ordering::Release);
 
         Ok(FenDocLockGuard {
             fence: self,
