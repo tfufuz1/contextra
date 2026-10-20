@@ -478,13 +478,13 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
 
     let target_doc_id = DocId::new(42);
     let intent = CommitIntent::Consolidation {
-        source_docs: vec![(DocId::new(1), TxId::new(1))],
+        source_docs: vec![(DocId::new(1), TxId::try_new(1).expect("TxId 1"))],
         target_id: target_doc_id,
-        base_tx: TxId::new(5),
+        base_tx: TxId::try_new(5).expect("TxId 5"),
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
 
-    let setup_tx = TxId::new(1);
+    let setup_tx = TxId::try_new(1).expect("TxId 1");
     lsm.put(setup_tx, b"consolidation_intent:1", &intent_bytes)
         .await?;
     lsm.commit(setup_tx).await?;
