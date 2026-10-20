@@ -173,6 +173,7 @@ pub struct Ring3Token {
 /// # Architektur-Hinweis (AK-18)
 /// Darf ausschließlich im Ring-3-Hintergrundtask aufgerufen werden. Ein automatisierter
 /// Architektur-Lint prüft die Einhaltung dieser Regel über den gesamten Workspace.
+#[cfg(feature = "flow-corrected-thompson")]
 pub fn ring3_background_task_token() -> Ring3Token {
     Ring3Token { _private: () }
 }
@@ -878,5 +879,55 @@ mod tests {
 
         cfg.dim = 0;
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_arm_set_determinism_identical_runs() {
+        let cfg = FcTsConfig {
+            dim: 4,
+            window_capacity: 50,
+            ..Default::default()
+        };
+        let mut arm0_a = FlowCorrectedThompsonBandit::new(cfg.clone()).unwrap();
+        let mut arm1_a = FlowCorrectedThompsonBandit::new(cfg.clone()).unwrap();
+
+        let mut arm0_b = FlowCorrectedThompsonBandit::new(cfg.clone()).unwrap();
+        let mut arm1_b = FlowCorrectedThompsonBandit::new(cfg.clone()).unwrap();
+
+        let token = ring3_background_task_token();
+
+        for t in 0..20 {
+            let ctx = [(t as f32) * 0.1, 0.2, -0.3, 0.5];
+            arm0_a.update_with_flow(&ctx, 1.0, t as u64, 1.0).unwrap();
+            arm1_a.update_with_flow(&ctx, 0.5, t as u64, 1.0).unwrap();
+
+            arm0_b.update_with_flow(&ctx, 1.0, t as u64, 1.0).unwrap();
+            arm1_b.update_with_flow(&ctx, 0.5, t as u64, 1.0).unwrap();
+        }
+
+        arm0_a.recompute_drift_rate_from_window(&token);
+        arm1_a.recompute_drift_rate_from_window(&token);
+        arm0_b.recompute_drift_rate_from_window(&token);
+        arm1_b.recompute_drift_rate_from_window(&token);
+
+        let set_a = FcTsArmSet {
+            arms: vec![arm0_a, arm1_a],
+        };
+        let set_b = FcTsArmSet {
+            arms: vec![arm0_b, arm1_b],
+        };
+
+        let mut rng_a = SplitMix64::new(9999);
+        let mut rng_b = SplitMix64::new(9999);
+
+        let test_ctx = [0.1, 0.2, 0.3, 0.4];
+        let selections_a: Vec<u32> = (0..50)
+            .map(|_| set_a.select_arm(&test_ctx, &mut rng_a).unwrap())
+            .collect();
+        let selections_b: Vec<u32> = (0..50)
+            .map(|_| set_b.select_arm(&test_ctx, &mut rng_b).unwrap())
+            .collect();
+
+        assert_eq!(selections_a, selections_b);
     }
 }

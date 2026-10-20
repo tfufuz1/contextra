@@ -8,7 +8,7 @@
 //! NOTE: `RerankPidController` is deprecated in favor of `crate::PoolController`.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use contextra_ports::{Clock, SystemClock};
 #[cfg(test)]
@@ -138,9 +138,9 @@ impl RerankDeadline {
         elapsed_nanos >= self.budget.as_nanos() as u64
     }
 
-    /// Checks if the elapsed time since `started_at` equals or exceeds the deadline budget.
-    pub fn deadline_exceeded(&self, started_at: Instant) -> bool {
-        started_at.elapsed() >= self.budget
+    /// Checks if the elapsed time since `started_at_nanos` equals or exceeds the deadline budget.
+    pub fn deadline_exceeded(&self, started_at_nanos: u64) -> bool {
+        self.deadline_exceeded_nanos(started_at_nanos)
     }
 }
 

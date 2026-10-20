@@ -50,6 +50,19 @@ impl PlattScaler {
         (self.a, self.b)
     }
 
+    /// Constructs a [`SignalCalibrationContext`](crate::fusion::SignalCalibrationContext) for this scaler given a signal name and drift status.
+    pub fn calibration_context(
+        &self,
+        signal_name: impl Into<String>,
+        drift_status: crate::drift::DriftStatus,
+    ) -> crate::fusion::SignalCalibrationContext {
+        crate::fusion::SignalCalibrationContext::new(
+            signal_name,
+            self.is_fitted(),
+            drift_status,
+        )
+    }
+
     /// Calculates calibrated probability for raw score.
     pub fn predict(&self, raw_score: f32) -> f32 {
         self.transform(raw_score)
