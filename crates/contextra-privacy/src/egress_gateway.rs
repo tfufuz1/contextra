@@ -297,16 +297,12 @@ fn evaluate_classification_result(classification: EgressClassification) -> Resul
             )))
         }
         EgressClassification::Block(BlockReason::PolicyDenied(reason))
-        | EgressClassification::Block(BlockReason::EgressPolicyDenied(reason)) => {
-            Err(block_policy_violation(format!(
-                "Egress policy violation: {reason}"
-            )))
-        }
-        EgressClassification::Block(BlockReason::ClassificationTimeout) => {
-            Err(block_policy_violation(
-                "Egress policy violation: classification evaluation timeout",
-            ))
-        }
+        | EgressClassification::Block(BlockReason::EgressPolicyDenied(reason)) => Err(
+            block_policy_violation(format!("Egress policy violation: {reason}")),
+        ),
+        EgressClassification::Block(BlockReason::ClassificationTimeout) => Err(
+            block_policy_violation("Egress policy violation: classification evaluation timeout"),
+        ),
         EgressClassification::Block(BlockReason::InternalError(err)) => Err(
             EgressError::internal_error(format!("Egress policy violation: {err}")),
         ),

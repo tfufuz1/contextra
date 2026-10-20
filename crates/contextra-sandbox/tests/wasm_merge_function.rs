@@ -1,5 +1,7 @@
 //! Integration tests for WasmMergeFunction (§4.18).
 
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use contextra_sandbox::{SandboxError, WasmMergeFunction};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;

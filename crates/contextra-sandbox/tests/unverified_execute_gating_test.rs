@@ -1,8 +1,8 @@
 //! Integration test for `unverified-execute` feature gating (§4.18).
 
-use contextra_sandbox::{MergeOperatorCapabilities, WasmCapabilities, WasmExecutor};
 #[cfg(not(feature = "unverified-execute"))]
 use contextra_sandbox::SandboxError;
+use contextra_sandbox::{MergeOperatorCapabilities, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
