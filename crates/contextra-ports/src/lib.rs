@@ -69,9 +69,8 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-// TODO(WP-S1 / PR-3 Schritt 2): `crates/contextra-ports/src/secret.rs` anlegen und `pub mod secret;` hier registrieren.
-// Soll den Typ `SecretBytes<N>` basierend auf `zeroize::Zeroizing` (oder manuell geschütztem Nullifying bei Drop)
-// implementieren, um kryptographisches Schlüsselmaterial im Speicher typsicher vor Leaks und Dumps zu schützen.
+/// Secret bytes port abstractions for secure key and seed handling.
+pub mod secret;
 /// Read snapshot and snapshot reader port traits (§7.2).
 pub mod snapshot;
 /// Key-value storage engine traits.
@@ -104,6 +103,7 @@ pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
+pub use secret::*;
 pub use snapshot::*;
 pub use storage::*;
 pub use text_index::*;
@@ -124,6 +124,7 @@ mod dyn_safety {
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
+    fn _assert_dyn_crypto_rng(_: Option<&dyn CryptoRng>) {}
     fn _assert_dyn_entropy_rng(_: Option<&dyn EntropyRng>) {}
     fn _assert_dyn_seeded_rng(_: Option<&dyn SeededRng>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
@@ -152,6 +153,7 @@ mod dyn_safety {
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
+        _assert_dyn_crypto_rng(None);
         _assert_dyn_entropy_rng(None);
         _assert_dyn_seeded_rng(None);
         _assert_dyn_rng(None);

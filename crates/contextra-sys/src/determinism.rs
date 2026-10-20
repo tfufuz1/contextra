@@ -65,6 +65,35 @@ impl Default for SystemClock {
     }
 }
 
+#[cfg(feature = "ports")]
+impl contextra_ports::Clock for SystemClock {
+    fn now(&self) -> contextra_ports::DeterministicTimestamp {
+        let wall_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+            .unwrap_or(0);
+        let mono_ctr = u64::try_from(
+            Instant::now()
+                .saturating_duration_since(self.start_instant)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX);
+        contextra_ports::DeterministicTimestamp::new(wall_ms, mono_ctr)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.monotonic_nanos()
+    }
+
+    fn now_unix_nanos(&self) -> u64 {
+        SystemClock::now_unix_nanos(self)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        SystemClock::monotonic_nanos(self)
+    }
+}
+
 /// A fast, thread-safe SplitMix64 pseudorandom generator seeded with process entropy.
 #[derive(Debug)]
 pub struct SeededRng {
@@ -162,6 +191,36 @@ impl SystemRng {
 impl Default for SystemRng {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "ports")]
+impl contextra_ports::SeededRng for SeededRng {
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SeededRng::fill_bytes(self, dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        SeededRng::next_unit_f64(self)
+    }
+}
+
+#[cfg(feature = "ports")]
+impl contextra_ports::SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        SystemRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SystemRng::fill_bytes(self, dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        SystemRng::next_unit_f64(self)
     }
 }
 
