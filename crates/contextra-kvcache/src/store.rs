@@ -409,7 +409,11 @@ impl TenantIsolatedKvStore {
     }
 
     /// Versucht, ein Segment für einen bestimmten Tenant einzufügen und gibt eventuelle Validierungsfehler zurück.
-    pub fn try_insert_segment(&self, tenant: TenantId, segment: KvSegment) -> Result<(), ContextraError> {
+    pub fn try_insert_segment(
+        &self,
+        tenant: TenantId,
+        segment: KvSegment,
+    ) -> Result<(), ContextraError> {
         self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto)
     }
 
@@ -644,6 +648,9 @@ impl TenantIsolatedKvStore {
 
         'outer: while freed < target_free_bytes {
             let mut made_progress_in_pass = false;
+            // ORDERING RATIONALE: Ordering::Relaxed is sufficient because global_shard_offset is
+            // a round-robin heuristic index for eviction starting shard across threads.
+            // No safety or data invariant depends on cross-thread synchronization of this index.
             let start_shard =
                 self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
 
@@ -668,6 +675,9 @@ impl TenantIsolatedKvStore {
                             let tenants: Vec<TenantId> = shard.keys().copied().collect();
                             let n = tenants.len();
                             if n > 0 {
+                                // ORDERING RATIONALE: Ordering::Relaxed is sufficient because eviction_round_offsets
+                                // is a round-robin heuristic index for tenant selection inside shard locks.
+                                // Mutex/RwLock synchronizes state; relaxed atomic increment suffices for fair round distribution.
                                 let offset = self.eviction_round_offsets[shard_idx]
                                     .fetch_add(1, Ordering::Relaxed)
                                     % n;

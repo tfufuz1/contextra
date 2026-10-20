@@ -287,7 +287,8 @@ impl KvSegment {
                 }
                 if !block.meta.scale.is_finite() || !block.meta.zero_point.is_finite() {
                     return Err(ContextraError::InvalidInput(
-                        "KIVI quantization meta contains non-finite scale or zero_point".to_string(),
+                        "KIVI quantization meta contains non-finite scale or zero_point"
+                            .to_string(),
                     ));
                 }
                 Ok(())
