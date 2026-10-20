@@ -270,9 +270,8 @@ impl<'a> PurgeOrchestrator<'a> {
         let run_pipeline = async {
             // P2: Acquire Fence
             if intent.phase <= PurgePhase::FenceAcquired {
-                // TODO(WP-4 / PR-13 / N1): Bei `self.storage == None` wird `purge_keys` komplett übersprungen!
-                // Für Standalone-Recovery muss hier entweder `storage` bereitgestellt oder ein Fehler
-                // zurückgegeben werden, damit kein Intent fälschlicherweise als erfolgreich gelöscht markiert wird.
+                // Bei Standalone-Recovery ist `self.storage` ggf. `None`. Falls kein Hook vorhanden ist,
+                // kann hier kein Erasure-Fence im laufenden Engine-Kontext gesetzt werden.
                 if let Some(storage) = self.storage {
                     if fence_prefixes.is_empty() {
                         return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));

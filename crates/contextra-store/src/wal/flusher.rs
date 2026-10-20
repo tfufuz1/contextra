@@ -195,7 +195,28 @@ impl Wal {
 
     /// Enables background flusher actor for processing WAL I/O commands sequentially with a custom `FaultInjector`.
     #[allow(dead_code)]
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn enable_flusher_with_injector<F: FaultInjector + 'static>(
+        &self,
+        file: crate::wal::fs::File,
+        config: WalFlusherConfig,
+        injector: F,
+    ) -> Result<()> {
+        self.enable_flusher_with_injector_impl(file, config, injector)
+    }
+
+    #[allow(dead_code)]
+    #[cfg(not(any(test, feature = "test-utils")))]
     pub(crate) fn enable_flusher_with_injector<F: FaultInjector + 'static>(
+        &self,
+        file: crate::wal::fs::File,
+        config: WalFlusherConfig,
+        injector: F,
+    ) -> Result<()> {
+        self.enable_flusher_with_injector_impl(file, config, injector)
+    }
+
+    fn enable_flusher_with_injector_impl<F: FaultInjector + 'static>(
         &self,
         mut file: crate::wal::fs::File,
         config: WalFlusherConfig,

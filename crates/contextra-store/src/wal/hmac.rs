@@ -310,6 +310,9 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&key).await {
+                // TODO(WP-ST2 / PR-26): Stille I/O-Fehler beheben:
+                // `let _ = remove_file(...)` ignoriert Fehler stillschweigend. Stattdessen Fehler protokollieren
+                // (tracing::warn!) oder strukturiert sammeln, damit verwaiste Lock-/Temp-Dateien aufgespürt werden.
                 let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL integrity key: {}",

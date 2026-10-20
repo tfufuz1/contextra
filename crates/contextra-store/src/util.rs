@@ -9,17 +9,17 @@ use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 
-#[cfg(all(test, not(loom)))]
-type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
 std::thread_local! {
     static DIRLOCK_SYNC_HOOK: std::cell::RefCell<Option<DirLockSyncHookFn>> =
         const { std::cell::RefCell::new(None) };
 }
 
-#[cfg(all(test, not(loom)))]
-pub(crate) fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
     DIRLOCK_SYNC_HOOK.with(|h| {
         *h.borrow_mut() = hook;
     });
@@ -27,7 +27,7 @@ pub(crate) fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
 
 #[cfg(not(loom))]
 pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     {
         let mut hook_res = None;
         DIRLOCK_SYNC_HOOK.with(|h| {
@@ -45,14 +45,14 @@ pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
 /// Handle for exclusive database directory locking.
 #[cfg(not(loom))]
 #[derive(Debug)]
-pub(crate) struct DirLock {
+pub struct DirLock {
     _file: Option<File>,
 }
 
 #[cfg(not(loom))]
 impl DirLock {
     /// Acquires an exclusive lock on `dir/LOCK`.
-    pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
+    pub fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
         let lock_path = dir.join("LOCK");
         let file = std::fs::OpenOptions::new()
             .read(true)
@@ -106,7 +106,7 @@ fn decide_on_lock_error(
     }
 }
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
 #[doc(hidden)]
 #[allow(dead_code)]
 pub fn test_decide_on_lock_error_wrapper(

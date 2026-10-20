@@ -202,6 +202,7 @@ impl<'a> DpiPurgeDriver<'a> {
             WitAssurance::S2 => WitClaimText::S2V,
             WitAssurance::S3 => WitClaimText::S3,
             WitAssurance::S4 => WitClaimText::S4,
+            _ => WitClaimText::S0,
         };
 
         let zeu_req = ZeuIssueRequest {

@@ -36,7 +36,7 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("poison_all_commands.wal");
 
-    let file = contextra_store::wal::fs::OpenOptions::new()
+    let _file = contextra_store::wal::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .read(true)
@@ -44,14 +44,9 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
         .await
         .expect("open file");
 
-    let wal = Wal::open_with_config(
-        &path,
-        contextra_store::wal::WalConfig {
-            flusher_config: WalFlusherConfig::default(),
-            ..Default::default()
-        },
-    )
-    .await?;
+    let mut wal_config = contextra_store::wal::WalConfig::default();
+    wal_config.flusher_config = WalFlusherConfig::default();
+    let _wal = Wal::open_with_config(&path, wal_config).await?;
 
     // Force append failure to poison handle
     let entry = WalEntry::try_new(
@@ -77,7 +72,7 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
     let wal_fail = Wal::open_read_only(&path, None).await?;
     wal_fail.enable_flusher_with_injector(file, WalFlusherConfig::default(), FailAllWritesInjector)?;
 
-    let res = wal_fail.append_batch(PreparedBatch(vec![entry])).await;
+    let res = wal_fail.append_batch(PreparedBatch::for_test(vec![entry])).await;
     assert!(res.is_err(), "Append must fail with FailAllWritesInjector");
     assert!(wal_fail.is_poisoned(), "WAL handle must be poisoned");
 
@@ -115,8 +110,7 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
         err_str
     );
 
-    let (item_tx, _item_rx) = tokio::sync::mpsc::unbounded_channel();
-    let res_scan = wal_fail.scan_entries_bounded(1024, item_tx).await;
+    let res_scan = wal_fail.scan_entries_with_callback(1024, |_seq, _entry, _pos| true).await;
     assert!(res_scan.is_err(), "Scan on poisoned WAL must return Err");
     let err_str = res_scan.unwrap_err().to_string();
     assert!(
@@ -144,7 +138,7 @@ async fn test_rewrite_crash_consistency_preserves_original_wal() -> Result<()> {
         &[1u8; 32],
         [0u8; 32],
     )?;
-    wal.append_batch(PreparedBatch(vec![entry.clone()])).await?;
+    wal.append_batch(PreparedBatch::for_test(vec![entry.clone()])).await?;
 
     let size_before = wal.size();
     assert!(size_before > 0);

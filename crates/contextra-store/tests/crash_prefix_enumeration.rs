@@ -24,7 +24,7 @@ async fn test_prefix_crash_recovery_enumeration() {
         ..Default::default()
     };
 
-    let ref_model = ReferenceModel::new();
+    let mut ref_model = ReferenceModel::new();
 
     // Setup initial DB state: 10 transactions across keys
     {

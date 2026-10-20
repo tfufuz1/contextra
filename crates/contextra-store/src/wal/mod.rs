@@ -37,7 +37,12 @@ pub use scope_purge::*;
 #[cfg(not(loom))]
 pub use witness_scan::*;
 
-#[cfg(not(loom))]
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub mod fs {
+    pub use tokio::fs::*;
+}
+
+#[cfg(all(not(loom), not(any(test, feature = "test-utils"))))]
 pub(crate) mod fs {
     pub use tokio::fs::*;
 }

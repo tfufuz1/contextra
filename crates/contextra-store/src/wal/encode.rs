@@ -108,6 +108,12 @@ impl PreparedBatch {
     pub fn extend(&mut self, other: PreparedBatch) {
         self.0.extend(other.0);
     }
+
+    /// Creates a `PreparedBatch` directly from entries for testing.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn for_test(entries: Vec<WalEntry>) -> Self {
+        Self(entries)
+    }
 }
 
 /// A single entry in the Write-Ahead Log.

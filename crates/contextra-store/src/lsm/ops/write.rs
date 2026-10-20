@@ -449,6 +449,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let append_handle = tokio::spawn(async move {
             match durability_mode {
                 DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+                    // TODO(WP-ST3 / PR-27): Locks über I/O minimieren/optimieren:
+                    // `truncate_guard` wird über die gesamte Dauer des Datei-Appends und Fsyncs gehalten.
+                    // Prüfen, ob das Halten dieses Locks über asynchrone Disk-I/O hinweg durch feinkörnigere
+                    // atomare Offset-Reservierung entkoppelt werden kann.
                     let truncate_guard = wal.truncate_lock.lock().await;
                     let start_offset = wal.size();
                     let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
