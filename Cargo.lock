@@ -942,6 +942,7 @@ dependencies = [
  "contextra-infer-onnx",
  "contextra-ports",
  "contextra-rank",
+ "contextra-sys",
  "contextra-types",
  "futures",
  "futures-util",

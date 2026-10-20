@@ -13,6 +13,7 @@ ring = "2"
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-sys = { workspace = true }
 contextra-rank = { workspace = true }
 parking_lot = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
