@@ -9,6 +9,8 @@ use contextra_simd::kernels::scalar::{
     euclidean_distance_f32_bytes_scalar, euclidean_distance_scalar,
     euclidean_distance_sq_u8_scalar,
 };
+use contextra_simd::{compute_distance, validate_vector};
+use contextra_types::DistanceMetric;
 use proptest::prelude::*;
 
 proptest! {
@@ -193,6 +195,152 @@ proptest! {
             "Cosine similarity parts u8 mismatch at dim {}: scalar={:?}, dispatch={:?}",
             n, scalar, dispatch
         );
+    }
+}
+
+#[test]
+fn test_unaligned_slice_offsets_all_metrics() {
+    let base_a: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.1).sin() * 2.0).collect();
+    let base_b: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.15).cos() * 2.0).collect();
+    let base_a_u8: Vec<u8> = (0..1024).map(|i| (i * 13 % 256) as u8).collect();
+    let base_b_u8: Vec<u8> = (0..1024).map(|i| (i * 17 % 256) as u8).collect();
+
+    for offset_a in 0..4 {
+        for offset_b in 0..4 {
+            let len = 256;
+            let slice_a = &base_a[offset_a..offset_a + len];
+            let slice_b = &base_b[offset_b..offset_b + len];
+            let b_bytes: Vec<u8> = slice_b.iter().flat_map(|x| x.to_le_bytes()).collect();
+
+            let slice_a_u8 = &base_a_u8[offset_a..offset_a + len];
+            let slice_b_u8 = &base_b_u8[offset_b..offset_b + len];
+
+            // f32 cosine
+            let cos_s = cosine_distance_scalar(slice_a, slice_b);
+            let cos_d = cosine_distance(slice_a, slice_b).unwrap();
+            assert!((cos_s - cos_d).abs() <= 1e-4);
+
+            // f32 euclidean
+            let euc_s = euclidean_distance_scalar(slice_a, slice_b);
+            let euc_d = euclidean_distance(slice_a, slice_b).unwrap();
+            assert!((euc_s - euc_d).abs() <= 1e-3);
+
+            // f32 dot
+            let dot_s = dot_product_scalar(slice_a, slice_b);
+            let dot_d = dot_product_distance(slice_a, slice_b).unwrap();
+            assert!((dot_s - dot_d).abs() <= 1e-3);
+
+            // f32 bytes
+            let cos_b_s = cosine_distance_f32_bytes_scalar(slice_a, &b_bytes);
+            let cos_b_d = cosine_distance_f32_bytes(slice_a, &b_bytes).unwrap();
+            assert!((cos_b_s - cos_b_d).abs() <= 1e-4);
+
+            // u8 dot
+            let dot_u8_s = dot_product_u8_scalar(slice_a_u8, slice_b_u8);
+            let dot_u8_d = dot_product_u8(slice_a_u8, slice_b_u8).unwrap();
+            assert_eq!(dot_u8_s, dot_u8_d);
+
+            // u8 euclidean sq
+            let euc_u8_s = euclidean_distance_sq_u8_scalar(slice_a_u8, slice_b_u8);
+            let euc_u8_d = euclidean_distance_sq_u8(slice_a_u8, slice_b_u8).unwrap();
+            assert_eq!(euc_u8_s, euc_u8_d);
+
+            // u8 cosine parts
+            let parts_s = cosine_similarity_parts_u8_scalar(slice_a_u8, slice_b_u8);
+            let parts_d = cosine_similarity_parts_u8(slice_a_u8, slice_b_u8).unwrap();
+            assert_eq!(parts_s, parts_d);
+        }
+    }
+}
+
+#[test]
+fn test_dimension_mismatch_returns_error() {
+    let a = vec![1.0f32; 10];
+    let b = vec![1.0f32; 12];
+    let a_u8 = vec![1u8; 10];
+    let b_u8 = vec![1u8; 12];
+    let b_bytes = vec![0u8; 32]; // 32 bytes = 8 floats, expected 10 floats = 40 bytes
+
+    assert!(cosine_distance(&a, &b).is_err());
+    assert!(euclidean_distance(&a, &b).is_err());
+    assert!(dot_product_distance(&a, &b).is_err());
+    assert!(cosine_distance_f32_bytes(&a, &b_bytes).is_err());
+    assert!(euclidean_distance_f32_bytes(&a, &b_bytes).is_err());
+    assert!(dot_product_distance_f32_bytes(&a, &b_bytes).is_err());
+    assert!(dot_product_u8(&a_u8, &b_u8).is_err());
+    assert!(euclidean_distance_sq_u8(&a_u8, &b_u8).is_err());
+    assert!(cosine_similarity_parts_u8(&a_u8, &b_u8).is_err());
+}
+
+#[test]
+fn test_special_float_values_validation_and_trusted() {
+    let nan_vec = vec![1.0f32, f32::NAN, 3.0];
+    let inf_vec = vec![1.0f32, f32::INFINITY, 3.0];
+    let neg_inf_vec = vec![1.0f32, f32::NEG_INFINITY, 3.0];
+    let valid_vec = vec![1.0f32, 2.0, 3.0];
+
+    assert!(validate_vector(&nan_vec).is_err());
+    assert!(validate_vector(&inf_vec).is_err());
+    assert!(validate_vector(&neg_inf_vec).is_err());
+    assert!(validate_vector(&valid_vec).is_ok());
+
+    assert!(compute_distance(&nan_vec, &valid_vec, DistanceMetric::Cosine).is_err());
+    assert!(compute_distance(&valid_vec, &nan_vec, DistanceMetric::Euclidean).is_err());
+
+    // Signed zero & denormals
+    let neg_zero = vec![-0.0f32, 0.0, -0.0];
+    let pos_zero = vec![0.0f32, -0.0, 0.0];
+    let denorm = vec![f32::MIN_POSITIVE * 0.5, f32::MIN_POSITIVE * 0.2, 0.0];
+
+    let cos_s = cosine_distance_scalar(&neg_zero, &pos_zero);
+    let cos_d = cosine_distance(&neg_zero, &pos_zero).unwrap();
+    assert_eq!(cos_s, cos_d);
+
+    let denorm_s = dot_product_scalar(&denorm, &denorm);
+    let denorm_d = dot_product_distance(&denorm, &denorm).unwrap();
+    assert!((denorm_s - denorm_d).abs() <= 1e-10);
+}
+
+#[test]
+fn test_parallel_simd_concurrency() {
+    use std::sync::Arc;
+    use std::thread;
+
+    let dim = 1024;
+    let a = Arc::new(
+        (0..dim)
+            .map(|i| (i as f32 * 0.01).sin())
+            .collect::<Vec<f32>>(),
+    );
+    let b = Arc::new(
+        (0..dim)
+            .map(|i| (i as f32 * 0.02).cos())
+            .collect::<Vec<f32>>(),
+    );
+
+    let mut handles = vec![];
+    for seed in 0..16 {
+        let a_cloned = Arc::clone(&a);
+        let b_cloned = Arc::clone(&b);
+        handles.push(thread::spawn(move || {
+            let expected_cos = cosine_distance(&a_cloned, &b_cloned).unwrap();
+            let expected_euc = euclidean_distance(&a_cloned, &b_cloned).unwrap();
+            let expected_dot = dot_product_distance(&a_cloned, &b_cloned).unwrap();
+
+            for iter in 0..100 {
+                let cos = cosine_distance(&a_cloned, &b_cloned).unwrap();
+                let euc = euclidean_distance(&a_cloned, &b_cloned).unwrap();
+                let dot = dot_product_distance(&a_cloned, &b_cloned).unwrap();
+
+                assert_eq!(cos, expected_cos, "Thread {seed} iter {iter} cos mismatch");
+                assert_eq!(euc, expected_euc, "Thread {seed} iter {iter} euc mismatch");
+                assert_eq!(dot, expected_dot, "Thread {seed} iter {iter} dot mismatch");
+            }
+        }));
+    }
+
+    for handle in handles {
+        handle.join().expect("Thread panicked");
     }
 }
 
