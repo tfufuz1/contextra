@@ -151,10 +151,7 @@ async fn test_redb_store_rollback_to_tx() -> TestResult {
     // Rollback to tx1
     store.rollback_to_tx(tx1).await?;
 
-    assert_eq!(
-        store.get(b"key_t1").await?,
-        Some(Bytes::from_static(b"v1"))
-    );
+    assert_eq!(store.get(b"key_t1").await?, Some(Bytes::from_static(b"v1")));
     assert!(store.get(b"key_t2").await?.is_none());
     assert_eq!(store.last_tx_id().await?, tx1);
 

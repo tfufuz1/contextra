@@ -165,8 +165,10 @@ pub fn scrub_if_safe_with_mountinfo<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
-            remaining -= chunk_size as u64;
+            if let Some(slice) = zeros.get(..chunk_size) {
+                file.write_all(slice)?;
+            }
+            remaining = remaining.saturating_sub(chunk_size as u64);
         }
 
         injector.on_fsync(Some(path))?;
@@ -228,7 +230,9 @@ fn query_cow_info(path: &Path, mountinfo_override: Option<&str>) -> (String, boo
     };
 
     if let Some(text) = mountinfo_text {
-        use contextra_sys::env_observe::{cow_fs_from_fs_kind_and_options, parse_mountinfo_details, EnvTri};
+        use contextra_sys::env_observe::{
+            cow_fs_from_fs_kind_and_options, parse_mountinfo_details, EnvTri,
+        };
         let (fs_kind, _discard, opts) = parse_mountinfo_details(&text, path);
         let cow_tri = cow_fs_from_fs_kind_and_options(fs_kind, &opts);
         let fs_name = format!("{:?}", fs_kind).to_lowercase();
@@ -299,8 +303,10 @@ pub fn scrub_and_remove_with_mountinfo<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
-            remaining -= chunk_size as u64;
+            if let Some(slice) = zeros.get(..chunk_size) {
+                file.write_all(slice)?;
+            }
+            remaining = remaining.saturating_sub(chunk_size as u64);
         }
 
         injector.on_fsync(Some(path))?;
@@ -332,14 +338,16 @@ fn verify_zero_readback(
         let chunk_size = usize::try_from(remaining)
             .unwrap_or(buf.len())
             .min(buf.len());
-        file.read_exact(&mut buf[..chunk_size])?;
-        if buf[..chunk_size].iter().any(|&b| b != 0) {
-            return Err(std::io::Error::other(format!(
-                "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
-                path
-            )));
+        if let Some(slice) = buf.get_mut(..chunk_size) {
+            file.read_exact(slice)?;
+            if slice.iter().any(|&b| b != 0) {
+                return Err(std::io::Error::other(format!(
+                    "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
+                    path
+                )));
+            }
         }
-        remaining -= chunk_size as u64;
+        remaining = remaining.saturating_sub(chunk_size as u64);
     }
 
     Ok(())

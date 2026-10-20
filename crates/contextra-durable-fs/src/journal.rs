@@ -75,21 +75,23 @@ impl PendingDeleteJournal {
     where
         F: FnMut(&Path) -> std::io::Result<()>,
     {
-        let mut processed_count = 0;
+        let mut processed_count: usize = 0;
         let mut remaining = Vec::new();
 
         for (idx, entry) in self.entries.iter().enumerate() {
             match remove_fn(entry) {
                 Ok(()) => {
-                    processed_count += 1;
+                    processed_count = processed_count.saturating_add(1);
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                     // File already deleted/missing, treat as processed
-                    processed_count += 1;
+                    processed_count = processed_count.saturating_add(1);
                 }
                 Err(err) => {
                     // Keep entry that failed AND all subsequent unprocessed entries
-                    remaining.extend(self.entries[idx..].iter().cloned());
+                    if let Some(unprocessed) = self.entries.get(idx..) {
+                        remaining.extend(unprocessed.iter().cloned());
+                    }
                     self.entries = remaining;
                     if let Err(flush_err) = self.flush() {
                         self.health.record_event(HealthEvent::FsyncFailure);

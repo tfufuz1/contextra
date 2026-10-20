@@ -99,6 +99,11 @@ impl Vfs for RealFs {
         if let Some(parent) = to.parent() {
             crate::sync_dir(parent)?;
         }
+        if let Some(from_parent) = from.parent() {
+            if from.parent() != to.parent() {
+                crate::sync_dir(from_parent)?;
+            }
+        }
         Ok(())
     }
 

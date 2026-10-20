@@ -48,7 +48,10 @@ fn test_scrub_and_remove_hardlink_safety() -> std::io::Result<()> {
     fs::hard_link(&original, &hardlink)?;
 
     let receipt: ScrubReceipt = scrub_and_remove(&original)?;
-    assert_eq!(receipt.method, contextra_durable_fs::ScrubMethod::UnlinkOnly);
+    assert_eq!(
+        receipt.method,
+        contextra_durable_fs::ScrubMethod::UnlinkOnly
+    );
     assert_eq!(receipt.bytes_scrubbed, 0);
 
     // Original file must be unlinked
