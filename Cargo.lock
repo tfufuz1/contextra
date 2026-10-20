@@ -1287,6 +1287,7 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "itoa",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "regex",

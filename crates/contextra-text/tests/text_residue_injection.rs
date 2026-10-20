@@ -71,7 +71,7 @@ impl StorageEngine for TestStorage {
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move { Ok(TxId::new(1)) })
+        Box::pin(async move { Ok(TxId::try_new(1).unwrap_or_else(|_| TxId::internal())) })
     }
 
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
@@ -135,13 +135,13 @@ async fn test_injected_posting_remains_detected() -> Result<()> {
     let storage = Arc::new(TestStorage::new());
     let index = InvertedIndex::new(storage, "test_ns");
 
-    let tx1 = TxId::new(1);
+    let tx1 = TxId::try_new(1)?;
     let doc1 = DocId::new(10);
 
     index.insert(tx1, doc1, "alpha beta").await?;
     index.commit(tx1).await?;
 
-    let tx2 = TxId::new(2);
+    let tx2 = TxId::try_new(2)?;
     index.delete(tx2, doc1).await?;
     index.commit(tx2).await?;
 
@@ -168,15 +168,17 @@ async fn test_injected_posting_remains_detected() -> Result<()> {
 #[tokio::test]
 async fn test_injected_df0_dict_entry_detected() -> Result<()> {
     let storage = Arc::new(TestStorage::new());
-    let index = InvertedIndex::new(storage, "test_ns");
+    let index = InvertedIndex::new(storage.clone(), "test_ns");
 
     let doc1 = DocId::new(10);
     let terms = vec![b"orphan_term".to_vec()];
 
-    // Fault injection: Insert empty posting list (df == 0) for orphan_term into resident index
-    index
-        .resident_index()
-        .insert_list("orphan_term".to_string(), PostingList::empty());
+    // Fault injection: Insert empty batch posting list (df == 0) for orphan_term into LSM storage
+    let plb_key = b"__txt:test_ns:plb:orphan_term".to_vec();
+    let empty_bytes = PostingList::empty().encode_compact()?;
+    storage
+        .put(TxId::try_new(1)?, &plb_key, &empty_bytes)
+        .await?;
 
     let evidence = index.scan_residue(doc1, &terms).await?;
     assert!(
