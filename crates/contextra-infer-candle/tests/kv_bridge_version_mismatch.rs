@@ -1,11 +1,17 @@
 #![cfg(feature = "kv-bridge")]
-#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 //! Verification test for KV-Bridge mismatch and corruption scenarios: Model fingerprint mismatch, RoPE mismatch, truncated or corrupted bytes.
 
 use contextra_crypto::{CryptoKey, KvSegmentCipher};
-use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
+use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ModelFingerprint, TenantId};
 use std::sync::Arc;
 

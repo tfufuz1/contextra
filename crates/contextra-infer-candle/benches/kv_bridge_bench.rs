@@ -1,4 +1,10 @@
-#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 //! Benchmark: KV-Cache-Bridge Prefill Savings (§8, §10 Krit. #15, P7).
 //!
@@ -7,8 +13,8 @@
 //! Erwartete Speedup-Größenordnung: Cache-Hit ist signifikant schneller (O(1) Reference Lookup vs. Speicherallokation & Voller Prefill).
 
 use contextra_crypto::{CryptoKey, KvSegmentCipher};
-use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
+use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_types::{ModelFingerprint, TenantId};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::sync::Arc;
