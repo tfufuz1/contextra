@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "redb StorageEngine Backend Adapter for Contextra"
 
+[package.metadata.contextra]
+ring = "Ring 1"
+
 [features]
 default = ["store-redb"]
 store-redb = []
