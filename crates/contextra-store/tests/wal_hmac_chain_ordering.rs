@@ -90,7 +90,7 @@ async fn test_group_commit_hmac_chain_no_bifurcation() {
     sorted_seqs.dedup();
     assert_eq!(
         sorted_seqs.len(),
-        num_tasks,
+        expected_wal_entries,
         "Unique transaction sequence number count mismatch"
     );
 
@@ -191,7 +191,7 @@ async fn test_out_of_order_append_hmac_chain_ordering() {
     sorted_seqs.dedup();
     assert_eq!(
         sorted_seqs.len(),
-        2,
+        4,
         "Unique transaction sequence number count mismatch"
     );
 

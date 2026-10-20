@@ -930,8 +930,16 @@ impl Wal {
     }
 
     pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {
-        let _truncate_guard = self.truncate_lock.lock().await;
+        let truncate_guard = self.truncate_lock.lock().await;
+        self.truncate_locked(offset, new_last_hmac, &truncate_guard).await
+    }
 
+    pub async fn truncate_locked(
+        &self,
+        offset: u64,
+        new_last_hmac: [u8; 32],
+        _guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
         if self.is_sealed() {
             return Err(ContextraError::Storage(format!(
                 "Cannot truncate sealed WAL segment {}",

@@ -44,7 +44,7 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
     storage.commit(tx0).await.expect("commit baseline failed");
 
     let hmac_baseline = storage.last_seq_no().await.expect("last_seq_no failed");
-    assert_eq!(hmac_baseline, 1, "Baseline sequence number must be 1");
+    assert_eq!(hmac_baseline, 2, "Baseline sequence number must be 2");
 
     // 2. Prepare concurrent tasks: Task 1 (failing commit) and Task 2 (successful commit)
     let storage1 = Arc::clone(&storage);

@@ -24,7 +24,7 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
         tx_timeout: Duration::from_millis(100),
-        group_commit_window_micros: 20_000, // 20ms batching window
+        group_commit_window_micros: 200_000, // 200ms batching window so follower times out in queue
         ..Default::default()
     };
 
@@ -113,7 +113,7 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
         tx_timeout: Duration::from_millis(100),
-        group_commit_window_micros: 20_000, // 20ms batching window
+        group_commit_window_micros: 200_000, // 200ms batching window so follower times out in queue
         ..Default::default()
     };
 
