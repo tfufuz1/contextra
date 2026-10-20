@@ -83,6 +83,19 @@ impl PlattScaler {
         }
     }
 
+    /// Constructs a [`crate::fusion::SignalCalibrationContext`] for rank fusion pipeline integration.
+    pub fn calibration_context(
+        &self,
+        signal_name: impl Into<String>,
+        drift_status: crate::drift::DriftStatus,
+    ) -> crate::fusion::SignalCalibrationContext {
+        crate::fusion::SignalCalibrationContext::new(
+            signal_name,
+            self.is_fitted(),
+            drift_status,
+        )
+    }
+
     /// Fits parameters `A` and `B` via Negative Log-Likelihood minimization with L2 regularization
     /// and target smoothing (Platt, 1999).
     pub fn fit(observations: &[(f32, bool)]) -> Self {
