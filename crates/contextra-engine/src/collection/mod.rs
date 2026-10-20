@@ -117,6 +117,46 @@ impl Default for CollectionConfig {
     }
 }
 
+#[cfg(test)]
+mod kv_store_tests {
+    use super::*;
+    use contextra_kvcache::TenantIsolatedKvStore;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_kv_store_feature_behavior() {
+        let dir = tempdir().unwrap();
+        let lsm = Arc::new(LsmStorage::new(LsmConfig { path: dir.path().to_path_buf(), ..Default::default() }).await.unwrap());
+        let hnsw = Arc::new(HnswIndex::try_new(HnswConfig { dimension: 4, ..Default::default() }).unwrap());
+        let graph = Arc::new(CsrGraph::new());
+        let mut col = Collection::new(
+            "test".into(),
+            lsm,
+            hnsw,
+            graph,
+            Arc::new(AtomicU64::new(1)),
+            4,
+            Language::English,
+        );
+
+        let kv_store = Arc::new(TenantIsolatedKvStore::new());
+        col.set_kv_store(kv_store.clone());
+
+        #[cfg(feature = "encryption-at-rest")]
+        {
+            assert!(col.kv_store().is_some());
+        }
+
+        #[cfg(not(feature = "encryption-at-rest"))]
+        {
+            // Without encryption-at-rest, kv_store is disabled and returns None as designed
+            assert!(col.kv_store().is_none());
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredDocument {
     pub id: String,
