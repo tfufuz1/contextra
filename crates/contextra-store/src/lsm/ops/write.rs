@@ -28,7 +28,7 @@ pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
     validate_key(key)?;
     validate_value(value)?;
     storage
-        .erasure_fence
+        .erasure_fence()
         .check_write_allowed_scope(key)
         .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
@@ -86,7 +86,7 @@ pub(super) async fn put_if_absent(
     validate_key(key)?;
     validate_value(value)?;
     storage
-        .erasure_fence
+        .erasure_fence()
         .check_write_allowed_scope(key)
         .map_err(|e| ContextraError::Storage(format!("Write rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
@@ -151,7 +151,7 @@ pub(super) async fn put_if_absent(
 pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
     validate_key(key)?;
     storage
-        .erasure_fence
+        .erasure_fence()
         .check_write_allowed_scope(key)
         .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
@@ -186,13 +186,21 @@ pub(super) async fn delete_many(
     }
     for key in &keys {
         validate_key(key)?;
+    }
+    if storage.erasure_fence().is_active() {
         storage
-            .erasure_fence
-            .check_write_allowed_scope(key)
+            .erasure_fence()
+            .check_write_allowed_batch(keys.iter().map(|k| k.as_slice()))
             .map_err(|e| {
                 ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
             })?;
     }
+    storage
+        .erasure_fence()
+        .check_write_allowed_batch(keys.iter().map(|k| k.as_slice()))
+        .map_err(|e| {
+            ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
+        })?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -222,7 +230,7 @@ pub(super) async fn delete_many(
 pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
     validate_key(prefix)?;
     storage
-        .erasure_fence
+        .erasure_fence()
         .check_write_allowed_scope(prefix)
         .map_err(|e| {
             ContextraError::Storage(format!("Delete prefix rejected by erasure fence: {e}"))
@@ -367,23 +375,25 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     }
 
     // Check erasure fence permissions for all staged operations prior to commit
-    for op in &ops {
-        let key = match op {
-            IndexOp::Insert { data, .. } => &data.0[..],
-            IndexOp::Delete { data, .. } => {
-                if let Some((k, _)) = data {
-                    &k[..]
-                } else {
-                    continue;
+    if storage.erasure_fence().is_active() {
+        for op in &ops {
+            let key = match op {
+                IndexOp::Insert { data, .. } => &data.0[..],
+                IndexOp::Delete { data, .. } => {
+                    if let Some((k, _)) = data {
+                        &k[..]
+                    } else {
+                        continue;
+                    }
                 }
+                _ => continue,
+            };
+            if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(ContextraError::Storage(format!(
+                    "Commit rejected by erasure fence: {e}"
+                )));
             }
-            _ => continue,
-        };
-        if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-            storage.cleanup_intent_locks_for_tx(tx_id);
-            return Err(ContextraError::Storage(format!(
-                "Commit rejected by erasure fence: {e}"
-            )));
         }
     }
 
@@ -401,26 +411,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
-        for op in &ops {
-            let key = match op {
-                IndexOp::Insert { data, .. } => &data.0[..],
-                IndexOp::Delete { data, .. } => {
-                    if let Some((k, _)) = data {
-                        &k[..]
-                    } else {
-                        continue;
-                    }
-                }
-                _ => continue,
-            };
-            if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(ContextraError::Storage(format!(
-                    "Commit rejected by erasure fence: {e}"
-                )));
-            }
-        }
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence.gate);
+        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
 
         let start_seq = storage.next_seq_no.load(Ordering::Acquire);
         let (wal_ops, mem_updates, first_seq) = match prepare_tx_ops(storage, tx_id, &ops) {
@@ -742,31 +733,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         };
 
         // Window 1: Fence Check for Leader + Followers under commit_mutex
-        for op in &leader_ops {
-            let key = match op {
-                IndexOp::Insert { data, .. } => &data.0[..],
-                IndexOp::Delete { data, .. } => {
-                    if let Some((k, _)) = data {
-                        &k[..]
-                    } else {
-                        continue;
-                    }
-                }
-                _ => continue,
-            };
-            if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
-                let mut batch_txs = vec![leader_tx_id];
-                batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                storage.cleanup_intent_locks_for_txs(&batch_txs);
-                let err_msg = format!("Commit rejected by erasure fence: {e}");
-                for r in requests {
-                    let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                }
-                return Err(ContextraError::Storage(err_msg));
-            }
-        }
-        for r in &requests {
-            for op in &r.ops {
+        if storage.erasure_fence().is_active() {
+            for op in &leader_ops {
                 let key = match op {
                     IndexOp::Insert { data, .. } => &data.0[..],
                     IndexOp::Delete { data, .. } => {
@@ -778,20 +746,45 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     }
                     _ => continue,
                 };
-                if let Err(e) = storage.erasure_fence.check_write_allowed_scope(key) {
+                if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
                     let mut batch_txs = vec![leader_tx_id];
                     batch_txs.extend(requests.iter().map(|r| r.tx_id));
                     storage.cleanup_intent_locks_for_txs(&batch_txs);
                     let err_msg = format!("Commit rejected by erasure fence: {e}");
-                    for req in requests {
-                        let _ = req.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                    for r in requests {
+                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
                     }
                     return Err(ContextraError::Storage(err_msg));
                 }
             }
+            for r in &requests {
+                for op in &r.ops {
+                    let key = match op {
+                        IndexOp::Insert { data, .. } => &data.0[..],
+                        IndexOp::Delete { data, .. } => {
+                            if let Some((k, _)) = data {
+                                &k[..]
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+                    if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
+                        let mut batch_txs = vec![leader_tx_id];
+                        batch_txs.extend(requests.iter().map(|r| r.tx_id));
+                        storage.cleanup_intent_locks_for_txs(&batch_txs);
+                        let err_msg = format!("Commit rejected by erasure fence: {e}");
+                        for req in requests {
+                            let _ = req.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                        }
+                        return Err(ContextraError::Storage(err_msg));
+                    }
+                }
+            }
         }
 
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence.gate);
+        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
 
         let mut follower_prep = Vec::with_capacity(requests.len());
         for r in &requests {

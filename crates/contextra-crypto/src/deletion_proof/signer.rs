@@ -43,9 +43,11 @@ impl FileOwnershipCheck for StrictFileOwnershipCheck {
 }
 
 /// Fake/permissive file ownership check for testing or container environments with fake UIDs.
+#[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FakeFileOwnershipCheck;
 
+#[cfg(any(test, feature = "test-utils"))]
 impl FileOwnershipCheck for FakeFileOwnershipCheck {
     fn verify_ownership(&self, _file_uid: u32) -> Result<()> {
         Ok(())
