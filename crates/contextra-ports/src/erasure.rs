@@ -10,14 +10,16 @@
 
 #![forbid(unsafe_code)]
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use thiserror::Error;
 
 use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 
 /// Operational mode for document erasure and deletion guarantees (§5.1, §8.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum ErasureMode {
     /// Off (Default): Standard tombstone delete. No ledger, no fence, no footprint scan.
     #[default]
@@ -189,7 +191,11 @@ impl PhysicalScope {
     /// Checks whether a physical storage key matches this scope in O(|key|) time.
     #[must_use]
     pub fn matches_key(&self, key: &[u8]) -> bool {
-        if self.keys.binary_search_by(|k| k.as_slice().cmp(key)).is_ok() {
+        if self
+            .keys
+            .binary_search_by(|k| k.as_slice().cmp(key))
+            .is_ok()
+        {
             return true;
         }
 
@@ -270,7 +276,10 @@ pub struct HookToken {
 
 impl HookToken {
     /// Sentinel token representing no-op or inactive hooks.
-    pub const NONE: Self = Self { id: 0, _no_copy: () };
+    pub const NONE: Self = Self {
+        id: 0,
+        _no_copy: (),
+    };
 
     /// Creates a new `HookToken` wrapping raw numeric identifier.
     pub const fn new(id: u64) -> Self {
@@ -450,10 +459,17 @@ impl From<PurgeError> for ContextraError {
 /// Storage backend contract for erasure operations (§5.5).
 pub trait ErasureBackend: Send + Sync {
     /// Translates a logical scope into a tenant-encoded physical scope.
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError>;
+    fn physical_scope(
+        &self,
+        scope: &LogicalScope,
+    ) -> std::result::Result<PhysicalScope, ContextraError>;
 
     /// Acquires write drain fence for `scope`.
-    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError>;
+    fn acquire_fence(
+        &self,
+        scope: &PhysicalScope,
+        id: PurgeId,
+    ) -> std::result::Result<FenceGuard, ContextraError>;
 
     /// Executes physical purge compaction for `scope` as of `as_of`.
     fn purge_physical(
@@ -482,7 +498,11 @@ pub trait ErasureHooks: Send + Sync + 'static {
     fn on_tombstoned(&self, tok: &HookToken, tx: TxId) -> std::result::Result<(), ContextraError>;
 
     /// Invoked after physical purge completed.
-    fn on_purged(&self, tok: &HookToken, out: &PurgeOutput) -> std::result::Result<(), ContextraError>;
+    fn on_purged(
+        &self,
+        tok: &HookToken,
+        out: &PurgeOutput,
+    ) -> std::result::Result<(), ContextraError>;
 
     /// Finalizes erasure and yields finish artifact (consumes `HookToken`).
     fn finish(&self, tok: HookToken) -> std::result::Result<FinishArtifact, ContextraError>;
@@ -502,7 +522,10 @@ pub trait WriteGate: Send + Sync {
     fn is_active(&self) -> bool;
 
     /// Checks whether write batch is allowed.
-    fn check_batch(&self, keys: &mut dyn Iterator<Item = &[u8]>) -> std::result::Result<(), WriteFenced>;
+    fn check_batch(
+        &self,
+        keys: &mut dyn Iterator<Item = &[u8]>,
+    ) -> std::result::Result<(), WriteFenced>;
 }
 
 /// Error returned by free space probe (§5.5).
