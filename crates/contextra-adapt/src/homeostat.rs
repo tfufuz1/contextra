@@ -139,6 +139,8 @@ impl RerankDeadline {
     }
 
     /// Checks if the elapsed time since `started_at_nanos` equals or exceeds the deadline budget.
+    ///
+    /// Delegated to `deadline_exceeded_nanos` to maintain backwards compatibility without wallclock access.
     pub fn deadline_exceeded(&self, started_at_nanos: u64) -> bool {
         self.deadline_exceeded_nanos(started_at_nanos)
     }

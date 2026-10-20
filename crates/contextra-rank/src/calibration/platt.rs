@@ -50,19 +50,6 @@ impl PlattScaler {
         (self.a, self.b)
     }
 
-    /// Constructs a [`SignalCalibrationContext`](crate::fusion::SignalCalibrationContext) for this scaler given a signal name and drift status.
-    pub fn calibration_context(
-        &self,
-        signal_name: impl Into<String>,
-        drift_status: crate::drift::DriftStatus,
-    ) -> crate::fusion::SignalCalibrationContext {
-        crate::fusion::SignalCalibrationContext::new(
-            signal_name,
-            self.is_fitted(),
-            drift_status,
-        )
-    }
-
     /// Calculates calibrated probability for raw score.
     pub fn predict(&self, raw_score: f32) -> f32 {
         self.transform(raw_score)
@@ -94,6 +81,19 @@ impl PlattScaler {
             self.b = 0.0;
             self.fingerprint = Some(new_fingerprint);
         }
+    }
+
+    /// Constructs a [`crate::fusion::SignalCalibrationContext`] for rank fusion pipeline integration.
+    pub fn calibration_context(
+        &self,
+        signal_name: impl Into<String>,
+        drift_status: crate::drift::DriftStatus,
+    ) -> crate::fusion::SignalCalibrationContext {
+        crate::fusion::SignalCalibrationContext::new(
+            signal_name,
+            self.is_fitted(),
+            drift_status,
+        )
     }
 
     /// Fits parameters `A` and `B` via Negative Log-Likelihood minimization with L2 regularization

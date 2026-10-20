@@ -11,7 +11,7 @@ const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
-/// Default ECE rebuild threshold (0.05 / 5%).
+/// Default Expected Calibration Error (ECE) threshold for triggering model rebuilds.
 pub const DEFAULT_ECE_REBUILD_THRESHOLD: f32 = 0.05;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
@@ -97,19 +97,6 @@ impl IsotonicCalibrator {
         self.observations.len() as u32 >= self.warmup_required
     }
 
-    /// Constructs a [`SignalCalibrationContext`](crate::fusion::SignalCalibrationContext) for this calibrator given a signal name and drift status.
-    pub fn calibration_context(
-        &self,
-        signal_name: impl Into<String>,
-        drift_status: crate::drift::DriftStatus,
-    ) -> crate::fusion::SignalCalibrationContext {
-        crate::fusion::SignalCalibrationContext::new(
-            signal_name,
-            self.is_calibrated(),
-            drift_status,
-        )
-    }
-
     /// Returns timestamp (UNIX epoch in seconds) of last model rebuild.
     pub fn last_calibration_at(&self) -> Option<u64> {
         self.last_calibration_at
@@ -141,18 +128,33 @@ impl IsotonicCalibrator {
         }
     }
 
-    /// Checks if calculated ECE exceeds the given threshold and rebuilds model if necessary.
+    /// Triggers a model rebuild if ECE exceeds `threshold`.
+    /// Returns `true` if a rebuild occurred.
     pub fn maybe_rebuild_on_ece(&mut self, threshold: f32) -> bool {
-        if threshold.is_nan() {
+        if !self.is_calibrated() || threshold.is_nan() {
             return false;
         }
-        if let Some(ece) = self.expected_calibration_error() {
-            if ece > threshold {
-                self.force_rebuild();
-                return true;
-            }
+
+        let ece = self.expected_calibration_error().unwrap_or(0.0);
+        if ece > threshold {
+            self.rebuild_model();
+            true
+        } else {
+            false
         }
-        false
+    }
+
+    /// Constructs a [`crate::fusion::SignalCalibrationContext`] for rank fusion pipeline integration.
+    pub fn calibration_context(
+        &self,
+        signal_name: impl Into<String>,
+        drift_status: crate::drift::DriftStatus,
+    ) -> crate::fusion::SignalCalibrationContext {
+        crate::fusion::SignalCalibrationContext::new(
+            signal_name,
+            self.is_calibrated(),
+            drift_status,
+        )
     }
 
     /// Resets observations if ConfigFingerprint changes (P8 Compliance).
