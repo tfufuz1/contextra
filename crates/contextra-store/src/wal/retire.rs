@@ -8,7 +8,7 @@
 #![cfg(not(loom))]
 
 use contextra_types::{ContextraError, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{classify_wal_filename, Wal, WalFileType};
 
@@ -21,8 +21,51 @@ pub struct WalRetireReport {
     pub bytes_removed: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct WalDirEntry {
+    pub path: PathBuf,
+    pub is_dir: bool,
+}
+
+#[allow(async_fn_in_trait)]
+pub trait WalDirStream {
+    async fn next_entry(&mut self) -> Result<Option<WalDirEntry>>;
+}
+
+pub struct TokioWalDirStream {
+    inner: tokio::fs::ReadDir,
+    wal_dir: PathBuf,
+}
+
+impl TokioWalDirStream {
+    pub fn new(dir: tokio::fs::ReadDir, wal_dir: &Path) -> Self {
+        Self {
+            inner: dir,
+            wal_dir: wal_dir.to_path_buf(),
+        }
+    }
+}
+
+impl WalDirStream for TokioWalDirStream {
+    async fn next_entry(&mut self) -> Result<Option<WalDirEntry>> {
+        match self.inner.next_entry().await {
+            Ok(Some(entry)) => {
+                let path = entry.path();
+                let is_dir = path.is_dir();
+                Ok(Some(WalDirEntry { path, is_dir }))
+            }
+            Ok(None) => Ok(None),
+            Err(err) => Err(ContextraError::Storage(format!(
+                "Failed to read WAL directory entry in {}: {}",
+                self.wal_dir.display(),
+                err
+            ))),
+        }
+    }
+}
+
 pub async fn retire_segments_up_to(wal_dir: &Path, checkpoint_tx: u64) -> Result<WalRetireReport> {
-    let mut entries = match tokio::fs::read_dir(wal_dir).await {
+    let entries = match tokio::fs::read_dir(wal_dir).await {
         Ok(e) => e,
         Err(err) => {
             return Err(ContextraError::Storage(format!(
@@ -33,16 +76,28 @@ pub async fn retire_segments_up_to(wal_dir: &Path, checkpoint_tx: u64) -> Result
         }
     };
 
+    let stream = TokioWalDirStream::new(entries, wal_dir);
+    retire_segments_with_stream(stream, checkpoint_tx).await
+}
+
+pub async fn retire_segments_with_stream<S: WalDirStream>(
+    mut stream: S,
+    checkpoint_tx: u64,
+) -> Result<WalRetireReport> {
     let mut report = WalRetireReport::default();
     let mut candidates = Vec::new();
 
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let path = entry.path();
-        if path.is_dir() {
+    loop {
+        let entry = match stream.next_entry().await? {
+            Some(e) => e,
+            None => break,
+        };
+
+        if entry.is_dir {
             continue;
         }
 
-        let filename = match path.file_name().and_then(|f| f.to_str()) {
+        let filename = match entry.path.file_name().and_then(|f| f.to_str()) {
             Some(f) => f,
             None => continue,
         };
@@ -53,7 +108,7 @@ pub async fn retire_segments_up_to(wal_dir: &Path, checkpoint_tx: u64) -> Result
             | WalFileType::Sealed
             | WalFileType::Archived
             | WalFileType::Backup => {
-                candidates.push((path, file_type));
+                candidates.push((entry.path, file_type));
             }
             WalFileType::Sidecar | WalFileType::Unclassified => {}
         }

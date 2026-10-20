@@ -195,6 +195,12 @@ pub(super) async fn delete_many(
                 ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
             })?;
     }
+    storage
+        .erasure_fence()
+        .check_write_batch_allowed_scope(keys.iter().map(|k| k.as_slice()))
+        .map_err(|e| {
+            ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
+        })?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(

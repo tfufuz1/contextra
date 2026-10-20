@@ -238,35 +238,44 @@ impl ErasureGate {
     }
 
     /// Releases a registered prefix fence by purge_id.
-    pub fn release_fence(&self, purge_id: u64) {
+    /// Returns true if a fence matching `purge_id` was found and removed.
+    pub fn release_fence(&self, purge_id: u64) -> bool {
         #[cfg(not(loom))]
         let _guard = self.install.lock();
         #[cfg(loom)]
         let _guard = self.install.lock().unwrap();
 
-        self.release_fence_internal(purge_id);
+        self.release_fence_internal(purge_id)
     }
 
-    fn release_fence_internal(&self, purge_id: u64) {
+    fn release_fence_internal(&self, purge_id: u64) -> bool {
         #[cfg(not(loom))]
         {
             let current_vec: &Vec<PrefixFence> = &**self.table.load();
             let mut new_table = current_vec.clone();
+            let len_before = new_table.len();
             new_table.retain(|f| f.purge_id != purge_id);
+            let removed = new_table.len() < len_before;
             let is_empty = new_table.is_empty();
             self.table.store(Arc::new(new_table));
             if is_empty {
                 self.active.store(false, Ordering::Release);
             }
+            removed
         }
 
         #[cfg(loom)]
         {
             if let Ok(mut table) = self.table.write() {
+                let len_before = table.len();
                 table.retain(|f| f.purge_id != purge_id);
+                let removed = table.len() < len_before;
                 if table.is_empty() {
                     self.active.store(false, Ordering::Release);
                 }
+                removed
+            } else {
+                false
             }
         }
     }
@@ -448,6 +457,7 @@ pub struct ErasureFence {
     locked_doc_ids: parking_lot::RwLock<HashSet<Vec<u8>>>,
     scope_write_seq: AtomicU64,
     next_fence_id: AtomicU64,
+    active_fence_count: AtomicU32,
 }
 
 impl ErasureFence {
@@ -460,6 +470,7 @@ impl ErasureFence {
             locked_doc_ids: parking_lot::RwLock::new(HashSet::new()),
             scope_write_seq: AtomicU64::new(0),
             next_fence_id: AtomicU64::new(1),
+            active_fence_count: AtomicU32::new(0),
         }
     }
 
@@ -609,9 +620,13 @@ impl ErasureFence {
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
-        self.gate
+        if let Err(e) = self
+            .gate
             .acquire_fence(id, prefixes.clone(), Duration::from_secs(5))
-            .await?;
+            .await
+        {
+            return Err(e);
+        }
 
         self.active_fences.fetch_add(1, Ordering::Release);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
@@ -681,7 +696,9 @@ impl ErasureFence {
         }
 
         for id in &doc_ids {
-            locked.insert(id.clone());
+            if locked.insert(id.clone()) {
+                self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+            }
         }
         self.active_fences.fetch_add(doc_ids.len() as u32, Ordering::Release);
 

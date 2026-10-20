@@ -1,16 +1,19 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::{Result, TxId};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_erasure_fence_blocking() -> contextra_core::Result<()> {
+async fn test_erasure_fence_blocking() -> Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
         ..Default::default()
     };
     let storage = LsmStorage::open(config).await?;
+
+    let tx1 = TxId::try_new(1).unwrap();
 
     // 1. Initial write permitted
     storage.put(TxId(1), b"key1", b"val1").await?;

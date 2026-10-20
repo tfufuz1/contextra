@@ -3,6 +3,7 @@
 // ZWECK: Traits und Typen für Purge-Compaction Record Filter und Disk Space Probes.
 
 use std::path::PathBuf;
+use thiserror::Error;
 
 /// Hook/Filter called during compaction to decide whether a record should be dropped.
 pub trait CompactionRecordFilter: Send + Sync {
@@ -52,28 +53,51 @@ impl PurgeScope {
 }
 
 /// Reasons why a purge compaction operation is blocked.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PurgeBlocked {
     /// Active MVCC snapshot pins a sequence number <= as_of_tx.
+    #[error("Active MVCC snapshot pins min_seq {min_seq}")]
     ActiveSnapshot { min_seq: u64 },
     /// Checkpoint clones present.
+    #[error("Checkpoint clones present: {copy_ids:?}")]
     CheckpointClones { copy_ids: Vec<String> },
     /// Reader is pinned in active memtable / scan.
+    #[error("Reader pinned in active memtable or scan")]
     ReaderPinned,
     /// Background compaction currently busy.
+    #[error("Background compaction currently busy")]
     CompactionBusy,
     /// Insufficient disk space to write compacted SSTables safely.
+    #[error("Insufficient disk space: needed {needed}, free {free}")]
     InsufficientDiskSpace { needed: u64, free: u64 },
     /// Unclassified files present in DB directory.
+    #[error("Unclassified files present in DB directory: {count}")]
     UnclassifiedFiles { count: usize },
     /// Secure deletion is unsupported on current filesystem/environment.
+    #[error("Secure deletion unsupported: {reason}")]
     SecureDeleteUnsupported { reason: String },
     /// Purge compaction implementation is not yet active (fail-closed).
+    #[error("Purge compaction implementation unimplemented")]
     Unimplemented,
     /// Scan timeout occurred.
+    #[error("Scan timeout occurred during purge")]
     ScanTimeout,
     /// Unknown free space.
+    #[error("Unknown free space")]
     UnknownFreeSpace,
+    /// Read error during purge compaction.
+    #[error("Read error at file {file}, offset {offset}: {details}")]
+    ReadError {
+        file: String,
+        offset: u64,
+        details: String,
+    },
+    /// Write error during purge compaction.
+    #[error("Write error at file {file}: {details}")]
+    WriteError { file: String, details: String },
+    /// Manifest error during purge compaction.
+    #[error("Manifest error during purge: {details}")]
+    ManifestError { details: String },
 }
 
 /// Report summarizing results of a successful purge compaction.
