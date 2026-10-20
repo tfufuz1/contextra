@@ -338,7 +338,10 @@ async fn hyperedge_survives_storage_roundtrip() {
     }
 
     let retrieved = reopened_graph.get_hyperedge(he_id);
-    assert!(retrieved.is_some(), "Hyperedge must survive storage roundtrip");
+    assert!(
+        retrieved.is_some(),
+        "Hyperedge must survive storage roundtrip"
+    );
     assert_eq!(*retrieved.unwrap(), edge);
     assert_eq!(reopened_graph.hyperedges_for_entity(e1), vec![he_id]);
 }

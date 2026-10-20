@@ -11,7 +11,9 @@ pub mod cost;
 pub mod shadow_hook;
 pub(crate) mod snapshot;
 
-use self::cost::{estimate_ppr_cost, estimate_ppr_cost_with_multiplier, GraphStats, PprCostCalibrator};
+use self::cost::{
+    estimate_ppr_cost, estimate_ppr_cost_with_multiplier, GraphStats, PprCostCalibrator,
+};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 use std::collections::{BTreeMap, HashSet};
@@ -179,7 +181,8 @@ pub(crate) fn select_auto_ppr_algorithm_with_calibrator(
     let stats = GraphStats::new(node_count, edge_count);
 
     let mult = calibrator.and_then(|c| c.recommended_multiplier());
-    let (_estimate, choice) = estimate_ppr_cost_with_multiplier(Some(&stats), seed_count, config, mult);
+    let (_estimate, choice) =
+        estimate_ppr_cost_with_multiplier(Some(&stats), seed_count, config, mult);
     choice
 }
 

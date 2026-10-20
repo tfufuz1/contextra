@@ -888,6 +888,7 @@ dependencies = [
  "contextra-types",
  "criterion",
  "futures",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "scc",

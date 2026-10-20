@@ -282,7 +282,8 @@ mod tests {
         assert!(mult_val > 2.5);
 
         // With calibrator feedback multiplier (~3.0): FP cost becomes ~20.0M > PI cost 11.0M -> DensePowerIteration
-        let (_, choice_calibrated) = estimate_ppr_cost_with_multiplier(Some(&stats), 1, &config, mult);
+        let (_, choice_calibrated) =
+            estimate_ppr_cost_with_multiplier(Some(&stats), 1, &config, mult);
         assert_eq!(choice_calibrated, PprAlgorithm::DensePowerIteration);
     }
 }
