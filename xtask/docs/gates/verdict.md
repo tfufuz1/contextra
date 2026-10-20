@@ -15,7 +15,7 @@ It aggregates all individual CI gate execution results, validates their JSON sch
 ### Supported Flags
 
 - `--results-dir <dir>`: Directory containing gate output JSON artifacts (default: `gate-results`).
-- `--required <toml>`: Path to governance TOML defining required/blocking status per gate (default: `governance/verdict-required.toml`).
+- `--required <toml>`: Path to governance TOML defining required/blocking status per gate (default: `xtask/config/governance/verdict-required.toml`).
 - `--root <dir>`: Workspace root path (default: `git rev-parse --show-toplevel`).
 - `--base <rev>`: Base git commit revision (default: `git merge-base HEAD origin/main`).
 - `--head <rev>`: Head git commit revision (default: `HEAD`).
@@ -25,7 +25,7 @@ It aggregates all individual CI gate execution results, validates their JSON sch
 
 ## Artifact Schema Validation
 
-The verdict engine looks for `<results-dir>/**/<gate-name>.json` for each gate defined in `governance/verdict-required.toml`.
+The verdict engine looks for `<results-dir>/**/<gate-name>.json` for each gate defined in `xtask/config/governance/verdict-required.toml`.
 Each JSON artifact must adhere to the standard harness schema:
 
 ```json

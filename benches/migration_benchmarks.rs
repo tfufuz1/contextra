@@ -1,6 +1,5 @@
-// ANCHOR[PERF:BENCH-001] STATUS:PARTIAL (TS:2026-08-29T00:00:00Z) — Benchmark Suite für LangGraph Migration
-// ZIEL: Latenz-Baseline für Contextra-interne Operationen — KEIN Cross-System-Vergleich
-// AGENT:09 DATE:2026-05-15 STATUS:PARTIAL
+// ANCHOR[PERF:BENCH-001] STATUS:DONE (TS:2026-10-20T00:00:00Z) — Benchmark Suite für LangGraph Migration
+// ZIEL: Latenz-Baseline für Contextra-interne Operationen (Hybrid Search, Checkpointing, Lookups, Stats Commit) — KEIN Cross-System-Vergleich
 
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_db::{Contextra, ContextraConfig};
@@ -50,8 +49,9 @@ fn bench_agent_state_checkpoint(c: &mut Criterion) {
 
     c.bench_function("checkpoint_latency", |b| {
         b.to_async(&rt).iter(|| async {
+            let tx = TxId::try_new(0).unwrap_or_else(|_| TxId::internal());
             let _ = manager
-                .create_checkpoint("test-cp", "default", 0, TxId::new(0), serde_json::json!({}))
+                .create_checkpoint("test-cp", "default", 0, tx, serde_json::json!({}))
                 .await
                 .unwrap(); // unwrap allowed
         })

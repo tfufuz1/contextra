@@ -33,7 +33,49 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+criterion = { workspace = true }
 contextra-license = { workspace = true, features = ["test-support"] }
+
+[[bench]]
+name = "competitive_bench"
+path = "../../benches/competitive_bench.rs"
+harness = false
+
+[[bench]]
+name = "migration_benchmarks"
+path = "../../benches/migration_benchmarks.rs"
+harness = false
+
+[[bench]]
+name = "relate_bench"
+path = "../../benches/relate_bench.rs"
+harness = false
+
+[[bench]]
+name = "rrf_scale_bench"
+path = "../../benches/rrf_scale_bench.rs"
+harness = false
+
+[[bench]]
+name = "scale_bench"
+path = "../../benches/scale_bench.rs"
+harness = false
+
+[[example]]
+name = "quickstart"
+path = "../../examples/quickstart.rs"
+
+[[example]]
+name = "hybrid_search"
+path = "../../examples/hybrid_search.rs"
+
+[[example]]
+name = "collections"
+path = "../../examples/collections.rs"
+
+[[example]]
+name = "governance_fixtures"
+path = "../../examples/governance_fixtures.rs"
 
 [features]
 default = ["fast"]

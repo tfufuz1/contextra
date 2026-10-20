@@ -1210,4 +1210,3 @@ pub fn finish_size_prefixed_search_response_buffer<'a, 'b, A: flatbuffers::Alloc
 }
 }  // pub mod IPC
 }  // pub mod Contextra
-

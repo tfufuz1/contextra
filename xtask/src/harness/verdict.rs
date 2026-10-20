@@ -55,7 +55,7 @@ struct VerdictOutputJson {
 
 pub fn run_verdict(args: &[String]) -> i32 {
     let mut results_dir = PathBuf::from("gate-results");
-    let mut required_toml = PathBuf::from("governance/verdict-required.toml");
+    let mut required_toml = PathBuf::from("xtask/config/governance/verdict-required.toml");
     let mut is_json = false;
 
     let mut i = 0;

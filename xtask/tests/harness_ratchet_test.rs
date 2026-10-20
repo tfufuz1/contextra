@@ -24,7 +24,7 @@ fn setup_temp_repo() -> TempDir {
     run_git(&["config", "user.name", "Test User"]);
     run_git(&["config", "user.email", "test@example.com"]);
 
-    fs::create_dir_all(path.join("governance")).unwrap();
+    fs::create_dir_all(path.join("xtask/config/governance")).unwrap();
     fs::create_dir_all(path.join("docs/decisions")).unwrap();
     fs::create_dir_all(path.join(".github")).unwrap();
     fs::create_dir_all(path.join("crates/contextra-crypto/src")).unwrap();

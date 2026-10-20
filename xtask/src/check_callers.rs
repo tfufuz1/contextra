@@ -30,7 +30,7 @@ pub fn print_help() {
     println!("  Zero callers for a default-feature or experimental item fails the command.");
     println!();
     println!("ALLOWLIST & EXPIRED ENTRIES:");
-    println!("  Exceptions are managed in 'rules/caller-allowlist.toml'.");
+    println!("  Exceptions are managed in 'xtask/config/caller-allowlist.toml'.");
     println!("  Each entry must specify a 'reason' and an 'expiry' date (YYYY-MM-DD).");
     println!("  If an allowlist entry has expired, check-callers fails.");
     println!();
@@ -58,15 +58,15 @@ pub fn run_check_callers(args: &[String]) -> bool {
     let today = chrono::Utc::now().naive_utc().date();
 
     // 1. Read allowlist
-    let allowlist_path = root.join("rules/caller-allowlist.toml");
+    let allowlist_path = root.join("xtask/config/caller-allowlist.toml");
     let allowlist: AllowlistConfig = if allowlist_path.exists() {
         match fs::read_to_string(&allowlist_path) {
             Ok(content) => toml::from_str(&content).unwrap_or_else(|e| {
-                eprintln!("⚠️ Failed to parse rules/caller-allowlist.toml: {}", e);
+                eprintln!("⚠️ Failed to parse xtask/config/caller-allowlist.toml: {}", e);
                 AllowlistConfig::default()
             }),
             Err(e) => {
-                eprintln!("⚠️ Failed to read rules/caller-allowlist.toml: {}", e);
+                eprintln!("⚠️ Failed to read xtask/config/caller-allowlist.toml: {}", e);
                 AllowlistConfig::default()
             }
         }

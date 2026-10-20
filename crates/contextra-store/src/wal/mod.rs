@@ -323,25 +323,33 @@ pub const MAX_WAL_ENTRY_SIZE: u32 = 64 * 1024 * 1024;
 /// Default capacity for the bounded WAL flusher command channel.
 pub const DEFAULT_WAL_QUEUE_CAPACITY: usize = 1_024;
 
-#[cfg(feature = "fault-injection")]
 #[derive(Debug, Default)]
-pub struct WalFaultPlan {
+pub struct WalFailpoints {
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub fail_append_for_tx: std::sync::atomic::AtomicU64,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub delay_append_for_tx: std::sync::atomic::AtomicU64,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub delay_append_ms: std::sync::atomic::AtomicU64,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub fail_truncate_once: std::sync::atomic::AtomicBool,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub fail_append_after_partial_bytes: std::sync::atomic::AtomicU64,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub fail_append_partial_once: std::sync::atomic::AtomicBool,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub fail_sync_once: std::sync::atomic::AtomicBool,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     pub wal_purge_failpoint: std::sync::atomic::AtomicU32,
 }
 
-#[cfg(feature = "fault-injection")]
-impl WalFaultPlan {
+impl WalFailpoints {
     pub fn new() -> Self {
         Self::default()
     }
 }
+
+pub type WalFaultPlan = WalFailpoints;
 
 #[derive(Debug, Clone)]
 pub struct WalConfig {
@@ -350,8 +358,7 @@ pub struct WalConfig {
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
     pub expected_hwm: Option<[u8; 32]>,
-    #[cfg(feature = "fault-injection")]
-    pub fault_plan: Arc<WalFaultPlan>,
+    pub fault_plan: Arc<WalFailpoints>,
 }
 
 impl Default for WalConfig {
@@ -362,8 +369,7 @@ impl Default for WalConfig {
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
             expected_hwm: None,
-            #[cfg(feature = "fault-injection")]
-            fault_plan: Arc::new(WalFaultPlan::default()),
+            fault_plan: Arc::new(WalFailpoints::default()),
         }
     }
 }
@@ -396,8 +402,7 @@ pub struct Wal {
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
     pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
     pub(crate) poisoned: Arc<std::sync::atomic::AtomicBool>,
-    #[cfg(feature = "fault-injection")]
-    pub(crate) fault_plan: Arc<WalFaultPlan>,
+    pub(crate) fault_plan: Arc<WalFailpoints>,
 }
 
 impl Drop for Wal {
@@ -647,7 +652,6 @@ impl Wal {
                 sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
                 truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
                 poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                #[cfg(feature = "fault-injection")]
                 fault_plan: config.fault_plan.clone(),
             })
         }
@@ -776,7 +780,6 @@ impl Wal {
                 sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
                 poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                #[cfg(feature = "fault-injection")]
                 fault_plan: config.fault_plan.clone(),
             };
 
@@ -938,8 +941,11 @@ impl Wal {
         self.poisoned.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    #[cfg(feature = "fault-injection")]
-    pub fn fault_plan(&self) -> &Arc<WalFaultPlan> {
+    pub fn fault_plan(&self) -> &Arc<WalFailpoints> {
+        &self.fault_plan
+    }
+
+    pub fn failpoints(&self) -> &Arc<WalFailpoints> {
         &self.fault_plan
     }
 
@@ -1076,8 +1082,7 @@ impl Wal {
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            #[cfg(feature = "fault-injection")]
-            fault_plan: Arc::new(WalFaultPlan::default()),
+            fault_plan: Arc::new(WalFailpoints::default()),
         };
         if let Err(e) = wal.enable_flusher_with_config(
             self::fs::LoomFile::new(),

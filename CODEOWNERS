@@ -25,7 +25,6 @@
 # Build & Infrastruktur & Governance Tooling
 /.github/                              @tfufuz1
 /xtask/                                @tfufuz1
-/governance/                           @tfufuz1
 /justfile                              @tfufuz1
 /rust-toolchain.toml                   @tfufuz1
 /deny.toml                             @tfufuz1

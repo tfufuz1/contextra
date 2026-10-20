@@ -57,8 +57,8 @@ async fn test_k2_flush_swap_race_crash_recovery() {
     commit_res.unwrap().unwrap();
     let _ = flush_res;
 
-    storage.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
+    storage_clone.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
+    storage_clone.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
 
     // Simulate crash without clean shutdown: copy DB directory
     let crash_dir = tempdir().unwrap();

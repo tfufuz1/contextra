@@ -34,10 +34,6 @@ glob = ".jules/setup/**"
 reason = "Setup-Skripte für die Agenten-Umgebung."
 
 [[protected]]
-glob = "governance/**"
-reason = "Governance-Konfigurationen und Selbstschutz der Governance-Gates."
-
-[[protected]]
 glob = "CODEOWNERS"
 reason = "Codeowner-Zuweisungen sichern Review-Pflichten ab."
 
@@ -68,10 +64,6 @@ reason = "Cargo-Konfigurationen und Build-Flags."
 [[protected]]
 glob = "sgconfig.yml"
 reason = "Ast-Grep / Static Analysis Regeln."
-
-[[protected]]
-glob = "xtask/registry.toml"
-reason = "Registry-Konfiguration der Xtask-Gates."
 
 [[protected]]
 glob = "tests/layering.rs"

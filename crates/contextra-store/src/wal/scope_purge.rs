@@ -11,7 +11,7 @@
 use contextra_durable_fs::atomic_replace;
 use contextra_types::{ContextraError, Result};
 use std::path::Path;
-#[cfg(feature = "fault-injection")]
+#[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
@@ -180,7 +180,7 @@ pub async fn purge_wal_scope(
     scope: &PurgeScope,
     as_of_tx: u64,
     key_manager: Option<Arc<KeyManager>>,
-    #[cfg(feature = "fault-injection")] fault_plan: Option<Arc<crate::wal::WalFaultPlan>>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<Arc<crate::wal::WalFailpoints>>,
 ) -> Result<WalPurgeReport> {
     resume_wal_scope_purge(wal_dir).await?;
 
@@ -196,7 +196,7 @@ pub async fn purge_wal_scope(
     let mut report = WalPurgeReport::default();
 
     if check_and_clear_failpoint(
-        #[cfg(feature = "fault-injection")]
+        #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
         fault_plan.as_deref(),
         FAILPOINT_BEFORE_REWRITE,
     ) {
@@ -367,7 +367,7 @@ pub async fn purge_wal_scope(
         drop(tmp_file);
 
         if check_and_clear_failpoint(
-            #[cfg(feature = "fault-injection")]
+            #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
             fault_plan.as_deref(),
             FAILPOINT_AFTER_REWRITE,
         ) {
@@ -389,7 +389,7 @@ pub async fn purge_wal_scope(
         fsync_parent_dir(&path).await?;
 
         if check_and_clear_failpoint(
-            #[cfg(feature = "fault-injection")]
+            #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
             fault_plan.as_deref(),
             FAILPOINT_AFTER_RENAME,
         ) {
@@ -404,7 +404,7 @@ pub async fn purge_wal_scope(
     }
 
     if check_and_clear_failpoint(
-        #[cfg(feature = "fault-injection")]
+        #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
         fault_plan.as_deref(),
         FAILPOINT_AFTER_OLD_REMOVAL,
     ) {
@@ -445,10 +445,10 @@ pub async fn resume_wal_scope_purge(wal_dir: &Path) -> Result<()> {
 }
 
 fn check_and_clear_failpoint(
-    #[cfg(feature = "fault-injection")] fault_plan: Option<&crate::wal::WalFaultPlan>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<&crate::wal::WalFailpoints>,
     fp: u32,
 ) -> bool {
-    #[cfg(feature = "fault-injection")]
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]
     if let Some(plan) = fault_plan {
         return plan
             .wal_purge_failpoint

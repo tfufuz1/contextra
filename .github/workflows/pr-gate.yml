@@ -298,7 +298,7 @@ jobs:
           path: gate-results
 
       - name: Evaluate Verdict (Must Return 0)
-        run: cargo xtask verdict --results-dir gate-results --required governance/verdict-required.toml
+        run: cargo xtask verdict --results-dir gate-results --required xtask/config/governance/verdict-required.toml
 
   verdict-comment:
     name: Verdict Sticky Comment
@@ -335,7 +335,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          VERDICT_OUT=$(cargo xtask verdict --results-dir gate-results --required governance/verdict-required.toml 2>&1 || true)
+          VERDICT_OUT=$(cargo xtask verdict --results-dir gate-results --required xtask/config/governance/verdict-required.toml 2>&1 || true)
           echo "$VERDICT_OUT"
 
           COMMENT_BODY="<!-- contextra-verdict -->
