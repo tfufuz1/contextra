@@ -6,7 +6,8 @@ use contextra_store::lsm::config::{EncryptionConfig, KekSource};
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_sovereign_profile_without_encryption_fails_open() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_sovereign_profile_without_encryption_fails_open(
+) -> Result<(), Box<dyn std::error::Error>> {
     let tmp = tempdir()?;
 
     // Sovereign profile (PerformanceProfile::Compliance) without encryption config MUST fail open.
@@ -36,8 +37,12 @@ async fn test_silent_downgrade_attempt_fails() -> Result<(), Box<dyn std::error:
             .build()
             .await?;
 
-        db.insert("doc_1", &[0.1, 0.2, 0.3, 0.4], Some(serde_json::json!({"canary": "secret_data"})))
-            .await?;
+        db.insert(
+            "doc_1",
+            &[0.1, 0.2, 0.3, 0.4],
+            Some(serde_json::json!({"canary": "secret_data"})),
+        )
+        .await?;
         db.close().await?;
     }
 

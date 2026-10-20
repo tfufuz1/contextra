@@ -1,7 +1,7 @@
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
 use contextra_ports::BoxFuture;
-use contextra_types::error::Result;
 use contextra_ports::SequentialIdGen;
+use contextra_types::error::Result;
 use std::sync::Arc;
 
 struct MockEmbedder;
