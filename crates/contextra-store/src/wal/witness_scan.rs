@@ -8,7 +8,8 @@
 //! - frames_matching_scope == 0
 
 use contextra_types::{ContextraError, Result};
-use contextra_ports::{Clock, SystemClock};
+use contextra_ports::Clock;
+use contextra_sys::SystemClock;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;

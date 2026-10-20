@@ -68,17 +68,31 @@ impl PurgeOutcome {
 }
 
 /// Hooks callback function type.
-pub type HookCallback = Box<dyn Fn() -> std::io::Result<()> + Send + Sync>;
+pub type HookCallback = Arc<dyn Fn() -> std::io::Result<()> + Send + Sync>;
 
 /// Scope reconstruction callback function type.
 pub type ScopeReconstructFn =
-    Box<dyn Fn(Option<u64>, Option<[u8; 32]>) -> Result<PurgeScope, OrxPurgeError> + Send + Sync>;
+    Arc<dyn Fn(Option<u64>, Option<[u8; 32]>) -> Result<PurgeScope, OrxPurgeError> + Send + Sync>;
+
+/// Async WAL retire callback function type with scope and cutoff tx.
+/// Returns (frames_purged, segments_rewritten).
+pub type ScopeWalRetireFn = Arc<
+    dyn Fn(
+            PurgeScope,
+            u64,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = contextra_types::Result<(u64, u64)>> + Send>,
+        > + Send
+        + Sync,
+>;
 
 /// Configuration and callbacks for purge lifecycle steps.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OrxHooks {
     /// Callback executed during WAL retirement (Phase 6).
     pub wal_retire: Option<HookCallback>,
+    /// Async callback executed during WAL retirement with scope and cutoff tx (Phase 6).
+    pub wal_retire_scope: Option<ScopeWalRetireFn>,
     /// Callback executed during witness generation (Phase 7).
     pub witness: Option<HookCallback>,
     /// Callback to reconstruct PurgeScope from intent ledger sequence or proof ID.
@@ -95,6 +109,7 @@ impl std::fmt::Debug for OrxHooks {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OrxHooks")
             .field("wal_retire", &self.wal_retire.is_some())
+            .field("wal_retire_scope", &self.wal_retire_scope.is_some())
             .field("witness", &self.witness.is_some())
             .field("reconstruct_scope", &self.reconstruct_scope.is_some())
             .field("flush_memtable", &self.flush_memtable.is_some())
@@ -166,7 +181,7 @@ impl<'a> PurgeOrchestrator<'a> {
         let mut hooks = OrxHooks::default();
         if let Some(cb) = wal_callback {
             let cb_cell = Arc::new(Mutex::new(Some(cb)));
-            hooks.wal_retire = Some(Box::new(move || {
+            hooks.wal_retire = Some(Arc::new(move || {
                 if let Ok(mut lock) = cb_cell.lock() {
                     if let Some(f) = lock.take() {
                         return f().map_err(|e| {
@@ -264,7 +279,9 @@ impl<'a> PurgeOrchestrator<'a> {
             if intent.phase <= PurgePhase::P2FenceAcquired {
                 if let Some(storage) = self.storage {
                     if fence_prefixes.is_empty() {
-                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
+                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles {
+                            count: 0,
+                        }));
                     }
                     let guard = storage
                         .erasure_fence
@@ -303,7 +320,7 @@ impl<'a> PurgeOrchestrator<'a> {
 
                 if let Some(storage) = self.storage {
                     match storage
-                        .purge_keys(scope, intent.as_of_tx, space_probe)
+                        .purge_keys(scope.clone(), intent.as_of_tx, space_probe)
                         .await
                     {
                         Ok(rep) => report = rep,
@@ -322,8 +339,12 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::P5Dispose)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
-                let disp_rep =
-                    dispose_obsolete_files(&self.storage_dir, report.obsolete_files.clone(), secure_delete).await?;
+                let disp_rep = dispose_obsolete_files(
+                    &self.storage_dir,
+                    report.obsolete_files.clone(),
+                    secure_delete,
+                )
+                .await?;
                 refusals = disp_rep.refusals.len();
 
                 self.check_failpoint("mid_dispose_journal")?;
@@ -333,8 +354,24 @@ impl<'a> PurgeOrchestrator<'a> {
             // P6: WAL Retire
             if intent.phase <= PurgePhase::WalRetire {
                 self.record_phase(&mut intent, PurgePhase::P6WalCallback)?;
-                if let Some(ref cb) = hooks.wal_retire {
-                    cb().map_err(OrxPurgeError::Io)?;
+                if let Some(ref cb_scope) = hooks.wal_retire_scope {
+                    match cb_scope(scope.clone(), intent.as_of_tx).await {
+                        Ok((frames, segs)) => {
+                            report.records_purged += frames;
+                            report.sstables_replaced += segs as usize;
+                        }
+                        Err(e) => {
+                            return Err(OrxPurgeError::Io(std::io::Error::other(format!(
+                                "ErasureIncomplete {{ component: \"wal\" }}: {e}"
+                            ))));
+                        }
+                    }
+                } else if let Some(ref cb) = hooks.wal_retire {
+                    if let Err(e) = cb() {
+                        return Err(OrxPurgeError::Io(std::io::Error::other(format!(
+                            "ErasureIncomplete {{ component: \"wal\" }}: {e}"
+                        ))));
+                    }
                 }
                 self.check_failpoint("after_wal_callback")?;
             }

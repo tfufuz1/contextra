@@ -88,7 +88,7 @@ impl ErasureLedger {
 
             // Fresh database: create new ledger
             let mut db_instance_id = [0u8; 16];
-            let rng = contextra_ports::SystemRng::new();
+            let rng = contextra_sys::SystemRng::new();
             contextra_ports::Rng::fill_bytes(&rng, &mut db_instance_id);
 
             let ledger = Self {
@@ -206,7 +206,7 @@ impl ErasureLedger {
             stored_db_id
         } else {
             let mut id = [0u8; 16];
-            let rng = contextra_ports::SystemRng::new();
+            let rng = contextra_sys::SystemRng::new();
             contextra_ports::Rng::fill_bytes(&rng, &mut id);
             id
         };

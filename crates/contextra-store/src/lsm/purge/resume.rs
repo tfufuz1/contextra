@@ -3,15 +3,14 @@
 // ZWECK: Resume-Schnittstelle zur Wiederaufnahme nicht abgeschlossener Purge-Operationen nach Absturz (Anhang B).
 // INVARIANTEN: Erkennt Korruption (Err), führt verbleibende Phasen idempotent aus, reinigt PendingDeleteJournal.
 
-use super::dispose::{
-    dispose_obsolete_files_with_policy, DisposePolicy, OrxDisposeReport,
-};
+use super::dispose::{dispose_obsolete_files_with_policy, DisposePolicy, OrxDisposeReport};
 use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::intent::OrxPurgeIntent;
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
 use crate::compaction::purge_filter::{PurgeReport, PurgeScope};
 use contextra_durable_fs::PendingDeleteJournal;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Resumes any pending or interrupted purge operation present in `storage_dir` using an explicit [`DisposePolicy`].
 ///
@@ -45,8 +44,22 @@ pub async fn resume_pending_with_policy(
         }
 
         let secure_delete = dispose_policy != DisposePolicy::Disabled;
+        let mut effective_hooks = hooks.clone();
+        if effective_hooks.wal_retire_scope.is_none() && effective_hooks.wal_retire.is_none() {
+            let wal_dir = storage_dir.to_path_buf();
+            effective_hooks.wal_retire_scope = Some(Arc::new(move |scope, as_of_tx| {
+                let wal_dir = wal_dir.clone();
+                Box::pin(async move {
+                    let report =
+                        crate::wal::scope_purge::purge_wal_scope(&wal_dir, &scope, as_of_tx, None)
+                            .await?;
+                    Ok((report.frames_purged, report.segments_rewritten))
+                })
+            }));
+        }
+
         let report = orchestrator
-            .execute_from_intent(intent, scope, hooks, secure_delete, None)
+            .execute_from_intent(intent, scope, &effective_hooks, secure_delete, None)
             .await?;
 
         return Ok(Some((report, OrxDisposeReport::default())));
@@ -57,12 +70,8 @@ pub async fn resume_pending_with_policy(
         let journal = PendingDeleteJournal::open(&journal_file)?;
         let obsolete_files = journal.pending().to_vec();
 
-        let disp_rep = dispose_obsolete_files_with_policy(
-            storage_dir,
-            obsolete_files,
-            dispose_policy,
-        )
-        .await?;
+        let disp_rep =
+            dispose_obsolete_files_with_policy(storage_dir, obsolete_files, dispose_policy).await?;
 
         return Ok(Some((
             PurgeReport {
@@ -86,13 +95,9 @@ pub async fn resume_pending(
     hooks: &OrxHooks,
     failpoints: Option<&OrxFailpointSet>,
 ) -> Result<Option<PurgeReport>, OrxPurgeError> {
-    let result = resume_pending_with_policy(
-        storage_dir,
-        hooks,
-        failpoints,
-        DisposePolicy::RequireScrub,
-    )
-    .await?;
+    let result =
+        resume_pending_with_policy(storage_dir, hooks, failpoints, DisposePolicy::RequireScrub)
+            .await?;
 
     Ok(result.map(|(report, _disp_rep)| report))
 }

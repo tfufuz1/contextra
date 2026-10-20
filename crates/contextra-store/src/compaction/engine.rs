@@ -79,7 +79,7 @@ impl CompactionEngine {
             workload_metrics: WorkloadMetrics::new(),
             adaptive_planner,
             merge_operator: None,
-            clock: Arc::new(contextra_ports::SystemClock::new()),
+            clock: Arc::new(contextra_sys::SystemClock::new()),
             purge_scope: parking_lot::RwLock::new(None),
         }
     }

@@ -17,6 +17,42 @@ pub struct SystemClock {
     start_instant: Instant,
 }
 
+impl contextra_ports::Clock for SystemClock {
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        let wall_ms = self.now_unix_nanos() / 1_000_000;
+        let mono_ctr = self.monotonic_nanos();
+        contextra_types::DeterministicTimestamp::new(wall_ms, mono_ctr)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.monotonic_nanos()
+    }
+}
+
+impl contextra_ports::EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn next_u64(&self) -> u64 {
+        self.inner.next_u64()
+    }
+}
+
+impl contextra_ports::SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        self.inner.next_unit_f64()
+    }
+}
+
 impl SystemClock {
     /// Creates a new [`SystemClock`] with current instant as monotonic baseline.
     // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-sys

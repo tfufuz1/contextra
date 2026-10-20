@@ -25,5 +25,7 @@ windows-sys = { version = "0.61", features = [
 libc = "0.2"
 
 [dependencies]
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }

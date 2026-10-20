@@ -8,7 +8,6 @@
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
 use contextra_ports::{Rng, StorageEngine};
-use contextra_testkit::{ManualClock, SeededRng};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;
@@ -18,6 +17,7 @@ use contextra_store::lsm::purge::{
     CANONICAL_FAILPOINTS,
 };
 use contextra_store::lsm::LsmStorage;
+use contextra_testkit::{ManualClock, SeededRng};
 use contextra_types::TxId;
 use std::env;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
 
     for i in 0..seed_count {
         let seed = base_seed + (i as u64);
-        let rng = SeededRng::new(seed);
+        let rng = contextra_sys::SeededRng::new(seed);
         let clock = Arc::new(ManualClock::new(1_700_000_000_000_000_000));
 
         // Advance deterministic clock using seeded pseudo-random steps

@@ -7,8 +7,8 @@ use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
 use super::resume::resume_pending_with_policy;
 use crate::compaction::purge_filter::PurgeReport;
-use contextra_types::Result;
 use contextra_ports::Clock;
+use contextra_types::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -49,7 +49,19 @@ pub struct PurgeWiring {
 
 impl PurgeWiring {
     /// Constructs a new `PurgeWiring` instance with explicit dependencies.
-    pub fn build(deps: PurgeWiringDeps) -> Result<Self> {
+    pub fn build(mut deps: PurgeWiringDeps) -> Result<Self> {
+        if deps.hooks.wal_retire_scope.is_none() && deps.hooks.wal_retire.is_none() {
+            let wal_dir = deps.storage_dir.clone();
+            deps.hooks.wal_retire_scope = Some(Arc::new(move |scope, as_of_tx| {
+                let wal_dir = wal_dir.clone();
+                Box::pin(async move {
+                    let report =
+                        crate::wal::scope_purge::purge_wal_scope(&wal_dir, &scope, as_of_tx, None)
+                            .await?;
+                    Ok((report.frames_purged, report.segments_rewritten))
+                })
+            }));
+        }
         Ok(Self {
             storage_dir: deps.storage_dir,
             hooks: deps.hooks,
@@ -71,7 +83,9 @@ impl PurgeWiring {
     }
 
     /// Resumes any pending or interrupted purge operation present in the storage directory.
-    pub async fn resume_pending(&self) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
+    pub async fn resume_pending(
+        &self,
+    ) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
         resume_pending_with_policy(
             &self.storage_dir,
             &self.hooks,

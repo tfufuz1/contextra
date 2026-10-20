@@ -3,7 +3,8 @@
 // ZWECK: Seedable, deterministic PRNG for Deterministic Simulation Testing (DST).
 // INVARIANTEN: Bit-identical random streams for identical seeds across executions.
 
-use contextra_ports::{EntropyRng as EntropyRngPort, SystemRng};
+use contextra_ports::EntropyRng as EntropyRngPort;
+use contextra_sys::SystemRng;
 
 /// Type-separated entropy RNG source for non-deterministic runtime entropy.
 ///
