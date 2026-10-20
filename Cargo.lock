@@ -1211,7 +1211,6 @@ dependencies = [
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "crc32fast",
  "criterion",
  "futures",
