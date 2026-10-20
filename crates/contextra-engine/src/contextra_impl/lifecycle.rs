@@ -182,8 +182,26 @@ impl Contextra {
         Ok(db)
     }
 
-    async fn init_embedding_backend(&self, _backend: &EmbeddingBackend) -> Result<()> {
-        Ok(())
+    async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
+        match backend {
+            EmbeddingBackend::None => Ok(()),
+            EmbeddingBackend::Candle { model_dir } => {
+                let client = contextra_infer_candle::CandleEmbedClient::from_dir(
+                    model_dir,
+                    contextra_infer_candle::CandleQuantization::Q8_0,
+                )?;
+                self.set_embedder(Arc::new(client)).await?;
+                Ok(())
+            }
+            EmbeddingBackend::Onnx { .. } => Err(contextra_types::ContextraError::capability_unsupported(
+                "onnx",
+                "ONNX embedding backend not supported directly in contextra-engine",
+            )),
+            EmbeddingBackend::Ollama { .. } => Err(contextra_types::ContextraError::capability_unsupported(
+                "ollama",
+                "Ollama embedding backend not supported directly in contextra-engine",
+            )),
+        }
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -557,6 +575,53 @@ mod consolidation_launcher_tests {
 
         let db = Contextra::open_with_config(dir.path(), config).await?;
         db.close().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_init_embedding_backend_variants() -> contextra_types::Result<()> {
+        let dir = tempdir().unwrap();
+
+        // None backend succeeds
+        let config_none = ContextraConfig {
+            embedding_backend: EmbeddingBackend::None,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config_none).await?;
+        db.close().await?;
+
+        // Candle with invalid dir fails with error
+        let config_candle = ContextraConfig {
+            embedding_backend: EmbeddingBackend::Candle {
+                model_dir: dir.path().join("non_existent_candle_dir"),
+            },
+            ..Default::default()
+        };
+        let res_candle = Contextra::open_with_config(dir.path(), config_candle).await;
+        assert!(res_candle.is_err());
+
+        // Onnx fails with capability_unsupported
+        let config_onnx = ContextraConfig {
+            embedding_backend: EmbeddingBackend::Onnx {
+                model_name: "test".into(),
+                cache_dir: None,
+            },
+            ..Default::default()
+        };
+        let res_onnx = Contextra::open_with_config(dir.path(), config_onnx).await;
+        assert!(matches!(res_onnx, Err(contextra_types::ContextraError::CapabilityUnsupported { .. })));
+
+        // Ollama fails with capability_unsupported
+        let config_ollama = ContextraConfig {
+            embedding_backend: EmbeddingBackend::Ollama {
+                endpoint: "http://localhost".into(),
+                model: "test".into(),
+            },
+            ..Default::default()
+        };
+        let res_ollama = Contextra::open_with_config(dir.path(), config_ollama).await;
+        assert!(matches!(res_ollama, Err(contextra_types::ContextraError::CapabilityUnsupported { .. })));
 
         Ok(())
     }

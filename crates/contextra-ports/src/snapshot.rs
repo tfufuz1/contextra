@@ -3,7 +3,7 @@
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use contextra_types::{Result, TxId};
+use contextra_types::TxId;
 
 /// Unique identifier for a read snapshot (§7.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -59,11 +59,3 @@ impl ReadSnapshot {
     }
 }
 
-/// Trait implemented by storage engines or snapshot providers to supply consistent point-in-time snapshots (§7.2).
-pub trait SnapshotReader: Send + Sync {
-    /// Acquires a new [`ReadSnapshot`] pinned at the current high-water transaction ID.
-    fn snapshot(&self) -> Result<ReadSnapshot>;
-
-    /// Reads value for `key` isolated at `snap`.
-    fn read_at(&self, snap: &ReadSnapshot, key: &[u8]) -> Result<Option<Vec<u8>>>;
-}

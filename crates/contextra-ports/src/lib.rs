@@ -43,8 +43,6 @@ pub mod erasure;
 pub mod graph;
 /// Graph index traits and CSR statistics.
 pub mod graph_index;
-/// Graph persistence port traits (§4.3).
-pub mod graph_persistence;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
 /// Unique ID generator port traits (§7.4).
@@ -91,7 +89,6 @@ pub use embedding::*;
 pub use erasure::*;
 pub use graph::*;
 pub use graph_index::*;
-pub use graph_persistence::*;
 pub use id_gen::*;
 pub use kv::*;
 pub use kv_bridge_port::*;
@@ -121,7 +118,6 @@ mod dyn_safety {
     fn _assert_dyn_kv_lifecycle_hooks(_: Option<&dyn KvLifecycleHooks>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
-    fn _assert_dyn_graph_persistence(_: Option<&dyn GraphPersistence>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
@@ -140,9 +136,7 @@ mod dyn_safety {
     fn _assert_dyn_restore_guard(_: Option<&dyn RestoreGuard>) {}
     fn _assert_dyn_write_gate(_: Option<&dyn WriteGate>) {}
     fn _assert_dyn_free_space_probe(_: Option<&dyn FreeSpaceProbe>) {}
-    fn _assert_dyn_snapshot_reader(_: Option<&dyn SnapshotReader>) {}
     fn _assert_dyn_merge_operator(_: Option<&dyn MergeOperator>) {}
-    fn _assert_dyn_merge_operator_factory(_: Option<&dyn MergeOperatorFactory>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -153,7 +147,6 @@ mod dyn_safety {
         _assert_dyn_kv_lifecycle_hooks(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
-        _assert_dyn_graph_persistence(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
         _assert_dyn_entropy_rng(None);
@@ -171,8 +164,6 @@ mod dyn_safety {
         _assert_dyn_restore_guard(None);
         _assert_dyn_write_gate(None);
         _assert_dyn_free_space_probe(None);
-        _assert_dyn_snapshot_reader(None);
         _assert_dyn_merge_operator(None);
-        _assert_dyn_merge_operator_factory(None);
     }
 }
