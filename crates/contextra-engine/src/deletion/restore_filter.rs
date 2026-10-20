@@ -8,12 +8,13 @@
 use contextra_checkpoint::restore_filter::CpyRestoreFilter;
 use contextra_crypto::kv_shredding::KeyRegistry;
 use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
-use contextra_store::erasure_ledger::{ErasureLedger, LedgerDecision};
+use contextra_store::erasure_ledger::{ErasureLedger, ErasureLedgerHandle, LedgerDecision};
 use std::sync::Arc;
 
 /// Restore filter adapter implementing [`CpyRestoreFilter`] backed by [`RevocationLog`], [`KeyRegistry`] and [`ErasureLedger`].
 pub struct DpiRestoreFilter {
-    ledger: Arc<ErasureLedger>,
+    ledger: Option<Arc<ErasureLedger>>,
+    ledger_handle: Option<Arc<ErasureLedgerHandle>>,
     revocation_log: Option<Arc<RevocationLog>>,
     key_registry: Option<Arc<KeyRegistry>>,
     storage_scope: Vec<u8>,
@@ -29,7 +30,25 @@ impl DpiRestoreFilter {
         storage_scope: impl Into<Vec<u8>>,
     ) -> Self {
         Self {
-            ledger,
+            ledger: Some(ledger),
+            ledger_handle: None,
+            revocation_log,
+            key_registry,
+            storage_scope: storage_scope.into(),
+        }
+    }
+
+    /// Creates a new `DpiRestoreFilter` wrapping `ledger_handle` and optional revocation sources for `storage_scope`.
+    #[must_use]
+    pub fn new_with_handle(
+        ledger_handle: Arc<ErasureLedgerHandle>,
+        revocation_log: Option<Arc<RevocationLog>>,
+        key_registry: Option<Arc<KeyRegistry>>,
+        storage_scope: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            ledger: None,
+            ledger_handle: Some(ledger_handle),
             revocation_log,
             key_registry,
             storage_scope: storage_scope.into(),
@@ -50,6 +69,12 @@ impl DpiRestoreFilter {
     #[must_use]
     pub fn for_lsm(ledger: Arc<ErasureLedger>) -> Self {
         Self::new(ledger, None, None, b"lsm".to_vec())
+    }
+
+    /// Creates a default `DpiRestoreFilter` for LSM storage scope `b"lsm"` with `ErasureLedgerHandle`.
+    #[must_use]
+    pub fn for_lsm_handle(ledger_handle: Arc<ErasureLedgerHandle>) -> Self {
+        Self::new_with_handle(ledger_handle, None, None, b"lsm".to_vec())
     }
 
     /// Attaches an optional `RevocationLog`.
@@ -111,6 +136,12 @@ impl CpyRestoreFilter for DpiRestoreFilter {
         }
 
         // 3. ErasureLedger decision query
-        self.ledger.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
+        if let Some(ref ledger) = self.ledger {
+            ledger.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
+        } else if let Some(ref handle) = self.ledger_handle {
+            handle.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
+        } else {
+            false
+        }
     }
 }

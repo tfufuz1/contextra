@@ -1067,11 +1067,7 @@ mod tests {
     }
 
     impl ResponseGroundingValidator for TestValidator {
-        fn score_grounding(
-            &self,
-            _response: &str,
-            _sources: &[&str],
-        ) -> contextra_types::Result<f32> {
+        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_types::Result<f32> {
             Ok(self.score)
         }
     }
@@ -1085,10 +1081,7 @@ mod tests {
             &'a self,
             _response: &'a str,
             _chunks: &'a [contextra_types::ContextChunk],
-        ) -> contextra_ports::BoxFuture<
-            'a,
-            contextra_types::Result<contextra_ports::GroundingAssessment>,
-        > {
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::GroundingAssessment>> {
             let score = self.score;
             Box::pin(async move {
                 Ok(contextra_ports::GroundingAssessment {

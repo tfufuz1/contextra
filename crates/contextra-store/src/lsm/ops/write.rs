@@ -197,7 +197,7 @@ pub(super) async fn delete_many(
     }
     storage
         .erasure_fence()
-        .check_write_allowed_batch(keys.iter().map(|k| k.as_slice()))
+        .check_write_batch_allowed_scope(keys.iter().map(|k| k.as_slice()))
         .map_err(|e| {
             ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
         })?;
