@@ -60,7 +60,12 @@ pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, ContextraE
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use crate::model_registry::{compute_fingerprint, CandleQuantization};

@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use contextra_infer_candle::{CandleAttentionExporter, MAX_TRACKED_REQUESTS};
 use contextra_ports::{AttentionExporter, RequestId};
