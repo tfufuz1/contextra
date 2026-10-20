@@ -256,7 +256,7 @@ pub fn ratchet_measure_repo(root: &str) -> RatchetConfig {
 pub fn run_ratchet(args: &[String]) -> i32 {
     let (root, command, adr, json, init) = ratchet_parse_args(args);
 
-    let config_path = Path::new(&root).join("governance/ratchet.toml");
+    let config_path = Path::new(&root).join("xtask/config/governance/ratchet.toml");
     let measured = ratchet_measure_repo(&root);
 
     if command == "show" {
@@ -718,7 +718,7 @@ pub fn run_ratchet(args: &[String]) -> i32 {
                 serde_json::json!({
                     "id": id,
                     "severity": "error",
-                    "file": "governance/ratchet.toml",
+                    "file": "xtask/config/governance/ratchet.toml",
                     "line": 0,
                     "message": msg,
                     "fix": fix

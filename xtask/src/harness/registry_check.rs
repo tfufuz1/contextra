@@ -1,4 +1,4 @@
-//! Prüft Vollständigkeit und Konsistenz von xtask-Kommandos gegen `xtask/registry.toml`.
+//! Prüft Vollständigkeit und Konsistenz von xtask-Kommandos gegen `xtask/config/registry.toml`.
 
 use std::collections::HashSet;
 use std::fs;
@@ -57,14 +57,14 @@ pub fn run_registry_check(args: &[String]) -> i32 {
     let mut findings = Vec::new();
 
     // 1. Parse registry.toml
-    let registry_path = root.join("xtask/registry.toml");
+    let registry_path = root.join("xtask/config/registry.toml");
     let registry_entries = match registry_check_load_registry(&registry_path) {
         Ok(entries) => entries,
         Err(e) => {
             findings.push(RegistryCheckFinding {
                 id: "REGISTRY_PARSE_ERROR".to_string(),
                 severity: "error".to_string(),
-                file: "xtask/registry.toml".to_string(),
+                file: "xtask/config/registry.toml".to_string(),
                 line: 1,
                 message: format!("registry.toml konnte nicht geparst werden: {}", e),
                 fix: "Prüfe xtask/registry.toml auf gültiges TOML-Format".to_string(),
@@ -136,14 +136,14 @@ pub fn run_registry_check(args: &[String]) -> i32 {
             findings.push(RegistryCheckFinding {
                 id: "MISSING_REGISTRY_ENTRY".to_string(),
                 severity: "error".to_string(),
-                file: "xtask/registry.toml".to_string(),
+                file: "xtask/config/registry.toml".to_string(),
                 line: 1,
                 message: format!(
-                    "Kommando '{}' wird verwendet, fehlt aber in xtask/registry.toml",
+                    "Kommando '{}' wird verwendet, fehlt aber in xtask/config/registry.toml",
                     cmd
                 ),
                 fix: format!(
-                    "Füge einen Eintrag für '{}' in xtask/registry.toml ein",
+                    "Füge einen Eintrag für '{}' in xtask/config/registry.toml ein",
                     cmd
                 ),
             });
@@ -160,14 +160,14 @@ pub fn run_registry_check(args: &[String]) -> i32 {
             findings.push(RegistryCheckFinding {
                 id: "ORPHANED_REGISTRY_ENTRY".to_string(),
                 severity: "error".to_string(),
-                file: "xtask/registry.toml".to_string(),
+                file: "xtask/config/registry.toml".to_string(),
                 line: 1,
                 message: format!(
                     "Eintrag '{}' in registry.toml ist verwaist (wird nirgends verwendet)",
                     reg_entry.name
                 ),
                 fix: format!(
-                    "Entferne den verwaisten Eintrag '{}' aus xtask/registry.toml",
+                    "Entferne den verwaisten Eintrag '{}' aus xtask/config/registry.toml",
                     reg_entry.name
                 ),
             });
@@ -407,7 +407,7 @@ fn registry_check_finish(
         println!("{}", output);
     } else {
         if exit_code == 0 {
-            println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/registry.toml registriert.");
+            println!("✅ [REGISTRY-CHECK]: Alle xtask-Kommandos sind konsistent in xtask/config/registry.toml registriert.");
         } else {
             println!(
                 "❌ [REGISTRY-CHECK]: Konsistenzprüfungen für xtask-Kommandos fehlgeschlagen."
@@ -420,7 +420,7 @@ fn registry_check_finish(
                     f.file,
                     f.line
                 );
-                println!("    Invariante/ADR: Registrierungspflicht in xtask/registry.toml");
+                println!("    Invariante/ADR: Registrierungspflicht in xtask/config/registry.toml");
                 println!("    FIX: {}", f.fix);
             }
         }

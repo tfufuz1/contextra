@@ -4,7 +4,7 @@ Stand: 2026-10-19
 
 ## 1. Übersicht & Zielsetzung
 
-Dieses Dokument definiert die verbindlichen Autonomiestufen für Agenten-gestützte Entwicklungs-Sessions (Jules) im Repository `contextra`. Die Differenzierung basiert auf der Risiko-Klassifizierung aus `.jules/tasks/_TEMPLATE.toml` (`risk: sec | crash | simd | utf8 | fusion | concurrency | calib | none`), den Prompter-Tiers aus `.jules/prompter-tiers.toml` sowie der Berührung geschützter Pfade (`governance/protected-paths.toml`).
+Dieses Dokument definiert die verbindlichen Autonomiestufen für Agenten-gestützte Entwicklungs-Sessions (Jules) im Repository `contextra`. Die Differenzierung basiert auf der Risiko-Klassifizierung aus `.jules/tasks/_TEMPLATE.toml` (`risk: sec | crash | simd | utf8 | fusion | concurrency | calib | none`), den Prompter-Tiers aus `.jules/prompter-tiers.toml` sowie der Berührung geschützter Pfade (`xtask/config/governance/protected-paths.toml`).
 
 ---
 

@@ -5,4 +5,4 @@ fix = "Korrigiere den PR-Text so, dass er exakt den vorgenommenen Änderungen en
 anti_fix = "Füge keine fiktiven Testergebnisse oder ungeprüfte Behauptungen ein."
 adr = ["ADR-035"]
 related = ["check-commit-diff-integrity", "task-card"]
-sources = ["docs/gates/phantom-commit-gate.md", "CONSTITUTION.md"]
+sources = ["xtask/docs/gates/phantom-commit-gate.md", "CONSTITUTION.md"]

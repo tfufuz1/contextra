@@ -9,5 +9,5 @@ cargo xtask determinism-check [--root <dir>] [--json] [--write-baseline] [--crat
 ```
 
 ## Governance & Baselines
-- `governance/determinism-allow.toml`: Allowlist exceptions backed by ADRs (e.g. ADR-098 HMAC key/salt generation).
-- `governance/determinism-baseline.toml`: Baseline of pre-existing findings. Only NEW violations cause PR gate failure.
+- `xtask/config/governance/determinism-allow.toml`: Allowlist exceptions backed by ADRs (e.g. ADR-098 HMAC key/salt generation).
+- `xtask/config/governance/determinism-baseline.toml`: Baseline of pre-existing findings. Only NEW violations cause PR gate failure.

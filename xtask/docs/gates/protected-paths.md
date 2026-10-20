@@ -5,7 +5,7 @@ Das Gate `protected-paths` stellt sicher, dass Änderungen an geschützten Pfade
 
 ## Regeln & Invarianten
 - Alle geänderten Dateien zwischen `--base` und `--head` werden analysiert (inkl. Umbenennungen, bei denen alter und neuer Pfad geprüft werden).
-- Ist ein Pfad durch `governance/protected-paths.toml` geschützt, erfordert die Änderung eine gültige ADR-Ausnahme.
+- Ist ein Pfad durch `xtask/config/governance/protected-paths.toml` geschützt, erfordert die Änderung eine gültige ADR-Ausnahme.
 - **Fail-Closed:** Fehlen Basis-Commit, ADR-Datei oder ist das Repository flach geklont, wird die Ausführung mit Exit Code 2 blockiert.
 
 ## Ausnahmeregelung (Protected Change)

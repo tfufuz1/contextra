@@ -1,0 +1,51 @@
+# Task-Karte xtask-Konsolidierung (ADR-N32)
+id        = "T-2026-9010"
+title     = "refactor(xtask): Gate-System in ein Verzeichnis konsolidiert (ADR-N32)"
+crate     = "xtask"
+tier      = 3
+risk      = "none"
+goal      = "Verzeichnisbereinigung des Gate-Systems in xtask/ gemäß ADR-N32"
+non_goals = [
+  "Keine Gate-Logik-, Schwellen- oder Baseline-Änderungen",
+  "Keine Änderungen am Quellcode in crates/**"
+]
+scope     = [
+  "xtask/**",
+  "governance/**",
+  "docs/gates/**",
+  "mutants-guarantees.toml",
+  "rules/caller-allowlist.toml",
+  "justfile",
+  ".cargo/config.toml",
+  ".github/workflows/*.yml",
+  ".githooks/*",
+  ".jules/**",
+  "AGENTS.md",
+  "CODEOWNERS",
+  "docs/**",
+  ".jules/tasks/T-2026-9010.toml"
+]
+forbidden = [
+  "crates/**"
+]
+invariants = ["Zero-Panic", "Gate Integrity", "Single Directory Ownership"]
+acceptance = [
+  "cargo test -p xtask --lib",
+  "cargo xtask gates-catalog-sync",
+  "cargo xtask registry-check",
+  "cargo xtask check-workflow-commands",
+  "cargo xtask check-doc-references",
+  "cargo xtask check-agents-integrity",
+  "cargo xtask protected-paths",
+  "cargo xtask gate-weakening",
+  "cargo xtask doc-truth",
+  "just sync-docs-check",
+  "cargo xtask check-dag"
+]
+evidence_required = ["Mechanische Gleichheit der Messungen Vorher/Nachher"]
+
+[budget]
+crates = 1
+files = 250
+lines = 5000
+iterations = 10
