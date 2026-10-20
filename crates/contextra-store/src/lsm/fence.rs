@@ -457,6 +457,7 @@ pub struct ErasureFence {
     locked_doc_ids: parking_lot::RwLock<HashSet<Vec<u8>>>,
     scope_write_seq: AtomicU64,
     next_fence_id: AtomicU64,
+    active_fence_count: AtomicU32,
 }
 
 impl ErasureFence {
@@ -469,6 +470,7 @@ impl ErasureFence {
             locked_doc_ids: parking_lot::RwLock::new(HashSet::new()),
             scope_write_seq: AtomicU64::new(0),
             next_fence_id: AtomicU64::new(1),
+            active_fence_count: AtomicU32::new(0),
         }
     }
 
@@ -695,7 +697,9 @@ impl ErasureFence {
         }
 
         for id in &doc_ids {
-            locked.insert(id.clone());
+            if locked.insert(id.clone()) {
+                self.active_fence_count.fetch_add(1, Ordering::SeqCst);
+            }
         }
         self.active_fences.fetch_add(doc_ids.len() as u32, Ordering::Release);
 
