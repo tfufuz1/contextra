@@ -605,6 +605,7 @@ dependencies = [
  "contextra-router",
  "contextra-store",
  "contextra-types",
+ "criterion",
  "serde",
  "serde_json",
  "tempfile",
