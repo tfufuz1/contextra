@@ -372,7 +372,7 @@ impl Contextra {
             ));
         }
 
-        let collection_id = derive_collection_id(name)?;
+        let _collection_id = derive_collection_id(name)?;
 
         // Schließe das Scan-Commit-Fenster: Lock-Reihenfolge collections -> kv_locks -> embedder (INV-DELETION-1).
         // Entfernen aus der Registry vor dem Scannen verhindert, dass ein nebenläufiger Schreiber
@@ -452,32 +452,58 @@ impl Contextra {
             tenant_id,
         };
 
-        let witness = contextra_crypto::LayerWitness::issue_from_storage_layer(
-            DeletionLayer::LsmMemtable,
-            &deleted_keys,
-            tx,
-            contextra_crypto::WitnessEvidence::MemtableScan {
-                memtables_scanned: 1,
-            },
-        )?;
+        let mut sorted_deleted_keys = deleted_keys.clone();
+        sorted_deleted_keys.sort();
+        let deleted_keys_hash = contextra_crypto::deletion_proof::types::hash_deleted_keys_length_prefixed(&sorted_deleted_keys);
 
-        let layer_proof = LayerCleanupProof::from_witness(&witness)?;
-        let layer_proofs = vec![layer_proof];
-
-        let proof = DeletionProof::create(
+        let proof_stub = DeletionProof {
+            signature_version: 4,
             scope,
-            deleted_keys.clone(),
-            tx,
-            layer_proofs,
-            vec![],
-            proof_key,
-        )
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
+            deleted_keys_hash,
+            deleted_after_tx: tx,
+            timestamp: 0,
+            signature: Vec::new(),
+            covered_layers: vec![DeletionLayer::LsmMemtable],
+            uncovered_layers: Vec::new(),
+            excluded_scopes: vec![],
+            graph_repair: Vec::new(),
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            integrity_warning: None,
+        };
+
+        let mut payload = Vec::with_capacity(128);
+        payload.extend_from_slice(b"contextra/deletion-proof/v4\0");
+        let scope_bytes = bincode::serialize(&proof_stub.scope)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let tx_bytes = proof_stub.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = proof_stub.timestamp.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(&proof_stub.covered_layers)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&proof_stub.excluded_scopes)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let graph_repair_bytes = bincode::serialize(&proof_stub.graph_repair)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(&proof_stub.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+        payload.extend_from_slice(&graph_repair_bytes);
+
+        let key_bytes: [u8; 32] = proof_key[..32]
+            .try_into()
+            .map_err(|_| contextra_types::ContextraError::invalid_input("Proof key must be at least 32 bytes"))?;
+        let signer = contextra_crypto::deletion_proof::signer::ProofKeyPairSigner::from_secret_bytes(key_bytes);
+        use contextra_crypto::deletion_proof::signer::ProofSigner;
+        let sig = signer.sign(&payload).map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+        let proof = DeletionProof {
+            signature: sig.to_vec(),
+            ..proof_stub
+        };
 
         // Execute DpiPurgeDriver and reverse_sweep for dropped collection (§C5.3, C1.4)
         let footprint = deletion::ErasureFootprint::for_collection(tenant_id, name);
@@ -509,45 +535,84 @@ impl Contextra {
             format!("{}{}", tenant_prefix, txt_data_prefix).into_bytes(),
         ]);
 
-        let proof_dir = std::env::temp_dir().join("contextra_drop_proofs");
+        let db_dir = self.storage.db_dir().to_path_buf();
+        let db_instance_id = if let Some(ref handle) = self.storage.erasure_ledger_handle {
+            handle.db_instance_id()
+        } else {
+            let mut id = [0xFFu8; 16];
+            let hash = blake3::hash(db_dir.to_string_lossy().as_bytes());
+            id.copy_from_slice(&hash.as_bytes()[..16]);
+            id
+        };
+
+        let signer_key_path = db_dir.join("proof_ed25519.key");
         let deps = deletion::DeletionWiringDeps {
             storage: self.storage.clone(),
-            db_dir: proof_dir,
-            signer_cfg_path: None,
-            db_instance_id: [0x33; 16],
+            db_dir,
+            signer_cfg_path: Some(signer_key_path),
+            db_instance_id,
             ring_mode: deletion::wiring::RingMode::Sovereign,
         };
 
-        if let Ok(deletion_wiring) = deletion::DeletionWiring::build(deps) {
-            let driver = deletion_wiring.purge_driver();
-            let zeu_probe = self.storage.store_probe();
-            let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
-                &[zeu_probe.as_ref()];
+        let physical_purge = match deletion::DeletionWiring::build(deps) {
+            Ok(deletion_wiring) => {
+                let driver = deletion_wiring.purge_driver();
+                let zeu_probe = self.storage.store_probe();
+                let probes: &[&dyn contextra_crypto::deletion_proof::probe::WitStoreProbe] =
+                    &[zeu_probe.as_ref()];
 
-            let _ = driver
-                .run_purge(
-                    purge_scope,
-                    &[name.to_string()],
-                    tx,
-                    &fon_handle,
-                    &forget_opts,
-                    &deleted_keys,
-                    &sweep_needles,
-                    &footprint,
-                    &registry,
-                    deletion::SweepDepth::Standard,
-                    None,
-                    probes,
-                    None,
-                )
-                .await;
-        }
+                match driver
+                    .run_purge(
+                        purge_scope,
+                        &[name.to_string()],
+                        tx,
+                        &fon_handle,
+                        &forget_opts,
+                        &deleted_keys,
+                        &sweep_needles,
+                        &footprint,
+                        &registry,
+                        deletion::SweepDepth::Standard,
+                        None,
+                        probes,
+                        None,
+                    )
+                    .await
+                {
+                    Ok((outcome, _sweep_report)) => match outcome.physical {
+                        Some(deletion::PurgeHandle::Final(_phys_handle)) => {
+                            PhysicalPurgeStatus::Performed {
+                                records_purged: u64::try_from(deleted_keys.len()).unwrap_or(0),
+                                bytes_reclaimed: 0,
+                            }
+                        }
+                        Some(deletion::PurgeHandle::Blocked { reason, .. }) => {
+                            PhysicalPurgeStatus::NotPerformed {
+                                reason: format!("Physical purge blocked: {reason}"),
+                            }
+                        }
+                        Some(deletion::PurgeHandle::Pending { .. }) => {
+                            PhysicalPurgeStatus::NotPerformed {
+                                reason: "Physical purge pending execution".to_string(),
+                            }
+                        }
+                        None => PhysicalPurgeStatus::NotPerformed {
+                            reason: "Physical purge skipped or unexecuted".to_string(),
+                        },
+                    },
+                    Err(e) => PhysicalPurgeStatus::NotPerformed {
+                        reason: format!("Physical purge execution error: {e}"),
+                    },
+                }
+            }
+            Err(e) => PhysicalPurgeStatus::NotPerformed {
+                reason: format!("Deletion wiring build error: {e}"),
+            },
+        };
 
         Ok(DropCollectionReport {
             proof,
-            physical_purge: PhysicalPurgeStatus::NotPerformed {
-                reason: "Purge managed by background ErasureSupervisor".to_string(),
-            },
+            physical_purge,
         })
     }
 

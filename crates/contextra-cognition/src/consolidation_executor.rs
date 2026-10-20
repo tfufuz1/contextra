@@ -677,12 +677,14 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         // APM-Datenverlust-Bei-Absturz:
         // Synthetisierte Summaries wurden bereits in execute_background_consolidation erzeugt & persistiert.
         // Erst NACH dem Bestätigen der Summaries wird der Decay Controller angewendet.
-        if synthesis_res.is_some() {
-            let decay_controller = AdaptiveDecayController::with_defaults();
-            let _ = self
-                .collection
-                .evict_decayed_chunks(&decay_controller, 100)
-                .await;
+        if let Some(ref s_res) = synthesis_res {
+            if !s_res.synthesized.is_empty() {
+                let decay_controller = AdaptiveDecayController::with_defaults();
+                let _ = self
+                    .collection
+                    .evict_decayed_chunks(&decay_controller, 100)
+                    .await;
+            }
         }
 
         // LeanRAG Stage 3 (Opt-in): NUR wenn leanrag.is_some() UND self.llm.is_some()
@@ -1059,6 +1061,70 @@ mod tests {
             result.is_ok(),
             "ConsolidationNodesGuard deadlock regression test timed out (deadlock detected!)"
         );
+    }
+
+    struct TestValidator {
+        score: f32,
+    }
+
+    impl ResponseGroundingValidator for TestValidator {
+        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_types::Result<f32> {
+            Ok(self.score)
+        }
+    }
+
+    struct TestRichValidator {
+        score: f32,
+    }
+
+    impl GroundingValidator for TestRichValidator {
+        fn validate_grounding<'a>(
+            &'a self,
+            _response: &'a str,
+            _chunks: &'a [contextra_types::ContextChunk],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::GroundingAssessment>> {
+            let score = self.score;
+            Box::pin(async move {
+                Ok(contextra_ports::GroundingAssessment {
+                    score,
+                    is_grounded: score >= 0.7,
+                    reason: Some("Test".into()),
+                })
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_consolidation_engine_builder_and_worker() {
+        let (col, _dir) = create_test_collection().await;
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+
+        let val = Arc::new(TestValidator { score: 0.9 });
+        let rich_val = Arc::new(TestRichValidator { score: 0.8 });
+
+        let engine = ConsolidationEngine::new(
+            col.clone(),
+            ConsolidationConfig::default(),
+            SynthesisConfig::default(),
+            Duration::from_millis(100),
+            cancel_token.clone(),
+        )
+        .with_validator(val.clone())
+        .with_rich_validator(rich_val.clone());
+
+        assert!(engine.validator.is_some());
+        assert!(engine.rich_validator.is_some());
+
+        let handle = start_consolidation_worker(
+            col,
+            ConsolidationConfig::default(),
+            SynthesisConfig::default(),
+            Duration::from_millis(100),
+            cancel_token.clone(),
+        );
+
+        cancel_token.cancel();
+        let _ = handle.await;
     }
 
     /// Verifikation: run_consolidation_pass in spawn_blocking gibt korrekte Ergebnisse zurück.

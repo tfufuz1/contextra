@@ -186,20 +186,20 @@ async fn test_f7_acquire_fence_isolation_and_drop() {
     // Key in tenant1 / col1 / doc1 SHOULD be fenced
     let doc1_key = format!("t:101:10:doc:1").into_bytes();
     assert!(
-        !storage.erasure_fence.check_write_allowed(&doc1_key),
+        !storage.erasure_fence().check_write_allowed(&doc1_key),
         "Key in scope should be fenced"
     );
 
     // Key in tenant2 or col2 SHOULD NOT be fenced (F7 isolation requirement)
     let other_tenant_key = format!("t:202:10:doc:1").into_bytes();
     assert!(
-        storage.erasure_fence.check_write_allowed(&other_tenant_key),
+        storage.erasure_fence().check_write_allowed(&other_tenant_key),
         "Writes to another tenant must not be fenced by document fence"
     );
 
     let other_col_key = format!("t:101:20:doc:1").into_bytes();
     assert!(
-        storage.erasure_fence.check_write_allowed(&other_col_key),
+        storage.erasure_fence().check_write_allowed(&other_col_key),
         "Writes to another collection in same tenant must not be fenced by document fence"
     );
 
@@ -208,7 +208,7 @@ async fn test_f7_acquire_fence_isolation_and_drop() {
 
     // After drop, doc1_key should no longer be fenced (F7 drop release requirement)
     assert!(
-        storage.erasure_fence.check_write_allowed(&doc1_key),
+        storage.erasure_fence().check_write_allowed(&doc1_key),
         "Fence should be released after FenceGuard is dropped"
     );
 

@@ -380,14 +380,7 @@ pub struct MetaChunk {
     pub llm_model_id: String,
 }
 
-/// Ergebnis des Generative Synthesis Pass.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SynthesisPhaseResult {
-    /// Neu generierte MetaChunks.
-    pub synthesized: Vec<MetaChunk>,
-    /// Hashes von qualifizierten Communities, deren Synthese wegen `max_llm_calls_per_cycle` verschoben wurde.
-    pub deferred_community_hashes: Vec<u64>,
-}
+pub use crate::synthesis_phase::SynthesisPhaseResult;
 
 /// Berechnet einen deterministischen 64-Bit-Hash für eine Liste von Member-DocIds.
 pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64 {
