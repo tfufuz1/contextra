@@ -167,7 +167,9 @@ impl WasmExecutor {
             timeout
         };
         let timeout_ms = effective_timeout.as_millis() as u64;
-        let deadline = tokio::time::Instant::now() + effective_timeout;
+        let deadline = tokio::time::Instant::now()
+            .checked_add(effective_timeout)
+            .unwrap_or_else(tokio::time::Instant::now);
 
         // Check input size limit prior to execution
         if input.len() > capabilities.max_stdin_bytes {
