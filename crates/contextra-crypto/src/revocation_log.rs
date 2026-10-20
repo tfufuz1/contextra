@@ -197,9 +197,47 @@ pub fn marker_path_for(log_path: &Path) -> PathBuf {
     PathBuf::from(os_str)
 }
 
+type DirSyncHookFn = fn(&Path) -> std::io::Result<()>;
+
+std::thread_local! {
+    static REVOCATION_LOG_DIR_SYNC_HOOK: std::cell::RefCell<Option<DirSyncHookFn>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[doc(hidden)]
+pub fn test_set_revocation_log_dir_sync_hook(hook: Option<DirSyncHookFn>) {
+    REVOCATION_LOG_DIR_SYNC_HOOK.with(|h| {
+        *h.borrow_mut() = hook;
+    });
+}
+
+fn sync_parent_dir_for_revocation_log(path: &Path) -> std::io::Result<()> {
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Target path has no parent directory",
+        )
+    })?;
+
+    let mut hook_res = None;
+    REVOCATION_LOG_DIR_SYNC_HOOK.with(|h| {
+        if let Some(hook) = *h.borrow() {
+            hook_res = Some(hook(parent));
+        }
+    });
+    if let Some(res) = hook_res {
+        return res;
+    }
+
+    contextra_durable_fs::sync_dir(parent)
+}
+
 fn write_atomic_file(path: &Path, content: &[u8]) -> Result<()> {
     contextra_durable_fs::atomic_replace(path, content)
-        .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))
+        .map_err(|e| CryptoError::Crypto(format!("Failed to write atomic file: {e}")))?;
+    sync_parent_dir_for_revocation_log(path)
+        .map_err(|e| CryptoError::Crypto(format!("Failed to sync parent directory for atomic file: {e}")))?;
+    Ok(())
 }
 
 /// Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID).
@@ -843,7 +881,7 @@ mod tests {
     use super::*;
     use crate::crypto::KeyManager;
     use crate::kv_shredding::KeyRegistry;
-    use contextra_ports::SystemClock;
+    use contextra_sys::SystemClock;
     use ed25519_dalek::SigningKey;
     use rand::rngs::OsRng;
     use tempfile::NamedTempFile;
