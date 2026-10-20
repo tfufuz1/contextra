@@ -160,6 +160,45 @@ mod tests {
         assert_eq!(escape_markdown("`<script>` & 'bold' *"), "\\`&lt;script&gt;\\` &amp; 'bold' \\*");
     }
 
+    #[test]
+    fn test_escape_markdown_headers_and_leading_spaces() {
+        assert_eq!(escape_markdown("   # Heading"), "   \\# Heading");
+        assert_eq!(escape_markdown("#Heading"), "\\#Heading");
+        assert_eq!(escape_markdown("## Subheading"), "\\## Subheading");
+    }
+
+    #[test]
+    fn test_escape_markdown_links() {
+        assert_eq!(
+            escape_markdown("[evil_link](http://hostile.test)"),
+            "\\[evil\\_link\\]\\(http://hostile.test\\)"
+        );
+    }
+
+    #[test]
+    fn test_escape_markdown_lists() {
+        assert_eq!(escape_markdown("- item"), "\\- item");
+        assert_eq!(escape_markdown("* item"), "\\* item");
+        assert_eq!(escape_markdown("+ item"), "\\+ item");
+        assert_eq!(escape_markdown("1. item"), "1\\. item");
+        assert_eq!(escape_markdown("10) item"), "10\\) item");
+        assert_eq!(escape_markdown("a - b"), "a - b");
+        assert_eq!(escape_markdown("a + b"), "a + b");
+    }
+
+    #[test]
+    fn test_escape_markdown_table_pipes_and_backticks() {
+        assert_eq!(escape_markdown("col1 | col2"), "col1 \\| col2");
+        assert_eq!(escape_markdown("`code`"), "\\`code\\`");
+    }
+
+    #[test]
+    fn test_escape_markdown_line_breaks() {
+        assert_eq!(escape_markdown("line1\nline2"), "line1<br/>line2");
+        assert_eq!(escape_markdown("line1\r\nline2"), "line1<br/>line2");
+        assert_eq!(escape_markdown("line1\rline2"), "line1<br/>line2");
+    }
+
     proptest! {
         #[test]
         fn prop_escape_markdown_no_extra_lines_or_headings_or_tables(input in ".*") {

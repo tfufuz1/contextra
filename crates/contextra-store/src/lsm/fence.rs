@@ -641,9 +641,8 @@ impl ErasureFence {
 
     /// Helper to release a registered prefix fence by ID.
     pub fn release_prefix_fence(&self, id: u64) {
-        if self.gate.release_fence(id) {
-            self.active_fences.fetch_sub(1, Ordering::Release);
-        }
+        self.gate.release_fence(id);
+        self.active_fences.fetch_sub(1, Ordering::Release);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
