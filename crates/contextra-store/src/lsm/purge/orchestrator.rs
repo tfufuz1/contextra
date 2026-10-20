@@ -250,6 +250,12 @@ impl<'a> PurgeOrchestrator<'a> {
         secure_delete: bool,
         space_probe: Option<&dyn FreeSpaceProbe>,
     ) -> PurgeOutcome {
+        let fence_prefixes = match &scope {
+            PurgeScope::Prefixes(prefixes) => prefixes.clone(),
+            PurgeScope::Keys(keys) => keys.clone(),
+        };
+
+        let mut fence_guard = None;
         let mut fence_acquired =
             intent.phase >= PurgePhase::P2FenceAcquired && intent.phase < PurgePhase::Release;
 
@@ -257,7 +263,14 @@ impl<'a> PurgeOrchestrator<'a> {
             // P2: Acquire Fence
             if intent.phase <= PurgePhase::P2FenceAcquired {
                 if let Some(storage) = self.storage {
-                    storage.erasure_fence.acquire_scope_fence();
+                    if fence_prefixes.is_empty() {
+                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
+                    }
+                    let guard = storage
+                        .erasure_fence
+                        .acquire_scope_fence_for(fence_prefixes.clone())
+                        .map_err(|_| OrxPurgeError::Blocked(PurgeBlocked::CompactionBusy))?;
+                    fence_guard = Some(guard);
                 }
                 if let Some(ref f) = hooks.fence_acquire {
                     f().map_err(OrxPurgeError::Io)?;
@@ -340,9 +353,7 @@ impl<'a> PurgeOrchestrator<'a> {
 
             // P8: Release Erasure Fence & Cleanup
             if intent.phase <= PurgePhase::Release {
-                if let Some(storage) = self.storage {
-                    storage.erasure_fence.release_scope_fence();
-                }
+                fence_guard.take();
                 if let Some(ref f) = hooks.fence_release {
                     f().map_err(OrxPurgeError::Io)?;
                 }
@@ -369,10 +380,8 @@ impl<'a> PurgeOrchestrator<'a> {
                 }
             }
             Err(err) => {
-                if fence_acquired {
-                    if let Some(storage) = self.storage {
-                        storage.erasure_fence.release_scope_fence();
-                    }
+                if fence_acquired || fence_guard.is_some() {
+                    fence_guard.take();
                     if let Some(ref f) = hooks.fence_release {
                         if let Err(rel_err) = f() {
                             tracing::warn!(
