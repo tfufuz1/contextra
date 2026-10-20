@@ -59,8 +59,8 @@ pub fn run_codeowners_coverage(args: &[String]) -> i32 {
 
     let mut findings = Vec::new();
 
-    // 1. Read governance/protected-paths.toml
-    let protected_paths_file = root_dir.join("governance/protected-paths.toml");
+    // 1. Read xtask/config/governance/protected-paths.toml
+    let protected_paths_file = root_dir.join("xtask/config/governance/protected-paths.toml");
     let protected_globs = match fs::read_to_string(&protected_paths_file) {
         Ok(content) => match toml::from_str::<ProtectedPathsConfig>(&content) {
             Ok(config) => config
@@ -72,10 +72,10 @@ pub fn run_codeowners_coverage(args: &[String]) -> i32 {
                 findings.push(CodeownersCoverageFinding {
                     id: "COC-001".to_string(),
                     severity: "error".to_string(),
-                    file: "governance/protected-paths.toml".to_string(),
+                    file: "xtask/config/governance/protected-paths.toml".to_string(),
                     line: 1,
                     message: format!("protected-paths.toml konnte nicht geparst werden: {e}"),
-                    fix: "Prüfe die TOML-Syntax in governance/protected-paths.toml".to_string(),
+                    fix: "Prüfe die TOML-Syntax in xtask/config/governance/protected-paths.toml".to_string(),
                 });
                 Vec::new()
             }
@@ -84,10 +84,10 @@ pub fn run_codeowners_coverage(args: &[String]) -> i32 {
             findings.push(CodeownersCoverageFinding {
                 id: "COC-001".to_string(),
                 severity: "error".to_string(),
-                file: "governance/protected-paths.toml".to_string(),
+                file: "xtask/config/governance/protected-paths.toml".to_string(),
                 line: 1,
                 message: format!("protected-paths.toml konnte nicht gelesen werden: {e}"),
-                fix: "Stelle sicher, dass governance/protected-paths.toml existiert".to_string(),
+                fix: "Stelle sicher, dass xtask/config/governance/protected-paths.toml existiert".to_string(),
             });
             Vec::new()
         }
@@ -151,7 +151,7 @@ pub fn run_codeowners_coverage(args: &[String]) -> i32 {
             findings.push(CodeownersCoverageFinding {
                 id: "COC-004".to_string(),
                 severity: "error".to_string(),
-                file: "governance/protected-paths.toml".to_string(),
+                file: "xtask/config/governance/protected-paths.toml".to_string(),
                 line: 1,
                 message: format!(
                     "Geschütztes Glob '{glob_str}' ist nicht durch CODEOWNERS abgedeckt"

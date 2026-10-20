@@ -11,11 +11,11 @@ fn test_gates_catalog_sync_mismatch() {
     let dir = tempdir().expect("tempdir");
     let root = dir.path();
 
-    fs::create_dir_all(root.join("governance")).expect("governance dir");
+    fs::create_dir_all(root.join("xtask/config/governance")).expect("governance dir");
     fs::create_dir_all(root.join(".jules")).expect("jules dir");
 
     fs::write(
-        root.join("governance/gates.toml"),
+        root.join("xtask/config/governance/gates.toml"),
         r#"
 [[gate]]
 name = "protected-paths"
@@ -40,7 +40,7 @@ required = true
     .expect("write harness-phases.toml");
 
     fs::write(
-        root.join("governance/verdict-required.toml"),
+        root.join("xtask/config/governance/verdict-required.toml"),
         r#"
 [[gate]]
 name = "protected-paths"
@@ -60,11 +60,11 @@ fn test_gates_catalog_sync_consistent() {
     let dir = tempdir().expect("tempdir");
     let root = dir.path();
 
-    fs::create_dir_all(root.join("governance")).expect("governance dir");
+    fs::create_dir_all(root.join("xtask/config/governance")).expect("governance dir");
     fs::create_dir_all(root.join(".jules")).expect("jules dir");
 
     fs::write(
-        root.join("governance/gates.toml"),
+        root.join("xtask/config/governance/gates.toml"),
         r#"
 [[gate]]
 name = "protected-paths"
@@ -89,7 +89,7 @@ required = true
     .expect("write harness-phases.toml");
 
     fs::write(
-        root.join("governance/verdict-required.toml"),
+        root.join("xtask/config/governance/verdict-required.toml"),
         r#"
 [[gate]]
 name = "protected-paths"

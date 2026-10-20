@@ -25,13 +25,13 @@ fn setup_temp_repo() -> (TempDir, String) {
     run_git(&["config", "user.email", "test@example.com"]);
 
     // Create governance and docs directory structure
-    fs::create_dir_all(path.join("governance")).unwrap();
+    fs::create_dir_all(path.join("xtask/config/governance")).unwrap();
     fs::create_dir_all(path.join("docs/decisions")).unwrap();
     fs::create_dir_all(path.join("xtask/src/harness")).unwrap();
     fs::create_dir_all(path.join("src")).unwrap();
 
     fs::write(
-        path.join("governance/protected-paths.toml"),
+        path.join("xtask/config/governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "governance/**"
@@ -395,7 +395,7 @@ fn test_protected_paths_self_protection_check() {
     let path = temp_dir.path();
 
     fs::write(
-        path.join("governance/protected-paths.toml"),
+        path.join("xtask/config/governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "AGENTS.md"

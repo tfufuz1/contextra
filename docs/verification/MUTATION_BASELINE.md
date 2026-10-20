@@ -5,7 +5,7 @@
 **Commit SHA:** `d39c79e0`
 **Hardware:** Intel(R) Xeon(R) CPU @ 2.30GHz (4 Cores), 8 GB RAM, Ubuntu 24.04 (Linux 6.6)
 **Toolchain:** Rust 1.89.0
-**Konfigurationsdatei:** `mutants-guarantees.toml` (Repo-Wurzel)
+**Konfigurationsdatei:** `xtask/config/mutants-guarantees.toml` (Repo-Wurzel)
 
 ---
 
@@ -13,7 +13,7 @@
 
 Bisherige Läufe über `.cargo/mutants.toml` waren irreführend, da sie auf `additional_cargo_args = ["--lib"]` beschränkt waren und somit alle Integrationstests (`tests/*.rs`) ignorierten. Zudem wurden Mutanten von `contextra-store` nur gegen Unit-Tests von `contextra-crypto` ausgeführt.
 
-Dieser unabhängige Funktionsnachweis nutzt `mutants-guarantees.toml` mit **aktivierten Integrationstests** (keine `--lib`-Einschränkung).
+Dieser unabhängige Funktionsnachweis nutzt `xtask/config/mutants-guarantees.toml` mit **aktivierten Integrationstests** (keine `--lib`-Einschränkung).
 
 ---
 
@@ -39,7 +39,7 @@ Formula: $\text{Score} = \frac{\text{Gefangen}}{\text{Gesamt} - \text{Unviable}}
 - **Dateien:** `src/wal/**`, `src/lsm/recovery.rs`, `src/lsm/ops/write.rs`, `src/lsm/group_commit.rs`
 - **Befehl:**
   ```bash
-  cargo mutants --config mutants-guarantees.toml -p contextra-store \
+  cargo mutants --config xtask/config/mutants-guarantees.toml -p contextra-store \
     -f "crates/contextra-store/src/wal/**" \
     -f "crates/contextra-store/src/lsm/recovery.rs" \
     -f "crates/contextra-store/src/lsm/ops/write.rs" \
@@ -53,7 +53,7 @@ Formula: $\text{Score} = \frac{\text{Gefangen}}{\text{Gesamt} - \text{Unviable}}
 - **Dateien:** `src/kv_shredding.rs`, `src/kv_cipher.rs`, `src/deletion_proof.rs`, `src/ed25519_proof.rs`, `src/kdf.rs`
 - **Befehl:**
   ```bash
-  cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+  cargo mutants --config xtask/config/mutants-guarantees.toml -p contextra-crypto \
     -f "crates/contextra-crypto/src/kv_shredding.rs" \
     -f "crates/contextra-crypto/src/kv_cipher.rs" \
     -f "crates/contextra-crypto/src/deletion_proof.rs" \
@@ -67,7 +67,7 @@ Formula: $\text{Score} = \frac{\text{Gefangen}}{\text{Gesamt} - \text{Unviable}}
 - **Dateien:** `src/audit_chain.rs`, `src/wal_crypto.rs`, `src/wal_completeness.rs`
 - **Befehl:**
   ```bash
-  cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
+  cargo mutants --config xtask/config/mutants-guarantees.toml -p contextra-crypto \
     -f "crates/contextra-crypto/src/audit_chain.rs" \
     -f "crates/contextra-crypto/src/wal_crypto.rs" \
     -f "crates/contextra-crypto/src/wal_completeness.rs" \
