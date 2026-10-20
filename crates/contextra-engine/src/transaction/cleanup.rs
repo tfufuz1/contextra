@@ -21,7 +21,8 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
                     .unwrap_or(false);
 
             if is_consolidation {
-                let tx = TxId::new(next_tx.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+                let next_val = next_tx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let tx = TxId::try_new(next_val)?;
                 storage.delete(tx, &key).await?;
                 storage.commit(tx).await?;
                 cleaned += 1;
