@@ -122,13 +122,13 @@ pub fn extract_validity_window(metadata: Option<&Value>) -> ValidityWindow {
     let tx_vf = obj
         .get("tx_valid_from")
         .and_then(parse_u64_val)
-        .map(TxId::new);
+        .and_then(|u| TxId::try_new(u).ok());
 
     let tx_vt = obj
         .get("tx_valid_to")
         .or_else(|| obj.get("tx_valid_until"))
         .and_then(parse_u64_val)
-        .map(TxId::new);
+        .and_then(|u| TxId::try_new(u).ok());
 
     // Business validity fields (accepting explicit business_valid_* and generic valid_from/valid_to/valid_until)
     let bus_vf = obj
@@ -209,7 +209,7 @@ pub fn apply_temporal_validity_filter_at(
             let mut window = extract_validity_window(res.metadata.as_ref());
             window.tx_valid_from = None;
             window.tx_valid_to = None;
-            window.is_valid_bitemporal(TxId::new(0), Some(as_of_timestamp))
+            window.is_valid_bitemporal(TxId::INVALID, Some(as_of_timestamp))
         })
         .collect()
 }
@@ -245,7 +245,7 @@ mod tests {
         );
 
         let results = vec![candidate_a, candidate_b];
-        let current_tx = TxId::new(1);
+        let current_tx = TxId::try_new(1).unwrap();
         let query_timestamp = Some(150);
 
         let filtered = apply_temporal_validity_filter(results, current_tx, query_timestamp);
@@ -262,7 +262,7 @@ mod tests {
         );
 
         let results = vec![candidate_no_meta, candidate_other_meta];
-        let current_tx = TxId::new(10);
+        let current_tx = TxId::try_new(10).unwrap();
         let query_timestamp = Some(500);
 
         let filtered = apply_temporal_validity_filter(results, current_tx, query_timestamp);
@@ -300,8 +300,11 @@ mod tests {
         let results = vec![old_chunk, new_chunk];
 
         // Query historical point in time at t = 30 (when old chunk was active, before supersedes at t=50)
-        let historical_results =
-            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let historical_results = apply_temporal_validity_filter_at_bitemporal(
+            results,
+            TxId::try_new(30).unwrap(),
+            Some(30),
+        );
         assert_eq!(
             historical_results.len(),
             1,
@@ -332,8 +335,11 @@ mod tests {
         // Business check: 10 <= 30 < 100 -> PASS.
         // Transaction check: 30 < tx_valid_from (50) -> FAIL.
         // Bi-temporal AND logic must filter out this candidate!
-        let filtered =
-            apply_temporal_validity_filter_at_bitemporal(results, TxId::new(30), Some(30));
+        let filtered = apply_temporal_validity_filter_at_bitemporal(
+            results,
+            TxId::try_new(30).unwrap(),
+            Some(30),
+        );
         assert!(
             filtered.is_empty(),
             "Candidate with valid business window but invalid transaction window at query time must be filtered out"
@@ -354,7 +360,7 @@ mod tests {
         // Before start (< 10) -> Invalid
         let res_before = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(9),
         );
         assert!(res_before.is_empty());
@@ -362,7 +368,7 @@ mod tests {
         // Exact start (10) -> Valid (inclusive lower bound)
         let res_start = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(10),
         );
         assert_eq!(res_start.len(), 1);
@@ -370,7 +376,7 @@ mod tests {
         // Inside window (50) -> Valid
         let res_mid = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(50),
         );
         assert_eq!(res_mid.len(), 1);
@@ -378,7 +384,7 @@ mod tests {
         // One step before end (99) -> Valid
         let res_before_end = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(99),
         );
         assert_eq!(res_before_end.len(), 1);
@@ -386,7 +392,7 @@ mod tests {
         // Exact end (100) -> Invalid (exclusive upper bound)
         let res_end = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(100),
         );
         assert!(res_end.is_empty());
@@ -394,7 +400,7 @@ mod tests {
         // After end (> 100) -> Invalid
         let res_after = apply_temporal_validity_filter_at_bitemporal(
             vec![candidate.clone()],
-            TxId::new(1),
+            TxId::try_new(1).unwrap(),
             Some(101),
         );
         assert!(res_after.is_empty());
@@ -414,10 +420,10 @@ mod tests {
         );
 
         let results = vec![candidate];
-        // Querying with as_of_tx = TxId::new(5) and as_of_business = Some(1700000000)
+        // Querying with as_of_tx = TxId::try_new(5).unwrap() and as_of_business = Some(1700000000)
         let filtered = apply_temporal_validity_filter_at_bitemporal(
             results.clone(),
-            TxId::new(5),
+            TxId::try_new(5).unwrap(),
             Some(1700000000),
         );
         assert_eq!(
