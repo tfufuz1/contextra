@@ -2,7 +2,7 @@
 // STAND: 2026-10-13
 // ZWECK: Failpoint-Infrastruktur und Typen für Purge-Orchestrator Crash-Tests.
 
-use crate::compaction::purge_filter::PurgeBlocked;
+use crate::compaction::purge_filter::{PurgeBlocked, PurgeError};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -78,12 +78,32 @@ impl From<PurgeBlocked> for OrxPurgeError {
     }
 }
 
-impl From<OrxPurgeError> for PurgeBlocked {
+impl From<PurgeError> for OrxPurgeError {
+    fn from(err: PurgeError) -> Self {
+        match err {
+            PurgeError::Io(e) => OrxPurgeError::Io(e),
+            PurgeError::CorruptedIntent(s) => OrxPurgeError::CorruptedIntent(s),
+            PurgeError::FailpointTriggered(s) => OrxPurgeError::FailpointTriggered(s),
+            other => OrxPurgeError::Blocked(other.into()),
+        }
+    }
+}
+
+impl From<OrxPurgeError> for PurgeError {
     fn from(err: OrxPurgeError) -> Self {
         match err {
-            OrxPurgeError::Blocked(b) => b,
-            _ => PurgeBlocked::UnclassifiedFiles { count: 1 },
+            OrxPurgeError::Io(e) => PurgeError::Io(e),
+            OrxPurgeError::Blocked(b) => b.into(),
+            OrxPurgeError::CorruptedIntent(s) => PurgeError::CorruptedIntent(s),
+            OrxPurgeError::FailpointTriggered(s) => PurgeError::FailpointTriggered(s),
         }
+    }
+}
+
+impl From<OrxPurgeError> for PurgeBlocked {
+    fn from(err: OrxPurgeError) -> Self {
+        let pe: PurgeError = err.into();
+        pe.into()
     }
 }
 

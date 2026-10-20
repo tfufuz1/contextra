@@ -171,12 +171,17 @@ impl LsmStorage {
         self.task_tracker.spawn(future);
     }
 
-    #[cfg(feature = "fault-injection")]
+    /// Returns the database root directory path.
+    pub fn db_path(&self) -> &std::path::Path {
+        &self.config.path
+    }
+
+    #[cfg(any(test, feature = "fault-injection"))]
     pub fn fault_plan(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
 
-    #[cfg(feature = "fault-injection")]
+    #[cfg(any(test, feature = "fault-injection"))]
     pub fn failpoints(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
@@ -353,6 +358,7 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
         Arc::clone(&self.manifest)
     }

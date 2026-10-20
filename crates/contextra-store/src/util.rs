@@ -54,12 +54,18 @@ impl DirLock {
     /// Acquires an exclusive lock on `dir/LOCK`.
     pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
         let lock_path = dir.join("LOCK");
-        let file = File::create(&lock_path).map_err(|e| {
-            ContextraError::Storage(format!(
-                "Failed to open/create LOCK file at {}: {e}",
-                lock_path.display()
-            ))
-        })?;
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to open/create LOCK file at {}: {e}",
+                    lock_path.display()
+                ))
+            })?;
 
         sync_dir_util(dir).map_err(|e| {
             ContextraError::Storage(format!(
@@ -102,6 +108,7 @@ fn decide_on_lock_error(
 
 #[cfg(all(test, not(loom)))]
 #[doc(hidden)]
+#[allow(dead_code)]
 pub fn test_decide_on_lock_error_wrapper(
     durability_mode: DurabilityMode,
     lock_path: &Path,

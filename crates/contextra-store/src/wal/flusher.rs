@@ -1002,6 +1002,7 @@ mod flusher_injector_tests {
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            fault_plan: Arc::new(crate::wal::WalFailpoints::default()),
         };
 
         wal.enable_flusher_with_injector(file, WalFlusherConfig::default(), FsyncFailInjector)

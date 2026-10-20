@@ -194,7 +194,7 @@ impl<'a> PurgeOrchestrator<'a> {
     ) -> PurgeOutcome {
         if let Err(e) = self.check_failpoint("p0_init") {
             return PurgeOutcome::Failed {
-                phase: PurgePhase::P0Init,
+                phase: PurgePhase::Init,
                 error_msg: e.to_string(),
             };
         }
@@ -207,18 +207,18 @@ impl<'a> PurgeOrchestrator<'a> {
         purge_id.copy_from_slice(&hasher.finalize().as_bytes()[..16]);
 
         let mut intent =
-            OrxPurgeIntent::new(purge_id, &scope, as_of_tx, None, None, PurgePhase::P1Intent);
+            OrxPurgeIntent::new(purge_id, &scope, as_of_tx, None, None, PurgePhase::Admitted);
 
-        if let Err(e) = self.record_phase(&mut intent, PurgePhase::P1Intent) {
+        if let Err(e) = self.record_phase(&mut intent, PurgePhase::Admitted) {
             return PurgeOutcome::Failed {
-                phase: PurgePhase::P1Intent,
+                phase: PurgePhase::Admitted,
                 error_msg: e.to_string(),
             };
         }
 
         if let Err(e) = self.check_failpoint("after_intent") {
             return PurgeOutcome::Failed {
-                phase: PurgePhase::P1Intent,
+                phase: PurgePhase::Admitted,
                 error_msg: e.to_string(),
             };
         }
@@ -257,11 +257,11 @@ impl<'a> PurgeOrchestrator<'a> {
 
         let mut fence_guard = None;
         let mut fence_acquired =
-            intent.phase >= PurgePhase::P2FenceAcquired && intent.phase < PurgePhase::Release;
+            intent.phase >= PurgePhase::FenceAcquired && intent.phase < PurgePhase::Release;
 
         let run_pipeline = async {
             // P2: Acquire Fence
-            if intent.phase <= PurgePhase::P2FenceAcquired {
+            if intent.phase <= PurgePhase::FenceAcquired {
                 if let Some(storage) = self.storage {
                     if fence_prefixes.is_empty() {
                         return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
@@ -276,7 +276,7 @@ impl<'a> PurgeOrchestrator<'a> {
                     f().map_err(OrxPurgeError::Io)?;
                 }
                 fence_acquired = true;
-                self.record_phase(&mut intent, PurgePhase::P2FenceAcquired)?;
+                self.record_phase(&mut intent, PurgePhase::FenceAcquired)?;
                 self.check_failpoint("after_fence")?;
             }
 
@@ -285,7 +285,7 @@ impl<'a> PurgeOrchestrator<'a> {
                 if let Some(ref f) = hooks.flush_memtable {
                     f().map_err(OrxPurgeError::Io)?;
                 }
-                self.record_phase(&mut intent, PurgePhase::P3Flush)?;
+                self.record_phase(&mut intent, PurgePhase::Flush)?;
                 self.check_failpoint("after_flush")?;
             }
 
@@ -298,7 +298,7 @@ impl<'a> PurgeOrchestrator<'a> {
             };
 
             if intent.phase <= PurgePhase::PurgeCompaction {
-                self.record_phase(&mut intent, PurgePhase::P4PurgeCompaction)?;
+                self.record_phase(&mut intent, PurgePhase::PurgeCompaction)?;
                 self.check_failpoint("mid_compaction_output")?;
 
                 if let Some(storage) = self.storage {
@@ -307,8 +307,8 @@ impl<'a> PurgeOrchestrator<'a> {
                         .await
                     {
                         Ok(rep) => report = rep,
-                        Err(blocked) => {
-                            return Err(OrxPurgeError::Blocked(blocked));
+                        Err(err) => {
+                            return Err(OrxPurgeError::from(err));
                         }
                     }
                 }
@@ -319,7 +319,7 @@ impl<'a> PurgeOrchestrator<'a> {
             // P5: Dispose Obsolete Files
             let mut refusals = 0;
             if intent.phase <= PurgePhase::Dispose {
-                self.record_phase(&mut intent, PurgePhase::P5Dispose)?;
+                self.record_phase(&mut intent, PurgePhase::Dispose)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
                 let disp_rep =
@@ -332,7 +332,7 @@ impl<'a> PurgeOrchestrator<'a> {
 
             // P6: WAL Retire
             if intent.phase <= PurgePhase::WalRetire {
-                self.record_phase(&mut intent, PurgePhase::P6WalCallback)?;
+                self.record_phase(&mut intent, PurgePhase::WalRetire)?;
                 if let Some(ref cb) = hooks.wal_retire {
                     cb().map_err(OrxPurgeError::Io)?;
                 }

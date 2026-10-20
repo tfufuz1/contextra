@@ -56,7 +56,9 @@ pub use orphan::{
     orphaned_checkpoint_count, pending_rollback_count, register_orphaned_checkpoint,
     register_pinned_seq_no_orphan, OrphanRegistry,
 };
-pub use restore_filter::{filter_restore_records, CpyRestoreFilter, NoOpRestoreFilter};
+pub use restore_filter::{filter_restore_records, CpyRestoreFilter};
+#[cfg(any(test, feature = "test-utils", feature = "testing"))]
+pub use restore_filter::NoOpRestoreFilter;
 pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};
 
 pub(crate) fn block_on_sync<F, T>(future: F) -> contextra_types::Result<T>

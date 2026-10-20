@@ -33,7 +33,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .join(format!("wal-{:020}.log", flush_id));
         let wal_config = crate::wal::WalConfig {
             key_manager: storage.key_manager.clone(),
-            #[cfg(feature = "fault-injection")]
+            #[cfg(any(test, feature = "fault-injection"))]
             fault_plan: storage.config.fault_plan.clone(),
             ..Default::default()
         };
@@ -63,7 +63,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         .join(format!("wal-{:020}.log", flush_id));
                     let wal_config = crate::wal::WalConfig {
                         key_manager: storage.key_manager.clone(),
-                        #[cfg(feature = "fault-injection")]
+                        #[cfg(any(test, feature = "fault-injection"))]
                         fault_plan: storage.config.fault_plan.clone(),
                         ..Default::default()
                     };

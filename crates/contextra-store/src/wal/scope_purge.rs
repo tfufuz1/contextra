@@ -413,10 +413,8 @@ pub async fn purge_wal_scope(
         ));
     }
 
-    if intent_path.exists() {
-        let _ = tokio::fs::remove_file(&intent_path).await;
-        fsync_parent_dir(&intent_path).await?;
-    }
+    remove_if_exists(&intent_path).await?;
+    fsync_parent_dir(&intent_path).await?;
 
     Ok(report)
 }
@@ -432,16 +430,22 @@ pub async fn resume_wal_scope_purge(wal_dir: &Path) -> Result<()> {
     while let Ok(Some(entry)) = dir_entries.next_entry().await {
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "purge_tmp") {
-            let _ = tokio::fs::remove_file(&path).await;
+            remove_if_exists(&path).await?;
         }
     }
 
-    if intent_path.exists() {
-        let _ = tokio::fs::remove_file(&intent_path).await;
-        fsync_parent_dir(&intent_path).await?;
-    }
+    remove_if_exists(&intent_path).await?;
+    fsync_parent_dir(&intent_path).await?;
 
     Ok(())
+}
+
+async fn remove_if_exists(p: &Path) -> std::io::Result<()> {
+    match tokio::fs::remove_file(p).await {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 fn check_and_clear_failpoint(
@@ -455,6 +459,7 @@ fn check_and_clear_failpoint(
             .compare_exchange(fp, 0, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok();
     }
+    #[cfg(not(any(test, feature = "failpoints", feature = "fault-injection")))]
     let _ = fp;
     false
 }

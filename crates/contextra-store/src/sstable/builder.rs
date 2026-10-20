@@ -662,7 +662,7 @@ mod tests {
 
         let key = Bytes::from("test_key");
         let val = Bytes::from("test_val");
-        builder.add(key, val, 100, 10, false).await.unwrap();
+        builder.add(&key, &val, 100, 10).await.unwrap();
 
         let err = builder.finish().await.unwrap_err();
         assert!(

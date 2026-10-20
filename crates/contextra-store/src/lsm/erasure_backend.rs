@@ -29,13 +29,7 @@ impl LsmStorage {
 
         let report = self
             .purge_keys(purge_scope, as_of.inner(), Some(probe))
-            .await
-            .map_err(|blocked| {
-                PurgeError::Io(std::io::Error::other(format!(
-                    "Purge compaction blocked: {:?}",
-                    blocked
-                )))
-            })?;
+            .await?;
 
         Ok(PurgeOutput {
             records_purged: report.records_purged,

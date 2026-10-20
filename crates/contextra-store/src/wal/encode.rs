@@ -167,7 +167,6 @@ impl WalEntry {
     /// This method calculates the legacy V2 checksum format used by historical WAL segments.
     /// It MUST NOT be used for new WAL entry creation. It is retained solely for legacy migration
     /// testing and verification during `rekey_from_legacy` / `rewrite_as_v3`.
-    #[cfg(any(feature = "legacy-wal-key", test))]
     #[deprecated(
         note = "Nur für Legacy-Migration und Tests von WalVersion::V2-Dateien. Neue WAL-Einträge nutzen compute_checksum_v3."
     )]

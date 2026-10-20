@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // FILE-CONTEXT
 // STAND: 2026-10-12
 // ZWECK: Orakel-Hilfsfunktion für Purge-Compaction Testverifikation.

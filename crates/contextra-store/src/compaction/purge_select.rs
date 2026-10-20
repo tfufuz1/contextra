@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(probe_none.free_space_bytes(), None);
     }
 
-    use crate::sstable::builder::SstableMetadata;
+    use crate::sstable::SstableMetadata;
     use bytes::Bytes;
     use proptest::prelude::*;
 
@@ -258,7 +258,7 @@ mod tests {
 
             let (actual_indices, naive_indices, sstables_meta) = rt.block_on(async {
                 let tmp = tempfile::tempdir().unwrap();
-                let bc = crate::sstable::create_block_cache();
+                let bc = crate::sstable::create_block_cache(16);
                 let mut sstables = Vec::new();
                 let mut sstables_meta = Vec::new();
 

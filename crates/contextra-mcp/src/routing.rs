@@ -123,7 +123,6 @@ pub async fn setup_routing(
     let router_weak = Arc::downgrade(&drift_adapter);
     db.set_router(router_weak);
     db.set_calibrator(Arc::downgrade(&calibrator));
-    db.set_pid_controller(Arc::downgrade(&pid_controller));
 
     Ok(Some(Arc::new(RoutingHandle {
         router,

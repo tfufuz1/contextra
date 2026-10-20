@@ -8,14 +8,7 @@
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
 use contextra_ports::{Rng, StorageEngine};
-<<<<<<< HEAD
 use contextra_testkit::{ManualClock, TestkitSeededRng as SeededRng};
-=======
-<<<<<<< HEAD
-=======
-use contextra_testkit::{ManualClock, TestkitSeededRng as SeededRng};
->>>>>>> 551e6fa79 (Shell-Commit)
->>>>>>> 5aa9fd58b (Shell-Commit)
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;

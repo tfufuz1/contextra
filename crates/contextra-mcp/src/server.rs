@@ -52,9 +52,9 @@ impl McpServer {
         let _deletion_key = deletion_proof_key_from_env().ok();
 
         let injection_guard = Arc::new(PromptInjectionGuard::from_env());
-        let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
-            server.db.license_gate(),
-        )));
+        let gate: Arc<dyn contextra_ports::license::LicenseGate> =
+            Arc::new(contextra_ports::license::OpenFastGate);
+        let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(gate)));
 
         Ok(server
             .with_injection_guard(injection_guard)

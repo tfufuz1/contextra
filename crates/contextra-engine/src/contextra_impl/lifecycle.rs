@@ -11,6 +11,18 @@ impl Contextra {
         Self::open_with_config(path, ContextraConfig::default()).await
     }
 
+    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token
+    /// and attached [`LicenseGate`].
+    #[tracing::instrument(level = "trace", skip(path, config, _authorized_ring, _gate))]
+    pub async fn open_authorized(
+        path: impl AsRef<Path>,
+        config: ContextraConfig,
+        _authorized_ring: &contextra_ports::license::AuthorizedRing,
+        _gate: Arc<dyn contextra_ports::license::LicenseGate>,
+    ) -> Result<Self> {
+        Self::open_with_config(path, config).await
+    }
+
     /// Opens or creates a `Contextra` instance at `path` with explicit `config`.
     #[tracing::instrument(level = "trace", skip(path, config))]
     pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {

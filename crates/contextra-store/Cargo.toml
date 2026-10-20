@@ -62,6 +62,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
+contextra-core = { workspace = true }
 sha2 = "0.10"
 contextra-testkit = { workspace = true }
 contextra-vector = { workspace = true }
@@ -111,6 +112,11 @@ required-features = ["legacy-wal-key"]
 [[test]]
 name = "wal_truncation_and_legacy_isolation"
 path = "tests/wal_truncation_and_legacy_isolation.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_migration_explicit_path_still_works"
+path = "tests/wal_legacy_migration_explicit_path_still_works.rs"
 required-features = ["legacy-wal-key"]
 
 [[bench]]

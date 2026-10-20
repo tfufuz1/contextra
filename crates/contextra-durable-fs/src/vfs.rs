@@ -97,7 +97,7 @@ impl Vfs for RealFs {
     fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
         contextra_sys::rename_durable(from, to)?;
         if let Some(parent) = to.parent() {
-            let _ = crate::sync_dir(parent);
+            crate::sync_dir(parent)?;
         }
         Ok(())
     }
