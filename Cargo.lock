@@ -1080,6 +1080,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "trybuild",
+ "zeroize",
 ]
 
 [[package]]
@@ -1258,8 +1259,10 @@ dependencies = [
 name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "libc",
  "memmap2",
+ "rand 0.8.8",
  "tracing",
  "windows-sys 0.61.2",
 ]

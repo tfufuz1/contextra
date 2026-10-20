@@ -25,6 +25,7 @@ serde_json = { workspace = true }
 ahash = { workspace = true }
 thiserror = { workspace = true }
 blake3 = { workspace = true }
+zeroize = "1.8"
 
 [dev-dependencies]
 contextra-ports = { path = ".", features = ["test-utils", "backend-impl"] }
