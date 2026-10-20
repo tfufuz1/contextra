@@ -156,3 +156,20 @@ impl StorageEngine for LsmStorage {
         Some(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_lsm_storage_supports_ssi_tracking() {
+        let dir = tempdir().unwrap();
+        let lsm_config = LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let storage = LsmStorage::new(lsm_config).await.unwrap();
+        assert!(storage.supports_ssi_tracking());
+    }
+}

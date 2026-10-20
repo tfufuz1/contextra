@@ -132,6 +132,10 @@ mod tests {
         assert_eq!(stages.stages[2], PipelineStage::Plan);
         assert_eq!(stages.stages[3], PipelineStage::EgressFilter);
 
+        let default_stages = PipelineStages::default();
+        assert_eq!(default_stages, stages);
+        assert!(default_stages.verify_order());
+
         let non_canonical = PipelineStages {
             stages: [
                 PipelineStage::Rerank,
