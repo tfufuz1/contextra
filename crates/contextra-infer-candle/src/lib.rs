@@ -18,6 +18,7 @@
 //! Cache-Projektionen) ist ein separates, zukünftiges Vorhaben und NICHT Gegenstand dieser Erstfassung.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-10-11T16:00:00Z) (SESSION: 5984fc0d) PRÜFER-KONTEXT: FRESH

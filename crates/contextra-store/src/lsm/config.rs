@@ -166,6 +166,9 @@ pub struct LsmConfig {
     /// Maximum factor for internal merge set size relative to limit in bounded scans.
     /// Default is `crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR` (8).
     pub max_internal_merge_factor: usize,
+    #[cfg(feature = "fault-injection")]
+    #[serde(skip, default)]
+    pub fault_plan: std::sync::Arc<crate::wal::WalFaultPlan>,
 }
 
 impl LsmConfig {
@@ -189,6 +192,8 @@ impl Default for LsmConfig {
             ssi_max_tracked_keys: 1_000_000,
             blob_bytes_threshold: crate::blob::DEFAULT_BLOB_THRESHOLD,
             max_internal_merge_factor: crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR,
+            #[cfg(feature = "fault-injection")]
+            fault_plan: std::sync::Arc::new(crate::wal::WalFaultPlan::default()),
         }
     }
 }

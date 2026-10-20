@@ -19,8 +19,6 @@ use super::{
     WAL_V3_HEADER,
 };
 
-#[cfg(feature = "fault-injection")]
-use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
 #[cfg(feature = "wal-integrity")]
 struct WalVerifierCtx<'a> {
@@ -538,22 +536,22 @@ impl Wal {
 
         #[cfg(feature = "fault-injection")]
         {
-            let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
+            let fail_tx = self.fault_plan.fail_append_for_tx.load(std::sync::atomic::Ordering::SeqCst);
             if fail_tx != 0
                 && entries
                     .iter()
                     .any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX)
             {
-                FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+                self.fault_plan.fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
                 return Err(ContextraError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
                 ));
             }
 
-            let delay_tx = DELAY_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
+            let delay_tx = self.fault_plan.delay_append_for_tx.load(std::sync::atomic::Ordering::SeqCst);
             if delay_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == delay_tx) {
-                let delay_ms = DELAY_APPEND_MS.load(std::sync::atomic::Ordering::SeqCst);
-                DELAY_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+                let delay_ms = self.fault_plan.delay_append_ms.load(std::sync::atomic::Ordering::SeqCst);
+                self.fault_plan.delay_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
                 if delay_ms > 0 {
                     tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
                 }
@@ -1037,7 +1035,7 @@ impl Wal {
     /// Setzt `FAIL_TRUNCATE_ONCE = true`. Wird vom Flusher nach Auslösung zurückgesetzt.
     #[cfg(feature = "fault-injection")]
     pub fn arm_truncate_failure_for_test(&self) {
-        crate::wal::FAIL_TRUNCATE_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.fault_plan.fail_truncate_once.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 

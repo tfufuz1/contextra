@@ -18,7 +18,7 @@ async fn test_async_runtime_blocking_attempt_rejected() {
 #[test]
 fn test_scope_fence_inside_outside_prefix() {
     let fence = ErasureFence::new();
-    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
+    let guard = fence.acquire_scope_fence_for(vec![b"coll_a:".to_vec()]).unwrap();
 
     // Writing outside prefix works
     assert!(fence.check_write_allowed_scope(b"coll_b:doc1").is_ok());
@@ -29,7 +29,7 @@ fn test_scope_fence_inside_outside_prefix() {
         Err(FenceError::CollectionDropping)
     );
 
-    fence.release_scope_fence_for_locked(b"coll_a:");
+    drop(guard);
     // After release, writing inside prefix is allowed again
     assert!(fence.check_write_allowed_scope(b"coll_a:doc1").is_ok());
 }
@@ -38,7 +38,7 @@ fn test_scope_fence_inside_outside_prefix() {
 fn test_scope_fence_prefix_edge_cases() {
     let fence = ErasureFence::new();
     // "a:" vs "ab:"
-    fence.acquire_scope_fence_for_locked(b"a:".to_vec());
+    let _guard = fence.acquire_scope_fence_for(vec![b"a:".to_vec()]).unwrap();
 
     // "a:123" is in scope "a:"
     assert_eq!(
@@ -54,36 +54,36 @@ fn test_scope_fence_prefix_edge_cases() {
 fn test_scope_fence_guard_drop_releases() {
     let fence = ErasureFence::new();
 
-    fence.acquire_scope_fence_for_locked(b"scope:".to_vec());
+    let guard = fence.acquire_scope_fence_for(vec![b"scope:".to_vec()]).unwrap();
     assert!(fence.check_write_allowed_scope(b"scope:key").is_err());
 
-    fence.release_scope_fence_for_locked(b"scope:");
+    drop(guard);
     assert!(fence.check_write_allowed_scope(b"scope:key").is_ok());
 }
 
 #[test]
 fn test_scope_fence_overlapping_scopes_union_ref_count() {
     let fence = ErasureFence::new();
-    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
+    let guard1 = fence.acquire_scope_fence_for(vec![b"coll_a:".to_vec()]).unwrap();
 
     // Overlapping scope "coll_a:sub:" -> Union with ref_count (F-2/F-3, no Conflict)
-    fence.acquire_scope_fence_for_locked(b"coll_a:sub:".to_vec());
+    let guard2 = fence.acquire_scope_fence_for(vec![b"coll_a:sub:".to_vec()]).unwrap();
 
     // Disjoint scope "coll_b:" -> Success
-    fence.acquire_scope_fence_for_locked(b"coll_b:".to_vec());
+    let guard3 = fence.acquire_scope_fence_for(vec![b"coll_b:".to_vec()]).unwrap();
 
-    fence.release_scope_fence_for_locked(b"coll_a:");
+    drop(guard1);
     // Overlapping "coll_a:sub:" still active via second registration
     assert_eq!(
         fence.check_write_allowed_scope(b"coll_a:sub:doc1"),
         Err(FenceError::CollectionDropping)
     );
 
-    fence.release_scope_fence_for_locked(b"coll_a:sub:");
+    drop(guard2);
     // Now coll_a:sub: is released
     assert!(fence.check_write_allowed_scope(b"coll_a:sub:doc1").is_ok());
 
-    fence.release_scope_fence_for_locked(b"coll_b:");
+    drop(guard3);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn test_scope_write_seq_increments_only_in_scope() {
     let fence = ErasureFence::new();
     let initial_seq = fence.scope_write_seq();
 
-    fence.acquire_scope_fence_for_locked(b"coll_a:".to_vec());
+    let _guard = fence.acquire_scope_fence_for(vec![b"coll_a:".to_vec()]).unwrap();
     let fenced_seq = fence.scope_write_seq();
     assert!(fenced_seq > initial_seq);
 
@@ -136,9 +136,10 @@ async fn test_all_write_paths_respect_fence() {
     let tx_id = TxId::new(1);
 
     // 1. Install fence via locked helper / sync call
-    storage
+    let guard = storage
         .erasure_fence
-        .acquire_scope_fence_for_locked(b"locked:".to_vec());
+        .acquire_scope_fence_for(vec![b"locked:".to_vec()])
+        .unwrap();
 
     let put_res = storage.put(tx_id, b"locked:key1", b"val1").await;
     assert!(put_res.is_err());
@@ -168,16 +169,17 @@ async fn test_all_write_paths_respect_fence() {
     assert!(del_prefix_res.is_err());
 
     // 6. Path 'commit' (when operation staged before fence)
-    storage.erasure_fence.release_scope_fence_for_locked(b"locked:");
+    drop(guard);
     let tx_staged = TxId::new(2);
     storage
         .put(tx_staged, b"locked:key4", b"val4")
         .await
         .unwrap();
 
-    storage
+    let _guard2 = storage
         .erasure_fence
-        .acquire_scope_fence_for_locked(b"locked:".to_vec());
+        .acquire_scope_fence_for(vec![b"locked:".to_vec()])
+        .unwrap();
 
     let commit_res = storage.commit(tx_staged).await;
     assert!(commit_res.is_err());
