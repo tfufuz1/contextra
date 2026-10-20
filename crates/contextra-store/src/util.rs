@@ -9,29 +9,35 @@ use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 
+#[cfg(all(test, not(loom)))]
 type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
 
+#[cfg(all(test, not(loom)))]
 std::thread_local! {
     static DIRLOCK_SYNC_HOOK: std::cell::RefCell<Option<DirLockSyncHookFn>> =
         const { std::cell::RefCell::new(None) };
 }
 
-#[doc(hidden)]
-pub fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
+#[cfg(all(test, not(loom)))]
+pub(crate) fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
     DIRLOCK_SYNC_HOOK.with(|h| {
         *h.borrow_mut() = hook;
     });
 }
 
+#[cfg(not(loom))]
 pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
-    let mut hook_res = None;
-    DIRLOCK_SYNC_HOOK.with(|h| {
-        if let Some(hook) = *h.borrow() {
-            hook_res = Some(hook(dir));
+    #[cfg(test)]
+    {
+        let mut hook_res = None;
+        DIRLOCK_SYNC_HOOK.with(|h| {
+            if let Some(hook) = *h.borrow() {
+                hook_res = Some(hook(dir));
+            }
+        });
+        if let Some(res) = hook_res {
+            return res;
         }
-    });
-    if let Some(res) = hook_res {
-        return res;
     }
     contextra_durable_fs::sync_dir(dir)
 }
