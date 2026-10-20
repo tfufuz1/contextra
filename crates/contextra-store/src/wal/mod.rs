@@ -356,6 +356,17 @@ impl WalFailpoints {
 
 pub type WalFaultPlan = WalFailpoints;
 
+/// Cryptographic guarantee provided by a WAL instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WalIntegrityGuarantee {
+    /// Integrity key is stored locally on disk adjacent to the WAL (`.wal_integrity_key`).
+    /// Protects strictly against bitrot/accidental corruption, NOT against filesystem tampering.
+    BitrotOnly,
+    /// Integrity key is derived/managed via an active external `KeyManager`.
+    /// Provides cryptographic tamper resistance.
+    TamperEvident,
+}
+
 #[derive(Debug, Clone)]
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
@@ -957,6 +968,15 @@ impl Wal {
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
         self.allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Returns the active integrity guarantee for this WAL instance.
+    pub fn integrity_guarantee(&self) -> WalIntegrityGuarantee {
+        if self.key_manager.is_some() {
+            WalIntegrityGuarantee::TamperEvident
+        } else {
+            WalIntegrityGuarantee::BitrotOnly
+        }
     }
 
     pub fn legacy_key_used_for_test(&self) -> bool {

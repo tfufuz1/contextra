@@ -182,10 +182,11 @@ impl Wal {
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+        let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
+        })?;
+        let std_file = tokio_file.into_std().await;
         let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-            let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
-            })?;
             let metadata = std_file.metadata().map_err(|e| {
                 ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}"))
             })?;
@@ -261,10 +262,11 @@ impl Wal {
         }
 
         #[allow(clippy::type_complexity)]
+        let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
+        })?;
+        let std_file = tokio_file.into_std().await;
         let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
-            let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
-            })?;
             let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
                 ContextraError::Storage(format!(
                     "Failed to mmap WAL file {}: {e}",
