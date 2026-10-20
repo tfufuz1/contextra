@@ -50,7 +50,9 @@ fn scan_file(path: &Path, unwrapped: &mut Vec<String>) {
                 let mut search_idx = i;
                 let end_search = (i + 40).min(lines.len());
                 while search_idx < end_search {
-                    if lines[search_idx].contains("guard_panic") || lines[search_idx].contains("public_api!") {
+                    if lines[search_idx].contains("guard_panic")
+                        || lines[search_idx].contains("public_api!")
+                    {
                         has_guard = true;
                         break;
                     }

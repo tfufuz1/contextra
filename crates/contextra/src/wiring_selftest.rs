@@ -4,9 +4,9 @@
 //! (Clock, Rng, IdGen, LicenseGate) gültige Implementierungen haben
 //! und Null-/Accept-All-Implementierungen nicht als Sicherheits-Port-Standard dienen.
 
-use contextra_types::error::ContextraError;
-use contextra_db::Contextra;
 use crate::builder::{BuildError, ContextraBuilder};
+use contextra_db::Contextra;
+use contextra_types::error::ContextraError;
 
 /// Liste der kritischen Pflicht-Ports (§22 Punkt 4).
 pub const REQUIRED_SECURITY_PORTS: &[&str] = &["Clock", "Rng", "IdGen", "LicenseGate"];
@@ -22,9 +22,7 @@ pub struct WiringReport {
 impl WiringReport {
     pub fn is_valid(&self) -> bool {
         self.missing_ports.iter().all(|m| {
-            m.contains("(disabled)")
-                || m.contains("(optional)")
-                || m.contains("(nicht prüfbar")
+            m.contains("(disabled)") || m.contains("(optional)") || m.contains("(nicht prüfbar")
         }) && self.invalid_security_ports.is_empty()
     }
 }
@@ -68,7 +66,9 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
     if builder.checkpoint_enabled() {
         report.wired_ports.push("CheckpointRecovery".to_string());
     } else {
-        report.missing_ports.push("CheckpointRecovery (disabled)".to_string());
+        report
+            .missing_ports
+            .push("CheckpointRecovery (disabled)".to_string());
     }
 
     if builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
@@ -77,15 +77,15 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
         report.missing_ports.push("Erasure (disabled)".to_string());
     }
 
-    report.missing_ports.push(
-        "Clock (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
-    );
-    report.missing_ports.push(
-        "Rng (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
-    );
-    report.missing_ports.push(
-        "IdGen (nicht prüfbar auf Builder: System-Default vor build())".to_string(),
-    );
+    report
+        .missing_ports
+        .push("Clock (nicht prüfbar auf Builder: System-Default vor build())".to_string());
+    report
+        .missing_ports
+        .push("Rng (nicht prüfbar auf Builder: System-Default vor build())".to_string());
+    report
+        .missing_ports
+        .push("IdGen (nicht prüfbar auf Builder: System-Default vor build())".to_string());
 
     report
 }
@@ -94,8 +94,13 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
 pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport, BuildError> {
     let report = generate_report_for_builder(builder);
 
-    if (builder.explicit_erasure_mode() || builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off) && !cfg!(feature = "erasure") {
-        if builder.explicit_erasure_mode() && builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off {
+    if (builder.explicit_erasure_mode()
+        || builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off)
+        && !cfg!(feature = "erasure")
+    {
+        if builder.explicit_erasure_mode()
+            && builder.erasure_mode() != contextra_ports::erasure::ErasureMode::Off
+        {
             return Err(BuildError::FeatureMissing {
                 mode: format!("{:?}", builder.erasure_mode()),
                 feature: "erasure".to_string(),
@@ -142,13 +147,17 @@ pub fn generate_report_for_instance(instance: &Contextra) -> WiringReport {
     if config.metrics_sink.is_some() {
         report.wired_ports.push("MetricsSink".to_string());
     } else {
-        report.missing_ports.push("MetricsSink (optional)".to_string());
+        report
+            .missing_ports
+            .push("MetricsSink (optional)".to_string());
     }
 
     if config.merge_operator.is_some() {
         report.wired_ports.push("MergeOperator".to_string());
     } else {
-        report.missing_ports.push("MergeOperator (optional)".to_string());
+        report
+            .missing_ports
+            .push("MergeOperator (optional)".to_string());
     }
 
     if config.consolidation_launcher.is_some() {
@@ -165,21 +174,21 @@ pub fn generate_report_for_instance(instance: &Contextra) -> WiringReport {
         report.missing_ports.push("Erasure (disabled)".to_string());
     }
 
-    report.missing_ports.push(
-        "Clock (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
-    );
-    report.missing_ports.push(
-        "Rng (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
-    );
-    report.missing_ports.push(
-        "IdGen (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
-    );
-    report.missing_ports.push(
-        "LicenseGate (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
-    );
-    report.missing_ports.push(
-        "EngineWiring (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string(),
-    );
+    report
+        .missing_ports
+        .push("Clock (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
+    report
+        .missing_ports
+        .push("Rng (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
+    report
+        .missing_ports
+        .push("IdGen (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
+    report
+        .missing_ports
+        .push("LicenseGate (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
+    report
+        .missing_ports
+        .push("EngineWiring (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
 
     report
 }
@@ -216,7 +225,9 @@ pub fn verify_wiring(
     }
 
     if license_gate_is_noop {
-        report.invalid_security_ports.push("LicenseGate (Noop/OpenFastGate used in strict mode)".to_string());
+        report
+            .invalid_security_ports
+            .push("LicenseGate (Noop/OpenFastGate used in strict mode)".to_string());
     }
 
     if !report.is_valid() {

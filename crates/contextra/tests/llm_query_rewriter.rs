@@ -3,9 +3,9 @@
 // INVARIANTEN: Zero Panic; Fake-Generator ohne Netzzugriff.
 
 use contextra::LlmQueryRewriter;
-use contextra_types::error::ContextraError;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::error::ContextraError;
 use contextra_types::ScoredEntry;
 use std::sync::{Arc, Mutex};
 

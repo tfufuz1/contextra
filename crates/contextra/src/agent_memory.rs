@@ -182,7 +182,9 @@ impl AgentMemory {
         let engine = self.engine.clone();
         let id_clone = id.clone();
         contextra_types::public_api!("AgentMemory::remember", {
-            engine.insert_text_only(&id_clone, &text_owned, metadata).await?;
+            engine
+                .insert_text_only(&id_clone, &text_owned, metadata)
+                .await?;
             Ok(MemoryId(id_clone))
         })
     }
@@ -202,15 +204,10 @@ impl AgentMemory {
     /// Deletes a memory entry by its `MemoryId`.
     ///
     /// Delegates directly to `Contextra::delete`.
-    pub async fn forget(
-        &self,
-        id: &MemoryId,
-    ) -> Result<(), ContextraError> {
+    pub async fn forget(&self, id: &MemoryId) -> Result<(), ContextraError> {
         let id_str = id.as_str().to_string();
         let engine = self.engine.clone();
-        contextra_types::public_api!("AgentMemory::forget", {
-            engine.delete(&id_str).await
-        })
+        contextra_types::public_api!("AgentMemory::forget", { engine.delete(&id_str).await })
     }
 
     /// Establishes a directed knowledge-graph relationship between two memories with a given label.
