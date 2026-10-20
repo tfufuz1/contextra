@@ -63,7 +63,8 @@ async fn test_store_wal_crash_harness_fixed_seeds() {
 
 /// Harness test for WAL stage recovery with partial frame truncation.
 ///
-/// Blocked by open store WAL truncation issue F-WAL-01 (`mod.rs:814` TODO).
+/// Verifies that re-opening a WAL after a crash with a torn write/partial tail frame
+/// recovers safely without corruption or panics.
 #[tokio::test]
 async fn test_store_wal_partial_tail_truncation_recovery() {
     let temp_dir = TempDir::new().expect("temp dir");
