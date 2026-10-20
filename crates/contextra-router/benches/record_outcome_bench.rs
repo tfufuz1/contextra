@@ -3,9 +3,7 @@
 #![cfg(feature = "bandit-routing")]
 
 use contextra_adapt::BanditProfileState;
-use contextra_router::{
-    outcome::RoutingOutcome, profile::SlmProfile, router::RouterEngine,
-};
+use contextra_router::{outcome::RoutingOutcome, profile::SlmProfile, router::RouterEngine};
 use contextra_types::TokenBudget;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
@@ -79,10 +77,10 @@ pub fn bench_record_outcome(c: &mut Criterion) {
 
             b.iter(|| {
                 let decision_id = router.decision_ids.next();
-                router.pending_decisions.write().insert(
-                    decision_id,
-                    ("p1".to_string(), std::time::Instant::now()),
-                );
+                router
+                    .pending_decisions
+                    .write()
+                    .insert(decision_id, ("p1".to_string(), std::time::Instant::now()));
                 router.pending_bandit.write().insert(
                     decision_id,
                     contextra_router::router::PendingBanditDecision {

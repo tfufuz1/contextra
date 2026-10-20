@@ -2,7 +2,7 @@
 
 use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
 use contextra_router::{
-    ArmRegistry, ArmRegistryError, DecisionIdGenerator, RoutingOutcome, RouterEngine, SlmProfile,
+    ArmRegistry, ArmRegistryError, DecisionIdGenerator, RouterEngine, RoutingOutcome, SlmProfile,
 };
 use contextra_types::{
     ContextChunk, ContextWindow, DocId, EntityId, Result, RetrievalStrategy, TokenBudget,
@@ -76,7 +76,8 @@ fn create_engine(profiles: Vec<SlmProfile>, dim: usize) -> RouterEngine {
 }
 
 #[tokio::test]
-async fn test_deterministic_routing_sequence() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn test_deterministic_routing_sequence() -> std::result::Result<(), Box<dyn std::error::Error>>
+{
     let dim = 4;
     let p1 = SlmProfile::new(
         "p1",
@@ -122,10 +123,7 @@ async fn test_deterministic_routing_sequence() -> std::result::Result<(), Box<dy
 fn test_arm_registry_and_candidate_functions() {
     let registry = ArmRegistry::default();
 
-    assert_eq!(
-        registry.strategy_for(0).unwrap(),
-        RetrievalStrategy::Vector
-    );
+    assert_eq!(registry.strategy_for(0).unwrap(), RetrievalStrategy::Vector);
     assert_eq!(registry.arm_for(RetrievalStrategy::Vector), 0);
 
     assert_eq!(
