@@ -533,14 +533,13 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         interval: std::time::Duration,
         cancel_token: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
-        let engine = Arc::new(ConsolidationEngine::new(
+        start_consolidation_worker(
             collection,
             consolidation_config,
             synthesis_config,
             interval,
             cancel_token,
-        ));
-        engine.start()
+        )
     }
 
     /// Hauptschleife der `ConsolidationEngine`.

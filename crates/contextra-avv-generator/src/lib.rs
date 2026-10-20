@@ -5,8 +5,14 @@
 //! Generates AVV (Auftragsverarbeitungsvertrag) template documents referencing Contextra's
 //! technical guarantees (deletion proof, egress gateway, multi-tenant isolation, encrypted KV-cache).
 
+pub mod assistance;
+pub mod audit;
+pub mod confidentiality;
+pub mod data_subject_rights;
 pub mod error;
+pub mod instructions;
 pub mod template;
+pub mod termination;
 
 pub use error::AvvGeneratorError;
 

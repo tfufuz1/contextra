@@ -15,51 +15,28 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Deterministischer SplitMix64 PRNG für retry jitter.
-///
-/// RING-LAYER-EXCEPTION: Local implementation retained in Ring 2 (`contextra-infer-ollama`)
-/// because Ring layering rules prohibition prevents Ring 2 crates from depending on Ring 0
-/// `contextra-sys` (Order 0).
+/// Adapter wrapper around [`contextra_sys::SeededRng`] implementing [`contextra_ports::SeededRng`].
 #[derive(Debug)]
-pub struct SeededRng {
-    state: AtomicU64,
-}
+pub struct OllamaRng(pub contextra_sys::SeededRng);
 
-impl SeededRng {
-    /// Erstellt eine neue [`SeededRng`]-Instanz mit dem gegebenen Seed.
+impl OllamaRng {
+    /// Erstellt eine neue [`OllamaRng`]-Instanz mit dem gegebenen Seed.
     pub fn new(seed: u64) -> Self {
-        Self {
-            state: AtomicU64::new(seed),
-        }
+        Self(contextra_sys::SeededRng::new(seed))
     }
 }
 
-impl contextra_ports::SeededRng for SeededRng {
+impl contextra_ports::SeededRng for OllamaRng {
     fn next_u64(&self) -> u64 {
-        const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
-        let z = self
-            .state
-            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
-            .wrapping_add(GOLDEN_RATIO_64);
-        let mut z = z;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        z ^ (z >> 31)
+        self.0.next_u64()
     }
 
-    fn fill_bytes(&self, mut dest: &mut [u8]) {
-        while !dest.is_empty() {
-            let val = self.next_u64();
-            let bytes = val.to_le_bytes();
-            let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
-        }
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        self.0.fill_bytes(dest)
     }
 
     fn next_unit_f64(&self) -> f64 {
-        let mantissa = self.next_u64() >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+        self.0.next_unit_f64()
     }
 }
 
@@ -120,9 +97,9 @@ impl OllamaClient {
                 reqwest::Client::new()
             }
         };
-        // Default RNG uses SeededRng with a deterministic default seed.
+        // Default RNG uses OllamaRng wrapping contextra_sys::SeededRng with a deterministic default seed.
         // The composition root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
-        let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(DEFAULT_RNG_SEED));
+        let rng: Arc<dyn Rng> = Arc::new(OllamaRng::new(DEFAULT_RNG_SEED));
         Self {
             config,
             client,

@@ -150,10 +150,16 @@ async fn create_faulty_collection() -> (
     );
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = Collection::new_without_graph(
+    let graph = contextra_graph::CsrGraph::load_from_storage(storage.as_ref())
+        .await
+        .unwrap();
+    let graph_index = Arc::new(graph);
+
+    let col = Collection::new(
         "default".to_string(),
         storage.clone(),
         index,
+        graph_index,
         next_tx,
         4,
         contextra_text::Language::English,
