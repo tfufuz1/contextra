@@ -891,7 +891,7 @@ impl Wal {
     }
 
     /// Rewrites legacy V1 or V2 WAL files as V3.
-    pub(crate) async fn rewrite_as_v3(
+    pub async fn rewrite_as_v3(
         &self,
         replayed_entries: &[(u64, WalEntry, u64)],
     ) -> Result<()> {

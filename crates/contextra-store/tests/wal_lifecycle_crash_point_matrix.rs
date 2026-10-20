@@ -22,11 +22,8 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     let tmp = TempDir::new().map_err(|e| format!("TempDir creation failed: {e}"))?;
     let wal_path = tmp.path().join("lifecycle_matrix.wal");
 
-    let config = WalConfig {
-        allow_legacy_integrity_key_fallback: true,
-        min_wal_version: WalVersion::V1,
-        ..Default::default()
-    };
+    let config = WalConfig::default()
+        .with_legacy_fallback(true);
 
     // 1. Initialise WAL and write 10 baseline entries
     let wal = Wal::open_with_config(&wal_path, config.clone())
@@ -115,10 +112,9 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
                 ..Default::default()
             });
 
-            if let Ok((replayed_entries, _)) = wal.replay_mmap().await {
-                let dummy_key = [0u8; 32];
+            if let Ok(replayed_entries) = wal.replay().await {
                 cmd_attempt_ok = wal
-                    .rewrite_as_v3_with_integrity_key(&replayed_entries, dummy_key)
+                    .rewrite_as_v3(&replayed_entries)
                     .await
                     .is_ok();
             }

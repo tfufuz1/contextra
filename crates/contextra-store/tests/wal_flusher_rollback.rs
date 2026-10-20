@@ -31,9 +31,10 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
         key: b"k2".to_vec(),
         value: b"v2".to_vec(),
     };
-    let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await?;
+    let (batch2, prev_hmac) = wal.prepare_batch(vec![(op2, 2)]).await?;
     let res = wal.append_batch(batch2).await;
     assert!(res.is_err(), "Partial append write must fail");
+    wal.rollback_hmac(prev_hmac).await;
 
     // After flusher rollback, poisoned MUST be false and file size MUST equal size_before
     assert!(
@@ -48,13 +49,13 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
         "File length on disk must be restored to size_before after rollback"
     );
 
-    // Subsequent append must succeed
+    // Subsequent append with seq_no 2 (since failed batch 2 was rolled back)
     let op3 = WalOp::Put {
         tx_id: TxId::new(3),
         key: b"k3".to_vec(),
         value: b"v3".to_vec(),
     };
-    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 2)]).await?;
     wal.append_batch(batch3).await?;
 
     drop(wal);
@@ -64,7 +65,7 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
     let replayed = wal_reopened.replay().await?;
     assert_eq!(replayed.len(), 2);
     assert_eq!(replayed[0].1.seq_no, 1);
-    assert_eq!(replayed[1].1.seq_no, 3);
+    assert_eq!(replayed[1].1.seq_no, 2);
 
     Ok(())
 }

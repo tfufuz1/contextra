@@ -177,27 +177,15 @@ impl LsmStorage {
     }
 
     #[cfg(feature = "fault-injection")]
-    pub fn fault_plan(&self) -> &Arc<crate::wal::WalFaultPlan> {
+    pub fn fault_plan(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
 
-    #[doc(hidden)]
-    pub async fn simulate_wal_append_failure_for_test(&self) {
-        #[cfg(feature = "fault-injection")]
-        self.config.fault_plan.fail_append_for_tx.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    #[cfg(feature = "fault-injection")]
+    pub fn failpoints(&self) -> &Arc<crate::wal::WalFailpoints> {
+        &self.config.fault_plan
     }
 
-    #[doc(hidden)]
-    pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {
-        #[cfg(feature = "fault-injection")]
-        self.config.fault_plan.fail_append_for_tx.store(_tx_id, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    #[doc(hidden)]
-    pub async fn restore_wal_file_handle_for_test(&self) {
-        #[cfg(feature = "fault-injection")]
-        self.config.fault_plan.fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
-    }
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
     /// unbudgeted memtable puts during commit when memory limit was exceeded.
