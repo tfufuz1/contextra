@@ -29,7 +29,7 @@ pub fn run_diffusion<G: PathGraph>(
     seeds: &[EntityId],
     params: &TlHfdParams,
 ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
-    params.validate()?;
+    params.validate().map_err(|err| TlHfdError::InvalidParameter(err.to_string()))?;
 
     if seeds.is_empty() {
         return Ok(AHashMap::default());
@@ -241,4 +241,49 @@ pub fn run_diffusion<G: PathGraph>(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hyperedge::HyperEdge;
+    use crate::HyperEdgeId;
+    use std::sync::Arc;
+
+    struct DummyGraph;
+
+    impl PathGraph for DummyGraph {
+        fn neighbors_with_weights(&self, _node: EntityId) -> Vec<(EntityId, f32)> {
+            Vec::new()
+        }
+
+        fn predecessors_with_weights(&self, _node: EntityId) -> Vec<(EntityId, f32)> {
+            Vec::new()
+        }
+
+        fn hyperedges_for_entity(&self, _node: EntityId) -> Vec<HyperEdgeId> {
+            Vec::new()
+        }
+
+        fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<Arc<HyperEdge>> {
+            None
+        }
+    }
+
+    #[test]
+    fn test_run_diffusion_invalid_params_returns_tl_hfd_error() {
+        let graph = DummyGraph;
+        let seeds = vec![EntityId::new(1)];
+        let invalid_params = TlHfdParams {
+            delta: 1.0, // Invalid: delta must be >= 2.0
+            ..Default::default()
+        };
+
+        let result = run_diffusion(&graph, &seeds, &invalid_params);
+        assert!(
+            matches!(result, Err(TlHfdError::InvalidParameter(_))),
+            "Expected Err(TlHfdError::InvalidParameter(_)), got {:?}",
+            result
+        );
+    }
 }

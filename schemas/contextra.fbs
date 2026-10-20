@@ -51,4 +51,5 @@ table HyperEdge {
   child_edge_ids: [ulong];
 }
 
+file_identifier "CTRA";
 root_type SearchResponse;

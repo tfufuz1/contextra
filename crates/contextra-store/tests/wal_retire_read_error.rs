@@ -4,9 +4,9 @@
 
 use contextra_store::wal::{retire_segments_with_stream, Wal, WalDirEntry, WalDirStream, WalOp};
 use contextra_types::{ContextraError, Result, TxId};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 
 struct MockErrorDirStream {

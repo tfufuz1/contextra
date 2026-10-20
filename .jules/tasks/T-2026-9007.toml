@@ -12,7 +12,9 @@ scope     = [
   ".github/labels.yml",
   ".github/workflows/labels-sync.yml",
   ".jules/ISSUE_AUTOMATION_POLICY.md",
-  ".jules/tasks/T-2026-9007.toml"
+  ".jules/tasks/T-2026-9007.toml",
+  "crates/contextra-wire/src/contextra_generated.rs",
+  "docs/generated/capability-markers.md"
 ]
 forbidden = [
   "xtask/**",
