@@ -79,14 +79,14 @@ pub enum AgentStatus {
 impl AgentStatus {
     /// Evaluates whether a state transition from `self` to `target` is allowed.
     pub fn can_transition_to(&self, target: AgentStatus) -> bool {
-        match (self, target) {
-            (AgentStatus::Idle, AgentStatus::Running) => true,
-            (AgentStatus::Running, AgentStatus::Running) => true,
-            (AgentStatus::Running, AgentStatus::Completed) => true,
-            (AgentStatus::Running, AgentStatus::Failed) => true,
-            (AgentStatus::Failed, AgentStatus::Running) => true,
-            _ => false,
-        }
+        matches!(
+            (*self, target),
+            (AgentStatus::Idle, AgentStatus::Running)
+                | (AgentStatus::Running, AgentStatus::Running)
+                | (AgentStatus::Running, AgentStatus::Completed)
+                | (AgentStatus::Running, AgentStatus::Failed)
+                | (AgentStatus::Failed, AgentStatus::Running)
+        )
     }
 }
 
@@ -190,7 +190,7 @@ impl AgentContext {
     }
 
     /// Resets agent status to Idle and current node position to `start_node` for event loop iteration.
-    pub(crate) fn reset_for_new_event(&mut self, start_node: &str) -> Result<()> {
+    pub fn reset_for_new_event(&mut self, start_node: &str) -> Result<()> {
         validate_node_id(start_node)?;
         self.status = AgentStatus::Idle;
         self.current_node = start_node.to_string();
@@ -246,7 +246,7 @@ impl AgentContext {
 
     /// Returns the step count to be used for a recovery retry after a partial step failure.
     pub fn next_retry_step_count(&self) -> u64 {
-        self.step_count + 1
+        self.step_count.saturating_add(1)
     }
 
     /// Integrates a background telemetry event with an explicit capacity check.
@@ -544,6 +544,64 @@ mod tests {
             "Err msg must not contain misleading 'MB' unit, got: {}",
             err_msg
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_reset_for_new_event_resets_status_and_node() -> contextra_types::Result<()> {
+        let temp_dir = tempfile::TempDir::new()?;
+        let config = contextra_db::ContextraConfig::default();
+        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let state_coll = db.collection("test_reset_event").await?;
+        let mut ctx = AgentContext::try_new(
+            "test_reset_task",
+            "start_node",
+            db,
+            state_coll,
+            TokenBudget::new(1000, 0),
+        )?;
+
+        // Simulate transition to Completed
+        ctx.set_status(AgentStatus::Running)?;
+        ctx.set_status(AgentStatus::Completed)?;
+        ctx.current_node = "end_node".to_string();
+
+        assert_eq!(ctx.status(), AgentStatus::Completed);
+        assert_eq!(ctx.current_node, "end_node");
+
+        // Reset for new event loop iteration
+        ctx.reset_for_new_event("start_node")?;
+
+        assert_eq!(ctx.status(), AgentStatus::Idle);
+        assert_eq!(ctx.current_node, "start_node");
+
+        // Validate error on empty or invalid node ID
+        assert!(ctx.reset_for_new_event("").is_err());
+        assert!(ctx.reset_for_new_event("invalid\0node").is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_retry_step_count_calculation() -> contextra_types::Result<()> {
+        let temp_dir = tempfile::TempDir::new()?;
+        let config = contextra_db::ContextraConfig::default();
+        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let state_coll = db.collection("test_retry_step").await?;
+        let mut ctx = AgentContext::try_new(
+            "test_retry_task",
+            "start_node",
+            db,
+            state_coll,
+            TokenBudget::new(1000, 0),
+        )?;
+
+        assert_eq!(ctx.step_count, 0);
+        assert_eq!(ctx.next_retry_step_count(), 1);
+
+        ctx.step_count = 5;
+        assert_eq!(ctx.next_retry_step_count(), 6);
+
         Ok(())
     }
 

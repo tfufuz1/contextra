@@ -283,6 +283,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_dlq_new_with_metrics_constructor() -> Result<()> {
+        use contextra_ports::{MetricEvent, TestMetricsSink};
+
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let metrics = Arc::new(TestMetricsSink::new());
+        let dlq = DeadLetterQueue::new_with_metrics(
+            storage,
+            metrics.clone() as Arc<dyn contextra_ports::MetricsSink>,
+        );
+
+        let letter = StepDeadLetter {
+            session_id: "sess-metrics".to_string(),
+            node_id: "node-m".to_string(),
+            step_index: 0,
+            tx_id: None,
+            failure_reason: DeadLetterReason::Timeout { timeout_ms: 1000 },
+            input: serde_json::json!({"test": "val"}),
+            attempt: 0,
+            failed_at_secs: 100,
+        };
+
+        dlq.push(&letter).await?;
+        let listed = dlq.list().await?;
+        assert_eq!(listed.len(), 1);
+
+        let events = metrics.events();
+        assert!(!events.is_empty());
+        let last_event = events.last().cloned().unwrap();
+        assert_eq!(
+            last_event,
+            MetricEvent::Gauge {
+                name: "dlq_depth".to_string(),
+                value: 1.0,
+                labels: vec![],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_dlq_allocate_tx_uniqueness() -> Result<()> {
         let storage = Arc::new(InMemoryStorageEngine::new());
         let dlq = DeadLetterQueue::new(storage);

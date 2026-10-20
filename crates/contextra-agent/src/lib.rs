@@ -88,6 +88,7 @@ pub use clm_scratchpad::{
     ClmScratchpad, ContextEditAuditSink, CountingContextEditAuditSink,
     CountingScratchpadCacheInvalidator, NoopContextEditAuditSink, NoopScratchpadCacheInvalidator,
     PinnedRegionId, ScratchpadCacheInvalidator, ScratchpadCheckpoint, ScratchpadEditOp,
+    ScratchpadEditRecord,
 };
 pub use context::{AgentContext, AgentStatus};
 pub use dlq::DeadLetterQueue;

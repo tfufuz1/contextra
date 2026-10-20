@@ -20,6 +20,15 @@ impl TestClock {
 }
 
 impl Clock for TestClock {
+    fn now(&self) -> contextra_types::DeterministicTimestamp {
+        let nanos = self.unix_nanos.load(Ordering::SeqCst);
+        contextra_types::DeterministicTimestamp::new(nanos / 1_000_000, nanos)
+    }
+
+    fn monotonic_ticks(&self) -> u64 {
+        self.unix_nanos.load(Ordering::SeqCst)
+    }
+
     fn now_unix_nanos(&self) -> u64 {
         self.unix_nanos.load(Ordering::SeqCst)
     }
