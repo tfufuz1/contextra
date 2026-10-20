@@ -209,6 +209,18 @@ impl<'a> DpiPurgeDriver<'a> {
                         "Provide a FreeSpaceProbe implementation or ensure disk space is queryable"
                             .to_string(),
                     ),
+                    PurgeBlocked::ReadError { file, details, .. } => (
+                        format!("Read error during purge compaction on {file}: {details}"),
+                        "Check disk health and file permissions, then retry".to_string(),
+                    ),
+                    PurgeBlocked::WriteError { file, details } => (
+                        format!("Write error during purge compaction on {file}: {details}"),
+                        "Check available disk space and write permissions, then retry".to_string(),
+                    ),
+                    PurgeBlocked::ManifestError { details } => (
+                        format!("Manifest update error during purge compaction: {details}"),
+                        "Check manifest file integrity and storage health, then retry".to_string(),
+                    ),
                 };
                 return Ok(PurgeHandle::Blocked { reason, retry_hint });
             }
