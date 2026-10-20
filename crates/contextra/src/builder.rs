@@ -62,6 +62,12 @@ pub struct ContextraBuilder {
     license_gate: Arc<dyn LicenseGate>,
     signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
+    kms_enabled: bool,
+    kv_shredding_enabled: bool,
+    checkpoint_enabled: bool,
+    erasure_hooks: Option<Arc<dyn contextra_ports::erasure::ErasureHooks>>,
+    router_enabled: bool,
+    sandbox_enabled: bool,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -91,6 +97,12 @@ impl Clone for ContextraBuilder {
             license_gate: Arc::clone(&self.license_gate),
             signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
+            kms_enabled: self.kms_enabled,
+            kv_shredding_enabled: self.kv_shredding_enabled,
+            checkpoint_enabled: self.checkpoint_enabled,
+            erasure_hooks: self.erasure_hooks.clone(),
+            router_enabled: self.router_enabled,
+            sandbox_enabled: self.sandbox_enabled,
         }
     }
 }
@@ -111,6 +123,12 @@ impl ContextraBuilder {
             license_gate: Arc::new(OpenFastGate),
             signed_license_error: None,
             performance_profile: None,
+            kms_enabled: false,
+            kv_shredding_enabled: false,
+            checkpoint_enabled: false,
+            erasure_hooks: None,
+            router_enabled: false,
+            sandbox_enabled: false,
         }
     }
 
@@ -139,10 +157,7 @@ impl ContextraBuilder {
     }
 
     /// Sets the full encryption configuration for persistent storage.
-    pub fn with_encryption_config(
-        mut self,
-        encryption: contextra_db::EncryptionConfig,
-    ) -> Self {
+    pub fn with_encryption_config(mut self, encryption: contextra_db::EncryptionConfig) -> Self {
         self.config.encryption = encryption;
         self
     }
@@ -228,6 +243,82 @@ impl ContextraBuilder {
         self
     }
 
+    /// Sets the operational erasure mode (§4.6).
+    pub fn with_erasure_mode(mut self, mode: contextra_ports::erasure::ErasureMode) -> Self {
+        self.config.erasure_mode = mode;
+        self.explicit_user_config = true;
+        self
+    }
+
+    /// Configures Key Management Service (KMS) integration.
+    pub fn with_kms(mut self, enabled: bool) -> Self {
+        self.kms_enabled = enabled;
+        self
+    }
+
+    /// Disables KMS integration.
+    pub fn without_kms(self) -> Self {
+        self.with_kms(false)
+    }
+
+    /// Configures KV shredding / cryptographic deletion mode.
+    pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
+        self.kv_shredding_enabled = enabled;
+        if enabled {
+            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::CryptoShred;
+        } else {
+            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::BackgroundRepair;
+        }
+        self
+    }
+
+    /// Disables KV shredding.
+    pub fn without_kv_shredding(self) -> Self {
+        self.with_kv_shredding(false)
+    }
+
+    /// Configures persistent state checkpoints.
+    pub fn with_checkpoint(mut self, enabled: bool) -> Self {
+        self.checkpoint_enabled = enabled;
+        self
+    }
+
+    /// Disables state checkpoints.
+    pub fn without_checkpoint(self) -> Self {
+        self.with_checkpoint(false)
+    }
+
+    /// Attaches explicit erasure hooks for erasure proof generation (§4.6).
+    pub fn with_erasure_hooks(
+        mut self,
+        hooks: Arc<dyn contextra_ports::erasure::ErasureHooks>,
+    ) -> Self {
+        self.erasure_hooks = Some(hooks);
+        self
+    }
+
+    /// Configures query router integration.
+    pub fn with_router(mut self, enabled: bool) -> Self {
+        self.router_enabled = enabled;
+        self
+    }
+
+    /// Disables query router integration.
+    pub fn without_router(self) -> Self {
+        self.with_router(false)
+    }
+
+    /// Configures execution sandbox integration.
+    pub fn with_sandbox(mut self, enabled: bool) -> Self {
+        self.sandbox_enabled = enabled;
+        self
+    }
+
+    /// Disables execution sandbox integration.
+    pub fn without_sandbox(self) -> Self {
+        self.with_sandbox(false)
+    }
+
     pub(crate) fn storage_path(&self) -> &PathBuf {
         &self.storage_path
     }
@@ -248,23 +339,42 @@ impl ContextraBuilder {
         self.signed_license_error.as_deref()
     }
 
-    pub(crate) fn performance_profile(&self) -> Option<crate::performance_profile::PerformanceProfile> {
+    pub(crate) fn performance_profile(
+        &self,
+    ) -> Option<crate::performance_profile::PerformanceProfile> {
         self.performance_profile
     }
 
-    pub(crate) fn kms_enabled(&self) -> bool {
-        self.config.encryption.is_encrypted()
+    pub fn kms_enabled(&self) -> bool {
+        self.kms_enabled || self.config.encryption.is_encrypted()
     }
 
-    pub(crate) fn checkpoint_enabled(&self) -> bool {
-        false
+    pub fn kv_shredding_enabled(&self) -> bool {
+        self.kv_shredding_enabled
+            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::CryptoShred
     }
 
-    pub(crate) fn erasure_mode(&self) -> contextra_ports::erasure::ErasureMode {
+    pub fn checkpoint_enabled(&self) -> bool {
+        self.checkpoint_enabled
+    }
+
+    pub fn erasure_hooks(&self) -> Option<&Arc<dyn contextra_ports::erasure::ErasureHooks>> {
+        self.erasure_hooks.as_ref()
+    }
+
+    pub fn router_enabled(&self) -> bool {
+        self.router_enabled
+    }
+
+    pub fn sandbox_enabled(&self) -> bool {
+        self.sandbox_enabled
+    }
+
+    pub fn erasure_mode(&self) -> contextra_ports::erasure::ErasureMode {
         self.config.erasure_mode
     }
 
-    pub(crate) fn explicit_erasure_mode(&self) -> bool {
+    pub fn explicit_erasure_mode(&self) -> bool {
         self.explicit_user_config
     }
 
@@ -281,7 +391,6 @@ impl ContextraBuilder {
                 let resolved = profile.resolve();
                 if self.explicit_user_config {
                     if self.config.durability_mode != resolved.durability_mode
-
                         || self.config.vector_delete_mode != resolved.vector_delete_mode
                     {
                         return Err(ContextraError::PolicyViolation(
@@ -431,7 +540,13 @@ mod tests {
         let report = wiring_selftest::generate_report_for_builder(&builder);
         assert!(!report.wired_ports.contains(&"Embedder".to_string()));
         assert!(!report.wired_ports.contains(&"Kms".to_string()));
-        assert!(report.missing_ports.iter().any(|m| m.contains("Embedder (optional)")));
-        assert!(report.missing_ports.iter().any(|m| m.contains("Kms (disabled)")));
+        assert!(report
+            .missing_ports
+            .iter()
+            .any(|m| m.contains("Embedder (optional)")));
+        assert!(report
+            .missing_ports
+            .iter()
+            .any(|m| m.contains("Kms (disabled)")));
     }
 }
