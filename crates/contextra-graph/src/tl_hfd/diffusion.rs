@@ -29,9 +29,7 @@ pub fn run_diffusion<G: PathGraph>(
     seeds: &[EntityId],
     params: &TlHfdParams,
 ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
-    params
-        .validate()
-        .map_err(|err| TlHfdError::InvalidParameter(err.to_string()))?;
+    params.validate().map_err(|err| TlHfdError::InvalidParameter(err.to_string()))?;
 
     if seeds.is_empty() {
         return Ok(AHashMap::default());
