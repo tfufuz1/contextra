@@ -15,6 +15,7 @@
 | `contextra-core` | Ring 0 | 🟢 stable | `tombstone-semantics`, `tx-buffer` | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
 | `contextra-crypto` | Ring 0 | 🟢 stable | `aes-256-gcm-siv`, `hmac-sha256`, `zeroize-on-drop` | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
 | `contextra-db` | Ring 3 | 🟢 stable | `hybrid-search`, `collection-manager`, `volatile-vault` | Contextra Main Database Abstraction, Hybrid Search & Collections |
+| `contextra-durable-fs` | Ring 0 | 🟢 stable | `durable-fs`, `fsync-flush` | Durable Filesystem operations and synchronous disk flushing |
 | `contextra-engine` | Ring 3 | 🟢 stable | `bounded-compute-pool`, `ring0-async-wrapper` | Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) |
 | `contextra-graph` | Ring 0 | 🟢 stable | `csr-traversal`, `label-propagation`, `deadlock-free-dag` | CSR Graph-Engine, Path Graphing und GraphRAG Community Detection |
 | `contextra-infer-candle` | Ring 2 | 🟢 stable | `candle-llm`, `kv-cache-bridge` | Candle LLM Inference Client und KV-Bridge Adapter |
@@ -32,6 +33,7 @@
 | `contextra-sandbox` | Ring 2 | 🟢 stable | `wasmtime-isolation`, `cpu-fuel-budget`, `wall-clock-timeout` | WASM Execution Boundary und Isolations-Sandbox |
 | `contextra-simd` | Ring 0 | 🟢 stable | `simd-distance`, `zero-panic-simd` | SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen |
 | `contextra-store` | Ring 1 | 🟢 stable | `wal-v3-hmac`, `lsm-compaction`, `crash-consistency` | LSM-Tree Storage Engine, WAL Durability und Compaction Engine |
+| `contextra-store-redb` | Ring 1 | 🟡 experimental | `redb-storage`, `storage-engine` | redb StorageEngine Backend Adapter |
 | `contextra-sys` | Ring 0 | 🟢 stable | `mmap-io`, `direct-file-access` | Systemnahe Bindings, Low-Level I/O und Memory-Mapping |
 | `contextra-testkit` | Tooling | 🟢 stable | `chaos-testing`, `mock-storage` | Test Fixtures, Mock Engines und Chaos Matrix Harness |
 | `contextra-text` | Ring 0 | 🟢 stable | `bm25-search`, `inverted-index` | Volltextsuche und Inverted-Index (BM25 Engine) |
