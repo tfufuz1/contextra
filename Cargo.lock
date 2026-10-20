@@ -985,6 +985,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
+ "loom",
  "lru",
  "parking_lot 0.12.5",
  "proptest",
