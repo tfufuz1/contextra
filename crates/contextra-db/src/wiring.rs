@@ -45,12 +45,13 @@ impl PipelineStages {
     /// Verifies that the stage sequence matches the strict order:
     /// Retrieval -> Rerank -> Plan -> EgressFilter.
     pub fn verify_order(&self) -> bool {
-        self.stages == [
-            PipelineStage::Retrieval,
-            PipelineStage::Rerank,
-            PipelineStage::Plan,
-            PipelineStage::EgressFilter,
-        ]
+        self.stages
+            == [
+                PipelineStage::Retrieval,
+                PipelineStage::Rerank,
+                PipelineStage::Plan,
+                PipelineStage::EgressFilter,
+            ]
     }
 }
 
