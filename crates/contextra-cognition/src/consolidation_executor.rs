@@ -533,14 +533,13 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         interval: std::time::Duration,
         cancel_token: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
-        let engine = Arc::new(ConsolidationEngine::new(
+        start_consolidation_worker(
             collection,
             consolidation_config,
             synthesis_config,
             interval,
             cancel_token,
-        ));
-        engine.start()
+        )
     }
 
     /// Hauptschleife der `ConsolidationEngine`.
@@ -1068,7 +1067,11 @@ mod tests {
     }
 
     impl ResponseGroundingValidator for TestValidator {
-        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_types::Result<f32> {
+        fn score_grounding(
+            &self,
+            _response: &str,
+            _sources: &[&str],
+        ) -> contextra_types::Result<f32> {
             Ok(self.score)
         }
     }
@@ -1082,7 +1085,10 @@ mod tests {
             &'a self,
             _response: &'a str,
             _chunks: &'a [contextra_types::ContextChunk],
-        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::GroundingAssessment>> {
+        ) -> contextra_ports::BoxFuture<
+            'a,
+            contextra_types::Result<contextra_ports::GroundingAssessment>,
+        > {
             let score = self.score;
             Box::pin(async move {
                 Ok(contextra_ports::GroundingAssessment {
