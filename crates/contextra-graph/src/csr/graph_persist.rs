@@ -226,8 +226,9 @@ impl CsrGraph {
                                     let superseded_doc = link.target;
                                     let edge_ids = graph.edges_for_doc(superseded_doc);
                                     if !edge_ids.is_empty() {
-                                        let _ = graph
-                                            .tombstone_edges_direct(&edge_ids, TxId::new(wal_seq));
+                                        let wal_tx = TxId::try_new(wal_seq)
+                                            .unwrap_or_else(|_| TxId::internal());
+                                        let _ = graph.tombstone_edges_direct(&edge_ids, wal_tx);
                                     }
                                 }
                             }

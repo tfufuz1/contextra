@@ -31,6 +31,7 @@ impl CsrGraph {
         {
             inner.compact();
         }
+        inner.commit();
     }
 
     /// Asynchronously compacts the graph delta buffer.
@@ -82,6 +83,7 @@ impl CsrGraph {
             inner.communities.insert(a.entity_id, a.community_id);
         }
         inner.communities_loaded = true;
+        inner.commit();
     }
 
     /// Retrieves community assignments for a batch of entity IDs in a single operation.
@@ -107,18 +109,22 @@ impl CsrGraph {
 
         if let Some(ref storage) = self.storage {
             let entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
-            let mut inner = self.inner_write();
-            inner.communities_loaded = true;
-            for (raw_key, raw_val) in entries {
-                if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
-                    if let Ok(key_str) = std::str::from_utf8(key_payload) {
-                        let eid = EntityId::from(key_str);
-                        if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
-                            inner.communities.insert(eid, comm_id);
+            {
+                let mut inner = self.inner_write();
+                inner.communities_loaded = true;
+                for (raw_key, raw_val) in entries {
+                    if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
+                        if let Ok(key_str) = std::str::from_utf8(key_payload) {
+                            let eid = EntityId::from(key_str);
+                            if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
+                                inner.communities.insert(eid, comm_id);
+                            }
                         }
                     }
                 }
+                inner.commit();
             }
+            let inner = self.inner_read();
             let mut map = HashMap::with_capacity(entity_ids.len());
             for &eid in entity_ids {
                 if let Some(&comm_id) = inner.communities.get(&eid) {
@@ -361,7 +367,7 @@ impl CsrGraph {
         seq_no: u64,
     ) -> contextra_ports::BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let as_of_tx = TxId::new(seq_no);
+            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
             if super::visibility::is_suspicious_tx_id(as_of_tx) {
                 tracing::warn!(
                     tx_id = seq_no,
