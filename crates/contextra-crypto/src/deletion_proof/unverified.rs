@@ -25,6 +25,7 @@ impl UnverifiedProof {
     /// Restricted to `pub(crate)` to prevent external production code from bypassing cryptographic
     /// verification and using unverified proofs as valid deletion assertions. Always verify the
     /// proof signature via [`.verify()`][UnverifiedProof::verify] before trusting its contents.
+    #[allow(dead_code)]
     pub(crate) fn raw_unverified(&self) -> &DeletionProof {
         &self.0
     }

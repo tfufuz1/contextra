@@ -10,7 +10,6 @@
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::sync::LazyLock;
 use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 

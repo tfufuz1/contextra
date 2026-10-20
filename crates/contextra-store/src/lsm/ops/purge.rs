@@ -116,7 +116,7 @@ impl LsmStorage {
         let mut sstables_replaced = 0usize;
 
         let mut manifest_entries = Vec::new();
-        let mut new_readers = Vec::new();
+        let mut replacements: Vec<(std::path::PathBuf, Option<Arc<SstableReader>>)> = Vec::new();
         let mut replaced_old_paths = Vec::new();
 
         for old_sst in &sstables_to_rewrite {
@@ -162,6 +162,7 @@ impl LsmStorage {
                 manifest_entries.push(ManifestEntry::Remove {
                     path: old_path.clone(),
                 });
+                replacements.push((old_path.clone(), None));
             } else {
                 let seq = self
                     .next_seq_no
@@ -210,7 +211,12 @@ impl LsmStorage {
                     })?;
 
                 if let Some(parent) = final_path.parent() {
-                    let _ = crate::util::fsync_parent_dir(parent).await;
+                    crate::util::fsync_parent_dir(parent)
+                        .await
+                        .map_err(|e| PurgeBlocked::WriteError {
+                            file: final_path.to_string_lossy().to_string(),
+                            details: format!("Directory fsync failed: {e}"),
+                        })?;
                 }
 
                 let new_reader = SstableReader::open_with_key_manager(
@@ -225,7 +231,7 @@ impl LsmStorage {
                     details: e.to_string(),
                 })?;
 
-                new_readers.push(Arc::new(new_reader));
+                replacements.push((old_path.clone(), Some(Arc::new(new_reader))));
 
                 manifest_entries.push(ManifestEntry::Replace {
                     removed: vec![old_path],
@@ -261,49 +267,45 @@ impl LsmStorage {
                 details: e.to_string(),
             })?;
 
-        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix)
+        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix & WP-5a fix)
         //
         // The read path iterates `sstables.iter().rev()` and takes the first match.
         // Appending rewritten readers at the end would give them the highest priority,
         // causing newer versions of non-purged keys (in other SSTables) to be shadowed
         // by older versions carried over from the rewritten file.
         //
-        // Fix: replace each old SSTable in-place at its original position.
+        // Fix: replace each old SSTable in-place at its original position via direct mapping.
         {
             let mut sst_guard = self.sstables.write().await;
-            let mut updated_sstables: Vec<Arc<SstableReader>> = sst_guard.clone();
 
-            // Build a map from old path → new reader
-            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
-                std::collections::HashMap::new();
+            // WP-5a (S3-Soll 2): Revalidierung unter dem Write-Lock.
+            // Stehen nicht mehr alle Inputs in der aktuellen Liste (z.B. Compaction dazwischen),
+            // Abbruch mit PurgeBlocked::CompactionBusy.
+            let current_paths: std::collections::HashSet<_> = sst_guard
+                .iter()
+                .map(|sst| sst.file_path().to_path_buf())
+                .collect();
             for old_path in &replaced_old_paths {
-                // Default to None (removal) — will be overwritten if a replacement reader exists
-                replacement_map.insert(old_path.clone(), None);
-            }
-            // Associate new readers with old paths in order
-            let mut reader_iter = new_readers.into_iter();
-            for old_path in &replaced_old_paths {
-                // If we have a replacement reader, map it; otherwise the SSTable was empty
-                // and should be removed (already None in the map)
-                if let Some(new_reader) = reader_iter.next() {
-                    replacement_map.insert(old_path.clone(), Some(new_reader));
+                if !current_paths.contains(old_path) {
+                    return Err(PurgeBlocked::CompactionBusy);
                 }
             }
 
-            // Rebuild the list: replace in-place or remove
-            updated_sstables = updated_sstables
-                .into_iter()
-                .filter_map(|sst| {
-                    let path = sst.file_path().to_path_buf();
-                    if let Some(replacement) = replacement_map.remove(&path) {
-                        // This was a replaced SSTable — substitute or remove
-                        replacement
-                    } else {
-                        // Not replaced — keep as-is
-                        Some(sst)
+            // WP-5a: Direkter Nachschlag in HashMap<PathBuf, Option<Arc<SstableReader>>>
+            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
+                replacements.into_iter().collect();
+
+            let mut updated_sstables: Vec<Arc<SstableReader>> = Vec::with_capacity(sst_guard.len());
+            for sst in sst_guard.iter() {
+                let path = sst.file_path().to_path_buf();
+                if let Some(replacement) = replacement_map.remove(&path) {
+                    if let Some(new_reader) = replacement {
+                        updated_sstables.push(new_reader);
                     }
-                })
-                .collect();
+                } else {
+                    updated_sstables.push(Arc::clone(sst));
+                }
+            }
 
             *sst_guard = updated_sstables;
         }

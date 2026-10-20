@@ -881,7 +881,7 @@ mod tests {
     use super::*;
     use crate::crypto::KeyManager;
     use crate::kv_shredding::KeyRegistry;
-    use contextra_sys::SystemClock;
+    use contextra_ports::SystemClock;
     use ed25519_dalek::SigningKey;
     use rand::rngs::OsRng;
     use tempfile::NamedTempFile;

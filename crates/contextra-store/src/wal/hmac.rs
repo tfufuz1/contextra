@@ -274,7 +274,6 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use contextra_ports::Rng;
             use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
@@ -403,7 +402,6 @@ impl Wal {
             parent
         };
 
-        use contextra_ports::Rng;
         use tokio::io::AsyncWriteExt;
 
         let rng = contextra_ports::SystemRng::default();
@@ -489,7 +487,6 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use contextra_ports::Rng;
             use tokio::io::AsyncWriteExt;
 
             let uuid = uuid::Uuid::new_v4();

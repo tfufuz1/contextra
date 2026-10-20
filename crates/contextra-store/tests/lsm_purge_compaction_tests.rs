@@ -28,19 +28,24 @@ async fn test_purge_keys_insufficient_disk_space() -> Result<()> {
     };
     let storage = LsmStorage::open(config).await?;
 
+    let tx1 = TxId::try_new(1).unwrap();
+    storage.put(tx1, b"key1", b"val1").await?;
+    storage.commit(tx1).await?;
+    StorageEngine::flush(&storage).await?;
+
     let probe = TestFreeSpaceProbe {
         free_bytes: Some(0),
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(
-        res.unwrap_err(),
-        PurgeBlocked::InsufficientDiskSpace {
-            needed: 1024 * 1024,
-            free: 0
+    match res.unwrap_err() {
+        PurgeBlocked::InsufficientDiskSpace { needed, free } => {
+            assert!(needed > 0);
+            assert_eq!(free, 0);
         }
-    );
+        other => panic!("expected InsufficientDiskSpace, got {:?}", other),
+    }
 
     Ok(())
 }
@@ -54,9 +59,11 @@ async fn test_purge_keys_success() -> Result<()> {
     };
     let storage = LsmStorage::open(config).await?;
 
+    let tx1 = TxId::try_new(1).unwrap();
     // Put & commit key
-    storage.put(TxId(1), b"purge_target", b"secret").await?;
-    storage.commit(TxId(1)).await?;
+    storage.put(tx1, b"purge_target", b"secret").await?;
+    storage.commit(tx1).await?;
+    StorageEngine::flush(&storage).await?;
 
     let probe = TestFreeSpaceProbe {
         free_bytes: Some(100 * 1024 * 1024),
@@ -64,9 +71,7 @@ async fn test_purge_keys_success() -> Result<()> {
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-
-    // WP-0.1: purge_keys must fail-closed with Unimplemented until real compaction filter is implemented
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    assert!(res.is_ok(), "purge_keys must succeed when disk space is available: {:?}", res);
 
     Ok(())
 }

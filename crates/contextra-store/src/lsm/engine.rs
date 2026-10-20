@@ -97,11 +97,6 @@ impl LsmStorage {
     }
 
     /// Returns a watch receiver for monitoring system pressure levels.
-    /// Returns a reference to the storage engine's erasure fence instance.
-    pub fn erasure_fence(&self) -> &Arc<super::fence::ErasureFence> {
-        &self.erasure_fence
-    }
-
     pub fn pressure_receiver(
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {

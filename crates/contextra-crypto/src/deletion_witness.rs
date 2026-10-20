@@ -66,6 +66,7 @@ pub struct WitnessIssuerToken {
 impl WitnessIssuerToken {
     /// Erzeugt einen neuen Token für autorisierte Issuer.
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn new() -> Self {
         Self { _private: () }
     }

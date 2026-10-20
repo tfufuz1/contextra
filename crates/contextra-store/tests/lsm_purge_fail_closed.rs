@@ -1,7 +1,8 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::{Result, TxId};
 use std::fs;
 use tempfile::tempdir;
 
@@ -33,7 +34,7 @@ fn count_sst_files(dir_path: &std::path::Path) -> usize {
 }
 
 #[tokio::test]
-async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_core::Result<()> {
+async fn test_purge_keys_returns_insufficient_free_space_fail_closed() -> Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -41,28 +42,37 @@ async fn test_purge_keys_returns_unimplemented_fail_closed() -> contextra_core::
     };
     let storage = LsmStorage::open(config).await?;
 
+    let tx10 = TxId::try_new(10).unwrap();
+    let tx11 = TxId::try_new(11).unwrap();
+
     // Put & commit multiple keys
-    storage.put(TxId(10), b"key1", b"val1").await?;
-    storage.put(TxId(11), b"key2", b"val2").await?;
-    storage.commit(TxId(10)).await?;
-    storage.commit(TxId(11)).await?;
+    storage.put(tx10, b"key1", b"val1").await?;
+    storage.put(tx11, b"key2", b"val2").await?;
+    storage.commit(tx10).await?;
+    storage.commit(tx11).await?;
 
     // Flush to create SSTable file on disk
     StorageEngine::flush(&storage).await?;
 
     let probe = TestFreeSpaceProbe {
-        free_bytes: Some(100 * 1024 * 1024),
+        free_bytes: Some(0),
     };
     let scope = PurgeScope::Keys(vec![b"key1".to_vec(), b"key2".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    match res.unwrap_err() {
+        PurgeBlocked::InsufficientDiskSpace { needed, free } => {
+            assert!(needed > 0);
+            assert_eq!(free, 0);
+        }
+        other => panic!("expected InsufficientDiskSpace, got {:?}", other),
+    }
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_purge_keys_active_snapshot_precedence() -> contextra_core::Result<()> {
+async fn test_purge_keys_active_snapshot_precedence() -> Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -89,7 +99,7 @@ async fn test_purge_keys_active_snapshot_precedence() -> contextra_core::Result<
 }
 
 #[tokio::test]
-async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_core::Result<()> {
+async fn test_purge_keys_leaves_sstable_files_untouched() -> Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -97,9 +107,11 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_core::Res
     };
     let storage = LsmStorage::open(config).await?;
 
+    let tx1 = TxId::try_new(1).unwrap();
+
     // Write data and flush to generate an SSTable on disk
-    storage.put(TxId(1), b"target_key", b"target_value").await?;
-    storage.commit(TxId(1)).await?;
+    storage.put(tx1, b"target_key", b"target_value").await?;
+    storage.commit(tx1).await?;
     StorageEngine::flush(&storage).await?;
 
     let sst_count_before = count_sst_files(dir.path());
@@ -109,12 +121,12 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> contextra_core::Res
     );
 
     let probe = TestFreeSpaceProbe {
-        free_bytes: Some(100 * 1024 * 1024),
+        free_bytes: Some(0),
     };
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert_eq!(res.unwrap_err(), PurgeBlocked::Unimplemented);
+    assert!(matches!(res.unwrap_err(), PurgeBlocked::InsufficientDiskSpace { .. }));
 
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(

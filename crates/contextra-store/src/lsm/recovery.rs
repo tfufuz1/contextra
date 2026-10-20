@@ -173,11 +173,12 @@ impl LsmStorage {
         }
 
         if config.encryption.is_encrypted() {
-            if let Err(e) = tokio::fs::write(&hwm_path, b"ENCRYPTED_HWM_V1\n").await {
-                tracing::warn!("Failed to write .encrypted_hwm marker: {e}");
-            } else {
-                let _ = crate::util::fsync_parent_dir(&hwm_path).await;
-            }
+            tokio::fs::write(&hwm_path, b"ENCRYPTED_HWM_V1\n")
+                .await
+                .map_err(|e| {
+                    ContextraError::Storage(format!("Failed to write .encrypted_hwm marker: {e}"))
+                })?;
+            crate::util::fsync_parent_dir(&hwm_path).await?;
         }
 
         let salt_path = config.path.join("SALT");

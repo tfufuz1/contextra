@@ -8,7 +8,7 @@
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
 use contextra_ports::{Rng, StorageEngine};
-use contextra_testkit::{ManualClock, SeededRng};
+use contextra_testkit::{ManualClock, TestkitSeededRng as SeededRng};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;
@@ -110,7 +110,7 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
             let _wiring = PurgeWiring::build(PurgeWiringDeps {
                 storage_dir: dir.path().to_path_buf(),
                 hooks: OrxHooks::default(),
-                clock: Some(clock.clone()),
+                clock: Some(clock.clone() as Arc<dyn contextra_ports::Clock>),
                 failpoints: Some(failpoint_set.clone()),
                 dispose_policy: DisposePolicy::RequireScrub,
             })

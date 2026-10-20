@@ -14,7 +14,6 @@ async fn test_flush_retry_after_phase3_failure_deletes_sealed_wal_and_no_null_ch
         max_ram_mb: 64,
         tx_timeout: std::time::Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -90,7 +89,6 @@ async fn test_parallel_force_flushes_execute_serially() {
         max_ram_mb: 64,
         tx_timeout: std::time::Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
