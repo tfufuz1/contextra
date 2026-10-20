@@ -102,9 +102,12 @@ impl ConsistencyEnforcer {
 
     /// Prüft eine Kanten-Aussage vor dem Einfügen, registriert das Widerspruchsmuster
     /// und gibt den Konfliktmuster-Eintrag zurück.
+    ///
+    /// VERWENDETE TRANS-ID: Nutzt `TxId::INVALID` (`0`), da vor dem tatsächlichen Einfügen
+    /// noch keine zugewiesene Transaktions-ID vorliegt.
     pub fn check_before_insert(&mut self, assertion: &EdgeAssertion) -> Option<ConflictPattern> {
         let pattern = assertion.pattern_hash();
-        let cp = self.record_contradiction(pattern, TxId::new(0));
+        let cp = self.record_contradiction(pattern, TxId::INVALID);
         Some(cp.clone())
     }
 
@@ -200,7 +203,7 @@ mod tests {
     fn test_first_contradiction() {
         let mut enforcer = ConsistencyEnforcer::new(3);
         let hash = [1u8; 32];
-        let tx1 = TxId::new(10);
+        let tx1 = TxId::try_new(10).unwrap();
 
         let cp = enforcer.record_contradiction(hash, tx1);
         assert_eq!(cp.contradiction_count, 1);
@@ -215,17 +218,17 @@ mod tests {
         let mut enforcer = ConsistencyEnforcer::new(3);
         let hash = [2u8; 32];
 
-        enforcer.record_contradiction(hash, TxId::new(1));
+        enforcer.record_contradiction(hash, TxId::try_new(1).unwrap());
         assert!(!enforcer.is_suppressed(hash));
 
-        enforcer.record_contradiction(hash, TxId::new(2));
+        enforcer.record_contradiction(hash, TxId::try_new(2).unwrap());
         assert!(!enforcer.is_suppressed(hash));
 
-        let cp3 = enforcer.record_contradiction(hash, TxId::new(3));
+        let cp3 = enforcer.record_contradiction(hash, TxId::try_new(3).unwrap());
         assert_eq!(cp3.contradiction_count, 3);
         assert!(cp3.suppressed);
-        assert_eq!(cp3.first_detected_tx, TxId::new(1));
-        assert_eq!(cp3.last_detected_tx, TxId::new(3));
+        assert_eq!(cp3.first_detected_tx, TxId::try_new(1).unwrap());
+        assert_eq!(cp3.last_detected_tx, TxId::try_new(3).unwrap());
         assert!(enforcer.is_suppressed(hash));
     }
 
@@ -235,10 +238,10 @@ mod tests {
         let hash1 = [10u8; 32];
         let hash2 = [20u8; 32];
 
-        enforcer.record_contradiction(hash1, TxId::new(1));
-        enforcer.record_contradiction(hash1, TxId::new(2));
+        enforcer.record_contradiction(hash1, TxId::try_new(1).unwrap());
+        enforcer.record_contradiction(hash1, TxId::try_new(2).unwrap());
 
-        enforcer.record_contradiction(hash2, TxId::new(1));
+        enforcer.record_contradiction(hash2, TxId::try_new(1).unwrap());
 
         assert_eq!(
             enforcer.get_pattern(&hash1).map(|a| a.contradiction_count),
@@ -252,7 +255,7 @@ mod tests {
         assert!(!enforcer.is_suppressed(hash2));
 
         // Third contradiction on hash1 suppresses hash1, but leaves hash2 unsuppressed
-        enforcer.record_contradiction(hash1, TxId::new(3));
+        enforcer.record_contradiction(hash1, TxId::try_new(3).unwrap());
         assert!(enforcer.is_suppressed(hash1));
         assert!(!enforcer.is_suppressed(hash2));
     }
@@ -309,9 +312,9 @@ mod tests {
         let hash_unsuppressed = [200u8; 32];
 
         for i in 1..=3 {
-            enforcer.record_contradiction(hash_suppressed, TxId::new(i));
+            enforcer.record_contradiction(hash_suppressed, TxId::try_new(i).unwrap());
         }
-        enforcer.record_contradiction(hash_unsuppressed, TxId::new(1));
+        enforcer.record_contradiction(hash_unsuppressed, TxId::try_new(1).unwrap());
 
         let active: Vec<_> = enforcer.active_patterns().collect();
         assert_eq!(active.len(), 1);
@@ -348,7 +351,7 @@ mod tests {
     fn test_zero_threshold_suppresses_immediately() {
         let mut enforcer = ConsistencyEnforcer::new(0);
         let hash = [88u8; 32];
-        let cp = enforcer.record_contradiction(hash, TxId::new(10));
+        let cp = enforcer.record_contradiction(hash, TxId::try_new(10).unwrap());
         assert!(cp.suppressed);
         assert!(enforcer.is_suppressed(hash));
     }
@@ -389,8 +392,8 @@ mod tests {
         let cp = ConflictPattern {
             pattern_hash: [42u8; 32],
             contradiction_count: 5,
-            first_detected_tx: TxId::new(10),
-            last_detected_tx: TxId::new(20),
+            first_detected_tx: TxId::try_new(10).unwrap(),
+            last_detected_tx: TxId::try_new(20).unwrap(),
             suppressed: true,
         };
 
@@ -436,7 +439,7 @@ mod tests {
     fn test_consistency_enforcer_bincode_serde_roundtrip() {
         let mut enforcer = ConsistencyEnforcer::new(2);
         let hash = [9u8; 32];
-        enforcer.record_contradiction(hash, TxId::new(1));
+        enforcer.record_contradiction(hash, TxId::try_new(1).unwrap());
 
         let bytes = bincode::serialize(&enforcer)
             .expect("Bincode serialization of ConsistencyEnforcer failed");
