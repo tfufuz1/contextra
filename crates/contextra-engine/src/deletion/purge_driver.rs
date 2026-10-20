@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use contextra_crypto::deletion_proof::claim_text::WitClaimText;
+use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::issuer::IssRequest;
 use contextra_crypto::deletion_proof::probe::WitStoreProbe;
 use contextra_crypto::deletion_proof::types::{hash_deleted_keys_length_prefixed, DeletionScope};
@@ -322,6 +322,7 @@ impl<'a> DpiPurgeDriver<'a> {
         let outcome = ForgetOutcome {
             logical: logical_handle.clone(),
             physical: Some(purge_handle),
+            purge_report: None,
         };
 
         Ok((outcome, sweep_report))

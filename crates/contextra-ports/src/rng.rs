@@ -12,6 +12,13 @@
 
 use std::sync::Arc;
 
+// TODO(WP-S1 / PR-3 Schritt 1): `CryptoRng` Marker-Trait implementieren.
+// Aktuell implementiert `SystemRng` hier fälschlicherweise `EntropyRng` via std RandomState/Hasher,
+// was KEIN kryptographischer Zufallszahlengenerator (CSPRNG) ist und zu Befund F-01 führte.
+// Implementierungsaufgabe:
+// 1. Definiere `pub trait CryptoRng: Send + Sync {}` als typ-sicheren Marker für echte CSPRNGs.
+// 2. `SystemRng` darf `CryptoRng` NICHT implementieren.
+// 3. Kryptographische Pfade (wie Ed25519-Schlüsselerzeugung) müssen statisch `CryptoRng` fordern.
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemRng;

@@ -139,6 +139,7 @@ fn test_logical_and_purge_handle_debug_redaction() {
     let outcome = ForgetOutcome {
         logical,
         physical: Some(purge),
+        purge_report: None,
     };
     assert_eq!(outcome.logical.proof_id, [0x42; 16]);
 }

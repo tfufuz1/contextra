@@ -67,12 +67,19 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
             secret.copy_from_slice(&raw_bytes);
             Ok(Zeroizing::new(secret))
         } else {
+            // TODO(WP-S1 / PR-3 Schritt 5): Signer-Verwaltung komplett umschreiben:
+            // 1. Genau ein deterministischer Pfad, kein HOME-Fallback.
+            // 2. Atomare Erstellung mit `create_new(true)`.
+            // 3. Strikte Dateiberechtigungen (0600 auf Unix via std::os::unix::fs::OpenOptionsExt, bzw. Owner-only ACL auf Windows).
             if let Some(parent) = self.key_path.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| {
                     ContextraError::Crypto(format!("Failed to create signer key dir: {e}"))
                 })?;
             }
 
+            // TODO(WP-S1 / PR-3 Schritt 4 / F-01): `SystemRng` durch echten CSPRNG (`CryptoRng` / `OsCryptoRng`) ersetzen!
+            // Befund F-01: `SystemRng` ist ein deterministischer SplitMix64-Generator und KEIN kryptographischer PRNG.
+            // Die Generierung von Ed25519-Schlüsseln aus schwachen Entropiequellen bricht alle Lösch- und Nachweisgarantien.
             let rng = contextra_ports::SystemRng::new();
             let mut secret = [0u8; 32];
             rng.fill_bytes(&mut secret);

@@ -69,6 +69,9 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+// TODO(WP-S1 / PR-3 Schritt 2): `crates/contextra-ports/src/secret.rs` anlegen und `pub mod secret;` hier registrieren.
+// Soll den Typ `SecretBytes<N>` basierend auf `zeroize::Zeroizing` (oder manuell geschütztem Nullifying bei Drop)
+// implementieren, um kryptographisches Schlüsselmaterial im Speicher typsicher vor Leaks und Dumps zu schützen.
 /// Read snapshot and snapshot reader port traits (§7.2).
 pub mod snapshot;
 /// Key-value storage engine traits.

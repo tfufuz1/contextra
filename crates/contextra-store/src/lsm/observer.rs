@@ -434,6 +434,11 @@ impl ObserverRegistry {
                     )));
                 }
 
+                // TODO(WP-ST1 / PR-8 Schritt 3): `recv_timeout` durch asynchrones mpsc mit `try_send` ersetzen:
+                // Das synchrone Blockieren des Commit-Pfads via `done_rx.recv_timeout(max_latency)` sowie
+                // die Fehlerrückgabe an den Aufrufer führen zu Latenzspitzen und Phantom-Commits.
+                // Umbau auf ungebundenen/gepufferten `tokio::sync::mpsc` mit non-blocking `try_send`,
+                // isoliertem Worker-Task und zählerbasiertem Catch-up ohne Propagation von Fehlern in den Commit.
                 match done_rx.recv_timeout(max_latency) {
                     Ok(WorkResult::Completed { elapsed_nanos, res }) => {
                         if elapsed_nanos > max_latency_nanos {

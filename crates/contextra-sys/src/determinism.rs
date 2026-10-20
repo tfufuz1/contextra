@@ -11,6 +11,13 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 static ENTROPY_COUNTER: AtomicU64 = AtomicU64::new(1);
 const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
 
+// TODO(WP-0 / PR-1 Schritt 1 / B0-d): Bridge-Trait implementieren: `impl Clock for SystemClock`.
+// Befund B0-d: `SystemClock` existiert doppelt in `contextra-ports` und `contextra-sys`. Die Version
+// in `contextra-sys` implementiert bislang nicht den `Clock`-Trait aus `contextra-ports`.
+// WICHTIG (Ring-DAG-Hierarchie): Da `contextra-sys` (Ring 0) nicht unkontrolliert von `contextra-ports`
+// (Ring 1) abhängen darf, soll die Trait-Implementierung direkt in `contextra-sys` über ein optionales
+// Feature `ports` bereitgestellt werden (`#[cfg(feature = "ports")] impl contextra_ports::Clock for SystemClock`).
+// Anschließend Consumer-Dateien von `contextra_ports::SystemClock` auf `contextra_sys::SystemClock` migrieren.
 /// Production system clock implementation backed by [`SystemTime`] and [`Instant`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemClock {
@@ -118,6 +125,10 @@ impl SeededRng {
     }
 }
 
+// TODO(WP-0 / PR-1 Schritt 2): Bridge-Trait implementieren: `impl Rng for SystemRng`.
+// `SystemRng` soll das RNG-Port-Interface (z.B. `contextra_ports::Rng` bzw. `EntropyRng`/`SeededRng`)
+// unter `#[cfg(feature = "ports")]` implementieren, um Vereinheitlichung und Port-Konsolidierung
+// unter Einhaltung der Ring-DAG-Hierarchie zu sichern.
 /// Standard non-cryptographic system RNG seeded from process entropy.
 #[derive(Debug)]
 pub struct SystemRng {

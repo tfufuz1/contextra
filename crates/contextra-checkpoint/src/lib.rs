@@ -57,7 +57,7 @@ pub use orphan::{
     register_pinned_seq_no_orphan, OrphanRegistry,
 };
 pub use restore_filter::{filter_restore_records, CpyRestoreFilter};
-#[cfg(any(test, feature = "test-utils", feature = "testing"))]
+#[cfg(any(test, feature = "test-utils"))]
 pub use restore_filter::NoOpRestoreFilter;
 pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};
 
