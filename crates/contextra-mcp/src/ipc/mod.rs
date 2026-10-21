@@ -1,6 +1,7 @@
 //! IPC module providing transport, primary detection, peer credential validation, and proxying.
 
 pub mod channel;
+#[cfg(unix)]
 pub mod peer_cred;
 pub mod primary;
 pub mod proxy;

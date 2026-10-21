@@ -29,6 +29,7 @@ pub use durability::{
     SyscallBackend,
 };
 pub use env_observe::*;
+pub use crypto_rng::OsCryptoRng;
 pub use hardening::{harden_process, ProcessHardeningStatus};
 pub use mlock::{mem_lock, mem_unlock};
 pub use mmap::mmap_readonly;
