@@ -69,14 +69,11 @@ impl LsmStorage {
         // Identify SSTables that contain keys matching scope
         for sst in &snapshot_sstables {
             let sst_path_str = sst.file_path().to_string_lossy().to_string();
-            let mut stream = sst
-                .stream()
-                .await
-                .map_err(|e| PurgeError::ReadError {
-                    file: sst_path_str.clone(),
-                    offset: 0,
-                    source_details: e.to_string(),
-                })?;
+            let mut stream = sst.stream().await.map_err(|e| PurgeError::ReadError {
+                file: sst_path_str.clone(),
+                offset: 0,
+                source_details: e.to_string(),
+            })?;
             let mut matches = false;
             loop {
                 match stream.next_entry().await {
@@ -122,14 +119,11 @@ impl LsmStorage {
         for old_sst in &sstables_to_rewrite {
             let old_path = old_sst.file_path().to_path_buf();
             let old_path_str = old_path.to_string_lossy().to_string();
-            let mut stream = old_sst
-                .stream()
-                .await
-                .map_err(|e| PurgeError::ReadError {
-                    file: old_path_str.clone(),
-                    offset: 0,
-                    source_details: e.to_string(),
-                })?;
+            let mut stream = old_sst.stream().await.map_err(|e| PurgeError::ReadError {
+                file: old_path_str.clone(),
+                offset: 0,
+                source_details: e.to_string(),
+            })?;
 
             let mut valid_entries = Vec::new();
 
@@ -194,13 +188,10 @@ impl LsmStorage {
                         })?;
                 }
 
-                let meta = builder
-                    .finish()
-                    .await
-                    .map_err(|e| PurgeError::WriteError {
-                        file: tmp_path.to_string_lossy().to_string(),
-                        details: e.to_string(),
-                    })?;
+                let meta = builder.finish().await.map_err(|e| PurgeError::WriteError {
+                    file: tmp_path.to_string_lossy().to_string(),
+                    details: e.to_string(),
+                })?;
 
                 // Atomic rename tmp -> final
                 tokio::fs::rename(&tmp_path, &final_path)
@@ -211,12 +202,12 @@ impl LsmStorage {
                     })?;
 
                 if let Some(parent) = final_path.parent() {
-                    crate::util::fsync_parent_dir(parent)
-                        .await
-                        .map_err(|e| PurgeError::WriteError {
+                    crate::util::fsync_parent_dir(parent).await.map_err(|e| {
+                        PurgeError::WriteError {
                             file: final_path.to_string_lossy().to_string(),
                             details: format!("Directory fsync failed: {e}"),
-                        })?;
+                        }
+                    })?;
                 }
 
                 let new_reader = SstableReader::open_with_key_manager(
@@ -244,18 +235,22 @@ impl LsmStorage {
 
         // Durably record obsolete file paths in pending_delete.journal BEFORE manifest transition
         let journal_path = db_path.join("pending_delete.journal");
-        let mut journal = contextra_durable_fs::PendingDeleteJournal::open(&journal_path)
-            .map_err(|e| PurgeError::WriteError {
-                file: journal_path.to_string_lossy().to_string(),
-                details: e.to_string(),
+        let mut journal =
+            contextra_durable_fs::PendingDeleteJournal::open(&journal_path).map_err(|e| {
+                PurgeError::WriteError {
+                    file: journal_path.to_string_lossy().to_string(),
+                    details: e.to_string(),
+                }
             })?;
 
         for old_path in &replaced_old_paths {
             if !journal.pending().contains(old_path) {
-                journal.record(old_path).map_err(|e| PurgeError::WriteError {
-                    file: journal_path.to_string_lossy().to_string(),
-                    details: e.to_string(),
-                })?;
+                journal
+                    .record(old_path)
+                    .map_err(|e| PurgeError::WriteError {
+                        file: journal_path.to_string_lossy().to_string(),
+                        details: e.to_string(),
+                    })?;
             }
         }
 
@@ -285,8 +280,10 @@ impl LsmStorage {
             // 1. Release-fähige Invarianten-Prüfung (nicht nur debug_assert), falls `replacement_map` nach Durchlauf nicht leer ist.
             // 2. Property-Test für SSTable-Swap unter parallelen Compactions.
             // 3. Eigenschaftstest mit Referenz-Orakel zur Validierung der Datenkonsistenz nach Re-Indexing.
-            let mut replacement_map: std::collections::HashMap<std::path::PathBuf, Option<Arc<SstableReader>>> =
-                replacements.into_iter().collect();
+            let mut replacement_map: std::collections::HashMap<
+                std::path::PathBuf,
+                Option<Arc<SstableReader>>,
+            > = replacements.into_iter().collect();
 
             let mut updated_sstables: Vec<Arc<SstableReader>> = Vec::with_capacity(sst_guard.len());
             for sst in sst_guard.iter() {

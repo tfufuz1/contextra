@@ -6,9 +6,9 @@
 //! - I-3: Torn Writes am physischen Dateiende (pos >= file_size) werden abgeschnitten; Bitrot (pos < file_size) liefert WalCorruption.
 //! - I-6: Verzeichnis-Fsync (fsync_parent_dir) nach allen .bak Recovery-Verzeichnis-Mutationen.
 
-use contextra_types::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
 #[cfg(feature = "wal-integrity")]
@@ -440,9 +440,8 @@ impl Wal {
                 break;
             }
 
-            let pos_usize = usize::try_from(pos).map_err(|_| {
-                ContextraError::wal_corruption(pos, "Offset exceeds usize bounds")
-            })?;
+            let pos_usize = usize::try_from(pos)
+                .map_err(|_| ContextraError::wal_corruption(pos, "Offset exceeds usize bounds"))?;
 
             let len_bytes_slice = match slice.get(pos_usize..pos_usize.saturating_add(4)) {
                 Some(s) => s,

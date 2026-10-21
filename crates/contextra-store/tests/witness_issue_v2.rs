@@ -1,11 +1,11 @@
 //! Integration tests for issue_witnesses_v2 and store_probe (T-2026-9220).
 
-use contextra_types::TxId;
 use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::DeletionLayer;
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::lsm::witness::ZeuIssueRequest;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::time::Duration;
 use tempfile::TempDir;
 

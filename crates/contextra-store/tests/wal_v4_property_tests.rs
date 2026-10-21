@@ -1,7 +1,7 @@
 #![cfg(feature = "wal-v4-wip")]
 
-use contextra_types::TxId;
 use contextra_store::wal::{WalEntry, WalOp};
+use contextra_types::TxId;
 
 #[test]
 fn test_wal_v4_encode_decode_identity_all_ops() {

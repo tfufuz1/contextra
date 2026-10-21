@@ -122,9 +122,9 @@ impl EncryptionConfig {
             Self::Keyring { kek_source, .. } => match kek_source {
                 KekSource::Passphrase(p) => Some(p.clone()),
                 KekSource::Environment(var) => std::env::var(var).ok(),
-                KekSource::File(path) => {
-                    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
-                }
+                KekSource::File(path) => std::fs::read_to_string(path)
+                    .ok()
+                    .map(|s| s.trim().to_string()),
             },
         }
     }

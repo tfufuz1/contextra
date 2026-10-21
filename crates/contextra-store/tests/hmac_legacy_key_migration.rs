@@ -2,9 +2,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_types::{ContextraError, TxId};
 use contextra_store::wal::hmac::{migrate_legacy_key, LegacyKeyStatus};
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 
 #[test]

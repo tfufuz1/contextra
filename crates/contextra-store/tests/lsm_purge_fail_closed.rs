@@ -126,7 +126,10 @@ async fn test_purge_keys_leaves_sstable_files_untouched() -> Result<()> {
     let scope = PurgeScope::Keys(vec![b"target_key".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert!(matches!(PurgeBlocked::from(res.unwrap_err()), PurgeBlocked::InsufficientDiskSpace { .. }));
+    assert!(matches!(
+        PurgeBlocked::from(res.unwrap_err()),
+        PurgeBlocked::InsufficientDiskSpace { .. }
+    ));
 
     let sst_count_after = count_sst_files(dir.path());
     assert_eq!(

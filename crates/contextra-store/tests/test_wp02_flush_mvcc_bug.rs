@@ -5,9 +5,9 @@
 #![forbid(unsafe_code)]
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::ReferenceModel;
+use contextra_types::TxId;
 
 #[tokio::test]
 async fn test_flush_loses_old_mvcc_versions_bug() -> contextra_types::Result<()> {

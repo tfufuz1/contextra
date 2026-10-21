@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 pub use super::*;
-use contextra_types::{ContextraError, Result};
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::crypto::KeyManager;
+use contextra_types::{ContextraError, Result};
 
 #[cfg(test)]
 mod encode_tests;

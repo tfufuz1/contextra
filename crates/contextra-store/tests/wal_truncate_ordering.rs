@@ -5,8 +5,8 @@
 // INVARIANT 2: truncate() und append_batch() sind über truncate_lock serialisiert.
 // REQUIRES: Feature "fault-injection" für Test 1.
 
-use contextra_types::{Result, TxId};
 use contextra_store::wal::{Wal, WalEntry, WalOp};
+use contextra_types::{Result, TxId};
 use std::sync::Arc;
 use tempfile::tempdir;
 

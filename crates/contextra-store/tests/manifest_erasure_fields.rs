@@ -102,9 +102,7 @@ async fn test_erasure_high_water_mark_monotonicity() {
     let dir = tempfile::tempdir().expect("tempdir");
     let manifest_path = dir.path().join("MANIFEST");
 
-    let manifest = Manifest::open(&manifest_path)
-        .await
-        .expect("open manifest");
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
 
     assert_eq!(manifest.erasure_high_water_mark(), ErasureMode::Off);
 
@@ -183,9 +181,7 @@ async fn test_ledger_head_and_crc_corruption_detection() {
     let dir = tempfile::tempdir().expect("tempdir");
     let manifest_path = dir.path().join("MANIFEST");
 
-    let manifest = Manifest::open(&manifest_path)
-        .await
-        .expect("open manifest");
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
 
     let test_mac = [0x55u8; 32];
     manifest
