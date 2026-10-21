@@ -12,14 +12,22 @@
 
 use std::sync::Arc;
 
-// TODO(WP-S1 / PR-3 Schritt 1): `CryptoRng` Marker-Trait implementieren.
-// Aktuell implementiert `SystemRng` hier fälschlicherweise `EntropyRng` via std RandomState/Hasher,
-// was KEIN kryptographischer Zufallszahlengenerator (CSPRNG) ist und zu Befund F-01 führte.
-// Implementierungsaufgabe:
-// 1. Definiere `pub trait CryptoRng: Send + Sync {}` als typ-sicheren Marker für echte CSPRNGs.
-// 2. `SystemRng` darf `CryptoRng` NICHT implementieren.
-// 3. Kryptographische Pfade (wie Ed25519-Schlüsselerzeugung) müssen statisch `CryptoRng` fordern.
+/// Marker trait for cryptographically secure random number generators (CSPRNG).
+///
+/// MUST NOT be implemented by deterministic or non-cryptographic PRNGs (e.g. [`SystemRng`], [`SeededRng`]).
+/// Security-critical paths like cryptographic key generation must statically require [`CryptoRng`].
+///
+/// ```compile_fail
+/// use contextra_ports::{CryptoRng, SystemRng};
+/// fn require_csprng<R: CryptoRng>(_: &R) {}
+/// let sys_rng = SystemRng::new();
+/// require_csprng(&sys_rng);
+/// ```
+pub trait CryptoRng: Send + Sync + 'static {}
+
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
+///
+/// NOTE: [`SystemRng`] does NOT implement [`CryptoRng`] or [`EntropyRng`] and MUST NOT be used for cryptographic key generation.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemRng;
 
@@ -31,12 +39,12 @@ impl SystemRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer.
     pub fn next_u64(&self) -> u64 {
-        EntropyRng::next_u64(self)
+        SeededRng::next_u64(self)
     }
 
     /// Fills `dest` with pseudorandom bytes.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        EntropyRng::fill_bytes(self, dest);
+        SeededRng::fill_bytes(self, dest);
     }
 
     /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
@@ -112,6 +120,8 @@ pub trait SeededRng: Send + Sync + 'static {
 /// Deprecated per E55 / §7.4: `Rng` is ambiguous. Use [`EntropyRng`] or [`SeededRng`] explicitly.
 #[deprecated(since = "0.1.0", note = "Use SeededRng or EntropyRng per §7.4 / E55")]
 pub use SeededRng as Rng;
+
+impl<T: CryptoRng + ?Sized> CryptoRng for Arc<T> {}
 
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
     fn fill_bytes(&self, dest: &mut [u8]) {
