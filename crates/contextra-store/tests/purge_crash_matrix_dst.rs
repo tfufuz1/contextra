@@ -157,14 +157,14 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
                 };
 
                 assert!(
-                    intent.phase <= PurgePhase::Release,
+                    intent.phase <= PurgePhase::Released,
                     "SEED {}: Recorded phase at failpoint {} must be <= Release",
                     seed,
                     fp_name
                 );
 
                 // Invariant 4: No completion proof without mandatory completed phases
-                if intent.phase < PurgePhase::Finalize {
+                if intent.phase < PurgePhase::Finalizing {
                     assert!(
                         res.is_err(),
                         "SEED {}: Purge cannot issue finalized result before Finalize phase at failpoint {}",

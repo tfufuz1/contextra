@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-14
+// STAND: 2026-10-21
 // ZWECK: Implementation of ErasureBackend trait for LsmStorage (§5.11, F-05, REG-15).
 // INVARIANTEN: Zero-panic, physical scope derivation without downcasts, fail-closed errors.
 
@@ -111,15 +111,19 @@ impl ErasureBackend for LsmStorage {
         probe: &dyn FreeSpaceProbe,
     ) -> std::result::Result<PurgeOutput, PurgeError> {
         if tokio::runtime::Handle::try_current().is_ok() {
-            return Err(PurgeError::Io(std::io::Error::other(
-                "ErasureBackend::purge_physical called synchronously from within an active Tokio runtime context; use LsmStorage::purge_physical_async instead",
-            )));
+            return Err(PurgeError::Write {
+                file: "purge_physical".to_string(),
+                source_details: "ErasureBackend::purge_physical called synchronously from within an active Tokio runtime context; use LsmStorage::purge_physical_async instead".to_string(),
+            });
         }
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| PurgeError::Io(std::io::Error::other(e.to_string())))?;
+            .map_err(|e| PurgeError::Write {
+                file: "purge_physical".to_string(),
+                source_details: e.to_string(),
+            })?;
 
         rt.block_on(self.purge_physical_async(scope, as_of, probe))
     }

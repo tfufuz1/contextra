@@ -388,11 +388,8 @@ async fn invariante_i4_fault_injection_error_and_byte_identical_files(
     );
 
     match res {
-        Err(PurgeError::ReadError { file, .. }) => {
-            assert!(
-                file.contains("sst"),
-                "Error must reference faulty SSTable file"
-            );
+        Err(PurgeError::Read { file, .. }) => {
+            assert!(file.contains("sst"), "Error must reference faulty SSTable file");
         }
         Err(other) => {
             let _ = other;

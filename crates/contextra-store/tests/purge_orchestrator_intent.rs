@@ -34,7 +34,7 @@ fn test_intent_roundtrip_and_crc() -> std::io::Result<()> {
     assert_eq!(loaded_intent.proof_id, intent.proof_id);
     assert_eq!(loaded_intent.scope_hash, intent.scope_hash);
     assert_eq!(loaded_intent.as_of_tx, intent.as_of_tx);
-    assert_eq!(loaded_intent.phase, PurgePhase::P1Intent);
+    assert_eq!(loaded_intent.phase, PurgePhase::Admitted);
 
     Ok(())
 }
@@ -56,7 +56,7 @@ fn test_intent_corruption_returns_error() -> std::io::Result<()> {
     let intent_path = dir.path().join("corrupted.intent");
 
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
-    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 10, None, None, PurgePhase::P1Intent);
+    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 10, None, None, PurgePhase::Admitted);
     intent.write_to_file(&intent_path)?;
 
     // Mutate a byte in the payload to invalidate CRC

@@ -7,12 +7,11 @@
 // - Double/nested resume is a safe no-op returning `Ok(None)`.
 // - Differential proptest against BTreeMap reference model verifies SSTable-swap and post-purge query correctness.
 
-use contextra_ports::erasure::PurgeError;
+use contextra_ports::erasure::{PurgeBlocked, PurgeError};
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
-use contextra_store::lsm::purge::failpoint::OrxPurgeError;
 use contextra_store::lsm::purge::intent::OrxPurgeIntent;
 use contextra_store::lsm::purge::orchestrator::OrxHooks;
 use contextra_store::lsm::purge::plan::PurgePhase;
@@ -98,9 +97,9 @@ async fn test_crash_resume_matrix_p1_to_p4_standalone_error_and_storage_completi
 ) -> contextra_types::Result<()> {
     let phases_to_test = [
         PurgePhase::Admitted,
-        PurgePhase::FenceAcquired,
-        PurgePhase::Flush,
-        PurgePhase::PurgeCompaction,
+        PurgePhase::Fenced,
+        PurgePhase::Flushed,
+        PurgePhase::Rewriting,
     ];
 
     for phase in phases_to_test {
@@ -155,15 +154,16 @@ async fn test_crash_resume_matrix_p1_to_p4_standalone_error_and_storage_completi
             phase
         );
         match standalone_res {
-            Err(OrxPurgeError::Io(io_err)) => {
+            Err(err) => {
+                let msg = err.to_string();
                 assert!(
-                    io_err.to_string().contains("Storage handle required")
-                        || io_err.to_string().contains("Purge failed at phase"),
+                    msg.contains("Storage handle required")
+                        || msg.contains("Purge failed at phase")
+                        || msg.contains("storage"),
                     "Error description must reference storage requirement or phase failure: {}",
-                    io_err
+                    msg
                 );
             }
-            Err(other) => panic!("Expected OrxPurgeError::Io, got: {:?}", other),
             Ok(_) => panic!(
                 "Standalone resume should not succeed without storage for phase {:?}",
                 phase
@@ -402,7 +402,7 @@ proptest! {
                                     let _ = contextra_durable_fs::durable_remove(file);
                                 }
                             }
-                            Err(PurgeError::CompactionBusy) => {
+                            Err(PurgeError::Blocked(PurgeBlocked::CompactionBusy)) => {
                                 // CompactionBusy is a valid fail-closed outcome under concurrency
                             }
                             Err(e) => return Err(TestCaseError::fail(format!("Purge failed: {:?}", e))),

@@ -51,21 +51,14 @@ async fn test_purge_obsolete_fault_injection_read_error() -> Result<(), Box<dyn 
     assert!(result.is_err(), "purge_keys must fail on read error");
 
     match result.unwrap_err() {
-        PurgeError::ReadError {
-            file,
-            source_details,
-            ..
-        } => {
+        PurgeError::Read { file, source_details, .. } => {
             assert!(
                 file.contains(sst_file.file_name().unwrap().to_str().unwrap()),
-                "ReadError must contain filename"
+                "Read must contain filename"
             );
-            assert!(
-                !source_details.is_empty(),
-                "ReadError details must not be empty"
-            );
+            assert!(!source_details.is_empty(), "Read details must not be empty");
         }
-        other => panic!("Expected PurgeError::ReadError, got {:?}", other),
+        other => panic!("Expected PurgeError::Read, got {:?}", other),
     }
 
     // Restore original bytes to inspect filesystem state

@@ -146,21 +146,17 @@ async fn test_f6_purge_physical_in_tokio_runtime_returns_io_error() {
     let tx = TxId::try_new(1).unwrap();
     let probe = DummyProbe;
 
-    // F6 requirement: Calling purge_physical inside a tokio runtime context must return Err(PurgeError::Io(...))
+    // F6 requirement: Calling purge_physical inside a tokio runtime context must return Err(PurgeError::Write(...))
     let result = storage.purge_physical(&phys_scope, tx, &probe);
     match result {
-        Err(contextra_ports::erasure::PurgeError::Io(e)) => {
-            let msg = e.to_string();
+        Err(contextra_ports::erasure::PurgeError::Write { source_details, .. }) => {
             assert!(
-                msg.contains("active Tokio runtime") || msg.contains("async"),
+                source_details.contains("active Tokio runtime") || source_details.contains("async"),
                 "Expected clear error message about Tokio runtime, got: {}",
-                msg
+                source_details
             );
         }
-        other => panic!(
-            "Expected PurgeError::Io when called inside Tokio runtime, got {:?}",
-            other
-        ),
+        other => panic!("Expected PurgeError::Write when called inside Tokio runtime, got {:?}", other),
     }
 
     storage.close().await.unwrap();

@@ -151,10 +151,7 @@ async fn test_purge_keys_insufficient_space_leaves_data_untouched() -> contextra
         .purge_keys(scope, 100, Some(&probe))
         .await
         .unwrap_err();
-    assert!(matches!(
-        err,
-        contextra_ports::erasure::PurgeError::InsufficientDiskSpace { .. }
-    ));
+    assert!(matches!(err, contextra_ports::erasure::PurgeError::Blocked(contextra_ports::erasure::PurgeBlocked::InsufficientDiskSpace { .. })));
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));
@@ -186,10 +183,7 @@ async fn test_purge_keys_active_snapshot_leaves_data_untouched() -> contextra_co
         .purge_keys(scope, 100, Some(&probe))
         .await
         .unwrap_err();
-    assert!(matches!(
-        err,
-        contextra_ports::erasure::PurgeError::SnapshotPinned { .. }
-    ));
+    assert!(matches!(err, contextra_ports::erasure::PurgeError::Blocked(contextra_ports::erasure::PurgeBlocked::ActiveSnapshot { .. })));
 
     let val = storage.get_at_seq(b"key1", 100).await?;
     assert_eq!(val, Some(Bytes::from_static(b"val1")));

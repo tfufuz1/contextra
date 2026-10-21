@@ -16,7 +16,7 @@ const INTENT_MAGIC: &[u8; 4] = b"ORXI";
 const INTENT_VERSION: u8 = 1;
 
 /// Durable intent representing an active or pending purge operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrxPurgeIntent {
     /// Unique identifier for this purge operation.
     pub purge_id: [u8; 16],
@@ -210,8 +210,8 @@ impl OrxPurgeIntent {
         );
         bytes = &bytes[8..];
 
-        let phase = PurgePhase::from_u8(bytes[0])
-            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "invalid PurgePhase code"))?;
+        let phase = PurgePhase::try_from(bytes[0])
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
         bytes = &bytes[1..];
 
         let attempt = u32::from_le_bytes(

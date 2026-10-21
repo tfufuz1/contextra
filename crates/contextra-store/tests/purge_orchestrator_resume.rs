@@ -14,7 +14,7 @@ async fn test_resume_pending_from_p1_intent_phase() -> std::io::Result<()> {
     let intent_path = dir.path().join("purge.intent");
 
     let scope = PurgeScope::Keys(vec![b"k1".to_vec()]);
-    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 50, None, None, PurgePhase::P1Intent);
+    let intent = OrxPurgeIntent::new([1u8; 16], &scope, 50, None, None, PurgePhase::Admitted);
     intent.write_to_file(&intent_path)?;
 
     let wal_retired = Arc::new(AtomicBool::new(false));
@@ -49,7 +49,7 @@ async fn test_resume_pending_from_p5_dispose_phase() -> std::io::Result<()> {
     let intent_path = dir.path().join("purge.intent");
 
     let scope = PurgeScope::Keys(vec![b"k1".to_vec()]);
-    let intent = OrxPurgeIntent::new([2u8; 16], &scope, 50, None, None, PurgePhase::P5Dispose);
+    let intent = OrxPurgeIntent::new([2u8; 16], &scope, 50, None, None, PurgePhase::Disposing);
     intent.write_to_file(&intent_path)?;
 
     let witness_called = Arc::new(AtomicBool::new(false));
@@ -78,7 +78,7 @@ async fn test_double_resume_is_idempotent() -> std::io::Result<()> {
     let intent_path = dir.path().join("purge.intent");
 
     let scope = PurgeScope::Keys(vec![b"k1".to_vec()]);
-    let intent = OrxPurgeIntent::new([3u8; 16], &scope, 50, None, None, PurgePhase::P1Intent);
+    let intent = OrxPurgeIntent::new([3u8; 16], &scope, 50, None, None, PurgePhase::Admitted);
     intent.write_to_file(&intent_path)?;
 
     let hooks = OrxHooks::default();
