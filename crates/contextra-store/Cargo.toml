@@ -63,6 +63,8 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
+trybuild = "1.0"
+contextra-checkpoint = { path = "../contextra-checkpoint" }
 contextra-store = { path = ".", features = ["test-utils"] }
 contextra-ports = { workspace = true, features = ["test-utils", "backend-impl"] }
 contextra-core = { workspace = true }
