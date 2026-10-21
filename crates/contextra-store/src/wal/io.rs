@@ -16,7 +16,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use super::legacy_integrity_key;
 use super::{
     PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
-    WAL_V3_HEADER,
+    WAL_V3_HEADER, WAL_V4_HEADER,
 };
 
 
@@ -73,7 +73,7 @@ impl<'a> WalVerifierCtx<'a> {
         };
 
         let verify_res = match version {
-            WalVersion::V3 => self.verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
+            WalVersion::V4 | WalVersion::V3 => self.verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
             WalVersion::V2 => self.verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
             WalVersion::V1 => {
                 self.verifier.skip_hmac_verify_legacy(&snapshot);
@@ -87,7 +87,7 @@ impl<'a> WalVerifierCtx<'a> {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                 legacy_verifier.set_last_hmac(self.verifier.last_hmac_snapshot());
                 let legacy_res = match version {
-                    WalVersion::V3 => legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
+                    WalVersion::V4 | WalVersion::V3 => legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
                     WalVersion::V2 => legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
                     WalVersion::V1 => {
                         legacy_verifier.skip_hmac_verify_legacy(&snapshot);
@@ -125,7 +125,9 @@ async fn detect_wal_header(
     if file_size >= 4 {
         let mut header_buf = [0u8; 4];
         if reader.read_exact(&mut header_buf).await.is_ok() {
-            if header_buf == WAL_V3_HEADER {
+            if header_buf == WAL_V4_HEADER {
+                return Ok((WalVersion::V4, 4));
+            } else if header_buf == WAL_V3_HEADER {
                 return Ok((WalVersion::V3, 4));
             } else if header_buf == WAL_V2_HEADER {
                 return Ok((WalVersion::V2, 4));

@@ -182,41 +182,45 @@ impl Wal {
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
-        })?;
-        let std_file = tokio_file.into_std().await;
-        let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-            let metadata = std_file.metadata().map_err(|e| {
-                ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}"))
+        #[cfg(not(loom))]
+        {
+            let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to open WAL for mmap: {e}"))
             })?;
-            let file_size = metadata.len();
+            let std_file = tokio_file.into_std().await;
+            let mmap_res = (|| -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+                let metadata = std_file.metadata().map_err(|e| {
+                    ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}"))
+                })?;
+                let file_size = metadata.len();
 
-            if file_size == 0 {
-                return Ok((Vec::new(), WalVersion::V1));
-            }
-
-            let mmap = contextra_sys::mmap_readonly(&std_file)
-                .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
-
-            self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
-        })();
-
-        match mmap_res {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                tracing::warn!(
-                    path = %self.path.display(),
-                    error = %e,
-                    "WAL mmap replay failed, falling back to stream reader"
-                );
-                let (entries, version) = self.replay_stream_with_version().await?;
-                for (seq, _, _) in &entries {
-                    sink.on_entry_replayed(*seq, None);
+                if file_size == 0 {
+                    return Ok((Vec::new(), WalVersion::V1));
                 }
-                Ok((entries, version))
+
+                let mmap = contextra_sys::mmap_readonly(&std_file)
+                    .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
+
+                self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
+            })();
+
+            match mmap_res {
+                Ok(res) => return Ok(res),
+                Err(e) => {
+                    tracing::warn!(
+                        path = %self.path.display(),
+                        error = %e,
+                        "WAL mmap replay failed, falling back to stream reader"
+                    );
+                }
             }
         }
+
+        let (entries, version) = self.replay_stream_with_version().await?;
+        for (seq, _, _) in &entries {
+            sink.on_entry_replayed(*seq, None);
+        }
+        Ok((entries, version))
     }
 
     #[allow(dead_code, clippy::type_complexity)]
@@ -262,47 +266,51 @@ impl Wal {
         }
 
         #[allow(clippy::type_complexity)]
-        let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
-        })?;
-        let std_file = tokio_file.into_std().await;
-        let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
-            let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
-                ContextraError::Storage(format!(
-                    "Failed to mmap WAL file {}: {e}",
-                    self.path.display()
-                ))
+        #[cfg(not(loom))]
+        {
+            let tokio_file = super::fs::File::open(&self.path).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
             })?;
+            let std_file = tokio_file.into_std().await;
+            let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
+                let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Failed to mmap WAL file {}: {e}",
+                        self.path.display()
+                    ))
+                })?;
 
-            let slice_len = (file_size as usize).min(mmap.len());
-            let slice = mmap
-                .get(..slice_len)
-                .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
-            let mut buffered_entries = Vec::new();
-            let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
-                buffered_entries.push((seq, entry, pos));
-                true
-            })?;
-            Ok((version, buffered_entries))
-        })();
+                let slice_len = (file_size as usize).min(mmap.len());
+                let slice = mmap
+                    .get(..slice_len)
+                    .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
+                let mut buffered_entries = Vec::new();
+                let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
+                    buffered_entries.push((seq, entry, pos));
+                    true
+                })?;
+                Ok((version, buffered_entries))
+            })();
 
-        match mmap_res {
-            Ok((version, buffered_entries)) => {
-                for (seq, entry, pos) in buffered_entries {
-                    if !callback(seq, entry, pos) {
-                        break;
+            match mmap_res {
+                Ok((version, buffered_entries)) => {
+                    for (seq, entry, pos) in buffered_entries {
+                        if !callback(seq, entry, pos) {
+                            break;
+                        }
                     }
+                    return Ok(version);
                 }
-                Ok(version)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    error = ?e,
-                    "scan_entries_mmap: HMAC/integrity verify error during mmap scan, falling back to stream"
-                );
-                self.scan_entries_with_callback(file_size, callback).await
+                Err(e) => {
+                    tracing::warn!(
+                        error = ?e,
+                        "scan_entries_mmap: HMAC/integrity verify error during mmap scan, falling back to stream"
+                    );
+                }
             }
         }
+
+        self.scan_entries_with_callback(file_size, callback).await
     }
 
     #[cfg(feature = "wal-integrity")]
@@ -316,7 +324,7 @@ impl Wal {
         using_legacy_key: &mut bool,
     ) -> Result<()> {
         let verify_res = match version {
-            WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
+            WalVersion::V4 | WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
             WalVersion::V2 => verifier.verify_and_update_v2(snapshot, chunk_start_pos),
             WalVersion::V1 => {
                 verifier.skip_hmac_verify_legacy(snapshot);
@@ -334,7 +342,7 @@ impl Wal {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                 legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
                 let legacy_res = match version {
-                    WalVersion::V3 => {
+                    WalVersion::V4 | WalVersion::V3 => {
                         legacy_verifier.verify_and_update_v3(snapshot, chunk_start_pos)
                     }
                     WalVersion::V2 => {

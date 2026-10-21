@@ -25,21 +25,10 @@ pub fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
     });
 }
 
-#[cfg(not(loom))]
-pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
-    #[cfg(any(test, feature = "test-utils"))]
-    {
-        let mut hook_res = None;
-        DIRLOCK_SYNC_HOOK.with(|h| {
-            if let Some(hook) = *h.borrow() {
-                hook_res = Some(hook(dir));
-            }
-        });
-        if let Some(res) = hook_res {
-            return res;
-        }
-    }
-    contextra_durable_fs::sync_dir(dir)
+/// Returns the current count of failed WAL cleanup attempts.
+#[allow(dead_code)]
+pub fn wal_cleanup_failures_total() -> u64 {
+    WAL_CLEANUP_FAILURES_TOTAL.load(Ordering::Relaxed)
 }
 
 /// Handle for exclusive database directory locking.

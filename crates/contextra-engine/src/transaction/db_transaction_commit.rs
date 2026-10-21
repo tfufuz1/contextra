@@ -17,6 +17,13 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     // wahr und `validate_ssi_gate` winkt Transaktionen trotz Write-Skew durch.
     // Leseoperationen müssen das `ReadSet` befüllen und hier gegen den `SequenceLogSsiValidator` geprüft werden.
     pub(super) fn validate_ssi_gate(&self) -> Result<()> {
+        if self.has_untracked_reads() {
+            return Err(ContextraError::CapabilityUnsupported {
+                capability: "ssi_validation".into(),
+                reason: "Transaction contains untracked read operations which cannot be validated under Serializable Snapshot Isolation".into(),
+            });
+        }
+
         let read_set = {
             let guard = self
                 .read_set
@@ -229,7 +236,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        // Phase (b): Commit LSM storage first so document payload and metadata are durable before index staging/commit
+        // Phase (b): Commit LSM storage (SINGLE POINT OF COMMIT - INV-IDX-1)
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
             let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
@@ -238,13 +245,11 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        ledger.push(CompensateLsmAction::new(
-            self.collection.clone(),
-            intent_key.clone(),
-            Arc::clone(&doc_ids),
-            f_keys,
-            r_keys,
-        ));
+        // --- AT THIS POINT, THE STORE TRANSACTION IS COMMITTED (INV-IDX-1) ---
+        self.committed.store(true, Ordering::Release);
+
+        // Suppress unused variable warnings for forward/reverse keys when store commit succeeds
+        let _ = (f_keys, r_keys);
 
         // Persist stages_completed = 1 marker in pending intent to record LSM storage commit completion
         let stage1_intent = CommitIntent::Pending {
@@ -266,7 +271,11 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         }
 
-        // Phase (c): Execute staged index steps and commit vector and text indices
+        // Phase (c): Follow-up index operations (Text, Vector, Graph indices)
+        // Note: Store transaction is ALREADY committed (INV-IDX-1). Follow-up failures mark index divergence,
+        // but DO NOT compensate or roll back LSM storage.
+        let mut index_diverged = false;
+
         if let Err(e) = self.commit_text_staged().await {
             let _ = ledger.execute_rollback().await;
             return Err(e);
@@ -279,11 +288,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 index_err
             )));
         }
-        ledger.push(CompensateHnswAction::new(
-            self.collection.clone(),
-            self.tenant_id,
-            Arc::clone(&doc_ids),
-        ));
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
             let _ = ledger.execute_rollback().await;
@@ -292,49 +296,46 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 text_err
             )));
         }
-        ledger.push(CompensateTextAction::new(
-            self.collection.clone(),
-            Arc::clone(&doc_ids),
-        ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
-        let cleanup_tx = self.collection.allocate_tx()?;
-        let commit_bytes = match serde_json::to_vec(&CommitIntent::Committed) {
-            Ok(b) => b,
-            Err(e) => {
-                tracing::warn!("Failed to serialize CommitIntent::Committed: {}", e);
-                b"{}".to_vec()
-            }
-        };
+        if let Ok(cleanup_tx) = self.collection.allocate_tx() {
+            let commit_bytes = match serde_json::to_vec(&CommitIntent::Committed) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!("Failed to serialize CommitIntent::Committed: {}", e);
+                    b"{}".to_vec()
+                }
+            };
 
-        let mut committed_marker_written = false;
-        let max_retries = 3;
-        for attempt in 1..=max_retries {
-            let put_res = self
-                .collection
-                .storage
-                .put(cleanup_tx, &intent_key, &commit_bytes)
-                .await;
-            if put_res.is_ok() {
-                if let Ok(()) = self.collection.storage.commit(cleanup_tx).await {
-                    committed_marker_written = true;
-                    break;
+            let mut committed_marker_written = false;
+            let max_retries = 3;
+            for attempt in 1..=max_retries {
+                let put_res = self
+                    .collection
+                    .storage
+                    .put(cleanup_tx, &intent_key, &commit_bytes)
+                    .await;
+                if put_res.is_ok() {
+                    if let Ok(()) = self.collection.storage.commit(cleanup_tx).await {
+                        committed_marker_written = true;
+                        break;
+                    }
+                }
+                if attempt < max_retries {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        50 * u64::try_from(attempt).unwrap_or(1),
+                    ))
+                    .await;
                 }
             }
-            if attempt < max_retries {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    50 * u64::try_from(attempt).unwrap_or(1),
-                ))
-                .await;
-            }
-        }
 
-        if !committed_marker_written {
-            tracing::error!(
-                tx_id = ?self.tx_id,
-                "[T-06] Failed to write CommitIntent::Committed after {} attempts; transaction marked as commit-uncertain for recovery inspection",
-                max_retries
-            );
+            if !committed_marker_written {
+                tracing::error!(
+                    tx_id = ?self.tx_id,
+                    "[T-06] Failed to write CommitIntent::Committed after {} attempts; transaction marked as commit-uncertain for recovery inspection",
+                    max_retries
+                );
+            }
         }
 
         // Phase (e): Finalize
