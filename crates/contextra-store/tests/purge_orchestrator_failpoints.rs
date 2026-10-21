@@ -5,7 +5,7 @@
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::{
-    resume_pending, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
+    resume_pending_for_storage, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
     CANONICAL_FAILPOINTS,
 };
 use contextra_store::lsm::LsmStorage;
@@ -21,12 +21,12 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
         };
         let storage = LsmStorage::open(config).await.expect("open storage");
 
-        let orchestrator = PurgeOrchestrator::new(&storage);
         let failpoint_set = OrxFailpointSet::new();
         failpoint_set.activate(fp_name);
 
+        let orchestrator = PurgeOrchestrator::new(&storage, dir.path()).with_failpoints(failpoint_set);
+
         let scope = PurgeScope::Keys(vec![b"k_fp".to_vec()]);
-        let orchestrator = orchestrator.with_failpoints(failpoint_set);
 
         let hooks = OrxHooks::default();
         let res = orchestrator
@@ -50,13 +50,13 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
             );
             let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
             assert!(
-                intent.phase <= PurgePhase::Release,
+                intent.phase <= PurgePhase::Released,
                 "Phase at failpoint {} must be recorded",
                 fp_name
             );
 
             // First resume execution and verify clean completion
-            let res_opt = resume_pending(dir.path(), &hooks, None)
+            let res_opt = resume_pending_for_storage(&storage, &hooks, None)
                 .await
                 .expect("Resumption after failpoint should succeed");
 
@@ -72,7 +72,7 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
             );
 
             // Second resume must be idempotent and return Ok(None)
-            let res_opt_2 = resume_pending(dir.path(), &hooks, None)
+            let res_opt_2 = resume_pending_for_storage(&storage, &hooks, None)
                 .await
                 .expect("Second resumption should succeed idempotently");
             assert!(

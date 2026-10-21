@@ -1,14 +1,15 @@
 // FILE-CONTEXT
-// STAND: 2026-10-13
-// ZWECK: Composition Root Wiring für Purge-Orchestrator (Vertrag §7).
+// STAND: 2026-10-21
+// ZWECK: Composition Root Wiring für Purge-Orchestrator.
 
+use super::backend::PurgeBackend;
 use super::dispose::{DisposePolicy, OrxDisposeReport};
 use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
-use super::resume::resume_pending_with_policy;
+use super::resume::resume_pending_for_backend;
 use crate::compaction::purge_filter::PurgeReport;
-use contextra_types::Result;
 use contextra_ports::Clock;
+use contextra_types::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -70,9 +71,13 @@ impl PurgeWiring {
         })
     }
 
-    /// Resumes any pending or interrupted purge operation present in the storage directory.
-    pub async fn resume_pending(&self) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
-        resume_pending_with_policy(
+    /// Resumes any pending or interrupted purge operation present in the storage directory for backend B.
+    pub async fn resume_pending<B: PurgeBackend>(
+        &self,
+        backend: &B,
+    ) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
+        resume_pending_for_backend(
+            backend,
             &self.storage_dir,
             &self.hooks,
             self.failpoints.as_ref(),
@@ -81,9 +86,9 @@ impl PurgeWiring {
         .await
     }
 
-    /// Constructs a `PurgeOrchestrator` bound to the storage directory and failpoint settings.
-    pub fn orchestrator_standalone(&self) -> PurgeOrchestrator<'static> {
-        let mut orch = PurgeOrchestrator::new_standalone(&self.storage_dir);
+    /// Constructs a `PurgeOrchestrator` bound to backend B and failpoint settings.
+    pub fn orchestrator<'a, B: PurgeBackend>(&self, backend: &'a B) -> PurgeOrchestrator<'a, B> {
+        let mut orch = PurgeOrchestrator::new(backend, &self.storage_dir);
         if let Some(ref fp) = self.failpoints {
             orch = orch.with_failpoints(fp.clone());
         }

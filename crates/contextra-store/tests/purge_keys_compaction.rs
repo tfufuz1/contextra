@@ -72,7 +72,7 @@ async fn test_purge_keys_compaction_canary_raw_scan() {
     let probe = DummyProbe(100 * 1024 * 1024);
 
     let report = storage
-        .purge_keys(scope, 0, Some(&probe))
+        .purge_keys(scope, 100, Some(&probe))
         .await
         .expect("purge_keys failed");
 
@@ -164,7 +164,7 @@ async fn test_purge_keys_crash_safety_3_interruption_points() {
         let unmanifested_sst = tmp.path().join("sst-purge-unmanifested.sst");
         std::fs::write(&unmanifested_sst, b"unmanifested data").unwrap();
 
-        let _report = storage.purge_keys(scope, 0, Some(&probe)).await.unwrap();
+        let _report = storage.purge_keys(scope, 100, Some(&probe)).await.unwrap();
 
         drop(storage);
 

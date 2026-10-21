@@ -99,6 +99,7 @@ pub mod ops;
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::{LsmStorage, StorageHealth};
 pub use gc_floor::GcFloor;
+pub use fence::{ErasureFence, FenceError};
 pub use probe::ZeuStoreProbe;
 
 pub(super) use guard::{CommitGuard, LsmState};

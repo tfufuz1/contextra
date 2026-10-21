@@ -116,7 +116,7 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
             })
             .expect("build PurgeWiring");
 
-            let orchestrator = PurgeOrchestrator::new(&storage).with_failpoints(failpoint_set);
+            let orchestrator = PurgeOrchestrator::new(&storage, dir.path()).with_failpoints(failpoint_set);
 
             // 1. Execute purge until failpoint interrupts execution
             let res = orchestrator
@@ -157,14 +157,14 @@ async fn test_purge_crash_matrix_all_failpoints_dst() -> std::io::Result<()> {
                 };
 
                 assert!(
-                    intent.phase <= PurgePhase::Release,
-                    "SEED {}: Recorded phase at failpoint {} must be <= Release",
+                    intent.phase <= PurgePhase::Released,
+                    "SEED {}: Recorded phase at failpoint {} must be <= Released",
                     seed,
                     fp_name
                 );
 
                 // Invariant 4: No completion proof without mandatory completed phases
-                if intent.phase < PurgePhase::Finalize {
+                if intent.phase < PurgePhase::Finalizing {
                     assert!(
                         res.is_err(),
                         "SEED {}: Purge cannot issue finalized result before Finalize phase at failpoint {}",

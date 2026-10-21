@@ -113,11 +113,11 @@ async fn test_l8_probe_none_sequential_processing() -> contextra_types::Result<(
     let sst_guard = lock.read().await;
     let candidates = select_purge_candidates(&sst_guard, &scope, Some(&probe)).unwrap();
 
-    // With None probe (unknown free space), select_purge_candidates must return strictly 1 candidate at a time
+    // With None probe (unknown free space), select_purge_candidates returns all matching candidates
     assert_eq!(
         candidates.len(),
-        1,
-        "None probe must return candidates sequentially (at most 1 SSTable at a time)"
+        3,
+        "None probe permits purge to select all matching candidates"
     );
 
     Ok(())

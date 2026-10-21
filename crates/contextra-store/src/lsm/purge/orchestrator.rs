@@ -1,23 +1,19 @@
 // FILE-CONTEXT
-// STAND: 2026-10-13
-// ZWECK: Orchestriert den Purge-Ablauf über Phasen P1..P8 (Intent, Flush, Compaction, Dispose, Witness, Release).
-// INVARIANTEN:
-// - P1..P8 State Machine: Jede Phase wird vor Ausführung atomar auf Disk in `purge.intent` mittels record_phase() persistiert.
-// - Fail-closed Error Recovery: Jeder Fehler (IO, Failpoint, Callback, Refusal) gibt das Erasure Fence frei und belässt `purge.intent` im zuletzt erfolgreich aufgezeichneten Zustand für Wiederaufnahme (`resume_pending`).
-// - Zero Dropped Results: Kein `let _ =` auf IO/Sicherheit; Ergebnisse werden mit `?` propagiert.
+// STAND: 2026-10-21
+// ZWECK: Orchestriert den Purge-Ablauf über Phasen 1..9 (Admitted..Released) über PurgeBackend.
 
+use super::backend::PurgeBackend;
 use super::dispose::dispose_obsolete_files;
 use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::intent::OrxPurgeIntent;
 use super::plan::PurgePhase;
-use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeReport, PurgeScope};
-use crate::lsm::engine::LsmStorage;
+use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeReport, PurgeScope};
 use contextra_durable_fs::durable_remove;
+use contextra_ports::erasure::{PurgeError, PurgeId};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 /// Detailed outcome of a purge pipeline execution run.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum PurgeOutcome {
     /// Pipeline completed all phases successfully.
     Completed(PurgeReport),
@@ -26,10 +22,10 @@ pub enum PurgeOutcome {
         report: PurgeReport,
         refusals: usize,
     },
-    /// Pipeline failed at `phase` with error description.
+    /// Pipeline failed at `phase` with error.
     Failed {
         phase: PurgePhase,
-        error_msg: String,
+        error: PurgeError,
     },
 }
 
@@ -45,24 +41,8 @@ impl PurgeOutcome {
     /// Converts the outcome into a Result<PurgeReport, OrxPurgeError>.
     pub fn into_result(self) -> Result<PurgeReport, OrxPurgeError> {
         match self {
-            PurgeOutcome::Completed(report) => Ok(report),
-            PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
-            PurgeOutcome::Failed { phase, error_msg } => {
-                if error_msg.contains("Failpoint triggered:") {
-                    let fp_name = error_msg
-                        .split("Failpoint triggered:")
-                        .nth(1)
-                        .unwrap_or("")
-                        .trim()
-                        .to_string();
-                    Err(OrxPurgeError::FailpointTriggered(fp_name))
-                } else {
-                    Err(OrxPurgeError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Purge failed at phase {:?}: {}", phase, error_msg),
-                    )))
-                }
-            }
+            PurgeOutcome::Completed(report) | PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
+            PurgeOutcome::Failed { error, .. } => Err(OrxPurgeError::from(error)),
         }
     }
 }
@@ -104,41 +84,21 @@ impl std::fmt::Debug for OrxHooks {
     }
 }
 
-/// Orchestrates the execution of a multi-phase purge pipeline.
-pub struct PurgeOrchestrator<'a> {
-    storage: Option<&'a LsmStorage>,
+/// Orchestrates the execution of a multi-phase purge pipeline bound to `B: PurgeBackend`.
+pub struct PurgeOrchestrator<'a, B: PurgeBackend> {
+    backend: &'a B,
     storage_dir: PathBuf,
     intent_file: PathBuf,
     failpoints: Option<OrxFailpointSet>,
 }
 
-impl<'a> PurgeOrchestrator<'a> {
-    /// Creates a new `PurgeOrchestrator` instance for `storage`.
-    pub fn new(storage: &'a LsmStorage) -> Self {
-        let storage_dir = storage.config.path.clone();
-        let intent_file = storage_dir.join("purge.intent");
-        Self {
-            storage: Some(storage),
-            storage_dir,
-            intent_file,
-            failpoints: None,
-        }
-    }
-
-    // TODO(WP-4 / PR-13 / N1): Befund N1 beheben (Resume ist No-op bei `storage: None`):
-    // `new_standalone` initialisiert `storage: None`. Wird dieser Orchestrator für Recovery/Resume
-    // (`resume_pending_purge` in `resume.rs`) aufgerufen, wird Phase P4 (`PurgeCompaction`)
-    // stillschweigend übersprungen, da `self.storage` `None` ist. Das Intent-File wird abgeräumt,
-    // ohne dass die Schlüssel jemals per Compaction gelöscht wurden.
-    // Implementierungsaufgabe:
-    // Standalone-Resume muss entweder einen echten `LsmStorage`-Handle erhalten oder eine deterministische
-    // Offline-Compaction durchführen, damit anstehende Purges nach Absturz vollständig ausgeführt werden.
-    /// Creates a standalone `PurgeOrchestrator` without active storage.
-    pub fn new_standalone(storage_dir: &Path) -> Self {
+impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
+    /// Creates a new `PurgeOrchestrator` instance for `backend` and `storage_dir`.
+    pub fn new(backend: &'a B, storage_dir: &Path) -> Self {
         let storage_dir = storage_dir.to_path_buf();
         let intent_file = storage_dir.join("purge.intent");
         Self {
-            storage: None,
+            backend,
             storage_dir,
             intent_file,
             failpoints: None,
@@ -163,34 +123,6 @@ impl<'a> PurgeOrchestrator<'a> {
             .map_err(OrxPurgeError::Io)
     }
 
-    /// Executes complete purge pipeline.
-    pub async fn execute_purge(
-        &self,
-        scope: PurgeScope,
-        as_of_tx: u64,
-        space_probe: Option<&dyn FreeSpaceProbe>,
-        wal_callback: Option<Box<dyn FnOnce() -> Result<(), PurgeBlocked> + Send>>,
-    ) -> std::result::Result<PurgeReport, PurgeBlocked> {
-        let mut hooks = OrxHooks::default();
-        if let Some(cb) = wal_callback {
-            let cb_cell = Arc::new(Mutex::new(Some(cb)));
-            hooks.wal_retire = Some(Box::new(move || {
-                if let Ok(mut lock) = cb_cell.lock() {
-                    if let Some(f) = lock.take() {
-                        return f().map_err(|e| {
-                            std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", e))
-                        });
-                    }
-                }
-                Ok(())
-            }));
-        }
-
-        self.execute_purge_internal(scope, as_of_tx, space_probe, &hooks, false)
-            .await
-            .map_err(Into::into)
-    }
-
     /// Executes complete purge pipeline and returns `PurgeOutcome`.
     pub async fn execute_purge_outcome(
         &self,
@@ -202,8 +134,8 @@ impl<'a> PurgeOrchestrator<'a> {
     ) -> PurgeOutcome {
         if let Err(e) = self.check_failpoint("p0_init") {
             return PurgeOutcome::Failed {
-                phase: PurgePhase::Init,
-                error_msg: e.to_string(),
+                phase: PurgePhase::Admitted,
+                error: e.into(),
             };
         }
 
@@ -211,23 +143,23 @@ impl<'a> PurgeOrchestrator<'a> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&scope_hash);
         hasher.update(&as_of_tx.to_le_bytes());
-        let mut purge_id = [0u8; 16];
-        purge_id.copy_from_slice(&hasher.finalize().as_bytes()[..16]);
+        let mut purge_id_bytes = [0u8; 16];
+        purge_id_bytes.copy_from_slice(&hasher.finalize().as_bytes()[..16]);
 
         let mut intent =
-            OrxPurgeIntent::new(purge_id, &scope, as_of_tx, None, None, PurgePhase::Admitted);
+            OrxPurgeIntent::new(purge_id_bytes, &scope, as_of_tx, None, None, PurgePhase::Admitted);
 
         if let Err(e) = self.record_phase(&mut intent, PurgePhase::Admitted) {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error_msg: e.to_string(),
+                error: e.into(),
             };
         }
 
         if let Err(e) = self.check_failpoint("after_intent") {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error_msg: e.to_string(),
+                error: e.into(),
             };
         }
 
@@ -258,81 +190,68 @@ impl<'a> PurgeOrchestrator<'a> {
         secure_delete: bool,
         space_probe: Option<&dyn FreeSpaceProbe>,
     ) -> PurgeOutcome {
-        let fence_prefixes = match &scope {
-            PurgeScope::Prefixes(prefixes) => prefixes.clone(),
-            PurgeScope::Keys(keys) => keys.clone(),
-        };
-
         let mut fence_guard = None;
         let mut fence_acquired =
-            intent.phase >= PurgePhase::FenceAcquired && intent.phase < PurgePhase::Release;
+            intent.phase >= PurgePhase::Fenced && intent.phase < PurgePhase::Released;
 
         let run_pipeline = async {
-            // P2: Acquire Fence
-            if intent.phase <= PurgePhase::FenceAcquired {
-                // Bei Standalone-Recovery ist `self.storage` ggf. `None`. Falls kein Hook vorhanden ist,
-                // kann hier kein Erasure-Fence im laufenden Engine-Kontext gesetzt werden.
-                if let Some(storage) = self.storage {
-                    if fence_prefixes.is_empty() {
-                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
-                    }
-                    let guard = storage
-                        .erasure_fence
-                        .acquire_scope_fence_for(fence_prefixes.clone())
-                        .map_err(|_| OrxPurgeError::Blocked(PurgeBlocked::CompactionBusy))?;
-                    fence_guard = Some(guard);
-                }
+            // Phase 2: Fenced
+            if intent.phase <= PurgePhase::Fenced {
+                let guard = self
+                    .backend
+                    .acquire_fence(&scope, PurgeId::new(intent.purge_id))
+                    .map_err(|_e| OrxPurgeError::Blocked(crate::compaction::purge_filter::PurgeBlocked::CompactionBusy))?;
+                fence_guard = Some(guard);
+
                 if let Some(ref f) = hooks.fence_acquire {
                     f().map_err(OrxPurgeError::Io)?;
                 }
                 fence_acquired = true;
-                self.record_phase(&mut intent, PurgePhase::FenceAcquired)?;
+                self.record_phase(&mut intent, PurgePhase::Fenced)?;
                 self.check_failpoint("after_fence")?;
             }
 
-            // P3: Flush Memtable
-            if intent.phase <= PurgePhase::Flush {
+            // Phase 3: Flushed
+            if intent.phase <= PurgePhase::Flushed {
+                self.backend.flush_memtable().await.map_err(OrxPurgeError::from)?;
                 if let Some(ref f) = hooks.flush_memtable {
                     f().map_err(OrxPurgeError::Io)?;
                 }
-                self.record_phase(&mut intent, PurgePhase::Flush)?;
+                self.record_phase(&mut intent, PurgePhase::Flushed)?;
                 self.check_failpoint("after_flush")?;
             }
 
-            // P4: Execute Purge Compaction
+            // Phase 4: Rewriting
             let mut report = PurgeReport {
                 records_purged: 0,
                 bytes_reclaimed: 0,
                 sstables_replaced: 0,
                 obsolete_files: Vec::new(),
+                residual_risks: Vec::new(),
             };
 
-            if intent.phase <= PurgePhase::PurgeCompaction {
-                self.record_phase(&mut intent, PurgePhase::PurgeCompaction)?;
+            if intent.phase <= PurgePhase::Rewriting {
+                self.record_phase(&mut intent, PurgePhase::Rewriting)?;
                 self.check_failpoint("mid_compaction_output")?;
 
-                // TODO(WP-4 / PR-13 / N1): Bei `self.storage == None` wird `purge_keys` komplett übersprungen!
-                // Für Standalone-Recovery muss hier entweder `storage` bereitgestellt oder ein Fehler
-                // zurückgegeben werden, damit kein Intent fälschlicherweise als erfolgreich gelöscht markiert wird.
-                if let Some(storage) = self.storage {
-                    match storage
-                        .purge_keys(scope, intent.as_of_tx, space_probe)
-                        .await
-                    {
-                        Ok(rep) => report = rep,
-                        Err(err) => {
-                            return Err(OrxPurgeError::from(err));
-                        }
+                match self
+                    .backend
+                    .purge_keys(scope.clone(), intent.as_of_tx, space_probe)
+                    .await
+                {
+                    Ok(rep) => report = rep,
+                    Err(err) => {
+                        return Err(OrxPurgeError::from(err));
                     }
                 }
 
                 self.check_failpoint("after_compaction_before_manifest")?;
             }
 
-            // P5: Dispose Obsolete Files
+            // Phase 5: Disposing
             let mut refusals = 0;
-            if intent.phase <= PurgePhase::Dispose {
-                self.record_phase(&mut intent, PurgePhase::Dispose)?;
+            if intent.phase <= PurgePhase::Disposing {
+                self.record_phase(&mut intent, PurgePhase::Disposing)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
                 let disp_rep =
@@ -343,36 +262,44 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.check_failpoint("after_unlink")?;
             }
 
-            // P6: WAL Retire
-            if intent.phase <= PurgePhase::WalRetire {
-                self.record_phase(&mut intent, PurgePhase::WalRetire)?;
+            // Phase 6: WalRetiring
+            if intent.phase <= PurgePhase::WalRetiring {
+                self.record_phase(&mut intent, PurgePhase::WalRetiring)?;
+                self.backend.retire_wal().await.map_err(OrxPurgeError::from)?;
                 if let Some(ref cb) = hooks.wal_retire {
                     cb().map_err(OrxPurgeError::Io)?;
                 }
                 self.check_failpoint("after_wal_callback")?;
             }
 
-            // P7: Witness & Finalize
-            if intent.phase <= PurgePhase::Finalize {
-                self.record_phase(&mut intent, PurgePhase::Witness)?;
+            // Phase 7 & 8: Witnessing & Finalizing
+            if intent.phase <= PurgePhase::Finalizing {
+                self.record_phase(&mut intent, PurgePhase::Witnessing)?;
                 if let Some(ref cb) = hooks.witness {
                     cb().map_err(OrxPurgeError::Io)?;
                 }
                 self.check_failpoint("after_witness")?;
 
-                self.record_phase(&mut intent, PurgePhase::Finalize)?;
+                self.record_phase(&mut intent, PurgePhase::Finalizing)?;
                 self.check_failpoint("after_finalize")?;
             }
 
-            // P8: Release Erasure Fence & Cleanup
-            if intent.phase <= PurgePhase::Release {
+            // Verification scan before Phase 9 Released
+            if self.backend.scan_residue(&scope).await.map_err(OrxPurgeError::from)? {
+                return Err(OrxPurgeError::from(PurgeError::CorruptedIntent(
+                    "Residue detected during verification scan before release".into(),
+                )));
+            }
+
+            // Phase 9: Released
+            if intent.phase <= PurgePhase::Released {
                 fence_guard.take();
                 if let Some(ref f) = hooks.fence_release {
                     f().map_err(OrxPurgeError::Io)?;
                 }
                 fence_acquired = false;
 
-                self.record_phase(&mut intent, PurgePhase::Release)?;
+                self.record_phase(&mut intent, PurgePhase::Released)?;
                 self.check_failpoint("after_release")?;
 
                 if self.intent_file.exists() {
@@ -406,7 +333,7 @@ impl<'a> PurgeOrchestrator<'a> {
                 }
                 PurgeOutcome::Failed {
                     phase: intent.phase,
-                    error_msg: err.to_string(),
+                    error: err.into(),
                 }
             }
         }

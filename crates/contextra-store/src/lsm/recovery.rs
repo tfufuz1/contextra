@@ -480,7 +480,8 @@ impl LsmStorage {
             let path = entry.path();
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if file_name.ends_with(".tmp")
-                || path.extension().is_some_and(|ext| ext == "tmp")
+                || file_name.ends_with(".purge_tmp")
+                || path.extension().is_some_and(|ext| ext.to_string_lossy().contains("tmp"))
                 || file_name.starts_with("SALT.tmp.")
                 || file_name.starts_with("MANIFEST.new.")
             {
@@ -561,17 +562,6 @@ impl LsmStorage {
         }
 
         // --- Recovery Bausteine Wiring ---
-        // 1. Resumption von unterbrochenen Purge-Operationen (Verdrahtung Punkt 2 & 3)
-        let purge_wiring = crate::lsm::purge::PurgeWiring::build_default(&config.path)?;
-        if let Err(e) = purge_wiring.resume_pending().await {
-            tracing::error!(
-                error = %e,
-                path = ?config.path,
-                "Interrupted purge resumption failed during LsmStorage recovery"
-            );
-            return Err(ContextraError::Storage(format!("Purge resumption failed: {e}")));
-        }
-
         // 2. Witness Scan über SSTable Dateiklassen (Verdrahtung Punkt 4)
         let sst_read = sstables.read().await;
         let live_sst_paths: Vec<_> = sst_read.iter().map(|s| s.file_path().to_path_buf()).collect();
@@ -735,8 +725,8 @@ impl LsmStorage {
             pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),
             cancel_token,
             task_tracker,
-            flush_counter: AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0)),
-            segment_counter: AtomicU64::new(0),
+            flush_counter: Arc::new(AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0))),
+            segment_counter: Arc::new(AtomicU64::new(0)),
             budget_tracking_drift_bytes: std::sync::atomic::AtomicU64::new(0),
             pending_commit_queue: tokio::sync::Mutex::new(None),
             wal_queue_depth,
@@ -749,6 +739,7 @@ impl LsmStorage {
             ),
             metrics_sink: metrics_sink_container,
             erasure_fence: Arc::new(super::fence::ErasureFence::new()),
+            purge_slot: Arc::new(tokio::sync::Mutex::new(())),
             erasure_ledger_handle,
             read_only,
             ledger_status,
@@ -860,6 +851,17 @@ impl LsmStorage {
                 "Successfully completed pending rollback recovery for TxId({})",
                 target_tx
             );
+        }
+
+        // Resume any interrupted purge operation found in data directory
+        let hooks = crate::lsm::purge::OrxHooks::default();
+        if let Err(e) = crate::lsm::purge::resume_pending_for_storage(&storage, &hooks, None).await {
+            tracing::error!(
+                error = %e,
+                path = ?storage.config.path,
+                "Startup purge resumption failed closed"
+            );
+            return Err(ContextraError::Storage(format!("Startup purge recovery failed: {e}")));
         }
 
         Ok(storage)

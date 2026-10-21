@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-11
+// STAND: 2026-10-21
 // ZWECK: Traits und Typen für Purge-Compaction Record Filter und Disk Space Probes.
 
 use serde::{Deserialize, Serialize};
@@ -50,6 +50,61 @@ impl PurgeScope {
             PurgeScope::Prefixes(prefixes) => {
                 prefixes.iter().any(|p| key.starts_with(p.as_slice()))
             }
+        }
+    }
+
+    /// Serializes scope into canonical TLV bytes.
+    pub fn to_canonical_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        match self {
+            PurgeScope::Keys(keys) => {
+                buf.push(0u8);
+                buf.extend_from_slice(&(keys.len() as u64).to_le_bytes());
+                for k in keys {
+                    buf.extend_from_slice(&(k.len() as u64).to_le_bytes());
+                    buf.extend_from_slice(k);
+                }
+            }
+            PurgeScope::Prefixes(prefixes) => {
+                buf.push(1u8);
+                buf.extend_from_slice(&(prefixes.len() as u64).to_le_bytes());
+                for p in prefixes {
+                    buf.extend_from_slice(&(p.len() as u64).to_le_bytes());
+                    buf.extend_from_slice(p);
+                }
+            }
+        }
+        buf
+    }
+
+    /// Deserializes scope from canonical TLV bytes.
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() < 9 {
+            return Err("scope bytes too short");
+        }
+        let kind = bytes[0];
+        let count = u64::from_le_bytes(bytes[1..9].try_into().map_err(|_| "invalid count")?) as usize;
+        let mut offset = 9;
+        let mut items = Vec::with_capacity(count);
+        for _ in 0..count {
+            if offset + 8 > bytes.len() {
+                return Err("truncated item len");
+            }
+            let len = u64::from_le_bytes(bytes[offset..offset + 8].try_into().map_err(|_| "invalid item len")?) as usize;
+            offset += 8;
+            if offset + len > bytes.len() {
+                return Err("truncated item bytes");
+            }
+            items.push(bytes[offset..offset + len].to_vec());
+            offset += len;
+        }
+        if offset != bytes.len() {
+            return Err("trailing bytes in scope encoding");
+        }
+        match kind {
+            0 => Ok(PurgeScope::Keys(items)),
+            1 => Ok(PurgeScope::Prefixes(items)),
+            _ => Err("invalid scope kind"),
         }
     }
 }
@@ -217,6 +272,17 @@ impl From<PurgeError> for PurgeBlocked {
     }
 }
 
+/// Residual risk factors associated with a physical purge operation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ResidualRisk {
+    SsdWearLeveling,
+    FilesystemJournal,
+    CopyOnWrite,
+    Backup(String),
+    SwapOrPageCache,
+    UnscrubbedRemoval(PathBuf),
+}
+
 /// Report summarizing results of a successful purge compaction.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PurgeReport {
@@ -228,4 +294,7 @@ pub struct PurgeReport {
     pub sstables_replaced: usize,
     /// List of obsolete file paths replaced or made obsolete during purge.
     pub obsolete_files: Vec<PathBuf>,
+    /// Residual risks identified during purge operation.
+    #[serde(default)]
+    pub residual_risks: Vec<ResidualRisk>,
 }

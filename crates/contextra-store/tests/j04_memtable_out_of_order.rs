@@ -3,7 +3,8 @@
 // ORAKEL: Invariant Zero-Panic and Snapshot Isolation — MemTable::put preserves sorted version order and correct get_at_seq visibility under all insertion permutations and concurrent access.
 
 use bytes::Bytes;
-use contextra_ports::SeededRng;
+use contextra_ports::Rng;
+use contextra_testkit::TestkitSeededRng as SeededRng;
 use contextra_store::memtable::{is_tombstone, MemTable};
 use contextra_types::{TxId, TOMBSTONE_BIT};
 use std::collections::BTreeMap;
@@ -203,7 +204,7 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
         let mt_clone = Arc::clone(&mt);
         let barrier_clone = Arc::clone(&barrier);
         handles.push(thread::spawn(move || {
-            let mut rng = SeededRng::new(SEED + thread_id as u64);
+            let rng = SeededRng::new(SEED + thread_id as u64);
             barrier_clone.wait();
 
             for i in 0..ITERATIONS_PER_WRITER {
@@ -228,7 +229,7 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
         let mt_clone = Arc::clone(&mt);
         let barrier_clone = Arc::clone(&barrier);
         handles.push(thread::spawn(move || {
-            let mut rng = SeededRng::new(SEED + 100 + reader_id as u64);
+            let rng = SeededRng::new(SEED + 100 + reader_id as u64);
             barrier_clone.wait();
 
             for _ in 0..ITERATIONS_PER_WRITER {

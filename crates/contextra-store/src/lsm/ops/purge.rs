@@ -22,6 +22,11 @@ impl LsmStorage {
         as_of_tx: u64,
         space_probe: Option<&dyn FreeSpaceProbe>,
     ) -> std::result::Result<PurgeReport, PurgeError> {
+        let _single_flight_guard = match self.purge_slot.clone().try_lock_owned() {
+            Ok(guard) => guard,
+            Err(_) => return Err(PurgeError::CompactionBusy),
+        };
+
         // 1. Active snapshot pin check
         let min_active_seq = self.snapshot_registry.min_active_seqno();
         if min_active_seq <= as_of_tx {
@@ -107,6 +112,7 @@ impl LsmStorage {
                 bytes_reclaimed: 0,
                 sstables_replaced: 0,
                 obsolete_files: Vec::new(),
+                residual_risks: Vec::new(),
             });
         }
 
@@ -308,6 +314,7 @@ impl LsmStorage {
             bytes_reclaimed,
             sstables_replaced,
             obsolete_files: replaced_old_paths,
+            residual_risks: Vec::new(),
         })
     }
 }
