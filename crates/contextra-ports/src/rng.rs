@@ -31,12 +31,12 @@ impl SystemRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer.
     pub fn next_u64(&self) -> u64 {
-        EntropyRng::next_u64(self)
+        SeededRng::next_u64(self)
     }
 
     /// Fills `dest` with pseudorandom bytes.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        EntropyRng::fill_bytes(self, dest);
+        SeededRng::fill_bytes(self, dest);
     }
 
     /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
