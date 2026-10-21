@@ -25,12 +25,21 @@ impl HnswIndexCore {
     }
 
     pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        let deadline = std::time::Instant::now() + timeout;
+        let start_ticks = self.cold.clock.monotonic_ticks();
+        let timeout_nanos = timeout.as_nanos() as u64;
         while self.hot.rebuilding.load(Ordering::Acquire) {
-            if std::time::Instant::now() >= deadline {
+            let elapsed_nanos = self.cold.clock.monotonic_ticks().saturating_sub(start_ticks);
+            if elapsed_nanos >= timeout_nanos {
                 return false;
             }
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            let remaining = std::time::Duration::from_nanos(timeout_nanos - elapsed_nanos);
+            let notified = self.hot.rebuild_notify.notified();
+            if !self.hot.rebuilding.load(Ordering::Acquire) {
+                return true;
+            }
+            if tokio::time::timeout(remaining, notified).await.is_err() {
+                return !self.hot.rebuilding.load(Ordering::Acquire);
+            }
         }
         true
     }
@@ -476,11 +485,12 @@ impl HnswIndexCore {
     }
 
     pub fn rebuild_sync(&self) -> Result<()> {
-        let now = std::time::Instant::now();
+        let now_ticks = self.cold.clock.monotonic_ticks();
         {
-            let last_rebuild_guard = self.cold.last_rebuild_instant.lock();
-            if let Some(last_instant) = *last_rebuild_guard {
-                let elapsed = now.duration_since(last_instant);
+            let last_rebuild_guard = self.cold.last_rebuild_tick.lock();
+            if let Some(last_tick) = *last_rebuild_guard {
+                let elapsed_nanos = now_ticks.saturating_sub(last_tick);
+                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                 let consecutive = self.cold.consecutive_rapid_rebuilds.load(Ordering::SeqCst);
 
                 let cooldown = if consecutive == 0 {
@@ -549,10 +559,13 @@ impl HnswIndexCore {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
         }
-        let _guard = RebuildGuard(&self.hot.rebuilding);
+        let _guard = RebuildGuard {
+            rebuilding: &self.hot.rebuilding,
+            notify: &self.hot.rebuild_notify,
+        };
 
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
-        let start_time = std::time::Instant::now();
+        let start_ticks = self.cold.clock.monotonic_ticks();
 
         let rebuild_res =
             self.rebuild_phase1_snapshot_and_build()
@@ -563,18 +576,19 @@ impl HnswIndexCore {
                     self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
                 });
 
-        let elapsed_secs = start_time.elapsed().as_secs_f64();
+        let elapsed_ticks = self.cold.clock.monotonic_ticks().saturating_sub(start_ticks);
+        let elapsed_secs = (elapsed_ticks as f64) / 1_000_000_000.0;
         let sink = self.cold.metrics_sink.read().clone();
 
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
-            *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
+            *self.cold.last_rebuild_tick.lock() = Some(self.cold.clock.monotonic_ticks());
             self.cold
                 .consecutive_rapid_rebuilds
                 .store(0, Ordering::SeqCst);
             sink.record_histogram("vector_rebuild_duration_seconds", elapsed_secs, &[]);
             sink.record_counter("vector_rebuild_total", 1, &[("status", "success")]);
-            tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
+            tracing::info!("HNSW rebuild completed in {:.4}s", elapsed_secs);
         } else {
             sink.record_counter("vector_rebuild_total", 1, &[("status", "error")]);
         }

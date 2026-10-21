@@ -1283,6 +1283,7 @@ name = "contextra-text"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "blake3",
  "bytes",
  "contextra-ports",
  "contextra-types",
@@ -1320,6 +1321,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
+ "blake3",
  "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",

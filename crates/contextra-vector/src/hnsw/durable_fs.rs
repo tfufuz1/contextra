@@ -23,11 +23,12 @@ pub fn atomic_replace(src: &Path, dst: &Path) -> Result<()> {
     })?;
 
     if let Some(parent) = dst.parent() {
-        if let Ok(dir) = std::fs::File::open(parent) {
-            dir.sync_all().map_err(|e| {
-                ContextraError::Storage(format!("Failed to fsync parent directory: {e}"))
-            })?;
-        }
+        let dir = std::fs::File::open(parent).map_err(|e| {
+            ContextraError::Storage(format!("Failed to open parent directory for fsync: {e}"))
+        })?;
+        dir.sync_all().map_err(|e| {
+            ContextraError::Storage(format!("Failed to fsync parent directory: {e}"))
+        })?;
     }
 
     Ok(())
@@ -41,11 +42,12 @@ pub fn durable_remove(path: &Path) -> Result<()> {
     }
 
     if let Some(parent) = path.parent() {
-        if let Ok(dir) = std::fs::File::open(parent) {
-            dir.sync_all().map_err(|e| {
-                ContextraError::Storage(format!("Failed to fsync parent directory: {e}"))
-            })?;
-        }
+        let dir = std::fs::File::open(parent).map_err(|e| {
+            ContextraError::Storage(format!("Failed to open parent directory for fsync: {e}"))
+        })?;
+        dir.sync_all().map_err(|e| {
+            ContextraError::Storage(format!("Failed to fsync parent directory: {e}"))
+        })?;
     }
 
     Ok(())
